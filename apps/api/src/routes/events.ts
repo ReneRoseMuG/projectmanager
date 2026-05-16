@@ -1,0 +1,70 @@
+import type { FastifyInstance } from "fastify";
+import type { EventInput, EventUpdate } from "@taskmanager/shared-types";
+import { createEvent, deleteEvent, getEvent, listEvents, updateEvent } from "../services/events.service.js";
+import { arrayResponseSchema, emptyResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+
+const eventBodySchema = {
+  type: "object",
+  required: ["title", "startTime", "endTime"],
+  additionalProperties: false,
+  properties: {
+    title: { type: "string", minLength: 1 },
+    description: { type: ["string", "null"] },
+    startTime: { type: "string" },
+    endTime: { type: "string" },
+    isAllDay: { type: "boolean" },
+    color: { type: ["string", "null"] },
+    projectId: { type: ["integer", "null"], minimum: 1 },
+    taskId: { type: ["integer", "null"], minimum: 1 }
+  }
+} as const;
+
+const eventPatchSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: eventBodySchema.properties
+} as const;
+
+const eventQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    from: { type: "string" },
+    to: { type: "string" }
+  }
+} as const;
+
+export async function registerEventsRoutes(app: FastifyInstance): Promise<void> {
+  app.get<{ Querystring: { from?: string; to?: string } }>(
+    "/events",
+    { schema: { querystring: eventQuerySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listEvents(app.db, request.query)
+  );
+
+  app.post<{ Body: EventInput }>(
+    "/events",
+    { schema: { body: eventBodySchema, response: { 201: objectResponseSchema } } },
+    async (request, reply) => reply.status(201).send(createEvent(app.db, request.body))
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/events/:id",
+    { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
+    async (request) => getEvent(app.db, request.params.id)
+  );
+
+  app.patch<{ Params: { id: number }; Body: EventUpdate }>(
+    "/events/:id",
+    { schema: { params: idParamSchema, body: eventPatchSchema, response: { 200: objectResponseSchema } } },
+    async (request) => updateEvent(app.db, request.params.id, request.body)
+  );
+
+  app.delete<{ Params: { id: number } }>(
+    "/events/:id",
+    { schema: { params: idParamSchema, response: { 200: emptyResponseSchema } } },
+    async (request) => {
+      deleteEvent(app.db, request.params.id);
+      return { ok: true };
+    }
+  );
+}

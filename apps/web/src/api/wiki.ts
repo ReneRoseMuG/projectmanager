@@ -1,0 +1,30 @@
+import type { WikiBreadcrumb, WikiPage, WikiPageInput, WikiPageUpdate } from "@taskmanager/shared-types";
+import { api } from "./client";
+
+export async function getRootWikiPages(): Promise<WikiPage[]> {
+  return api.get("wiki").json<WikiPage[]>();
+}
+
+export async function getWikiChildren(id: number): Promise<WikiPage[]> {
+  return api.get(`wiki/${id}/children`).json<WikiPage[]>();
+}
+
+export async function getWikiBreadcrumb(id: number): Promise<WikiBreadcrumb[]> {
+  return api.get(`wiki/${id}/breadcrumb`).json<WikiBreadcrumb[]>();
+}
+
+export async function getWikiPage(id: number): Promise<WikiPage> {
+  return api.get(`wiki/${id}`).json<WikiPage>();
+}
+
+export async function createWikiPage(input: WikiPageInput): Promise<WikiPage> {
+  return api.post("wiki", { json: input }).json<WikiPage>();
+}
+
+export async function updateWikiPage(id: number, input: WikiPageUpdate): Promise<WikiPage> {
+  return api.patch(`wiki/${id}`, { json: input }).json<WikiPage>();
+}
+
+export async function deleteWikiPage(id: number): Promise<void> {
+  await api.delete(`wiki/${id}`);
+}

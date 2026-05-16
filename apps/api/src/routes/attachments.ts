@@ -1,0 +1,86 @@
+import type { FastifyInstance, FastifyRequest } from "fastify";
+import {
+  createProjectAttachment,
+  createTaskAttachment,
+  deleteAttachment,
+  listProjectAttachments,
+  listTaskAttachments
+} from "../services/attachments.service.js";
+import { badRequest } from "../utils/errors.js";
+import { arrayResponseSchema, emptyResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+
+interface MultipartFileField {
+  filename?: string;
+  mimetype?: string;
+  toBuffer?: () => Promise<Buffer>;
+}
+
+interface UploadBody {
+  file?: MultipartFileField | MultipartFileField[];
+}
+
+const uploadBodySchema = {
+  consumes: ["multipart/form-data"],
+  body: {
+    type: "object",
+    required: ["file"],
+    additionalProperties: false,
+    properties: {
+      file: { $ref: "#multipartFile" }
+    }
+  }
+} as const;
+
+async function readUpload(request: FastifyRequest) {
+  const file = (request.body as UploadBody | undefined)?.file;
+  if (!file || Array.isArray(file) || typeof file.toBuffer !== "function") {
+    throw badRequest("A file upload is required");
+  }
+
+  return {
+    originalName: file.filename ?? "upload",
+    mimetype: file.mimetype ?? "application/octet-stream",
+    buffer: await file.toBuffer()
+  };
+}
+
+export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<void> {
+  app.get<{ Params: { id: number } }>(
+    "/projects/:id/attachments",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listProjectAttachments(app.db, request.params.id)
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/tasks/:id/attachments",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listTaskAttachments(app.db, request.params.id)
+  );
+
+  app.post<{ Params: { id: number } }>(
+    "/projects/:id/attachments",
+    { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
+    async (request, reply) => {
+      const attachment = await createProjectAttachment(app.db, request.params.id, await readUpload(request));
+      return reply.status(201).send(attachment);
+    }
+  );
+
+  app.post<{ Params: { id: number } }>(
+    "/tasks/:id/attachments",
+    { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
+    async (request, reply) => {
+      const attachment = await createTaskAttachment(app.db, request.params.id, await readUpload(request));
+      return reply.status(201).send(attachment);
+    }
+  );
+
+  app.delete<{ Params: { id: number } }>(
+    "/attachments/:id",
+    { schema: { params: idParamSchema, response: { 200: emptyResponseSchema } } },
+    async (request) => {
+      await deleteAttachment(app.db, request.params.id);
+      return { ok: true };
+    }
+  );
+}

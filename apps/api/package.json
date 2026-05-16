@@ -1,0 +1,42 @@
+{
+  "name": "@taskmanager/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate:sqlite --config=drizzle.config.ts",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/multipart": "^8.3.1",
+    "@fastify/static": "^7.0.4",
+    "@taskmanager/shared-types": "file:../../packages/shared-types",
+    "better-sqlite3": "^9.6.0",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.30.10",
+    "fastify": "^4.28.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.14.10",
+    "@types/supertest": "^6.0.3",
+    "@typescript-eslint/eslint-plugin": "^7.16.0",
+    "@typescript-eslint/parser": "^7.16.0",
+    "@vitest/coverage-v8": "^1.6.1",
+    "drizzle-kit": "^0.20.18",
+    "eslint": "^8.57.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.16.2",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.1"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "version": "5",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1778909126807,
+      "tag": "0000_special_shaman",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1778930078467,
+      "tag": "0001_wakeful_the_call",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1778933375673,
+      "tag": "0002_minor_sinister_six",
+      "breakpoints": true
+    }
+  ]
+}

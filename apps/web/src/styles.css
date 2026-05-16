@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #172026;
+  background: #f6f7f2;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.ProseMirror {
+  min-height: 260px;
+  outline: none;
+}
+
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.fc {
+  --fc-border-color: #d9ded6;
+  --fc-today-bg-color: rgba(15, 118, 110, 0.08);
+  --fc-button-bg-color: #172026;
+  --fc-button-border-color: #172026;
+  --fc-button-hover-bg-color: #0f766e;
+  --fc-button-hover-border-color: #0f766e;
+}
