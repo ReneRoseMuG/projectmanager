@@ -18,7 +18,7 @@ const statusLabels: Record<Feature["status"], string> = {
 
 export function FeatureCard({ feature, onDelete }: FeatureCardProps) {
   return (
-    <article className="grid min-h-52 gap-4 rounded-lg border border-line bg-white p-5 shadow-sm">
+    <article className="grid min-h-52 gap-4 rounded-lg border border-line bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-panel">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-teal text-white">

@@ -27,9 +27,10 @@ const statusLabels: Record<Task["status"], string> = {
 
 export function TaskCard({ task, compact = false, onOpen, onDelete }: TaskCardProps) {
   const overdue = task.status !== "done" && isOverdue(task.dueDate);
+  const hoverClass = compact ? "" : "transition duration-200 hover:-translate-y-0.5 hover:shadow-panel";
 
   return (
-    <article className={`rounded-lg border bg-white p-4 shadow-sm ${overdue ? "border-coral" : "border-line"} ${compact ? "grid gap-2" : "grid gap-3"}`}>
+    <article className={`rounded-lg border bg-white p-4 shadow-sm ${hoverClass} ${overdue ? "border-coral" : "border-line"} ${compact ? "grid gap-2" : "grid gap-3"}`}>
       <div className="flex items-start justify-between gap-2">
         <button type="button" className="min-w-0 text-left" onClick={() => onOpen(task)}>
           <h3 className="line-clamp-2 text-sm font-semibold text-ink">{task.title}</h3>

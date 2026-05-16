@@ -20,6 +20,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerNotesRoutes } = await import("../../src/routes/notes.js");
   const { registerEventsRoutes } = await import("../../src/routes/events.js");
   const { registerFeaturesRoutes } = await import("../../src/routes/features.js");
+  const { registerHealthRoutes } = await import("../../src/routes/health.js");
   const { registerUseCasesRoutes } = await import("../../src/routes/use-cases.js");
   const { registerWikiRoutes } = await import("../../src/routes/wiki.js");
   const { registerBacklogRoutes } = await import("../../src/routes/backlog.js");
@@ -45,6 +46,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerTagsRoutes, { prefix: "/api" });
   await app.register(registerNotesRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
+  await app.register(registerHealthRoutes, { prefix: "/api" });
   await app.register(registerFeaturesRoutes, { prefix: "/api" });
   await app.register(registerUseCasesRoutes, { prefix: "/api" });
   await app.register(registerWikiRoutes, { prefix: "/api" });

@@ -9,6 +9,7 @@ import { registerCommentsRoutes } from "./routes/comments.js";
 import { registerDocLinksRoutes } from "./routes/doc-links.js";
 import { registerEventsRoutes } from "./routes/events.js";
 import { registerFeaturesRoutes } from "./routes/features.js";
+import { registerHealthRoutes } from "./routes/health.js";
 import { registerNotesRoutes } from "./routes/notes.js";
 import { registerProjectsRoutes } from "./routes/projects.js";
 import { registerSubtasksRoutes } from "./routes/subtasks.js";
@@ -38,6 +39,7 @@ export async function buildApp(injectedDb: typeof db = db): Promise<FastifyInsta
   await app.register(registerNotesRoutes, { prefix: "/api" });
   await app.register(registerAttachmentsRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
+  await app.register(registerHealthRoutes, { prefix: "/api" });
   await app.register(registerFeaturesRoutes, { prefix: "/api" });
   await app.register(registerUseCasesRoutes, { prefix: "/api" });
   await app.register(registerWikiRoutes, { prefix: "/api" });

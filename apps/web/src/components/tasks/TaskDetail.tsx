@@ -1,5 +1,5 @@
 import type { Note, Priority, Tag, TaskStatus } from "@taskmanager/shared-types";
-import { Save } from "lucide-react";
+import { CheckCircle2, MessageSquare, Save } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useAttachments } from "../../hooks/useAttachments";
@@ -8,7 +8,7 @@ import { errorMessage } from "../../hooks/errors";
 import { useFeatures } from "../../hooks/useFeatures";
 import { useNotes } from "../../hooks/useNotes";
 import { useTaskDetail } from "../../hooks/useTaskDetail";
-import { toDateInput } from "../../utils/date";
+import { formatHumanDate, toDateInput } from "../../utils/date";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { FeaturePicker } from "../features/FeaturePicker";
@@ -142,6 +142,13 @@ export function TaskDetail({ taskId, open, onClose, onChanged }: TaskDetailProps
     return null;
   }
 
+  const subtaskPreview = detail.task?.subtasks.slice(0, 3) ?? [];
+  const completedSubtasks = detail.task?.subtasks.filter((subtask) => subtask.status === "done").length ?? 0;
+  const totalSubtasks = detail.task?.subtasks.length ?? 0;
+  const latestComments = [...(detail.task?.comments ?? [])]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 2);
+
   return (
     <Modal open={open} title={detail.task?.title ?? "Aufgabe"} size="xl" onClose={onClose}>
       {detail.loading ? (
@@ -197,6 +204,63 @@ export function TaskDetail({ taskId, open, onClose, onChanged }: TaskDetailProps
                 <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
               </div>
               <TagPicker selected={selectedTags} onChange={setSelectedTags} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <section className="grid gap-3 rounded-md border border-line bg-shell/60 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 size={17} className="text-teal" />
+                      <h3 className="text-sm font-semibold text-ink">Subtasks</h3>
+                    </div>
+                    <span className="text-xs font-medium text-slate-600">
+                      {completedSubtasks} / {totalSubtasks}
+                    </span>
+                  </div>
+                  {subtaskPreview.length > 0 ? (
+                    <div className="grid gap-2">
+                      {subtaskPreview.map((subtask) => (
+                        <div key={subtask.id} className="flex min-w-0 items-center gap-2 text-sm">
+                          <span className={`h-4 w-4 rounded border ${subtask.status === "done" ? "border-teal bg-teal" : "border-line bg-white"}`} />
+                          <span className={`min-w-0 truncate ${subtask.status === "done" ? "text-slate-500 line-through" : "text-ink"}`}>{subtask.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-600">Keine Subtasks</p>
+                  )}
+                  {totalSubtasks > 3 ? (
+                    <button type="button" className="justify-self-start text-sm font-medium text-teal hover:text-ink" onClick={() => setActiveTab("subtasks")}>
+                      Alle anzeigen
+                    </button>
+                  ) : null}
+                </section>
+
+                <section className="grid gap-3 rounded-md border border-line bg-shell/60 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare size={17} className="text-teal" />
+                      <h3 className="text-sm font-semibold text-ink">Kommentare</h3>
+                    </div>
+                    <span className="text-xs font-medium text-slate-600">{detail.task.comments.length}</span>
+                  </div>
+                  {latestComments.length > 0 ? (
+                    <div className="grid gap-2">
+                      {latestComments.map((comment) => (
+                        <article key={comment.id} className="grid gap-1 rounded border border-line bg-white p-2">
+                          <time className="text-xs text-slate-500">{formatHumanDate(comment.createdAt)}</time>
+                          <p className="line-clamp-2 text-sm text-ink">{comment.body}</p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-600">Keine Kommentare</p>
+                  )}
+                  {detail.task.comments.length > 0 ? (
+                    <button type="button" className="justify-self-start text-sm font-medium text-teal hover:text-ink" onClick={() => setActiveTab("comments")}>
+                      Alle Kommentare
+                    </button>
+                  ) : null}
+                </section>
+              </div>
               <div className="flex justify-end border-t border-line pt-4">
                 <Button type="submit" variant="primary" icon={<Save size={16} />}>
                   Speichern

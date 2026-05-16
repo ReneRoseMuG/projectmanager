@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { CalendarView } from "../components/calendar/CalendarView";
 import { EventForm } from "../components/calendar/EventForm";
+import { UpcomingEvents } from "../components/calendar/UpcomingEvents";
 import { Button } from "../components/ui/Button";
 import { CalendarSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
@@ -57,24 +58,33 @@ export function CalendarPage() {
       {events.loading || calendarTasks.loading || projectsLoading ? (
         <CalendarSkeleton />
       ) : (
-        <CalendarView
-          events={events.events}
-          tasks={calendarTasks.tasks}
-          onDateClick={openCreate}
-          onEventClick={(event) => {
-            setSelectedEvent(event);
-            setFormOpen(true);
-          }}
-          onEventMove={async (event, startTime, endTime) => {
-            try {
-              await events.updateEvent(event.id, { startTime, endTime });
-              showToast({ tone: "success", title: "Termin verschoben" });
-            } catch (eventError) {
-              showToast({ tone: "error", title: "Termin konnte nicht verschoben werden", message: errorMessage(eventError) });
-              throw eventError;
-            }
-          }}
-        />
+        <>
+          <CalendarView
+            events={events.events}
+            tasks={calendarTasks.tasks}
+            onDateClick={openCreate}
+            onEventClick={(event) => {
+              setSelectedEvent(event);
+              setFormOpen(true);
+            }}
+            onEventMove={async (event, startTime, endTime) => {
+              try {
+                await events.updateEvent(event.id, { startTime, endTime });
+                showToast({ tone: "success", title: "Termin verschoben" });
+              } catch (eventError) {
+                showToast({ tone: "error", title: "Termin konnte nicht verschoben werden", message: errorMessage(eventError) });
+                throw eventError;
+              }
+            }}
+          />
+          <UpcomingEvents
+            events={events.events}
+            onOpen={(event) => {
+              setSelectedEvent(event);
+              setFormOpen(true);
+            }}
+          />
+        </>
       )}
       <EventForm
         open={formOpen}

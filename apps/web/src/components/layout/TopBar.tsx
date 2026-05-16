@@ -1,7 +1,10 @@
 import { CalendarDays, FolderKanban } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useHealthCheck } from "../../hooks/useHealthCheck";
 
 export function TopBar() {
+  const health = useHealthCheck();
+
   return (
     <header className="flex h-16 items-center justify-between border-b border-line bg-white px-4 md:px-6">
       <div className="flex items-center gap-3 md:hidden">
@@ -15,7 +18,13 @@ export function TopBar() {
           <CalendarDays size={18} />
         </NavLink>
       </nav>
-      <div className="hidden text-sm text-slate-500 md:block">Single-User Workspace</div>
+      <div className="hidden items-center gap-3 text-sm text-slate-500 md:flex">
+        <span>Single-User Workspace</span>
+        <span className="inline-flex items-center gap-2" title={health.latencyMs ? `${health.latencyMs} ms` : undefined}>
+          <span className={`h-2.5 w-2.5 rounded-full ${health.online ? "bg-moss" : "bg-coral"}`} />
+          <span>localhost:3001</span>
+        </span>
+      </div>
     </header>
   );
 }

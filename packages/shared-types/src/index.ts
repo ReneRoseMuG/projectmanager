@@ -35,6 +35,8 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
   openTaskCount: number;
+  doneTaskCount: number;
+  totalTaskCount: number;
   tags: Tag[];
 }
 

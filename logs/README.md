@@ -2,6 +2,12 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 16.05.26 | 6 | Task-Detail Vorschau | ✅ |
+| 16.05.26 | 5 | Health-Endpoint | ✅ |
+| 16.05.26 | 4 | Nächste Termine | ✅ |
+| 16.05.26 | 3 | Filter-Chips | ✅ |
+| 16.05.26 | 2 | Progress-Balken | ✅ |
+| 16.05.26 | 1 | Hover-Lift | ✅ |
 | 16.05.26 | Fix / Feature | API Red Tests | ✅ |
 | 16.05.26 | Fix / Feature | Node 24 SQLite Binding | ✅ |
 | 16.05.26 | Fix / Feature | Test Kurzkommando | ✅ |

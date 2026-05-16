@@ -1,9 +1,11 @@
-import type { Project, ProjectInput } from "@taskmanager/shared-types";
+import { PROJECT_STATUSES, type Project, type ProjectInput, type ProjectStatus } from "@taskmanager/shared-types";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ProjectForm } from "../components/projects/ProjectForm";
 import { ProjectList } from "../components/projects/ProjectList";
 import { Button } from "../components/ui/Button";
+import { FilterChips } from "../components/ui/FilterChips";
+import { SearchInput } from "../components/ui/SearchInput";
 import { ProjectGridSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
@@ -14,6 +16,27 @@ export function ProjectsPage() {
   const { showToast } = useToast();
   const [formOpen, setFormOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
+  const [search, setSearch] = useState("");
+
+  const statusOptions = useMemo(
+    () =>
+      PROJECT_STATUSES.map((status) => ({
+        value: status,
+        label: statusLabels[status],
+        count: projects.filter((project) => project.status === status).length
+      })),
+    [projects]
+  );
+
+  const filteredProjects = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return projects.filter((project) => {
+      const matchesStatus = statusFilter === "all" || project.status === statusFilter;
+      const matchesSearch = !query || project.name.toLowerCase().includes(query) || (project.description ?? "").toLowerCase().includes(query);
+      return matchesStatus && matchesSearch;
+    });
+  }, [projects, search, statusFilter]);
 
   const openCreate = () => {
     setEditingProject(null);
@@ -60,7 +83,13 @@ export function ProjectsPage() {
       </header>
 
       {error ? <div className="rounded-md border border-coral bg-coral/10 p-3 text-sm text-coral">{error}</div> : null}
-      {loading ? <ProjectGridSkeleton /> : <ProjectList projects={projects} onEdit={(project) => {
+      {!loading ? (
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <FilterChips value={statusFilter} onChange={setStatusFilter} options={statusOptions} allCount={projects.length} />
+          <SearchInput value={search} onChange={setSearch} placeholder="Projekte suchen" />
+        </div>
+      ) : null}
+      {loading ? <ProjectGridSkeleton /> : <ProjectList projects={filteredProjects} onEdit={(project) => {
         setEditingProject(project);
         setFormOpen(true);
       }} onDelete={(project) => void deleteProject(project)} />}
@@ -69,3 +98,10 @@ export function ProjectsPage() {
     </div>
   );
 }
+
+const statusLabels: Record<ProjectStatus, string> = {
+  active: "Aktiv",
+  on_hold: "Pausiert",
+  completed: "Abgeschlossen",
+  archived: "Archiviert"
+};
