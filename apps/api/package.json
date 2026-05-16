@@ -20,7 +20,7 @@
     "@fastify/multipart": "^8.3.1",
     "@fastify/static": "^7.0.4",
     "@taskmanager/shared-types": "file:../../packages/shared-types",
-    "better-sqlite3": "^9.6.0",
+    "better-sqlite3": "^12.10.0",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.30.10",
     "fastify": "^4.28.1"

@@ -132,7 +132,7 @@ Der Plan muss ausreichend Kontext enthalten, damit der Nutzer die Tragweite der 
 | `branch <name>` | Branch von `main` anlegen, Remote-Tracking einrichten, sofort pushen |
 | `plan` | Auftrag klassifizieren → Analyse → Plan ausgeben, ohne Branch-Rückfrage |
 | `audit` | Vollen Audit gemäß Abschnitt 12 als reinen Report-Auftrag ausführen |
-| `test` | Vollen Testlauf gemäß Abschnitt 12 als reinen Report-Auftrag ausführen |
+| `test` / `Test` | Alle verfügbaren Tests ausführen; bei möglicher State- oder Daten-Vermischung seriell ausführen; anschließend Anzahl der ausgeführten, grünen und roten Tests berichten |
 | `log <kurztitel>` | Schritt-Log manuell auslösen (ergänzt automatisches Log) |
 | `save` | Alle offenen Änderungen stagen, eine sinnvolle Commit-Message wählen, alles committen und auf den aktuellen Branch pushen |
 

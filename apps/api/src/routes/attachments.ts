@@ -7,7 +7,7 @@ import {
   listTaskAttachments
 } from "../services/attachments.service.js";
 import { badRequest } from "../utils/errors.js";
-import { arrayResponseSchema, emptyResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 interface MultipartFileField {
   filename?: string;
@@ -77,10 +77,10 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
 
   app.delete<{ Params: { id: number } }>(
     "/attachments/:id",
-    { schema: { params: idParamSchema, response: { 200: emptyResponseSchema } } },
-    async (request) => {
+    { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
       await deleteAttachment(app.db, request.params.id);
-      return { ok: true };
+      return reply.status(204).send();
     }
   );
 }

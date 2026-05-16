@@ -7,7 +7,7 @@ import {
   setTaskTags,
   updateTag
 } from "../services/tags.service.js";
-import { arrayResponseSchema, emptyResponseSchema, idParamSchema, objectResponseSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, idParamSchema, objectResponseSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
 
 const tagBodySchema = {
   type: "object",
@@ -42,10 +42,10 @@ export async function registerTagsRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: { id: number } }>(
     "/tags/:id",
-    { schema: { params: idParamSchema, response: { 200: emptyResponseSchema } } },
-    async (request) => {
+    { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
       deleteTag(app.db, request.params.id);
-      return { ok: true };
+      return reply.status(204).send();
     }
   );
 

@@ -9,7 +9,7 @@ import {
   updateTask,
   updateTaskPosition
 } from "../services/tasks.service.js";
-import { arrayResponseSchema, emptyResponseSchema, idParamSchema, objectResponseSchema, projectIdParamSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, idParamSchema, objectResponseSchema, projectIdParamSchema } from "../utils/route-schemas.js";
 
 const taskBodySchema = {
   type: "object",
@@ -77,10 +77,10 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: { id: number } }>(
     "/tasks/:id",
-    { schema: { params: idParamSchema, response: { 200: emptyResponseSchema } } },
-    async (request) => {
+    { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
       deleteTask(app.db, request.params.id);
-      return { ok: true };
+      return reply.status(204).send();
     }
   );
 }

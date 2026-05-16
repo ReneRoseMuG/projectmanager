@@ -9,7 +9,7 @@
     "packages/shared-types"
   ],
   "engines": {
-    "node": ">=20 <22"
+    "node": "20.x || 22.x || 24.x"
   },
   "scripts": {
     "dev": "concurrently \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",

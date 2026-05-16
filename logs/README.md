@@ -2,6 +2,9 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 16.05.26 | Fix / Feature | API Red Tests | ✅ |
+| 16.05.26 | Fix / Feature | Node 24 SQLite Binding | ✅ |
+| 16.05.26 | Fix / Feature | Test Kurzkommando | ✅ |
 | 16.05.26 | Fix / Feature | Save Kurzkommando | ✅ |
 | 16.05.26 | 30 | Integrationstests Wiki/Docs | ✅ |
 | 16.05.26 | 29 | Integration bestehende Views | ✅ |

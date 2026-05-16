@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { PROJECT_STATUSES } from "../db/schema.js";
 import { createProject, deleteProject, getProject, listProjects, updateProject } from "../services/projects.service.js";
-import { arrayResponseSchema, emptyResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const projectBodySchema = {
   type: "object",
@@ -48,10 +48,10 @@ export async function registerProjectsRoutes(app: FastifyInstance): Promise<void
 
   app.delete<{ Params: { id: number } }>(
     "/projects/:id",
-    { schema: { params: idParamSchema, response: { 200: emptyResponseSchema } } },
-    async (request) => {
+    { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
       deleteProject(app.db, request.params.id);
-      return { ok: true };
+      return reply.status(204).send();
     }
   );
 }

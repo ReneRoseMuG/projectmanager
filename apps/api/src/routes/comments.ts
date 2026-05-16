@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { CommentInput } from "@taskmanager/shared-types";
 import { createComment, deleteComment, listComments } from "../services/comments.service.js";
-import { arrayResponseSchema, emptyResponseSchema, idParamSchema, objectResponseSchema, taskIdParamSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, idParamSchema, objectResponseSchema, taskIdParamSchema } from "../utils/route-schemas.js";
 
 const commentBodySchema = {
   type: "object",
@@ -30,10 +30,10 @@ export async function registerCommentsRoutes(app: FastifyInstance): Promise<void
 
   app.delete<{ Params: { id: number } }>(
     "/comments/:id",
-    { schema: { params: idParamSchema, response: { 200: emptyResponseSchema } } },
-    async (request) => {
+    { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
       deleteComment(app.db, request.params.id);
-      return { ok: true };
+      return reply.status(204).send();
     }
   );
 }

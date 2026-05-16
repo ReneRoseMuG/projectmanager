@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { EventInput, EventUpdate } from "@taskmanager/shared-types";
 import { createEvent, deleteEvent, getEvent, listEvents, updateEvent } from "../services/events.service.js";
-import { arrayResponseSchema, emptyResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const eventBodySchema = {
   type: "object",
@@ -61,10 +61,10 @@ export async function registerEventsRoutes(app: FastifyInstance): Promise<void> 
 
   app.delete<{ Params: { id: number } }>(
     "/events/:id",
-    { schema: { params: idParamSchema, response: { 200: emptyResponseSchema } } },
-    async (request) => {
+    { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
       deleteEvent(app.db, request.params.id);
-      return { ok: true };
+      return reply.status(204).send();
     }
   );
 }

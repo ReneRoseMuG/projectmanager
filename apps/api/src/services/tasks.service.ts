@@ -143,6 +143,10 @@ export function createTask(database: DbClient, projectId: number, input: TaskInp
 
 export function createSubtask(database: DbClient, taskId: number, input: TaskInput): Task {
   const parent = getTaskRecord(database, taskId);
+  if (parent.parentId !== null) {
+    throw badRequest("Subtasks cannot have subtasks");
+  }
+
   return createTask(database, parent.projectId, input, parent.id);
 }
 

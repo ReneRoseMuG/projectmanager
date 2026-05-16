@@ -75,7 +75,7 @@ describe("Taskmanager API integration", () => {
     expect(updatedTag.color).toBe("#6366f1");
 
     const throwawayTag = (await request(app.server).post("/api/tags").send({ name: "Delete me", color: "#94a3b8" }).expect(201)).body as Tag;
-    await request(app.server).delete(`/api/tags/${throwawayTag.id}`).expect(200, { ok: true });
+    await request(app.server).delete(`/api/tags/${throwawayTag.id}`).expect(204);
 
     const projectTags = (await request(app.server).put(`/api/projects/${createdProject.id}/tags`).send({ tagIds: [createdTag.id] }).expect(200)).body as Tag[];
     expect(projectTags).toHaveLength(1);
@@ -105,7 +105,7 @@ describe("Taskmanager API integration", () => {
     await request(app.server).get(`/api/tasks/${createdTask.id}/comments`).expect(200, []);
     const comment = (await request(app.server).post(`/api/tasks/${createdTask.id}/comments`).send({ body: "Kommentar" }).expect(201)).body as Comment;
     expect(comment.taskId).toBe(createdTask.id);
-    await request(app.server).delete(`/api/comments/${comment.id}`).expect(200, { ok: true });
+    await request(app.server).delete(`/api/comments/${comment.id}`).expect(204);
 
     await request(app.server).get(`/api/projects/${createdProject.id}/notes`).expect(200, []);
     const projectNote = (
@@ -132,8 +132,8 @@ describe("Taskmanager API integration", () => {
     const taskNote = (await request(app.server).post(`/api/tasks/${createdTask.id}/notes`).send({ title: "Tasknotiz", contentJson: {} }).expect(201)).body as Note;
     const taskNotes = (await request(app.server).get(`/api/tasks/${createdTask.id}/notes`).expect(200)).body as Note[];
     expect(taskNotes.map((note) => note.id)).toContain(taskNote.id);
-    await request(app.server).delete(`/api/notes/${taskNote.id}`).expect(200, { ok: true });
-    await request(app.server).delete(`/api/notes/${projectNote.id}`).expect(200, { ok: true });
+    await request(app.server).delete(`/api/notes/${taskNote.id}`).expect(204);
+    await request(app.server).delete(`/api/notes/${projectNote.id}`).expect(204);
 
     await request(app.server).get(`/api/projects/${createdProject.id}/attachments`).expect(200, []);
     const projectAttachment = (
@@ -157,8 +157,8 @@ describe("Taskmanager API integration", () => {
     const projectAttachments = (await request(app.server).get(`/api/projects/${createdProject.id}/attachments`).expect(200)).body as Attachment[];
     expect(projectAttachments.map((attachment) => attachment.id)).toContain(projectAttachment.id);
     await request(app.server).post(`/api/projects/${createdProject.id}/attachments`).expect(400);
-    await request(app.server).delete(`/api/attachments/${projectAttachment.id}`).expect(200, { ok: true });
-    await request(app.server).delete(`/api/attachments/${taskAttachment.id}`).expect(200, { ok: true });
+    await request(app.server).delete(`/api/attachments/${projectAttachment.id}`).expect(204);
+    await request(app.server).delete(`/api/attachments/${taskAttachment.id}`).expect(204);
 
     await request(app.server).get("/api/events").expect(200, []);
     const createdEvent = (
@@ -183,14 +183,14 @@ describe("Taskmanager API integration", () => {
 
     const patchedEvent = (await request(app.server).patch(`/api/events/${createdEvent.id}`).send({ title: "Review verschoben" }).expect(200)).body as Event;
     expect(patchedEvent.title).toBe("Review verschoben");
-    await request(app.server).delete(`/api/events/${createdEvent.id}`).expect(200, { ok: true });
+    await request(app.server).delete(`/api/events/${createdEvent.id}`).expect(204);
 
     const taskDetail = (await request(app.server).get(`/api/tasks/${createdTask.id}`).expect(200)).body as TaskDetail;
     expect(taskDetail.subtasks.map((item) => item.id)).toContain(subtask.id);
 
-    await request(app.server).delete(`/api/tasks/${subtask.id}`).expect(200, { ok: true });
-    await request(app.server).delete(`/api/tasks/${createdTask.id}`).expect(200, { ok: true });
-    await request(app.server).delete(`/api/tags/${createdTag.id}`).expect(200, { ok: true });
-    await request(app.server).delete(`/api/projects/${createdProject.id}`).expect(200, { ok: true });
+    await request(app.server).delete(`/api/tasks/${subtask.id}`).expect(204);
+    await request(app.server).delete(`/api/tasks/${createdTask.id}`).expect(204);
+    await request(app.server).delete(`/api/tags/${createdTag.id}`).expect(204);
+    await request(app.server).delete(`/api/projects/${createdProject.id}`).expect(204);
   });
 });

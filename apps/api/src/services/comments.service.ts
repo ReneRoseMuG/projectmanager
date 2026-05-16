@@ -1,5 +1,5 @@
 import type { Comment, CommentInput } from "@taskmanager/shared-types";
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { comments, tasks } from "../db/schema.js";
 import { notFound } from "../utils/errors.js";
@@ -29,7 +29,7 @@ export function listComments(database: DbClient, taskId: number): Comment[] {
     .select()
     .from(comments)
     .where(eq(comments.taskId, taskId))
-    .orderBy(desc(comments.createdAt))
+    .orderBy(comments.createdAt, comments.id)
     .all()
     .map(mapComment);
 }
