@@ -15,18 +15,44 @@ interface CalendarViewProps {
   onEventMove: (event: CalendarEvent, startTime: string, endTime: string) => Promise<void>;
 }
 
+const theme = {
+  steel: {
+    400: "#94B2D1",
+    700: "#2E5984"
+  },
+  shell: "#F4F7FA",
+  ink: "#0F2542",
+  tangerine: "#ED8C3A",
+  teal: "#2F8E96",
+  fern: "#4D9359"
+};
+
+const projectAccent: Record<number, string> = {
+  1: theme.steel[700],
+  2: theme.tangerine,
+  3: theme.teal,
+  4: theme.fern
+};
+
+function getEventAccent(event: CalendarEvent) {
+  return event.color ?? (event.projectId ? projectAccent[event.projectId] : undefined) ?? theme.steel[700];
+}
+
 export function CalendarView({ events, tasks, onDateClick, onEventClick, onEventMove }: CalendarViewProps) {
   const calendarEvents = [
-    ...events.map((event) => ({
-      id: `event-${event.id}`,
-      title: event.title,
-      start: event.startTime,
-      end: event.endTime,
-      allDay: event.isAllDay,
-      backgroundColor: event.color ?? "#6366f1",
-      borderColor: event.color ?? "#6366f1",
-      extendedProps: { kind: "event", source: event }
-    })),
+    ...events.map((event) => {
+      const accent = getEventAccent(event);
+      return {
+        id: `event-${event.id}`,
+        title: event.title,
+        start: event.startTime,
+        end: event.endTime,
+        allDay: event.isAllDay,
+        backgroundColor: accent,
+        borderColor: accent,
+        extendedProps: { kind: "event", source: event }
+      };
+    }),
     ...tasks
       .filter((task) => task.dueDate)
       .map((task) => ({
@@ -34,8 +60,10 @@ export function CalendarView({ events, tasks, onDateClick, onEventClick, onEvent
         title: task.title,
         start: task.dueDate ?? undefined,
         allDay: true,
-        backgroundColor: "#94a3b8",
-        borderColor: "#94a3b8",
+        backgroundColor: theme.shell,
+        borderColor: theme.steel[400],
+        textColor: theme.ink,
+        classNames: ["task-due-event"],
         editable: false,
         extendedProps: { kind: "task", source: task }
       }))

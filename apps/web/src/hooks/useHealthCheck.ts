@@ -4,10 +4,11 @@ import { getHealth } from "../api/health";
 interface HealthCheckState {
   online: boolean;
   latencyMs: number | null;
+  refetch: () => Promise<void>;
 }
 
 export function useHealthCheck(): HealthCheckState {
-  const [state, setState] = useState<HealthCheckState>({ online: false, latencyMs: null });
+  const [state, setState] = useState<Omit<HealthCheckState, "refetch">>({ online: false, latencyMs: null });
 
   const check = useCallback(async () => {
     const startedAt = performance.now();
@@ -25,5 +26,5 @@ export function useHealthCheck(): HealthCheckState {
     return () => window.clearInterval(intervalId);
   }, [check]);
 
-  return state;
+  return { ...state, refetch: check };
 }

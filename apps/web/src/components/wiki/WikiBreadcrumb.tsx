@@ -13,7 +13,7 @@ export function WikiBreadcrumb({ items }: WikiBreadcrumbProps) {
 
   return (
     <nav className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-      <Link className="hover:text-teal" to="/wiki">
+      <Link className="hover:text-fern" to="/wiki">
         Wiki
       </Link>
       {items.map((item, index) => (
@@ -22,7 +22,7 @@ export function WikiBreadcrumb({ items }: WikiBreadcrumbProps) {
           {index === items.length - 1 ? (
             <span className="text-ink">{item.title}</span>
           ) : (
-            <Link className="hover:text-teal" to={`/wiki/${item.id}`}>
+            <Link className="hover:text-fern" to={`/wiki/${item.id}`}>
               {item.title}
             </Link>
           )}

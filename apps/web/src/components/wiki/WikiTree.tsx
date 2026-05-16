@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { WikiTreeNode } from "../../hooks/useWiki";
 import { Button } from "../ui/Button";
+import { EmptyState } from "../ui/EmptyState";
 
 interface WikiTreeProps {
   tree: WikiTreeNode[];
@@ -35,7 +36,7 @@ function WikiNode({ node, activeId, level, onCreate }: WikiNodeProps) {
         </button>
         <Link
           className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-sm ${
-            activeId === node.id ? "bg-ink text-white" : "text-slate-700 hover:bg-shell"
+            activeId === node.id ? "bg-steel-900 text-white" : "text-slate-700 hover:bg-shell"
           }`}
           to={`/wiki/${node.id}`}
         >
@@ -66,7 +67,7 @@ export function WikiTree({ tree, onCreate }: WikiTreeProps) {
           Root
         </Button>
       </div>
-      {tree.length === 0 ? <p className="rounded-md border border-dashed border-line p-4 text-center text-sm text-slate-600">Keine Wiki-Seiten</p> : null}
+      {tree.length === 0 ? <EmptyState icon={<FileText size={20} />} title="Keine Wiki-Seiten" body="Starte mit einer Root-Seite." tone="teal" variant="default" className="p-4" /> : null}
       <div className="grid gap-1">
         {tree.map((node) => (
           <WikiNode key={node.id} node={node} activeId={activeId} level={0} onCreate={onCreate} />

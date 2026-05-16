@@ -83,11 +83,11 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
       <form className="grid gap-4" onSubmit={submit}>
         <label className="grid gap-1 text-sm font-medium">
           Titel
-          <input className="h-10 rounded-md border border-line px-3 outline-none focus:border-teal" value={title} onChange={(inputEvent) => setTitle(inputEvent.target.value)} required />
+          <input className="h-10 rounded-md border border-line px-3 outline-none focus:border-fern" value={title} onChange={(inputEvent) => setTitle(inputEvent.target.value)} required />
         </label>
         <label className="grid gap-1 text-sm font-medium">
           Beschreibung
-          <textarea className="min-h-24 rounded-md border border-line px-3 py-2 outline-none focus:border-teal" value={description} onChange={(inputEvent) => setDescription(inputEvent.target.value)} />
+          <textarea className="min-h-24 rounded-md border border-line px-3 py-2 outline-none focus:border-fern" value={description} onChange={(inputEvent) => setDescription(inputEvent.target.value)} />
         </label>
         <label className="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" checked={isAllDay} onChange={(inputEvent) => setIsAllDay(inputEvent.target.checked)} />

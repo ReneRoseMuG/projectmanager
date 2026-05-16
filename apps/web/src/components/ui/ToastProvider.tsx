@@ -1,56 +1,80 @@
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "./Button";
-
-type ToastTone = "success" | "error" | "info";
+import { Toast, type ToastAction, type ToastTone, type ToastViewModel } from "./Toast";
 
 interface ToastInput {
   title: string;
+  body?: ReactNode;
   message?: string;
   tone?: ToastTone;
+  duration?: number | "persistent";
   timeoutMs?: number;
+  actions?: ToastAction[];
 }
 
-interface Toast extends Required<Pick<ToastInput, "title" | "tone">> {
-  id: number;
-  message?: string;
+interface ToastHandle {
+  dismiss: () => void;
 }
+
+type ToastFunction = ((input: ToastInput) => ToastHandle) & {
+  success: (title: string, body?: ReactNode) => ToastHandle;
+  error: (title: string, body?: ReactNode) => ToastHandle;
+  warn: (title: string, body?: ReactNode) => ToastHandle;
+  info: (title: string, body?: ReactNode) => ToastHandle;
+};
 
 interface ToastContextValue {
   showToast: (toast: ToastInput) => number;
+  toast: ToastFunction;
   dismissToast: (id: number) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-const toneClasses: Record<ToastTone, string> = {
-  success: "border-moss bg-white text-ink",
-  error: "border-coral bg-white text-ink",
-  info: "border-teal bg-white text-ink"
-};
-
-const icons: Record<ToastTone, ReactNode> = {
-  success: <CheckCircle2 size={18} className="text-moss" />,
-  error: <AlertCircle size={18} className="text-coral" />,
-  info: <Info size={18} className="text-teal" />
-};
-
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const timers = useRef<number[]>([]);
+  const [toasts, setToasts] = useState<ToastViewModel[]>([]);
+  const timers = useRef<Map<number, number>>(new Map());
 
   const dismissToast = useCallback((id: number) => {
+    const timer = timers.current.get(id);
+    if (timer) {
+      window.clearTimeout(timer);
+      timers.current.delete(id);
+    }
     setToasts((current) => current.filter((toast) => toast.id !== id));
   }, []);
 
   const showToast = useCallback(
-    ({ title, message, tone = "info", timeoutMs = 4500 }: ToastInput) => {
+    ({ title, body, message, tone = "info", duration, timeoutMs, actions }: ToastInput) => {
       const id = Date.now() + Math.floor(Math.random() * 1000);
-      setToasts((current) => [...current, { id, title, message, tone }].slice(-4));
-      timers.current.push(window.setTimeout(() => dismissToast(id), timeoutMs));
+      const resolvedDuration = actions?.length ? "persistent" : duration ?? timeoutMs ?? 5000;
+      const nextToast: ToastViewModel = { id, title, body: body ?? message, tone, duration: resolvedDuration, actions };
+      setToasts((current) => [nextToast, ...current].slice(0, 3));
+      if (typeof resolvedDuration === "number") {
+        const timer = window.setTimeout(() => dismissToast(id), resolvedDuration);
+        timers.current.set(id, timer);
+      }
       return id;
     },
     [dismissToast]
+  );
+
+  const toastBase = useCallback(
+    (input: ToastInput) => {
+      const id = showToast(input);
+      return { dismiss: () => dismissToast(id) };
+    },
+    [dismissToast, showToast]
+  );
+
+  const toast = useMemo(
+    () =>
+      Object.assign(toastBase, {
+        success: (title: string, body?: ReactNode) => toastBase({ title, body, tone: "success" }),
+        error: (title: string, body?: ReactNode) => toastBase({ title, body, tone: "error" }),
+        warn: (title: string, body?: ReactNode) => toastBase({ title, body, tone: "warn" }),
+        info: (title: string, body?: ReactNode) => toastBase({ title, body, tone: "info" })
+      }),
+    [toastBase]
   );
 
   useEffect(
@@ -60,21 +84,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const value = useMemo(() => ({ showToast, dismissToast }), [dismissToast, showToast]);
+  const value = useMemo(() => ({ showToast, toast, dismissToast }), [dismissToast, showToast, toast]);
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed right-4 top-4 z-50 grid w-[min(24rem,calc(100vw-2rem))] gap-2" role="status" aria-live="polite">
-        {toasts.map((toast) => (
-          <div key={toast.id} className={`grid grid-cols-[auto_1fr_auto] gap-3 rounded-md border-l-4 p-3 shadow-panel ${toneClasses[toast.tone]}`}>
-            <div className="pt-0.5">{icons[toast.tone]}</div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">{toast.title}</p>
-              {toast.message ? <p className="mt-1 break-words text-xs text-slate-600">{toast.message}</p> : null}
-            </div>
-            <Button aria-label="Toast schließen" title="Toast schließen" variant="ghost" icon={<X size={15} />} onClick={() => dismissToast(toast.id)} />
-          </div>
+      <div className="fixed bottom-6 right-6 z-50 grid w-[min(24rem,calc(100vw-2rem))] gap-2" role="status" aria-live="polite">
+        {toasts.map((item) => (
+          <Toast key={item.id} toast={item} onDismiss={dismissToast} />
         ))}
       </div>
     </ToastContext.Provider>

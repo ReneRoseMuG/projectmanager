@@ -1,6 +1,7 @@
 import type { Note } from "@taskmanager/shared-types";
-import { Plus } from "lucide-react";
+import { Plus, StickyNote } from "lucide-react";
 import { Button } from "../ui/Button";
+import { EmptyState } from "../ui/EmptyState";
 import { NoteCard } from "./NoteCard";
 
 interface NoteListProps {
@@ -19,7 +20,7 @@ export function NoteList({ notes, onCreate, onEdit, onDelete }: NoteListProps) {
         </Button>
       </div>
       {notes.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center text-sm text-slate-600">Keine Notizen</div>
+        <EmptyState icon={<StickyNote size={22} />} title="Keine Notizen" body="Erstelle eine Notiz, um Kontext und Entscheidungen festzuhalten." tone="violet" variant="tinted" />
       ) : (
         <div className="grid gap-3">
           {notes.map((note) => (

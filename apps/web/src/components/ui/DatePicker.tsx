@@ -11,7 +11,7 @@ export function DatePicker({ label, mode = "date", className = "", ...props }: D
       {label}
       <input
         type={mode}
-        className={`h-10 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-teal ${className}`}
+        className={`h-10 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-fern ${className}`}
         {...props}
       />
     </label>

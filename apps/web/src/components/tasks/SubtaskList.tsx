@@ -1,7 +1,8 @@
 import type { Task, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, ListChecks, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/Button";
+import { EmptyState } from "../ui/EmptyState";
 
 interface SubtaskListProps {
   subtasks: Task[];
@@ -12,6 +13,8 @@ interface SubtaskListProps {
 
 export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskListProps) {
   const [title, setTitle] = useState("");
+  const completed = subtasks.filter((subtask) => subtask.status === "done").length;
+  const progress = subtasks.length > 0 ? Math.round((completed / subtasks.length) * 100) : 0;
 
   const add = async () => {
     const trimmed = title.trim();
@@ -27,36 +30,62 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
   };
 
   return (
-    <div className="grid gap-3">
-      <div className="flex gap-2">
-        <input
-          className="h-10 min-w-0 flex-1 rounded-md border border-line px-3 outline-none focus:border-teal"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              void add();
-            }
-          }}
-        />
-        <Button icon={<Plus size={16} />} onClick={add}>
-          Hinzufügen
-        </Button>
-      </div>
-      <div className="grid gap-2">
-        {subtasks.map((subtask) => (
-          <div key={subtask.id} className="flex items-center gap-3 rounded-md border border-line bg-white p-3">
-            <input
-              type="checkbox"
-              checked={subtask.status === "done"}
-              onChange={(event) => void onUpdate(subtask.id, { status: event.target.checked ? "done" : "todo" }).catch(() => undefined)}
-            />
-            <span className={`min-w-0 flex-1 text-sm ${subtask.status === "done" ? "text-slate-500 line-through" : "text-ink"}`}>{subtask.title}</span>
-            <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={15} />} variant="ghost" className="h-8 w-8" onClick={() => void onDelete(subtask.id).catch(() => undefined)} />
+    <div className="grid gap-4">
+      <section className="rounded-lg border border-line bg-white p-4 shadow-[0_10px_28px_rgba(31,43,56,0.06)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-ink">Subtasks</h3>
+            <p className="text-sm text-slate-500">
+              {completed} von {subtasks.length} erledigt
+            </p>
           </div>
-        ))}
-      </div>
+          <span className="text-sm font-bold text-fern">{progress}%</span>
+        </div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-steel-100">
+          <div className="h-full rounded-full bg-fern transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      </section>
+
+      <section className="grid gap-2 rounded-lg border border-line bg-white p-4 shadow-[0_10px_28px_rgba(31,43,56,0.06)]">
+        {subtasks.length === 0 ? <EmptyState icon={<ListChecks size={20} />} title="Noch keine Subtasks" body="Zerlege die Aufgabe in kleinere Schritte." tone="fern" variant="default" className="p-6" /> : null}
+        {subtasks.map((subtask) => {
+          const done = subtask.status === "done";
+          return (
+            <div key={subtask.id} className="flex items-center gap-3 rounded-md border border-line bg-shell/40 px-3 py-2 transition hover:border-fern/60 hover:bg-white">
+              <button
+                type="button"
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${
+                  done ? "border-fern bg-fern text-white" : "border-steel-300 bg-white text-transparent hover:border-fern"
+                }`}
+                aria-label={done ? "Als offen markieren" : "Als erledigt markieren"}
+                onClick={() => void onUpdate(subtask.id, { status: done ? "todo" : "done" }).catch(() => undefined)}
+              >
+                <Check size={15} />
+              </button>
+              <span className={`min-w-0 flex-1 truncate text-sm font-medium ${done ? "text-slate-500 line-through" : "text-ink"}`}>{subtask.title}</span>
+              <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={15} />} variant="ghost" className="h-8 w-8" onClick={() => void onDelete(subtask.id).catch(() => undefined)} />
+            </div>
+          );
+        })}
+
+        <div className="mt-2 flex gap-2 rounded-md border border-dashed border-steel-300 bg-steel-100/35 p-2">
+          <input
+            className="h-10 min-w-0 flex-1 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-fern focus:ring-2 focus:ring-fern/15"
+            placeholder="Neuen Subtask hinzufügen"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void add();
+              }
+            }}
+          />
+          <Button icon={<Plus size={16} />} variant="primary" onClick={add}>
+            Hinzufügen
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

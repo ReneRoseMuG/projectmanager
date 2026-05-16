@@ -14,6 +14,7 @@ import { TaskDetail } from "../components/tasks/TaskDetail";
 import { TaskForm } from "../components/tasks/TaskForm";
 import { TaskList } from "../components/tasks/TaskList";
 import { Button } from "../components/ui/Button";
+import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton, KanbanSkeleton, TaskListSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { ViewToggle } from "../components/ui/ViewToggle";
@@ -41,6 +42,7 @@ export function ProjectDetailPage() {
   const params = useParams();
   const projectId = Number(params.id);
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const { project, loading: projectLoading } = useProjects(projectId);
   const tasks = useTasks(projectId);
   const allFeatures = useFeatures();
@@ -76,13 +78,20 @@ export function ProjectDetailPage() {
   };
 
   const deleteAttachment = async (attachment: Attachment) => {
-    if (window.confirm("Datei löschen?")) {
-      try {
-        await attachments.removeAttachment(attachment.id);
-        showToast({ tone: "success", title: "Datei gelöscht" });
-      } catch (attachmentError) {
-        showToast({ tone: "error", title: "Datei konnte nicht gelöscht werden", message: errorMessage(attachmentError) });
-      }
+    const approved = await confirm({
+      title: "Datei löschen?",
+      body: attachment.originalName,
+      severity: "danger",
+      confirmLabel: "Löschen"
+    });
+    if (!approved) {
+      return;
+    }
+    try {
+      await attachments.removeAttachment(attachment.id);
+      showToast({ tone: "success", title: "Datei gelöscht" });
+    } catch (attachmentError) {
+      showToast({ tone: "error", title: "Datei konnte nicht gelöscht werden", message: errorMessage(attachmentError) });
     }
   };
 
@@ -98,7 +107,13 @@ export function ProjectDetailPage() {
   };
 
   const deleteTask = async (task: Task) => {
-    if (!window.confirm("Aufgabe löschen?")) {
+    const approved = await confirm({
+      title: "Aufgabe löschen?",
+      body: `Die Aufgabe "${task.title}" wird entfernt.`,
+      severity: "danger",
+      confirmLabel: "Löschen"
+    });
+    if (!approved) {
       return;
     }
     try {
@@ -134,7 +149,13 @@ export function ProjectDetailPage() {
   };
 
   const deleteBacklogItem = async (item: BacklogItem) => {
-    if (!window.confirm("Backlog-Item löschen?")) {
+    const approved = await confirm({
+      title: "Backlog-Item löschen?",
+      body: `Das Backlog-Item "${item.title}" wird entfernt.`,
+      severity: "danger",
+      confirmLabel: "Löschen"
+    });
+    if (!approved) {
       return;
     }
     try {
@@ -157,7 +178,7 @@ export function ProjectDetailPage() {
     <div className="mx-auto grid max-w-7xl gap-6">
       <header className="grid gap-4">
         <nav className="flex items-center gap-2 text-sm text-slate-600">
-          <Link className="hover:text-teal" to="/projects">
+          <Link className="hover:text-fern" to="/projects">
             Projekte
           </Link>
           <ChevronRight size={16} />
@@ -184,7 +205,7 @@ export function ProjectDetailPage() {
           <button
             key={tab.value}
             type="button"
-            className={`h-9 rounded-md px-3 text-sm font-medium ${activeTab === tab.value ? "bg-ink text-white" : "hover:bg-line/50"}`}
+            className={`h-9 rounded-md px-3 text-sm font-medium ${activeTab === tab.value ? "bg-steel-900 text-white" : "hover:bg-line/50"}`}
             onClick={() => setActiveTab(tab.value)}
           >
             {tab.label}
@@ -233,7 +254,7 @@ export function ProjectDetailPage() {
                 Speichern
               </Button>
             </div>
-            {projectFeatureLinks.error ? <div className="text-sm text-coral">{projectFeatureLinks.error}</div> : null}
+            {projectFeatureLinks.error ? <div className="text-sm text-crimson">{projectFeatureLinks.error}</div> : null}
             <FeaturePicker features={allFeatures.features} selectedIds={selectedProjectFeatureIds} onChange={setSelectedProjectFeatureIds} />
           </section>
         )
@@ -271,11 +292,18 @@ export function ProjectDetailPage() {
             onCreate={createNote}
             onEdit={setEditingNote}
             onDelete={(note) => {
-              if (window.confirm("Notiz löschen?")) {
-                void notes.removeNote(note.id)
-                  .then(() => showToast({ tone: "success", title: "Notiz gelöscht" }))
-                  .catch((noteError: unknown) => showToast({ tone: "error", title: "Notiz konnte nicht gelöscht werden", message: errorMessage(noteError) }));
-              }
+              void confirm({
+                title: "Notiz löschen?",
+                body: `Die Notiz "${note.title}" wird entfernt.`,
+                severity: "danger",
+                confirmLabel: "Löschen"
+              }).then((approved) => {
+                if (approved) {
+                  void notes.removeNote(note.id)
+                    .then(() => showToast({ tone: "success", title: "Notiz gelöscht" }))
+                    .catch((noteError: unknown) => showToast({ tone: "error", title: "Notiz konnte nicht gelöscht werden", message: errorMessage(noteError) }));
+                }
+              });
             }}
           />
           <NoteEditor note={editingNote} open={Boolean(editingNote)} onSave={notes.updateNote} onClose={() => setEditingNote(null)} />

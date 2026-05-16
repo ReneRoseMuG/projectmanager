@@ -57,7 +57,7 @@ export function TagPicker({ selected, onChange }: TagPickerProps) {
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="h-10 rounded-md border border-line px-3 outline-none focus:border-teal"
+            className="h-10 rounded-md border border-line px-3 outline-none focus:border-fern"
           />
         </label>
         <div className="flex gap-1">

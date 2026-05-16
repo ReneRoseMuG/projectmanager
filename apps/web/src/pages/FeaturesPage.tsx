@@ -3,11 +3,12 @@ import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FeatureForm } from "../components/features/FeatureForm";
+import { FeatureCardSkeleton } from "../components/features/FeatureCardSkeleton";
 import { FeatureList } from "../components/features/FeatureList";
 import { Button } from "../components/ui/Button";
+import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
 import { SearchInput } from "../components/ui/SearchInput";
-import { TaskListSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useFeatures } from "../hooks/useFeatures";
@@ -15,6 +16,7 @@ import { useFeatures } from "../hooks/useFeatures";
 export function FeaturesPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const features = useFeatures();
   const [formOpen, setFormOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | "all">("all");
@@ -63,9 +65,9 @@ export function FeaturesPage() {
       </header>
 
       {features.loading ? (
-        <TaskListSkeleton />
+        <FeatureCardSkeleton />
       ) : features.error ? (
-        <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-coral">{features.error}</div>
+        <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-crimson">{features.error}</div>
       ) : (
         <>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -76,11 +78,18 @@ export function FeaturesPage() {
             features={filteredFeatures}
             onCreate={() => setFormOpen(true)}
             onDelete={(feature) => {
-              if (window.confirm("Feature löschen?")) {
-                void features.removeFeature(feature.id)
-                  .then(() => showToast({ tone: "success", title: "Feature gelöscht" }))
-                  .catch((featureError: unknown) => showToast({ tone: "error", title: "Feature konnte nicht gelöscht werden", message: errorMessage(featureError) }));
-              }
+              void confirm({
+                title: "Feature löschen?",
+                body: `Das Feature "${feature.title}" wird entfernt.`,
+                severity: "danger",
+                confirmLabel: "Löschen"
+              }).then((approved) => {
+                if (approved) {
+                  void features.removeFeature(feature.id)
+                    .then(() => showToast({ tone: "success", title: "Feature gelöscht" }))
+                    .catch((featureError: unknown) => showToast({ tone: "error", title: "Feature konnte nicht gelöscht werden", message: errorMessage(featureError) }));
+                }
+              });
             }}
           />
         </>

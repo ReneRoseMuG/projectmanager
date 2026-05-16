@@ -20,7 +20,7 @@ export function UpcomingEvents({ events, onOpen }: UpcomingEventsProps) {
   return (
     <section className="grid gap-3 rounded-lg border border-line bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2">
-        <CalendarClock size={18} className="text-teal" />
+        <CalendarClock size={18} className="text-fern" />
         <h2 className="text-base font-semibold text-ink">Nächste Termine</h2>
       </div>
 
@@ -30,7 +30,7 @@ export function UpcomingEvents({ events, onOpen }: UpcomingEventsProps) {
             <button
               key={event.id}
               type="button"
-              className="grid min-h-24 gap-2 rounded-md border border-line bg-shell/60 p-3 text-left transition hover:border-teal hover:bg-white"
+              className="grid min-h-24 gap-2 rounded-md border border-line bg-shell/60 p-3 text-left transition hover:border-fern hover:bg-white"
               onClick={() => onOpen(event)}
             >
               <span className="h-1 w-10 rounded" style={{ backgroundColor: event.color ?? "#0f766e" }} />

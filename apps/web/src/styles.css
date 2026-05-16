@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  color: #172026;
-  background: #f6f7f2;
+  color: #0F2542;
+  background: #F4F7FA;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -44,10 +44,95 @@ textarea {
 }
 
 .fc {
-  --fc-border-color: #d9ded6;
-  --fc-today-bg-color: rgba(15, 118, 110, 0.08);
-  --fc-button-bg-color: #172026;
-  --fc-button-border-color: #172026;
-  --fc-button-hover-bg-color: #0f766e;
-  --fc-button-hover-border-color: #0f766e;
+  --fc-border-color: theme("colors.line");
+  --fc-today-bg-color: rgba(46, 89, 132, 0.05);
+  --fc-button-bg-color: theme("colors.steel.700");
+  --fc-button-border-color: theme("colors.steel.700");
+  --fc-button-hover-bg-color: theme("colors.steel.800");
+  --fc-button-hover-border-color: theme("colors.steel.800");
+}
+
+.fc-event {
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  padding: 2px 6px;
+}
+
+.fc-daygrid-day-number {
+  color: theme("colors.slate.700");
+  font-weight: 700;
+}
+
+.fc-toolbar-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.fc-button {
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+}
+
+.fc-button-primary {
+  background: theme("colors.steel.700") !important;
+  border-color: theme("colors.steel.700") !important;
+}
+
+.fc .task-due-event {
+  border: 1px dashed theme("colors.steel.400") !important;
+  color: theme("colors.ink") !important;
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toast-timebar {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.toast-enter {
+  animation: toast-enter 240ms ease-out both;
+}
+
+.toast-timebar {
+  transform-origin: left;
+  animation-name: toast-timebar;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background-image: linear-gradient(90deg, theme("colors.steel.100") 0%, theme("colors.steel.50") 45%, theme("colors.steel.100") 90%);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+  }
 }

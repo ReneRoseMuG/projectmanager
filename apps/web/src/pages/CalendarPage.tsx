@@ -5,7 +5,7 @@ import { CalendarView } from "../components/calendar/CalendarView";
 import { EventForm } from "../components/calendar/EventForm";
 import { UpcomingEvents } from "../components/calendar/UpcomingEvents";
 import { Button } from "../components/ui/Button";
-import { CalendarSkeleton } from "../components/ui/Skeleton";
+import { CalendarSkeleton } from "../components/calendar/CalendarSkeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useCalendarTasks } from "../hooks/useCalendarTasks";
@@ -54,7 +54,7 @@ export function CalendarPage() {
         </Button>
       </header>
 
-      {events.error || calendarTasks.error ? <div className="rounded-md border border-coral bg-coral/10 p-3 text-sm text-coral">{events.error ?? calendarTasks.error}</div> : null}
+      {events.error || calendarTasks.error ? <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">{events.error ?? calendarTasks.error}</div> : null}
       {events.loading || calendarTasks.loading || projectsLoading ? (
         <CalendarSkeleton />
       ) : (

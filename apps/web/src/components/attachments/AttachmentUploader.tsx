@@ -5,12 +5,14 @@ import { Button } from "../ui/Button";
 
 interface AttachmentUploaderProps {
   onUpload: (file: File) => Promise<unknown>;
+  size?: "default" | "sm";
 }
 
-export function AttachmentUploader({ onUpload }: AttachmentUploaderProps) {
+export function AttachmentUploader({ onUpload, size = "default" }: AttachmentUploaderProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [active, setActive] = useState(false);
   const [uploading, setUploading] = useState<string[]>([]);
+  const compact = size === "sm";
 
   const uploadFiles = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -34,7 +36,9 @@ export function AttachmentUploader({ onUpload }: AttachmentUploaderProps) {
 
   return (
     <div
-      className={`grid gap-3 rounded-lg border border-dashed p-6 text-center ${active ? "border-teal bg-teal/5" : "border-line bg-white"}`}
+      className={`grid place-items-center gap-3 rounded-2xl border-2 border-dashed px-6 text-center transition ${compact ? "py-5" : "py-9"} ${
+        active ? "border-steel-600 bg-steel-100/60" : "border-steel-300 bg-gradient-to-b from-steel-100/50 to-white"
+      }`}
       onDragOver={(event) => {
         event.preventDefault();
         setActive(true);
@@ -53,15 +57,15 @@ export function AttachmentUploader({ onUpload }: AttachmentUploaderProps) {
           }
         }}
       />
-      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-md bg-shell text-teal">
-        <Upload size={20} />
+      <div className={`flex items-center justify-center rounded-2xl bg-steel-700 text-white shadow-[0_8px_20px_rgba(46,89,132,0.3)] ${compact ? "h-10 w-10" : "h-14 w-14"}`}>
+        <Upload size={compact ? 18 : 22} />
       </div>
       <div>
-        <p className="text-sm font-medium text-ink">Dateien ablegen</p>
-        <p className="text-xs text-slate-500">Max. 25 MB pro Datei</p>
+        <h3 className={`${compact ? "text-sm" : "text-base"} font-bold text-ink`}>Dateien hier ablegen</h3>
+        <p className="text-sm text-slate-500">oder über den Button auswählen - max. 25 MB pro Datei</p>
       </div>
       <div>
-        <Button icon={<Upload size={16} />} onClick={() => inputRef.current?.click()}>
+        <Button variant="primary" icon={<Upload size={16} />} onClick={() => inputRef.current?.click()}>
           Auswählen
         </Button>
       </div>

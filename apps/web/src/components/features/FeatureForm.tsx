@@ -1,11 +1,10 @@
 import type { Feature, FeatureInput, FeatureStatus } from "@taskmanager/shared-types";
-import { Save } from "lucide-react";
-import type { FormEvent } from "react";
+import { LinkIcon, Save } from "lucide-react";
+import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
 import { MarkdownEditor } from "../ui/MarkdownEditor";
 import { Modal } from "../ui/Modal";
-import { Select } from "../ui/Select";
 
 interface FeatureFormProps {
   open: boolean;
@@ -14,12 +13,30 @@ interface FeatureFormProps {
   onClose: () => void;
 }
 
-const statuses: Array<{ value: FeatureStatus; label: string }> = [
-  { value: "draft", label: "Entwurf" },
-  { value: "active", label: "Aktiv" },
-  { value: "done", label: "Erledigt" },
-  { value: "archived", label: "Archiviert" }
+const statuses: Array<{ value: FeatureStatus; label: string; className: string }> = [
+  { value: "draft", label: "Entwurf", className: "data-[active=true]:bg-mustard data-[active=true]:text-[#6E5800]" },
+  { value: "active", label: "Aktiv", className: "data-[active=true]:bg-fern data-[active=true]:text-white" },
+  { value: "done", label: "Erledigt", className: "data-[active=true]:bg-violet data-[active=true]:text-white" },
+  { value: "archived", label: "Archiviert", className: "data-[active=true]:bg-steel-100 data-[active=true]:text-steel-700" }
 ];
+
+function FieldLabel({ children, required = false }: { children: string; required?: boolean }) {
+  return (
+    <span>
+      {children}
+      {required ? <span className="text-crimson">*</span> : null}
+    </span>
+  );
+}
+
+function FormCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="grid gap-4 rounded-xl border border-line bg-white p-4 shadow-sm">
+      <h3 className="text-sm font-bold text-ink">{title}</h3>
+      {children}
+    </section>
+  );
+}
 
 export function FeatureForm({ open, feature, onSubmit, onClose }: FeatureFormProps) {
   const [title, setTitle] = useState("");
@@ -65,47 +82,69 @@ export function FeatureForm({ open, feature, onSubmit, onClose }: FeatureFormPro
   return (
     <Modal open={open} title={feature ? "Feature bearbeiten" : "Neues Feature"} size="xl" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
-        <div className="grid gap-4 md:grid-cols-2">
+        <FormCard title="Stammdaten">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="grid gap-1 text-sm font-medium">
+              <FieldLabel required>Titel</FieldLabel>
+              <input autoFocus={!feature} className="h-11 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" value={title} onChange={(event) => setTitle(event.target.value)} required />
+            </label>
+            <label className="grid gap-1 text-sm font-medium">
+              <FieldLabel required>Slug</FieldLabel>
+              <span className="relative">
+                <LinkIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-steel-400" size={16} />
+                <input className="h-11 w-full rounded-lg border border-line pl-9 pr-3 font-mono text-sm outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" value={slug} onChange={(event) => setSlug(event.target.value)} required />
+              </span>
+            </label>
+          </div>
+        </FormCard>
+
+        <FormCard title="Status & Sortierung">
+          <div className="grid gap-4 md:grid-cols-[1fr_10rem]">
+            <div className="grid gap-1 text-sm font-medium">
+              <span>Status</span>
+              <div className="flex flex-wrap gap-2 rounded-xl border border-line bg-steel-50 p-1.5">
+                {statuses.map((item) => (
+                  <button
+                    key={item.value}
+                    className={`h-9 rounded-lg px-3 text-xs font-bold uppercase tracking-wide text-slate-500 transition hover:bg-white ${item.className}`}
+                    data-active={status === item.value}
+                    type="button"
+                    onClick={() => setStatus(item.value)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="grid gap-1 text-sm font-medium">
+              Sortierung
+              <input
+                className="h-11 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10"
+                type="number"
+                value={sortOrder}
+                onChange={(event) => setSortOrder(Number(event.target.value))}
+              />
+            </label>
+          </div>
+        </FormCard>
+
+        <FormCard title="Kurzbeschreibung">
           <label className="grid gap-1 text-sm font-medium">
-            Titel
-            <input className="h-10 rounded-md border border-line px-3 outline-none focus:border-teal" value={title} onChange={(event) => setTitle(event.target.value)} required />
-          </label>
-          <label className="grid gap-1 text-sm font-medium">
-            Slug
-            <input className="h-10 rounded-md border border-line px-3 outline-none focus:border-teal" value={slug} onChange={(event) => setSlug(event.target.value)} required />
-          </label>
-        </div>
-        <div className="grid gap-4 md:grid-cols-[1fr_10rem]">
-          <Select label="Status" value={status} onChange={(event) => setStatus(event.target.value as FeatureStatus)}>
-            {statuses.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </Select>
-          <label className="grid gap-1 text-sm font-medium">
-            Sortierung
-            <input
-              className="h-10 rounded-md border border-line px-3 outline-none focus:border-teal"
-              type="number"
-              value={sortOrder}
-              onChange={(event) => setSortOrder(Number(event.target.value))}
+            <textarea
+              className="min-h-24 rounded-lg border border-line px-3 py-2 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
             />
           </label>
-        </div>
-        <label className="grid gap-1 text-sm font-medium">
-          Kurzbeschreibung
-          <textarea
-            className="min-h-24 rounded-md border border-line px-3 py-2 outline-none focus:border-teal"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </label>
-        <div className="grid gap-1 text-sm font-medium">
-          Inhalt
-          <MarkdownEditor initialContent={content} placeholder="Feature-Inhalt" onChange={setContent} />
-        </div>
-        <div className="flex justify-end gap-2 border-t border-line pt-4">
+        </FormCard>
+
+        <FormCard title="Inhalt">
+          <div className="grid gap-2 text-sm font-medium">
+            <MarkdownEditor initialContent={content} placeholder="Feature-Inhalt" onChange={setContent} />
+          </div>
+        </FormCard>
+
+        <div className="flex justify-between gap-2 border-t border-line pt-4">
           <Button onClick={onClose}>Abbrechen</Button>
           <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
             Speichern

@@ -1,4 +1,6 @@
 import type { Project } from "@taskmanager/shared-types";
+import { FolderKanban } from "lucide-react";
+import { EmptyState } from "../ui/EmptyState";
 import { ProjectCard } from "./ProjectCard";
 
 interface ProjectListProps {
@@ -9,7 +11,7 @@ interface ProjectListProps {
 
 export function ProjectList({ projects, onEdit, onDelete }: ProjectListProps) {
   if (projects.length === 0) {
-    return <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center text-sm text-slate-600">Keine Projekte</div>;
+    return <EmptyState icon={<FolderKanban size={22} />} title="Keine Projekte" body="Lege dein erstes Projekt an, um Aufgaben, Backlog und Dateien zu bündeln." tone="fern" variant="first-run" />;
   }
 
   return (

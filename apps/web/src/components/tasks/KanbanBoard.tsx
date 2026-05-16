@@ -1,5 +1,7 @@
 import type { Task, TaskStatus } from "@taskmanager/shared-types";
 import { closestCorners, DndContext, type DragEndEvent } from "@dnd-kit/core";
+import { Columns3 } from "lucide-react";
+import { EmptyState } from "../ui/EmptyState";
 import { KanbanColumn } from "./KanbanColumn";
 
 interface KanbanBoardProps {
@@ -64,7 +66,7 @@ export function KanbanBoard({ tasks, onOpen, onDelete, onMove }: KanbanBoardProp
   };
 
   if (tasks.length === 0) {
-    return <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center text-sm text-slate-600">Keine Aufgaben</div>;
+    return <EmptyState icon={<Columns3 size={22} />} title="Keine Aufgaben" body="Sobald Aufgaben angelegt sind, erscheinen sie hier nach Status gruppiert." tone="teal" variant="tinted" />;
   }
 
   return (

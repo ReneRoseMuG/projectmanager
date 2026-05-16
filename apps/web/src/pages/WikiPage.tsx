@@ -1,8 +1,10 @@
 import type { WikiPage as WikiPageType, WikiPageInput, WikiPageUpdate } from "@taskmanager/shared-types";
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/ui/Button";
+import { useConfirm } from "../components/ui/ConfirmDialogProvider";
+import { EmptyState } from "../components/ui/EmptyState";
 import { TaskListSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { WikiBreadcrumb } from "../components/wiki/WikiBreadcrumb";
@@ -19,6 +21,7 @@ export function WikiPage() {
   const wiki = useWiki(activePageId);
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const [formOpen, setFormOpen] = useState(false);
   const [formParent, setFormParent] = useState<WikiPageType | null>(null);
   const [editingPage, setEditingPage] = useState<WikiPageType | null>(null);
@@ -61,16 +64,23 @@ export function WikiPage() {
     }
   };
 
-  const deletePage = (page: WikiPageType) => {
-    if (!window.confirm("Wiki-Seite löschen?")) {
+  const deletePage = async (page: WikiPageType) => {
+    const approved = await confirm({
+      title: "Wiki-Seite löschen?",
+      body: `Die Seite "${page.title}" wird entfernt.`,
+      severity: "danger",
+      confirmLabel: "Löschen"
+    });
+    if (!approved) {
       return;
     }
-    void wiki.removeWikiPage(page.id)
-      .then(() => {
-        showToast({ tone: "success", title: "Wiki-Seite gelöscht" });
-        navigate("/wiki");
-      })
-      .catch((wikiError: unknown) => showToast({ tone: "error", title: "Wiki-Seite konnte nicht gelöscht werden", message: errorMessage(wikiError) }));
+    try {
+      await wiki.removeWikiPage(page.id);
+      showToast({ tone: "success", title: "Wiki-Seite gelöscht" });
+      navigate("/wiki");
+    } catch (wikiError) {
+      showToast({ tone: "error", title: "Wiki-Seite konnte nicht gelöscht werden", message: errorMessage(wikiError) });
+    }
   };
 
   return (
@@ -91,12 +101,12 @@ export function WikiPage() {
         <div className="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
           <WikiTree tree={wiki.tree} onCreate={openCreate} />
           <div className="grid content-start gap-4">
-            {wiki.error ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-coral">{wiki.error}</div> : null}
+            {wiki.error ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">{wiki.error}</div> : null}
             <WikiBreadcrumb items={wiki.breadcrumb} />
             {wiki.page ? (
               <WikiPageDetail page={wiki.page} onSave={savePage} onDelete={deletePage} onEditMetadata={openEditMetadata} />
             ) : (
-              <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center text-sm text-slate-600">Keine Wiki-Seite ausgewählt</div>
+              <EmptyState icon={<FileText size={22} />} title="Keine Wiki-Seite ausgewählt" body="Wähle links eine Seite aus oder lege eine neue Wiki-Seite an." tone="teal" variant="tinted" actions={[{ label: "Neue Seite", onClick: () => openCreate(null), primary: true, icon: <Plus size={16} /> }]} />
             )}
           </div>
         </div>

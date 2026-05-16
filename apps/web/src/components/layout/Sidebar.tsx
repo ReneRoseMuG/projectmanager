@@ -1,4 +1,4 @@
-import { BookOpen, CalendarDays, FolderKanban, Library } from "lucide-react";
+import { BookOpen, CalendarDays, FolderKanban, Library, Tags } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
@@ -8,16 +8,23 @@ const items = [
   { to: "/calendar", label: "Kalender", icon: CalendarDays }
 ];
 
+const settingsItems = [{ to: "/settings/tags", label: "Tags", icon: Tags }];
+
+function NavSection({ children }: { children: string }) {
+  return <div className="mb-2 mt-5 px-1.5 text-[10px] font-semibold uppercase tracking-widest text-steel-400">{children}</div>;
+}
+
 export function Sidebar() {
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-line bg-white p-4 md:block">
+    <aside className="hidden w-64 shrink-0 bg-gradient-to-b from-steel-700 to-steel-800 p-4 text-white md:block">
       <div className="mb-8 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-md bg-ink text-white">TM</span>
+        <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-steel-700 shadow-lg">TM</span>
         <div>
-          <strong className="block text-sm text-ink">Taskmanager</strong>
-          <span className="text-xs text-slate-500">Lokal</span>
+          <strong className="block text-sm font-bold text-white">Taskmanager</strong>
+          <span className="text-[11px] uppercase tracking-widest text-steel-300">Lokal</span>
         </div>
       </div>
+      <NavSection>Navigation</NavSection>
       <nav className="grid gap-1">
         {items.map((item) => {
           const Icon = item.icon;
@@ -26,7 +33,25 @@ export function Sidebar() {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium ${isActive ? "bg-ink text-white" : "text-slate-700 hover:bg-shell"}`
+                `flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-md" : "text-white/75 hover:bg-white/5 hover:text-white"}`
+              }
+            >
+              <Icon size={17} />
+              {item.label}
+            </NavLink>
+          );
+        })}
+      </nav>
+      <NavSection>Einstellungen</NavSection>
+      <nav className="grid gap-1">
+        {settingsItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-md" : "text-white/75 hover:bg-white/5 hover:text-white"}`
               }
             >
               <Icon size={17} />

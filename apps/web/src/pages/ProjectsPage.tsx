@@ -2,11 +2,12 @@ import { PROJECT_STATUSES, type Project, type ProjectInput, type ProjectStatus }
 import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ProjectForm } from "../components/projects/ProjectForm";
+import { ProjectCardSkeleton } from "../components/projects/ProjectCardSkeleton";
 import { ProjectList } from "../components/projects/ProjectList";
 import { Button } from "../components/ui/Button";
+import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
 import { SearchInput } from "../components/ui/SearchInput";
-import { ProjectGridSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useProjects } from "../hooks/useProjects";
@@ -14,6 +15,7 @@ import { useProjects } from "../hooks/useProjects";
 export function ProjectsPage() {
   const { projects, loading, error, createProject, updateProject, removeProject } = useProjects();
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const [formOpen, setFormOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
@@ -59,7 +61,13 @@ export function ProjectsPage() {
   };
 
   const deleteProject = async (project: Project) => {
-    if (!window.confirm("Projekt löschen?")) {
+    const approved = await confirm({
+      title: "Projekt löschen?",
+      body: `Das Projekt "${project.name}" wird entfernt.`,
+      severity: "danger",
+      confirmLabel: "Löschen"
+    });
+    if (!approved) {
       return;
     }
     try {
@@ -82,14 +90,14 @@ export function ProjectsPage() {
         </Button>
       </header>
 
-      {error ? <div className="rounded-md border border-coral bg-coral/10 p-3 text-sm text-coral">{error}</div> : null}
+      {error ? <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">{error}</div> : null}
       {!loading ? (
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <FilterChips value={statusFilter} onChange={setStatusFilter} options={statusOptions} allCount={projects.length} />
           <SearchInput value={search} onChange={setSearch} placeholder="Projekte suchen" />
         </div>
       ) : null}
-      {loading ? <ProjectGridSkeleton /> : <ProjectList projects={filteredProjects} onEdit={(project) => {
+      {loading ? <ProjectCardSkeleton /> : <ProjectList projects={filteredProjects} onEdit={(project) => {
         setEditingProject(project);
         setFormOpen(true);
       }} onDelete={(project) => void deleteProject(project)} />}

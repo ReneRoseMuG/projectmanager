@@ -9,7 +9,7 @@ interface FilterChipsProps<T extends string> {
 export function FilterChips<T extends string>({ value, onChange, options, allLabel = "Alle", allCount }: FilterChipsProps<T>) {
   const chipClass = (active: boolean) =>
     `inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium transition ${
-      active ? "border-ink bg-ink text-white" : "border-line bg-white text-slate-700 hover:border-teal hover:text-ink"
+      active ? "border-ink bg-steel-900 text-white" : "border-line bg-white text-slate-700 hover:border-fern hover:text-ink"
     }`;
 
   return (

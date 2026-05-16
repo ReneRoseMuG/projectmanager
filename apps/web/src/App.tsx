@@ -4,9 +4,11 @@ import { TopBar } from "./components/layout/TopBar";
 import { CalendarPage } from "./pages/CalendarPage";
 import { FeatureDetailPage } from "./pages/FeatureDetailPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
+import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { SettingsTagsPage } from "./pages/SettingsTagsPage";
 import { WikiPage } from "./pages/WikiPage";
 
 export default function App() {
@@ -25,6 +27,8 @@ export default function App() {
             <Route path="/wiki" element={<WikiPage />} />
             <Route path="/wiki/:id" element={<WikiPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/settings/tags" element={<SettingsTagsPage />} />
+            <Route path="/forbidden" element={<ForbiddenPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>

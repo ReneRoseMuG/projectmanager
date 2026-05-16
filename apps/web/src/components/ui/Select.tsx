@@ -8,7 +8,7 @@ export function Select({ label, className = "", children, ...props }: SelectProp
   return (
     <label className="grid gap-1 text-sm font-medium text-ink">
       {label}
-      <select className={`h-10 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-teal ${className}`} {...props}>
+      <select className={`h-10 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-fern ${className}`} {...props}>
         {children}
       </select>
     </label>
