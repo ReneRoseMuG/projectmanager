@@ -1,9 +1,8 @@
-import type { Feature, Project, ProjectInput, ProjectStatus, Tag } from "@taskmanager/shared-types";
+import type { Project, ProjectInput, ProjectStatus, Tag } from "@taskmanager/shared-types";
 import { FolderKanban } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { formatHumanDate } from "../../utils/date";
-import { FeatureRelationPanel } from "../features/FeatureRelationPanel";
 import { TagPicker } from "../tags/TagPicker";
 import { ColorPicker } from "../ui/ColorPicker";
 import { DatePicker } from "../ui/DatePicker";
@@ -17,9 +16,7 @@ import { SegmentedControl } from "../ui/SegmentedControl";
 interface ProjectFormProps {
   open: boolean;
   project?: Project | null;
-  features?: Feature[];
-  initialFeatureIds?: number[];
-  onSubmit: (input: ProjectInput, tagIds: number[], featureIds: number[]) => Promise<void>;
+  onSubmit: (input: ProjectInput, tagIds: number[]) => Promise<void>;
   onClose: () => void;
 }
 
@@ -52,18 +49,16 @@ function projectCode(name: string) {
     .toUpperCase();
 }
 
-export function ProjectForm({ open, project, features = [], initialFeatureIds = [], onSubmit, onClose }: ProjectFormProps) {
+export function ProjectForm({ open, project, onSubmit, onClose }: ProjectFormProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<ProjectStatus>("active");
   const [color, setColor] = useState("var(--color-steel-700)");
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
-  const [selectedFeatureIds, setSelectedFeatureIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const code = useMemo(() => projectCode(name), [name]);
-  const initialFeatureKey = initialFeatureIds.join(",");
 
   useEffect(() => {
     if (!open) {
@@ -75,10 +70,9 @@ export function ProjectForm({ open, project, features = [], initialFeatureIds = 
     setStatus(project?.status ?? "active");
     setColor(project?.color ?? "var(--color-steel-700)");
     setSelectedTags(project?.tags ?? []);
-    setSelectedFeatureIds(initialFeatureIds);
     setStartDate(project?.startDate ?? "");
     setDueDate(project?.dueDate ?? "");
-  }, [initialFeatureKey, open, project]);
+  }, [open, project]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -93,8 +87,7 @@ export function ProjectForm({ open, project, features = [], initialFeatureIds = 
           startDate: startDate || null,
           dueDate: dueDate || null
         },
-        selectedTags.map((tag) => tag.id),
-        selectedFeatureIds
+        selectedTags.map((tag) => tag.id)
       );
       onClose();
     } catch {
@@ -150,17 +143,6 @@ export function ProjectForm({ open, project, features = [], initialFeatureIds = 
 
       <Section title="Tags">
         <TagPicker selected={selectedTags} onChange={setSelectedTags} />
-      </Section>
-
-      <Section title="Features">
-        <FeatureRelationPanel
-          features={features}
-          selectedIds={selectedFeatureIds}
-          onChange={setSelectedFeatureIds}
-          onSave={async () => undefined}
-          title="Vorauswahl"
-          showSave={false}
-        />
       </Section>
     </FormModal>
   );

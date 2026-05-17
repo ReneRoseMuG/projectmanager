@@ -2,6 +2,8 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 18.05.26 | Fix | Projektformular Feature-Vorauswahl | ✅ |
+| 18.05.26 | Fix | App-Datenbank leeren | ✅ |
 | 17.05.26 | Fix | Delete-Cascade-Tests | ✅ |
 | 17.05.26 | Fix | Delete-Cascade-Cleanup | ✅ |
 | 17.05.26 | Fix | Wiki-Import Feature-Content | ✅ |

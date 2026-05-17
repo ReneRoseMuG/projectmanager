@@ -1,28 +1,20 @@
 import { PROJECT_STATUSES, type Project, type ProjectInput, type ProjectStatus } from "@taskmanager/shared-types";
-import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ProjectForm } from "../components/projects/ProjectForm";
 import { ProjectListBoardView } from "../components/projects/ProjectListBoardView";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
 import { useToast } from "../components/ui/ToastProvider";
-import { setProjectFeatures } from "../api/doc-links";
 import { errorMessage } from "../hooks/errors";
-import { useProjectFeatureLinks } from "../hooks/useDocLinks";
-import { useFeatures } from "../hooks/useFeatures";
 import { useProjects } from "../hooks/useProjects";
-import { invalidateFeatureScope, invalidateProjectScope } from "../queries/invalidation";
 import { projectStatusLabels } from "../utils/domainLabels";
 
 export function ProjectsPage() {
-  const queryClient = useQueryClient();
   const { projects, loading, error, createProject, updateProject, removeProject } = useProjects();
-  const allFeatures = useFeatures();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const [formOpen, setFormOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const projectFeatureLinks = useProjectFeatureLinks(editingProject?.id);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
 
   const statusOptions = useMemo(
@@ -47,28 +39,18 @@ export function ProjectsPage() {
     setFormOpen(true);
   };
 
-  const submit = async (input: ProjectInput, tagIds: number[], featureIds: number[]) => {
+  const submit = async (input: ProjectInput, tagIds: number[]) => {
     try {
       if (editingProject) {
         await updateProject(editingProject.id, input, tagIds);
-        await setProjectFeatures(editingProject.id, featureIds);
-        await invalidateProjectScope(queryClient, editingProject.id);
-        await invalidateFeatureScope(queryClient);
         showToast({ tone: "success", title: "Projekt aktualisiert" });
         return;
       }
-      const created = await createProject(input, tagIds);
-      if (featureIds.length > 0) {
-        await setProjectFeatures(created.id, featureIds);
-        await invalidateProjectScope(queryClient, created.id);
-        await invalidateFeatureScope(queryClient);
-      }
+      await createProject(input, tagIds);
       showToast({ tone: "success", title: "Projekt erstellt" });
     } catch (submitError) {
       showToast({ tone: "error", title: "Projekt konnte nicht gespeichert werden", message: errorMessage(submitError) });
       throw submitError;
-    } finally {
-      await projectFeatureLinks.reload();
     }
   };
 
@@ -115,8 +97,6 @@ export function ProjectsPage() {
       <ProjectForm
         open={formOpen}
         project={editingProject}
-        features={allFeatures.features}
-        initialFeatureIds={editingProject ? projectFeatureLinks.features.map((feature) => feature.id) : []}
         onSubmit={submit}
         onClose={() => setFormOpen(false)}
       />
