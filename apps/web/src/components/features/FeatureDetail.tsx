@@ -4,7 +4,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { formatHumanDate } from "../../utils/date";
 import { Button } from "../ui/Button";
-import { MarkdownEditor } from "../ui/MarkdownEditor";
+import { RichTextEditor } from "../ui/RichTextEditor";
 
 interface FeatureDetailProps {
   feature: Feature;
@@ -129,7 +129,7 @@ export function FeatureDetail({ feature, onSave }: FeatureDetailProps) {
 
       <FormCard title="Inhalt">
       <div className="grid gap-2 text-sm font-medium">
-        <MarkdownEditor initialContent={content} placeholder="Feature-Inhalt" onChange={setContent} />
+        <RichTextEditor markdown={content} placeholder="Feature-Inhalt" onMarkdownChange={setContent} />
       </div>
       </FormCard>
 

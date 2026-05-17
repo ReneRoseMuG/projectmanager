@@ -1,4 +1,4 @@
-import type { Feature, UseCase } from "@taskmanager/shared-types";
+import type { Feature, Project, UseCase } from "@taskmanager/shared-types";
 import { useCallback, useEffect, useState } from "react";
 import {
   getProjectFeatures,
@@ -8,6 +8,7 @@ import {
   setTaskFeatures as setTaskFeaturesRequest,
   setTaskUseCases as setTaskUseCasesRequest
 } from "../api/doc-links";
+import { getProjects } from "../api/projects";
 import { getUseCases } from "../api/use-cases";
 import { errorMessage } from "./errors";
 
@@ -50,6 +51,76 @@ export function useProjectFeatureLinks(projectId?: number) {
   );
 
   return { features, loading, error, reload: load, setFeaturesForProject };
+}
+
+export function useFeatureProjectLinks(featureId?: number) {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [linkedProjects, setLinkedProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(Boolean(featureId));
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!featureId) {
+      setProjects([]);
+      setLinkedProjects([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const allProjects = await getProjects();
+      const projectFeaturePairs = await Promise.all(
+        allProjects.map(async (project) => ({
+          project,
+          features: await getProjectFeatures(project.id)
+        }))
+      );
+      setProjects(allProjects);
+      setLinkedProjects(projectFeaturePairs.filter((pair) => pair.features.some((feature) => feature.id === featureId)).map((pair) => pair.project));
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setLoading(false);
+    }
+  }, [featureId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const addProjectToFeature = useCallback(
+    async (projectId: number) => {
+      if (!featureId) {
+        throw new Error("Feature id is required");
+      }
+      const currentFeatures = await getProjectFeatures(projectId);
+      const featureIds = currentFeatures.map((feature) => feature.id);
+      if (!featureIds.includes(featureId)) {
+        await setProjectFeaturesRequest(projectId, [...featureIds, featureId]);
+      }
+      await load();
+    },
+    [featureId, load]
+  );
+
+  const removeProjectFromFeature = useCallback(
+    async (projectId: number) => {
+      if (!featureId) {
+        throw new Error("Feature id is required");
+      }
+      const currentFeatures = await getProjectFeatures(projectId);
+      await setProjectFeaturesRequest(
+        projectId,
+        currentFeatures.filter((feature) => feature.id !== featureId).map((feature) => feature.id)
+      );
+      await load();
+    },
+    [featureId, load]
+  );
+
+  return { projects, linkedProjects, loading, error, reload: load, addProjectToFeature, removeProjectFromFeature };
 }
 
 export function useTaskDocLinks(taskId?: number | null) {

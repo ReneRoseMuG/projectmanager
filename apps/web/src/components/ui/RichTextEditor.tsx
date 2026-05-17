@@ -35,13 +35,16 @@ import {
   Unlink
 } from "lucide-react";
 import { useEffect } from "react";
+import { Markdown } from "tiptap-markdown";
 import { Button } from "./Button";
 
 interface RichTextEditorProps {
-  value: JsonObject;
+  value?: JsonObject;
+  markdown?: string;
   placeholder?: string;
   fullscreen?: boolean;
-  onChange: (value: JsonObject) => void;
+  onChange?: (value: JsonObject) => void;
+  onMarkdownChange?: (value: string) => void;
   onFullscreenChange?: (value: boolean) => void;
 }
 
@@ -52,6 +55,12 @@ type EditorJsonContent = {
   marks?: EditorJsonContent[];
   text?: string;
 };
+
+interface MarkdownStorage {
+  markdown: {
+    getMarkdown: () => string;
+  };
+}
 
 const emptyDoc: EditorJsonContent = {
   type: "doc",
@@ -66,7 +75,13 @@ function toContent(value: JsonObject): EditorJsonContent {
   return isRecord(value) && typeof value.type === "string" ? (value as unknown as EditorJsonContent) : emptyDoc;
 }
 
-export function RichTextEditor({ value, placeholder = "Notiz", fullscreen = false, onChange, onFullscreenChange }: RichTextEditorProps) {
+function getMarkdown(editor: { storage: unknown }) {
+  const storage = editor.storage as MarkdownStorage;
+  return storage.markdown.getMarkdown();
+}
+
+export function RichTextEditor({ value, markdown, placeholder = "Notiz", fullscreen = false, onChange, onMarkdownChange, onFullscreenChange }: RichTextEditorProps) {
+  const usesMarkdown = markdown !== undefined;
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -82,11 +97,21 @@ export function RichTextEditor({ value, placeholder = "Notiz", fullscreen = fals
       TextStyle,
       Highlight.configure({ multicolor: true }),
       TaskList,
-      TaskItem.configure({ nested: true })
+      TaskItem.configure({ nested: true }),
+      Markdown.configure({
+        html: false,
+        tightLists: true,
+        bulletListMarker: "-",
+        linkify: true,
+        breaks: false,
+        transformPastedText: true,
+        transformCopiedText: true
+      })
     ],
-    content: toContent(value),
-    onUpdate: ({ editor: activeEditor }: { editor: { getJSON: () => unknown } }) => {
-      onChange(activeEditor.getJSON() as JsonObject);
+    content: usesMarkdown ? markdown : toContent(value ?? {}),
+    onUpdate: ({ editor: activeEditor }: { editor: { getJSON: () => unknown; storage: unknown } }) => {
+      onChange?.(activeEditor.getJSON() as JsonObject);
+      onMarkdownChange?.(getMarkdown(activeEditor));
     },
     editorProps: {
       attributes: {
@@ -99,11 +124,17 @@ export function RichTextEditor({ value, placeholder = "Notiz", fullscreen = fals
     if (!editor) {
       return;
     }
-    const next = toContent(value);
+    if (usesMarkdown) {
+      if (getMarkdown(editor) !== markdown) {
+        editor.commands.setContent(markdown ?? "");
+      }
+      return;
+    }
+    const next = toContent(value ?? {});
     if (JSON.stringify(editor.getJSON()) !== JSON.stringify(next)) {
       editor.commands.setContent(next);
     }
-  }, [editor, value]);
+  }, [editor, markdown, usesMarkdown, value]);
 
   if (!editor) {
     return null;

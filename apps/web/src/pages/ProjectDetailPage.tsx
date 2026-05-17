@@ -1,12 +1,13 @@
-import type { Attachment, BacklogItem, Note, Task, TaskStatus } from "@taskmanager/shared-types";
+import type { Attachment, BacklogItem, Feature, FeatureInput, Note, Task, TaskStatus } from "@taskmanager/shared-types";
 import { ChevronRight, Filter, MoreHorizontal, Plus } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AttachmentList } from "../components/attachments/AttachmentList";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
 import { BacklogItemForm } from "../components/backlog/BacklogItemForm";
 import { BacklogList } from "../components/backlog/BacklogList";
-import { FeaturePicker } from "../components/features/FeaturePicker";
+import { FeatureForm } from "../components/features/FeatureForm";
+import { ProjectFeaturePanel } from "../components/features/ProjectFeaturePanel";
 import { WikiImportPanel } from "../components/imports/WikiImportPanel";
 import { NoteEditor } from "../components/notes/NoteEditor";
 import { NoteList } from "../components/notes/NoteList";
@@ -19,6 +20,7 @@ import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton, KanbanSkeleton, TaskListSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { ViewToggle } from "../components/ui/ViewToggle";
+import { getFeature } from "../api/features";
 import { errorMessage } from "../hooks/errors";
 import { useAttachments } from "../hooks/useAttachments";
 import { useBacklog } from "../hooks/useBacklog";
@@ -29,6 +31,7 @@ import { useProjects } from "../hooks/useProjects";
 import { useTasks } from "../hooks/useTasks";
 import { useViewMode } from "../hooks/useViewMode";
 import { useWikiImport } from "../hooks/useWikiImport";
+import type { ViewMode } from "../types";
 import { formatHumanDate } from "../utils/date";
 
 type ProjectTab = "tasks" | "features" | "backlog" | "import" | "notes" | "attachments";
@@ -44,7 +47,7 @@ const tabs: Array<{ value: ProjectTab; label: string }> = [
 
 const activeTabActionLabels: Record<ProjectTab, string> = {
   tasks: "Neue Aufgabe",
-  features: "Features speichern",
+  features: "Neues Feature",
   backlog: "Neues Item",
   notes: "Neue Notiz",
   attachments: "Dateien hochladen",
@@ -71,14 +74,12 @@ export function ProjectDetailPage() {
   const [detailTaskId, setDetailTaskId] = useState<number | null>(null);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editingBacklogItem, setEditingBacklogItem] = useState<BacklogItem | null>(null);
-  const [selectedProjectFeatureIds, setSelectedProjectFeatureIds] = useState<number[]>([]);
+  const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
+  const [featureFormOpen, setFeatureFormOpen] = useState(false);
+  const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
   const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
 
   const openTask = (task: Task) => setDetailTaskId(task.id);
-
-  useEffect(() => {
-    setSelectedProjectFeatureIds(projectFeatureLinks.features.map((feature) => feature.id));
-  }, [projectFeatureLinks.features]);
 
   const createNote = async () => {
     try {
@@ -139,12 +140,42 @@ export function ProjectDetailPage() {
     }
   };
 
-  const saveProjectFeatures = async () => {
+  const reloadFeatureRelations = async () => {
+    await allFeatures.reload();
+    await projectFeatureLinks.reload();
+  };
+
+  const openCreateFeatureForm = () => {
+    setEditingFeature(null);
+    setFeatureFormOpen(true);
+  };
+
+  const openFeatureForm = async (feature: Feature) => {
     try {
-      await projectFeatureLinks.setFeaturesForProject(selectedProjectFeatureIds);
-      showToast({ tone: "success", title: "Features gespeichert" });
+      setEditingFeature(await getFeature(feature.id));
+      setFeatureFormOpen(true);
     } catch (featureError) {
-      showToast({ tone: "error", title: "Features konnten nicht gespeichert werden", message: errorMessage(featureError) });
+      showToast({ tone: "error", title: "Feature konnte nicht geladen werden", message: errorMessage(featureError) });
+    }
+  };
+
+  const submitFeatureForm = async (input: FeatureInput) => {
+    try {
+      if (editingFeature) {
+        await allFeatures.updateFeature(editingFeature.id, input);
+        await reloadFeatureRelations();
+        showToast({ tone: "success", title: "Feature gespeichert" });
+        return;
+      }
+
+      const created = await allFeatures.createFeature(input);
+      const linkedFeatureIds = projectFeatureLinks.features.map((feature) => feature.id);
+      await projectFeatureLinks.setFeaturesForProject([...new Set([...linkedFeatureIds, created.id])]);
+      await reloadFeatureRelations();
+      showToast({ tone: "success", title: "Feature erstellt und verknüpft" });
+    } catch (featureError) {
+      showToast({ tone: "error", title: "Feature konnte nicht gespeichert werden", message: errorMessage(featureError) });
+      throw featureError;
     }
   };
 
@@ -234,7 +265,7 @@ export function ProjectDetailPage() {
       return;
     }
     if (activeTab === "features") {
-      void saveProjectFeatures();
+      openCreateFeatureForm();
       return;
     }
     if (activeTab === "backlog") {
@@ -374,22 +405,19 @@ export function ProjectDetailPage() {
       ) : null}
 
       {activeTab === "features" ? (
-        allFeatures.loading || projectFeatureLinks.loading ? (
+        projectFeatureLinks.loading ? (
           <TaskListSkeleton />
         ) : (
-          <section className="grid gap-4 rounded-lg border border-line bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-ink">Projekt-Features</h2>
-                <p className="text-sm text-slate-600">{projectFeatureLinks.features.length} verknüpft</p>
-              </div>
-              <Button variant="primary" onClick={() => void saveProjectFeatures()}>
-                Speichern
-              </Button>
-            </div>
+          <>
             {projectFeatureLinks.error ? <div className="text-sm text-crimson">{projectFeatureLinks.error}</div> : null}
-            <FeaturePicker features={allFeatures.features} selectedIds={selectedProjectFeatureIds} onChange={setSelectedProjectFeatureIds} />
-          </section>
+            <ProjectFeaturePanel
+              features={projectFeatureLinks.features}
+              viewMode={featureViewMode}
+              onViewModeChange={setFeatureViewMode}
+              onCreate={openCreateFeatureForm}
+              onOpen={(feature) => void openFeatureForm(feature)}
+            />
+          </>
         )
       ) : null}
 
@@ -480,6 +508,16 @@ export function ProjectDetailPage() {
           }
         }}
         onClose={() => setTaskFormOpen(false)}
+      />
+      <FeatureForm
+        open={featureFormOpen}
+        feature={editingFeature}
+        onSubmit={submitFeatureForm}
+        onProjectLinksChanged={reloadFeatureRelations}
+        onClose={() => {
+          setFeatureFormOpen(false);
+          setEditingFeature(null);
+        }}
       />
       <BacklogItemForm
         open={backlogFormOpen}

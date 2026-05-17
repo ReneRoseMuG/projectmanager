@@ -2,6 +2,9 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 17.05.26 | Fix | Feature Rich-Text-Editor | ✅ |
+| 17.05.26 | Feature | Feature-Projekt-Relation UI | ✅ |
+| 17.05.26 | Feature | Feature-Detail Use-Case Overlay | ✅ |
 | 17.05.26 | Fix | Project-Detail-Hero | ✅ |
 | 17.05.26 | Fix | Feature-Input Container | ✅ |
 | 16.05.26 | Fix | Import-Tab Position | ✅ |
