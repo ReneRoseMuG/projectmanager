@@ -1,10 +1,14 @@
+import type { FeatureRelationInput } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
+import { FEATURE_RELATION_TYPES } from "../db/schema.js";
 import {
+  listFeatureRelations,
   listFeatureTasks,
   listProjectFeatures,
   listTaskFeatures,
   listTaskUseCases,
   listUseCaseTasks,
+  setFeatureRelations,
   setFeatureTasks,
   setProjectFeatures,
   setTaskFeatures,
@@ -49,6 +53,27 @@ const taskIdsBodySchema = {
   }
 } as const;
 
+const featureRelationsBodySchema = {
+  type: "object",
+  required: ["relations"],
+  additionalProperties: false,
+  properties: {
+    relations: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["targetFeatureId"],
+        additionalProperties: false,
+        properties: {
+          targetFeatureId: { type: "integer", minimum: 1 },
+          relationType: { type: "string", enum: FEATURE_RELATION_TYPES },
+          description: { type: ["string", "null"] }
+        }
+      }
+    }
+  }
+} as const;
+
 export async function registerDocLinksRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { id: number } }>(
     "/projects/:id/features",
@@ -84,6 +109,18 @@ export async function registerDocLinksRoutes(app: FastifyInstance): Promise<void
     "/features/:id/tasks",
     { schema: { params: idParamSchema, body: taskIdsBodySchema, response: { 200: arrayResponseSchema } } },
     async (request) => setFeatureTasks(app.db, request.params.id, request.body.taskIds)
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/features/:id/relations",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listFeatureRelations(app.db, request.params.id)
+  );
+
+  app.put<{ Params: { id: number }; Body: { relations: FeatureRelationInput[] } }>(
+    "/features/:id/relations",
+    { schema: { params: idParamSchema, body: featureRelationsBodySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => setFeatureRelations(app.db, request.params.id, request.body.relations)
   );
 
   app.get<{ Params: { id: number } }>(

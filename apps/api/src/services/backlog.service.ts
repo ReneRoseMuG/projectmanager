@@ -13,6 +13,7 @@ export interface BacklogInput {
   description?: string | null;
   status?: BacklogStatus;
   priority?: BacklogPriority;
+  importKey?: string | null;
   featureId?: number | null;
   useCaseId?: number | null;
   sortOrder?: number;
@@ -33,6 +34,7 @@ export interface BacklogDto {
   description: string | null;
   status: BacklogStatus;
   priority: BacklogPriority;
+  importKey: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -48,6 +50,7 @@ function mapBacklogItem(record: BacklogRecord): BacklogDto {
     description: record.description,
     status: record.status,
     priority: record.priority,
+    importKey: record.importKey,
     sortOrder: record.sortOrder,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
@@ -144,6 +147,7 @@ export function createBacklogItem(database: DbClient, projectId: number, input: 
       description: cleanNullable(input.description) ?? null,
       status: input.status ?? "open",
       priority: input.priority ?? "medium",
+      importKey: cleanNullable(input.importKey) ?? null,
       sortOrder: input.sortOrder ?? 0,
       createdAt: now,
       updatedAt: now
@@ -174,6 +178,9 @@ export function updateBacklogItem(database: DbClient, id: number, input: Backlog
   }
   if (input.priority !== undefined) {
     values.priority = input.priority;
+  }
+  if (input.importKey !== undefined) {
+    values.importKey = cleanNullable(input.importKey) ?? null;
   }
   if (input.featureId !== undefined) {
     ensureFeatureExists(database, input.featureId);

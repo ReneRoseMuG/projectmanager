@@ -24,7 +24,7 @@ if (!allowedRoots.some((root) => isSameOrInside(runtimeRoot, root))) {
 }
 
 fs.rmSync(runtimeRoot, { recursive: true, force: true });
-for (const subdir of ["data", "uploads", "content", "backups"]) {
+for (const subdir of ["data", "uploads", "previews", "content", "backups"]) {
   fs.mkdirSync(path.join(runtimeRoot, subdir), { recursive: true });
 }
 

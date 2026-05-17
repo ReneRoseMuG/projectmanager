@@ -1,4 +1,5 @@
 import type {
+  FeatureRelationType,
   Priority,
   WikiImportAction,
   WikiImportItemResult,
@@ -10,7 +11,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import fs from "node:fs";
 import path from "node:path";
 import type { DbClient } from "../db/client.js";
-import { features, projectFeatures, projects, taskFeatures, taskUseCases, tasks, useCases } from "../db/schema.js";
+import { backlogItems, featureRelations, features, projectFeatures, projects, taskFeatures, taskUseCases, tasks, useCases } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import {
   buildFilename,
@@ -25,6 +26,7 @@ interface ParsedWiki {
   sourcePath: string;
   features: ParsedFeature[];
   useCases: ParsedUseCase[];
+  backlogItems: ParsedBacklogItem[];
   tasks: ParsedTask[];
   warnings: WikiImportItemResult[];
 }
@@ -37,6 +39,27 @@ interface ParsedFeature {
   sortOrder: number;
   sourcePath: string;
   featureCode: string | null;
+  relations: ParsedFeatureRelation[];
+}
+
+interface ParsedFeatureRelation {
+  targetSlug: string;
+  targetCode: string;
+  relationType: FeatureRelationType;
+  description: string | null;
+}
+
+type BacklogStatus = typeof backlogItems.$inferSelect["status"];
+
+interface ParsedBacklogItem {
+  featureSlug: string;
+  title: string;
+  description: string | null;
+  status: BacklogStatus;
+  priority: Priority;
+  sortOrder: number;
+  importKey: string;
+  sourcePath: string;
 }
 
 interface ParsedUseCase {
@@ -76,6 +99,18 @@ interface StoredTask {
   id: number;
   projectId: number;
   importKey: string | null;
+}
+
+interface StoredBacklogItem {
+  id: number;
+  projectId: number;
+  importKey: string | null;
+}
+
+interface StoredFeatureRelation {
+  sourceFeatureId: number;
+  targetFeatureId: number;
+  relationType: FeatureRelationType;
 }
 
 const MARKDOWN_LINK_TARGET_PATTERN = /\[[^\]]+\]\(([^)]+)\)/g;
@@ -175,6 +210,24 @@ function descriptionFromSection(content: string, headings: string[]): string | n
   return firstParagraph(markdownSection(content, headings)) ?? firstParagraph(content);
 }
 
+function contentBeforeHeading(content: string, headingPattern: RegExp): string {
+  const lines = content.split(/\r?\n/);
+  const keptLines: string[] = [];
+
+  for (const line of lines) {
+    if (headingPattern.test(line)) {
+      break;
+    }
+    keptLines.push(line);
+  }
+
+  return keptLines.join("\n").trim();
+}
+
+function featureCoreContent(content: string): string {
+  return contentBeforeHeading(content, /^##\s+Use Cases\s*$/i);
+}
+
 function numberFromSlug(slug: string): number {
   const match = slug.match(/^(?:ft|uc)-(\d+)(?:-(\d+))?/i);
   if (!match) {
@@ -189,6 +242,105 @@ function numberFromSlug(slug: string): number {
 function featureCodeFromSlug(slug: string): string | null {
   const match = slug.match(/^ft-(\d+)/i);
   return match ? `ft-${(match[1] ?? "").padStart(2, "0")}` : null;
+}
+
+function featureCodeFromNumber(value: string): string {
+  return `ft-${value.padStart(2, "0")}`;
+}
+
+function featureCodesFromText(value: string): string[] {
+  const codes = new Set<string>();
+  for (const match of value.matchAll(/\bFT\s*(?:[-(]\s*)?(\d{1,2})/gi)) {
+    const rawNumber = match[1];
+    if (rawNumber) {
+      codes.add(featureCodeFromNumber(rawNumber));
+    }
+  }
+
+  return [...codes];
+}
+
+function relationTypeFromContext(context: string): FeatureRelationType {
+  const normalized = context.toLowerCase();
+  if (normalized.includes("wird konsumiert")) {
+    return "consumed_by";
+  }
+  if (normalized.includes("konsumiert") || normalized.includes("abhängig") || normalized.includes("abhängigkeiten")) {
+    return "depends_on";
+  }
+
+  return "related";
+}
+
+function parseFeatureRelations(
+  content: string,
+  sourceSlug: string,
+  featureCodeToSlug: Map<string, string>,
+  sourcePath: string,
+  warnings: WikiImportItemResult[]
+): ParsedFeatureRelation[] {
+  const relations = new Map<string, ParsedFeatureRelation>();
+  const lines = content.split(/\r?\n/);
+  let collecting = false;
+  let context = "";
+
+  for (const line of lines) {
+    const heading = line.match(/^(#{2,4})\s+(.+?)\s*$/);
+    if (heading) {
+      const title = heading[2] ?? "";
+      const normalizedTitle = title.toLowerCase();
+      if (normalizedTitle.includes("verwandte features") || normalizedTitle === "abhängigkeiten") {
+        collecting = true;
+        context = title;
+        continue;
+      }
+      if (collecting && heading[1] !== "####") {
+        collecting = false;
+      }
+    }
+
+    if (!collecting) {
+      continue;
+    }
+
+    const boldContext = line.match(/^\*\*(.+?)\*\*/);
+    if (boldContext?.[1]) {
+      context = boldContext[1];
+      continue;
+    }
+
+    if (!line.trim().startsWith("-")) {
+      continue;
+    }
+
+    for (const targetCode of featureCodesFromText(line)) {
+      const targetSlug = featureCodeToSlug.get(targetCode);
+      if (!targetSlug) {
+        warnings.push({
+          type: "featureRelation",
+          action: "warning",
+          title: sourceSlug,
+          slug: sourceSlug,
+          sourcePath,
+          message: `Feature reference "${targetCode.toUpperCase()}" is not part of the import source`
+        });
+        continue;
+      }
+      if (targetSlug === sourceSlug) {
+        continue;
+      }
+
+      const relationType = relationTypeFromContext(context);
+      relations.set(`${targetSlug}:${relationType}`, {
+        targetSlug,
+        targetCode,
+        relationType,
+        description: cleanNullable(line.replace(/^\s*-\s*/, "")) ?? null
+      });
+    }
+  }
+
+  return [...relations.values()].sort((first, second) => first.targetSlug.localeCompare(second.targetSlug) || first.relationType.localeCompare(second.relationType));
 }
 
 function parsePriority(content: string): Priority {
@@ -206,6 +358,21 @@ function parsePriority(content: string): Priority {
   return "medium";
 }
 
+function parseBacklogStatus(content: string): BacklogStatus {
+  const normalized = content.toLowerCase();
+  if (normalized.includes("verworfen") || normalized.includes("rejected")) {
+    return "rejected";
+  }
+  if (normalized.includes("erledigt") || normalized.includes("abgeschlossen") || normalized.includes("done")) {
+    return "done";
+  }
+  if (normalized.includes("in arbeit") || normalized.includes("in_progress")) {
+    return "in_progress";
+  }
+
+  return "open";
+}
+
 function listMarkdownFiles(dir: string): string[] {
   if (!fs.existsSync(dir)) {
     return [];
@@ -220,6 +387,61 @@ function listMarkdownFiles(dir: string): string[] {
 
 function readMarkdown(filePath: string): string {
   return fs.readFileSync(filePath, "utf8");
+}
+
+function markdownH2Sections(content: string): Array<{ title: string; body: string; index: number }> {
+  const sections: Array<{ title: string; body: string; index: number }> = [];
+  const lines = content.split(/\r?\n/);
+  let currentTitle: string | null = null;
+  let currentBody: string[] = [];
+  let currentIndex = 0;
+
+  for (const line of lines) {
+    const heading = line.match(/^##\s+(.+?)\s*$/);
+    if (heading) {
+      if (currentTitle) {
+        sections.push({ title: currentTitle, body: currentBody.join("\n").trim(), index: currentIndex });
+      }
+      currentTitle = heading[1] ?? "";
+      currentBody = [];
+      currentIndex += 1;
+      continue;
+    }
+
+    if (currentTitle) {
+      currentBody.push(line);
+    }
+  }
+
+  if (currentTitle) {
+    sections.push({ title: currentTitle, body: currentBody.join("\n").trim(), index: currentIndex });
+  }
+
+  return sections;
+}
+
+function parseBacklogItems(featureSlug: string, backlogDir: string, sourcePath: string): ParsedBacklogItem[] {
+  const parsedBacklogItems: ParsedBacklogItem[] = [];
+  for (const backlogFile of listMarkdownFiles(backlogDir)) {
+    const content = readMarkdown(backlogFile);
+    const sourceRelativePath = relativeSourcePath(sourcePath, backlogFile);
+
+    for (const section of markdownH2Sections(content)) {
+      const description = cleanNullable(section.body) ?? null;
+      parsedBacklogItems.push({
+        featureSlug,
+        title: section.title,
+        description,
+        status: parseBacklogStatus(section.body),
+        priority: parsePriority(section.body),
+        sortOrder: numberFromSlug(featureSlug) + section.index,
+        importKey: `wiki:${sourceRelativePath.toLowerCase()}#${normalizePathSegment(section.title)}`,
+        sourcePath: sourceRelativePath
+      });
+    }
+  }
+
+  return parsedBacklogItems;
 }
 
 function parseLinkTargets(content: string): string[] {
@@ -269,24 +491,45 @@ function parseTaskRelations(content: string, featureCodeToSlug: Map<string, stri
   };
 }
 
-function parseWikiSource(sourcePathInput: string): ParsedWiki {
-  const sourcePath = path.resolve(requireNonEmpty(sourcePathInput, "sourcePath"));
-  if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isDirectory()) {
+function resolveWikiSourcePaths(sourcePathInput: string): { sourcePath: string; featuresDir: string; tasksDir: string | null } {
+  const requestedPath = path.resolve(requireNonEmpty(sourcePathInput, "sourcePath"));
+  if (!fs.existsSync(requestedPath) || !fs.statSync(requestedPath).isDirectory()) {
     throw badRequest(`Wiki source path "${sourcePathInput}" is not a directory`);
   }
 
-  const featuresDir = path.join(sourcePath, "features");
-  const tasksDir = path.join(sourcePath, "tasks");
-  if (!fs.existsSync(featuresDir) || !fs.statSync(featuresDir).isDirectory()) {
-    throw badRequest("Wiki source path must contain a features directory");
+  const nestedFeaturesDir = path.join(requestedPath, "features");
+  if (fs.existsSync(nestedFeaturesDir) && fs.statSync(nestedFeaturesDir).isDirectory()) {
+    const tasksDir = path.join(requestedPath, "tasks");
+    return {
+      sourcePath: requestedPath,
+      featuresDir: nestedFeaturesDir,
+      tasksDir: fs.existsSync(tasksDir) && fs.statSync(tasksDir).isDirectory() ? tasksDir : null
+    };
   }
-  if (!fs.existsSync(tasksDir) || !fs.statSync(tasksDir).isDirectory()) {
-    throw badRequest("Wiki source path must contain a tasks directory");
+
+  const featureDirectories = fs
+    .readdirSync(requestedPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && /^ft-\d+/i.test(entry.name));
+  if (path.basename(requestedPath).toLowerCase() === "features" || featureDirectories.length > 0) {
+    const sourcePath = path.dirname(requestedPath);
+    const tasksDir = path.join(sourcePath, "tasks");
+    return {
+      sourcePath,
+      featuresDir: requestedPath,
+      tasksDir: fs.existsSync(tasksDir) && fs.statSync(tasksDir).isDirectory() ? tasksDir : null
+    };
   }
+
+  throw badRequest("Wiki source path must be a wiki root or a features directory");
+}
+
+function parseWikiSource(sourcePathInput: string): ParsedWiki {
+  const { sourcePath, featuresDir, tasksDir } = resolveWikiSourcePaths(sourcePathInput);
 
   const warnings: WikiImportItemResult[] = [];
   const parsedFeatures: ParsedFeature[] = [];
   const parsedUseCases: ParsedUseCase[] = [];
+  const parsedBacklogItems: ParsedBacklogItem[] = [];
   const featureCodeToSlug = new Map<string, string>();
   const useCaseSlugToFeatureSlug = new Map<string, string>();
 
@@ -295,6 +538,14 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
     .filter((entry) => entry.isDirectory())
     .map((entry) => path.join(featuresDir, entry.name))
     .sort((first, second) => first.localeCompare(second));
+
+  for (const featureDir of featureDirs) {
+    const featureSlug = normalizePathSegment(path.basename(featureDir));
+    const featureCode = featureCodeFromSlug(featureSlug);
+    if (featureCode) {
+      featureCodeToSlug.set(featureCode, featureSlug);
+    }
+  }
 
   for (const featureDir of featureDirs) {
     const featureSlug = normalizePathSegment(path.basename(featureDir));
@@ -314,21 +565,23 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
       continue;
     }
 
-    const content = readMarkdown(featureDoc);
     const featureCode = featureCodeFromSlug(featureSlug);
-    if (featureCode) {
-      featureCodeToSlug.set(featureCode, featureSlug);
-    }
+    const sourceRelativePath = relativeSourcePath(sourcePath, featureDoc);
+    const content = readMarkdown(featureDoc);
+    const coreContent = featureCoreContent(content);
 
     parsedFeatures.push({
       title: markdownTitle(content, featureSlug),
       slug: featureSlug,
-      description: descriptionFromSection(content, ["Ziel / Zweck", "Fachliche Beschreibung"]),
-      content,
+      description: descriptionFromSection(coreContent, ["Ziel / Zweck", "Fachliche Beschreibung"]),
+      content: coreContent,
       sortOrder: numberFromSlug(featureSlug),
-      sourcePath: relativeSourcePath(sourcePath, featureDoc),
-      featureCode
+      sourcePath: sourceRelativePath,
+      featureCode,
+      relations: parseFeatureRelations(content, featureSlug, featureCodeToSlug, sourceRelativePath, warnings)
     });
+
+    parsedBacklogItems.push(...parseBacklogItems(featureSlug, path.join(featureDir, "backlog"), sourcePath));
 
     const useCaseDir = path.join(featureDir, "use-cases");
     for (const useCaseFile of listMarkdownFiles(useCaseDir).filter((filePath) => /^uc-\d+/i.test(path.basename(filePath)))) {
@@ -347,30 +600,33 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
     }
   }
 
-  const parsedTasks = listMarkdownFiles(tasksDir)
-    .filter((filePath) => {
-      const name = path.basename(filePath).toLowerCase();
-      return name !== "readme.md" && name !== "template.md";
-    })
-    .map((filePath) => {
-      const content = readMarkdown(filePath);
-      const relations = parseTaskRelations(content, featureCodeToSlug, useCaseSlugToFeatureSlug);
-      const sourceRelativePath = relativeSourcePath(sourcePath, filePath);
-      return {
-        title: markdownTitle(content, path.basename(filePath, ".md")),
-        importKey: `wiki:${sourceRelativePath.toLowerCase()}`,
-        description: content,
-        priority: parsePriority(content),
-        sourcePath: sourceRelativePath,
-        featureSlugs: relations.featureSlugs,
-        useCaseSlugs: relations.useCaseSlugs
-      };
-    });
+  const parsedTasks = tasksDir
+    ? listMarkdownFiles(tasksDir)
+        .filter((filePath) => {
+          const name = path.basename(filePath).toLowerCase();
+          return name !== "readme.md" && name !== "template.md";
+        })
+        .map((filePath) => {
+          const content = readMarkdown(filePath);
+          const relations = parseTaskRelations(content, featureCodeToSlug, useCaseSlugToFeatureSlug);
+          const sourceRelativePath = relativeSourcePath(sourcePath, filePath);
+          return {
+            title: markdownTitle(content, path.basename(filePath, ".md")),
+            importKey: `wiki:${sourceRelativePath.toLowerCase()}`,
+            description: content,
+            priority: parsePriority(content),
+            sourcePath: sourceRelativePath,
+            featureSlugs: relations.featureSlugs,
+            useCaseSlugs: relations.useCaseSlugs
+          };
+        })
+    : [];
 
   return {
     sourcePath,
     features: parsedFeatures,
     useCases: parsedUseCases,
+    backlogItems: parsedBacklogItems,
     tasks: parsedTasks,
     warnings
   };
@@ -404,6 +660,37 @@ function getTaskByImportKey(database: DbClient, projectId: number, importKey: st
     .select({ id: tasks.id, projectId: tasks.projectId, importKey: tasks.importKey })
     .from(tasks)
     .where(and(eq(tasks.projectId, projectId), eq(tasks.importKey, importKey)))
+    .get();
+}
+
+function getBacklogItemByImportKey(database: DbClient, projectId: number, importKey: string): StoredBacklogItem | undefined {
+  return database
+    .select({ id: backlogItems.id, projectId: backlogItems.projectId, importKey: backlogItems.importKey })
+    .from(backlogItems)
+    .where(and(eq(backlogItems.projectId, projectId), eq(backlogItems.importKey, importKey)))
+    .get();
+}
+
+function getFeatureRelation(
+  database: DbClient,
+  sourceFeatureId: number,
+  targetFeatureId: number,
+  relationType: FeatureRelationType
+): StoredFeatureRelation | undefined {
+  return database
+    .select({
+      sourceFeatureId: featureRelations.sourceFeatureId,
+      targetFeatureId: featureRelations.targetFeatureId,
+      relationType: featureRelations.relationType
+    })
+    .from(featureRelations)
+    .where(
+      and(
+        eq(featureRelations.sourceFeatureId, sourceFeatureId),
+        eq(featureRelations.targetFeatureId, targetFeatureId),
+        eq(featureRelations.relationType, relationType)
+      )
+    )
     .get();
 }
 
@@ -591,6 +878,111 @@ function upsertUseCase(
   return { record: { ...created, contentPath }, action: "created" };
 }
 
+function upsertBacklogItem(
+  database: DbClient,
+  projectId: number,
+  backlogItem: ParsedBacklogItem,
+  featureId: number,
+  execute: boolean,
+  now: string
+): { record?: StoredBacklogItem; action: WikiImportAction } {
+  const existing = getBacklogItemByImportKey(database, projectId, backlogItem.importKey);
+  if (!execute) {
+    return { record: existing, action: existing ? "updated" : "created" };
+  }
+
+  if (existing) {
+    database
+      .update(backlogItems)
+      .set({
+        featureId,
+        useCaseId: null,
+        title: backlogItem.title,
+        description: backlogItem.description,
+        status: backlogItem.status,
+        priority: backlogItem.priority,
+        sortOrder: backlogItem.sortOrder,
+        updatedAt: now
+      })
+      .where(eq(backlogItems.id, existing.id))
+      .run();
+    return { record: existing, action: "updated" };
+  }
+
+  const created = database
+    .insert(backlogItems)
+    .values({
+      projectId,
+      featureId,
+      useCaseId: null,
+      title: backlogItem.title,
+      description: backlogItem.description,
+      status: backlogItem.status,
+      priority: backlogItem.priority,
+      importKey: backlogItem.importKey,
+      sortOrder: backlogItem.sortOrder,
+      createdAt: now,
+      updatedAt: now
+    })
+    .returning({ id: backlogItems.id, projectId: backlogItems.projectId, importKey: backlogItems.importKey })
+    .get();
+
+  return { record: created, action: "created" };
+}
+
+function upsertFeatureRelation(
+  database: DbClient,
+  sourceFeature: StoredFeature,
+  targetFeature: StoredFeature,
+  relation: ParsedFeatureRelation,
+  execute: boolean,
+  now: string
+): WikiImportAction {
+  if (sourceFeature.id === targetFeature.id) {
+    return "skipped";
+  }
+
+  if (!execute) {
+    if (sourceFeature.id <= 0 || targetFeature.id <= 0) {
+      return "created";
+    }
+    return getFeatureRelation(database, sourceFeature.id, targetFeature.id, relation.relationType) ? "updated" : "created";
+  }
+
+  const existing = getFeatureRelation(database, sourceFeature.id, targetFeature.id, relation.relationType);
+  if (existing) {
+    database
+      .update(featureRelations)
+      .set({
+        description: relation.description,
+        updatedAt: now
+      })
+      .where(
+        and(
+          eq(featureRelations.sourceFeatureId, sourceFeature.id),
+          eq(featureRelations.targetFeatureId, targetFeature.id),
+          eq(featureRelations.relationType, relation.relationType)
+        )
+      )
+      .run();
+    return "updated";
+  }
+
+  database
+    .insert(featureRelations)
+    .values({
+      sourceFeatureId: sourceFeature.id,
+      targetFeatureId: targetFeature.id,
+      relationType: relation.relationType,
+      description: relation.description,
+      createdAt: now,
+      updatedAt: now
+    })
+    .run();
+
+  return "created";
+}
+
 function upsertTask(database: DbClient, projectId: number, task: ParsedTask, execute: boolean, now: string): { record?: StoredTask; action: WikiImportAction } {
   const existing = getTaskByImportKey(database, projectId, task.importKey);
   if (!execute) {
@@ -739,6 +1131,38 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
     });
   }
 
+  for (const feature of parsed.features) {
+    const sourceFeature = featureRecordsBySlug.get(feature.slug) ?? getFeatureBySlug(database, feature.slug);
+    if (!sourceFeature) {
+      continue;
+    }
+
+    for (const relation of feature.relations) {
+      const targetFeature = featureRecordsBySlug.get(relation.targetSlug) ?? getFeatureBySlug(database, relation.targetSlug);
+      if (!targetFeature) {
+        addResult(report, {
+          type: "featureRelation",
+          action: "warning",
+          title: feature.slug,
+          slug: feature.slug,
+          sourcePath: feature.sourcePath,
+          message: `Feature "${relation.targetCode.toUpperCase()}" is missing`
+        });
+        continue;
+      }
+
+      const action = upsertFeatureRelation(database, sourceFeature, targetFeature, relation, execute, now);
+      addResult(report, {
+        type: "featureRelation",
+        action,
+        title: `${feature.slug} -> ${relation.targetSlug}`,
+        slug: relation.targetSlug,
+        sourcePath: feature.sourcePath,
+        message: `${relation.relationType} relation ${action}`
+      });
+    }
+  }
+
   for (const useCase of parsed.useCases) {
     const feature = featureRecordsBySlug.get(useCase.featureSlug) ?? getFeatureBySlug(database, useCase.featureSlug);
     if (!feature) {
@@ -764,6 +1188,30 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
       title: useCase.title,
       slug: useCase.slug,
       sourcePath: useCase.sourcePath
+    });
+  }
+
+  for (const backlogItem of parsed.backlogItems) {
+    const feature = featureRecordsBySlug.get(backlogItem.featureSlug) ?? getFeatureBySlug(database, backlogItem.featureSlug);
+    if (!feature) {
+      addResult(report, {
+        type: "backlogItem",
+        action: "error",
+        title: backlogItem.title,
+        importKey: backlogItem.importKey,
+        sourcePath: backlogItem.sourcePath,
+        message: `Feature "${backlogItem.featureSlug}" is missing`
+      });
+      continue;
+    }
+
+    const result = upsertBacklogItem(database, projectId, backlogItem, feature.id, execute, now);
+    addResult(report, {
+      type: "backlogItem",
+      action: result.action,
+      title: backlogItem.title,
+      importKey: backlogItem.importKey,
+      sourcePath: backlogItem.sourcePath
     });
   }
 

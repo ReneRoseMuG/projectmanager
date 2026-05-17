@@ -1,4 +1,4 @@
-import type { Attachment, Comment, Event, Note, Project, Tag, Task, TaskDetail } from "@taskmanager/shared-types";
+import type { Attachment, BacklogItem, Comment, Event, Feature, FeatureRelation, Note, Project, Tag, Task, TaskDetail, UseCase, WikiImportReport } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import fs from "node:fs/promises";
@@ -32,6 +32,7 @@ describe("Taskmanager API integration", () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "taskmanager-api-"));
     process.env.DATABASE_PATH = path.join(tempDir, "taskmanager.sqlite");
     process.env.UPLOAD_DIR = path.join(tempDir, "uploads");
+    process.env.PREVIEW_CACHE_DIR = path.join(tempDir, "previews");
     process.env.CONTENT_DIR = path.join(tempDir, "content");
     process.env.BACKUP_WORK_DIR = path.join(tempDir, "backups");
     process.env.PORT = "0";
@@ -194,5 +195,127 @@ describe("Taskmanager API integration", () => {
     await request(app.server).delete(`/api/tasks/${createdTask.id}`).expect(204);
     await request(app.server).delete(`/api/tags/${createdTag.id}`).expect(204);
     await request(app.server).delete(`/api/projects/${createdProject.id}`).expect(204);
+  });
+
+  it("imports wiki feature content, relations, backlogs and tasks from a features path", async () => {
+    const project = (await request(app.server).post("/api/projects").send({ name: "Wiki Import" }).expect(201)).body as Project;
+    const wikiRoot = path.join(tempDir, "wiki-import");
+    const featuresRoot = path.join(wikiRoot, "features");
+    const alphaRoot = path.join(featuresRoot, "ft-01-alpha");
+    const betaRoot = path.join(featuresRoot, "ft-02-beta");
+
+    await fs.mkdir(path.join(alphaRoot, "use-cases"), { recursive: true });
+    await fs.mkdir(path.join(alphaRoot, "backlog"), { recursive: true });
+    await fs.mkdir(path.join(betaRoot, "use-cases"), { recursive: true });
+    await fs.mkdir(path.join(wikiRoot, "tasks"), { recursive: true });
+
+    await fs.writeFile(
+      path.join(alphaRoot, "ft-01-alpha.md"),
+      [
+        "# FT (01): Alpha",
+        "",
+        "## Ziel / Zweck",
+        "",
+        "Alpha core paragraph.",
+        "",
+        "## Fachliche Beschreibung",
+        "",
+        "Alpha description.",
+        "",
+        "## Use Cases",
+        "",
+        "- [UC 01/01: Alpha start](use-cases/uc-01-01-alpha-start.md)",
+        "",
+        "## Architektur & Kontext",
+        "",
+        "### Verwandte Features & Abhängigkeiten",
+        "",
+        "**Dieses Feature konsumiert (abhängig von):**",
+        "",
+        "- [FT-02: Beta](../ft-02-beta/ft-02-beta.md) — Alpha needs Beta."
+      ].join("\n"),
+      "utf8"
+    );
+    await fs.writeFile(
+      path.join(alphaRoot, "use-cases", "uc-01-01-alpha-start.md"),
+      ["# UC 01/01: Alpha start", "", "## Ziel", "", "Alpha use case."].join("\n"),
+      "utf8"
+    );
+    await fs.writeFile(
+      path.join(alphaRoot, "backlog", "ft-01-alpha-backlog.md"),
+      ["# FT (01) Backlog", "", "## BL-01: Alpha backlog", "", "Status: Backlog / nicht begonnen", "", "### Ziel / Zweck", "", "Later alpha improvement."].join("\n"),
+      "utf8"
+    );
+    await fs.writeFile(
+      path.join(betaRoot, "ft-02-beta.md"),
+      ["# FT (02): Beta", "", "## Ziel / Zweck", "", "Beta core paragraph.", "", "## Use Cases"].join("\n"),
+      "utf8"
+    );
+    await fs.writeFile(
+      path.join(wikiRoot, "tasks", "alpha-task.md"),
+      [
+        "# Alpha task",
+        "",
+        "| Status | Dringlichkeit | Thema | Typ | Erstellt |",
+        "| :--- | :--- | :--- | :--- | :--- |",
+        "| `offen` | Hoch | Alpha | Umsetzung | 17.05.26 |",
+        "",
+        "## Ziel",
+        "",
+        "Implement alpha.",
+        "",
+        "## Beziehungen",
+        "",
+        "- Features: [FT-01 - Alpha](../features/ft-01-alpha/ft-01-alpha.md)",
+        "- Use Cases: [UC 01/01](../features/ft-01-alpha/use-cases/uc-01-01-alpha-start.md)"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const preview = (
+      await request(app.server).post(`/api/projects/${project.id}/import/wiki/preview`).send({ sourcePath: featuresRoot }).expect(200)
+    ).body as WikiImportReport;
+    expect(preview.items.some((item) => item.type === "featureRelation" && item.action === "created")).toBe(true);
+    expect(preview.items.some((item) => item.type === "backlogItem" && item.action === "created")).toBe(true);
+
+    await request(app.server).post(`/api/projects/${project.id}/import/wiki/run`).send({ sourcePath: featuresRoot }).expect(200);
+
+    const features = (await request(app.server).get("/api/features").expect(200)).body as Feature[];
+    const alpha = features.find((feature) => feature.slug === "ft-01-alpha");
+    const beta = features.find((feature) => feature.slug === "ft-02-beta");
+    expect(alpha).toBeDefined();
+    expect(beta).toBeDefined();
+
+    const alphaDetail = (await request(app.server).get(`/api/features/${alpha?.id}`).expect(200)).body as Feature;
+    expect(alphaDetail.content).toContain("Alpha core paragraph.");
+    expect(alphaDetail.content).not.toContain("## Use Cases");
+
+    const relations = (await request(app.server).get(`/api/features/${alpha?.id}/relations`).expect(200)).body as FeatureRelation[];
+    expect(relations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          targetFeatureId: beta?.id,
+          relationType: "depends_on"
+        })
+      ])
+    );
+
+    const backlog = (await request(app.server).get(`/api/projects/${project.id}/backlog`).query({ featureId: alpha?.id }).expect(200)).body as BacklogItem[];
+    expect(backlog).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: "BL-01: Alpha backlog",
+          importKey: expect.stringContaining("ft-01-alpha-backlog.md")
+        })
+      ])
+    );
+
+    const tasks = (await request(app.server).get(`/api/projects/${project.id}/tasks`).expect(200)).body as Task[];
+    const importedTask = tasks.find((task) => task.title === "Alpha task");
+    expect(importedTask).toBeDefined();
+    const taskFeatures = (await request(app.server).get(`/api/tasks/${importedTask?.id}/features`).expect(200)).body as Feature[];
+    const taskUseCases = (await request(app.server).get(`/api/tasks/${importedTask?.id}/use-cases`).expect(200)).body as UseCase[];
+    expect(taskFeatures.map((feature) => feature.id)).toContain(alpha?.id);
+    expect(taskUseCases.map((useCase) => useCase.slug)).toContain("uc-01-01-alpha-start");
   });
 });

@@ -1,4 +1,4 @@
-import { BookOpen, CalendarDays, DatabaseBackup, FolderKanban, Library, Tags } from "lucide-react";
+import { BookOpen, CalendarDays, DatabaseBackup, DatabaseZap, FolderKanban, Library, Tags } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
@@ -10,7 +10,8 @@ const items = [
 
 const settingsItems = [
   { to: "/settings/tags", label: "Tags", icon: Tags },
-  { to: "/settings/backup", label: "Sicherung", icon: DatabaseBackup }
+  { to: "/settings/backup", label: "Sicherung", icon: DatabaseBackup },
+  { to: "/settings/test-data", label: "Testdaten", icon: DatabaseZap }
 ];
 
 function NavSection({ children }: { children: string }) {

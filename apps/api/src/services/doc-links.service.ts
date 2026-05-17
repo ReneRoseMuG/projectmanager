@@ -1,13 +1,22 @@
-import type { Task } from "@taskmanager/shared-types";
+import type { FeatureRelation, FeatureRelationInput, Task } from "@taskmanager/shared-types";
 import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { features, projectFeatures, projects, taskFeatures, taskUseCases, tasks, useCases } from "../db/schema.js";
+import { featureRelations, features, projectFeatures, projects, taskFeatures, taskUseCases, tasks, useCases } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import type { FeatureDto } from "./features.service.js";
 import { mapTask } from "./tasks.service.js";
 import type { UseCaseDto } from "./use-cases.service.js";
 
-function mapFeature(row: typeof features.$inferSelect, useCaseCount = 0): FeatureDto {
+type MappableFeatureRecord = Pick<
+  typeof features.$inferSelect,
+  "id" | "title" | "slug" | "status" | "description" | "contentPath" | "sortOrder" | "createdAt" | "updatedAt"
+>;
+type MappableUseCaseRecord = Pick<
+  typeof useCases.$inferSelect,
+  "id" | "featureId" | "title" | "slug" | "status" | "description" | "contentPath" | "sortOrder" | "createdAt" | "updatedAt"
+>;
+
+function mapFeature(row: MappableFeatureRecord, useCaseCount = 0): FeatureDto {
   return {
     id: row.id,
     title: row.title,
@@ -22,7 +31,7 @@ function mapFeature(row: typeof features.$inferSelect, useCaseCount = 0): Featur
   };
 }
 
-function mapUseCase(row: typeof useCases.$inferSelect): UseCaseDto {
+function mapUseCase(row: MappableUseCaseRecord): UseCaseDto {
   return {
     id: row.id,
     featureId: row.featureId,
@@ -97,6 +106,25 @@ function ensureFeaturesExist(database: DbClient, featureIds: number[]): number[]
   }
 
   return uniqueIds;
+}
+
+function normalizeFeatureRelations(featureId: number, relations: FeatureRelationInput[]): Array<Required<FeatureRelationInput>> {
+  const uniqueRelations = new Map<string, Required<FeatureRelationInput>>();
+
+  for (const relation of relations) {
+    const relationType = relation.relationType ?? "related";
+    if (relation.targetFeatureId === featureId) {
+      throw badRequest("Feature relations cannot point to the same feature");
+    }
+
+    uniqueRelations.set(`${relation.targetFeatureId}:${relationType}`, {
+      targetFeatureId: relation.targetFeatureId,
+      relationType,
+      description: relation.description ?? null
+    });
+  }
+
+  return [...uniqueRelations.values()];
 }
 
 function ensureUseCasesExist(database: DbClient, useCaseIds: number[]): number[] {
@@ -241,6 +269,86 @@ export function setFeatureTasks(database: DbClient, featureId: number, taskIds: 
   });
 
   return listFeatureTasks(database, featureId);
+}
+
+export function listFeatureRelations(database: DbClient, featureId: number): FeatureRelation[] {
+  ensureFeatureExists(database, featureId);
+  const rows = database
+    .select({
+      sourceFeatureId: featureRelations.sourceFeatureId,
+      targetFeatureId: featureRelations.targetFeatureId,
+      relationType: featureRelations.relationType,
+      description: featureRelations.description,
+      createdAt: featureRelations.createdAt,
+      updatedAt: featureRelations.updatedAt,
+      targetId: features.id,
+      targetTitle: features.title,
+      targetSlug: features.slug,
+      targetStatus: features.status,
+      targetDescription: features.description,
+      targetContentPath: features.contentPath,
+      targetSortOrder: features.sortOrder,
+      targetCreatedAt: features.createdAt,
+      targetUpdatedAt: features.updatedAt
+    })
+    .from(featureRelations)
+    .innerJoin(features, eq(featureRelations.targetFeatureId, features.id))
+    .where(eq(featureRelations.sourceFeatureId, featureId))
+    .all();
+  const counts = getUseCaseCountMap(
+    database,
+    rows.map((row) => row.targetId)
+  );
+
+  return rows.map((row) => ({
+    sourceFeatureId: row.sourceFeatureId,
+    targetFeatureId: row.targetFeatureId,
+    relationType: row.relationType,
+    description: row.description,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    targetFeature: mapFeature(
+      {
+        id: row.targetId,
+        title: row.targetTitle,
+        slug: row.targetSlug,
+        status: row.targetStatus,
+        description: row.targetDescription,
+        contentPath: row.targetContentPath,
+        sortOrder: row.targetSortOrder,
+        createdAt: row.targetCreatedAt,
+        updatedAt: row.targetUpdatedAt
+      },
+      counts.get(row.targetId) ?? 0
+    )
+  }));
+}
+
+export function setFeatureRelations(database: DbClient, featureId: number, relations: FeatureRelationInput[]): FeatureRelation[] {
+  ensureFeatureExists(database, featureId);
+  const normalized = normalizeFeatureRelations(featureId, relations);
+  ensureFeaturesExist(
+    database,
+    normalized.map((relation) => relation.targetFeatureId)
+  );
+
+  database.transaction((tx) => {
+    tx.delete(featureRelations).where(eq(featureRelations.sourceFeatureId, featureId)).run();
+    if (normalized.length > 0) {
+      tx.insert(featureRelations)
+        .values(
+          normalized.map((relation) => ({
+            sourceFeatureId: featureId,
+            targetFeatureId: relation.targetFeatureId,
+            relationType: relation.relationType,
+            description: relation.description
+          }))
+        )
+        .run();
+    }
+  });
+
+  return listFeatureRelations(database, featureId);
 }
 
 export function listTaskUseCases(database: DbClient, taskId: number): UseCaseDto[] {

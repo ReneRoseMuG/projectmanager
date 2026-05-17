@@ -18,7 +18,7 @@ import {
  * - Temp-Verzeichnisse und apps/api/.test-runtime sind als isolierte Testziele erlaubt.
  *
  * Fehlerfälle:
- * - Standard-DB, uploads/, content/ und backups/ werden im Testmodus blockiert.
+ * - Standard-DB, uploads/, previews/, content/ und backups/ werden im Testmodus blockiert.
  *
  * Ziel:
  * Datenbank- und Dateisystemtests technisch gegen produktive Laufzeitpfade absichern.
@@ -68,6 +68,7 @@ describe("runtime safety guard", () => {
     enableTestRuntime();
 
     expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "uploads"), "UPLOAD_DIR")).toThrow(/application filesystem/);
+    expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "previews"), "PREVIEW_CACHE_DIR")).toThrow(/application filesystem/);
     expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "content"), "CONTENT_DIR")).toThrow(/application filesystem/);
     expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "backups"), "BACKUP_WORK_DIR")).toThrow(/application filesystem/);
   });
@@ -79,6 +80,7 @@ describe("runtime safety guard", () => {
       assertSafeTestRuntimeTargets({
         databasePath: path.join(testRuntimeRoot, "e2e", "data", "taskmanager.sqlite"),
         uploadDir: path.join(testRuntimeRoot, "e2e", "uploads"),
+        previewCacheDir: path.join(testRuntimeRoot, "e2e", "previews"),
         contentDir: path.join(testRuntimeRoot, "e2e", "content"),
         backupWorkDir: path.join(testRuntimeRoot, "e2e", "backups")
       })

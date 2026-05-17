@@ -13,6 +13,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { buildTestApp, createProject, createTask, createTestDb, truncateAll, type TestDb } from "../helpers/index.js";
 
 const uploadDir = path.join(os.tmpdir(), `taskmanager-api-attachments-${process.pid}`);
+const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-attachment-previews-${process.pid}`);
 
 describe("Attachments API", () => {
   let testDb: TestDb;
@@ -20,6 +21,7 @@ describe("Attachments API", () => {
 
   beforeAll(async () => {
     process.env.UPLOAD_DIR = uploadDir;
+    process.env.PREVIEW_CACHE_DIR = previewCacheDir;
     testDb = createTestDb();
     app = await buildTestApp(testDb, { enableMultipart: true });
   });
@@ -28,13 +30,16 @@ describe("Attachments API", () => {
 
   afterEach(async () => {
     await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
     await fs.mkdir(uploadDir, { recursive: true });
+    await fs.mkdir(previewCacheDir, { recursive: true });
   });
 
   afterAll(async () => {
     await app.close();
     testDb.sqlite.close();
     await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
   });
 
   it("POST /api/projects/:id/attachments laedt Datei hoch und gibt Metadaten zurueck", async () => {
@@ -100,5 +105,42 @@ describe("Attachments API", () => {
 
   it("DELETE eines nicht vorhandenen Attachments gibt 404 zurueck", async () => {
     await supertest(app.server).delete("/api/attachments/9999").expect(404);
+  });
+
+  it("GET /api/attachments/:id/preview gibt Textvorschau begrenzt zurueck", async () => {
+    const project = await createProject(app);
+    const upload = await supertest(app.server)
+      .post(`/api/projects/${project.id}/attachments`)
+      .attach("file", Buffer.from("Erste Zeile\nZweite Zeile"), { filename: "notiz.txt", contentType: "text/plain" })
+      .expect(201);
+
+    const res = await supertest(app.server).get(`/api/attachments/${upload.body.id}/preview`).expect(200);
+
+    expect(res.body).toMatchObject({
+      id: upload.body.id,
+      kind: "text",
+      status: "available",
+      previewUrl: null
+    });
+    expect(res.body.text.content).toContain("Erste Zeile");
+    expect(res.body.text.truncated).toBe(false);
+  });
+
+  it("GET /api/attachments/:id/preview erkennt PDF als native Vorschau", async () => {
+    const project = await createProject(app);
+    const upload = await supertest(app.server)
+      .post(`/api/projects/${project.id}/attachments`)
+      .attach("file", Buffer.from("%PDF-1.4"), { filename: "dokument.pdf", contentType: "application/pdf" })
+      .expect(201);
+
+    const res = await supertest(app.server).get(`/api/attachments/${upload.body.id}/preview`).expect(200);
+
+    expect(res.body).toMatchObject({
+      id: upload.body.id,
+      kind: "pdf",
+      status: "available",
+      previewUrl: upload.body.url,
+      text: null
+    });
   });
 });

@@ -43,6 +43,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerDocLinksRoutes } = await import("../../src/routes/doc-links.js");
   const { registerImportsRoutes } = await import("../../src/routes/imports.js");
   const { registerDumpRoutes } = await import("../../src/routes/dumps.js");
+  const { registerAdminSeedRunRoutes } = await import("../../src/routes/admin-seed-runs.js");
 
   app.setErrorHandler(errorHandler);
   await registerCors(app);
@@ -72,6 +73,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerDocLinksRoutes, { prefix: "/api" });
   await app.register(registerImportsRoutes, { prefix: "/api" });
   await app.register(registerDumpRoutes, { prefix: "/api" });
+  await app.register(registerAdminSeedRunRoutes, { prefix: "/api" });
 
   await app.ready();
   return app;

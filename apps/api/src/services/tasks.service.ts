@@ -10,10 +10,14 @@ import { listTaskNotes } from "./notes.service.js";
 import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 
 type TaskRecord = typeof tasks.$inferSelect;
+type MappableTaskRecord = Pick<
+  TaskRecord,
+  "id" | "projectId" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "position" | "createdAt" | "updatedAt"
+>;
 
 export function mapTask(
   database: DbClient,
-  record: TaskRecord,
+  record: MappableTaskRecord,
   tags = getTaskTags(database, record.id),
   subtaskCount = getSubtaskCounts(database, [record.id]).get(record.id) ?? 0
 ): Task {

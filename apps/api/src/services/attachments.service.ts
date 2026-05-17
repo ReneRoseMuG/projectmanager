@@ -8,6 +8,7 @@ import type { DbClient } from "../db/client.js";
 import { attachments, features, projects, tasks } from "../db/schema.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { notFound } from "../utils/errors.js";
+import { removeAttachmentPreviews } from "./attachment-preview.service.js";
 
 type AttachmentRecord = typeof attachments.$inferSelect;
 
@@ -148,4 +149,5 @@ export async function deleteAttachment(database: DbClient, id: number): Promise<
 
   const diskPath = path.join(config.uploadDir, record.filename);
   await fs.rm(diskPath, { force: true });
+  await removeAttachmentPreviews(id);
 }

@@ -1,4 +1,4 @@
-import type { Feature, Task, UseCase } from "@taskmanager/shared-types";
+import type { Feature, FeatureRelation, FeatureRelationInput, Task, UseCase } from "@taskmanager/shared-types";
 import { api } from "./client";
 
 export async function getProjectFeatures(projectId: number): Promise<Feature[]> {
@@ -23,6 +23,14 @@ export async function getFeatureTasks(featureId: number): Promise<Task[]> {
 
 export async function setFeatureTasks(featureId: number, taskIds: number[]): Promise<Task[]> {
   return api.put(`features/${featureId}/tasks`, { json: { taskIds } }).json<Task[]>();
+}
+
+export async function getFeatureRelations(featureId: number): Promise<FeatureRelation[]> {
+  return api.get(`features/${featureId}/relations`).json<FeatureRelation[]>();
+}
+
+export async function setFeatureRelations(featureId: number, relations: FeatureRelationInput[]): Promise<FeatureRelation[]> {
+  return api.put(`features/${featureId}/relations`, { json: { relations } }).json<FeatureRelation[]>();
 }
 
 export async function getTaskUseCases(taskId: number): Promise<UseCase[]> {

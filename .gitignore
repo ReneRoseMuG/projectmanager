@@ -10,6 +10,8 @@ apps/api/data/
 apps/api/.test-runtime/
 apps/api/uploads/*
 !apps/api/uploads/.gitkeep
+apps/api/previews/*
+!apps/api/previews/.gitkeep
 coverage/
 .vite/
 apps/web/test-results/

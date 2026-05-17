@@ -50,6 +50,20 @@
       "when": 1779015373502,
       "tag": "0006_dear_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1779024921170,
+      "tag": "0007_careful_vin_gonzales",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1779027804931,
+      "tag": "0008_broken_the_order",
+      "breakpoints": true
     }
   ]
 }

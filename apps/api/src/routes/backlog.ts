@@ -22,6 +22,7 @@ const backlogBodySchema = {
     description: { type: ["string", "null"] },
     status: { type: "string", enum: BACKLOG_STATUSES },
     priority: { type: "string", enum: PRIORITIES },
+    importKey: { type: ["string", "null"] },
     featureId: { type: ["integer", "null"], minimum: 1 },
     useCaseId: { type: ["integer", "null"], minimum: 1 },
     sortOrder: { type: "integer" }

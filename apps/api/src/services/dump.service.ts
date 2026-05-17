@@ -32,10 +32,12 @@ function createArchive(): Archiver {
 }
 
 const DUMP_TABLES = [
+  { key: "seedRuns", tableName: "seed_runs" },
   { key: "projects", tableName: "projects" },
   { key: "tags", tableName: "tags" },
   { key: "notes", tableName: "notes" },
   { key: "features", tableName: "features" },
+  { key: "featureRelations", tableName: "feature_relations" },
   { key: "tasks", tableName: "tasks" },
   { key: "useCases", tableName: "use_cases" },
   { key: "wikiPages", tableName: "wiki_pages" },
@@ -49,7 +51,8 @@ const DUMP_TABLES = [
   { key: "backlogItems", tableName: "backlog_items" },
   { key: "projectFeatures", tableName: "project_features" },
   { key: "taskFeatures", tableName: "task_features" },
-  { key: "taskUseCases", tableName: "task_use_cases" }
+  { key: "taskUseCases", tableName: "task_use_cases" },
+  { key: "seedRunItems", tableName: "seed_run_items" }
 ] as const;
 
 export const DUMP_TABLE_KEYS = DUMP_TABLES.map((entry) => entry.key);

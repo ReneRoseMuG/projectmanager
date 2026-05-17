@@ -2,6 +2,12 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 17.05.26 | Feature | Attachment-Previews | ✅ |
+| 17.05.26 | Feature | Wiki-Import Relationen und Backlogs | ✅ |
+| 17.05.26 | Fix | Project Features Board | ✅ |
+| 17.05.26 | Feature | Board/ListView Testsuite | ✅ |
+| 17.05.26 | Feature | Admin-Testdaten | ✅ |
+| 17.05.26 | 0 | ListBoardView Testsuite Blocker | 🔴 |
 | 17.05.26 | Fix | Test Runtime Safety | ✅ |
 | 17.05.26 | Fix | E2E leere Tests | ✅ |
 | 17.05.26 | Fix | Design-Review-Befunde | ✅ |

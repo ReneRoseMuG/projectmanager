@@ -1,4 +1,4 @@
-import type { Attachment } from "@taskmanager/shared-types";
+import type { Attachment, AttachmentPreviewInfo } from "@taskmanager/shared-types";
 import { api } from "./client";
 
 export async function getProjectAttachments(projectId: number): Promise<Attachment[]> {
@@ -33,4 +33,8 @@ export async function uploadFeatureAttachment(featureId: number, file: File): Pr
 
 export async function deleteAttachment(id: number): Promise<void> {
   await api.delete(`attachments/${id}`).json();
+}
+
+export async function getAttachmentPreview(id: number): Promise<AttachmentPreviewInfo> {
+  return api.get(`attachments/${id}/preview`).json<AttachmentPreviewInfo>();
 }

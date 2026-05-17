@@ -1,13 +1,13 @@
 import type { Attachment, BacklogItem, Feature, FeatureInput, Note, ProjectInput, Task, TaskStatus } from "@taskmanager/shared-types";
 import { ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AttachmentList } from "../components/attachments/AttachmentList";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
 import { BacklogItemForm } from "../components/backlog/BacklogItemForm";
 import { BacklogListBoardView } from "../components/backlog/BacklogListBoardView";
 import { FeatureForm } from "../components/features/FeatureForm";
-import { FeatureRelationPanel } from "../components/features/FeatureRelationPanel";
+import { ProjectFeaturePanel } from "../components/features/ProjectFeaturePanel";
 import { WikiImportPanel } from "../components/imports/WikiImportPanel";
 import { NoteEditor } from "../components/notes/NoteEditor";
 import { NoteList } from "../components/notes/NoteList";
@@ -82,15 +82,13 @@ export function ProjectDetailPage() {
   const [editingBacklogItem, setEditingBacklogItem] = useState<BacklogItem | null>(null);
   const [featureFormOpen, setFeatureFormOpen] = useState(false);
   const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
-  const [selectedProjectFeatureIds, setSelectedProjectFeatureIds] = useState<number[]>([]);
-  const [projectFeatureSaving, setProjectFeatureSaving] = useState(false);
   const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
 
-  useEffect(() => {
-    setSelectedProjectFeatureIds(projectFeatureLinks.features.map((feature) => feature.id));
-  }, [projectFeatureLinks.features]);
-
   const openTask = (task: Task) => setDetailTaskId(task.id);
+  const openFeature = (feature: Feature) => {
+    setEditingFeature(feature);
+    setFeatureFormOpen(true);
+  };
 
   const createNote = async () => {
     try {
@@ -154,19 +152,6 @@ export function ProjectDetailPage() {
   const reloadFeatureRelations = async () => {
     await allFeatures.reload();
     await projectFeatureLinks.reload();
-  };
-
-  const saveProjectFeatureRelations = async () => {
-    setProjectFeatureSaving(true);
-    try {
-      await projectFeatureLinks.setFeaturesForProject(selectedProjectFeatureIds);
-      await reloadFeatureRelations();
-      showToast({ tone: "success", title: "Feature-Verknüpfungen gespeichert" });
-    } catch (featureError) {
-      showToast({ tone: "error", title: "Feature-Verknüpfungen konnten nicht gespeichert werden", message: errorMessage(featureError) });
-    } finally {
-      setProjectFeatureSaving(false);
-    }
   };
 
   const submitProjectDetails = async (input: ProjectInput, tagIds: number[]) => {
@@ -444,18 +429,17 @@ export function ProjectDetailPage() {
       ) : null}
 
       {activeTab === "features" ? (
-        projectFeatureLinks.loading || allFeatures.loading ? (
+        projectFeatureLinks.loading ? (
           <TaskListSkeleton />
         ) : (
           <>
             {projectFeatureLinks.error ? <div className="text-sm text-crimson">{projectFeatureLinks.error}</div> : null}
-            <FeatureRelationPanel
-              features={allFeatures.features}
-              selectedIds={selectedProjectFeatureIds}
-              onChange={setSelectedProjectFeatureIds}
-              onSave={saveProjectFeatureRelations}
-              saving={projectFeatureSaving}
-              title="Projekt-Features"
+            <ProjectFeaturePanel
+              features={projectFeatureLinks.features}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              onCreate={openCreateFeatureForm}
+              onOpen={openFeature}
             />
           </>
         )

@@ -8,6 +8,7 @@ import {
   listProjectAttachments,
   listTaskAttachments
 } from "../services/attachments.service.js";
+import { getAttachmentPreview } from "../services/attachment-preview.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
@@ -63,6 +64,12 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     "/features/:id/attachments",
     { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
     async (request) => listFeatureAttachments(app.db, request.params.id)
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/attachments/:id/preview",
+    { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
+    async (request) => getAttachmentPreview(app.db, request.params.id)
   );
 
   app.post<{ Params: { id: number } }>(

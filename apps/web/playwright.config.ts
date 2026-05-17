@@ -32,6 +32,7 @@ export default defineConfig({
         TASKMANAGER_TEST_RUNTIME_ROOT: e2eRuntimeRoot,
         DATABASE_PATH: path.join(e2eRuntimeRoot, "data", "taskmanager.sqlite"),
         UPLOAD_DIR: path.join(e2eRuntimeRoot, "uploads"),
+        PREVIEW_CACHE_DIR: path.join(e2eRuntimeRoot, "previews"),
         CONTENT_DIR: path.join(e2eRuntimeRoot, "content"),
         BACKUP_WORK_DIR: path.join(e2eRuntimeRoot, "backups"),
         PORT: String(apiPort),

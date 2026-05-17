@@ -1,6 +1,7 @@
 export const PROJECT_STATUSES = ["active", "on_hold", "completed", "archived"] as const;
 export const TASK_STATUSES = ["todo", "in_progress", "done"] as const;
 export const FEATURE_STATUSES = ["draft", "active", "done", "archived"] as const;
+export const FEATURE_RELATION_TYPES = ["related", "depends_on", "consumed_by"] as const;
 export const BACKLOG_STATUSES = ["open", "in_progress", "done", "rejected"] as const;
 export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "backlogItem", "wikiPage"] as const;
@@ -8,6 +9,7 @@ export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "b
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
+export type FeatureRelationType = (typeof FEATURE_RELATION_TYPES)[number];
 export type BacklogStatus = (typeof BACKLOG_STATUSES)[number];
 export type Priority = (typeof PRIORITIES)[number];
 export type CommentEntityType = (typeof COMMENT_ENTITY_TYPES)[number];
@@ -127,6 +129,27 @@ export interface Attachment {
   createdAt: string;
 }
 
+export type AttachmentPreviewKind = "image" | "pdf" | "text" | "csv" | "audio" | "video" | "generatedPdf" | "unsupported";
+export type AttachmentPreviewStatus = "available" | "unsupported" | "failed";
+
+export interface AttachmentTextPreview {
+  content: string;
+  encoding: "utf-8";
+  truncated: boolean;
+  bytesRead: number;
+}
+
+export interface AttachmentPreviewInfo {
+  id: number;
+  kind: AttachmentPreviewKind;
+  status: AttachmentPreviewStatus;
+  label: string;
+  previewUrl: string | null;
+  text: AttachmentTextPreview | null;
+  message: string | null;
+  generatedAt: string | null;
+}
+
 export interface Event {
   id: number;
   title: string;
@@ -180,6 +203,22 @@ export interface FeatureInput {
 }
 
 export type FeatureUpdate = Partial<FeatureInput>;
+
+export interface FeatureRelation {
+  sourceFeatureId: number;
+  targetFeatureId: number;
+  relationType: FeatureRelationType;
+  description: string | null;
+  targetFeature: Feature;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FeatureRelationInput {
+  targetFeatureId: number;
+  relationType?: FeatureRelationType;
+  description?: string | null;
+}
 
 export interface UseCase {
   id: number;
@@ -247,6 +286,7 @@ export interface BacklogItem {
   description: string | null;
   status: BacklogStatus;
   priority: Priority;
+  importKey: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -259,6 +299,7 @@ export interface BacklogItemInput {
   useCaseId?: number | null;
   status?: BacklogStatus;
   priority?: Priority;
+  importKey?: string | null;
   sortOrder?: number;
 }
 
@@ -277,7 +318,7 @@ export interface WikiImportPreviewRequest {
 
 export type WikiImportRunRequest = WikiImportPreviewRequest;
 
-export type WikiImportItemType = "feature" | "useCase" | "task" | "projectFeature" | "taskFeature" | "taskUseCase";
+export type WikiImportItemType = "feature" | "useCase" | "task" | "backlogItem" | "featureRelation" | "projectFeature" | "taskFeature" | "taskUseCase";
 
 export type WikiImportAction = "created" | "updated" | "skipped" | "warning" | "error";
 
@@ -369,4 +410,46 @@ export interface DumpDriveApplyResult {
   fileRootsRestored: DumpFileRootSummary[];
   warnings: string[];
   blockingIssues: string[];
+}
+
+export type SeedRunScenario = "visual";
+
+export interface SeedRunTableCount {
+  tableName: string;
+  count: number;
+}
+
+export interface SeedRunSummary {
+  totalRecords: number;
+  tableCounts: SeedRunTableCount[];
+}
+
+export interface SeedRun {
+  id: string;
+  label: string;
+  scenario: SeedRunScenario;
+  createdAt: string;
+  summary: SeedRunSummary;
+}
+
+export interface SeedRunCreateRequest {
+  label?: string | null;
+}
+
+export interface SeedRunDeletePreview {
+  seedRun: SeedRun;
+  canDelete: boolean;
+  blockingIssues: string[];
+  tableCounts: SeedRunTableCount[];
+}
+
+export interface SeedRunDeleteRequest {
+  confirmationId: string;
+}
+
+export interface SeedRunDeleteResult {
+  seedRunId: string;
+  deletedAt: string;
+  deletedTables: SeedRunTableCount[];
+  deletedFiles: number;
 }

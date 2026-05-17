@@ -6,8 +6,9 @@ import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
 
 type TagRecord = typeof tags.$inferSelect;
+type MappableTagRecord = Pick<TagRecord, "id" | "name" | "color">;
 
-function mapTag(record: TagRecord): Tag {
+function mapTag(record: MappableTagRecord): Tag {
   return {
     id: record.id,
     name: record.name,

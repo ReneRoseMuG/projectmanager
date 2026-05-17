@@ -6,8 +6,9 @@ import { badRequest, notFound } from "../utils/errors.js";
 import { nowIso, parseJsonObject, stringifyJsonObject } from "./helpers.js";
 
 type NoteRecord = typeof notes.$inferSelect;
+type MappableNoteRecord = Pick<NoteRecord, "id" | "title" | "contentJson" | "createdAt" | "updatedAt">;
 
-function mapNote(record: NoteRecord): Note {
+function mapNote(record: MappableNoteRecord): Note {
   return {
     id: record.id,
     title: record.title,
