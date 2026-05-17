@@ -30,6 +30,30 @@ export interface TestTask {
   subtaskCount: number;
 }
 
+export interface TestTicket {
+  id: number;
+  projectId: number;
+  parentId: number | null;
+  type: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  severity: string | null;
+  resolution: string | null;
+  reporter: string | null;
+  assignee: string | null;
+  environment: string | null;
+  affectedVersion: string | null;
+  dueDate: string | null;
+  resolvedAt: string | null;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+  tags: TestTag[];
+  subTicketCount: number;
+}
+
 export interface TestTag {
   id: number;
   name: string;
@@ -169,6 +193,45 @@ export async function createSubtask(
 
   const res = await supertest(app.server).post(`/api/tasks/${parentTaskId}/subtasks`).send(body).expect(201);
   return res.body as TestTask;
+}
+
+export async function createTicket(
+  app: FastifyInstance,
+  projectId: number,
+  overrides: Partial<{
+    title: string;
+    type: string;
+    description: string | null;
+    status: string;
+    priority: string;
+    severity: string | null;
+    assignee: string | null;
+  }> = {}
+): Promise<TestTicket> {
+  const body = {
+    title: "Test-Ticket",
+    type: "bug",
+    status: "open",
+    priority: "medium",
+    ...overrides
+  };
+
+  const res = await supertest(app.server).post(`/api/projects/${projectId}/tickets`).send(body).expect(201);
+  return res.body as TestTicket;
+}
+
+export async function createSubTicket(
+  app: FastifyInstance,
+  parentTicketId: number,
+  overrides: Partial<{ title: string; status: string; priority: string }> = {}
+): Promise<TestTicket> {
+  const body = {
+    title: "Test-Sub-Ticket",
+    ...overrides
+  };
+
+  const res = await supertest(app.server).post(`/api/tickets/${parentTicketId}/sub-tickets`).send(body).expect(201);
+  return res.body as TestTicket;
 }
 
 export async function createTag(

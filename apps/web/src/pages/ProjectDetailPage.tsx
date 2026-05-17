@@ -16,6 +16,7 @@ import { ProjectInlineForm } from "../components/projects/ProjectInlineForm";
 import { TaskDetail } from "../components/tasks/TaskDetail";
 import { TaskForm } from "../components/tasks/TaskForm";
 import { TaskListBoardView } from "../components/tasks/TaskListBoardView";
+import { ProjectTicketPanel } from "../components/tickets/ProjectTicketPanel";
 import { Button } from "../components/ui/Button";
 import { CommentThread } from "../components/ui/CommentThread";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
@@ -33,18 +34,20 @@ import { useNotes } from "../hooks/useNotes";
 import { useProjectFeatureLinks } from "../hooks/useDocLinks";
 import { useProjects } from "../hooks/useProjects";
 import { useTasks } from "../hooks/useTasks";
+import { useTickets } from "../hooks/useTickets";
 import { useViewMode } from "../hooks/useViewMode";
 import { useWikiImport } from "../hooks/useWikiImport";
 import { invalidateFeatureScope, invalidateTags, invalidateTaskScope, invalidateUseCaseScope } from "../queries/invalidation";
 import { formatHumanDate } from "../utils/date";
 import { deriveProjectTaskStats } from "../utils/projectTaskStats";
 
-type ProjectTab = "details" | "features" | "tasks" | "comments" | "attachments" | "notes" | "backlog" | "import";
+type ProjectTab = "details" | "features" | "tasks" | "tickets" | "comments" | "attachments" | "notes" | "backlog" | "import";
 
 const tabs: Array<{ value: ProjectTab; label: string }> = [
   { value: "details", label: "Stammdaten" },
   { value: "features", label: "Features" },
   { value: "tasks", label: "Aufgaben" },
+  { value: "tickets", label: "Tickets" },
   { value: "comments", label: "Kommentare" },
   { value: "attachments", label: "Dateien" },
   { value: "notes", label: "Notizen" },
@@ -60,6 +63,7 @@ export function ProjectDetailPage() {
   const { confirm } = useConfirm();
   const { project, loading: projectLoading, updateProject } = useProjects(projectId);
   const tasks = useTasks(projectId);
+  const projectTickets = useTickets(projectId);
   const allFeatures = useFeatures();
   const projectFeatureLinks = useProjectFeatureLinks(Number.isFinite(projectId) ? projectId : undefined);
   const backlog = useBacklog(Number.isFinite(projectId) ? projectId : undefined);
@@ -260,6 +264,7 @@ export function ProjectDetailPage() {
     details: 0,
     features: projectFeatureLinks.features.length,
     tasks: openTasks,
+    tickets: projectTickets.tickets.length,
     comments: projectComments.comments.length,
     attachments: attachments.attachments.length,
     notes: notes.notes.length,
@@ -380,6 +385,8 @@ export function ProjectDetailPage() {
             onDelete={(task) => void deleteTask(task)}
           />
       ) : null}
+
+      {activeTab === "tickets" ? <ProjectTicketPanel projectId={projectId} /> : null}
 
       {activeTab === "features" ? (
         projectFeatureLinks.loading ? (

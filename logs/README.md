@@ -2,6 +2,17 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 17.05.26 | 11 | Ticket-Tests | ✅ |
+| 17.05.26 | 10 | Ticket-Seed-Daten | ✅ |
+| 17.05.26 | 9 | Ticket-Globale-Suche | ✅ |
+| 17.05.26 | 8 | Ticket-Seiten & Navigation | ✅ |
+| 17.05.26 | 7 | Ticket-Komponenten | ✅ |
+| 17.05.26 | 6 | Ticket-Frontend-API & Hooks | ✅ |
+| 17.05.26 | 5 | Ticket-Shared-Infrastruktur | ✅ |
+| 17.05.26 | 4 | Ticket-Routes | ✅ |
+| 17.05.26 | 3 | Ticket-Service | ✅ |
+| 17.05.26 | 2 | Ticket-Shared-Types | ✅ |
+| 17.05.26 | 1 | Ticket-Schema & Migration | ✅ |
 | 17.05.26 | Feature | Query-Sync-Testabdeckung | ✅ |
 | 17.05.26 | Fix | Test-only Fehlerbehebung | ✅ |
 | 17.05.26 | Feature | Drive-Konfiguration UI | ✅ |

@@ -9,11 +9,12 @@ import {
   getTaskNotes,
   updateNote as updateNoteRequest
 } from "../api/notes";
+import { createTicketNote, getTicketNotes } from "../api/tickets";
 import { invalidateNotes } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
-export type NoteOwner = { type: "project"; id: number } | { type: "task"; id: number };
+export type NoteOwner = { type: "project"; id: number } | { type: "task"; id: number } | { type: "ticket"; id: number };
 
 export function useNotes(owner: NoteOwner | null) {
   const queryClient = useQueryClient();
@@ -23,7 +24,15 @@ export function useNotes(owner: NoteOwner | null) {
 
   const notesQuery = useQuery({
     queryKey: queryKeys.notes.owner(ownerType ?? "project", ownerId ?? 0),
-    queryFn: () => (ownerType === "project" ? getProjectNotes(ownerId as number) : getTaskNotes(ownerId as number)),
+    queryFn: () => {
+      if (ownerType === "project") {
+        return getProjectNotes(ownerId as number);
+      }
+      if (ownerType === "ticket") {
+        return getTicketNotes(ownerId as number);
+      }
+      return getTaskNotes(ownerId as number);
+    },
     enabled: hasOwner
   });
 
@@ -38,7 +47,13 @@ export function useNotes(owner: NoteOwner | null) {
       if (!hasOwner) {
         return null;
       }
-      return ownerType === "project" ? createProjectNote(ownerId as number, input) : createTaskNote(ownerId as number, input);
+      if (ownerType === "project") {
+        return createProjectNote(ownerId as number, input);
+      }
+      if (ownerType === "ticket") {
+        return createTicketNote(ownerId as number, input);
+      }
+      return createTaskNote(ownerId as number, input);
     },
     onSuccess: async () => {
       if (hasOwner) {

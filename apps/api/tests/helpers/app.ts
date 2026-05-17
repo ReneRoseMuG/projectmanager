@@ -34,6 +34,8 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerCommentsRoutes } = await import("../../src/routes/comments.js");
   const { registerTagsRoutes } = await import("../../src/routes/tags.js");
   const { registerNotesRoutes } = await import("../../src/routes/notes.js");
+  const { registerTicketsRoutes } = await import("../../src/routes/tickets.js");
+  const { registerMultipart } = await import("../../src/plugins/multipart.js");
   const { registerEventsRoutes } = await import("../../src/routes/events.js");
   const { registerFeaturesRoutes } = await import("../../src/routes/features.js");
   const { registerHealthRoutes } = await import("../../src/routes/health.js");
@@ -47,13 +49,12 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
 
   app.setErrorHandler(errorHandler);
   await registerCors(app);
+  await registerMultipart(app);
 
   if (options.enableMultipart) {
-    const { registerMultipart } = await import("../../src/plugins/multipart.js");
     const { registerStatic } = await import("../../src/plugins/static.js");
     const { registerAttachmentsRoutes } = await import("../../src/routes/attachments.js");
 
-    await registerMultipart(app);
     await registerStatic(app);
     await app.register(registerAttachmentsRoutes, { prefix: "/api" });
   }
@@ -64,6 +65,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerCommentsRoutes, { prefix: "/api" });
   await app.register(registerTagsRoutes, { prefix: "/api" });
   await app.register(registerNotesRoutes, { prefix: "/api" });
+  await app.register(registerTicketsRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
   await app.register(registerHealthRoutes, { prefix: "/api" });
   await app.register(registerFeaturesRoutes, { prefix: "/api" });

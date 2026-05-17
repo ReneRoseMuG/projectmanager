@@ -5,7 +5,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { config } from "../config.js";
 import type { DbClient } from "../db/client.js";
-import { attachments, features, projects, tasks } from "../db/schema.js";
+import { attachments, features, projects, tasks, tickets } from "../db/schema.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { notFound } from "../utils/errors.js";
 import { removeAttachmentPreviews } from "./attachment-preview.service.js";
@@ -24,6 +24,7 @@ function mapAttachment(record: AttachmentRecord): Attachment {
     projectId: record.projectId,
     taskId: record.taskId,
     featureId: record.featureId,
+    ticketId: record.ticketId,
     originalName: record.originalName,
     filename: record.filename,
     mimetype: record.mimetype,
@@ -54,6 +55,13 @@ function ensureFeatureExists(database: DbClient, featureId: number): void {
   }
 }
 
+function ensureTicketExists(database: DbClient, ticketId: number): void {
+  const ticket = database.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)).get();
+  if (!ticket) {
+    throw notFound(`Ticket with id ${ticketId} not found`);
+  }
+}
+
 function makeFilename(originalName: string): string {
   const extension = path.extname(originalName);
   return `${randomUUID()}${extension}`;
@@ -64,6 +72,7 @@ async function persistAttachment(values: {
   projectId?: number;
   taskId?: number;
   featureId?: number;
+  ticketId?: number;
   upload: AttachmentUpload;
 }): Promise<Attachment> {
   assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
@@ -79,6 +88,7 @@ async function persistAttachment(values: {
       projectId: values.projectId ?? null,
       taskId: values.taskId ?? null,
       featureId: values.featureId ?? null,
+      ticketId: values.ticketId ?? null,
       originalName: values.upload.originalName,
       filename,
       mimetype: values.upload.mimetype,
@@ -123,6 +133,17 @@ export function listFeatureAttachments(database: DbClient, featureId: number): A
     .map(mapAttachment);
 }
 
+export function listTicketAttachments(database: DbClient, ticketId: number): Attachment[] {
+  ensureTicketExists(database, ticketId);
+  return database
+    .select()
+    .from(attachments)
+    .where(eq(attachments.ticketId, ticketId))
+    .orderBy(desc(attachments.createdAt))
+    .all()
+    .map(mapAttachment);
+}
+
 export async function createProjectAttachment(database: DbClient, projectId: number, upload: AttachmentUpload): Promise<Attachment> {
   ensureProjectExists(database, projectId);
   return persistAttachment({ database, projectId, upload });
@@ -136,6 +157,11 @@ export async function createTaskAttachment(database: DbClient, taskId: number, u
 export async function createFeatureAttachment(database: DbClient, featureId: number, upload: AttachmentUpload): Promise<Attachment> {
   ensureFeatureExists(database, featureId);
   return persistAttachment({ database, featureId, upload });
+}
+
+export async function createTicketAttachment(database: DbClient, ticketId: number, upload: AttachmentUpload): Promise<Attachment> {
+  ensureTicketExists(database, ticketId);
+  return persistAttachment({ database, ticketId, upload });
 }
 
 export async function deleteAttachment(database: DbClient, id: number): Promise<void> {

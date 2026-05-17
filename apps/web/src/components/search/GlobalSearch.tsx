@@ -1,4 +1,5 @@
-import { BookOpen, FileText, FolderKanban, ListTodo, Paperclip, Plus, Search, StickyNote, X } from "lucide-react";
+import { BookOpen, Bug, CircleHelp, ClipboardList, FileText, FolderKanban, ListTodo, Paperclip, Plus, Search, Sparkles, StickyNote, X } from "lucide-react";
+import type { Ticket } from "@taskmanager/shared-types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGlobalSearchData } from "../../hooks/useGlobalSearchData";
@@ -9,14 +10,27 @@ interface GlobalSearchProps {
   onClose: () => void;
 }
 
-type Scope = "all" | "projects" | "tasks" | "features" | "notes" | "wiki" | "files";
+type Scope = "all" | "projects" | "tasks" | "tickets" | "features" | "notes" | "wiki" | "files";
+
+function ticketIcon(ticket: Ticket) {
+  if (ticket.type === "bug") {
+    return <Bug size={17} />;
+  }
+  if (ticket.type === "improvement") {
+    return <Sparkles size={17} />;
+  }
+  if (ticket.type === "question") {
+    return <CircleHelp size={17} />;
+  }
+  return <ClipboardList size={17} />;
+}
 
 export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   const navigate = useNavigate();
   const searchData = useGlobalSearchData(open);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("all");
-  const { projects, features, wikiPages, tasks, notes, attachments } = searchData.data;
+  const { projects, features, wikiPages, tasks, tickets, notes, attachments } = searchData.data;
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -29,6 +43,9 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
     const taskResults = tasks
       .filter((task) => !normalized || task.title.toLowerCase().includes(normalized) || (task.description ?? "").toLowerCase().includes(normalized))
       .map((task) => ({ id: `task-${task.id}`, type: "Aufgaben", title: task.title, meta: `TASK-${task.id}`, to: `/projects/${task.projectId}`, icon: <ListTodo size={17} /> }));
+    const ticketResults = tickets
+      .filter((ticket) => !normalized || ticket.title.toLowerCase().includes(normalized) || (ticket.description ?? "").toLowerCase().includes(normalized))
+      .map((ticket) => ({ id: `ticket-${ticket.id}`, type: "Tickets", title: ticket.title, meta: `TICKET-${ticket.id}`, to: "/tickets", icon: ticketIcon(ticket) }));
     const noteResults = notes
       .filter((note) => !normalized || note.title.toLowerCase().includes(normalized))
       .map((note) => ({ id: `note-${note.id}`, type: "Notizen", title: note.title, meta: `NOTE-${note.id}`, to: "/projects", icon: <StickyNote size={17} /> }));
@@ -41,12 +58,13 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
     return [
       ...(scope === "all" || scope === "projects" ? projectResults : []),
       ...(scope === "all" || scope === "tasks" ? taskResults : []),
+      ...(scope === "all" || scope === "tickets" ? ticketResults : []),
       ...(scope === "all" || scope === "features" ? featureResults : []),
       ...(scope === "all" || scope === "notes" ? noteResults : []),
       ...(scope === "all" || scope === "wiki" ? wikiResults : []),
       ...(scope === "all" || scope === "files" ? fileResults : [])
     ];
-  }, [attachments, features, notes, projects, query, scope, tasks, wikiPages]);
+  }, [attachments, features, notes, projects, query, scope, tasks, tickets, wikiPages]);
 
   const go = (to: string) => {
     navigate(to);
@@ -58,9 +76,10 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   }
 
   const scopes: Array<{ value: Scope; label: string; count: number }> = [
-    { value: "all", label: "Alle", count: projects.length + tasks.length + features.length + notes.length + wikiPages.length + attachments.length },
+    { value: "all", label: "Alle", count: projects.length + tasks.length + tickets.length + features.length + notes.length + wikiPages.length + attachments.length },
     { value: "projects", label: "Projekte", count: projects.length },
     { value: "tasks", label: "Aufgaben", count: tasks.length },
+    { value: "tickets", label: "Tickets", count: tickets.length },
     { value: "features", label: "Features", count: features.length },
     { value: "notes", label: "Notizen", count: notes.length },
     { value: "wiki", label: "Wiki", count: wikiPages.length },

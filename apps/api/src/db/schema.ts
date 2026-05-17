@@ -8,7 +8,12 @@ export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export const FEATURE_STATUSES = ["draft", "active", "done", "archived"] as const;
 export const FEATURE_RELATION_TYPES = ["related", "depends_on", "consumed_by"] as const;
 export const BACKLOG_STATUSES = ["open", "in_progress", "done", "rejected"] as const;
-export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "backlogItem", "wikiPage"] as const;
+export const TICKET_TYPES = ["bug", "improvement", "question", "task"] as const;
+export const TICKET_STATUSES = ["open", "in_progress", "in_review", "resolved", "closed"] as const;
+export const TICKET_SEVERITIES = ["critical", "major", "minor", "trivial"] as const;
+export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
+export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
+export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "backlogItem", "wikiPage", "ticket"] as const;
 
 export const appSettings = sqliteTable("app_settings", {
   key: text("key").primaryKey(),
@@ -153,6 +158,7 @@ export const attachments = sqliteTable(
     projectId: integer("project_id").references(() => projects.id, { onDelete: "cascade" }),
     taskId: integer("task_id").references(() => tasks.id, { onDelete: "cascade" }),
     featureId: integer("feature_id").references(() => features.id, { onDelete: "cascade" }),
+    ticketId: integer("ticket_id").references(() => tickets.id, { onDelete: "cascade" }),
     originalName: text("original_name").notNull(),
     filename: text("filename").notNull(),
     mimetype: text("mimetype").notNull(),
@@ -162,7 +168,10 @@ export const attachments = sqliteTable(
   (table) => ({
     ownerCheck: check(
       "attachments_exactly_one_owner",
-      sql`(${table.projectId} is not null and ${table.taskId} is null and ${table.featureId} is null) or (${table.projectId} is null and ${table.taskId} is not null and ${table.featureId} is null) or (${table.projectId} is null and ${table.taskId} is null and ${table.featureId} is not null)`
+      sql`(${table.projectId} is not null and ${table.taskId} is null and ${table.featureId} is null and ${table.ticketId} is null)
+       or (${table.projectId} is null and ${table.taskId} is not null and ${table.featureId} is null and ${table.ticketId} is null)
+       or (${table.projectId} is null and ${table.taskId} is null and ${table.featureId} is not null and ${table.ticketId} is null)
+       or (${table.projectId} is null and ${table.taskId} is null and ${table.featureId} is null and ${table.ticketId} is not null)`
     )
   })
 );
@@ -297,4 +306,72 @@ export const taskUseCases = sqliteTable("task_use_cases", {
   useCaseId: integer("use_case_id")
     .notNull()
     .references(() => useCases.id, { onDelete: "cascade" })
+});
+
+export const tickets = sqliteTable("tickets", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  seedRunId: text("seed_run_id").references(() => seedRuns.id),
+  projectId: integer("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  parentId: integer("parent_id").references((): AnySQLiteColumn => tickets.id, { onDelete: "cascade" }),
+  type: text("type", { enum: TICKET_TYPES }).notNull().default("bug"),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status", { enum: TICKET_STATUSES }).notNull().default("open"),
+  priority: text("priority", { enum: PRIORITIES }).notNull().default("medium"),
+  severity: text("severity", { enum: TICKET_SEVERITIES }),
+  resolution: text("resolution", { enum: TICKET_RESOLUTIONS }),
+  reporter: text("reporter"),
+  assignee: text("assignee"),
+  environment: text("environment"),
+  affectedVersion: text("affected_version"),
+  dueDate: text("due_date"),
+  resolvedAt: text("resolved_at"),
+  position: real("position").notNull().default(0),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+});
+
+export const ticketRelations = sqliteTable(
+  "ticket_relations",
+  {
+    seedRunId: text("seed_run_id").references(() => seedRuns.id),
+    sourceTicketId: integer("source_ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    targetTicketId: integer("target_ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    relationType: text("relation_type", { enum: TICKET_RELATION_TYPES }).notNull().default("related"),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    ticketRelationUnique: uniqueIndex("ticket_relations_source_target_type_unique").on(
+      table.sourceTicketId,
+      table.targetTicketId,
+      table.relationType
+    ),
+    noSelfRelation: check("ticket_relations_no_self_relation", sql`${table.sourceTicketId} <> ${table.targetTicketId}`)
+  })
+);
+
+export const ticketTags = sqliteTable("ticket_tags", {
+  seedRunId: text("seed_run_id").references(() => seedRuns.id),
+  ticketId: integer("ticket_id")
+    .notNull()
+    .references(() => tickets.id, { onDelete: "cascade" }),
+  tagId: integer("tag_id")
+    .notNull()
+    .references(() => tags.id, { onDelete: "cascade" })
+});
+
+export const ticketNotes = sqliteTable("ticket_notes", {
+  seedRunId: text("seed_run_id").references(() => seedRuns.id),
+  ticketId: integer("ticket_id")
+    .notNull()
+    .references(() => tickets.id, { onDelete: "cascade" }),
+  noteId: integer("note_id")
+    .notNull()
+    .references(() => notes.id, { onDelete: "cascade" })
 });

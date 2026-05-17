@@ -11,6 +11,7 @@ import { ProjectsPage } from "./pages/ProjectsPage";
 import { SettingsBackupPage } from "./pages/SettingsBackupPage";
 import { SettingsSeedDataPage } from "./pages/SettingsSeedDataPage";
 import { SettingsTagsPage } from "./pages/SettingsTagsPage";
+import { TicketsPage } from "./pages/TicketsPage";
 import { WikiPage } from "./pages/WikiPage";
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/projects" replace />} />
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
+            <Route path="/tickets" element={<TicketsPage />} />
             <Route path="/features" element={<FeaturesPage />} />
             <Route path="/features/:id" element={<FeatureDetailPage />} />
             <Route path="/wiki" element={<WikiPage />} />
