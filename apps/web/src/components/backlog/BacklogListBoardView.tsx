@@ -49,9 +49,10 @@ export function BacklogListBoardView({ items, features, statusFilter, onStatusFi
   const [mode, setMode] = useState<ListBoardMode>("list");
   const [searchValue, setSearchValue] = useState("");
   const featureNames = useMemo(() => new Map(features.map((feature) => [feature.id, feature.title])), [features]);
+  const filteredItems = useMemo(() => items.filter((item) => statusFilter === "all" || item.status === statusFilter), [items, statusFilter]);
   const visibleItems = useMemo(
-    () => items.filter((item) => matchesSearch(item, item.featureId ? (featureNames.get(item.featureId) ?? String(item.featureId)) : "", searchValue)),
-    [featureNames, items, searchValue]
+    () => filteredItems.filter((item) => matchesSearch(item, item.featureId ? (featureNames.get(item.featureId) ?? String(item.featureId)) : "", searchValue)),
+    [featureNames, filteredItems, searchValue]
   );
   const filterOptions = statusOptions.map((option) => ({
     ...option,

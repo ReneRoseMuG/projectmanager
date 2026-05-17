@@ -1,119 +1,170 @@
-import type { CommentInput, Tag, TaskDetail, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import type { CommentInput, Tag, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { createComment as createCommentRequest, deleteComment as deleteCommentRequest } from "../api/comments";
 import { createSubtask as createSubtaskRequest } from "../api/subtasks";
 import { setTaskTags } from "../api/tags";
 import { deleteTask, getTask, updateTask as updateTaskRequest } from "../api/tasks";
-import { errorMessage } from "./errors";
+import { invalidateComments, invalidateTags, invalidateTaskScope } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export function useTaskDetail(taskId: number | null) {
-  const [task, setTask] = useState<TaskDetail | null>(null);
-  const [loading, setLoading] = useState(Boolean(taskId));
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const validTaskId = taskId !== null && Number.isFinite(taskId) ? taskId : undefined;
 
-  const load = useCallback(async () => {
-    if (!taskId) {
-      setTask(null);
-      setLoading(false);
-      return;
+  const taskQuery = useQuery({
+    queryKey: queryKeys.tasks.detail(validTaskId ?? 0),
+    queryFn: () => getTask(validTaskId as number),
+    enabled: validTaskId !== undefined
+  });
+
+  const reload = useCallback(async () => {
+    if (validTaskId !== undefined) {
+      await taskQuery.refetch();
     }
+  }, [taskQuery, validTaskId]);
 
-    setLoading(true);
-    setError(null);
-    try {
-      setTask(await getTask(taskId));
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const updateTaskMutation = useMutation({
+    mutationFn: async (input: TaskUpdate) => {
+      if (validTaskId === undefined) {
+        return null;
+      }
+      return updateTaskRequest(validTaskId, input);
+    },
+    onSuccess: async (updated) => {
+      await invalidateTaskScope(queryClient, updated?.projectId ?? taskQuery.data?.projectId, updated?.id ?? validTaskId);
     }
-  }, [taskId]);
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const updateTagsMutation = useMutation({
+    mutationFn: async (tags: Tag[]) => {
+      if (validTaskId === undefined) {
+        return [];
+      }
+      return setTaskTags(
+        validTaskId,
+        tags.map((tag) => tag.id)
+      );
+    },
+    onSuccess: async () => {
+      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, validTaskId);
+      await invalidateTags(queryClient);
+    }
+  });
+
+  const createSubtaskMutation = useMutation({
+    mutationFn: async (input: TaskInput) => {
+      if (validTaskId === undefined) {
+        return null;
+      }
+      return createSubtaskRequest(validTaskId, input);
+    },
+    onSuccess: async (created) => {
+      await invalidateTaskScope(queryClient, created?.projectId ?? taskQuery.data?.projectId, created?.id);
+      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, validTaskId);
+    }
+  });
+
+  const updateSubtaskMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: TaskUpdate }) => updateTaskRequest(id, input),
+    onSuccess: async (updated) => {
+      await invalidateTaskScope(queryClient, updated.projectId, updated.id);
+      await invalidateTaskScope(queryClient, updated.projectId, validTaskId);
+    }
+  });
+
+  const removeSubtaskMutation = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: async (_result, id) => {
+      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, id);
+      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, validTaskId);
+    }
+  });
+
+  const createCommentMutation = useMutation({
+    mutationFn: async (input: CommentInput) => {
+      if (validTaskId === undefined) {
+        return null;
+      }
+      return createCommentRequest(validTaskId, input);
+    },
+    onSuccess: async () => {
+      if (validTaskId !== undefined) {
+        await invalidateComments(queryClient, "task", validTaskId);
+      }
+      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, validTaskId);
+    }
+  });
+
+  const removeCommentMutation = useMutation({
+    mutationFn: deleteCommentRequest,
+    onSuccess: async () => {
+      if (validTaskId !== undefined) {
+        await invalidateComments(queryClient, "task", validTaskId);
+      }
+      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, validTaskId);
+    }
+  });
 
   const updateTask = useCallback(
     async (input: TaskUpdate) => {
-      if (!taskId) {
+      if (validTaskId === undefined) {
         return null;
       }
-      await updateTaskRequest(taskId, input);
-      await load();
-      return taskId;
+      await updateTaskMutation.mutateAsync(input);
+      return validTaskId;
     },
-    [load, taskId]
+    [updateTaskMutation, validTaskId]
   );
 
   const updateTags = useCallback(
     async (tags: Tag[]) => {
-      if (!taskId) {
-        return [];
-      }
-      const updated = await setTaskTags(
-        taskId,
-        tags.map((tag) => tag.id)
-      );
-      await load();
-      return updated;
+      return updateTagsMutation.mutateAsync(tags);
     },
-    [load, taskId]
+    [updateTagsMutation]
   );
 
   const createSubtask = useCallback(
     async (input: TaskInput) => {
-      if (!taskId) {
-        return null;
-      }
-      const created = await createSubtaskRequest(taskId, input);
-      await load();
-      return created;
+      return createSubtaskMutation.mutateAsync(input);
     },
-    [load, taskId]
+    [createSubtaskMutation]
   );
 
   const updateSubtask = useCallback(
     async (id: number, input: TaskUpdate) => {
-      const updated = await updateTaskRequest(id, input);
-      await load();
-      return updated;
+      return updateSubtaskMutation.mutateAsync({ id, input });
     },
-    [load]
+    [updateSubtaskMutation]
   );
 
   const removeSubtask = useCallback(
     async (id: number) => {
-      await deleteTask(id);
-      await load();
+      await removeSubtaskMutation.mutateAsync(id);
     },
-    [load]
+    [removeSubtaskMutation]
   );
 
   const createComment = useCallback(
     async (input: CommentInput) => {
-      if (!taskId) {
-        return null;
-      }
-      const created = await createCommentRequest(taskId, input);
-      await load();
-      return created;
+      return createCommentMutation.mutateAsync(input);
     },
-    [load, taskId]
+    [createCommentMutation]
   );
 
   const removeComment = useCallback(
     async (id: number) => {
-      await deleteCommentRequest(id);
-      await load();
+      await removeCommentMutation.mutateAsync(id);
     },
-    [load]
+    [removeCommentMutation]
   );
 
   return {
-    task,
-    loading,
-    error,
-    reload: load,
+    task: taskQuery.data ?? null,
+    loading: taskQuery.isLoading,
+    error: toQueryError(taskQuery.error),
+    reload,
     updateTask,
     updateTags,
     createSubtask,

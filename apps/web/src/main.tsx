@@ -1,23 +1,27 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { ErrorBoundary } from "./components/error/ErrorBoundary";
 import { ConfirmDialogProvider } from "./components/ui/ConfirmDialogProvider";
 import { ToastProvider } from "./components/ui/ToastProvider";
+import { queryClient } from "./queries/queryClient";
 import "./styles/theme.css";
 import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <ToastProvider>
-        <ConfirmDialogProvider>
-          <ErrorBoundary>
-            <App />
-          </ErrorBoundary>
-        </ConfirmDialogProvider>
-      </ToastProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <ToastProvider>
+          <ConfirmDialogProvider>
+            <ErrorBoundary>
+              <App />
+            </ErrorBoundary>
+          </ConfirmDialogProvider>
+        </ToastProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   </React.StrictMode>
 );

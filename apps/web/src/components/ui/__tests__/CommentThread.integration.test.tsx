@@ -17,6 +17,7 @@ import "@testing-library/jest-dom/vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import type { Comment } from "@taskmanager/shared-types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useEntityComments } from "../../../hooks/useEntityComments";
 import { createEntityComment, deleteEntityComment, getEntityComments } from "../../../api/comments";
@@ -73,6 +74,21 @@ function Harness() {
   );
 }
 
+function renderHarness() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false }
+    }
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <Harness />
+    </QueryClientProvider>
+  );
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -82,7 +98,7 @@ describe("CommentThread API Integration", () => {
   it("lädt Kommentare beim Öffnen", async () => {
     apiMocks.getEntityComments.mockResolvedValue([initialComment]);
 
-    render(<Harness />);
+    renderHarness();
 
     await waitFor(() => expect(screen.getByText("Bestehender Kommentar")).toBeInTheDocument());
     expect(apiMocks.getEntityComments).toHaveBeenCalledWith("project", 7);
@@ -92,7 +108,7 @@ describe("CommentThread API Integration", () => {
     apiMocks.getEntityComments.mockResolvedValueOnce([]).mockResolvedValueOnce([createdComment]);
     apiMocks.createEntityComment.mockResolvedValue(createdComment);
 
-    render(<Harness />);
+    renderHarness();
 
     await waitFor(() => expect(screen.getByText("Noch keine Kommentare")).toBeInTheDocument());
     fireEvent.change(screen.getByLabelText("Kommentar schreiben"), { target: { value: "<p>Neu</p>" } });
@@ -106,7 +122,7 @@ describe("CommentThread API Integration", () => {
     apiMocks.getEntityComments.mockResolvedValueOnce([initialComment]).mockResolvedValueOnce([]);
     apiMocks.deleteEntityComment.mockResolvedValue(undefined);
 
-    render(<Harness />);
+    renderHarness();
 
     await waitFor(() => expect(screen.getByText("Bestehender Kommentar")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
@@ -118,7 +134,7 @@ describe("CommentThread API Integration", () => {
   it("zeigt API-Fehler beim Laden", async () => {
     apiMocks.getEntityComments.mockRejectedValue(new Error("API nicht erreichbar"));
 
-    render(<Harness />);
+    renderHarness();
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("API nicht erreichbar"));
   });

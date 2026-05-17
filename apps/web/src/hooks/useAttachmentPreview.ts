@@ -1,35 +1,19 @@
 import type { AttachmentPreviewInfo } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getAttachmentPreview } from "../api/attachments";
-import { errorMessage } from "./errors";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export function useAttachmentPreview(attachmentId: number, enabled: boolean) {
-  const [preview, setPreview] = useState<AttachmentPreviewInfo | null>(null);
-  const [loading, setLoading] = useState(enabled);
-  const [error, setError] = useState<string | null>(null);
+  const previewQuery = useQuery({
+    queryKey: queryKeys.attachments.preview(attachmentId),
+    queryFn: () => getAttachmentPreview(attachmentId),
+    enabled
+  });
 
-  const load = useCallback(async () => {
-    if (!enabled) {
-      setPreview(null);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      setPreview(await getAttachmentPreview(attachmentId));
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
-    }
-  }, [attachmentId, enabled]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { preview, loading, error, reload: load };
+  return {
+    preview: previewQuery.data ?? (null as AttachmentPreviewInfo | null),
+    loading: previewQuery.isLoading,
+    error: toQueryError(previewQuery.error)
+  };
 }

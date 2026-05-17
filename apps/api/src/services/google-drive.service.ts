@@ -27,14 +27,16 @@ export interface GoogleDriveBackupClient {
   downloadFile(fileId: string): Promise<Buffer>;
 }
 
-function requireDriveConfig(): {
+type GoogleDriveFolderIdProvider = () => string | null;
+
+function requireDriveConfig(folderId: string | null): {
   folderId: string;
   clientId: string;
   clientSecret: string;
   refreshToken: string;
 } {
   if (
-    !config.googleDriveBackupFolderId ||
+    !folderId ||
     !config.googleDriveClientId ||
     !config.googleDriveClientSecret ||
     !config.googleDriveRefreshToken
@@ -43,7 +45,7 @@ function requireDriveConfig(): {
   }
 
   return {
-    folderId: config.googleDriveBackupFolderId,
+    folderId,
     clientId: config.googleDriveClientId,
     clientSecret: config.googleDriveClientSecret,
     refreshToken: config.googleDriveRefreshToken
@@ -71,12 +73,14 @@ function escapeDriveQueryValue(value: string): string {
 export class GoogleDriveApiBackupClient implements GoogleDriveBackupClient {
   private accessToken: string | null = null;
 
+  constructor(private readonly getFolderId: GoogleDriveFolderIdProvider = () => config.googleDriveBackupFolderId) {}
+
   private async getAccessToken(): Promise<string> {
     if (this.accessToken) {
       return this.accessToken;
     }
 
-    const driveConfig = requireDriveConfig();
+    const driveConfig = requireDriveConfig(this.getFolderId());
     const body = new URLSearchParams({
       client_id: driveConfig.clientId,
       client_secret: driveConfig.clientSecret,
@@ -111,7 +115,7 @@ export class GoogleDriveApiBackupClient implements GoogleDriveBackupClient {
   }
 
   async listDumpFiles(): Promise<DumpDriveFile[]> {
-    const driveConfig = requireDriveConfig();
+    const driveConfig = requireDriveConfig(this.getFolderId());
     const query = [
       `'${escapeDriveQueryValue(driveConfig.folderId)}' in parents`,
       "trashed = false",
@@ -135,7 +139,7 @@ export class GoogleDriveApiBackupClient implements GoogleDriveBackupClient {
   }
 
   async uploadDump(filename: string, content: Buffer): Promise<DumpDriveFile> {
-    const driveConfig = requireDriveConfig();
+    const driveConfig = requireDriveConfig(this.getFolderId());
     const boundary = `taskmanager-${crypto.randomUUID()}`;
     const metadata = {
       name: filename,
@@ -178,6 +182,6 @@ export class GoogleDriveApiBackupClient implements GoogleDriveBackupClient {
   }
 }
 
-export function createGoogleDriveBackupClient(): GoogleDriveBackupClient {
-  return new GoogleDriveApiBackupClient();
+export function createGoogleDriveBackupClient(getFolderId?: GoogleDriveFolderIdProvider): GoogleDriveBackupClient {
+  return new GoogleDriveApiBackupClient(getFolderId);
 }

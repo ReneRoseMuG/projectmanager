@@ -1,5 +1,6 @@
-import type { Task, TaskInput, TaskPositionInput, TaskUpdate } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import type { TaskInput, TaskPositionInput, TaskUpdate } from "@taskmanager/shared-types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import {
   createTask as createTaskRequest,
   deleteTask as deleteTaskRequest,
@@ -7,72 +8,95 @@ import {
   updateTask as updateTaskRequest,
   updateTaskPosition as updateTaskPositionRequest
 } from "../api/tasks";
-import { errorMessage } from "./errors";
+import { invalidateTaskScope } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export function useTasks(projectId?: number) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(Boolean(projectId));
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const validProjectId = projectId !== undefined && Number.isFinite(projectId) ? projectId : undefined;
 
-  const load = useCallback(async () => {
-    if (!projectId) {
-      setTasks([]);
-      setLoading(false);
-      return;
+  const tasksQuery = useQuery({
+    queryKey: queryKeys.projects.tasks(validProjectId ?? 0),
+    queryFn: () => getProjectTasks(validProjectId as number),
+    enabled: validProjectId !== undefined
+  });
+
+  const reload = useCallback(async () => {
+    if (validProjectId !== undefined) {
+      await tasksQuery.refetch();
     }
+  }, [tasksQuery, validProjectId]);
 
-    setLoading(true);
-    setError(null);
-    try {
-      setTasks(await getProjectTasks(projectId));
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const createTaskMutation = useMutation({
+    mutationFn: async (input: TaskInput) => {
+      if (validProjectId === undefined) {
+        return null;
+      }
+      return createTaskRequest(validProjectId, input);
+    },
+    onSuccess: async (created) => {
+      await invalidateTaskScope(queryClient, created?.projectId ?? validProjectId, created?.id);
     }
-  }, [projectId]);
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: TaskUpdate }) => updateTaskRequest(id, input),
+    onSuccess: async (updated) => {
+      await invalidateTaskScope(queryClient, updated.projectId, updated.id);
+    }
+  });
+
+  const updateTaskPositionMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: TaskPositionInput }) => updateTaskPositionRequest(id, input),
+    onSuccess: async (updated) => {
+      await invalidateTaskScope(queryClient, updated.projectId, updated.id);
+    }
+  });
+
+  const removeTaskMutation = useMutation({
+    mutationFn: deleteTaskRequest,
+    onSuccess: async (_result, id) => {
+      await invalidateTaskScope(queryClient, validProjectId, id);
+    }
+  });
 
   const createTask = useCallback(
     async (input: TaskInput) => {
-      if (!projectId) {
-        return null;
-      }
-      const created = await createTaskRequest(projectId, input);
-      await load();
-      return created;
+      return createTaskMutation.mutateAsync(input);
     },
-    [load, projectId]
+    [createTaskMutation]
   );
 
   const updateTask = useCallback(
     async (id: number, input: TaskUpdate) => {
-      const updated = await updateTaskRequest(id, input);
-      await load();
-      return updated;
+      return updateTaskMutation.mutateAsync({ id, input });
     },
-    [load]
+    [updateTaskMutation]
   );
 
   const updateTaskPosition = useCallback(
     async (id: number, input: TaskPositionInput) => {
-      const updated = await updateTaskPositionRequest(id, input);
-      await load();
-      return updated;
+      return updateTaskPositionMutation.mutateAsync({ id, input });
     },
-    [load]
+    [updateTaskPositionMutation]
   );
 
   const removeTask = useCallback(
     async (id: number) => {
-      await deleteTaskRequest(id);
-      await load();
+      await removeTaskMutation.mutateAsync(id);
     },
-    [load]
+    [removeTaskMutation]
   );
 
-  return { tasks, loading, error, reload: load, createTask, updateTask, updateTaskPosition, removeTask };
+  return {
+    tasks: tasksQuery.data ?? [],
+    loading: tasksQuery.isLoading,
+    error: toQueryError(tasksQuery.error),
+    reload,
+    createTask,
+    updateTask,
+    updateTaskPosition,
+    removeTask
+  };
 }

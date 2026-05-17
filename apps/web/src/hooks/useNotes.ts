@@ -1,5 +1,6 @@
-import type { Note, NoteInput } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import type { NoteInput } from "@taskmanager/shared-types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import {
   createProjectNote,
   createTaskNote,
@@ -8,69 +9,90 @@ import {
   getTaskNotes,
   updateNote as updateNoteRequest
 } from "../api/notes";
-import { errorMessage } from "./errors";
+import { invalidateNotes } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export type NoteOwner = { type: "project"; id: number } | { type: "task"; id: number };
 
 export function useNotes(owner: NoteOwner | null) {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [loading, setLoading] = useState(Boolean(owner));
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const ownerType = owner?.type;
   const ownerId = owner?.id;
+  const hasOwner = ownerType !== undefined && ownerId !== undefined && Number.isFinite(ownerId);
 
-  const load = useCallback(async () => {
-    if (!ownerType || !ownerId) {
-      setNotes([]);
-      setLoading(false);
-      return;
+  const notesQuery = useQuery({
+    queryKey: queryKeys.notes.owner(ownerType ?? "project", ownerId ?? 0),
+    queryFn: () => (ownerType === "project" ? getProjectNotes(ownerId as number) : getTaskNotes(ownerId as number)),
+    enabled: hasOwner
+  });
+
+  const reload = useCallback(async () => {
+    if (hasOwner) {
+      await notesQuery.refetch();
     }
+  }, [hasOwner, notesQuery]);
 
-    setLoading(true);
-    setError(null);
-    try {
-      const items = ownerType === "project" ? await getProjectNotes(ownerId) : await getTaskNotes(ownerId);
-      setNotes(items);
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const createNoteMutation = useMutation({
+    mutationFn: async (input: NoteInput) => {
+      if (!hasOwner) {
+        return null;
+      }
+      return ownerType === "project" ? createProjectNote(ownerId as number, input) : createTaskNote(ownerId as number, input);
+    },
+    onSuccess: async () => {
+      if (hasOwner) {
+        await invalidateNotes(queryClient, ownerType as NoteOwner["type"], ownerId as number);
+      }
     }
-  }, [ownerId, ownerType]);
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const updateNoteMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: NoteInput }) => updateNoteRequest(id, input),
+    onSuccess: async () => {
+      if (hasOwner) {
+        await invalidateNotes(queryClient, ownerType as NoteOwner["type"], ownerId as number);
+      }
+    }
+  });
+
+  const removeNoteMutation = useMutation({
+    mutationFn: deleteNoteRequest,
+    onSuccess: async () => {
+      if (hasOwner) {
+        await invalidateNotes(queryClient, ownerType as NoteOwner["type"], ownerId as number);
+      }
+    }
+  });
 
   const createNote = useCallback(
     async (input: NoteInput) => {
-      if (!ownerType || !ownerId) {
-        return null;
-      }
-
-      const created = ownerType === "project" ? await createProjectNote(ownerId, input) : await createTaskNote(ownerId, input);
-      await load();
-      return created;
+      return createNoteMutation.mutateAsync(input);
     },
-    [load, ownerId, ownerType]
+    [createNoteMutation]
   );
 
   const updateNote = useCallback(
     async (id: number, input: NoteInput) => {
-      const updated = await updateNoteRequest(id, input);
-      await load();
-      return updated;
+      return updateNoteMutation.mutateAsync({ id, input });
     },
-    [load]
+    [updateNoteMutation]
   );
 
   const removeNote = useCallback(
     async (id: number) => {
-      await deleteNoteRequest(id);
-      await load();
+      await removeNoteMutation.mutateAsync(id);
     },
-    [load]
+    [removeNoteMutation]
   );
 
-  return { notes, loading, error, reload: load, createNote, updateNote, removeNote };
+  return {
+    notes: notesQuery.data ?? [],
+    loading: notesQuery.isLoading,
+    error: toQueryError(notesQuery.error),
+    reload,
+    createNote,
+    updateNote,
+    removeNote
+  };
 }

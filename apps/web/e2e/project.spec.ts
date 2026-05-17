@@ -78,7 +78,7 @@ function relationPanel(page: Page, title: string) {
 
 async function openProjectList(page: Page) {
   await page.goto("/projects");
-  await expect(page.getByRole("heading", { name: "Projekte" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Projekte", exact: true })).toBeVisible();
 }
 
 async function fillProjectForm(page: Page, name: string) {
@@ -171,19 +171,22 @@ test.describe("Projekt CRUD", () => {
     await deleteProject(request, project.id);
   });
 
-  test("Feature verknüpfen im Features-Tab", async ({ page, request }) => {
+  test("Feature verknüpfen im Projektformular und im Features-Tab anzeigen", async ({ page, request }) => {
     const project = await createProject(request, "E2E Project Feature Link");
     const feature = await createFeature(request, "E2E Project Linked Feature");
 
     try {
+      await openProjectList(page);
+      await projectCard(page, project.name).getByRole("button", { name: "Bearbeiten" }).click();
+      await activeModal(page).locator("label").filter({ hasText: feature.title }).click();
+      await Promise.all([
+        page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),
+        activeModal(page).getByRole("button", { name: "Speichern" }).click()
+      ]);
+
       await page.goto(`/projects/${project.id}`);
       await page.getByRole("button", { name: /Features/ }).click();
-      await page.getByRole("checkbox", { name: new RegExp(feature.title) }).check({ force: true });
-      await relationPanel(page, "Features").getByRole("button", { name: "Speichern" }).click();
-
-      await page.reload();
-      await page.getByRole("button", { name: /Features/ }).click();
-      await expect(page.getByRole("checkbox", { name: new RegExp(feature.title) })).toBeChecked();
+      await expect(page.getByText(feature.title)).toBeVisible();
     } finally {
       await deleteProject(request, project.id);
       await deleteFeature(request, feature.id);

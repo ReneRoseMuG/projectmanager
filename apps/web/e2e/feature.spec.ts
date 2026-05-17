@@ -80,7 +80,7 @@ function relationPanel(page: Page, title: string) {
 
 async function openFeatureList(page: Page) {
   await page.goto("/features");
-  await expect(page.getByRole("heading", { name: "Features" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Features", exact: true })).toBeVisible();
 }
 
 async function fillFeatureForm(page: Page, title: string, slug: string, description = "E2E Beschreibung", content = "E2E Inhalt") {
@@ -166,7 +166,10 @@ test.describe("Feature CRUD", () => {
       await page.goto(`/features/${feature.id}`);
       await page.getByRole("tab", { name: /Projekte/ }).click();
       await page.getByRole("checkbox", { name: new RegExp(project.name) }).check({ force: true });
-      await relationPanel(page, "Projekte").getByRole("button", { name: "Speichern" }).click();
+      await Promise.all([
+        page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),
+        relationPanel(page, "Projekte").getByRole("button", { name: "Speichern" }).click()
+      ]);
 
       await page.reload();
       await page.getByRole("tab", { name: /Projekte/ }).click();

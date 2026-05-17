@@ -1,34 +1,34 @@
 import type { Task } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { getProjects } from "../api/projects";
 import { getProjectTasks } from "../api/tasks";
-import { errorMessage } from "./errors";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
+
+async function getCalendarTasks(): Promise<Task[]> {
+  const projects = await getProjects();
+  const allTasks: Task[] = [];
+  for (const project of projects) {
+    allTasks.push(...(await getProjectTasks(project.id)));
+  }
+  return allTasks;
+}
 
 export function useCalendarTasks() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const tasksQuery = useQuery({
+    queryKey: queryKeys.calendarTasks.list(),
+    queryFn: getCalendarTasks
+  });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const projects = await getProjects();
-      const allTasks: Task[] = [];
-      for (const project of projects) {
-        allTasks.push(...(await getProjectTasks(project.id)));
-      }
-      setTasks(allTasks);
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const reload = useCallback(async () => {
+    await tasksQuery.refetch();
+  }, [tasksQuery]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  return { tasks, loading, error, reload: load };
+  return {
+    tasks: tasksQuery.data ?? [],
+    loading: tasksQuery.isLoading,
+    error: toQueryError(tasksQuery.error),
+    reload
+  };
 }

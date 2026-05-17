@@ -1,13 +1,7 @@
-import type { Attachment, Note, Task, WikiPage } from "@taskmanager/shared-types";
 import { BookOpen, FileText, FolderKanban, ListTodo, Paperclip, Plus, Search, StickyNote, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getProjectAttachments } from "../../api/attachments";
-import { getProjectNotes } from "../../api/notes";
-import { getProjectTasks } from "../../api/tasks";
-import { getRootWikiPages } from "../../api/wiki";
-import { useFeatures } from "../../hooks/useFeatures";
-import { useProjects } from "../../hooks/useProjects";
+import { useGlobalSearchData } from "../../hooks/useGlobalSearchData";
 import { EmptyState } from "../ui/EmptyState";
 
 interface GlobalSearchProps {
@@ -19,49 +13,17 @@ type Scope = "all" | "projects" | "tasks" | "features" | "notes" | "wiki" | "fil
 
 export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   const navigate = useNavigate();
-  const projects = useProjects();
-  const features = useFeatures();
+  const searchData = useGlobalSearchData(open);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("all");
-  const [wikiPages, setWikiPages] = useState<WikiPage[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    void getRootWikiPages()
-      .then(setWikiPages)
-      .catch(() => setWikiPages([]));
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || projects.projects.length === 0) {
-      setTasks([]);
-      setNotes([]);
-      setAttachments([]);
-      return;
-    }
-    const projectIds = projects.projects.map((project) => project.id);
-    void Promise.all(projectIds.map((projectId) => getProjectTasks(projectId)))
-      .then((lists) => setTasks(lists.flat()))
-      .catch(() => setTasks([]));
-    void Promise.all(projectIds.map((projectId) => getProjectNotes(projectId)))
-      .then((lists) => setNotes(lists.flat()))
-      .catch(() => setNotes([]));
-    void Promise.all(projectIds.map((projectId) => getProjectAttachments(projectId)))
-      .then((lists) => setAttachments(lists.flat()))
-      .catch(() => setAttachments([]));
-  }, [open, projects.projects]);
+  const { projects, features, wikiPages, tasks, notes, attachments } = searchData.data;
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const projectResults = projects.projects
+    const projectResults = projects
       .filter((project) => !normalized || project.name.toLowerCase().includes(normalized) || (project.description ?? "").toLowerCase().includes(normalized))
       .map((project) => ({ id: `project-${project.id}`, type: "Projekte", title: project.name, meta: `PROJECT-${project.id}`, to: `/projects/${project.id}`, icon: <FolderKanban size={17} /> }));
-    const featureResults = features.features
+    const featureResults = features
       .filter((feature) => !normalized || feature.title.toLowerCase().includes(normalized) || feature.slug.toLowerCase().includes(normalized))
       .map((feature) => ({ id: `feature-${feature.id}`, type: "Features", title: feature.title, meta: feature.slug, to: `/features/${feature.id}`, icon: <BookOpen size={17} /> }));
     const taskResults = tasks
@@ -84,7 +46,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
       ...(scope === "all" || scope === "wiki" ? wikiResults : []),
       ...(scope === "all" || scope === "files" ? fileResults : [])
     ];
-  }, [attachments, features.features, notes, projects.projects, query, scope, tasks, wikiPages]);
+  }, [attachments, features, notes, projects, query, scope, tasks, wikiPages]);
 
   const go = (to: string) => {
     navigate(to);
@@ -96,10 +58,10 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   }
 
   const scopes: Array<{ value: Scope; label: string; count: number }> = [
-    { value: "all", label: "Alle", count: projects.projects.length + tasks.length + features.features.length + notes.length + wikiPages.length + attachments.length },
-    { value: "projects", label: "Projekte", count: projects.projects.length },
+    { value: "all", label: "Alle", count: projects.length + tasks.length + features.length + notes.length + wikiPages.length + attachments.length },
+    { value: "projects", label: "Projekte", count: projects.length },
     { value: "tasks", label: "Aufgaben", count: tasks.length },
-    { value: "features", label: "Features", count: features.features.length },
+    { value: "features", label: "Features", count: features.length },
     { value: "notes", label: "Notizen", count: notes.length },
     { value: "wiki", label: "Wiki", count: wikiPages.length },
     { value: "files", label: "Dateien", count: attachments.length }
@@ -123,7 +85,9 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
           ))}
         </nav>
         <div className="max-h-[420px] overflow-auto p-3">
-          {!query ? (
+          {searchData.error ? (
+            <p className="rounded-lg border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{searchData.error}</p>
+          ) : !query ? (
             <div className="grid gap-2">
               <p className="px-2 text-xs font-bold uppercase text-slate-500">Schnellaktionen</p>
               <button type="button" className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-shell" onClick={() => go("/projects")}>

@@ -1,10 +1,11 @@
 import type { DumpDriveApplyResult, DumpDrivePreviewResult, DumpDriveSaveResult } from "@taskmanager/shared-types";
-import { AlertTriangle, CloudDownload, CloudUpload, DatabaseBackup, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, CheckCircle2, CloudDownload, CloudUpload, DatabaseBackup, FolderCog, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
 import { applyLatestDriveDump, previewLatestDriveDump, saveDriveDump } from "../api/dumps";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
+import { useDriveDumpConfig } from "../hooks/useDriveDumpConfig";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Aktion fehlgeschlagen";
@@ -20,15 +21,42 @@ function readinessTone(readiness: DumpDrivePreviewResult["transferReadiness"]) {
   return "crimson";
 }
 
+function sourceLabel(source: "database" | "environment" | "missing"): string {
+  if (source === "database") return "UI";
+  if (source === "environment") return ".env";
+  return "Nicht gesetzt";
+}
+
 export function SettingsBackupPage() {
+  const driveConfig = useDriveDumpConfig();
+  const driveReady = driveConfig.config?.ready ?? false;
   const [saveResult, setSaveResult] = useState<DumpDriveSaveResult | null>(null);
   const [preview, setPreview] = useState<DumpDrivePreviewResult | null>(null);
   const [applyResult, setApplyResult] = useState<DumpDriveApplyResult | null>(null);
+  const [folderInput, setFolderInput] = useState("");
+  const [configSaved, setConfigSaved] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [applying, setApplying] = useState(false);
+
+  useEffect(() => {
+    if (driveConfig.config) {
+      setFolderInput(driveConfig.config.folderUrl ?? driveConfig.config.folderId ?? "");
+    }
+  }, [driveConfig.config]);
+
+  async function handleConfigSave() {
+    setError(null);
+    setConfigSaved(false);
+    try {
+      await driveConfig.updateConfig({ folderInput });
+      setConfigSaved(true);
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -86,14 +114,57 @@ export function SettingsBackupPage() {
           <p className="text-sm text-slate-500">Google Drive</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="primary" icon={<CloudUpload size={16} />} loading={saving} onClick={() => void handleSave()}>
+          <Button variant="primary" icon={<CloudUpload size={16} />} loading={saving} disabled={!driveReady} onClick={() => void handleSave()}>
             Sichern
           </Button>
-          <Button icon={<RefreshCw size={16} />} loading={previewing} onClick={() => void handlePreview()}>
+          <Button icon={<RefreshCw size={16} />} loading={previewing} disabled={!driveReady} onClick={() => void handlePreview()}>
             Aktualisieren
           </Button>
         </div>
       </header>
+
+      <section className="rounded-md border border-line bg-white p-4 shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <FolderCog size={18} />
+            <h2 className="text-base font-semibold">Google-Drive-Zielordner</h2>
+          </div>
+          {driveConfig.config && (
+            <Badge tone={driveConfig.config.ready ? "fern" : "crimson"}>{driveConfig.config.ready ? "bereit" : "unvollständig"}</Badge>
+          )}
+        </div>
+
+        <div className="grid gap-3">
+          <div className="flex flex-wrap gap-2">
+            <Input
+              value={folderInput}
+              onChange={(event) => {
+                setConfigSaved(false);
+                setFolderInput(event.target.value);
+              }}
+              className="min-w-80 flex-1"
+              placeholder="https://drive.google.com/drive/folders/... oder Folder-ID"
+            />
+            <Button icon={<FolderCog size={16} />} loading={driveConfig.updating} onClick={() => void handleConfigSave()}>
+              Speichern
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+            <span>Quelle: {driveConfig.config ? sourceLabel(driveConfig.config.source) : "lädt"}</span>
+            {driveConfig.config?.folderId && <span className="select-all">ID: {driveConfig.config.folderId}</span>}
+            <span>OAuth: {driveConfig.config?.oauthConfigured ? "konfiguriert" : "fehlt in .env"}</span>
+          </div>
+
+          {driveConfig.error && <p className="rounded-md border border-crimson/20 bg-crimson/10 p-2 text-sm text-crimson">{driveConfig.error}</p>}
+          {configSaved && (
+            <p className="flex items-center gap-2 rounded-md border border-fern/20 bg-fern/10 p-2 text-sm text-fern">
+              <CheckCircle2 size={16} />
+              Zielordner gespeichert.
+            </p>
+          )}
+        </div>
+      </section>
 
       {error && (
         <section className="rounded-md border border-crimson/20 bg-crimson/10 p-3 text-sm text-crimson">

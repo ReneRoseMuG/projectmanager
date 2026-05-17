@@ -10,6 +10,12 @@ export const FEATURE_RELATION_TYPES = ["related", "depends_on", "consumed_by"] a
 export const BACKLOG_STATUSES = ["open", "in_progress", "done", "rejected"] as const;
 export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "backlogItem", "wikiPage"] as const;
 
+export const appSettings = sqliteTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+});
+
 export const seedRuns = sqliteTable("seed_runs", {
   id: text("id").primaryKey(),
   label: text("label").notNull(),

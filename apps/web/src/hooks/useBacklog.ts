@@ -1,71 +1,95 @@
-import type { BacklogItem, BacklogItemInput, BacklogItemUpdate, BacklogStatus } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import type { BacklogItemInput, BacklogItemUpdate, BacklogStatus } from "@taskmanager/shared-types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 import {
   createBacklogItem as createBacklogItemRequest,
   deleteBacklogItem as deleteBacklogItemRequest,
   getBacklogItems,
-  updateBacklogItem as updateBacklogItemRequest,
-  type BacklogFilters
+  updateBacklogItem as updateBacklogItemRequest
 } from "../api/backlog";
-import { errorMessage } from "./errors";
+import { invalidateBacklogScope } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export function useBacklog(projectId?: number) {
-  const [items, setItems] = useState<BacklogItem[]>([]);
   const [statusFilter, setStatusFilter] = useState<BacklogStatus | "all">("all");
-  const [loading, setLoading] = useState(Boolean(projectId));
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const validProjectId = projectId !== undefined && Number.isFinite(projectId) ? projectId : undefined;
 
-  const load = useCallback(async () => {
-    if (!projectId) {
-      setItems([]);
-      setLoading(false);
-      return;
+  const backlogQuery = useQuery({
+    queryKey: queryKeys.projects.backlog(validProjectId ?? 0),
+    queryFn: () => getBacklogItems(validProjectId as number),
+    enabled: validProjectId !== undefined
+  });
+
+  const reload = useCallback(async () => {
+    if (validProjectId !== undefined) {
+      await backlogQuery.refetch();
     }
+  }, [backlogQuery, validProjectId]);
 
-    setLoading(true);
-    setError(null);
-    try {
-      const filters: BacklogFilters = statusFilter === "all" ? {} : { status: statusFilter };
-      setItems(await getBacklogItems(projectId, filters));
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const createItemMutation = useMutation({
+    mutationFn: (input: BacklogItemInput) => {
+      if (validProjectId === undefined) {
+        throw new Error("Project id is required");
+      }
+      return createBacklogItemRequest(validProjectId, input);
+    },
+    onSuccess: async () => {
+      if (validProjectId !== undefined) {
+        await invalidateBacklogScope(queryClient, validProjectId);
+      }
     }
-  }, [projectId, statusFilter]);
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const updateItemMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: BacklogItemUpdate }) => updateBacklogItemRequest(id, input),
+    onSuccess: async () => {
+      if (validProjectId !== undefined) {
+        await invalidateBacklogScope(queryClient, validProjectId);
+      }
+    }
+  });
+
+  const removeItemMutation = useMutation({
+    mutationFn: deleteBacklogItemRequest,
+    onSuccess: async () => {
+      if (validProjectId !== undefined) {
+        await invalidateBacklogScope(queryClient, validProjectId);
+      }
+    }
+  });
 
   const createItem = useCallback(
     async (input: BacklogItemInput) => {
-      if (!projectId) {
-        throw new Error("Project id is required");
-      }
-      const created = await createBacklogItemRequest(projectId, input);
-      await load();
-      return created;
+      return createItemMutation.mutateAsync(input);
     },
-    [projectId, load]
+    [createItemMutation]
   );
 
   const updateItem = useCallback(
     async (id: number, input: BacklogItemUpdate) => {
-      const updated = await updateBacklogItemRequest(id, input);
-      await load();
-      return updated;
+      return updateItemMutation.mutateAsync({ id, input });
     },
-    [load]
+    [updateItemMutation]
   );
 
   const removeItem = useCallback(
     async (id: number) => {
-      await deleteBacklogItemRequest(id);
-      await load();
+      await removeItemMutation.mutateAsync(id);
     },
-    [load]
+    [removeItemMutation]
   );
 
-  return { items, statusFilter, setStatusFilter, loading, error, reload: load, createItem, updateItem, removeItem };
+  return {
+    items: backlogQuery.data ?? [],
+    statusFilter,
+    setStatusFilter,
+    loading: backlogQuery.isLoading,
+    error: toQueryError(backlogQuery.error),
+    reload,
+    createItem,
+    updateItem,
+    removeItem
+  };
 }

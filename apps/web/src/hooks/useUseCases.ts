@@ -1,5 +1,6 @@
 import type { UseCase, UseCaseInput, UseCaseUpdate } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 import {
   createUseCase as createUseCaseRequest,
   deleteUseCase as deleteUseCaseRequest,
@@ -7,92 +8,101 @@ import {
   getUseCases,
   updateUseCase as updateUseCaseRequest
 } from "../api/use-cases";
-import { errorMessage } from "./errors";
+import { invalidateUseCaseScope } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export function useUseCases(featureId?: number) {
-  const [useCases, setUseCases] = useState<UseCase[]>([]);
   const [selectedUseCase, setSelectedUseCase] = useState<UseCase | null>(null);
-  const [loading, setLoading] = useState(Boolean(featureId));
   const [detailLoading, setDetailLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const validFeatureId = featureId !== undefined && Number.isFinite(featureId) ? featureId : undefined;
 
-  const load = useCallback(async () => {
-    if (!featureId) {
-      setUseCases([]);
-      setSelectedUseCase(null);
-      setLoading(false);
-      return;
+  const useCasesQuery = useQuery({
+    queryKey: queryKeys.features.useCases(validFeatureId ?? 0),
+    queryFn: () => getUseCases(validFeatureId as number),
+    enabled: validFeatureId !== undefined
+  });
+
+  const reload = useCallback(async () => {
+    if (validFeatureId !== undefined) {
+      await useCasesQuery.refetch();
     }
+  }, [useCasesQuery, validFeatureId]);
 
-    setLoading(true);
-    setError(null);
-    try {
-      setUseCases(await getUseCases(featureId));
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const loadUseCase = useCallback(
+    async (id: number) => {
+      setDetailLoading(true);
+      try {
+        const cached = queryClient.getQueryData<UseCase>(queryKeys.useCases.detail(id));
+        const loaded = cached ?? (await getUseCase(id));
+        queryClient.setQueryData(queryKeys.useCases.detail(id), loaded);
+        setSelectedUseCase(loaded);
+        return loaded;
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [queryClient]
+  );
+
+  const createUseCaseMutation = useMutation({
+    mutationFn: (input: UseCaseInput) => {
+      if (validFeatureId === undefined) {
+        throw new Error("Feature id is required");
+      }
+      return createUseCaseRequest(validFeatureId, input);
+    },
+    onSuccess: async (created) => {
+      setSelectedUseCase(created);
+      await invalidateUseCaseScope(queryClient, created.featureId, created.id);
     }
-  }, [featureId]);
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const loadUseCase = useCallback(async (id: number) => {
-    setDetailLoading(true);
-    setError(null);
-    try {
-      const loaded = await getUseCase(id);
-      setSelectedUseCase(loaded);
-      return loaded;
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-      throw requestError;
-    } finally {
-      setDetailLoading(false);
+  const updateUseCaseMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: UseCaseUpdate }) => updateUseCaseRequest(id, input),
+    onSuccess: async (updated) => {
+      setSelectedUseCase(updated);
+      await invalidateUseCaseScope(queryClient, updated.featureId, updated.id);
     }
-  }, []);
+  });
+
+  const removeUseCaseMutation = useMutation({
+    mutationFn: deleteUseCaseRequest,
+    onSuccess: async (_result, id) => {
+      setSelectedUseCase((current) => (current?.id === id ? null : current));
+      await invalidateUseCaseScope(queryClient, validFeatureId, id);
+    }
+  });
 
   const createUseCase = useCallback(
     async (input: UseCaseInput) => {
-      if (!featureId) {
-        throw new Error("Feature id is required");
-      }
-      const created = await createUseCaseRequest(featureId, input);
-      await load();
-      setSelectedUseCase(created);
-      return created;
+      return createUseCaseMutation.mutateAsync(input);
     },
-    [featureId, load]
+    [createUseCaseMutation]
   );
 
   const updateUseCase = useCallback(
     async (id: number, input: UseCaseUpdate) => {
-      const updated = await updateUseCaseRequest(id, input);
-      await load();
-      setSelectedUseCase(updated);
-      return updated;
+      return updateUseCaseMutation.mutateAsync({ id, input });
     },
-    [load]
+    [updateUseCaseMutation]
   );
 
   const removeUseCase = useCallback(
     async (id: number) => {
-      await deleteUseCaseRequest(id);
-      await load();
-      setSelectedUseCase((current) => (current?.id === id ? null : current));
+      await removeUseCaseMutation.mutateAsync(id);
     },
-    [load]
+    [removeUseCaseMutation]
   );
 
   return {
-    useCases,
+    useCases: useCasesQuery.data ?? [],
     selectedUseCase,
-    loading,
-    detailLoading,
-    error,
-    reload: load,
+    loading: useCasesQuery.isLoading,
+    detailLoading: detailLoading || createUseCaseMutation.isPending || updateUseCaseMutation.isPending,
+    error: toQueryError(useCasesQuery.error ?? createUseCaseMutation.error ?? updateUseCaseMutation.error ?? removeUseCaseMutation.error),
+    reload,
     loadUseCase,
     createUseCase,
     updateUseCase,

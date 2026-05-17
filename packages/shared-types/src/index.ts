@@ -350,6 +350,7 @@ export interface WikiImportReport {
 
 export type DumpReadiness = "ready" | "warning" | "blocked";
 export type DumpImportStatus = "success" | "warning" | "error";
+export type DumpDriveConfigSource = "database" | "environment" | "missing";
 
 export interface DumpDriveFile {
   id: string;
@@ -410,6 +411,19 @@ export interface DumpDriveApplyResult {
   fileRootsRestored: DumpFileRootSummary[];
   warnings: string[];
   blockingIssues: string[];
+}
+
+export interface DumpDriveConfig {
+  folderId: string | null;
+  folderUrl: string | null;
+  source: DumpDriveConfigSource;
+  oauthConfigured: boolean;
+  ready: boolean;
+  updatedAt: string | null;
+}
+
+export interface DumpDriveConfigUpdateRequest {
+  folderInput: string;
 }
 
 export type SeedRunScenario = "visual";

@@ -276,24 +276,50 @@ Der neueste Eintrag steht **oben**. Der Index wird nach jedem neuen Log sofort a
 - Keine direkte `fetch`-Nutzung in Komponenten — immer über `src/api/`-Funktionen
 - Kein `any` in Props-Definitionen
 
+### TanStack Query (verbindlich)
+
+Server-State wird ausschließlich über TanStack Query verwaltet. Kein `useState` + `useEffect` für Datenabruf.
+
+- **API-Client:** `ky` — importiert als `api` aus `src/api/client.ts`. URLs ohne führenden Slash: `api.get("projects/1/tickets").json<Ticket[]>()`. Kein eigener Wrapper.
+- **Query-Keys:** zentral in `src/queries/queryKeys.ts`. Jede Domäne hat einen eigenen Block mit `root`, `list`, `detail` und ggf. domänenspezifischen Schlüsseln. Neue Domänen müssen dort eingetragen werden.
+- **Invalidierung:** zentral in `src/queries/invalidation.ts` als benannte async-Funktionen (z. B. `invalidateTicketScope`). Nach jeder Mutation wird der zuständige Scope invalidiert — nie manuell `queryClient.invalidateQueries` in Hooks aufrufen. `invalidateSeedData` muss alle Domänen-Roots erfassen.
+- **Hooks:** Zwei Ebenen pro Domäne:
+  - `use<Domäne>(projectId?)` — Liste + Mutations (create, update, position, delete)
+  - `use<Domäne>Detail(id)` — Einzelelement + alle Detail-Mutations (tags, comments, relations, sub-items)
+- **Owner-basierte Querschnitts-Hooks:** `useNotes(owner)` und `useAttachments(owner)` sind generisch und decken alle Domänen ab. `owner` ist eine Discriminated Union (`{ type: "project" | "task" | "feature" | "ticket"; id: number }`). Beim Hinzufügen einer neuen Entität als Attachment- oder Note-Träger müssen diese Union-Typen sowie `QueryOwnerType` und `NoteOwnerType` in `queryKeys.ts` erweitert werden.
+- **Fehlerbehandlung:** `toQueryError(query.error)` aus `src/queries/queryErrors.ts` — nie rohe `error`-Objekte an Komponenten weitergeben.
+
 ---
 
 ## 7. Projektstruktur (Referenz)
 
 ```
 taskmanager/
-├── agents.md              ← diese Datei
-├── logs/                  ← Schritt-Logs (automatisch, Abschnitt 5)
+├── agents.md                          ← diese Datei
+├── logs/                              ← Schritt-Logs (automatisch, Abschnitt 5)
 │   └── README.md
-├── docs/                  ← Architektur- und Implementierungsdokumentation
+├── docs/                              ← Architektur- und Implementierungsdokumentation
+├── codex-auftrag-ticket-system.md     ← Großauftrag: Ticket- & Bug-Tracking (ab 17.05.26)
 ├── apps/
-│   ├── api/               ← Fastify + Drizzle + SQLite
-│   └── web/               ← Vite + React
+│   ├── api/
+│   │   └── src/
+│   │       ├── db/schema.ts           ← zentrales Drizzle-Schema (alle Tabellen)
+│   │       ├── routes/                ← Fastify-Routes (eine Datei pro Domäne)
+│   │       ├── services/              ← Business-Logik (eine Datei pro Domäne)
+│   │       └── db/migrations/        ← versionierte SQL-Migrationen
+│   └── web/
+│       └── src/
+│           ├── api/                   ← ky-Fetch-Funktionen (eine Datei pro Domäne)
+│           ├── hooks/                 ← TanStack Query Hooks
+│           ├── queries/               ← queryKeys, invalidation, queryClient, queryErrors
+│           ├── components/            ← UI-Komponenten (Ordner pro Domäne)
+│           └── pages/                 ← Seitenkomponenten
 └── packages/
-    └── shared-types/      ← gemeinsame TypeScript-Interfaces
+    └── shared-types/                  ← gemeinsame TypeScript-Interfaces
 ```
 
-Der Großauftrag (`Codex_Grossauftrag_Taskmanager.md`) ist der fachliche Ausgangspunkt. Er beschreibt Schema, API-Endpunkte, Komponentenstruktur und die 17 Implementierungsschritte.
+Aktuelle Großaufträge:
+- `codex-auftrag-ticket-system.md` — Ticket- & Bug-Tracking-System (Domäne 3, ab 17.05.26)
 
 ---
 
@@ -467,6 +493,74 @@ Codex prüft das Ergebnis gegen:
 Codex nennt konkret, welche Stellen geprüft wurden und ob es bekannte Abweichungen gibt. Bei Abweichungen werden konkrete Korrekturen vorgeschlagen.
 
 Eine Aufgabe gilt als abgeschlossen, wenn das fachliche Ziel umgesetzt und der Schritt-Log geschrieben ist. Kann eine Aufgabe nur teilweise umgesetzt werden, gilt sie als abgeschlossen, sofern der Blocker im Log sauber dokumentiert ist.
+
+---
+
+## 14. Domänenarchitektur (Referenz)
+
+Die App ist in drei fachliche Domänen gegliedert. Neue Features und Änderungen müssen sich in dieses Modell einordnen.
+
+### Domäne 1 — Projektmanagement
+
+Entitäten: `projects`, `tasks` (inkl. Subtasks via `parentId`), `backlogItems`
+
+- Tasks gehören immer einem Projekt (`projectId NOT NULL`)
+- Subtasks sind Tasks mit gesetztem `parentId`
+- Backlog ist ein **Ideenspeicher** — BacklogItems werden nicht zu Tasks oder Tickets konvertiert
+- Navigation: `/projects`, `/projects/:id`
+
+### Domäne 2 — Dokumentation
+
+Entitäten: `features`, `useCases`, `wikiPages`, `featureRelations`
+
+- Use Cases gehören immer einem Feature (`featureId NOT NULL`)
+- Features können projektübergreifend referenziert werden (`projectFeatures`, `taskFeatures`)
+- Wiki-Seiten sind hierarchisch via `parentId` (restrict on delete), optional einem Projekt zugeordnet
+- Navigation: `/features`, `/features/:id`, `/wiki`, `/wiki/:id`
+
+### Domäne 3 — Tickets & Bug-Tracking
+
+Entitäten: `tickets`, `ticketRelations`, `ticketTags`, `ticketNotes`
+
+- Tickets gehören immer einem Projekt (`projectId NOT NULL`, cascade delete)
+- Sub-Tickets via `parentId` (cascade delete); Sub-Tickets erben Projekt des Eltern-Tickets
+- Ticket-Typen: `bug | improvement | question | task`
+- Ticket-Status: `open → in_progress → in_review → resolved → closed`
+- `resolvedAt` wird automatisch gesetzt beim Übergang in `resolved` oder `closed`
+- Relationen: `blocks | related | duplicate` (keine Self-Relationen)
+- Navigation: `/tickets` (projektübergreifend mit Filter)
+
+### Querschnittsinfrastruktur
+
+Folgende Infrastruktur wird von mehreren Domänen gemeinsam genutzt:
+
+| Infrastruktur | Träger-Entitäten | Implementierung |
+|---|---|---|
+| **Tags** | projects, tasks, tickets | Join-Tabellen (`projectTags`, `taskTags`, `ticketTags`), `setXxxTags`-Service-Funktionen |
+| **Notes** | projects, tasks, tickets | Join-Tabellen (`projectNotes`, `taskNotes`, `ticketNotes`), `useNotes(owner)` Hook |
+| **Attachments** | projects, tasks, features, tickets | Spalten in `attachments`-Tabelle, gegenseitig exklusive CHECK-Constraint, `useAttachments(owner)` Hook |
+| **Comments** | tasks, features, projects, useCases, backlogItems, wikiPages, tickets | Generisch via `entityType` + `entityId` in `comments`-Tabelle |
+| **Calendar** | projects, tasks | `events`-Tabelle mit optionalen FK |
+
+**Beim Hinzufügen einer neuen Attachment- oder Note-fähigen Entität** müssen stets aktualisiert werden:
+1. `attachments`-Tabelle (neue Spalte + CHECK-Constraint-Rebuild) oder Join-Tabelle für Notes
+2. `QueryOwnerType` und `NoteOwnerType` in `src/queries/queryKeys.ts`
+3. `AttachmentOwner` in `src/hooks/useAttachments.ts`
+4. `NoteOwner` in `src/hooks/useNotes.ts`
+5. Entsprechende API-Funktionen in `src/api/<domäne>.ts`
+
+**Beim Hinzufügen einer neuen comment-fähigen Entität:**
+1. `COMMENT_ENTITY_TYPES` in `apps/api/src/db/schema.ts` ergänzen
+2. `CommentEntityType` in `packages/shared-types` ergänzen (falls separater Type-Export)
+
+**Beim Hinzufügen einer neuen suchbaren Entität:**
+
+Die globale Suche ist zentral in `apps/web/src/hooks/useGlobalSearchData.ts` implementiert (eingeführt durch `logs/2026-05-17-feature-global-query-sync.md`). Neue Entitäten, die in der globalen Suche erscheinen sollen, müssen dort in drei Stellen registriert werden:
+1. `GlobalSearchData`-Interface um das neue Feld erweitern (z. B. `tickets: Ticket[]`)
+2. In `loadGlobalSearchData` die Fetch-Funktion ergänzen (pro Projekt oder global, je nach Entität)
+3. Fallback-Objekt im Hook-Return um das Feld mit leerem Array ergänzen
+
+Zusätzlich muss `apps/web/src/components/search/GlobalSearch.tsx` den neuen Entitätstyp als Ergebnisgruppe rendern.
 
 ---
 
