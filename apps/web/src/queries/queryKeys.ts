@@ -1,7 +1,7 @@
 import type { CommentEntityType } from "@taskmanager/shared-types";
 
-export type QueryOwnerType = "project" | "task" | "feature";
-export type NoteOwnerType = "project" | "task";
+export type NoteOwnerType = "project" | "task" | "ticket";
+export type QueryOwnerType = "project" | "task" | "feature" | "ticket";
 
 export const queryKeys = {
   projects: {
@@ -69,6 +69,14 @@ export const queryKeys = {
   dumps: {
     root: ["dumps"] as const,
     driveConfig: () => [...queryKeys.dumps.root, "driveConfig"] as const
+  },
+  tickets: {
+    root: ["tickets"] as const,
+    list: () => [...queryKeys.tickets.root, "list"] as const,
+    detail: (ticketId: number) => [...queryKeys.tickets.root, "detail", ticketId] as const,
+    byProject: (projectId: number) => [...queryKeys.projects.detail(projectId), "tickets"] as const,
+    relations: (ticketId: number) => [...queryKeys.tickets.detail(ticketId), "relations"] as const,
+    subTickets: (ticketId: number) => [...queryKeys.tickets.detail(ticketId), "subTickets"] as const
   },
   globalSearch: {
     root: ["globalSearch"] as const,

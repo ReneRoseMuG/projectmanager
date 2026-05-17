@@ -52,7 +52,7 @@ export async function registerProjectsRoutes(app: FastifyInstance): Promise<void
     "/projects/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteProject(app.db, request.params.id);
+      await deleteProject(app.db, request.params.id);
       return reply.status(204).send();
     }
   );

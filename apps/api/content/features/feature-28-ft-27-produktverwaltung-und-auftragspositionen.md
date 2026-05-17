@@ -74,26 +74,3 @@ Auftragspositionen (`project_order_items`) werden pro Projekt verwaltet, um eine
 ### Referenzintegrität
 
 - Beim Löschen eines Produkts oder einer Komponente wird geprüft, ob noch aktive Auftragspositionen darauf verweisen; wenn ja, wird das Löschen blockiert.
-
-## Use Cases
-
-- [UC 27/01: Produktkategorie anlegen (Admin)](use-cases/uc-27-01-produktkategorie-anlegen-admin.md)
-- [UC 27/02: Produkt anlegen (Admin)](use-cases/uc-27-02-produkt-anlegen-admin.md)
-- [UC 27/03: Komponentenkategorie anlegen (Admin)](use-cases/uc-27-03-komponentenkategorie-anlegen-admin.md)
-- [UC 27/04: Komponente anlegen (Admin)](use-cases/uc-27-04-komponente-anlegen-admin.md)
-- [UC 27/05: Auftragsposition manuell erfassen (Disponent / Admin)](use-cases/uc-27-05-auftragsposition-manuell-erfassen-disponent-admin.md)
-- [UC 27/06: Auftragsposition bearbeiten (Disponent / Admin)](use-cases/uc-27-06-auftragsposition-bearbeiten-disponent-admin.md)
-- [UC 27/07: Auftragsposition löschen (Admin)](use-cases/uc-27-07-auftragsposition-loeschen-admin.md)
-- [UC 27/08: Detailseite anzeigen (Produkt / Komponente)](use-cases/uc-27-08-detailseite-anzeigen.md)
-- [UC 27/09: Attachment hochladen (Admin)](use-cases/uc-27-09-attachment-hochladen-admin.md)
-- [UC 27/10: Attachment löschen (Admin)](use-cases/uc-27-10-attachment-loeschen-admin.md)
-
-## Backlogs
-
-
-## Architektur & Kontext
-
-
-## Entscheidungen & Offene Punkte
-
-- Statistiken (z. B. Verwendungshäufigkeit in Auftragspositionen, beteiligte Projekte) sind bewusst zurückgestellt. Eine spätere Zusammenführung mit dem Produktionsplanung-Report in einer gemeinsamen Basiskomponente ist angedacht.

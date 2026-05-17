@@ -9,11 +9,16 @@ import {
   uploadProjectAttachment,
   uploadTaskAttachment
 } from "../api/attachments";
+import { getTicketAttachments, uploadTicketAttachment } from "../api/tickets";
 import { invalidateAttachments } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
-export type AttachmentOwner = { type: "project"; id: number } | { type: "task"; id: number } | { type: "feature"; id: number };
+export type AttachmentOwner =
+  | { type: "project"; id: number }
+  | { type: "task"; id: number }
+  | { type: "feature"; id: number }
+  | { type: "ticket"; id: number };
 
 export function useAttachments(owner: AttachmentOwner | null) {
   const queryClient = useQueryClient();
@@ -27,7 +32,13 @@ export function useAttachments(owner: AttachmentOwner | null) {
       if (ownerType === "project") {
         return getProjectAttachments(ownerId as number);
       }
-      return ownerType === "task" ? getTaskAttachments(ownerId as number) : getFeatureAttachments(ownerId as number);
+      if (ownerType === "task") {
+        return getTaskAttachments(ownerId as number);
+      }
+      if (ownerType === "ticket") {
+        return getTicketAttachments(ownerId as number);
+      }
+      return getFeatureAttachments(ownerId as number);
     },
     enabled: hasOwner
   });
@@ -46,7 +57,13 @@ export function useAttachments(owner: AttachmentOwner | null) {
       if (ownerType === "project") {
         return uploadProjectAttachment(ownerId as number, file);
       }
-      return ownerType === "task" ? uploadTaskAttachment(ownerId as number, file) : uploadFeatureAttachment(ownerId as number, file);
+      if (ownerType === "task") {
+        return uploadTaskAttachment(ownerId as number, file);
+      }
+      if (ownerType === "ticket") {
+        return uploadTicketAttachment(ownerId as number, file);
+      }
+      return uploadFeatureAttachment(ownerId as number, file);
     },
     onSuccess: async () => {
       if (hasOwner) {

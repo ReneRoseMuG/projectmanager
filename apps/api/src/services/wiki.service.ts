@@ -2,6 +2,7 @@ import { eq, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { projects, wikiPages } from "../db/schema.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
+import { deleteCommentsForEntity } from "./comments.service.js";
 import {
   buildStoredContentPath,
   deleteContent,
@@ -236,6 +237,7 @@ export function deleteWikiPage(database: DbClient, id: number): void {
     throw conflict("Wiki page has child pages");
   }
 
+  deleteCommentsForEntity(database, "wikiPage", id);
   database.delete(wikiPages).where(eq(wikiPages.id, id)).run();
 
   if (page.contentPath) {

@@ -15,6 +15,7 @@ export async function invalidateProjectScope(queryClient: QueryClient, projectId
   await invalidateMany(queryClient, [
     queryKeys.projects.root,
     queryKeys.tasks.root,
+    queryKeys.tickets.root,
     queryKeys.calendarTasks.root,
     queryKeys.globalSearch.root,
     ...(projectId !== undefined ? [queryKeys.projects.detail(projectId)] : [])
@@ -57,6 +58,15 @@ export async function invalidateBacklogScope(queryClient: QueryClient, projectId
   await invalidateMany(queryClient, [queryKeys.projects.backlog(projectId), queryKeys.projects.detail(projectId), queryKeys.globalSearch.root]);
 }
 
+export async function invalidateTicketScope(queryClient: QueryClient, projectId?: number, ticketId?: number): Promise<void> {
+  await invalidateMany(queryClient, [
+    queryKeys.tickets.root,
+    queryKeys.globalSearch.root,
+    ...(projectId !== undefined ? [queryKeys.tickets.byProject(projectId), queryKeys.projects.detail(projectId)] : []),
+    ...(ticketId !== undefined ? [queryKeys.tickets.detail(ticketId), queryKeys.tickets.relations(ticketId), queryKeys.tickets.subTickets(ticketId)] : [])
+  ]);
+}
+
 export async function invalidateComments(queryClient: QueryClient, entityType: CommentEntityType, entityId: number): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.comments.entity(entityType, entityId), queryKeys.globalSearch.root]);
 }
@@ -70,7 +80,7 @@ export async function invalidateAttachments(queryClient: QueryClient, ownerType:
 }
 
 export async function invalidateTags(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.tags.root, queryKeys.projects.root, queryKeys.tasks.root, queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.tags.root, queryKeys.projects.root, queryKeys.tasks.root, queryKeys.tickets.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateWiki(queryClient: QueryClient): Promise<void> {
@@ -94,6 +104,7 @@ export async function invalidateSeedData(queryClient: QueryClient): Promise<void
     queryKeys.tags.root,
     queryKeys.wiki.root,
     queryKeys.calendarTasks.root,
+    queryKeys.tickets.root,
     queryKeys.globalSearch.root
   ]);
 }

@@ -48,7 +48,7 @@ export async function registerFeaturesRoutes(app: FastifyInstance): Promise<void
     "/features/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteFeature(app.db, request.params.id);
+      await deleteFeature(app.db, request.params.id);
       return reply.status(204).send();
     }
   );

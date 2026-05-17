@@ -1,4 +1,7 @@
 import Fastify from "fastify";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import type { TestDb } from "./db.js";
 import type { GoogleDriveBackupClient } from "../../src/services/google-drive.service.js";
 
@@ -21,6 +24,12 @@ const unavailableDriveClient: GoogleDriveBackupClient = {
 
 export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions = {}) {
   const app = Fastify({ logger: false });
+  const contentDir = await fs.mkdtemp(path.join(os.tmpdir(), "taskmanager-api-content-"));
+  const { setContentBaseDir } = await import("../../src/services/content.service.js");
+  setContentBaseDir(contentDir);
+  app.addHook("onClose", async () => {
+    await fs.rm(contentDir, { recursive: true, force: true });
+  });
 
   app.decorate("db", testDb.db);
   app.decorate("sqlite", testDb.sqlite);
@@ -34,6 +43,8 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerCommentsRoutes } = await import("../../src/routes/comments.js");
   const { registerTagsRoutes } = await import("../../src/routes/tags.js");
   const { registerNotesRoutes } = await import("../../src/routes/notes.js");
+  const { registerTicketsRoutes } = await import("../../src/routes/tickets.js");
+  const { registerMultipart } = await import("../../src/plugins/multipart.js");
   const { registerEventsRoutes } = await import("../../src/routes/events.js");
   const { registerFeaturesRoutes } = await import("../../src/routes/features.js");
   const { registerHealthRoutes } = await import("../../src/routes/health.js");
@@ -47,13 +58,12 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
 
   app.setErrorHandler(errorHandler);
   await registerCors(app);
+  await registerMultipart(app);
 
   if (options.enableMultipart) {
-    const { registerMultipart } = await import("../../src/plugins/multipart.js");
     const { registerStatic } = await import("../../src/plugins/static.js");
     const { registerAttachmentsRoutes } = await import("../../src/routes/attachments.js");
 
-    await registerMultipart(app);
     await registerStatic(app);
     await app.register(registerAttachmentsRoutes, { prefix: "/api" });
   }
@@ -64,6 +74,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerCommentsRoutes, { prefix: "/api" });
   await app.register(registerTagsRoutes, { prefix: "/api" });
   await app.register(registerNotesRoutes, { prefix: "/api" });
+  await app.register(registerTicketsRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
   await app.register(registerHealthRoutes, { prefix: "/api" });
   await app.register(registerFeaturesRoutes, { prefix: "/api" });

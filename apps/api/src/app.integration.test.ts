@@ -287,6 +287,7 @@ describe("Taskmanager API integration", () => {
     expect(beta).toBeDefined();
 
     const alphaDetail = (await request(app.server).get(`/api/features/${alpha?.id}`).expect(200)).body as Feature;
+    expect(alphaDetail.content).toContain("<h1>FT (01): Alpha</h1>");
     expect(alphaDetail.content).toContain("Alpha core paragraph.");
     expect(alphaDetail.content).not.toContain("## Use Cases");
 

@@ -40,21 +40,3 @@ Ist globale 2FA aktiv, muss pro Benutzer ein technisch nutzbares und bestätigte
 Admins dürfen benutzerspezifische 2FA-Zustände für andere Benutzer zurücksetzen und bestehende Benutzer vollständig bearbeiten, einschließlich optionaler Passwortänderung. Der Reset löscht nur den 2FA-Zustand, nicht Passwort, Rolle oder sonstige Stammdaten.
 
 Der letzte aktive Admin bleibt besonders geschützt. Er darf weder entfernt noch deaktiviert werden. Bei global aktiver 2FA darf er seinen eigenen 2FA-Zustand außerdem nicht so zurücksetzen, dass kein aktiver Rückfallanker mehr verbleibt.
-
-## Use Cases
-
-- [UC 14/01: Benutzer anlegen](use-cases/uc-14-01-benutzer-anlegen.md)
-- [UC 14/02: Rolle eines Benutzers ändern](use-cases/uc-14-02-rolle-eines-benutzers-aendern.md)
-- [UC 14/03: Unzulässige Mutation blockieren](use-cases/uc-14-03-unzulaessige-mutation-blockieren.md)
-- [UC 14/04: Letzten Admin schützen](use-cases/uc-14-04-letzten-admin-schuetzen.md)
-- [UC 14/05: Rollenabhängige UI-Reduktion](use-cases/uc-14-05-rollenabhaengige-ui-reduktion.md)
-- [UC 14/06: Deep-Link serverseitig validieren](use-cases/uc-14-06-deep-link-serverseitig-validieren.md)
-- [UC 14/07: Multi-Browser-Rollenänderung konsistent darstellen](use-cases/uc-14-07-multi-browser-rollenaenderung-konsistent-darstellen.md)
-
-## Backlogs
-
-
-## Architektur & Kontext
-
-
-## Entscheidungen & Offene Punkte

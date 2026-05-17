@@ -210,6 +210,80 @@ function descriptionFromSection(content: string, headings: string[]): string | n
   return firstParagraph(markdownSection(content, headings)) ?? firstParagraph(content);
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function inlineMarkdownToHtml(value: string): string {
+  let result = escapeHtml(value);
+  result = result.replace(/`([^`]+)`/g, "<code>$1</code>");
+  result = result.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  return result;
+}
+
+function markdownToHtml(content: string): string {
+  const lines = content.split(/\r?\n/);
+  const blocks: string[] = [];
+  let paragraphLines: string[] = [];
+  let listItems: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraphLines.length === 0) {
+      return;
+    }
+    blocks.push(`<p>${paragraphLines.map(inlineMarkdownToHtml).join("<br>")}</p>`);
+    paragraphLines = [];
+  };
+
+  const flushList = () => {
+    if (listItems.length === 0) {
+      return;
+    }
+    blocks.push(`<ul>${listItems.map((item) => `<li>${inlineMarkdownToHtml(item)}</li>`).join("")}</ul>`);
+    listItems = [];
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,6})\s+(.+?)\s*$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      const level = Math.min(heading[1]?.length ?? 1, 3);
+      blocks.push(`<h${level}>${inlineMarkdownToHtml(heading[2] ?? "")}</h${level}>`);
+      continue;
+    }
+
+    const bullet = trimmed.match(/^[-*]\s+(.+?)\s*$/);
+    if (bullet) {
+      flushParagraph();
+      listItems.push(bullet[1] ?? "");
+      continue;
+    }
+
+    if (trimmed.startsWith("|")) {
+      flushParagraph();
+      flushList();
+      blocks.push(`<p><code>${escapeHtml(trimmed)}</code></p>`);
+      continue;
+    }
+
+    flushList();
+    paragraphLines.push(trimmed);
+  }
+
+  flushParagraph();
+  flushList();
+  return blocks.join("\n");
+}
+
 function contentBeforeHeading(content: string, headingPattern: RegExp): string {
   const lines = content.split(/\r?\n/);
   const keptLines: string[] = [];
@@ -427,11 +501,11 @@ function parseBacklogItems(featureSlug: string, backlogDir: string, sourcePath: 
     const sourceRelativePath = relativeSourcePath(sourcePath, backlogFile);
 
     for (const section of markdownH2Sections(content)) {
-      const description = cleanNullable(section.body) ?? null;
+      const description = cleanNullable(section.body);
       parsedBacklogItems.push({
         featureSlug,
         title: section.title,
-        description,
+        description: description ? markdownToHtml(description) : null,
         status: parseBacklogStatus(section.body),
         priority: parsePriority(section.body),
         sortOrder: numberFromSlug(featureSlug) + section.index,
@@ -574,7 +648,7 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
       title: markdownTitle(content, featureSlug),
       slug: featureSlug,
       description: descriptionFromSection(coreContent, ["Ziel / Zweck", "Fachliche Beschreibung"]),
-      content: coreContent,
+      content: markdownToHtml(coreContent),
       sortOrder: numberFromSlug(featureSlug),
       sourcePath: sourceRelativePath,
       featureCode,
@@ -593,7 +667,7 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
         title: markdownTitle(useCaseContent, useCaseSlug),
         slug: useCaseSlug,
         description: descriptionFromSection(useCaseContent, ["Ziel", "Beschreibung"]),
-        content: useCaseContent,
+        content: markdownToHtml(useCaseContent),
         sortOrder: numberFromSlug(useCaseSlug),
         sourcePath: relativeSourcePath(sourcePath, useCaseFile)
       });
@@ -613,7 +687,7 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
           return {
             title: markdownTitle(content, path.basename(filePath, ".md")),
             importKey: `wiki:${sourceRelativePath.toLowerCase()}`,
-            description: content,
+            description: markdownToHtml(content),
             priority: parsePriority(content),
             sourcePath: sourceRelativePath,
             featureSlugs: relations.featureSlugs,

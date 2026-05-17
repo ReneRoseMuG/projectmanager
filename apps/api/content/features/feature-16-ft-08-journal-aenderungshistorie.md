@@ -37,19 +37,3 @@ Das Journal ist eine lesende Nachvollziehbarkeitsfunktion. Es ersetzt weder fach
 
 - FT (32): Aktive Änderungsbenachrichtigung – fachlich verwandt, aber getrennte Funktion. FT (32) informiert aktiv über Änderungen; FT (08) macht Änderungen historisch lesbar.
 - NFR (01): Multi-User-Konsistenz – definiert den Rahmen für konkurrierende Änderungen und deren Absicherung beim Speichern.
-
-## Use Cases
-
-- [UC 08/01: Globales Journal öffnen](use-cases/uc-08-01-globales-journal-oeffnen.md)
-- [UC 08/02: Journal filtern und durchsuchen](use-cases/uc-08-02-journal-filtern-und-durchsuchen.md)
-- [UC 08/03: Kontextbezogenes Journal in einem Detailformular lesen](use-cases/uc-08-03-kontextbezogenes-journal-in-einem-detailformular-lesen.md)
-- [UC 08/04: Fachliche Änderung erzeugt Journal-Eintrag](use-cases/uc-08-04-fachliche-aenderung-erzeugt-journal-eintrag.md)
-- [UC 08/05: Journal ohne Leseberechtigung nicht öffnen](use-cases/uc-08-05-journal-ohne-leseberechtigung-nicht-oeffnen.md)
-
-## Backlogs
-
-
-## Architektur & Kontext
-
-
-## Entscheidungen & Offene Punkte

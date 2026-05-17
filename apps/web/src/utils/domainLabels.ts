@@ -1,4 +1,15 @@
-import type { BacklogStatus, FeatureStatus, Priority, ProjectStatus, TaskStatus } from "@taskmanager/shared-types";
+import type {
+  BacklogStatus,
+  FeatureStatus,
+  Priority,
+  ProjectStatus,
+  TaskStatus,
+  TicketRelationType,
+  TicketResolution,
+  TicketSeverity,
+  TicketStatus,
+  TicketType
+} from "@taskmanager/shared-types";
 import type { BadgeTone } from "../components/ui/Badge";
 import type { PillTone } from "../components/ui/Pill";
 
@@ -75,4 +86,62 @@ export const priorityBadgeTones: Record<Priority, BadgeTone> = {
   high: "tangerine",
   medium: "mustard",
   low: "steel"
+};
+
+export const ticketStatusLabels: Record<TicketStatus, string> = {
+  open: "Offen",
+  in_progress: "In Arbeit",
+  in_review: "In Prüfung",
+  resolved: "Gelöst",
+  closed: "Geschlossen"
+};
+
+export const ticketStatusTones: Record<TicketStatus, PillTone> = {
+  open: "steel",
+  in_progress: "tangerine",
+  in_review: "mustard",
+  resolved: "fern",
+  closed: "violet"
+};
+
+export const ticketTypeLabels: Record<TicketType, string> = {
+  bug: "Bug",
+  improvement: "Verbesserung",
+  question: "Frage",
+  task: "Aufgabe"
+};
+
+export const ticketTypeTones: Record<TicketType, BadgeTone> = {
+  bug: "crimson",
+  improvement: "teal",
+  question: "violet",
+  task: "steel"
+};
+
+export const ticketSeverityLabels: Record<TicketSeverity, string> = {
+  critical: "Kritisch",
+  major: "Schwer",
+  minor: "Mittel",
+  trivial: "Trivial"
+};
+
+export const ticketSeverityTones: Record<TicketSeverity, BadgeTone> = {
+  critical: "crimson",
+  major: "tangerine",
+  minor: "mustard",
+  trivial: "steel"
+};
+
+export const ticketResolutionLabels: Record<TicketResolution, string> = {
+  fixed: "Behoben",
+  wont_fix: "Wird nicht behoben",
+  duplicate: "Duplikat",
+  cant_reproduce: "Nicht reproduzierbar",
+  by_design: "Beabsichtigt"
+};
+
+export const ticketRelationTypeLabels: Record<TicketRelationType, string> = {
+  blocks: "Blockiert",
+  related: "Verwandt",
+  duplicate: "Duplikat"
 };

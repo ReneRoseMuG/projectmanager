@@ -69,9 +69,9 @@ describe("Seed data admin API", () => {
     expect(testDb.db.select().from(seedRuns).where(eq(seedRuns.id, seedRunId)).all()).toHaveLength(1);
     expect(testDb.db.select().from(projects).where(eq(projects.seedRunId, seedRunId)).all()).toHaveLength(4);
     expect(testDb.db.select().from(tasks).where(eq(tasks.seedRunId, seedRunId)).all().length).toBeGreaterThan(4);
-    expect(testDb.db.select().from(attachments).where(eq(attachments.seedRunId, seedRunId)).all()).toHaveLength(3);
+    expect(testDb.db.select().from(attachments).where(eq(attachments.seedRunId, seedRunId)).all()).toHaveLength(4);
     expect(fs.readdirSync(tmpContentDir, { recursive: true }).length).toBeGreaterThan(0);
-    expect(fs.readdirSync(tmpUploadDir)).toHaveLength(3);
+    expect(fs.readdirSync(tmpUploadDir)).toHaveLength(4);
 
     await supertest(app.server).delete(`/api/admin/seed-runs/${seedRunId}`).send({ confirmationId: "wrong" }).expect(400);
 

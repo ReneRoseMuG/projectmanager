@@ -1,7 +1,7 @@
 import type { Tag } from "@taskmanager/shared-types";
 import { inArray, eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { projectTags, projects, tags, taskTags, tasks } from "../db/schema.js";
+import { projectTags, projects, tags, taskTags, tasks, ticketTags, tickets } from "../db/schema.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
 
@@ -27,6 +27,13 @@ function ensureTaskExists(database: DbClient, taskId: number): void {
   const task = database.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)).get();
   if (!task) {
     throw notFound(`Task with id ${taskId} not found`);
+  }
+}
+
+function ensureTicketExists(database: DbClient, ticketId: number): void {
+  const ticket = database.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)).get();
+  if (!ticket) {
+    throw notFound(`Ticket with id ${ticketId} not found`);
   }
 }
 
@@ -71,6 +78,21 @@ export function getTaskTags(database: DbClient, taskId: number): Tag[] {
     .from(taskTags)
     .innerJoin(tags, eq(taskTags.tagId, tags.id))
     .where(eq(taskTags.taskId, taskId))
+    .all();
+
+  return rows.map(mapTag);
+}
+
+export function getTicketTags(database: DbClient, ticketId: number): Tag[] {
+  const rows = database
+    .select({
+      id: tags.id,
+      name: tags.name,
+      color: tags.color
+    })
+    .from(ticketTags)
+    .innerJoin(tags, eq(ticketTags.tagId, tags.id))
+    .where(eq(ticketTags.ticketId, ticketId))
     .all();
 
   return rows.map(mapTag);
@@ -125,6 +147,33 @@ export function getTaskTagsMap(database: DbClient, taskIds: number[]): Map<numbe
     const current = map.get(row.taskId) ?? [];
     current.push({ id: row.id, name: row.name, color: row.color });
     map.set(row.taskId, current);
+  }
+
+  return map;
+}
+
+export function getTicketTagsMap(database: DbClient, ticketIds: number[]): Map<number, Tag[]> {
+  const map = new Map<number, Tag[]>();
+  if (ticketIds.length === 0) {
+    return map;
+  }
+
+  const rows = database
+    .select({
+      ticketId: ticketTags.ticketId,
+      id: tags.id,
+      name: tags.name,
+      color: tags.color
+    })
+    .from(ticketTags)
+    .innerJoin(tags, eq(ticketTags.tagId, tags.id))
+    .where(inArray(ticketTags.ticketId, ticketIds))
+    .all();
+
+  for (const row of rows) {
+    const current = map.get(row.ticketId) ?? [];
+    current.push({ id: row.id, name: row.name, color: row.color });
+    map.set(row.ticketId, current);
   }
 
   return map;
@@ -206,4 +255,21 @@ export function setTaskTags(database: DbClient, taskId: number, tagIds: number[]
   });
 
   return getTaskTags(database, taskId);
+}
+
+export function setTicketTags(database: DbClient, ticketId: number, tagIds: number[]): Tag[] {
+  ensureTicketExists(database, ticketId);
+  ensureTagsExist(database, tagIds);
+
+  database.transaction((tx) => {
+    tx.delete(ticketTags).where(eq(ticketTags.ticketId, ticketId)).run();
+    const uniqueIds = [...new Set(tagIds)];
+    if (uniqueIds.length > 0) {
+      tx.insert(ticketTags)
+        .values(uniqueIds.map((tagId) => ({ ticketId, tagId })))
+        .run();
+    }
+  });
+
+  return getTicketTags(database, ticketId);
 }

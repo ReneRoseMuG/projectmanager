@@ -564,6 +564,148 @@ Zusätzlich muss `apps/web/src/components/search/GlobalSearch.tsx` den neuen Ent
 
 ---
 
+## 15. UI-Komponentenarchitektur (verbindlich)
+
+Alle neuen Domain-Views und -Formulare werden **ausschließlich auf vorhandenen UI-Basiskomponenten** aufgebaut. Keine eigenen Card-Strukturen, keine eigenen Formular-Primitives, keine hardcodierten deutschen Strings in Komponenten.
+
+### 15.1 Basiskomponenten — Übersicht
+
+| Komponente | Pfad | Verwendungszweck |
+|---|---|---|
+| `ListBoardView<T>` | `components/ui/ListBoardView.tsx` | Generische Liste/Board-Oberfläche mit Suche, Filter, View-Toggle, Add-Button |
+| `ItemCard` | `components/ui/ItemCard.tsx` | Karte für Board-/Grid-Layout; Slots: `header`, `body`, `footer`, optionaler `accentColor`-Streifen |
+| `ItemRow` | `components/ui/ItemRow.tsx` | Zeile für Listen-Layout; Slots: `statusIndicator`, `title`, `description`, `pills`, `meta`, `actions` |
+| `FormModal` | `components/ui/FormModal.tsx` | Formular-Modal mit Gradient-Header, Scroll-Body, festem Footer; Props: `title`, `subtitle`, `icon`, `breadcrumb`, `onSubmit`, `saving` |
+| `Section` | `components/ui/Section.tsx` | Inhalts-Panel innerhalb von Formularen und Detail-Ansichten; optionaler `title` mit Divider |
+| `FormField` | `components/ui/FormField.tsx` | Wrapper für Label + Control + Hint/Error |
+| `RadioList` | `components/ui/RadioList.tsx` | Auswahl-Liste für Status- und Typ-Felder in Formularen |
+| `Pill` | `components/ui/Pill.tsx` | Kompaktes Status-Label; Tones: `fern \| tangerine \| violet \| crimson \| steel \| mustard` |
+| `Badge` | `components/ui/Badge.tsx` | Sekundär-Label; gleiche Tones wie Pill |
+| `DetailModal` | `components/ui/DetailModal.tsx` | Vollständige Detail-Ansicht einer Entität |
+| `RelationPanel` | `components/ui/RelationPanel.tsx` | Generisches Panel für Relationen zwischen Entitäten |
+| `CommentThread` | `components/ui/CommentThread.tsx` | Kommentar-Thread-Darstellung (domänenübergreifend) |
+| `EmptyState` | `components/ui/EmptyState.tsx` | Leere Listen-Zustände |
+
+### 15.2 Domänen-Views als dünne Adapter
+
+Jeder Domain-View (`<Domäne>ListBoardView.tsx`) ist ein **dünner Adapter** über `ListBoardView<T>`. Der Adapter:
+- Hält UI-State (`mode`, `search`, `filter`)
+- Rendert `renderCard` via eine Domain-Card-Komponente (aufgebaut auf `ItemCard`)
+- Rendert `renderRow` via `ItemRow`-Komposition
+- Übergibt `statusColumns` für Board-Ansichten mit Status-Swim-Lanes
+- Öffnet das `<DomainForm />`-Modal bei `onAdd`
+
+```
+<DomäneListBoardView>
+  └── <ListBoardView<Domäne>>
+        ├── renderCard={item => <DomäneCard ... />}   ← aufgebaut auf ItemCard
+        └── renderRow={item => <ItemRow ... />}
+```
+
+### 15.3 Card-Komposition
+
+Domain-Cards bauen ausschließlich auf `ItemCard` auf — kein eigenes `<article>`-Markup:
+
+```tsx
+// Richtig
+export function TicketCard({ ticket, onOpen, onEdit, onDelete }: TicketCardProps) {
+  return (
+    <ItemCard
+      accentColor={severityAccentColor(ticket.severity)}
+      onOpen={onOpen}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      header={<><h3 className="...">{ticket.title}</h3><Pill tone={ticketStatusTones[ticket.status]}>{ticketStatusLabels[ticket.status]}</Pill></>}
+      body={ticket.description ? <p className="text-sm text-slate-500">{ticket.description}</p> : undefined}
+      footer={<div className="flex gap-2">...</div>}
+    />
+  );
+}
+```
+
+### 15.4 Formular-Komposition
+
+Domain-Formulare bauen ausschließlich auf `FormModal` + `Section` + `FormField` + `RadioList` auf:
+
+```tsx
+export function TicketForm({ open, ticket, onSubmit, onClose }: TicketFormProps) {
+  return (
+    <FormModal open={open} title="Ticket" icon={<Bug size={20} />} onSubmit={handleSubmit} saving={saving} onClose={onClose}>
+      <Section title="Allgemein">
+        <FormField label="Titel" required>
+          <Input value={title} onChange={e => setTitle(e.target.value)} />
+        </FormField>
+        <FormField label="Typ">
+          <RadioList items={ticketTypeItems} value={type} onChange={setType} />
+        </FormField>
+      </Section>
+      <Section title="Details">
+        <FormField label="Schweregrad">
+          <RadioList items={ticketSeverityItems} value={severity} onChange={setSeverity} />
+        </FormField>
+      </Section>
+    </FormModal>
+  );
+}
+```
+
+### 15.5 domainLabels.ts — Single Source of Truth für Labels
+
+**Alle** deutschen UI-Labels und Tone-Zuweisungen für Status, Typ, Schweregrad, Priorität etc. gehören in `src/utils/domainLabels.ts` — **nicht** als lokale Konstanten in Komponenten oder Formularen.
+
+Vorhandene Exports (Stand Codebase):
+- `projectStatusLabels` / `projectStatusTones` (`PillTone`)
+- `featureStatusLabels` / `featureStatusTones` (`PillTone`)
+- `taskStatusLabels` / `taskStatusTones` (`PillTone`)
+- `backlogStatusLabels` / `backlogStatusTones` (`PillTone`)
+- `priorityLabels` / `priorityPillTones` / `priorityBadgeTones` (`PillTone` und `BadgeTone`)
+
+Neue Domänen müssen ihre Label- und Tone-Maps hier ergänzen, bevor Komponenten geschrieben werden. Beispiel Tickets:
+
+```ts
+export const ticketStatusLabels: Record<TicketStatus, string> = {
+  open: "Offen", in_progress: "In Arbeit", in_review: "Im Review", resolved: "Gelöst", closed: "Geschlossen"
+};
+export const ticketStatusTones: Record<TicketStatus, PillTone> = {
+  open: "steel", in_progress: "tangerine", in_review: "violet", resolved: "fern", closed: "fern"
+};
+export const ticketTypeLabels: Record<TicketType, string> = {
+  bug: "Bug", improvement: "Verbesserung", question: "Frage", task: "Aufgabe"
+};
+export const ticketTypeTones: Record<TicketType, BadgeTone> = {
+  bug: "crimson", improvement: "fern", question: "mustard", task: "steel"
+};
+export const ticketSeverityLabels: Record<TicketSeverity, string> = {
+  low: "Niedrig", medium: "Mittel", high: "Hoch", critical: "Kritisch"
+};
+export const ticketSeverityTones: Record<TicketSeverity, PillTone> = {
+  low: "steel", medium: "mustard", high: "tangerine", critical: "crimson"
+};
+```
+
+> **Hinweis:** Ältere Komponenten (z. B. `TaskForm.tsx`) definieren Status-/Prioritäts-Arrays noch lokal. Bei Überarbeitungen sollen diese Arrays durch Importe aus `domainLabels.ts` ersetzt werden.
+
+### 15.6 Styling-Prinzipien
+
+- Tailwind-Utility-Klassen — ausschließlich vorhandene Design-Tokens aus der App (`bg-shell`, `border-line`, `text-ink`, `shadow-panel`, `rounded-xl`, `rounded-2xl` usw.)
+- Keine neuen Farb- oder Shadow-Klassen ohne Abstimmung
+- Kein Inline-CSS außer für `accentColor`-Streifen (RGB-Wert aus Entitätsdaten)
+- Icons aus `lucide-react` — konsistente Größen: `size={16}` für Buttons, `size={20}` für Modal-Icons, `size={17}` für Primär-Aktionen
+
+### 15.7 Abnahme-Checkliste für neue UI-Komponenten
+
+Vor dem Commit einer neuen Domain-View oder eines Formulars prüfen:
+
+- [ ] Kein eigenes Card-Markup — ausschließlich `ItemCard` oder `ItemRow`
+- [ ] Kein eigenes Modal/Formular-Markup — ausschließlich `FormModal` + `Section` + `FormField`
+- [ ] Alle deutschen Labels aus `domainLabels.ts` importiert — keine Inline-Strings für Status/Typ/Schweregrad
+- [ ] `Pill`/`Badge`-Tones aus `domainLabels.ts`-Maps bezogen
+- [ ] Domain-View ist ein dünner Adapter über `ListBoardView<T>` — kein eigenes Such-/Filter-/Toggle-Markup
+- [ ] Keine neuen Tailwind-Klassen, die es in der App noch nicht gibt
+- [ ] Kein `any` in Props
+
+---
+
 ## Plan-Aktualisierung im Plan-Modus
 
 Wenn nach der Formulierung eines Plans weitere Informationen, Korrekturen oder Ergänzungen gegeben werden, muss **immer ein vollständig neuer Plan** gepostet werden.

@@ -1,8 +1,9 @@
-import { BookOpen, CalendarDays, DatabaseBackup, DatabaseZap, FolderKanban, Library, Tags } from "lucide-react";
+import { BookOpen, Bug, CalendarDays, DatabaseBackup, DatabaseZap, FolderKanban, Library, Tags } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
   { to: "/projects", label: "Projekte", icon: FolderKanban },
+  { to: "/tickets", label: "Tickets", icon: Bug },
   { to: "/features", label: "Features", icon: BookOpen },
   { to: "/wiki", label: "Wiki", icon: Library },
   { to: "/calendar", label: "Kalender", icon: CalendarDays }

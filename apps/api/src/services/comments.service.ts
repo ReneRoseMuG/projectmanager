@@ -1,7 +1,7 @@
 import type { Comment, CommentEntityType, CommentInput } from "@taskmanager/shared-types";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { backlogItems, comments, features, projects, tasks, useCases, wikiPages } from "../db/schema.js";
+import { backlogItems, comments, features, projects, tasks, tickets, useCases, wikiPages } from "../db/schema.js";
 import { notFound } from "../utils/errors.js";
 import { nowIso, requireNonEmpty } from "./helpers.js";
 
@@ -30,7 +30,9 @@ function ensureEntityExists(database: DbClient, entityType: CommentEntityType, e
             ? database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, entityId)).get()
             : entityType === "backlogItem"
               ? database.select({ id: backlogItems.id }).from(backlogItems).where(eq(backlogItems.id, entityId)).get()
-              : database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, entityId)).get();
+              : entityType === "wikiPage"
+                ? database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, entityId)).get()
+                : database.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, entityId)).get();
 
   if (!exists) {
     throw notFound(`${entityType} with id ${entityId} not found`);
@@ -75,6 +77,19 @@ export function deleteEntityComment(database: DbClient, entityType: CommentEntit
   if (result.changes === 0) {
     throw notFound(`Comment with id ${id} not found`);
   }
+}
+
+export function deleteCommentsForEntity(database: DbClient, entityType: CommentEntityType, entityId: number): void {
+  database.delete(comments).where(and(eq(comments.entityType, entityType), eq(comments.entityId, entityId))).run();
+}
+
+export function deleteCommentsForEntities(database: DbClient, entityType: CommentEntityType, entityIds: number[]): void {
+  const uniqueIds = [...new Set(entityIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  database.delete(comments).where(and(eq(comments.entityType, entityType), inArray(comments.entityId, uniqueIds))).run();
 }
 
 export function listComments(database: DbClient, taskId: number): Comment[] {

@@ -2,6 +2,8 @@ import { eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { features, useCases } from "../db/schema.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
+import { deleteFeatureAttachmentsForIds } from "./attachments.service.js";
+import { deleteCommentsForEntities, deleteCommentsForEntity } from "./comments.service.js";
 import {
   buildFilename,
   buildStoredContentPath,
@@ -210,10 +212,14 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
   return mapFeature(updated, countUseCases(database, id), input.content ?? readFeatureContent(updated));
 }
 
-export function deleteFeature(database: DbClient, id: number): void {
+export async function deleteFeature(database: DbClient, id: number): Promise<void> {
   const feature = getFeatureRecord(database, id);
-  const linkedUseCases = database.select({ contentPath: useCases.contentPath }).from(useCases).where(eq(useCases.featureId, id)).all();
+  const linkedUseCases = database.select({ id: useCases.id, contentPath: useCases.contentPath }).from(useCases).where(eq(useCases.featureId, id)).all();
+  const linkedUseCaseIds = linkedUseCases.map((useCase) => useCase.id);
 
+  await deleteFeatureAttachmentsForIds(database, [id]);
+  deleteCommentsForEntity(database, "feature", id);
+  deleteCommentsForEntities(database, "useCase", linkedUseCaseIds);
   database.delete(features).where(eq(features.id, id)).run();
 
   if (feature.contentPath) {
