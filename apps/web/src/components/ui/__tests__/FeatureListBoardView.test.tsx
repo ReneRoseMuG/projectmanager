@@ -61,6 +61,8 @@ function expectItemCardClasses(cards: NodeListOf<Element>) {
   cards.forEach((card) => {
     expect(card).toHaveClass("border");
     expect(card).toHaveClass("bg-white");
+    expect(card).toHaveClass("min-w-0");
+    expect(card).toHaveClass("max-w-full");
     expect(card).toHaveClass("p-5");
     expect(card).toHaveClass("shadow-sm");
     expect(card.querySelector("span.absolute.inset-x-0.top-0.h-1")).toBeInTheDocument();
@@ -82,6 +84,9 @@ describe("FeatureListBoardView", () => {
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns.length).toBe(statusColumns.length);
+    columns.forEach((column) => {
+      expect(column).toHaveClass("min-w-0");
+    });
     statusColumns.forEach((column) => {
       expect(screen.getByRole("heading", { name: column.label })).toBeInTheDocument();
     });

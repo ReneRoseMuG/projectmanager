@@ -2,6 +2,8 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 17.05.26 | Fix | Board Card Width | ✅ |
+| 17.05.26 | Fix | ListBoard Add Buttons | ✅ |
 | 17.05.26 | Feature | Attachment-Previews | ✅ |
 | 17.05.26 | Feature | Wiki-Import Relationen und Backlogs | ✅ |
 | 17.05.26 | Fix | Project Features Board | ✅ |

@@ -1,5 +1,5 @@
 import type { Attachment, BacklogItem, Feature, FeatureInput, Note, ProjectInput, Task, TaskStatus } from "@taskmanager/shared-types";
-import { ChevronRight, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronRight, MoreHorizontal } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { useState } from "react";
 import { AttachmentList } from "../components/attachments/AttachmentList";
@@ -48,15 +48,6 @@ const tabs: Array<{ value: ProjectTab; label: string }> = [
   { value: "backlog", label: "Backlog" },
   { value: "import", label: "Import" }
 ];
-
-const activeTabActionLabels: Partial<Record<ProjectTab, string>> = {
-  tasks: "Neue Aufgabe",
-  features: "Neues Feature",
-  backlog: "Neues Item",
-  notes: "Neue Notiz",
-  attachments: "Dateien hochladen",
-  import: "Import prüfen"
-};
 
 export function ProjectDetailPage() {
   const params = useParams();
@@ -278,36 +269,9 @@ export function ProjectDetailPage() {
     ...tab,
     count: tab.value === "details" ? undefined : tabCounts[tab.value]
   }));
-  const activeTabActionLabel = activeTabActionLabels[activeTab];
-
   const openTaskForm = (status: TaskStatus = "todo") => {
     setNewTaskStatus(status);
     setTaskFormOpen(true);
-  };
-
-  const runActiveTabAction = () => {
-    if (activeTab === "tasks") {
-      openTaskForm();
-      return;
-    }
-    if (activeTab === "features") {
-      openCreateFeatureForm();
-      return;
-    }
-    if (activeTab === "backlog") {
-      setEditingBacklogItem(null);
-      setBacklogFormOpen(true);
-      return;
-    }
-    if (activeTab === "notes") {
-      void createNote();
-      return;
-    }
-    if (activeTab === "import") {
-      void previewWikiImport();
-      return;
-    }
-    setActiveTab("attachments");
   };
 
   return (
@@ -335,11 +299,6 @@ export function ProjectDetailPage() {
                 icon={<MoreHorizontal size={16} />}
                 variant="ghost"
               />
-              {activeTabActionLabel ? (
-                <Button className="bg-white text-steel-700 hover:bg-steel-50" icon={<Plus size={16} />} variant="ghost" onClick={runActiveTabAction}>
-                  {activeTabActionLabel}
-                </Button>
-              ) : null}
             </div>
           </div>
 
@@ -372,13 +331,6 @@ export function ProjectDetailPage() {
 
       <div className="grid gap-3 rounded-lg border border-line bg-white shadow-sm">
         <TabBar tabs={projectTabs} active={activeTab} onChange={setActiveTab} />
-        {activeTabActionLabel ? (
-          <div className="flex flex-wrap items-center justify-end gap-2 px-4 pb-4 md:px-5">
-            <Button variant="primary" icon={<Plus size={16} />} onClick={runActiveTabAction}>
-              {activeTabActionLabel}
-            </Button>
-          </div>
-        ) : null}
       </div>
 
       {activeTab === "details" ? <ProjectInlineForm project={project} onSubmit={submitProjectDetails} /> : null}
@@ -421,7 +373,7 @@ export function ProjectDetailPage() {
             loading={tasks.loading}
             viewMode={viewMode}
             onViewModeChange={setViewMode}
-            onAdd={runActiveTabAction}
+            onAdd={() => openTaskForm()}
             onAddStatus={openTaskForm}
             onOpen={openTask}
             onDelete={(task) => void deleteTask(task)}

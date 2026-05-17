@@ -51,6 +51,7 @@ describe("ProjectFeaturePanel", () => {
     expect(screen.getByRole("button", { name: "Board" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Neues Feature" })).toBeInTheDocument();
+    expect(screen.queryByText("Neues Feature")).not.toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-xl");
     expect(columns).toHaveLength(4);
@@ -122,6 +123,7 @@ describe("ProjectFeaturePanel", () => {
     const { container } = renderProjectFeaturePanel({ features: [] });
 
     expect(screen.getByText("Keine Features verknüpft")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Neues Feature" })).toHaveLength(1);
     expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
     expect(container.querySelector("table")).not.toBeInTheDocument();
   });

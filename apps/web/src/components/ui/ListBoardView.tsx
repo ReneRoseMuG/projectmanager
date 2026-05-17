@@ -74,16 +74,24 @@ export function ListBoardView<T>({
       {loading ? <TaskListSkeleton /> : null}
       {!loading && items.length === 0 ? emptyState : null}
       {!loading && items.length > 0 && mode === "list" ? <div className="grid gap-3">{items.map((item, index) => <div key={index}>{renderRow(item)}</div>)}</div> : null}
-      {!loading && items.length > 0 && mode === "board" && !boardByStatus ? <CardGrid>{items.map((item, index) => <div key={index}>{renderCard(item)}</div>)}</CardGrid> : null}
+      {!loading && items.length > 0 && mode === "board" && !boardByStatus ? (
+        <CardGrid>
+          {items.map((item, index) => (
+            <div key={index} className="min-w-0 max-w-full">
+              {renderCard(item)}
+            </div>
+          ))}
+        </CardGrid>
+      ) : null}
       {!loading && items.length > 0 && boardByStatus ? (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-3">
           {statusColumns.map((column) => {
             const columnItems = items.filter((item) => String(item[statusKey]) === column.value);
 
             return (
-              <section key={column.value} className="grid min-h-[240px] content-start gap-3 rounded-lg border border-line bg-shell/60 p-3">
-                <header className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-ink">{column.label}</h2>
+              <section key={column.value} className="grid min-h-[240px] min-w-0 content-start gap-3 rounded-lg border border-line bg-shell/60 p-3">
+                <header className="flex min-w-0 items-center justify-between gap-3">
+                  <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{column.label}</h2>
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">{columnItems.length}</span>
                     {onAddToColumn ? (
@@ -100,7 +108,9 @@ export function ListBoardView<T>({
                   </div>
                 </header>
                 {columnItems.map((item, index) => (
-                  <div key={index}>{renderCard(item)}</div>
+                  <div key={index} className="min-w-0 max-w-full">
+                    {renderCard(item)}
+                  </div>
                 ))}
               </section>
             );

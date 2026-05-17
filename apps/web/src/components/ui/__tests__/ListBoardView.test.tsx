@@ -72,11 +72,16 @@ afterEach(() => {
 
 describe("ListBoardView", () => {
   it("rendert Items als Karten im Board-Modus", () => {
-    renderListBoardView({ mode: "board" });
+    const { container } = renderListBoardView({ mode: "board" });
 
     expect(screen.getByText("Card Alpha")).toBeInTheDocument();
     expect(screen.getByText("Card Beta")).toBeInTheDocument();
     expect(screen.queryByText("Row Alpha")).not.toBeInTheDocument();
+    expect(container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3")).toHaveClass("min-w-0");
+    container.querySelectorAll("article.rounded-2xl").forEach((card) => {
+      expect(card).toHaveClass("min-w-0");
+      expect(card).toHaveClass("max-w-full");
+    });
   });
 
   it("rendert Items als Zeilen im Listen-Modus", () => {
@@ -126,6 +131,10 @@ describe("ListBoardView", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Offen hinzufügen" }));
+
+    screen.getAllByRole("heading").forEach((heading) => {
+      expect(heading.closest("section")).toHaveClass("min-w-0");
+    });
 
     expect(onAddToColumn).toHaveBeenCalledWith("todo");
   });
@@ -202,6 +211,15 @@ describe("ItemCard", () => {
     const accent = container.querySelector("span[style]");
 
     expect(accent).toHaveStyle({ backgroundColor: "rgb(18, 52, 86)" });
+  });
+
+  it("begrenzt Kartenbreite innerhalb von Board-Spalten", () => {
+    render(<ItemCard header={<h3>Alpha</h3>} />);
+
+    const card = screen.getByText("Alpha").closest("article");
+    expect(card).toHaveClass("min-w-0");
+    expect(card).toHaveClass("max-w-full");
+    expect(card).toHaveClass("overflow-hidden");
   });
 });
 

@@ -17,7 +17,7 @@ interface ItemCardProps {
 export function ItemCard({ accentColor, onOpen, onEdit, onDelete, header, body, footer, className = "" }: ItemCardProps) {
   return (
     <article
-      className={`relative grid gap-3 overflow-hidden rounded-2xl border border-line bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-panel ${onOpen ? "cursor-pointer" : ""} ${className}`}
+      className={`relative grid min-w-0 max-w-full gap-3 overflow-hidden rounded-2xl border border-line bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-panel ${onOpen ? "cursor-pointer" : ""} ${className}`}
       onDoubleClick={onOpen}
     >
       {accentColor ? <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: accentColor }} /> : null}

@@ -86,9 +86,7 @@ export function ProjectFeaturePanel({ features, viewMode, onViewModeChange, onCr
               Liste
             </Button>
           </div>
-          <Button variant="primary" icon={<Plus size={16} />} onClick={onCreate}>
-            Neues Feature
-          </Button>
+          <Button aria-label="Neues Feature" title="Neues Feature" variant="primary" icon={<Plus size={16} />} onClick={onCreate} />
         </div>
       </div>
 
@@ -99,7 +97,6 @@ export function ProjectFeaturePanel({ features, viewMode, onViewModeChange, onCr
           body="Öffne ein Feature und füge dieses Projekt im Tab Projekte hinzu."
           tone="violet"
           variant="tinted"
-          actions={[{ label: "Neues Feature", onClick: onCreate, primary: true, icon: <Plus size={17} /> }]}
         />
       ) : null}
 
