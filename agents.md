@@ -378,7 +378,11 @@ npm run test -w apps/api  # nur API-Tests
 ### Grundregeln
 
 - Jeder Test muss einen beobachtbaren Effekt prüfen — keine reinen Sichtbarkeitsprüfungen
+- Leere Tests, Platzhaltertests und Tests ohne fachliche Assertion sind unzulässig. `test.skip`, `it.skip`, `describe.skip` oder leere Testkörper dürfen nur verwendet werden, wenn der Nutzer dies ausdrücklich beauftragt oder ein konkreter Blocker im Log dokumentiert wird; sie zählen nie als implementierte Tests.
+- Wenn ein Test noch nicht sicher implementierbar ist, wird kein leeres Testgerüst committed. Stattdessen wird die fehlende Testabdeckung als offener Punkt im Log dokumentiert.
 - Keine Direktzugriffe auf die Produktions-SQLite-Datei in Tests
+- Alle Tests mit DB-Bezug verwenden ausschließlich In-Memory-, Temp- oder `.test-runtime`-Datenbanken; Testläufe dürfen nie `apps/api/data/` verwenden.
+- Alle Tests mit Dateisystembezug verwenden ausschließlich Temp- oder `.test-runtime`-Verzeichnisse; Testläufe dürfen nie `apps/api/uploads/`, `apps/api/content/` oder `apps/api/backups/` verwenden.
 - Integrationstests verwenden eine eigene Temp-DB, die vor/nach dem Test angelegt und gelöscht wird
 - Schlägt ein Test fehl, dokumentiert Codex den Fehler und nimmt keine eigenständigen Fixes vor
 

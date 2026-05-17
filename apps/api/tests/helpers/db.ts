@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { fileURLToPath } from "node:url";
 import * as schema from "../../src/db/schema.js";
+import { assertSafeTestDatabasePath } from "../../src/runtime-safety.js";
 
 export type TestDb = ReturnType<typeof createTestDb>;
 
@@ -30,6 +31,7 @@ export function createTestDb() {
 }
 
 export function createFileTestDb(databasePath: string) {
+  assertSafeTestDatabasePath(databasePath, "createFileTestDb databasePath");
   const sqlite = new Database(databasePath);
   sqlite.pragma("journal_mode = WAL");
 

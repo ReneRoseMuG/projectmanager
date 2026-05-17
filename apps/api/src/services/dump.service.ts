@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import unzipper from "unzipper";
 import { config } from "../config.js";
+import { assertSafeTestDatabasePath, assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { getContentBaseDir } from "./content.service.js";
 import type { GoogleDriveBackupClient } from "./google-drive.service.js";
@@ -134,8 +135,16 @@ function buildDumpFilename(dumpId: string): string {
 }
 
 function ensureWorkDir(): string {
+  assertSafeTestDirectoryPath(config.backupWorkDir, "BACKUP_WORK_DIR");
   fs.mkdirSync(config.backupWorkDir, { recursive: true });
   return config.backupWorkDir;
+}
+
+function assertSafeDumpRuntimeTargets(): void {
+  assertSafeTestDatabasePath(config.databasePath);
+  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
+  assertSafeTestDirectoryPath(getContentBaseDir(), "CONTENT_DIR");
+  assertSafeTestDirectoryPath(config.backupWorkDir, "BACKUP_WORK_DIR");
 }
 
 function makeTempDir(prefix: string): string {
@@ -287,6 +296,7 @@ export async function buildDumpArchive(sqlite: Database.Database): Promise<{
   filename: string;
   manifest: DumpManifest;
 }> {
+  assertSafeDumpRuntimeTargets();
   const exportedAt = nowIso();
   const dumpId = buildDumpId(exportedAt);
   const schemaRevision = getSchemaRevision();
@@ -793,6 +803,7 @@ export async function applyDriveDump(
   params: { fileId: string; fileHash: string; confirmationPhrase: string },
   options: ApplyDumpOptions = {}
 ): Promise<DumpDriveApplyResult> {
+  assertSafeDumpRuntimeTargets();
   const files = await driveClient.listDumpFiles();
   const driveFile = files.find((file) => file.id === params.fileId);
   if (!driveFile) {

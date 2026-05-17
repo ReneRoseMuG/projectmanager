@@ -21,7 +21,6 @@ import path from "node:path";
 import {
   buildFilename,
   deleteContent,
-  getContentBaseDir,
   readContent,
   renameContent,
   resolveContentPath,
@@ -31,16 +30,13 @@ import {
 
 describe("ContentService", () => {
   let tmpDir: string;
-  let originalBaseDir: string;
 
   beforeEach(() => {
-    originalBaseDir = getContentBaseDir();
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "content-test-"));
     setContentBaseDir(tmpDir);
   });
 
   afterEach(() => {
-    setContentBaseDir(originalBaseDir);
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 

@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import { config } from "../config.js";
+import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 
 export type ContentSubdir = "features" | "usecases" | "wiki";
 
-let contentBaseDir = path.resolve(process.cwd(), "content");
+let contentBaseDir = config.contentDir;
 
 function ensureInsideBase(baseDir: string, targetPath: string): void {
   const relative = path.relative(baseDir, targetPath);
@@ -23,6 +25,7 @@ function sanitizeSegment(value: string): string {
 }
 
 export function setContentBaseDir(dir: string): void {
+  assertSafeTestDirectoryPath(dir, "CONTENT_DIR");
   contentBaseDir = path.resolve(dir);
 }
 
@@ -32,6 +35,7 @@ export function getContentBaseDir(): string {
 
 export function resolveContentPath(subdir: ContentSubdir, filename: string): string {
   const subdirPath = path.resolve(contentBaseDir, subdir);
+  assertSafeTestDirectoryPath(contentBaseDir, "CONTENT_DIR");
   const absolutePath = path.resolve(subdirPath, filename);
 
   ensureInsideBase(subdirPath, absolutePath);
@@ -60,11 +64,13 @@ export function buildFilename(prefix: string, id: number, slug: string): string 
 }
 
 export function writeContent(absolutePath: string, markdown: string): void {
+  assertSafeTestDirectoryPath(path.dirname(absolutePath), "CONTENT_DIR");
   fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
   fs.writeFileSync(absolutePath, markdown, "utf8");
 }
 
 export function readContent(absolutePath: string): string {
+  assertSafeTestDirectoryPath(path.dirname(absolutePath), "CONTENT_DIR");
   try {
     return fs.readFileSync(absolutePath, "utf8");
   } catch (error) {
@@ -76,6 +82,7 @@ export function readContent(absolutePath: string): string {
 }
 
 export function deleteContent(absolutePath: string): void {
+  assertSafeTestDirectoryPath(path.dirname(absolutePath), "CONTENT_DIR");
   try {
     fs.rmSync(absolutePath);
   } catch (error) {
@@ -87,6 +94,8 @@ export function deleteContent(absolutePath: string): void {
 }
 
 export function renameContent(oldPath: string, newPath: string): string {
+  assertSafeTestDirectoryPath(path.dirname(oldPath), "CONTENT_DIR");
+  assertSafeTestDirectoryPath(path.dirname(newPath), "CONTENT_DIR");
   fs.mkdirSync(path.dirname(newPath), { recursive: true });
   fs.renameSync(oldPath, newPath);
   return newPath;

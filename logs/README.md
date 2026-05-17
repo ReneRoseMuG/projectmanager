@@ -2,6 +2,8 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 17.05.26 | Fix | Test Runtime Safety | ✅ |
+| 17.05.26 | Fix | E2E leere Tests | ✅ |
 | 17.05.26 | Fix | Design-Review-Befunde | ✅ |
 | 17.05.26 | Feature | Google-Drive-Dump | ✅ |
 | 17.05.26 | Fix | Restabweichungen Designauftrag | ✅ |

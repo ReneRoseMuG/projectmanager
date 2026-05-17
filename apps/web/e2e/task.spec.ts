@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
-const apiBaseUrl = "http://localhost:3001/api";
+const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL ?? "http://127.0.0.1:3101/api";
 
 interface ProjectFixture {
   id: number;
@@ -71,7 +71,7 @@ function taskButton(page: Page, title: string) {
 }
 
 function activeModal(page: Page) {
-  return page.locator(".fixed").last();
+  return page.locator(".fixed.inset-0").last();
 }
 
 test.describe("Task CRUD", () => {

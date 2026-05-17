@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { config } from "../config.js";
 import type { DbClient } from "../db/client.js";
 import { attachments, features, projects, tasks } from "../db/schema.js";
+import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { notFound } from "../utils/errors.js";
 
 type AttachmentRecord = typeof attachments.$inferSelect;
@@ -64,6 +65,7 @@ async function persistAttachment(values: {
   featureId?: number;
   upload: AttachmentUpload;
 }): Promise<Attachment> {
+  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   await fs.mkdir(config.uploadDir, { recursive: true });
 
   const filename = makeFilename(values.upload.originalName);
@@ -136,6 +138,7 @@ export async function createFeatureAttachment(database: DbClient, featureId: num
 }
 
 export async function deleteAttachment(database: DbClient, id: number): Promise<void> {
+  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   const record = database.select().from(attachments).where(eq(attachments.id, id)).get();
   if (!record) {
     throw notFound(`Attachment with id ${id} not found`);

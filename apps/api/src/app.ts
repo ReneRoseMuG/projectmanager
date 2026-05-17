@@ -19,7 +19,9 @@ import { registerTagsRoutes } from "./routes/tags.js";
 import { registerTasksRoutes } from "./routes/tasks.js";
 import { registerUseCasesRoutes } from "./routes/use-cases.js";
 import { registerWikiRoutes } from "./routes/wiki.js";
+import { config } from "./config.js";
 import { createGoogleDriveBackupClient, type GoogleDriveBackupClient } from "./services/google-drive.service.js";
+import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
 import { errorHandler } from "./utils/errors.js";
 import type Database from "better-sqlite3";
 
@@ -28,6 +30,8 @@ export async function buildApp(
   injectedSqlite: Database.Database = sqlite,
   injectedDriveClient: GoogleDriveBackupClient = createGoogleDriveBackupClient()
 ): Promise<FastifyInstance> {
+  assertSafeTestRuntimeTargets(config);
+
   const app = Fastify({ logger: true });
 
   app.decorate("db", injectedDb);

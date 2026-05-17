@@ -32,6 +32,8 @@ describe("Taskmanager API integration", () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "taskmanager-api-"));
     process.env.DATABASE_PATH = path.join(tempDir, "taskmanager.sqlite");
     process.env.UPLOAD_DIR = path.join(tempDir, "uploads");
+    process.env.CONTENT_DIR = path.join(tempDir, "content");
+    process.env.BACKUP_WORK_DIR = path.join(tempDir, "backups");
     process.env.PORT = "0";
 
     const dbModule = await import("./db/client.js");
