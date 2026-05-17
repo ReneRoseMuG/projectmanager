@@ -11,7 +11,7 @@ import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 
 type TaskRecord = typeof tasks.$inferSelect;
 
-function mapTask(
+export function mapTask(
   database: DbClient,
   record: TaskRecord,
   tags = getTaskTags(database, record.id),
@@ -83,6 +83,20 @@ export function listProjectTasks(database: DbClient, projectId: number): Task[] 
     .from(tasks)
     .where(and(eq(tasks.projectId, projectId), isNull(tasks.parentId)))
     .orderBy(tasks.status, tasks.position)
+    .all();
+  const ids = rows.map((task) => task.id);
+  const tagsByTask = getTaskTagsMap(database, ids);
+  const subtaskCounts = getSubtaskCounts(database, ids);
+
+  return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
+}
+
+export function listTasks(database: DbClient): Task[] {
+  const rows = database
+    .select()
+    .from(tasks)
+    .where(isNull(tasks.parentId))
+    .orderBy(tasks.projectId, tasks.status, tasks.position)
     .all();
   const ids = rows.map((task) => task.id);
   const tagsByTask = getTaskTagsMap(database, ids);

@@ -23,7 +23,7 @@ export function NotFoundPage() {
           </Button>
         </div>
       </section>
-      <aside className="rounded-[18px] border border-line bg-gradient-to-br from-steel-100 to-white p-8 text-center shadow-panel">
+      <aside className="rounded-2xl border border-line bg-gradient-to-br from-steel-100 to-white p-8 text-center shadow-panel">
         <div className="font-mono text-[96px] font-black leading-none text-steel-700">404</div>
         <p className="mt-3 text-sm font-semibold text-slate-500">Route nicht gefunden</p>
       </aside>

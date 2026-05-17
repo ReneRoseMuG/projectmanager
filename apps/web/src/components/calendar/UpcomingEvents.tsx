@@ -2,6 +2,7 @@ import type { CalendarEvent } from "@taskmanager/shared-types";
 import { CalendarClock } from "lucide-react";
 import { useMemo } from "react";
 import { formatHumanDate } from "../../utils/date";
+import { ItemRow } from "../ui/ItemRow";
 
 interface UpcomingEventsProps {
   events: CalendarEvent[];
@@ -25,18 +26,17 @@ export function UpcomingEvents({ events, onOpen }: UpcomingEventsProps) {
       </div>
 
       {upcoming.length > 0 ? (
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2">
           {upcoming.map((event) => (
-            <button
+            <ItemRow
               key={event.id}
-              type="button"
-              className="grid min-h-24 gap-2 rounded-md border border-line bg-shell/60 p-3 text-left transition hover:border-fern hover:bg-white"
-              onClick={() => onOpen(event)}
-            >
-              <span className="h-1 w-10 rounded" style={{ backgroundColor: event.color ?? "#0f766e" }} />
-              <span className="line-clamp-2 text-sm font-semibold text-ink">{event.title}</span>
-              <span className="text-xs text-slate-600">{formatHumanDate(event.startTime)}</span>
-            </button>
+              accentColor={event.color ?? "var(--color-teal)"}
+              statusIndicator={<span className="flex h-9 w-9 items-center justify-center rounded-lg bg-fern/10 text-fern"><CalendarClock size={16} /></span>}
+              title={event.title}
+              description={event.description || "Keine Beschreibung"}
+              meta={<span className="text-xs font-semibold text-slate-600">{formatHumanDate(event.startTime)}</span>}
+              onOpen={() => onOpen(event)}
+            />
           ))}
         </div>
       ) : (

@@ -18,6 +18,7 @@ type UseCaseRecord = typeof useCases.$inferSelect;
 type UseCaseStatus = UseCaseRecord["status"];
 
 export interface UseCaseInput {
+  featureId?: number;
   title?: string;
   slug?: string;
   status?: UseCaseStatus;
@@ -103,7 +104,8 @@ export function getUseCase(database: DbClient, id: number): UseCaseDto {
 }
 
 export function createUseCase(database: DbClient, featureId: number, input: UseCaseInput): UseCaseDto {
-  ensureFeatureExists(database, featureId);
+  const targetFeatureId = input.featureId ?? featureId;
+  ensureFeatureExists(database, targetFeatureId);
   const title = requireNonEmpty(input.title, "title");
   const slug = requireNonEmpty(input.slug, "slug");
   ensureSlugIsUnique(database, slug);
@@ -112,7 +114,7 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
   const created = database
     .insert(useCases)
     .values({
-      featureId,
+      featureId: targetFeatureId,
       title,
       slug,
       status: input.status ?? "draft",
@@ -153,6 +155,10 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
 
   if (input.title !== undefined) {
     values.title = requireNonEmpty(input.title, "title");
+  }
+  if (input.featureId !== undefined) {
+    ensureFeatureExists(database, input.featureId);
+    values.featureId = input.featureId;
   }
   if (input.slug !== undefined) {
     values.slug = requireNonEmpty(input.slug, "slug");

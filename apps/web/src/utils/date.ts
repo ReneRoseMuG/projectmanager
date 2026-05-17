@@ -14,10 +14,6 @@ export function isOverdue(value: string | null | undefined): boolean {
   return isBefore(parseISO(value), new Date());
 }
 
-export function todayDateInput(): string {
-  return format(new Date(), "yyyy-MM-dd");
-}
-
 export function toDateInput(value: string | null | undefined): string {
   if (!value) {
     return "";

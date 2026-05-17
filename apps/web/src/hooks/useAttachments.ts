@@ -2,14 +2,16 @@ import type { Attachment } from "@taskmanager/shared-types";
 import { useCallback, useEffect, useState } from "react";
 import {
   deleteAttachment as deleteAttachmentRequest,
+  getFeatureAttachments,
   getProjectAttachments,
   getTaskAttachments,
+  uploadFeatureAttachment,
   uploadProjectAttachment,
   uploadTaskAttachment
 } from "../api/attachments";
 import { errorMessage } from "./errors";
 
-export type AttachmentOwner = { type: "project"; id: number } | { type: "task"; id: number };
+export type AttachmentOwner = { type: "project"; id: number } | { type: "task"; id: number } | { type: "feature"; id: number };
 
 export function useAttachments(owner: AttachmentOwner | null) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -28,7 +30,8 @@ export function useAttachments(owner: AttachmentOwner | null) {
     setLoading(true);
     setError(null);
     try {
-      const items = ownerType === "project" ? await getProjectAttachments(ownerId) : await getTaskAttachments(ownerId);
+      const items =
+        ownerType === "project" ? await getProjectAttachments(ownerId) : ownerType === "task" ? await getTaskAttachments(ownerId) : await getFeatureAttachments(ownerId);
       setAttachments(items);
     } catch (requestError) {
       setError(errorMessage(requestError));
@@ -47,7 +50,8 @@ export function useAttachments(owner: AttachmentOwner | null) {
         return null;
       }
 
-      const uploaded = ownerType === "project" ? await uploadProjectAttachment(ownerId, file) : await uploadTaskAttachment(ownerId, file);
+      const uploaded =
+        ownerType === "project" ? await uploadProjectAttachment(ownerId, file) : ownerType === "task" ? await uploadTaskAttachment(ownerId, file) : await uploadFeatureAttachment(ownerId, file);
       await load();
       return uploaded;
     },

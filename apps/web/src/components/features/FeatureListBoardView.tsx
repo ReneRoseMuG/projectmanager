@@ -1,0 +1,54 @@
+import type { Feature, FeatureStatus } from "@taskmanager/shared-types";
+import { BookOpen } from "lucide-react";
+import { useMemo, useState } from "react";
+import { EmptyState } from "../ui/EmptyState";
+import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
+import { FeatureCard } from "./FeatureCard";
+
+interface FeatureListBoardViewProps {
+  features: Feature[];
+  onCreate: () => void;
+  onDelete: (feature: Feature) => void;
+  filters?: React.ReactNode;
+}
+
+const statusColumns: Array<{ value: FeatureStatus; label: string }> = [
+  { value: "draft", label: "Entwurf" },
+  { value: "active", label: "Aktiv" },
+  { value: "done", label: "Erledigt" },
+  { value: "archived", label: "Archiviert" }
+];
+
+function matchesSearch(feature: Feature, searchValue: string) {
+  const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
+  if (!normalized) {
+    return true;
+  }
+  return [feature.title, feature.slug, feature.description ?? ""].some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
+}
+
+/** Feature-specific ListBoardView adapter with status board columns. */
+export function FeatureListBoardView({ features, onCreate, onDelete, filters }: FeatureListBoardViewProps) {
+  const [mode, setMode] = useState<ListBoardMode>("board");
+  const [searchValue, setSearchValue] = useState("");
+  const visibleFeatures = useMemo(() => features.filter((feature) => matchesSearch(feature, searchValue)), [features, searchValue]);
+
+  return (
+    <ListBoardView
+      items={visibleFeatures}
+      mode={mode}
+      onModeChange={setMode}
+      onAdd={onCreate}
+      onAddToColumn={onCreate}
+      addLabel="Neues Feature"
+      statusKey="status"
+      statusColumns={statusColumns}
+      searchValue={searchValue}
+      onSearchChange={setSearchValue}
+      filters={filters}
+      emptyState={<EmptyState icon={<BookOpen size={22} />} title="Keine Features" body="Lege ein Feature an, um Use Cases und Aufgaben fachlich zu gruppieren." tone="violet" variant="tinted" />}
+      renderCard={(feature) => <FeatureCard feature={feature} onDelete={onDelete} />}
+      renderRow={(feature) => <FeatureCard feature={feature} onDelete={onDelete} />}
+    />
+  );
+}

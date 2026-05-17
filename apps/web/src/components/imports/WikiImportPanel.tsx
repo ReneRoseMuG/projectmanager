@@ -38,7 +38,7 @@ export function WikiImportPanel({ sourcePath, report, loading, error, onSourcePa
         <label className="grid min-w-[280px] flex-1 gap-1 text-sm font-medium text-ink">
           Wiki-Ordner
           <input
-            className="h-10 rounded-md border border-line bg-white px-3 text-sm font-normal outline-none focus:border-fern"
+            className="h-10 rounded-md border border-line bg-white px-3 text-sm font-normal outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
             placeholder="C:\\...\\docs\\wiki"
             value={sourcePath}
             onChange={(event) => onSourcePathChange(event.target.value)}

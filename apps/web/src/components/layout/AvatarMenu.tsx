@@ -19,7 +19,7 @@ export function AvatarMenu() {
   };
 
   return (
-    <div className="absolute right-0 top-12 z-40 w-80 overflow-hidden rounded-[18px] border border-line bg-white shadow-panel">
+    <div className="absolute right-0 top-12 z-40 w-80 overflow-hidden rounded-2xl border border-line bg-white shadow-panel">
       <header className="bg-gradient-to-br from-steel-700 to-steel-900 p-4 text-white">
         <div className="flex items-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-sm font-bold">RM</span>

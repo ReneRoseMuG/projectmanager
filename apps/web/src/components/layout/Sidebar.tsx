@@ -1,4 +1,4 @@
-import { BookOpen, CalendarDays, FolderKanban, Library, Tags } from "lucide-react";
+import { BookOpen, CalendarDays, DatabaseBackup, FolderKanban, Library, Tags } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
@@ -8,7 +8,10 @@ const items = [
   { to: "/calendar", label: "Kalender", icon: CalendarDays }
 ];
 
-const settingsItems = [{ to: "/settings/tags", label: "Tags", icon: Tags }];
+const settingsItems = [
+  { to: "/settings/tags", label: "Tags", icon: Tags },
+  { to: "/settings/backup", label: "Sicherung", icon: DatabaseBackup }
+];
 
 function NavSection({ children }: { children: string }) {
   return <div className="mb-2 mt-5 px-1.5 text-[10px] font-semibold uppercase tracking-widest text-steel-400">{children}</div>;

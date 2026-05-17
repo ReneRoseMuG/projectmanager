@@ -3,7 +3,11 @@ import { Edit3, Save, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
-import { MarkdownEditor } from "../ui/MarkdownEditor";
+import { CommentThread } from "../ui/CommentThread";
+import { RichTextEditor } from "../ui/RichTextEditor";
+import { Section } from "../ui/Section";
+import { TabBar, type Tab } from "../ui/TabBar";
+import { useEntityComments } from "../../hooks/useEntityComments";
 
 interface WikiPageDetailProps {
   page: WikiPage;
@@ -13,8 +17,10 @@ interface WikiPageDetailProps {
 }
 
 export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiPageDetailProps) {
+  const comments = useEntityComments("wikiPage", page.id);
   const [content, setContent] = useState(page.content ?? "");
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<"content" | "comments">("content");
 
   useEffect(() => {
     setContent(page.content ?? "");
@@ -30,9 +36,14 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
     }
   };
 
+  const tabs: Array<Tab<"content" | "comments">> = [
+    { value: "content", label: "Inhalt" },
+    { value: "comments", label: "Kommentare" }
+  ];
+
   return (
-    <form className="grid gap-5 rounded-lg border border-line bg-white p-5 shadow-sm" onSubmit={submit}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section className="overflow-hidden rounded-lg border border-line bg-white shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3 p-5">
         <div>
           <h1 className="text-2xl font-semibold text-ink">{page.title}</h1>
           <p className="text-sm text-slate-600">{page.slug}</p>
@@ -44,12 +55,28 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
           <Button variant="ghost" icon={<Trash2 size={16} />} onClick={() => onDelete(page)}>
             Löschen
           </Button>
-          <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
-            Speichern
-          </Button>
+          {activeTab === "content" ? (
+            <Button type="submit" form="wiki-page-detail-form" variant="primary" icon={<Save size={16} />} disabled={saving}>
+              Speichern
+            </Button>
+          ) : null}
         </div>
       </div>
-      <MarkdownEditor initialContent={content} placeholder="Wiki-Inhalt" onChange={setContent} />
-    </form>
+      <TabBar tabs={tabs} active={activeTab} onChange={setActiveTab} />
+      <div className="p-5">
+        {activeTab === "content" ? (
+          <form id="wiki-page-detail-form" className="grid gap-5" onSubmit={submit}>
+            {/* TODO: migrate existing markdown content to HTML. */}
+            <RichTextEditor content={content} placeholder="Wiki-Inhalt" toolbar="full" onChange={setContent} />
+          </form>
+        ) : null}
+        {activeTab === "comments" ? (
+          <Section title="Kommentare">
+            {comments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{comments.error}</div> : null}
+            <CommentThread comments={comments.comments} entityLabel="Wiki-Seite" onCreate={comments.createComment} onDelete={comments.removeComment} />
+          </Section>
+        ) : null}
+      </div>
+    </section>
   );
 }

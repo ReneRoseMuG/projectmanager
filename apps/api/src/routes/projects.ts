@@ -12,7 +12,9 @@ const projectBodySchema = {
     name: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
     status: { type: "string", enum: PROJECT_STATUSES },
-    color: { type: ["string", "null"] }
+    color: { type: ["string", "null"] },
+    startDate: { type: ["string", "null"] },
+    dueDate: { type: ["string", "null"] }
   }
 } as const;
 

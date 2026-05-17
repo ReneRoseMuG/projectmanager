@@ -12,7 +12,7 @@ export function ApiHealthPopover({ online, latencyMs, onRefetch }: ApiHealthPopo
   const label = online ? (slow ? "slow" : "online") : "offline";
 
   return (
-    <div className="absolute right-12 top-12 z-40 w-72 rounded-[18px] border border-line bg-white p-4 shadow-panel">
+    <div className="absolute right-12 top-12 z-40 w-72 rounded-2xl border border-line bg-white p-4 shadow-panel">
       <div className="flex items-start gap-3">
         <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${online ? "bg-fern/10 text-fern" : "bg-crimson/10 text-crimson"}`}>
           <Activity size={18} />

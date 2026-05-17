@@ -9,6 +9,10 @@ export async function getTaskAttachments(taskId: number): Promise<Attachment[]> 
   return api.get(`tasks/${taskId}/attachments`).json<Attachment[]>();
 }
 
+export async function getFeatureAttachments(featureId: number): Promise<Attachment[]> {
+  return api.get(`features/${featureId}/attachments`).json<Attachment[]>();
+}
+
 export async function uploadProjectAttachment(projectId: number, file: File): Promise<Attachment> {
   const formData = new FormData();
   formData.append("file", file);
@@ -19,6 +23,12 @@ export async function uploadTaskAttachment(taskId: number, file: File): Promise<
   const formData = new FormData();
   formData.append("file", file);
   return api.post(`tasks/${taskId}/attachments`, { body: formData }).json<Attachment>();
+}
+
+export async function uploadFeatureAttachment(featureId: number, file: File): Promise<Attachment> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post(`features/${featureId}/attachments`, { body: formData }).json<Attachment>();
 }
 
 export async function deleteAttachment(id: number): Promise<void> {

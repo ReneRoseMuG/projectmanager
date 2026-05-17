@@ -17,7 +17,7 @@ export function ForbiddenPage() {
           Zur Projektübersicht
         </Button>
       </section>
-      <aside className="rounded-[18px] border border-line bg-gradient-to-br from-tangerine/15 to-white p-8 text-center shadow-panel">
+      <aside className="rounded-2xl border border-line bg-gradient-to-br from-tangerine/15 to-white p-8 text-center shadow-panel">
         <div className="font-mono text-[96px] font-black leading-none text-tangerine">403</div>
         <p className="mt-3 text-sm font-semibold text-slate-500">Zugriff vorbereitet</p>
       </aside>

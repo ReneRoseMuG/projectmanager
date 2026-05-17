@@ -3,12 +3,14 @@ export const TASK_STATUSES = ["todo", "in_progress", "done"] as const;
 export const FEATURE_STATUSES = ["draft", "active", "done", "archived"] as const;
 export const BACKLOG_STATUSES = ["open", "in_progress", "done", "rejected"] as const;
 export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "backlogItem", "wikiPage"] as const;
 
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
 export type BacklogStatus = (typeof BACKLOG_STATUSES)[number];
 export type Priority = (typeof PRIORITIES)[number];
+export type CommentEntityType = (typeof COMMENT_ENTITY_TYPES)[number];
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonObject = { [key: string]: JsonValue };
@@ -32,6 +34,8 @@ export interface Project {
   description: string | null;
   status: ProjectStatus;
   color: string | null;
+  startDate: string | null;
+  dueDate: string | null;
   createdAt: string;
   updatedAt: string;
   openTaskCount: number;
@@ -45,6 +49,8 @@ export interface ProjectInput {
   description?: string | null;
   status?: ProjectStatus;
   color?: string | null;
+  startDate?: string | null;
+  dueDate?: string | null;
 }
 
 export type ProjectUpdate = Partial<ProjectInput>;
@@ -84,7 +90,9 @@ export interface TaskPositionInput {
 
 export interface Comment {
   id: number;
-  taskId: number;
+  taskId: number | null;
+  entityType: CommentEntityType;
+  entityId: number;
   body: string;
   createdAt: string;
 }
@@ -110,6 +118,7 @@ export interface Attachment {
   id: number;
   projectId: number | null;
   taskId: number | null;
+  featureId: number | null;
   originalName: string;
   filename: string;
   mimetype: string;
@@ -187,6 +196,7 @@ export interface UseCase {
 }
 
 export interface UseCaseInput {
+  featureId?: number;
   title: string;
   slug: string;
   status?: FeatureStatus;
@@ -295,4 +305,68 @@ export interface WikiImportReport {
   mode: "preview" | "run";
   summary: WikiImportSummary;
   items: WikiImportItemResult[];
+}
+
+export type DumpReadiness = "ready" | "warning" | "blocked";
+export type DumpImportStatus = "success" | "warning" | "error";
+
+export interface DumpDriveFile {
+  id: string;
+  name: string;
+  createdTime: string;
+  modifiedTime: string | null;
+  sizeBytes: number;
+}
+
+export interface DumpTableSummary {
+  key: string;
+  rowCount: number;
+  sha256: string;
+}
+
+export interface DumpFileRootSummary {
+  key: "uploads" | "content";
+  fileCount: number;
+  totalBytes: number;
+  sha256: string;
+}
+
+export interface DumpDriveSaveResult {
+  dumpId: string;
+  filename: string;
+  sizeBytes: number;
+  driveFile: DumpDriveFile;
+}
+
+export interface DumpDrivePreviewResult {
+  fileHash: string;
+  dumpId: string;
+  driveFile: DumpDriveFile;
+  targetDatabasePath: string;
+  transferReadiness: DumpReadiness;
+  blockingIssues: string[];
+  warnings: string[];
+  confirmationPhrase: string;
+  manifestPresent: boolean;
+  schemaRevision: string | null;
+  expectedTables: DumpTableSummary[];
+  expectedFileRoots: DumpFileRootSummary[];
+}
+
+export interface DumpDriveApplyRequest {
+  fileId: string;
+  fileHash: string;
+  confirmationPhrase: string;
+}
+
+export interface DumpDriveApplyResult {
+  dumpId: string;
+  driveFile: DumpDriveFile;
+  targetBackupPath: string;
+  verificationPassed: boolean;
+  importStatus: DumpImportStatus;
+  tablesRestored: number;
+  fileRootsRestored: DumpFileRootSummary[];
+  warnings: string[];
+  blockingIssues: string[];
 }

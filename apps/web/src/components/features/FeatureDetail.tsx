@@ -1,9 +1,12 @@
 import type { Feature, FeatureStatus, FeatureUpdate } from "@taskmanager/shared-types";
 import { LinkIcon, RotateCcw, Save } from "lucide-react";
-import type { FormEvent, ReactNode } from "react";
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
+import { FormField } from "../ui/FormField";
 import { RichTextEditor } from "../ui/RichTextEditor";
+import { Section } from "../ui/Section";
+import { SegmentedControl } from "../ui/SegmentedControl";
 
 interface FeatureDetailProps {
   feature: Feature;
@@ -11,25 +14,12 @@ interface FeatureDetailProps {
   onDelete: (feature: Feature) => void;
 }
 
-const statuses: Array<{ value: FeatureStatus; label: string; className: string }> = [
-  { value: "draft", label: "Entwurf", className: "data-[active=true]:bg-mustard data-[active=true]:text-[#6E5800]" },
-  { value: "active", label: "Aktiv", className: "data-[active=true]:bg-fern data-[active=true]:text-white" },
-  { value: "done", label: "Erledigt", className: "data-[active=true]:bg-violet data-[active=true]:text-white" },
-  { value: "archived", label: "Archiviert", className: "data-[active=true]:bg-steel-100 data-[active=true]:text-steel-700" }
+const statuses: Array<{ value: FeatureStatus; label: string; activeClassName: string }> = [
+  { value: "draft", label: "Entwurf", activeClassName: "data-[active=true]:bg-mustard data-[active=true]:text-mustard-dark" },
+  { value: "active", label: "Aktiv", activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" },
+  { value: "done", label: "Erledigt", activeClassName: "data-[active=true]:bg-violet data-[active=true]:text-white" },
+  { value: "archived", label: "Archiviert", activeClassName: "data-[active=true]:bg-steel-100 data-[active=true]:text-steel-700" }
 ];
-
-function FieldLabel({ children }: { children: string; required?: boolean }) {
-  return <span>{children}</span>;
-}
-
-function FormCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="grid gap-4 rounded-xl border border-line bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-bold text-ink">{title}</h3>
-      {children}
-    </section>
-  );
-}
 
 export function FeatureDetail({ feature, onSave }: FeatureDetailProps) {
   const [title, setTitle] = useState(feature.title);
@@ -70,62 +60,44 @@ export function FeatureDetail({ feature, onSave }: FeatureDetailProps) {
 
   return (
     <form id="feature-detail-form" className="grid gap-4" onSubmit={submit}>
-      <FormCard title="Stammdaten">
+      <Section title="Stammdaten">
         <div className="grid gap-4 md:grid-cols-2">
-        <label className="grid min-w-0 gap-1 text-sm font-medium">
-          <FieldLabel required>Titel</FieldLabel>
+        <FormField label="Titel" required className="min-w-0">
           <input className="h-11 w-full min-w-0 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" value={title} onChange={(event) => setTitle(event.target.value)} required />
-        </label>
-        <label className="grid min-w-0 gap-1 text-sm font-medium">
-          <FieldLabel required>Slug</FieldLabel>
+        </FormField>
+        <FormField label="Slug" required className="min-w-0">
           <span className="relative min-w-0">
             <LinkIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-steel-400" size={16} />
             <input className="h-11 w-full min-w-0 rounded-lg border border-line pl-9 pr-3 font-mono text-sm outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" value={slug} onChange={(event) => setSlug(event.target.value)} required />
           </span>
-        </label>
+        </FormField>
         </div>
-      </FormCard>
+      </Section>
 
-      <FormCard title="Status & Sortierung">
+      <Section title="Status & Sortierung">
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
-        <div className="grid min-w-0 gap-1 text-sm font-medium">
-          <span>Status</span>
-          <div className="flex flex-wrap gap-2 rounded-xl border border-line bg-steel-50 p-1.5">
-          {statuses.map((item) => (
-            <button
-              key={item.value}
-              className={`h-9 rounded-lg px-3 text-xs font-bold uppercase tracking-wide text-slate-500 transition hover:bg-white ${item.className}`}
-              data-active={status === item.value}
-              type="button"
-              onClick={() => setStatus(item.value)}
-            >
-              {item.label}
-            </button>
-          ))}
-          </div>
-        </div>
-        <label className="grid min-w-0 gap-1 text-sm font-medium">
-          Sortierung
+        <FormField label="Status" className="min-w-0">
+          <SegmentedControl value={status} options={statuses} onChange={setStatus} />
+        </FormField>
+        <FormField label="Sortierung" className="min-w-0">
           <input className="h-11 w-full min-w-0 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
-        </label>
+        </FormField>
       </div>
-      </FormCard>
+      </Section>
 
-      <FormCard title="Kurzbeschreibung">
-      <label className="grid gap-1 text-sm font-medium">
-        <textarea
-          className="min-h-24 rounded-lg border border-line px-3 py-2 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-        />
-      </label>
-      </FormCard>
+      <Section title="Kurzbeschreibung">
+      <div className="grid gap-1 text-sm font-medium">
+        {/* TODO: migrate existing markdown content to HTML. */}
+        <RichTextEditor content={description} placeholder="Kurzbeschreibung" toolbar="minimal" minHeight="6rem" onChange={setDescription} />
+      </div>
+      </Section>
 
-      <FormCard title="Inhalt">
+      <Section title="Inhalt">
       <div className="grid gap-2 text-sm font-medium">
-        <RichTextEditor markdown={content} placeholder="Feature-Inhalt" onMarkdownChange={setContent} />
+        {/* TODO: migrate existing markdown content to HTML. */}
+        <RichTextEditor content={content} placeholder="Feature-Inhalt" onChange={setContent} />
       </div>
-      </FormCard>
+      </Section>
 
       <footer className="flex flex-wrap items-center justify-end gap-3 rounded-xl border border-line bg-white p-4 shadow-sm">
         <div className="flex gap-2">

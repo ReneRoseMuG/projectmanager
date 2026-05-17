@@ -17,14 +17,14 @@ interface CalendarViewProps {
 
 const theme = {
   steel: {
-    400: "#94B2D1",
-    700: "#2E5984"
+    400: "var(--color-steel-400)",
+    700: "var(--color-steel-700)"
   },
-  shell: "#F4F7FA",
-  ink: "#0F2542",
-  tangerine: "#ED8C3A",
-  teal: "#2F8E96",
-  fern: "#4D9359"
+  shell: "var(--color-shell)",
+  ink: "var(--color-ink)",
+  tangerine: "var(--color-tangerine)",
+  teal: "var(--color-teal)",
+  fern: "var(--color-fern)"
 };
 
 const projectAccent: Record<number, string> = {

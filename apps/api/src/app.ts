@@ -1,5 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { db } from "./db/client.js";
+import { db, sqlite } from "./db/client.js";
 import { registerCors } from "./plugins/cors.js";
 import { registerMultipart } from "./plugins/multipart.js";
 import { registerStatic } from "./plugins/static.js";
@@ -7,6 +7,7 @@ import { registerAttachmentsRoutes } from "./routes/attachments.js";
 import { registerBacklogRoutes } from "./routes/backlog.js";
 import { registerCommentsRoutes } from "./routes/comments.js";
 import { registerDocLinksRoutes } from "./routes/doc-links.js";
+import { registerDumpRoutes } from "./routes/dumps.js";
 import { registerEventsRoutes } from "./routes/events.js";
 import { registerFeaturesRoutes } from "./routes/features.js";
 import { registerHealthRoutes } from "./routes/health.js";
@@ -18,12 +19,20 @@ import { registerTagsRoutes } from "./routes/tags.js";
 import { registerTasksRoutes } from "./routes/tasks.js";
 import { registerUseCasesRoutes } from "./routes/use-cases.js";
 import { registerWikiRoutes } from "./routes/wiki.js";
+import { createGoogleDriveBackupClient, type GoogleDriveBackupClient } from "./services/google-drive.service.js";
 import { errorHandler } from "./utils/errors.js";
+import type Database from "better-sqlite3";
 
-export async function buildApp(injectedDb: typeof db = db): Promise<FastifyInstance> {
+export async function buildApp(
+  injectedDb: typeof db = db,
+  injectedSqlite: Database.Database = sqlite,
+  injectedDriveClient: GoogleDriveBackupClient = createGoogleDriveBackupClient()
+): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
 
   app.decorate("db", injectedDb);
+  app.decorate("sqlite", injectedSqlite);
+  app.decorate("driveClient", injectedDriveClient);
   app.setErrorHandler(errorHandler);
 
   await registerCors(app);
@@ -47,6 +56,7 @@ export async function buildApp(injectedDb: typeof db = db): Promise<FastifyInsta
   await app.register(registerBacklogRoutes, { prefix: "/api" });
   await app.register(registerDocLinksRoutes, { prefix: "/api" });
   await app.register(registerImportsRoutes, { prefix: "/api" });
+  await app.register(registerDumpRoutes, { prefix: "/api" });
 
   return app;
 }

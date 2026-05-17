@@ -15,7 +15,6 @@ import { badRequest, notFound } from "../utils/errors.js";
 import {
   buildFilename,
   buildStoredContentPath,
-  readContent,
   resolveContentPath,
   resolveStoredContentPath,
   writeContent
@@ -412,7 +411,7 @@ function featureContentPath(featureId: number, slug: string): string {
   return buildStoredContentPath("features", buildFilename("feature", featureId, slug));
 }
 
-function useCaseContentPath(useCaseId: number, slug: string): string {
+function makeUseCaseContentPath(useCaseId: number, slug: string): string {
   return buildStoredContentPath("usecases", buildFilename("usecase", useCaseId, slug));
 }
 
@@ -553,7 +552,7 @@ function upsertUseCase(
   }
 
   if (existing) {
-    const contentPath = existing.contentPath ?? useCaseContentPath(existing.id, existing.slug);
+    const contentPath = existing.contentPath ?? makeUseCaseContentPath(existing.id, existing.slug);
     database
       .update(useCases)
       .set({
@@ -585,7 +584,7 @@ function upsertUseCase(
     })
     .returning({ id: useCases.id, featureId: useCases.featureId, slug: useCases.slug, contentPath: useCases.contentPath })
     .get();
-  const contentPath = useCaseContentPath(created.id, created.slug);
+  const contentPath = makeUseCaseContentPath(created.id, created.slug);
   writeContent(resolveContentPath("usecases", path.basename(contentPath)), useCase.content);
   database.update(useCases).set({ contentPath, updatedAt: now }).where(eq(useCases.id, created.id)).run();
 

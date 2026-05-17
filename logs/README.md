@@ -2,6 +2,25 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 17.05.26 | Fix | Design-Review-Befunde | ✅ |
+| 17.05.26 | Feature | Google-Drive-Dump | ✅ |
+| 17.05.26 | Fix | Restabweichungen Designauftrag | ✅ |
+| 17.05.26 | 15 | Cleanup | ✅ |
+| 17.05.26 | 14 | Comments Rollout | ✅ |
+| 17.05.26 | 13 | Domain Wiki & Kalender | ✅ |
+| 17.05.26 | 12 | Domain Use Case & Backlog | ✅ |
+| 17.05.26 | 11 | Domain Project | ✅ |
+| 17.05.26 | 10 | Domain Feature | ✅ |
+| 17.05.26 | 9 | Domain Task | ⚠️ |
+| 17.05.26 | 8 | RelationPanel | ✅ |
+| 17.05.26 | 7 | ListBoard | ✅ |
+| 17.05.26 | 6 | Comments | ✅ |
+| 17.05.26 | 5 | Templates | ✅ |
+| 17.05.26 | 4 | Section & FormField | ✅ |
+| 17.05.26 | 3 | Rich-Text | ✅ |
+| 17.05.26 | 2 | Moleküle | ✅ |
+| 17.05.26 | 1 | Atome | ✅ |
+| 17.05.26 | 0 | Token-Migration | ✅ |
 | 17.05.26 | Fix | Form-Footer-Hinweise | ✅ |
 | 17.05.26 | Fix | Create-Form Pflichtfeld-Markierungen | ✅ |
 | 17.05.26 | Fix | Project-Form Footer-Text | ✅ |

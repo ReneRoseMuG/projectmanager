@@ -5,6 +5,7 @@ import App from "./App";
 import { ErrorBoundary } from "./components/error/ErrorBoundary";
 import { ConfirmDialogProvider } from "./components/ui/ConfirmDialogProvider";
 import { ToastProvider } from "./components/ui/ToastProvider";
+import "./styles/theme.css";
 import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

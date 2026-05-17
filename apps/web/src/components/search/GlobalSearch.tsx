@@ -107,7 +107,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
 
   return (
     <div className="fixed inset-0 z-[55] flex items-start justify-center bg-steel-900/55 p-4 pt-[12vh] backdrop-blur-[2px]">
-      <section className="w-full max-w-[720px] overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_24px_70px_rgba(22,36,52,0.28)]">
+      <section className="w-full max-w-[720px] overflow-hidden rounded-2xl border border-line bg-white shadow-modal">
         <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-line px-4 py-3">
           <Search size={18} className="text-steel-500" />
           <input autoFocus className="h-10 min-w-0 bg-transparent text-base outline-none placeholder:text-slate-400" placeholder="Global suchen" value={query} onChange={(event) => setQuery(event.target.value)} />

@@ -16,6 +16,7 @@ const useCaseBodySchema = {
   required: ["title", "slug"],
   additionalProperties: false,
   properties: {
+    featureId: { type: "integer", minimum: 1 },
     title: { type: "string", minLength: 1 },
     slug: { type: "string", minLength: 1 },
     status: { type: "string", enum: FEATURE_STATUSES },

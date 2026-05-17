@@ -1,8 +1,10 @@
+import type { Task } from "@taskmanager/shared-types";
 import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { features, projectFeatures, projects, taskFeatures, taskUseCases, tasks, useCases } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import type { FeatureDto } from "./features.service.js";
+import { mapTask } from "./tasks.service.js";
 import type { UseCaseDto } from "./use-cases.service.js";
 
 function mapFeature(row: typeof features.$inferSelect, useCaseCount = 0): FeatureDto {
@@ -47,6 +49,37 @@ function ensureTaskExists(database: DbClient, taskId: number): void {
   if (!task) {
     throw notFound(`Task with id ${taskId} not found`);
   }
+}
+
+function ensureUseCaseExists(database: DbClient, useCaseId: number): void {
+  const useCase = database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, useCaseId)).get();
+  if (!useCase) {
+    throw notFound(`Use case with id ${useCaseId} not found`);
+  }
+}
+
+function ensureFeatureExists(database: DbClient, featureId: number): void {
+  const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
+  if (!feature) {
+    throw notFound(`Feature with id ${featureId} not found`);
+  }
+}
+
+function ensureTasksExist(database: DbClient, taskIds: number[]): number[] {
+  const uniqueIds = [...new Set(taskIds)];
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  const found = database.select({ id: tasks.id }).from(tasks).where(inArray(tasks.id, uniqueIds)).all();
+  const foundIds = new Set(found.map((row) => row.id));
+  const invalidIds = uniqueIds.filter((id) => !foundIds.has(id));
+
+  if (invalidIds.length > 0) {
+    throw badRequest(`Invalid taskIds: ${invalidIds.join(", ")}`);
+  }
+
+  return uniqueIds;
 }
 
 function ensureFeaturesExist(database: DbClient, featureIds: number[]): number[] {
@@ -171,6 +204,45 @@ export function setTaskFeatures(database: DbClient, taskId: number, featureIds: 
   return listTaskFeatures(database, taskId);
 }
 
+export function listFeatureTasks(database: DbClient, featureId: number): Task[] {
+  ensureFeatureExists(database, featureId);
+  return database
+    .select({
+      id: tasks.id,
+      projectId: tasks.projectId,
+      parentId: tasks.parentId,
+      title: tasks.title,
+      description: tasks.description,
+      status: tasks.status,
+      priority: tasks.priority,
+      assignee: tasks.assignee,
+      dueDate: tasks.dueDate,
+      importKey: tasks.importKey,
+      position: tasks.position,
+      createdAt: tasks.createdAt,
+      updatedAt: tasks.updatedAt
+    })
+    .from(taskFeatures)
+    .innerJoin(tasks, eq(taskFeatures.taskId, tasks.id))
+    .where(eq(taskFeatures.featureId, featureId))
+    .all()
+    .map((task) => mapTask(database, task));
+}
+
+export function setFeatureTasks(database: DbClient, featureId: number, taskIds: number[]): Task[] {
+  ensureFeatureExists(database, featureId);
+  const uniqueIds = ensureTasksExist(database, taskIds);
+
+  database.transaction((tx) => {
+    tx.delete(taskFeatures).where(eq(taskFeatures.featureId, featureId)).run();
+    if (uniqueIds.length > 0) {
+      tx.insert(taskFeatures).values(uniqueIds.map((taskId) => ({ taskId, featureId }))).run();
+    }
+  });
+
+  return listFeatureTasks(database, featureId);
+}
+
 export function listTaskUseCases(database: DbClient, taskId: number): UseCaseDto[] {
   ensureTaskExists(database, taskId);
   return database
@@ -205,4 +277,43 @@ export function setTaskUseCases(database: DbClient, taskId: number, useCaseIds: 
   });
 
   return listTaskUseCases(database, taskId);
+}
+
+export function listUseCaseTasks(database: DbClient, useCaseId: number): Task[] {
+  ensureUseCaseExists(database, useCaseId);
+  return database
+    .select({
+      id: tasks.id,
+      projectId: tasks.projectId,
+      parentId: tasks.parentId,
+      title: tasks.title,
+      description: tasks.description,
+      status: tasks.status,
+      priority: tasks.priority,
+      assignee: tasks.assignee,
+      dueDate: tasks.dueDate,
+      importKey: tasks.importKey,
+      position: tasks.position,
+      createdAt: tasks.createdAt,
+      updatedAt: tasks.updatedAt
+    })
+    .from(taskUseCases)
+    .innerJoin(tasks, eq(taskUseCases.taskId, tasks.id))
+    .where(eq(taskUseCases.useCaseId, useCaseId))
+    .all()
+    .map((task) => mapTask(database, task));
+}
+
+export function setUseCaseTasks(database: DbClient, useCaseId: number, taskIds: number[]): Task[] {
+  ensureUseCaseExists(database, useCaseId);
+  const uniqueIds = ensureTasksExist(database, taskIds);
+
+  database.transaction((tx) => {
+    tx.delete(taskUseCases).where(eq(taskUseCases.useCaseId, useCaseId)).run();
+    if (uniqueIds.length > 0) {
+      tx.insert(taskUseCases).values(uniqueIds.map((taskId) => ({ taskId, useCaseId }))).run();
+    }
+  });
+
+  return listUseCaseTasks(database, useCaseId);
 }

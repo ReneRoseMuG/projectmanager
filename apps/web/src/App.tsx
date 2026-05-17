@@ -8,6 +8,7 @@ import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { SettingsBackupPage } from "./pages/SettingsBackupPage";
 import { SettingsTagsPage } from "./pages/SettingsTagsPage";
 import { WikiPage } from "./pages/WikiPage";
 
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/wiki/:id" element={<WikiPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/settings/tags" element={<SettingsTagsPage />} />
+            <Route path="/settings/backup" element={<SettingsBackupPage />} />
             <Route path="/forbidden" element={<ForbiddenPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

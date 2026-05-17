@@ -1,8 +1,10 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
+  createFeatureAttachment,
   createProjectAttachment,
   createTaskAttachment,
   deleteAttachment,
+  listFeatureAttachments,
   listProjectAttachments,
   listTaskAttachments
 } from "../services/attachments.service.js";
@@ -57,6 +59,12 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     async (request) => listTaskAttachments(app.db, request.params.id)
   );
 
+  app.get<{ Params: { id: number } }>(
+    "/features/:id/attachments",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listFeatureAttachments(app.db, request.params.id)
+  );
+
   app.post<{ Params: { id: number } }>(
     "/projects/:id/attachments",
     { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
@@ -71,6 +79,15 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
       const attachment = await createTaskAttachment(app.db, request.params.id, await readUpload(request));
+      return reply.status(201).send(attachment);
+    }
+  );
+
+  app.post<{ Params: { id: number } }>(
+    "/features/:id/attachments",
+    { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
+    async (request, reply) => {
+      const attachment = await createFeatureAttachment(app.db, request.params.id, await readUpload(request));
       return reply.status(201).send(attachment);
     }
   );

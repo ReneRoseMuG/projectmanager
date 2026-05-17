@@ -1,4 +1,4 @@
-import type { Feature, UseCase } from "@taskmanager/shared-types";
+import type { Feature, Task, UseCase } from "@taskmanager/shared-types";
 import { api } from "./client";
 
 export async function getProjectFeatures(projectId: number): Promise<Feature[]> {
@@ -17,10 +17,26 @@ export async function setTaskFeatures(taskId: number, featureIds: number[]): Pro
   return api.put(`tasks/${taskId}/features`, { json: { featureIds } }).json<Feature[]>();
 }
 
+export async function getFeatureTasks(featureId: number): Promise<Task[]> {
+  return api.get(`features/${featureId}/tasks`).json<Task[]>();
+}
+
+export async function setFeatureTasks(featureId: number, taskIds: number[]): Promise<Task[]> {
+  return api.put(`features/${featureId}/tasks`, { json: { taskIds } }).json<Task[]>();
+}
+
 export async function getTaskUseCases(taskId: number): Promise<UseCase[]> {
   return api.get(`tasks/${taskId}/use-cases`).json<UseCase[]>();
 }
 
 export async function setTaskUseCases(taskId: number, useCaseIds: number[]): Promise<UseCase[]> {
   return api.put(`tasks/${taskId}/use-cases`, { json: { useCaseIds } }).json<UseCase[]>();
+}
+
+export async function getUseCaseTasks(useCaseId: number): Promise<Task[]> {
+  return api.get(`use-cases/${useCaseId}/tasks`).json<Task[]>();
+}
+
+export async function setUseCaseTasks(useCaseId: number, taskIds: number[]): Promise<Task[]> {
+  return api.put(`use-cases/${useCaseId}/tasks`, { json: { taskIds } }).json<Task[]>();
 }

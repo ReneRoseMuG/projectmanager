@@ -9,10 +9,6 @@ export async function createEvent(input: EventInput): Promise<CalendarEvent> {
   return api.post("events", { json: input }).json<CalendarEvent>();
 }
 
-export async function getEvent(id: number): Promise<CalendarEvent> {
-  return api.get(`events/${id}`).json<CalendarEvent>();
-}
-
 export async function updateEvent(id: number, input: EventUpdate): Promise<CalendarEvent> {
   return api.patch(`events/${id}`, { json: input }).json<CalendarEvent>();
 }

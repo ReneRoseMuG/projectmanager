@@ -1,11 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import {
+  listFeatureTasks,
   listProjectFeatures,
   listTaskFeatures,
   listTaskUseCases,
+  listUseCaseTasks,
+  setFeatureTasks,
   setProjectFeatures,
   setTaskFeatures,
-  setTaskUseCases
+  setTaskUseCases,
+  setUseCaseTasks
 } from "../services/doc-links.service.js";
 import { arrayResponseSchema, idParamSchema } from "../utils/route-schemas.js";
 
@@ -27,6 +31,18 @@ const useCaseIdsBodySchema = {
   additionalProperties: false,
   properties: {
     useCaseIds: {
+      type: "array",
+      items: { type: "integer", minimum: 1 }
+    }
+  }
+} as const;
+
+const taskIdsBodySchema = {
+  type: "object",
+  required: ["taskIds"],
+  additionalProperties: false,
+  properties: {
+    taskIds: {
       type: "array",
       items: { type: "integer", minimum: 1 }
     }
@@ -59,6 +75,18 @@ export async function registerDocLinksRoutes(app: FastifyInstance): Promise<void
   );
 
   app.get<{ Params: { id: number } }>(
+    "/features/:id/tasks",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listFeatureTasks(app.db, request.params.id)
+  );
+
+  app.put<{ Params: { id: number }; Body: { taskIds: number[] } }>(
+    "/features/:id/tasks",
+    { schema: { params: idParamSchema, body: taskIdsBodySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => setFeatureTasks(app.db, request.params.id, request.body.taskIds)
+  );
+
+  app.get<{ Params: { id: number } }>(
     "/tasks/:id/use-cases",
     { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
     async (request) => listTaskUseCases(app.db, request.params.id)
@@ -68,5 +96,17 @@ export async function registerDocLinksRoutes(app: FastifyInstance): Promise<void
     "/tasks/:id/use-cases",
     { schema: { params: idParamSchema, body: useCaseIdsBodySchema, response: { 200: arrayResponseSchema } } },
     async (request) => setTaskUseCases(app.db, request.params.id, request.body.useCaseIds)
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/use-cases/:id/tasks",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listUseCaseTasks(app.db, request.params.id)
+  );
+
+  app.put<{ Params: { id: number }; Body: { taskIds: number[] } }>(
+    "/use-cases/:id/tasks",
+    { schema: { params: idParamSchema, body: taskIdsBodySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => setUseCaseTasks(app.db, request.params.id, request.body.taskIds)
   );
 }

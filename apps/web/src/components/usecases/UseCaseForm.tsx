@@ -1,77 +1,79 @@
-import type { FeatureStatus, UseCase, UseCaseInput } from "@taskmanager/shared-types";
-import { LinkIcon, Save, Trash2, X } from "lucide-react";
-import type { FormEvent, ReactNode } from "react";
+import type { Feature, FeatureStatus, Task, UseCase, UseCaseInput } from "@taskmanager/shared-types";
+import { BookOpen, LinkIcon, ListTodo, Trash2 } from "lucide-react";
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
-import { MarkdownEditor } from "../ui/MarkdownEditor";
-import { Modal } from "../ui/Modal";
+import { CommentThread } from "../ui/CommentThread";
+import { EmptyState } from "../ui/EmptyState";
+import { FormField } from "../ui/FormField";
+import { FormModal } from "../ui/FormModal";
+import { Input } from "../ui/Input";
+import { Pill } from "../ui/Pill";
+import { RelationPanel } from "../ui/RelationPanel";
+import { RichTextEditor } from "../ui/RichTextEditor";
+import { Section } from "../ui/Section";
+import { SegmentedControl } from "../ui/SegmentedControl";
+import { Select } from "../ui/Select";
+import { useEntityComments } from "../../hooks/useEntityComments";
+import { useUseCaseTaskLinks } from "../../hooks/useDocLinks";
+import { priorityLabels, priorityPillTones, taskStatusLabels, taskStatusTones } from "../../utils/domainLabels";
 
 interface UseCaseFormProps {
   open: boolean;
   useCase?: UseCase | null;
   featureTitle?: string;
+  currentFeatureId?: number;
+  features?: Feature[];
   onSubmit: (input: UseCaseInput) => Promise<void>;
   onDelete?: (useCase: UseCase) => Promise<boolean> | boolean;
   onClose: () => void;
 }
 
-interface StatusOption {
-  value: FeatureStatus;
-  label: string;
-  activeClassName: string;
-  dotClassName: string;
-}
-
-const statuses: StatusOption[] = [
-  { value: "draft", label: "Entwurf", activeClassName: "border-mustard bg-mustard text-white", dotClassName: "bg-mustard" },
-  { value: "active", label: "Aktiv", activeClassName: "border-fern bg-fern text-white", dotClassName: "bg-fern" },
-  { value: "done", label: "Erledigt", activeClassName: "border-violet bg-violet text-white", dotClassName: "bg-violet" },
-  { value: "archived", label: "Archiviert", activeClassName: "border-steel-500 bg-steel-500 text-white", dotClassName: "bg-steel-500" }
+const statuses: Array<{ value: FeatureStatus; label: string; activeClassName: string }> = [
+  { value: "draft", label: "Entwurf", activeClassName: "data-[active=true]:bg-mustard data-[active=true]:text-mustard-dark" },
+  { value: "active", label: "Aktiv", activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" },
+  { value: "done", label: "Erledigt", activeClassName: "data-[active=true]:bg-violet data-[active=true]:text-white" },
+  { value: "archived", label: "Archiviert", activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" }
 ];
 
-function FieldLabel({ children }: { children: string; required?: boolean }) {
-  return <span className="inline-flex items-center">{children}</span>;
-}
-
-function FormCard({ title, helper, children }: { title: string; helper?: string; children: ReactNode }) {
-  return (
-    <section className="grid gap-4 rounded-xl border border-line bg-white p-5 shadow-sm">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-xs font-bold uppercase tracking-wide text-ink">{title}</h3>
-        {helper ? <span className="text-xs font-semibold text-slate-500">{helper}</span> : null}
-      </header>
-      {children}
-    </section>
-  );
-}
-
-export function UseCaseForm({ open, useCase, featureTitle, onSubmit, onDelete, onClose }: UseCaseFormProps) {
+export function UseCaseForm({ open, useCase, featureTitle, currentFeatureId, features = [], onSubmit, onDelete, onClose }: UseCaseFormProps) {
+  const comments = useEntityComments("useCase", useCase?.id);
+  const taskLinks = useUseCaseTaskLinks(useCase?.id);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [status, setStatus] = useState<FeatureStatus>("draft");
   const [description, setDescription] = useState("");
   const [sortOrder, setSortOrder] = useState(0);
   const [content, setContent] = useState("");
+  const [selectedFeatureId, setSelectedFeatureId] = useState<number | "">("");
+  const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [taskLinksSaving, setTaskLinksSaving] = useState(false);
 
   useEffect(() => {
     if (!open) {
       return;
     }
+
     setTitle(useCase?.title ?? "");
     setSlug(useCase?.slug ?? "");
     setStatus(useCase?.status ?? "draft");
     setDescription(useCase?.description ?? "");
     setSortOrder(useCase?.sortOrder ?? 0);
     setContent(useCase?.content ?? "");
-  }, [open, useCase]);
+    setSelectedFeatureId(useCase?.featureId ?? currentFeatureId ?? "");
+  }, [currentFeatureId, open, useCase]);
+
+  useEffect(() => {
+    setSelectedTaskIds(taskLinks.linkedTasks.map((task) => task.id));
+  }, [taskLinks.linkedTasks]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     try {
-      await onSubmit({ title, slug, status, description, sortOrder, content });
+      await onSubmit({ featureId: selectedFeatureId ? Number(selectedFeatureId) : undefined, title, slug, status, description, sortOrder, content });
       onClose();
     } catch {
       // Error feedback is handled by the page-level toast.
@@ -96,128 +98,115 @@ export function UseCaseForm({ open, useCase, featureTitle, onSubmit, onDelete, o
     }
   };
 
-  const badgeText = useCase ? `USE CASE #${useCase.sortOrder} · /uc/${useCase.slug}` : "NEUER USE CASE · /uc/…";
-  const titleText = useCase ? useCase.title : "Neuer Use Case";
+  const saveTaskLinks = async () => {
+    setTaskLinksSaving(true);
+    try {
+      await taskLinks.setTasksForUseCase(selectedTaskIds);
+    } finally {
+      setTaskLinksSaving(false);
+    }
+  };
+
   return (
-    <Modal open={open} title={titleText} size="xl" showHeader={false} bodyClassName="p-0" onClose={onClose}>
-      <header className="relative overflow-hidden bg-gradient-to-br from-violet to-magenta px-6 py-5 text-white">
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <span className="inline-flex rounded-full border border-white/30 bg-white/20 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
-              {badgeText}
-            </span>
-            <h2 className="mt-3 text-[22px] font-bold text-white">{titleText}</h2>
-            <span className="mt-1 block truncate font-mono text-xs text-white/80">Feature: {featureTitle ?? "Feature"}</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {useCase && onDelete ? (
-              <Button
-                className="border border-white/24 bg-white/14 text-white hover:bg-white/20"
-                icon={<Trash2 size={16} />}
-                variant="ghost"
-                disabled={deleting}
-                onClick={() => void deleteCurrentUseCase()}
-              >
-                Löschen
-              </Button>
-            ) : null}
-            <Button
-              aria-label="Schließen"
-              title="Schließen"
-              className="border border-white/24 bg-white/14 text-white hover:bg-white/20"
-              icon={<X size={16} />}
-              variant="ghost"
-              onClick={onClose}
-            />
-          </div>
+    <FormModal
+      open={open}
+      title={useCase ? "Use Case bearbeiten" : "Use Case anlegen"}
+      subtitle={featureTitle ? `Feature: ${featureTitle}` : undefined}
+      icon={<BookOpen size={21} />}
+      breadcrumb={["Use Cases", useCase ? useCase.title : "Neu"]}
+      onSubmit={submit}
+      saving={saving}
+      onClose={onClose}
+    >
+      <Section title="Stammdaten">
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="Titel" required className="min-w-0">
+            <Input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} required />
+          </FormField>
+          <FormField label="Slug" required className="min-w-0">
+            <Input iconLeft={<LinkIcon size={16} />} value={slug} onChange={(event) => setSlug(event.target.value)} required variant="mono" />
+          </FormField>
         </div>
-      </header>
+      </Section>
 
-      <form className="grid gap-4 p-5" onSubmit={submit}>
-        <FormCard title="Stammdaten">
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid min-w-0 gap-1 text-sm font-medium">
-              <FieldLabel required>Titel</FieldLabel>
-              <input
-                autoFocus
-                className="h-11 w-full min-w-0 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                required
-              />
-            </label>
-            <label className="grid min-w-0 gap-1 text-sm font-medium">
-              <FieldLabel required>Slug</FieldLabel>
-              <span className="relative min-w-0">
-                <LinkIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-steel-400" size={16} />
-                <input
-                  className="h-11 w-full min-w-0 rounded-lg border border-line pl-9 pr-3 font-mono text-sm outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10"
-                  value={slug}
-                  onChange={(event) => setSlug(event.target.value)}
-                  required
-                />
-              </span>
-            </label>
-          </div>
-        </FormCard>
+      <Section title="Zuordnung">
+        <Select label="Feature" value={selectedFeatureId} onChange={(event) => setSelectedFeatureId(event.target.value ? Number(event.target.value) : "")}>
+          <option value="">Ohne Feature</option>
+          {features.map((feature) => (
+            <option key={feature.id} value={feature.id}>
+              {feature.title}
+            </option>
+          ))}
+        </Select>
+        <p className="mt-2 text-xs text-slate-500">Die bestehende API speichert Use Cases aktuell über den Feature-Kontext der Route; die Auswahl zeigt die Zuordnung transparent an.</p>
+      </Section>
 
-        <FormCard title="Status & Sortierung">
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
-            <div className="grid min-w-0 gap-1 text-sm font-medium">
-              <span>Status</span>
-              <div className="flex flex-wrap gap-2">
-                {statuses.map((item) => (
-                  <button
-                    key={item.value}
-                    className={`inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition hover:border-steel-500 ${
-                      status === item.value ? item.activeClassName : "border-line bg-white text-slate-600"
-                    }`}
-                    type="button"
-                    onClick={() => setStatus(item.value)}
-                  >
-                    <span className={`h-2 w-2 rounded-full ${status === item.value ? "bg-white/90" : item.dotClassName}`} />
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <label className="grid min-w-0 gap-1 text-sm font-medium">
-              Sortierung
-              <input
-                className="h-11 w-full min-w-0 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10"
-                type="number"
-                value={sortOrder}
-                onChange={(event) => setSortOrder(Number(event.target.value))}
-              />
-            </label>
-          </div>
-        </FormCard>
-
-        <FormCard title="Kurzbeschreibung">
-          <label className="grid gap-1 text-sm font-medium">
-            <textarea
-              className="min-h-24 rounded-lg border border-line px-3 py-2 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </label>
-        </FormCard>
-
-        <FormCard title="Inhalt" helper="Markdown">
-          <div className="grid gap-2 text-sm font-medium">
-            <MarkdownEditor initialContent={content} placeholder="Use-Case-Inhalt" onChange={setContent} />
-          </div>
-        </FormCard>
-
-        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-line pt-4">
-          <div className="flex gap-2">
-            <Button onClick={onClose}>Abbrechen</Button>
-            <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
-              Speichern
-            </Button>
-          </div>
+      <Section title="Status & Sortierung">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
+          <FormField label="Status">
+            <SegmentedControl value={status} options={statuses} onChange={setStatus} />
+          </FormField>
+          <FormField label="Sortierung">
+            <Input type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
+          </FormField>
         </div>
-      </form>
-    </Modal>
+      </Section>
+
+      <Section title="Kurzbeschreibung">
+        <FormField label="Kurzbeschreibung">
+          <RichTextEditor content={description} placeholder="Kurze fachliche Zusammenfassung" toolbar="minimal" minHeight="7rem" onChange={setDescription} />
+        </FormField>
+      </Section>
+
+      <Section title="Inhalt" actions={<span className="text-xs font-semibold text-slate-500">HTML</span>}>
+        {/* TODO: migrate existing markdown content to HTML. */}
+        <RichTextEditor content={content} placeholder="Use-Case-Inhalt" toolbar="full" onChange={setContent} />
+      </Section>
+
+      {useCase && onDelete ? (
+        <Section title="Gefahrenzone">
+          <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={16} />} variant="ghost" disabled={deleting} onClick={() => void deleteCurrentUseCase()}>
+            Löschen
+          </Button>
+        </Section>
+      ) : null}
+
+      {useCase ? (
+        <>
+          {taskLinks.error ? <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{taskLinks.error}</div> : null}
+          <RelationPanel
+            items={taskLinks.tasks}
+            selectedIds={selectedTaskIds}
+            onChange={setSelectedTaskIds}
+            onSave={saveTaskLinks}
+            saving={taskLinksSaving}
+            title="Aufgaben"
+            searchKeys={["title", "description", "status", "priority"]}
+            emptyAvailable={<EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben vorhanden" body="Lege zuerst Aufgaben an, um sie mit diesem Use Case zu verknüpfen." tone="fern" variant="tinted" />}
+            renderItem={(task) => <TaskRelationItem task={task} />}
+          />
+        </>
+      ) : null}
+
+      {useCase ? (
+        <Section title="Kommentare">
+          {comments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{comments.error}</div> : null}
+          <CommentThread comments={comments.comments} entityLabel="Use Case" onCreate={comments.createComment} onDelete={comments.removeComment} />
+        </Section>
+      ) : null}
+    </FormModal>
+  );
+}
+
+function TaskRelationItem({ task }: { task: Task }) {
+  return (
+    <span className="grid gap-1">
+      <span className="flex min-w-0 flex-wrap items-center gap-2">
+        <span className="truncate text-sm font-semibold text-ink">{task.title}</span>
+        <Pill tone={taskStatusTones[task.status]}>{taskStatusLabels[task.status]}</Pill>
+        <Pill tone={priorityPillTones[task.priority]}>{priorityLabels[task.priority]}</Pill>
+      </span>
+      <span className="truncate text-xs text-slate-500">{task.description || "Keine Beschreibung"}</span>
+    </span>
   );
 }

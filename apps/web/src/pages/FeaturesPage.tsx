@@ -1,17 +1,15 @@
 import { FEATURE_STATUSES, type FeatureInput, type FeatureStatus } from "@taskmanager/shared-types";
-import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FeatureForm } from "../components/features/FeatureForm";
 import { FeatureCardSkeleton } from "../components/features/FeatureCardSkeleton";
-import { FeatureList } from "../components/features/FeatureList";
-import { Button } from "../components/ui/Button";
+import { FeatureListBoardView } from "../components/features/FeatureListBoardView";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
-import { SearchInput } from "../components/ui/SearchInput";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useFeatures } from "../hooks/useFeatures";
+import { featureStatusLabels } from "../utils/domainLabels";
 
 export function FeaturesPage() {
   const navigate = useNavigate();
@@ -20,26 +18,18 @@ export function FeaturesPage() {
   const features = useFeatures();
   const [formOpen, setFormOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | "all">("all");
-  const [search, setSearch] = useState("");
 
   const statusOptions = useMemo(
     () =>
       FEATURE_STATUSES.map((status) => ({
         value: status,
-        label: statusLabels[status],
+        label: featureStatusLabels[status],
         count: features.features.filter((feature) => feature.status === status).length
       })),
     [features.features]
   );
 
-  const filteredFeatures = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return features.features.filter((feature) => {
-      const matchesStatus = statusFilter === "all" || feature.status === statusFilter;
-      const matchesSearch = !query || feature.title.toLowerCase().includes(query) || feature.slug.toLowerCase().includes(query) || (feature.description ?? "").toLowerCase().includes(query);
-      return matchesStatus && matchesSearch;
-    });
-  }, [features.features, search, statusFilter]);
+  const filteredFeatures = useMemo(() => features.features.filter((feature) => statusFilter === "all" || feature.status === statusFilter), [features.features, statusFilter]);
 
   const createFeature = async (input: FeatureInput) => {
     try {
@@ -54,14 +44,11 @@ export function FeaturesPage() {
 
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="grid gap-1">
         <div>
           <h1 className="text-2xl font-semibold text-ink">Features</h1>
           <p className="text-sm text-slate-600">Fachliche Features und Use Cases</p>
         </div>
-        <Button variant="primary" icon={<Plus size={17} />} onClick={() => setFormOpen(true)}>
-          Neues Feature
-        </Button>
       </header>
 
       {features.loading ? (
@@ -70,13 +57,10 @@ export function FeaturesPage() {
         <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-crimson">{features.error}</div>
       ) : (
         <>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <FilterChips value={statusFilter} onChange={setStatusFilter} options={statusOptions} allCount={features.features.length} />
-            <SearchInput value={search} onChange={setSearch} placeholder="Features suchen" />
-          </div>
-          <FeatureList
+          <FeatureListBoardView
             features={filteredFeatures}
             onCreate={() => setFormOpen(true)}
+            filters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={statusOptions} allCount={features.features.length} />}
             onDelete={(feature) => {
               void confirm({
                 title: "Feature löschen?",
@@ -99,10 +83,3 @@ export function FeaturesPage() {
     </div>
   );
 }
-
-const statusLabels: Record<FeatureStatus, string> = {
-  draft: "Entwurf",
-  active: "Aktiv",
-  done: "Erledigt",
-  archived: "Archiviert"
-};

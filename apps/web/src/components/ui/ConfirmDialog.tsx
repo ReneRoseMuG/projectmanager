@@ -39,7 +39,7 @@ export function ConfirmDialog({ open, options, onConfirm, onCancel }: ConfirmDia
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-steel-900/55 p-4 backdrop-blur-[2px]">
-      <section className="w-full max-w-md overflow-hidden rounded-[18px] border border-line bg-white shadow-[0_24px_70px_rgba(22,36,52,0.28)]" role="alertdialog" aria-modal="true">
+      <section className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white shadow-modal" role="alertdialog" aria-modal="true">
         <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div className="flex items-start gap-3">
             {!compact ? <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.iconClass}`}>{tone.icon}</span> : null}
@@ -67,8 +67,4 @@ export function ConfirmDialog({ open, options, onConfirm, onCancel }: ConfirmDia
       </section>
     </div>
   );
-}
-
-export function ConfirmPopover({ children }: { children: ReactNode }) {
-  return <div className="rounded-lg border border-line bg-white p-3 shadow-panel">{children}</div>;
 }

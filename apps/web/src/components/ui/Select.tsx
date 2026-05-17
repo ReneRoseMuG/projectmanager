@@ -1,4 +1,5 @@
 import type { SelectHTMLAttributes } from "react";
+import { FormField } from "./FormField";
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
@@ -6,11 +7,10 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 export function Select({ label, className = "", children, ...props }: SelectProps) {
   return (
-    <label className="grid gap-1 text-sm font-medium text-ink">
-      {label}
-      <select className={`h-10 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-fern ${className}`} {...props}>
+    <FormField label={label}>
+      <select className={`h-10 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 ${className}`} {...props}>
         {children}
       </select>
-    </label>
+    </FormField>
   );
 }

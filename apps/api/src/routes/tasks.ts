@@ -5,6 +5,7 @@ import {
   createTask,
   deleteTask,
   getTaskDetail,
+  listTasks,
   listProjectTasks,
   updateTask,
   updateTaskPosition
@@ -42,6 +43,8 @@ const taskPositionSchema = {
 } as const;
 
 export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/tasks", { schema: { response: { 200: arrayResponseSchema } } }, async () => listTasks(app.db));
+
   app.get<{ Params: { projectId: number } }>(
     "/projects/:projectId/tasks",
     { schema: { params: projectIdParamSchema, response: { 200: arrayResponseSchema } } },

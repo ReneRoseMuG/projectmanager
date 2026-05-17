@@ -1,14 +1,30 @@
 import Fastify from "fastify";
 import type { TestDb } from "./db.js";
+import type { GoogleDriveBackupClient } from "../../src/services/google-drive.service.js";
 
 interface BuildTestAppOptions {
   enableMultipart?: boolean;
+  driveClient?: GoogleDriveBackupClient;
 }
+
+const unavailableDriveClient: GoogleDriveBackupClient = {
+  async listDumpFiles() {
+    throw new Error("Google Drive test client is not configured");
+  },
+  async uploadDump() {
+    throw new Error("Google Drive test client is not configured");
+  },
+  async downloadFile() {
+    throw new Error("Google Drive test client is not configured");
+  }
+};
 
 export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions = {}) {
   const app = Fastify({ logger: false });
 
   app.decorate("db", testDb.db);
+  app.decorate("sqlite", testDb.sqlite);
+  app.decorate("driveClient", options.driveClient ?? unavailableDriveClient);
 
   const { errorHandler } = await import("../../src/utils/errors.js");
   const { registerCors } = await import("../../src/plugins/cors.js");
@@ -26,6 +42,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerBacklogRoutes } = await import("../../src/routes/backlog.js");
   const { registerDocLinksRoutes } = await import("../../src/routes/doc-links.js");
   const { registerImportsRoutes } = await import("../../src/routes/imports.js");
+  const { registerDumpRoutes } = await import("../../src/routes/dumps.js");
 
   app.setErrorHandler(errorHandler);
   await registerCors(app);
@@ -54,6 +71,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerBacklogRoutes, { prefix: "/api" });
   await app.register(registerDocLinksRoutes, { prefix: "/api" });
   await app.register(registerImportsRoutes, { prefix: "/api" });
+  await app.register(registerDumpRoutes, { prefix: "/api" });
 
   await app.ready();
   return app;

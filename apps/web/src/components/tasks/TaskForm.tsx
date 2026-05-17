@@ -1,42 +1,60 @@
-import type { Priority, Task, TaskInput, TaskStatus } from "@taskmanager/shared-types";
-import { CalendarDays, Check, ExternalLink, FileText, Save, UserRound, X } from "lucide-react";
+import type { Feature, Priority, Tag, Task, TaskInput, TaskStatus, UseCase } from "@taskmanager/shared-types";
+import { ClipboardList, UserRound } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { getUseCases } from "../../api/use-cases";
 import { toDateInput } from "../../utils/date";
-import { Button } from "../ui/Button";
+import { FeatureRelationPanel } from "../features/FeatureRelationPanel";
+import { TagPicker } from "../tags/TagPicker";
+import { UseCaseRelationPanel } from "../usecases/UseCaseRelationPanel";
 import { DatePicker } from "../ui/DatePicker";
-import { Modal } from "../ui/Modal";
+import { FormField } from "../ui/FormField";
+import { FormModal } from "../ui/FormModal";
+import { Input } from "../ui/Input";
+import { RadioList } from "../ui/RadioList";
+import { RichTextEditor } from "../ui/RichTextEditor";
+import { Section } from "../ui/Section";
+
+export interface TaskFormInput extends TaskInput {
+  tagIds: number[];
+  featureIds: number[];
+  useCaseIds: number[];
+}
 
 interface TaskFormProps {
   open: boolean;
   task?: Task | null;
+  features?: Feature[];
+  initialStatus?: TaskStatus;
   title?: string;
-  onSubmit: (input: TaskInput) => Promise<void>;
+  onSubmit: (input: TaskFormInput) => Promise<void>;
   onClose: () => void;
 }
 
-const statuses: Array<{ value: TaskStatus; label: string }> = [
-  { value: "todo", label: "Offen" },
-  { value: "in_progress", label: "In Arbeit" },
-  { value: "done", label: "Erledigt" }
+const statuses: Array<{ value: TaskStatus; label: string; activeColor: "fern" | "tangerine" | "crimson" }> = [
+  { value: "todo", label: "Offen", activeColor: "crimson" },
+  { value: "in_progress", label: "In Arbeit", activeColor: "tangerine" },
+  { value: "done", label: "Erledigt", activeColor: "fern" }
 ];
 
-const priorities: Array<{ value: Priority; label: string }> = [
-  { value: "low", label: "Niedrig" },
-  { value: "medium", label: "Mittel" },
-  { value: "high", label: "Hoch" },
-  { value: "urgent", label: "Dringend" }
+const priorities: Array<{ value: Priority; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
+  { value: "low", label: "Niedrig", activeColor: "fern" },
+  { value: "medium", label: "Mittel", activeColor: "violet" },
+  { value: "high", label: "Hoch", activeColor: "tangerine" },
+  { value: "urgent", label: "Dringend", activeColor: "crimson" }
 ];
 
-const cardClass = "rounded-lg border border-line bg-white p-4 shadow-[0_10px_28px_rgba(31,43,56,0.06)]";
-
-export function TaskForm({ open, task, title = "Aufgabe", onSubmit, onClose }: TaskFormProps) {
+export function TaskForm({ open, task, features = [], initialStatus = "todo", title = "Aufgabe", onSubmit, onClose }: TaskFormProps) {
   const [taskTitle, setTaskTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>("todo");
   const [priority, setPriority] = useState<Priority>("medium");
   const [assignee, setAssignee] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [selectedFeatureIds, setSelectedFeatureIds] = useState<number[]>([]);
+  const [selectedUseCaseIds, setSelectedUseCaseIds] = useState<number[]>([]);
+  const [availableUseCases, setAvailableUseCases] = useState<UseCase[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -45,11 +63,39 @@ export function TaskForm({ open, task, title = "Aufgabe", onSubmit, onClose }: T
     }
     setTaskTitle(task?.title ?? "");
     setDescription(task?.description ?? "");
-    setStatus(task?.status ?? "todo");
+    setStatus(task?.status ?? initialStatus);
     setPriority(task?.priority ?? "medium");
     setAssignee(task?.assignee ?? "");
     setDueDate(toDateInput(task?.dueDate));
-  }, [open, task]);
+    setSelectedTags(task?.tags ?? []);
+    setSelectedFeatureIds([]);
+    setSelectedUseCaseIds([]);
+  }, [initialStatus, open, task]);
+
+  useEffect(() => {
+    if (!open || selectedFeatureIds.length === 0) {
+      setAvailableUseCases([]);
+      setSelectedUseCaseIds([]);
+      return;
+    }
+
+    let cancelled = false;
+    const loadUseCases = async () => {
+      const lists = await Promise.all(selectedFeatureIds.map((featureId) => getUseCases(featureId)));
+      if (cancelled) {
+        return;
+      }
+      const merged = lists.flat();
+      const allowedIds = new Set(merged.map((useCase) => useCase.id));
+      setAvailableUseCases(merged);
+      setSelectedUseCaseIds((current) => current.filter((id) => allowedIds.has(id)));
+    };
+
+    void loadUseCases();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectedFeatureIds]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -61,7 +107,10 @@ export function TaskForm({ open, task, title = "Aufgabe", onSubmit, onClose }: T
         status,
         priority,
         assignee,
-        dueDate: dueDate || null
+        dueDate: dueDate || null,
+        tagIds: selectedTags.map((tag) => tag.id),
+        featureIds: selectedFeatureIds,
+        useCaseIds: selectedUseCaseIds
       });
       onClose();
     } catch {
@@ -72,129 +121,59 @@ export function TaskForm({ open, task, title = "Aufgabe", onSubmit, onClose }: T
   };
 
   return (
-    <Modal open={open} title={task ? "Aufgabe bearbeiten" : title} size="xl" showHeader={false} bodyClassName="p-0" onClose={onClose}>
-      <form className="flex max-h-[calc(100vh-64px)] flex-col bg-shell" onSubmit={submit}>
-        <header className="bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="grid gap-2">
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-white/75">
-                <span>{task ? `Projekt #${task.projectId}` : "Projekt"}</span>
-                <span>›</span>
-                <span>{task ? "Aufgabe bearbeiten" : "Neue Aufgabe"}</span>
-              </div>
-              <h2 className="text-2xl font-bold tracking-normal">{task ? "Aufgabe bearbeiten" : title}</h2>
-              <p className="text-sm text-white/75">Schnelle Erfassung · für Vollansicht Task-Detail öffnen</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button className="border-white/20 bg-white/10 text-white hover:bg-white/20" icon={<ExternalLink size={16} />} disabled={!task}>
-                Vollansicht öffnen
-              </Button>
-              <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Schließen" title="Schließen" onClick={onClose}>
-                <X size={18} />
-              </button>
-            </div>
-          </div>
-        </header>
-
-        <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
-          <section className={cardClass}>
-            <div className="grid gap-4">
-              <label className="grid gap-1 text-sm font-semibold text-ink">
-                Titel
-                <input className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-fern focus:ring-2 focus:ring-fern/15" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} required />
-              </label>
-              <label className="grid gap-1 text-sm font-semibold text-ink">
-                Beschreibung
-                <textarea
-                  className="min-h-28 rounded-md border border-line bg-white px-3 py-2 text-sm outline-none transition focus:border-fern focus:ring-2 focus:ring-fern/15"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </label>
-            </div>
-          </section>
-
-          <section className={cardClass}>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
-                <h3 className="text-sm font-bold uppercase text-slate-500">Status</h3>
-                <div className="grid gap-2">
-                  {statuses.map((item) => {
-                    const selected = status === item.value;
-                    return (
-                      <button
-                        key={item.value}
-                        type="button"
-                        className={`flex h-10 items-center justify-between rounded-md border px-3 text-sm font-semibold transition ${selected ? "border-fern bg-fern/10 text-ink" : "border-line bg-shell/60 text-slate-600 hover:border-fern"}`}
-                        onClick={() => setStatus(item.value)}
-                      >
-                        {item.label}
-                        {selected ? <Check size={15} className="text-fern" /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <h3 className="text-sm font-bold uppercase text-slate-500">Priorität</h3>
-                <div className="grid gap-2">
-                  {priorities.map((item) => {
-                    const selected = priority === item.value;
-                    return (
-                      <button
-                        key={item.value}
-                        type="button"
-                        className={`flex h-10 items-center justify-between rounded-md border px-3 text-sm font-semibold transition ${selected ? "border-tangerine bg-tangerine/10 text-ink" : "border-line bg-shell/60 text-slate-600 hover:border-tangerine"}`}
-                        onClick={() => setPriority(item.value)}
-                      >
-                        {item.label}
-                        {selected ? <Check size={15} className="text-tangerine" /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className={cardClass}>
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="relative grid gap-1 text-sm font-semibold text-ink">
-                Zuständig
-                <UserRound size={16} className="pointer-events-none absolute left-3 top-[2.35rem] text-slate-400" />
-                <input className="h-10 rounded-md border border-line bg-white px-3 pl-9 text-sm outline-none transition focus:border-fern focus:ring-2 focus:ring-fern/15" value={assignee} onChange={(event) => setAssignee(event.target.value)} />
-              </label>
-              <div className="relative">
-                <CalendarDays size={16} className="pointer-events-none absolute left-3 top-[2.35rem] text-slate-400" />
-                <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="pl-9" />
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-dashed border-line bg-shell/60 p-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet/10 text-violet">
-                <FileText size={18} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-ink">Feature-Bezug</p>
-                <p className="truncate text-xs text-slate-500">Feature-Zuordnung erfolgt im Task-Detail.</p>
-              </div>
-              <Button disabled>Ändern</Button>
-            </div>
-          </section>
-
-          <section className={cardClass}>
-            <div className="rounded-lg border border-dashed border-line bg-shell/60 p-4 text-sm text-slate-600">Tags werden nach dem Speichern im Task-Detail gepflegt.</div>
-          </section>
+    <FormModal
+      open={open}
+      title={task ? "Aufgabe bearbeiten" : title}
+      subtitle="Aufgabe, Tags und Dokumentverknüpfungen in einem Schritt pflegen."
+      icon={<ClipboardList size={20} />}
+      breadcrumb={["Projekt", task ? "Aufgabe bearbeiten" : "Neue Aufgabe"]}
+      submitLabel={task ? "Speichern" : "Aufgabe anlegen"}
+      saving={saving}
+      onSubmit={submit}
+      onClose={onClose}
+    >
+      <Section title="Basisdaten">
+        <div className="grid gap-4">
+          <FormField label="Titel" required>
+            <Input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} required autoFocus={!task} />
+          </FormField>
+          <FormField label="Beschreibung">
+            <RichTextEditor content={description} placeholder="Beschreibung" toolbar="minimal" minHeight="8rem" onChange={setDescription} />
+          </FormField>
         </div>
+      </Section>
 
-        <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">
-          <div className="flex items-center gap-2">
-            <Button onClick={onClose}>Abbrechen</Button>
-            <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
-              {task ? "Speichern" : "Aufgabe anlegen"}
-            </Button>
-          </div>
-        </footer>
-      </form>
-    </Modal>
+      <Section title="Status & Priorität">
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="Status">
+            <RadioList value={status} options={statuses} onChange={setStatus} />
+          </FormField>
+          <FormField label="Priorität">
+            <RadioList value={priority} options={priorities} onChange={setPriority} />
+          </FormField>
+        </div>
+      </Section>
+
+      <Section title="Zuweisung">
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="Zuständig">
+            <Input iconLeft={<UserRound size={16} />} value={assignee} onChange={(event) => setAssignee(event.target.value)} />
+          </FormField>
+          <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+        </div>
+      </Section>
+
+      <Section title="Tags">
+        <TagPicker selected={selectedTags} onChange={setSelectedTags} />
+      </Section>
+
+      <Section title="Features">
+        <FeatureRelationPanel features={features} selectedIds={selectedFeatureIds} onChange={setSelectedFeatureIds} onSave={async () => undefined} showSave={false} />
+      </Section>
+
+      <Section title="Use Cases">
+        <UseCaseRelationPanel useCases={availableUseCases} selectedIds={selectedUseCaseIds} onChange={setSelectedUseCaseIds} onSave={async () => undefined} showSave={false} />
+      </Section>
+    </FormModal>
   );
 }

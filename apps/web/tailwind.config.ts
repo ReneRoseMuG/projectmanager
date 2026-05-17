@@ -8,34 +8,40 @@ export default {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"]
       },
       colors: {
-        ink: "#0F2542",
-        shell: "#F4F7FA",
-        line: "#D5DEE9",
-        white: "#FFFFFF",
+        ink: "var(--color-ink)",
+        shell: "var(--color-shell)",
+        line: "var(--color-line)",
+        white: "var(--color-white)",
         steel: {
-          50: "#F4F7FA",
-          100: "#E8EFF5",
-          200: "#D5E1EE",
-          300: "#BACDE3",
-          400: "#94B2D1",
-          500: "#6B92BD",
-          600: "#4682B4",
-          700: "#2E5984",
-          800: "#1B355C",
-          900: "#0F2542"
+          50: "var(--color-steel-50)",
+          100: "var(--color-steel-100)",
+          200: "var(--color-steel-200)",
+          300: "var(--color-steel-300)",
+          400: "var(--color-steel-400)",
+          500: "var(--color-steel-500)",
+          600: "var(--color-steel-600)",
+          700: "var(--color-steel-700)",
+          800: "var(--color-steel-800)",
+          900: "var(--color-steel-900)"
         },
-        crimson: "#D9416A",
-        tangerine: "#ED8C3A",
-        mustard: "#E2BA2C",
-        fern: "#4D9359",
-        teal: "#2F8E96",
-        violet: "#6A40BE",
-        magenta: "#C13D9A"
+        crimson: "var(--color-crimson)",
+        tangerine: "var(--color-tangerine)",
+        mustard: {
+          DEFAULT: "var(--color-mustard)",
+          dark: "var(--color-mustard-dark)"
+        },
+        fern: "var(--color-fern)",
+        teal: "var(--color-teal)",
+        violet: "var(--color-violet)",
+        magenta: "var(--color-magenta)"
       },
       boxShadow: {
-        panel: "0 10px 28px rgba(15, 37, 66, 0.08)",
-        steel: "0 12px 32px rgba(46, 89, 132, 0.16)",
-        sm: "0 1px 2px rgba(15, 37, 66, 0.06)"
+        panel: "var(--shadow-panel)",
+        steel: "var(--shadow-steel)",
+        sm: "var(--shadow-sm)",
+        modal: "var(--shadow-modal)",
+        card: "var(--shadow-card)",
+        "steel-icon": "var(--shadow-steel-icon)"
       }
     }
   },

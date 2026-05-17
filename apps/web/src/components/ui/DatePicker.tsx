@@ -1,4 +1,5 @@
 import type { InputHTMLAttributes } from "react";
+import { FormField } from "./FormField";
 
 interface DatePickerProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
@@ -7,13 +8,12 @@ interface DatePickerProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export function DatePicker({ label, mode = "date", className = "", ...props }: DatePickerProps) {
   return (
-    <label className="grid gap-1 text-sm font-medium text-ink">
-      {label}
+    <FormField label={label}>
       <input
         type={mode}
-        className={`h-10 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-fern ${className}`}
+        className={`h-10 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 ${className}`}
         {...props}
       />
-    </label>
+    </FormField>
   );
 }

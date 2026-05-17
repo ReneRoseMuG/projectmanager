@@ -57,7 +57,7 @@ export function AttachmentUploader({ onUpload, size = "default" }: AttachmentUpl
           }
         }}
       />
-      <div className={`flex items-center justify-center rounded-2xl bg-steel-700 text-white shadow-[0_8px_20px_rgba(46,89,132,0.3)] ${compact ? "h-10 w-10" : "h-14 w-14"}`}>
+      <div className={`flex items-center justify-center rounded-2xl bg-steel-700 text-white shadow-steel-icon ${compact ? "h-10 w-10" : "h-14 w-14"}`}>
         <Upload size={compact ? 18 : 22} />
       </div>
       <div>

@@ -11,3 +11,5 @@ apps/api/uploads/*
 !apps/api/uploads/.gitkeep
 coverage/
 .vite/
+apps/web/test-results/
+apps/web/playwright-report/

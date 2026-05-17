@@ -6,11 +6,20 @@ import { errorMessage } from "../../hooks/errors";
 import { useTags } from "../../hooks/useTags";
 import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
+import { Section } from "../ui/Section";
 import { useToast } from "../ui/ToastProvider";
 
-const palette = ["#2E5984", "#D9416A", "#ED8C3A", "#E2BA2C", "#4D9359", "#2F8E96", "#6A40BE", "#C13D9A"];
-const defaultTagColor = "#2E5984";
-const cardClass = "rounded-lg border border-line bg-white p-4 shadow-[0_10px_28px_rgba(31,43,56,0.06)]";
+const palette = [
+  "var(--color-steel-700)",
+  "var(--color-crimson)",
+  "var(--color-tangerine)",
+  "var(--color-mustard)",
+  "var(--color-fern)",
+  "var(--color-teal)",
+  "var(--color-violet)",
+  "var(--color-magenta)"
+];
+const defaultTagColor = "var(--color-steel-700)";
 
 type SortMode = "usage" | "name" | "newest";
 
@@ -122,7 +131,7 @@ export function TagManager() {
   return (
     <div className="mx-auto grid max-w-[920px] gap-4">
       <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
-        <header className="bg-gradient-to-br from-magenta to-[#d558aa] px-5 py-5 text-white">
+        <header className="bg-gradient-to-br from-magenta to-magenta/75 px-5 py-5 text-white">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/12">
               <TagIcon size={21} />
@@ -134,7 +143,7 @@ export function TagManager() {
           </div>
         </header>
         <div className="grid gap-4 p-4 md:p-5">
-          <section className={cardClass}>
+          <Section>
             <h2 className="mb-3 text-sm font-bold uppercase text-slate-500">Neuer Tag</h2>
             <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
               <span className="h-9 w-9 rounded-full border border-white shadow-sm" style={{ backgroundColor: color }} />
@@ -148,9 +157,9 @@ export function TagManager() {
                 <button key={swatch} type="button" className={`h-8 w-8 rounded-full border-2 ${color === swatch ? "border-steel-900" : "border-white"}`} style={{ backgroundColor: swatch }} onClick={() => setColor(swatch)} aria-label={`Farbe ${swatch}`} />
               ))}
             </div>
-          </section>
+          </Section>
 
-          <section className={cardClass}>
+          <Section>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold text-ink">Alle Tags · {filteredTags.length} Einträge</h2>
               <div className="flex flex-wrap items-center gap-2">
@@ -175,7 +184,7 @@ export function TagManager() {
             {tags.loading ? <div className="py-8 text-center text-sm text-slate-500">Tags werden geladen.</div> : null}
             {!tags.loading && filteredTags.length === 0 ? <div className="rounded-lg border border-dashed border-line bg-shell/60 p-8 text-center text-sm text-slate-500">Keine Tags gefunden.</div> : null}
             {!tags.loading ? filteredTags.map((tag) => <TagRow key={tag.id} tag={tag} onReload={tags.reload} />) : null}
-          </section>
+          </Section>
 
           <section className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500">
             <span className="rounded-full bg-steel-100 px-2 py-1">Steel: Struktur</span>

@@ -10,12 +10,21 @@ interface TagPickerProps {
   onChange: (tags: Tag[]) => void;
 }
 
-const colors = ["#94a3b8", "#6366f1", "#0f766e", "#e76f51", "#d99a21", "#6a994e", "#8a4fff", "#2563eb"];
+const colors = [
+  "var(--color-steel-600)",
+  "var(--color-crimson)",
+  "var(--color-tangerine)",
+  "var(--color-mustard)",
+  "var(--color-fern)",
+  "var(--color-teal)",
+  "var(--color-violet)",
+  "var(--color-magenta)"
+];
 
 export function TagPicker({ selected, onChange }: TagPickerProps) {
   const { tags, createTag } = useTags();
   const [name, setName] = useState("");
-  const [color, setColor] = useState(colors[0] ?? "#94a3b8");
+  const [color, setColor] = useState(colors[0] ?? "var(--color-steel-600)");
 
   const selectedIds = useMemo(() => new Set(selected.map((tag) => tag.id)), [selected]);
 
@@ -57,7 +66,7 @@ export function TagPicker({ selected, onChange }: TagPickerProps) {
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
-            className="h-10 rounded-md border border-line px-3 outline-none focus:border-fern"
+            className="h-10 rounded-md border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
           />
         </label>
         <div className="flex gap-1">

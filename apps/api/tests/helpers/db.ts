@@ -6,10 +6,7 @@ import * as schema from "../../src/db/schema.js";
 
 export type TestDb = ReturnType<typeof createTestDb>;
 
-export function createTestDb() {
-  const sqlite = new Database(":memory:");
-  sqlite.pragma("journal_mode = WAL");
-
+function migrateTestDb(sqlite: Database.Database) {
   const db = drizzle(sqlite, { schema });
   const migrationsFolder = fileURLToPath(new URL("../../src/db/migrations", import.meta.url));
 
@@ -23,6 +20,20 @@ export function createTestDb() {
   }
 
   return { db, sqlite };
+}
+
+export function createTestDb() {
+  const sqlite = new Database(":memory:");
+  sqlite.pragma("journal_mode = WAL");
+
+  return migrateTestDb(sqlite);
+}
+
+export function createFileTestDb(databasePath: string) {
+  const sqlite = new Database(databasePath);
+  sqlite.pragma("journal_mode = WAL");
+
+  return migrateTestDb(sqlite);
 }
 
 export function truncateAll(sqlite: Database.Database): void {

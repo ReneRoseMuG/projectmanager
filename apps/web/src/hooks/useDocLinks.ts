@@ -1,14 +1,19 @@
-import type { Feature, Project, UseCase } from "@taskmanager/shared-types";
+import type { Feature, Project, Task, UseCase } from "@taskmanager/shared-types";
 import { useCallback, useEffect, useState } from "react";
 import {
+  getFeatureTasks,
   getProjectFeatures,
   getTaskFeatures,
   getTaskUseCases,
+  getUseCaseTasks,
+  setFeatureTasks as setFeatureTasksRequest,
   setProjectFeatures as setProjectFeaturesRequest,
   setTaskFeatures as setTaskFeaturesRequest,
-  setTaskUseCases as setTaskUseCasesRequest
+  setTaskUseCases as setTaskUseCasesRequest,
+  setUseCaseTasks as setUseCaseTasksRequest
 } from "../api/doc-links";
 import { getProjects } from "../api/projects";
+import { getTasks } from "../api/tasks";
 import { getUseCases } from "../api/use-cases";
 import { errorMessage } from "./errors";
 
@@ -120,7 +125,36 @@ export function useFeatureProjectLinks(featureId?: number) {
     [featureId, load]
   );
 
-  return { projects, linkedProjects, loading, error, reload: load, addProjectToFeature, removeProjectFromFeature };
+  const setProjectsForFeature = useCallback(
+    async (projectIds: number[]) => {
+      if (!featureId) {
+        throw new Error("Feature id is required");
+      }
+
+      const selectedProjectIds = new Set(projectIds);
+      for (const project of projects) {
+        const currentFeatures = await getProjectFeatures(project.id);
+        const currentFeatureIds = currentFeatures.map((feature) => feature.id);
+        const isLinked = currentFeatureIds.includes(featureId);
+        const shouldBeLinked = selectedProjectIds.has(project.id);
+
+        if (shouldBeLinked && !isLinked) {
+          await setProjectFeaturesRequest(project.id, [...currentFeatureIds, featureId]);
+        }
+        if (!shouldBeLinked && isLinked) {
+          await setProjectFeaturesRequest(
+            project.id,
+            currentFeatureIds.filter((id) => id !== featureId)
+          );
+        }
+      }
+
+      await load();
+    },
+    [featureId, load, projects]
+  );
+
+  return { projects, linkedProjects, loading, error, reload: load, addProjectToFeature, removeProjectFromFeature, setProjectsForFeature };
 }
 
 export function useTaskDocLinks(taskId?: number | null) {
@@ -197,4 +231,96 @@ export function useTaskDocLinks(taskId?: number | null) {
   );
 
   return { features, useCases, availableUseCases, loading, error, reload: load, setFeaturesForTask, setUseCasesForTask };
+}
+
+export function useFeatureTaskLinks(featureId?: number | null) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [linkedTasks, setLinkedTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(Boolean(featureId));
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!featureId) {
+      setTasks([]);
+      setLinkedTasks([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const [allTasks, relatedTasks] = await Promise.all([getTasks(), getFeatureTasks(featureId)]);
+      setTasks(allTasks);
+      setLinkedTasks(relatedTasks);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setLoading(false);
+    }
+  }, [featureId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const setTasksForFeature = useCallback(
+    async (taskIds: number[]) => {
+      if (!featureId) {
+        throw new Error("Feature id is required");
+      }
+      const updated = await setFeatureTasksRequest(featureId, taskIds);
+      setLinkedTasks(updated);
+      return updated;
+    },
+    [featureId]
+  );
+
+  return { tasks, linkedTasks, loading, error, reload: load, setTasksForFeature };
+}
+
+export function useUseCaseTaskLinks(useCaseId?: number | null) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [linkedTasks, setLinkedTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(Boolean(useCaseId));
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!useCaseId) {
+      setTasks([]);
+      setLinkedTasks([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const [allTasks, relatedTasks] = await Promise.all([getTasks(), getUseCaseTasks(useCaseId)]);
+      setTasks(allTasks);
+      setLinkedTasks(relatedTasks);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+    } finally {
+      setLoading(false);
+    }
+  }, [useCaseId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const setTasksForUseCase = useCallback(
+    async (taskIds: number[]) => {
+      if (!useCaseId) {
+        throw new Error("Use case id is required");
+      }
+      const updated = await setUseCaseTasksRequest(useCaseId, taskIds);
+      setLinkedTasks(updated);
+      return updated;
+    },
+    [useCaseId]
+  );
+
+  return { tasks, linkedTasks, loading, error, reload: load, setTasksForUseCase };
 }

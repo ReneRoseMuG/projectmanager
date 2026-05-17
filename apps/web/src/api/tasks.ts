@@ -5,6 +5,10 @@ export async function getProjectTasks(projectId: number): Promise<Task[]> {
   return api.get(`projects/${projectId}/tasks`).json<Task[]>();
 }
 
+export async function getTasks(): Promise<Task[]> {
+  return api.get("tasks").json<Task[]>();
+}
+
 export async function createTask(projectId: number, input: TaskInput): Promise<Task> {
   return api.post(`projects/${projectId}/tasks`, { json: input }).json<Task>();
 }

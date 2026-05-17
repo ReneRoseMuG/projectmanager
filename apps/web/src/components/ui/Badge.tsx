@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type BadgeTone = "crimson" | "tangerine" | "mustard" | "fern" | "teal" | "violet" | "magenta" | "steel" | "mute";
+export type BadgeTone = "crimson" | "tangerine" | "mustard" | "fern" | "teal" | "violet" | "magenta" | "steel" | "mute";
 
 interface BadgeProps {
   children: ReactNode;
@@ -12,7 +12,7 @@ interface BadgeProps {
 const toneClasses: Record<BadgeTone, string> = {
   crimson: "border-crimson/20 bg-crimson/10 text-crimson",
   tangerine: "border-tangerine/20 bg-tangerine/10 text-tangerine",
-  mustard: "border-mustard/25 bg-mustard/15 text-[#8A6B05]",
+  mustard: "border-mustard/25 bg-mustard/15 text-mustard-dark",
   fern: "border-fern/20 bg-fern/10 text-fern",
   teal: "border-teal/20 bg-teal/10 text-teal",
   violet: "border-violet/20 bg-violet/10 text-violet",
@@ -21,6 +21,7 @@ const toneClasses: Record<BadgeTone, string> = {
   mute: "border-line bg-shell text-slate-600"
 };
 
+/** Compact label for metadata, statuses and custom color tags. */
 export function Badge({ children, color, muted = false, tone }: BadgeProps) {
   const style = color
     ? {

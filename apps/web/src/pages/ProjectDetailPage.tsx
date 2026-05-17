@@ -1,29 +1,32 @@
-import type { Attachment, BacklogItem, Feature, FeatureInput, Note, Task, TaskStatus } from "@taskmanager/shared-types";
-import { ChevronRight, Filter, MoreHorizontal, Plus } from "lucide-react";
+import type { Attachment, BacklogItem, Feature, FeatureInput, Note, ProjectInput, Task, TaskStatus } from "@taskmanager/shared-types";
+import { ChevronRight, MoreHorizontal, Plus } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AttachmentList } from "../components/attachments/AttachmentList";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
 import { BacklogItemForm } from "../components/backlog/BacklogItemForm";
-import { BacklogList } from "../components/backlog/BacklogList";
+import { BacklogListBoardView } from "../components/backlog/BacklogListBoardView";
 import { FeatureForm } from "../components/features/FeatureForm";
-import { ProjectFeaturePanel } from "../components/features/ProjectFeaturePanel";
+import { FeatureRelationPanel } from "../components/features/FeatureRelationPanel";
 import { WikiImportPanel } from "../components/imports/WikiImportPanel";
 import { NoteEditor } from "../components/notes/NoteEditor";
 import { NoteList } from "../components/notes/NoteList";
-import { KanbanBoard } from "../components/tasks/KanbanBoard";
+import { ProjectInlineForm } from "../components/projects/ProjectInlineForm";
 import { TaskDetail } from "../components/tasks/TaskDetail";
 import { TaskForm } from "../components/tasks/TaskForm";
-import { TaskList } from "../components/tasks/TaskList";
+import { TaskListBoardView } from "../components/tasks/TaskListBoardView";
 import { Button } from "../components/ui/Button";
+import { CommentThread } from "../components/ui/CommentThread";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
-import { DetailPageSkeleton, KanbanSkeleton, TaskListSkeleton } from "../components/ui/Skeleton";
+import { DetailPageSkeleton, TaskListSkeleton } from "../components/ui/Skeleton";
+import { TabBar, type Tab } from "../components/ui/TabBar";
 import { useToast } from "../components/ui/ToastProvider";
-import { ViewToggle } from "../components/ui/ViewToggle";
-import { getFeature } from "../api/features";
+import { setTaskFeatures, setTaskUseCases } from "../api/doc-links";
+import { setTaskTags } from "../api/tags";
 import { errorMessage } from "../hooks/errors";
 import { useAttachments } from "../hooks/useAttachments";
 import { useBacklog } from "../hooks/useBacklog";
+import { useEntityComments } from "../hooks/useEntityComments";
 import { useFeatures } from "../hooks/useFeatures";
 import { useNotes } from "../hooks/useNotes";
 import { useProjectFeatureLinks } from "../hooks/useDocLinks";
@@ -31,21 +34,22 @@ import { useProjects } from "../hooks/useProjects";
 import { useTasks } from "../hooks/useTasks";
 import { useViewMode } from "../hooks/useViewMode";
 import { useWikiImport } from "../hooks/useWikiImport";
-import type { ViewMode } from "../types";
 import { formatHumanDate } from "../utils/date";
 
-type ProjectTab = "tasks" | "features" | "backlog" | "import" | "notes" | "attachments";
+type ProjectTab = "details" | "features" | "tasks" | "comments" | "attachments" | "notes" | "backlog" | "import";
 
 const tabs: Array<{ value: ProjectTab; label: string }> = [
-  { value: "tasks", label: "Aufgaben" },
+  { value: "details", label: "Stammdaten" },
   { value: "features", label: "Features" },
-  { value: "backlog", label: "Backlog" },
-  { value: "notes", label: "Notizen" },
+  { value: "tasks", label: "Aufgaben" },
+  { value: "comments", label: "Kommentare" },
   { value: "attachments", label: "Dateien" },
+  { value: "notes", label: "Notizen" },
+  { value: "backlog", label: "Backlog" },
   { value: "import", label: "Import" }
 ];
 
-const activeTabActionLabels: Record<ProjectTab, string> = {
+const activeTabActionLabels: Partial<Record<ProjectTab, string>> = {
   tasks: "Neue Aufgabe",
   features: "Neues Feature",
   backlog: "Neues Item",
@@ -59,25 +63,32 @@ export function ProjectDetailPage() {
   const projectId = Number(params.id);
   const { showToast } = useToast();
   const { confirm } = useConfirm();
-  const { project, loading: projectLoading } = useProjects(projectId);
+  const { project, loading: projectLoading, updateProject } = useProjects(projectId);
   const tasks = useTasks(projectId);
   const allFeatures = useFeatures();
   const projectFeatureLinks = useProjectFeatureLinks(Number.isFinite(projectId) ? projectId : undefined);
   const backlog = useBacklog(Number.isFinite(projectId) ? projectId : undefined);
   const notes = useNotes(Number.isFinite(projectId) ? { type: "project", id: projectId } : null);
   const attachments = useAttachments(Number.isFinite(projectId) ? { type: "project", id: projectId } : null);
+  const projectComments = useEntityComments("project", Number.isFinite(projectId) ? projectId : undefined);
   const wikiImport = useWikiImport(Number.isFinite(projectId) ? projectId : undefined);
   const { viewMode, setViewMode } = useViewMode();
-  const [activeTab, setActiveTab] = useState<ProjectTab>("tasks");
+  const [activeTab, setActiveTab] = useState<ProjectTab>("details");
   const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [newTaskStatus, setNewTaskStatus] = useState<TaskStatus>("todo");
   const [backlogFormOpen, setBacklogFormOpen] = useState(false);
   const [detailTaskId, setDetailTaskId] = useState<number | null>(null);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editingBacklogItem, setEditingBacklogItem] = useState<BacklogItem | null>(null);
-  const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
   const [featureFormOpen, setFeatureFormOpen] = useState(false);
   const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
+  const [selectedProjectFeatureIds, setSelectedProjectFeatureIds] = useState<number[]>([]);
+  const [projectFeatureSaving, setProjectFeatureSaving] = useState(false);
   const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
+
+  useEffect(() => {
+    setSelectedProjectFeatureIds(projectFeatureLinks.features.map((feature) => feature.id));
+  }, [projectFeatureLinks.features]);
 
   const openTask = (task: Task) => setDetailTaskId(task.id);
 
@@ -145,18 +156,36 @@ export function ProjectDetailPage() {
     await projectFeatureLinks.reload();
   };
 
+  const saveProjectFeatureRelations = async () => {
+    setProjectFeatureSaving(true);
+    try {
+      await projectFeatureLinks.setFeaturesForProject(selectedProjectFeatureIds);
+      await reloadFeatureRelations();
+      showToast({ tone: "success", title: "Feature-Verknüpfungen gespeichert" });
+    } catch (featureError) {
+      showToast({ tone: "error", title: "Feature-Verknüpfungen konnten nicht gespeichert werden", message: errorMessage(featureError) });
+    } finally {
+      setProjectFeatureSaving(false);
+    }
+  };
+
+  const submitProjectDetails = async (input: ProjectInput, tagIds: number[]) => {
+    if (!project) {
+      return;
+    }
+
+    try {
+      await updateProject(project.id, input, tagIds);
+      showToast({ tone: "success", title: "Projekt gespeichert" });
+    } catch (projectError) {
+      showToast({ tone: "error", title: "Projekt konnte nicht gespeichert werden", message: errorMessage(projectError) });
+      throw projectError;
+    }
+  };
+
   const openCreateFeatureForm = () => {
     setEditingFeature(null);
     setFeatureFormOpen(true);
-  };
-
-  const openFeatureForm = async (feature: Feature) => {
-    try {
-      setEditingFeature(await getFeature(feature.id));
-      setFeatureFormOpen(true);
-    } catch (featureError) {
-      showToast({ tone: "error", title: "Feature konnte nicht geladen werden", message: errorMessage(featureError) });
-    }
   };
 
   const submitFeatureForm = async (input: FeatureInput) => {
@@ -251,17 +280,29 @@ export function ProjectDetailPage() {
   const openTasks = loadedTaskCount > 0 ? tasks.tasks.filter((task) => task.status !== "done").length : project.openTaskCount;
   const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const tabCounts: Record<ProjectTab, number> = {
-    tasks: openTasks,
+    details: 0,
     features: projectFeatureLinks.features.length,
-    backlog: backlog.items.length,
-    notes: notes.notes.length,
+    tasks: openTasks,
+    comments: projectComments.comments.length,
     attachments: attachments.attachments.length,
+    notes: notes.notes.length,
+    backlog: backlog.items.length,
     import: wikiImport.preview?.items.length ?? 0
+  };
+  const projectTabs: Array<Tab<ProjectTab>> = tabs.map((tab) => ({
+    ...tab,
+    count: tab.value === "details" ? undefined : tabCounts[tab.value]
+  }));
+  const activeTabActionLabel = activeTabActionLabels[activeTab];
+
+  const openTaskForm = (status: TaskStatus = "todo") => {
+    setNewTaskStatus(status);
+    setTaskFormOpen(true);
   };
 
   const runActiveTabAction = () => {
     if (activeTab === "tasks") {
-      setTaskFormOpen(true);
+      openTaskForm();
       return;
     }
     if (activeTab === "features") {
@@ -309,9 +350,11 @@ export function ProjectDetailPage() {
                 icon={<MoreHorizontal size={16} />}
                 variant="ghost"
               />
-              <Button className="bg-white text-steel-700 hover:bg-steel-50" icon={<Plus size={16} />} variant="ghost" onClick={runActiveTabAction}>
-                {activeTabActionLabels[activeTab]}
-              </Button>
+              {activeTabActionLabel ? (
+                <Button className="bg-white text-steel-700 hover:bg-steel-50" icon={<Plus size={16} />} variant="ghost" onClick={runActiveTabAction}>
+                  {activeTabActionLabel}
+                </Button>
+              ) : null}
             </div>
           </div>
 
@@ -342,80 +385,77 @@ export function ProjectDetailPage() {
         </div>
       </header>
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap gap-1 rounded-lg border border-line bg-white p-1 shadow-sm" role="tablist">
-          {tabs.map((tab) => {
-            const selected = activeTab === tab.value;
-            return (
-              <button
-                key={tab.value}
-                type="button"
-                className={`flex h-9 items-center gap-2 rounded-md px-3 text-sm font-semibold transition ${
-                  selected ? "bg-steel-700 text-white shadow-sm" : "text-slate-600 hover:bg-shell hover:text-ink"
-                }`}
-                onClick={() => setActiveTab(tab.value)}
-              >
-                {tab.label}
-                <span className={`rounded-full px-2 py-0.5 text-[11px] ${selected ? "bg-white/18 text-white" : "bg-steel-100 text-slate-500"}`}>{tabCounts[tab.value]}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {activeTab === "tasks" ? (
-            <>
-              <ViewToggle value={viewMode} onChange={setViewMode} />
-              <Button icon={<Filter size={15} />}>Filter</Button>
-            </>
-          ) : null}
-          {activeTab !== "tasks" ? (
+      <div className="grid gap-3 rounded-lg border border-line bg-white shadow-sm">
+        <TabBar tabs={projectTabs} active={activeTab} onChange={setActiveTab} />
+        {activeTabActionLabel ? (
+          <div className="flex flex-wrap items-center justify-end gap-2 px-4 pb-4 md:px-5">
             <Button variant="primary" icon={<Plus size={16} />} onClick={runActiveTabAction}>
-              {activeTabActionLabels[activeTab]}
+              {activeTabActionLabel}
             </Button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
 
-      {activeTab === "tasks" ? (
-        tasks.loading ? (
-          viewMode === "list" ? <TaskListSkeleton /> : <KanbanSkeleton />
-        ) : viewMode === "list" ? (
-          <TaskList
-            tasks={tasks.tasks}
-            onOpen={openTask}
-            onDelete={(task) => void deleteTask(task)}
-          />
+      {activeTab === "details" ? <ProjectInlineForm project={project} onSubmit={submitProjectDetails} /> : null}
+
+      {activeTab === "comments" ? (
+        projectComments.loading ? (
+          <TaskListSkeleton />
         ) : (
-          <KanbanBoard
-            tasks={tasks.tasks}
-            onOpen={openTask}
-            onDelete={(task) => void deleteTask(task)}
-            onMove={async (task, status: TaskStatus, position) => {
-              try {
-                await tasks.updateTaskPosition(task.id, { status, position });
-                showToast({ tone: "success", title: "Aufgabe verschoben" });
-              } catch (taskError) {
-                showToast({ tone: "error", title: "Aufgabe konnte nicht verschoben werden", message: errorMessage(taskError) });
-                throw taskError;
-              }
-            }}
-          />
+          <div className="grid gap-4">
+            {projectComments.error ? <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{projectComments.error}</div> : null}
+            <CommentThread
+              comments={projectComments.comments}
+              entityLabel="Projekt"
+              onCreate={async (input) => {
+                try {
+                  await projectComments.createComment(input);
+                  showToast({ tone: "success", title: "Kommentar erstellt" });
+                } catch (commentError) {
+                  showToast({ tone: "error", title: "Kommentar konnte nicht erstellt werden", message: errorMessage(commentError) });
+                  throw commentError;
+                }
+              }}
+              onDelete={async (id) => {
+                try {
+                  await projectComments.removeComment(id);
+                  showToast({ tone: "success", title: "Kommentar gelöscht" });
+                } catch (commentError) {
+                  showToast({ tone: "error", title: "Kommentar konnte nicht gelöscht werden", message: errorMessage(commentError) });
+                  throw commentError;
+                }
+              }}
+            />
+          </div>
         )
       ) : null}
 
+      {activeTab === "tasks" ? (
+        <TaskListBoardView
+            tasks={tasks.tasks}
+            loading={tasks.loading}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onAdd={runActiveTabAction}
+            onAddStatus={openTaskForm}
+            onOpen={openTask}
+            onDelete={(task) => void deleteTask(task)}
+          />
+      ) : null}
+
       {activeTab === "features" ? (
-        projectFeatureLinks.loading ? (
+        projectFeatureLinks.loading || allFeatures.loading ? (
           <TaskListSkeleton />
         ) : (
           <>
             {projectFeatureLinks.error ? <div className="text-sm text-crimson">{projectFeatureLinks.error}</div> : null}
-            <ProjectFeaturePanel
-              features={projectFeatureLinks.features}
-              viewMode={featureViewMode}
-              onViewModeChange={setFeatureViewMode}
-              onCreate={openCreateFeatureForm}
-              onOpen={(feature) => void openFeatureForm(feature)}
+            <FeatureRelationPanel
+              features={allFeatures.features}
+              selectedIds={selectedProjectFeatureIds}
+              onChange={setSelectedProjectFeatureIds}
+              onSave={saveProjectFeatureRelations}
+              saving={projectFeatureSaving}
+              title="Projekt-Features"
             />
           </>
         )
@@ -425,7 +465,7 @@ export function ProjectDetailPage() {
         backlog.loading || allFeatures.loading ? (
           <TaskListSkeleton />
         ) : (
-          <BacklogList
+          <BacklogListBoardView
             items={backlog.items}
             features={allFeatures.features}
             statusFilter={backlog.statusFilter}
@@ -498,9 +538,24 @@ export function ProjectDetailPage() {
       <TaskForm
         open={taskFormOpen}
         title="Neue Aufgabe"
+        initialStatus={newTaskStatus}
+        features={allFeatures.features}
         onSubmit={async (input) => {
           try {
-            await tasks.createTask(input);
+            const { tagIds, featureIds, useCaseIds, ...taskInput } = input;
+            const created = await tasks.createTask(taskInput);
+            if (created) {
+              if (tagIds.length > 0) {
+                await setTaskTags(created.id, tagIds);
+              }
+              if (featureIds.length > 0) {
+                await setTaskFeatures(created.id, featureIds);
+              }
+              if (useCaseIds.length > 0) {
+                await setTaskUseCases(created.id, useCaseIds);
+              }
+              await tasks.reload();
+            }
             showToast({ tone: "success", title: "Aufgabe erstellt" });
           } catch (taskError) {
             showToast({ tone: "error", title: "Aufgabe konnte nicht erstellt werden", message: errorMessage(taskError) });

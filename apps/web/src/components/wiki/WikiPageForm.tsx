@@ -5,8 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { WikiTreeNode } from "../../hooks/useWiki";
 import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
-import { MarkdownEditor } from "../ui/MarkdownEditor";
 import { Modal } from "../ui/Modal";
+import { RichTextEditor } from "../ui/RichTextEditor";
+import { Section } from "../ui/Section";
 
 interface WikiPageFormProps {
   open: boolean;
@@ -16,8 +17,6 @@ interface WikiPageFormProps {
   onSubmit: (input: WikiPageInput) => Promise<void>;
   onClose: () => void;
 }
-
-const cardClass = "rounded-lg border border-line bg-white p-4 shadow-[0_10px_28px_rgba(31,43,56,0.06)]";
 
 function flattenTree(nodes: WikiTreeNode[]): WikiPage[] {
   return nodes.flatMap((node) => [node, ...flattenTree(node.children)]);
@@ -83,7 +82,7 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose }: Wi
   return (
     <Modal open={open} title={page ? "Wiki-Seite bearbeiten" : "Neue Wiki-Seite"} size="xl" showHeader={false} bodyClassName="p-0" onClose={() => void requestClose()}>
       <form className="flex max-h-[calc(100vh-64px)] flex-col bg-shell" onSubmit={submit}>
-        <header className="bg-gradient-to-br from-teal to-[#3fa9b1] px-5 py-5 text-white md:px-6">
+        <header className="bg-gradient-to-br from-teal to-teal/75 px-5 py-5 text-white md:px-6">
           <div className="flex items-start justify-between gap-4">
             <div className="grid gap-2">
               <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-white/75">
@@ -111,7 +110,7 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose }: Wi
         </header>
 
         <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
-          <section className={cardClass}>
+          <Section>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-1 text-sm font-semibold text-ink">
                 Titel
@@ -150,19 +149,20 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose }: Wi
               Sortierung
               <input className="h-10 rounded-md border border-line px-3 text-sm outline-none focus:border-teal" type="number" value={sortOrder} onChange={(event) => { setSortOrder(Number(event.target.value)); setDirty(true); }} />
             </label>
-          </section>
+          </Section>
 
-          {versionsOpen ? <section className={cardClass}><div className="rounded-lg border border-dashed border-line bg-shell/60 p-8 text-center text-sm text-slate-500">Noch keine Versionen vorhanden.</div></section> : null}
+          {versionsOpen ? <Section><div className="rounded-lg border border-dashed border-line bg-shell/60 p-8 text-center text-sm text-slate-500">Noch keine Versionen vorhanden.</div></Section> : null}
 
-          <section className={cardClass}>
+          <Section>
             {preview ? (
-              <div className="prose max-w-none rounded-lg border border-line bg-shell/40 p-4">
-                <pre className="whitespace-pre-wrap font-sans text-sm text-ink">{content || "Noch kein Inhalt."}</pre>
-              </div>
+              <div className="prose max-w-none rounded-lg border border-line bg-shell/40 p-4" dangerouslySetInnerHTML={{ __html: content || "<p>Noch kein Inhalt.</p>" }} />
             ) : (
-              <MarkdownEditor initialContent={content} placeholder="Wiki-Inhalt" onChange={(value) => { setContent(value); setDirty(true); }} />
+              <>
+                {/* TODO: migrate existing markdown content to HTML. */}
+                <RichTextEditor content={content} placeholder="Wiki-Inhalt" toolbar="full" onChange={(value) => { setContent(value); setDirty(true); }} />
+              </>
             )}
-          </section>
+          </Section>
         </div>
 
         <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">

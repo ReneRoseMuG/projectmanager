@@ -16,7 +16,7 @@ const formatTone: Record<string, string> = {
   png: "bg-violet text-white",
   jpg: "bg-violet text-white",
   jpeg: "bg-violet text-white",
-  zip: "bg-mustard text-[#6E5800]",
+  zip: "bg-mustard text-mustard-dark",
   doc: "bg-teal text-white",
   docx: "bg-teal text-white",
   xls: "bg-fern text-white",

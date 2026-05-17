@@ -31,7 +31,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
 
   return (
     <div className="grid gap-4">
-      <section className="rounded-lg border border-line bg-white p-4 shadow-[0_10px_28px_rgba(31,43,56,0.06)]">
+      <section className="rounded-lg border border-line bg-white p-4 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="font-semibold text-ink">Subtasks</h3>
@@ -46,7 +46,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
         </div>
       </section>
 
-      <section className="grid gap-2 rounded-lg border border-line bg-white p-4 shadow-[0_10px_28px_rgba(31,43,56,0.06)]">
+      <section className="grid gap-2 rounded-lg border border-line bg-white p-4 shadow-card">
         {subtasks.length === 0 ? <EmptyState icon={<ListChecks size={20} />} title="Noch keine Subtasks" body="Zerlege die Aufgabe in kleinere Schritte." tone="fern" variant="default" className="p-6" /> : null}
         {subtasks.map((subtask) => {
           const done = subtask.status === "done";
@@ -70,7 +70,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
 
         <div className="mt-2 flex gap-2 rounded-md border border-dashed border-steel-300 bg-steel-100/35 p-2">
           <input
-            className="h-10 min-w-0 flex-1 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-fern focus:ring-2 focus:ring-fern/15"
+            className="h-10 min-w-0 flex-1 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
             placeholder="Neuen Subtask hinzufügen"
             value={title}
             onChange={(event) => setTitle(event.target.value)}

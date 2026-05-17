@@ -28,6 +28,8 @@ function mapProject(database: DbClient, record: ProjectRecord, counts: ProjectTa
     description: record.description,
     status: record.status,
     color: record.color,
+    startDate: record.startDate,
+    dueDate: record.dueDate,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     openTaskCount: counts.openTaskCount,
@@ -96,6 +98,8 @@ export function createProject(database: DbClient, input: ProjectInput): Project 
       description: cleanNullable(input.description) ?? null,
       status: input.status ?? "active",
       color: input.color ?? "#6366f1",
+      startDate: cleanNullable(input.startDate) ?? null,
+      dueDate: cleanNullable(input.dueDate) ?? null,
       createdAt: now,
       updatedAt: now
     })
@@ -119,6 +123,12 @@ export function updateProject(database: DbClient, id: number, input: ProjectUpda
   }
   if (input.color !== undefined) {
     values.color = input.color;
+  }
+  if (input.startDate !== undefined) {
+    values.startDate = cleanNullable(input.startDate) ?? null;
+  }
+  if (input.dueDate !== undefined) {
+    values.dueDate = cleanNullable(input.dueDate) ?? null;
   }
 
   if (Object.keys(values).length === 0) {

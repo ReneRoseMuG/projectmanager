@@ -1,4 +1,4 @@
-import type { JsonObject, Note, NoteInput } from "@taskmanager/shared-types";
+import type { JsonObject, JsonValue, Note, NoteInput } from "@taskmanager/shared-types";
 import { Download, MoreHorizontal, Save, StickyNote, Trash2, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { Modal } from "../ui/Modal";
 import { RichTextEditor } from "../ui/RichTextEditor";
+import { Section } from "../ui/Section";
 
 interface NoteEditorProps {
   note: Note | null;
@@ -15,19 +16,54 @@ interface NoteEditorProps {
   onClose: () => void;
 }
 
-const cardClass = "rounded-lg border border-line bg-white p-4 shadow-[0_10px_28px_rgba(31,43,56,0.06)]";
-
 function countJsonWords(value: JsonObject) {
-  const text = JSON.stringify(value).replace(/[{}[\]",:]/g, " ");
+  const text = noteContentToHtml(value).replace(/<[^>]+>/g, " ");
   return text.split(/\s+/).filter((word) => word.length > 1).length;
 }
 
-function exportNote(note: Note, title: string, contentJson: JsonObject) {
-  const blob = new Blob([`# ${title}\n\n\`\`\`json\n${JSON.stringify(contentJson, null, 2)}\n\`\`\`\n`], { type: "text/markdown;charset=utf-8" });
+function isJsonRecord(value: JsonValue): value is Record<string, JsonValue> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function collectText(value: JsonValue): string[] {
+  if (!isJsonRecord(value)) {
+    return [];
+  }
+
+  if (typeof value.text === "string") {
+    return [value.text];
+  }
+
+  if (Array.isArray(value.content)) {
+    return value.content.flatMap(collectText);
+  }
+
+  return [];
+}
+
+function noteContentToHtml(value: JsonObject) {
+  if (typeof value.html === "string") {
+    return value.html;
+  }
+
+  const legacyText = collectText(value).join(" ").trim();
+  return legacyText ? `<p>${escapeHtml(legacyText)}</p>` : "";
+}
+
+function htmlToNoteContent(html: string): JsonObject {
+  return { html };
+}
+
+function exportNote(note: Note, title: string, content: string) {
+  const blob = new Blob([`<h1>${escapeHtml(title)}</h1>\n${content}\n`], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `note-${note.id}.md`;
+  link.download = `note-${note.id}.html`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -35,18 +71,17 @@ function exportNote(note: Note, title: string, contentJson: JsonObject) {
 export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
   const { confirm } = useConfirm();
   const [title, setTitle] = useState("Ohne Titel");
-  const [contentJson, setContentJson] = useState<JsonObject>({});
+  const [content, setContent] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
-  const wordCount = useMemo(() => countJsonWords(contentJson), [contentJson]);
+  const wordCount = useMemo(() => countJsonWords(htmlToNoteContent(content)), [content]);
 
   useEffect(() => {
     if (!open || !note) {
       return;
     }
     setTitle(note.title);
-    setContentJson(note.contentJson);
+    setContent(noteContentToHtml(note.contentJson));
     setDirty(false);
   }, [note, open]);
 
@@ -60,7 +95,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
     }, 2000);
 
     return () => window.clearTimeout(timeout);
-  }, [contentJson, dirty, note, open, title]);
+  }, [content, dirty, note, open, title]);
 
   const save = async () => {
     if (!note) {
@@ -68,7 +103,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
     }
     setSaving(true);
     try {
-      await onSave(note.id, { title, contentJson });
+      await onSave(note.id, { title, contentJson: htmlToNoteContent(content) });
       setDirty(false);
     } finally {
       setSaving(false);
@@ -98,10 +133,10 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
   };
 
   return (
-    <Modal open={open && Boolean(note)} title="Notiz" size={fullscreen ? "full" : "xl"} showHeader={false} bodyClassName="p-0" onClose={() => void requestClose()}>
+    <Modal open={open && Boolean(note)} title="Notiz" size="xl" showHeader={false} bodyClassName="p-0" onClose={() => void requestClose()}>
       {note ? (
         <form className="flex max-h-[calc(100vh-64px)] flex-col bg-shell" onSubmit={submit}>
-          <header className="bg-gradient-to-br from-violet to-[#8459d9] px-5 py-5 text-white md:px-6">
+          <header className="bg-gradient-to-br from-violet to-violet/75 px-5 py-5 text-white md:px-6">
             <div className="flex items-start justify-between gap-4">
               <div className="grid gap-2">
                 <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-white/75">
@@ -122,8 +157,8 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button className="border-white/20 bg-white/10 text-white hover:bg-white/20" icon={<Download size={16} />} onClick={() => exportNote(note, title, contentJson)}>
-                  Export Markdown
+                <Button className="border-white/20 bg-white/10 text-white hover:bg-white/20" icon={<Download size={16} />} onClick={() => exportNote(note, title, content)}>
+                  Export HTML
                 </Button>
                 <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Mehr" title="Mehr">
                   <MoreHorizontal size={18} />
@@ -136,7 +171,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
           </header>
 
           <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
-            <section className={cardClass}>
+            <Section>
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem]">
                 <label className="grid gap-1 text-sm font-semibold text-ink">
                   Titel
@@ -158,19 +193,18 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
                 </label>
               </div>
               <div className="mt-4 rounded-lg border border-dashed border-line bg-shell/60 p-3 text-sm text-slate-600">Tags für Notizen werden über die Kontextlisten gepflegt.</div>
-            </section>
+            </Section>
 
-            <section className={cardClass}>
+            <Section>
+              {/* TODO: migrate existing note JSON content to HTML. */}
               <RichTextEditor
-                value={contentJson}
-                fullscreen={fullscreen}
-                onFullscreenChange={setFullscreen}
+                content={content}
                 onChange={(value) => {
-                  setContentJson(value);
+                  setContent(value);
                   setDirty(true);
                 }}
               />
-            </section>
+            </Section>
           </div>
 
           <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">

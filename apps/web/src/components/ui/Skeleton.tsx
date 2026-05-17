@@ -1,6 +1,6 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, HTMLAttributes } from "react";
 
-interface SkeletonProps {
+interface SkeletonProps extends HTMLAttributes<HTMLSpanElement> {
   className?: string;
   width?: CSSProperties["width"];
   height?: CSSProperties["height"];
@@ -13,35 +13,9 @@ const radiusClass: Record<NonNullable<SkeletonProps["radius"]>, string> = {
   round: "rounded-full"
 };
 
-export function Skeleton({ className = "", width, height, radius = "md" }: SkeletonProps) {
-  return <span className={`skeleton-shimmer block bg-steel-100 ${radiusClass[radius]} ${className}`} style={{ width, height }} aria-hidden="true" />;
-}
-
-export function ProjectGridSkeleton() {
-  return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {Array.from({ length: 6 }, (_, index) => (
-        <div key={index} className="grid min-h-52 gap-4 overflow-hidden rounded-lg border border-line bg-white shadow-sm">
-          <Skeleton className="h-1.5 w-full" radius="sm" />
-          <div className="grid gap-4 p-5 pt-2">
-            <div className="flex items-start gap-3">
-              <Skeleton className="h-11 w-11" />
-              <div className="grid flex-1 gap-2">
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-3 w-20" />
-              </div>
-            </div>
-            <Skeleton className="h-10 w-full" />
-            <div className="flex gap-2">
-              <Skeleton className="h-6 w-16" radius="round" />
-              <Skeleton className="h-6 w-20" radius="round" />
-            </div>
-            <Skeleton className="mt-auto h-10 w-full" />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+/** Loading placeholder with the shared shimmer treatment. */
+export function Skeleton({ className = "", width, height, radius = "md", style, ...props }: SkeletonProps) {
+  return <span className={`skeleton-shimmer block bg-steel-100 ${radiusClass[radius]} ${className}`} style={{ width, height, ...style }} aria-hidden="true" {...props} />;
 }
 
 export function TaskListSkeleton() {
@@ -58,25 +32,6 @@ export function TaskListSkeleton() {
             <Skeleton className="h-6 w-16" radius="round" />
             <Skeleton className="h-6 w-24" radius="round" />
           </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export function KanbanSkeleton() {
-  return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      {Array.from({ length: 3 }, (_, columnIndex) => (
-        <div key={columnIndex} className="grid content-start gap-3 rounded-lg border border-line bg-white p-4">
-          <Skeleton className="h-5 w-28" />
-          {Array.from({ length: 3 }, (_, cardIndex) => (
-            <div key={cardIndex} className="grid gap-2 rounded-md border border-line bg-shell p-3">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-6 w-20" radius="round" />
-            </div>
-          ))}
         </div>
       ))}
     </div>

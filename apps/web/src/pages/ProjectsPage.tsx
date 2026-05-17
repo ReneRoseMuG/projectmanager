@@ -1,58 +1,62 @@
 import { PROJECT_STATUSES, type Project, type ProjectInput, type ProjectStatus } from "@taskmanager/shared-types";
-import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ProjectForm } from "../components/projects/ProjectForm";
-import { ProjectCardSkeleton } from "../components/projects/ProjectCardSkeleton";
-import { ProjectList } from "../components/projects/ProjectList";
-import { Button } from "../components/ui/Button";
+import { ProjectListBoardView } from "../components/projects/ProjectListBoardView";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
-import { SearchInput } from "../components/ui/SearchInput";
 import { useToast } from "../components/ui/ToastProvider";
+import { setProjectFeatures } from "../api/doc-links";
 import { errorMessage } from "../hooks/errors";
+import { useProjectFeatureLinks } from "../hooks/useDocLinks";
+import { useFeatures } from "../hooks/useFeatures";
 import { useProjects } from "../hooks/useProjects";
+import { projectStatusLabels } from "../utils/domainLabels";
 
 export function ProjectsPage() {
   const { projects, loading, error, createProject, updateProject, removeProject } = useProjects();
+  const allFeatures = useFeatures();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const [formOpen, setFormOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const projectFeatureLinks = useProjectFeatureLinks(editingProject?.id);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
-  const [search, setSearch] = useState("");
 
   const statusOptions = useMemo(
     () =>
       PROJECT_STATUSES.map((status) => ({
         value: status,
-        label: statusLabels[status],
+        label: projectStatusLabels[status],
         count: projects.filter((project) => project.status === status).length
       })),
     [projects]
   );
 
   const filteredProjects = useMemo(() => {
-    const query = search.trim().toLowerCase();
     return projects.filter((project) => {
       const matchesStatus = statusFilter === "all" || project.status === statusFilter;
-      const matchesSearch = !query || project.name.toLowerCase().includes(query) || (project.description ?? "").toLowerCase().includes(query);
-      return matchesStatus && matchesSearch;
+      return matchesStatus;
     });
-  }, [projects, search, statusFilter]);
+  }, [projects, statusFilter]);
 
   const openCreate = () => {
     setEditingProject(null);
     setFormOpen(true);
   };
 
-  const submit = async (input: ProjectInput, tagIds: number[]) => {
+  const submit = async (input: ProjectInput, tagIds: number[], featureIds: number[]) => {
     try {
       if (editingProject) {
         await updateProject(editingProject.id, input, tagIds);
+        await setProjectFeatures(editingProject.id, featureIds);
+        await projectFeatureLinks.reload();
         showToast({ tone: "success", title: "Projekt aktualisiert" });
         return;
       }
-      await createProject(input, tagIds);
+      const created = await createProject(input, tagIds);
+      if (featureIds.length > 0) {
+        await setProjectFeatures(created.id, featureIds);
+      }
       showToast({ tone: "success", title: "Projekt erstellt" });
     } catch (submitError) {
       showToast({ tone: "error", title: "Projekt konnte nicht gespeichert werden", message: errorMessage(submitError) });
@@ -85,31 +89,29 @@ export function ProjectsPage() {
           <h1 className="text-2xl font-semibold text-ink">Projekte</h1>
           <p className="text-sm text-slate-600">{projects.length} Einträge</p>
         </div>
-        <Button variant="primary" icon={<Plus size={17} />} onClick={openCreate}>
-          Neues Projekt
-        </Button>
       </header>
 
       {error ? <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">{error}</div> : null}
-      {!loading ? (
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <FilterChips value={statusFilter} onChange={setStatusFilter} options={statusOptions} allCount={projects.length} />
-          <SearchInput value={search} onChange={setSearch} placeholder="Projekte suchen" />
-        </div>
-      ) : null}
-      {loading ? <ProjectCardSkeleton /> : <ProjectList projects={filteredProjects} onEdit={(project) => {
-        setEditingProject(project);
-        setFormOpen(true);
-      }} onDelete={(project) => void deleteProject(project)} />}
+      <ProjectListBoardView
+        projects={filteredProjects}
+        loading={loading}
+        onCreate={openCreate}
+        onEdit={(project) => {
+          setEditingProject(project);
+          setFormOpen(true);
+        }}
+        onDelete={(project) => void deleteProject(project)}
+        filters={!loading ? <FilterChips value={statusFilter} onChange={setStatusFilter} options={statusOptions} allCount={projects.length} /> : null}
+      />
 
-      <ProjectForm open={formOpen} project={editingProject} onSubmit={submit} onClose={() => setFormOpen(false)} />
+      <ProjectForm
+        open={formOpen}
+        project={editingProject}
+        features={allFeatures.features}
+        initialFeatureIds={editingProject ? projectFeatureLinks.features.map((feature) => feature.id) : []}
+        onSubmit={submit}
+        onClose={() => setFormOpen(false)}
+      />
     </div>
   );
 }
-
-const statusLabels: Record<ProjectStatus, string> = {
-  active: "Aktiv",
-  on_hold: "Pausiert",
-  completed: "Abgeschlossen",
-  archived: "Archiviert"
-};

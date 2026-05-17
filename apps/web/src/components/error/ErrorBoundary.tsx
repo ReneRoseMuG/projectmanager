@@ -33,7 +33,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     return (
       <div className="min-h-screen bg-shell p-6 text-ink">
-        <div className="mx-auto grid max-w-5xl gap-5 rounded-[18px] border border-line bg-white p-6 shadow-panel">
+        <div className="mx-auto grid max-w-5xl gap-5 rounded-2xl border border-line bg-white p-6 shadow-panel">
           <span className="inline-flex w-fit rounded-full bg-crimson/10 px-3 py-1 text-xs font-bold uppercase text-crimson">Crash abgefangen</span>
           <div>
             <h1 className="text-3xl font-bold tracking-normal">Etwas ist im Interface abgestürzt.</h1>

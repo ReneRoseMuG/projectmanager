@@ -20,15 +20,19 @@
     "@fastify/multipart": "^8.3.1",
     "@fastify/static": "^7.0.4",
     "@taskmanager/shared-types": "file:../../packages/shared-types",
+    "archiver": "^8.0.0",
     "better-sqlite3": "^12.10.0",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.30.10",
-    "fastify": "^4.28.1"
+    "fastify": "^4.28.1",
+    "unzipper": "^0.12.3"
   },
   "devDependencies": {
+    "@types/archiver": "^7.0.0",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.14.10",
     "@types/supertest": "^6.0.3",
+    "@types/unzipper": "^0.10.11",
     "@typescript-eslint/eslint-plugin": "^7.16.0",
     "@typescript-eslint/parser": "^7.16.0",
     "@vitest/coverage-v8": "^1.6.1",

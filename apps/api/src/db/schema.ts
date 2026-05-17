@@ -7,6 +7,7 @@ export const TASK_STATUSES = ["todo", "in_progress", "done"] as const;
 export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export const FEATURE_STATUSES = ["draft", "active", "done", "archived"] as const;
 export const BACKLOG_STATUSES = ["open", "in_progress", "done", "rejected"] as const;
+export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "backlogItem", "wikiPage"] as const;
 
 export const projects = sqliteTable("projects", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -14,6 +15,8 @@ export const projects = sqliteTable("projects", {
   description: text("description"),
   status: text("status", { enum: PROJECT_STATUSES }).notNull().default("active"),
   color: text("color").default("#6366f1"),
+  startDate: text("start_date"),
+  dueDate: text("due_date"),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
@@ -45,8 +48,9 @@ export const tasks = sqliteTable(
 export const comments = sqliteTable("comments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   taskId: integer("task_id")
-    .notNull()
     .references(() => tasks.id, { onDelete: "cascade" }),
+  entityType: text("entity_type", { enum: COMMENT_ENTITY_TYPES }).notNull().default("task"),
+  entityId: integer("entity_id").notNull(),
   body: text("body").notNull(),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`)
 });
@@ -107,6 +111,7 @@ export const attachments = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     projectId: integer("project_id").references(() => projects.id, { onDelete: "cascade" }),
     taskId: integer("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+    featureId: integer("feature_id").references(() => features.id, { onDelete: "cascade" }),
     originalName: text("original_name").notNull(),
     filename: text("filename").notNull(),
     mimetype: text("mimetype").notNull(),
@@ -116,7 +121,7 @@ export const attachments = sqliteTable(
   (table) => ({
     ownerCheck: check(
       "attachments_exactly_one_owner",
-      sql`(${table.projectId} is not null and ${table.taskId} is null) or (${table.projectId} is null and ${table.taskId} is not null)`
+      sql`(${table.projectId} is not null and ${table.taskId} is null and ${table.featureId} is null) or (${table.projectId} is null and ${table.taskId} is not null and ${table.featureId} is null) or (${table.projectId} is null and ${table.taskId} is null and ${table.featureId} is not null)`
     )
   })
 );
