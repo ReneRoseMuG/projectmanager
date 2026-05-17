@@ -84,23 +84,23 @@ export function FeatureForm({ open, feature, onSubmit, onClose }: FeatureFormPro
       <form className="grid gap-4" onSubmit={submit}>
         <FormCard title="Stammdaten">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid gap-1 text-sm font-medium">
+            <label className="grid min-w-0 gap-1 text-sm font-medium">
               <FieldLabel required>Titel</FieldLabel>
-              <input autoFocus={!feature} className="h-11 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" value={title} onChange={(event) => setTitle(event.target.value)} required />
+              <input autoFocus={!feature} className="h-11 w-full min-w-0 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" value={title} onChange={(event) => setTitle(event.target.value)} required />
             </label>
-            <label className="grid gap-1 text-sm font-medium">
+            <label className="grid min-w-0 gap-1 text-sm font-medium">
               <FieldLabel required>Slug</FieldLabel>
-              <span className="relative">
+              <span className="relative min-w-0">
                 <LinkIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-steel-400" size={16} />
-                <input className="h-11 w-full rounded-lg border border-line pl-9 pr-3 font-mono text-sm outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" value={slug} onChange={(event) => setSlug(event.target.value)} required />
+                <input className="h-11 w-full min-w-0 rounded-lg border border-line pl-9 pr-3 font-mono text-sm outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" value={slug} onChange={(event) => setSlug(event.target.value)} required />
               </span>
             </label>
           </div>
         </FormCard>
 
         <FormCard title="Status & Sortierung">
-          <div className="grid gap-4 md:grid-cols-[1fr_10rem]">
-            <div className="grid gap-1 text-sm font-medium">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
+            <div className="grid min-w-0 gap-1 text-sm font-medium">
               <span>Status</span>
               <div className="flex flex-wrap gap-2 rounded-xl border border-line bg-steel-50 p-1.5">
                 {statuses.map((item) => (
@@ -116,10 +116,10 @@ export function FeatureForm({ open, feature, onSubmit, onClose }: FeatureFormPro
                 ))}
               </div>
             </div>
-            <label className="grid gap-1 text-sm font-medium">
+            <label className="grid min-w-0 gap-1 text-sm font-medium">
               Sortierung
               <input
-                className="h-11 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10"
+                className="h-11 w-full min-w-0 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10"
                 type="number"
                 value={sortOrder}
                 onChange={(event) => setSortOrder(Number(event.target.value))}

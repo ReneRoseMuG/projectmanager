@@ -25,6 +25,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerWikiRoutes } = await import("../../src/routes/wiki.js");
   const { registerBacklogRoutes } = await import("../../src/routes/backlog.js");
   const { registerDocLinksRoutes } = await import("../../src/routes/doc-links.js");
+  const { registerImportsRoutes } = await import("../../src/routes/imports.js");
 
   app.setErrorHandler(errorHandler);
   await registerCors(app);
@@ -52,6 +53,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerWikiRoutes, { prefix: "/api" });
   await app.register(registerBacklogRoutes, { prefix: "/api" });
   await app.register(registerDocLinksRoutes, { prefix: "/api" });
+  await app.register(registerImportsRoutes, { prefix: "/api" });
 
   await app.ready();
   return app;

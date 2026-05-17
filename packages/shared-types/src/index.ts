@@ -260,3 +260,39 @@ export interface TaskDetail extends Task {
   notes: Note[];
   attachments: Attachment[];
 }
+
+export interface WikiImportPreviewRequest {
+  sourcePath: string;
+}
+
+export type WikiImportRunRequest = WikiImportPreviewRequest;
+
+export type WikiImportItemType = "feature" | "useCase" | "task" | "projectFeature" | "taskFeature" | "taskUseCase";
+
+export type WikiImportAction = "created" | "updated" | "skipped" | "warning" | "error";
+
+export interface WikiImportSummary {
+  created: number;
+  updated: number;
+  skipped: number;
+  warnings: number;
+  errors: number;
+}
+
+export interface WikiImportItemResult {
+  type: WikiImportItemType;
+  action: WikiImportAction;
+  title: string;
+  slug?: string;
+  importKey?: string;
+  sourcePath?: string;
+  message?: string;
+}
+
+export interface WikiImportReport {
+  projectId: number;
+  sourcePath: string;
+  mode: "preview" | "run";
+  summary: WikiImportSummary;
+  items: WikiImportItemResult[];
+}

@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
-import { check, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { check, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const PROJECT_STATUSES = ["active", "on_hold", "completed", "archived"] as const;
 export const TASK_STATUSES = ["todo", "in_progress", "done"] as const;
@@ -18,22 +18,29 @@ export const projects = sqliteTable("projects", {
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
 
-export const tasks = sqliteTable("tasks", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  projectId: integer("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
-  parentId: integer("parent_id").references((): AnySQLiteColumn => tasks.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  description: text("description"),
-  status: text("status", { enum: TASK_STATUSES }).notNull().default("todo"),
-  priority: text("priority", { enum: PRIORITIES }).notNull().default("medium"),
-  assignee: text("assignee"),
-  dueDate: text("due_date"),
-  position: real("position").notNull().default(0),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
-});
+export const tasks = sqliteTable(
+  "tasks",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    parentId: integer("parent_id").references((): AnySQLiteColumn => tasks.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: text("status", { enum: TASK_STATUSES }).notNull().default("todo"),
+    priority: text("priority", { enum: PRIORITIES }).notNull().default("medium"),
+    assignee: text("assignee"),
+    dueDate: text("due_date"),
+    importKey: text("import_key"),
+    position: real("position").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    projectImportKeyUnique: uniqueIndex("tasks_project_import_key_unique").on(table.projectId, table.importKey)
+  })
+);
 
 export const comments = sqliteTable("comments", {
   id: integer("id").primaryKey({ autoIncrement: true }),

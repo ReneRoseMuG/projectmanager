@@ -1,5 +1,5 @@
 import type { Attachment, BacklogItem, Note, Task, TaskStatus } from "@taskmanager/shared-types";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Filter, MoreHorizontal, Plus } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { AttachmentList } from "../components/attachments/AttachmentList";
@@ -7,6 +7,7 @@ import { AttachmentUploader } from "../components/attachments/AttachmentUploader
 import { BacklogItemForm } from "../components/backlog/BacklogItemForm";
 import { BacklogList } from "../components/backlog/BacklogList";
 import { FeaturePicker } from "../components/features/FeaturePicker";
+import { WikiImportPanel } from "../components/imports/WikiImportPanel";
 import { NoteEditor } from "../components/notes/NoteEditor";
 import { NoteList } from "../components/notes/NoteList";
 import { KanbanBoard } from "../components/tasks/KanbanBoard";
@@ -27,16 +28,28 @@ import { useProjectFeatureLinks } from "../hooks/useDocLinks";
 import { useProjects } from "../hooks/useProjects";
 import { useTasks } from "../hooks/useTasks";
 import { useViewMode } from "../hooks/useViewMode";
+import { useWikiImport } from "../hooks/useWikiImport";
+import { formatHumanDate } from "../utils/date";
 
-type ProjectTab = "tasks" | "features" | "backlog" | "notes" | "attachments";
+type ProjectTab = "tasks" | "features" | "backlog" | "import" | "notes" | "attachments";
 
 const tabs: Array<{ value: ProjectTab; label: string }> = [
   { value: "tasks", label: "Aufgaben" },
   { value: "features", label: "Features" },
   { value: "backlog", label: "Backlog" },
   { value: "notes", label: "Notizen" },
-  { value: "attachments", label: "Dateien" }
+  { value: "attachments", label: "Dateien" },
+  { value: "import", label: "Import" }
 ];
+
+const activeTabActionLabels: Record<ProjectTab, string> = {
+  tasks: "Neue Aufgabe",
+  features: "Features speichern",
+  backlog: "Neues Item",
+  notes: "Neue Notiz",
+  attachments: "Dateien hochladen",
+  import: "Import prüfen"
+};
 
 export function ProjectDetailPage() {
   const params = useParams();
@@ -50,6 +63,7 @@ export function ProjectDetailPage() {
   const backlog = useBacklog(Number.isFinite(projectId) ? projectId : undefined);
   const notes = useNotes(Number.isFinite(projectId) ? { type: "project", id: projectId } : null);
   const attachments = useAttachments(Number.isFinite(projectId) ? { type: "project", id: projectId } : null);
+  const wikiImport = useWikiImport(Number.isFinite(projectId) ? projectId : undefined);
   const { viewMode, setViewMode } = useViewMode();
   const [activeTab, setActiveTab] = useState<ProjectTab>("tasks");
   const [taskFormOpen, setTaskFormOpen] = useState(false);
@@ -58,6 +72,7 @@ export function ProjectDetailPage() {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editingBacklogItem, setEditingBacklogItem] = useState<BacklogItem | null>(null);
   const [selectedProjectFeatureIds, setSelectedProjectFeatureIds] = useState<number[]>([]);
+  const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
 
   const openTask = (task: Task) => setDetailTaskId(task.id);
 
@@ -166,6 +181,31 @@ export function ProjectDetailPage() {
     }
   };
 
+  const previewWikiImport = async () => {
+    try {
+      const report = await wikiImport.previewImport(wikiImportSourcePath);
+      if (report) {
+        showToast({ tone: "success", title: "Import-Vorschau erstellt" });
+      }
+    } catch (importError) {
+      showToast({ tone: "error", title: "Import-Vorschau fehlgeschlagen", message: errorMessage(importError) });
+    }
+  };
+
+  const runWikiImport = async () => {
+    try {
+      const report = await wikiImport.runImport(wikiImportSourcePath);
+      if (report) {
+        await allFeatures.reload();
+        await projectFeatureLinks.reload();
+        await tasks.reload();
+        showToast({ tone: "success", title: "Wiki importiert" });
+      }
+    } catch (importError) {
+      showToast({ tone: "error", title: "Wiki-Import fehlgeschlagen", message: errorMessage(importError) });
+    }
+  };
+
   if (projectLoading) {
     return <DetailPageSkeleton />;
   }
@@ -174,43 +214,136 @@ export function ProjectDetailPage() {
     return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Projekt nicht gefunden</div>;
   }
 
+  const loadedTaskCount = tasks.tasks.length;
+  const totalTasks = loadedTaskCount > 0 ? loadedTaskCount : project.totalTaskCount;
+  const doneTasks = loadedTaskCount > 0 ? tasks.tasks.filter((task) => task.status === "done").length : project.doneTaskCount;
+  const openTasks = loadedTaskCount > 0 ? tasks.tasks.filter((task) => task.status !== "done").length : project.openTaskCount;
+  const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  const tabCounts: Record<ProjectTab, number> = {
+    tasks: openTasks,
+    features: projectFeatureLinks.features.length,
+    backlog: backlog.items.length,
+    notes: notes.notes.length,
+    attachments: attachments.attachments.length,
+    import: wikiImport.preview?.items.length ?? 0
+  };
+
+  const runActiveTabAction = () => {
+    if (activeTab === "tasks") {
+      setTaskFormOpen(true);
+      return;
+    }
+    if (activeTab === "features") {
+      void saveProjectFeatures();
+      return;
+    }
+    if (activeTab === "backlog") {
+      setEditingBacklogItem(null);
+      setBacklogFormOpen(true);
+      return;
+    }
+    if (activeTab === "notes") {
+      void createNote();
+      return;
+    }
+    if (activeTab === "import") {
+      void previewWikiImport();
+      return;
+    }
+    setActiveTab("attachments");
+  };
+
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
-      <header className="grid gap-4">
-        <nav className="flex items-center gap-2 text-sm text-slate-600">
-          <Link className="hover:text-fern" to="/projects">
-            Projekte
-          </Link>
-          <ChevronRight size={16} />
-          <span className="text-ink">{project.name}</span>
-        </nav>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-ink">{project.name}</h1>
-            <p className="text-sm text-slate-600">{project.description || "Keine Beschreibung"}</p>
-          </div>
-          {activeTab === "tasks" ? (
-            <div className="flex items-center gap-2">
-              <ViewToggle value={viewMode} onChange={setViewMode} />
-              <Button variant="primary" icon={<Plus size={17} />} onClick={() => setTaskFormOpen(true)}>
-                Neue Aufgabe
+      <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-steel-700 via-steel-600 to-violet p-6 text-white shadow-steel">
+        <div className="pointer-events-none absolute -right-20 -top-48 h-[480px] w-[480px] rounded-full bg-white/10 blur-sm" />
+        <div className="relative grid gap-5">
+          <div className="flex flex-wrap items-start justify-between gap-5">
+            <div className="min-w-0">
+              <nav className="flex flex-wrap items-center gap-2 text-sm text-white/70">
+                <Link className="hover:text-white" to="/projects">
+                  Projekte
+                </Link>
+                <ChevronRight size={16} />
+                <span className="text-white">{project.name}</span>
+              </nav>
+              <h1 className="mt-3 text-[30px] font-bold leading-tight tracking-normal text-white">{project.name}</h1>
+              <p className="mt-1 max-w-[720px] text-[15px] leading-6 text-white/85">{project.description || "Keine Beschreibung"}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                aria-label="Mehr Optionen"
+                title="Mehr Optionen"
+                className="border border-white/20 bg-white/10 text-white hover:bg-white/20"
+                icon={<MoreHorizontal size={16} />}
+                variant="ghost"
+              />
+              <Button className="bg-white text-steel-700 hover:bg-steel-50" icon={<Plus size={16} />} variant="ghost" onClick={runActiveTabAction}>
+                {activeTabActionLabels[activeTab]}
               </Button>
             </div>
-          ) : null}
+          </div>
+
+          <div className="grid gap-4 border-t border-white/18 pt-5 sm:grid-cols-2 lg:grid-cols-5">
+            <div>
+              <span className="block text-[11px] font-semibold uppercase tracking-widest text-white/60">Fortschritt</span>
+              <span className="mt-1 block text-2xl font-bold text-white">{progress} %</span>
+            </div>
+            <div>
+              <span className="block text-[11px] font-semibold uppercase tracking-widest text-white/60">Aufgaben</span>
+              <span className="mt-1 block text-2xl font-bold text-white">
+                {doneTasks} / {totalTasks}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[11px] font-semibold uppercase tracking-widest text-white/60">Offen</span>
+              <span className="mt-1 block text-2xl font-bold text-white">{openTasks}</span>
+            </div>
+            <div>
+              <span className="block text-[11px] font-semibold uppercase tracking-widest text-white/60">Backlog</span>
+              <span className="mt-1 block text-2xl font-bold text-white">{backlog.items.length}</span>
+            </div>
+            <div>
+              <span className="block text-[11px] font-semibold uppercase tracking-widest text-white/60">Aktualisiert</span>
+              <span className="mt-1 block text-2xl font-bold text-white">{formatHumanDate(project.updatedAt)}</span>
+            </div>
+          </div>
         </div>
       </header>
 
-      <div className="flex flex-wrap gap-2 border-b border-line pb-3">
-        {tabs.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            className={`h-9 rounded-md px-3 text-sm font-medium ${activeTab === tab.value ? "bg-steel-900 text-white" : "hover:bg-line/50"}`}
-            onClick={() => setActiveTab(tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-line bg-white p-1 shadow-sm" role="tablist">
+          {tabs.map((tab) => {
+            const selected = activeTab === tab.value;
+            return (
+              <button
+                key={tab.value}
+                type="button"
+                className={`flex h-9 items-center gap-2 rounded-md px-3 text-sm font-semibold transition ${
+                  selected ? "bg-steel-700 text-white shadow-sm" : "text-slate-600 hover:bg-shell hover:text-ink"
+                }`}
+                onClick={() => setActiveTab(tab.value)}
+              >
+                {tab.label}
+                <span className={`rounded-full px-2 py-0.5 text-[11px] ${selected ? "bg-white/18 text-white" : "bg-steel-100 text-slate-500"}`}>{tabCounts[tab.value]}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {activeTab === "tasks" ? (
+            <>
+              <ViewToggle value={viewMode} onChange={setViewMode} />
+              <Button icon={<Filter size={15} />}>Filter</Button>
+            </>
+          ) : null}
+          {activeTab !== "tasks" ? (
+            <Button variant="primary" icon={<Plus size={16} />} onClick={runActiveTabAction}>
+              {activeTabActionLabels[activeTab]}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {activeTab === "tasks" ? (
@@ -280,6 +413,18 @@ export function ProjectDetailPage() {
             onDelete={(item) => void deleteBacklogItem(item)}
           />
         )
+      ) : null}
+
+      {activeTab === "import" ? (
+        <WikiImportPanel
+          sourcePath={wikiImportSourcePath}
+          report={wikiImport.preview}
+          loading={wikiImport.loading}
+          error={wikiImport.error}
+          onSourcePathChange={setWikiImportSourcePath}
+          onPreview={() => void previewWikiImport()}
+          onRun={() => void runWikiImport()}
+        />
       ) : null}
 
       {activeTab === "notes" ? (

@@ -1,0 +1,51 @@
+# UC 05/03: Mitarbeiter-Termine anzeigen
+
+## Metadaten
+
+- Feature: [FT (05): Mitarbeiterverwaltung](../ft-05-mitarbeiterverwaltung.md)
+
+## Akteur
+
+Administrator, Disponent, Leser
+
+## Ziel
+
+Die Stammdaten eines Mitarbeiters einsehen und nachvollziehen, welchen Terminen dieser Mitarbeiter aktuell oder in der Vergangenheit zugeordnet ist.
+
+## Vorbedingungen
+
+- Der Mitarbeiter existiert.
+- Der Nutzer ist berechtigt, Mitarbeiterdaten einzusehen.
+
+**Auslöser**
+
+Der Nutzer wählt einen Mitarbeiter zur Anzeige aus.
+
+## Ablauf
+
+1. Der Nutzer wählt einen bestehenden Mitarbeiter aus.
+2. Das System zeigt die Stammdaten des Mitarbeiters an.
+3. Das System ermittelt alle Termine (Terminauswahl in der Sidebar und alle Termine auf Anfrage), denen der Mitarbeiter zugewiesen ist, über die Termin-Mitarbeiter-Relation.
+4. Das System zeigt zu jedem Termin die relevanten Informationen an.
+5. Das System stellt sicher, dass auch vergangene Termine angezeigt werden.
+
+
+## Alternativen
+
+- Dem Mitarbeiter sind keine Termine zugewiesen: Das System zeigt eine leere Terminliste an.
+
+## Alternativen
+
+
+## Ergebnis
+
+Die Stammdaten des Mitarbeiters sowie eine vollständige Übersicht aller zugeordneten Termine sind sichtbar.
+
+Die Terminliste bildet die Einsatzhistorie des Mitarbeiters ab.
+
+**Angezeigte Informationen (Terminliste)**
+
+- Terminzeitraum (Start- und ggf. Enddatum)
+- Terminbezeichnung
+- Zugeordnete Tour
+- Zugeordneter Kunde

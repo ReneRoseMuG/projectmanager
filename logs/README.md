@@ -2,6 +2,10 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 17.05.26 | Fix | Project-Detail-Hero | ✅ |
+| 17.05.26 | Fix | Feature-Input Container | ✅ |
+| 16.05.26 | Fix | Import-Tab Position | ✅ |
+| 16.05.26 | Feature | Wiki-Import | ✅ |
 | 16.05.26 | 12 | GlobalSearch, Avatar und API-Health | ✅ |
 | 16.05.26 | 11 | NotFound und ErrorBoundary | ✅ |
 | 16.05.26 | 10 | EmptyState | ✅ |
