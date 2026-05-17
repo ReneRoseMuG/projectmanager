@@ -1,5 +1,5 @@
 import type { FeatureRelation, FeatureRelationInput, Task } from "@taskmanager/shared-types";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureRelations, features, projectFeatures, projects, taskFeatures, taskUseCases, tasks, useCases } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
@@ -333,7 +333,7 @@ export function setFeatureRelations(database: DbClient, featureId: number, relat
   );
 
   database.transaction((tx) => {
-    tx.delete(featureRelations).where(eq(featureRelations.sourceFeatureId, featureId)).run();
+    tx.delete(featureRelations).where(or(eq(featureRelations.sourceFeatureId, featureId), eq(featureRelations.targetFeatureId, featureId))).run();
     if (normalized.length > 0) {
       tx.insert(featureRelations)
         .values(

@@ -1,9 +1,12 @@
 import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { projects, tasks } from "../db/schema.js";
+import { backlogItems, projects, tasks, tickets } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
+import { deleteProjectAttachmentsForIds, deleteTaskAttachmentsForIds, deleteTicketAttachmentsForIds } from "./attachments.service.js";
+import { deleteCommentsForEntities, deleteCommentsForEntity } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
+import { deleteProjectNotesForIds, deleteTaskNotesForIds, deleteTicketNotesForIds } from "./notes.service.js";
 import { getProjectTags, getProjectTagsMap } from "./tags.service.js";
 
 type ProjectRecord = typeof projects.$inferSelect;
@@ -146,7 +149,28 @@ export function updateProject(database: DbClient, id: number, input: ProjectUpda
   return mapProject(database, updated, counts.get(id));
 }
 
-export function deleteProject(database: DbClient, id: number): void {
+export async function deleteProject(database: DbClient, id: number): Promise<void> {
+  const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, id)).get();
+  if (!project) {
+    throw notFound(`Project with id ${id} not found`);
+  }
+
+  const taskIds = database.select({ id: tasks.id }).from(tasks).where(eq(tasks.projectId, id)).all().map((task) => task.id);
+  const ticketIds = database.select({ id: tickets.id }).from(tickets).where(eq(tickets.projectId, id)).all().map((ticket) => ticket.id);
+  const backlogItemIds = database.select({ id: backlogItems.id }).from(backlogItems).where(eq(backlogItems.projectId, id)).all().map((item) => item.id);
+
+  await deleteProjectAttachmentsForIds(database, [id]);
+  await deleteTaskAttachmentsForIds(database, taskIds);
+  await deleteTicketAttachmentsForIds(database, ticketIds);
+
+  deleteCommentsForEntity(database, "project", id);
+  deleteCommentsForEntities(database, "task", taskIds);
+  deleteCommentsForEntities(database, "ticket", ticketIds);
+  deleteCommentsForEntities(database, "backlogItem", backlogItemIds);
+  deleteProjectNotesForIds(database, [id]);
+  deleteTaskNotesForIds(database, taskIds);
+  deleteTicketNotesForIds(database, ticketIds);
+
   const result = database.delete(projects).where(eq(projects.id, id)).run();
   if (result.changes === 0) {
     throw notFound(`Project with id ${id} not found`);

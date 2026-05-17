@@ -170,7 +170,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     "/tickets/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteTicket(app.db, request.params.id);
+      await deleteTicket(app.db, request.params.id);
       return reply.status(204).send();
     }
   );

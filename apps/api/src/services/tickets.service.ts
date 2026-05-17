@@ -12,10 +12,10 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { projects, ticketRelations, tickets } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import { listTicketAttachments } from "./attachments.service.js";
-import { listEntityComments } from "./comments.service.js";
+import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
+import { deleteCommentsForEntities, listEntityComments } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
-import { listTicketNotes } from "./notes.service.js";
+import { deleteTicketNotesForIds, listTicketNotes } from "./notes.service.js";
 import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
 
 type TicketRecord = typeof tickets.$inferSelect;
@@ -49,6 +49,32 @@ function getSubTicketCounts(database: DbClient, ticketIds: number[]): Map<number
   }
 
   return counts;
+}
+
+function collectTicketSubtreeIds(database: DbClient, ticketId: number): number[] {
+  const root = getTicketRecord(database, ticketId);
+  const rows = database.select({ id: tickets.id, parentId: tickets.parentId }).from(tickets).where(eq(tickets.projectId, root.projectId)).all();
+  const childrenByParent = new Map<number, number[]>();
+
+  for (const row of rows) {
+    if (row.parentId !== null) {
+      childrenByParent.set(row.parentId, [...(childrenByParent.get(row.parentId) ?? []), row.id]);
+    }
+  }
+
+  const ids: number[] = [];
+  const queue = [ticketId];
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    if (currentId === undefined) {
+      continue;
+    }
+
+    ids.push(currentId);
+    queue.push(...(childrenByParent.get(currentId) ?? []));
+  }
+
+  return ids;
 }
 
 function nextPosition(database: DbClient, projectId: number, status: TicketRecord["status"], parentId: number | null): number {
@@ -296,7 +322,13 @@ export function updateTicketPosition(database: DbClient, id: number, input: Tick
   return mapTicket(database, updated);
 }
 
-export function deleteTicket(database: DbClient, id: number): void {
+export async function deleteTicket(database: DbClient, id: number): Promise<void> {
+  const ticketIds = collectTicketSubtreeIds(database, id);
+
+  await deleteTicketAttachmentsForIds(database, ticketIds);
+  deleteCommentsForEntities(database, "ticket", ticketIds);
+  deleteTicketNotesForIds(database, ticketIds);
+
   const result = database.delete(tickets).where(eq(tickets.id, id)).run();
   if (result.changes === 0) {
     throw notFound(`Ticket with id ${id} not found`);

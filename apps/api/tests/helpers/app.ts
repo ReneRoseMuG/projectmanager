@@ -1,4 +1,7 @@
 import Fastify from "fastify";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import type { TestDb } from "./db.js";
 import type { GoogleDriveBackupClient } from "../../src/services/google-drive.service.js";
 
@@ -21,6 +24,12 @@ const unavailableDriveClient: GoogleDriveBackupClient = {
 
 export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions = {}) {
   const app = Fastify({ logger: false });
+  const contentDir = await fs.mkdtemp(path.join(os.tmpdir(), "taskmanager-api-content-"));
+  const { setContentBaseDir } = await import("../../src/services/content.service.js");
+  setContentBaseDir(contentDir);
+  app.addHook("onClose", async () => {
+    await fs.rm(contentDir, { recursive: true, force: true });
+  });
 
   app.decorate("db", testDb.db);
   app.decorate("sqlite", testDb.sqlite);

@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { backlogItems, features, projects, useCases } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
+import { deleteCommentsForEntity } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 
 type BacklogRecord = typeof backlogItems.$inferSelect;
@@ -205,6 +206,8 @@ export function updateBacklogItem(database: DbClient, id: number, input: Backlog
 }
 
 export function deleteBacklogItem(database: DbClient, id: number): void {
+  getBacklogRecord(database, id);
+  deleteCommentsForEntity(database, "backlogItem", id);
   const result = database.delete(backlogItems).where(eq(backlogItems.id, id)).run();
   if (result.changes === 0) {
     throw notFound(`Backlog item with id ${id} not found`);

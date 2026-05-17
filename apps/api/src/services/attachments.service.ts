@@ -1,5 +1,5 @@
 import type { Attachment } from "@taskmanager/shared-types";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -11,6 +11,7 @@ import { notFound } from "../utils/errors.js";
 import { removeAttachmentPreviews } from "./attachment-preview.service.js";
 
 type AttachmentRecord = typeof attachments.$inferSelect;
+type AttachmentCleanupRecord = Pick<AttachmentRecord, "id" | "filename">;
 
 export interface AttachmentUpload {
   originalName: string;
@@ -65,6 +66,25 @@ function ensureTicketExists(database: DbClient, ticketId: number): void {
 function makeFilename(originalName: string): string {
   const extension = path.extname(originalName);
   return `${randomUUID()}${extension}`;
+}
+
+async function removeAttachmentFiles(records: AttachmentCleanupRecord[]): Promise<void> {
+  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
+
+  for (const record of records) {
+    const diskPath = path.join(config.uploadDir, record.filename);
+    await fs.rm(diskPath, { force: true });
+    await removeAttachmentPreviews(record.id);
+  }
+}
+
+async function deleteAttachmentRecords(database: DbClient, records: AttachmentCleanupRecord[]): Promise<void> {
+  if (records.length === 0) {
+    return;
+  }
+
+  database.delete(attachments).where(inArray(attachments.id, records.map((record) => record.id))).run();
+  await removeAttachmentFiles(records);
 }
 
 async function persistAttachment(values: {
@@ -144,6 +164,46 @@ export function listTicketAttachments(database: DbClient, ticketId: number): Att
     .map(mapAttachment);
 }
 
+export async function deleteProjectAttachmentsForIds(database: DbClient, projectIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(projectIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const records = database.select({ id: attachments.id, filename: attachments.filename }).from(attachments).where(inArray(attachments.projectId, uniqueIds)).all();
+  await deleteAttachmentRecords(database, records);
+}
+
+export async function deleteTaskAttachmentsForIds(database: DbClient, taskIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(taskIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const records = database.select({ id: attachments.id, filename: attachments.filename }).from(attachments).where(inArray(attachments.taskId, uniqueIds)).all();
+  await deleteAttachmentRecords(database, records);
+}
+
+export async function deleteFeatureAttachmentsForIds(database: DbClient, featureIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(featureIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const records = database.select({ id: attachments.id, filename: attachments.filename }).from(attachments).where(inArray(attachments.featureId, uniqueIds)).all();
+  await deleteAttachmentRecords(database, records);
+}
+
+export async function deleteTicketAttachmentsForIds(database: DbClient, ticketIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(ticketIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const records = database.select({ id: attachments.id, filename: attachments.filename }).from(attachments).where(inArray(attachments.ticketId, uniqueIds)).all();
+  await deleteAttachmentRecords(database, records);
+}
+
 export async function createProjectAttachment(database: DbClient, projectId: number, upload: AttachmentUpload): Promise<Attachment> {
   ensureProjectExists(database, projectId);
   return persistAttachment({ database, projectId, upload });
@@ -165,15 +225,10 @@ export async function createTicketAttachment(database: DbClient, ticketId: numbe
 }
 
 export async function deleteAttachment(database: DbClient, id: number): Promise<void> {
-  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   const record = database.select().from(attachments).where(eq(attachments.id, id)).get();
   if (!record) {
     throw notFound(`Attachment with id ${id} not found`);
   }
 
-  database.delete(attachments).where(eq(attachments.id, id)).run();
-
-  const diskPath = path.join(config.uploadDir, record.filename);
-  await fs.rm(diskPath, { force: true });
-  await removeAttachmentPreviews(id);
+  await deleteAttachmentRecords(database, [record]);
 }

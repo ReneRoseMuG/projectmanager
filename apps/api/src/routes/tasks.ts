@@ -82,7 +82,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/tasks/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteTask(app.db, request.params.id);
+      await deleteTask(app.db, request.params.id);
       return reply.status(204).send();
     }
   );

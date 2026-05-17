@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { features, useCases } from "../db/schema.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
+import { deleteCommentsForEntity } from "./comments.service.js";
 import {
   buildFilename,
   buildStoredContentPath,
@@ -209,6 +210,7 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
 
 export function deleteUseCase(database: DbClient, id: number): void {
   const useCase = getUseCaseRecord(database, id);
+  deleteCommentsForEntity(database, "useCase", id);
   database.delete(useCases).where(eq(useCases.id, id)).run();
 
   if (useCase.contentPath) {

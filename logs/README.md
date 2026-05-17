@@ -2,6 +2,9 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 17.05.26 | Fix | Delete-Cascade-Tests | ✅ |
+| 17.05.26 | Fix | Delete-Cascade-Cleanup | ✅ |
+| 17.05.26 | Fix | Wiki-Import Feature-Content | ✅ |
 | 17.05.26 | 11 | Ticket-Tests | ✅ |
 | 17.05.26 | 10 | Ticket-Seed-Daten | ✅ |
 | 17.05.26 | 9 | Ticket-Globale-Suche | ✅ |

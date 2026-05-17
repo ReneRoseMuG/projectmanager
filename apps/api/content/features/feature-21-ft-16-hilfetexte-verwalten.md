@@ -32,24 +32,3 @@ Die Verwaltung (CRUD) der Hilfetexte ist ausschließlich der Rolle Admin vorbeha
 Die Anzeige der Hilfetexte ist für alle Rollen erlaubt, sofern der Text aktiv ist.
 
 Der Inhalt wird als Markdown gespeichert; externe Ressourcen- oder Dateipfadabhängigkeiten aus dem Client sind nicht vorgesehen.
-
-## Use Cases
-
-- [UC 16/01: Hilfetext anzeigen (kontextbezogen)](use-cases/uc-16-01-hilfetext-anzeigen-kontextbezogen.md)
-- [UC 16/02: Hilfetext anlegen](use-cases/uc-16-02-hilfetext-anlegen.md)
-- [UC 16/03: Hilfetext bearbeiten](use-cases/uc-16-03-hilfetext-bearbeiten.md)
-- [UC 16/04: Hilfetext aktivieren/deaktivieren](use-cases/uc-16-04-hilfetext-aktivieren-deaktivieren.md)
-- [UC 16/05: Hilfetexte durchsuchen und anzeigen](use-cases/uc-16-05-hilfetexte-durchsuchen-und-anzeigen.md)
-- [UC 16/06: Hilfetext löschen](use-cases/uc-16-06-hilfetext-loeschen.md)
-- [UC 16/07: Versionskonflikt bei paralleler Bearbeitung eines Hilfetextes](use-cases/uc-16-07-versionskonflikt-bei-paralleler-bearbeitung-eines-hilfetextes.md)
-- [UC 16/08: Unberechtigter Zugriff auf Hilfetext-Verwaltung verhindern](use-cases/uc-16-08-unberechtigter-zugriff-auf-hilfetext-verwaltung-verhindern.md)
-- [UC 16/09: Hilfetexte aus Datei importieren](use-cases/uc-16-09-hilfetexte-aus-datei-importieren.md)
-- [UC 16/10: Hilfetexte in Datei exportieren](use-cases/uc-16-10-hilfetexte-in-datei-exportieren.md)
-
-## Backlogs
-
-
-## Architektur & Kontext
-
-
-## Entscheidungen & Offene Punkte

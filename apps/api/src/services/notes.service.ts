@@ -1,5 +1,5 @@
 import type { Note, NoteInput } from "@taskmanager/shared-types";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { notes, projectNotes, projects, taskNotes, tasks, ticketNotes, tickets } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
@@ -201,6 +201,45 @@ export function deleteNote(database: DbClient, id: number): void {
   if (result.changes === 0) {
     throw notFound(`Note with id ${id} not found`);
   }
+}
+
+function deleteNotesByIds(database: DbClient, noteIds: number[]): void {
+  const uniqueIds = [...new Set(noteIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  database.delete(notes).where(inArray(notes.id, uniqueIds)).run();
+}
+
+export function deleteProjectNotesForIds(database: DbClient, projectIds: number[]): void {
+  const uniqueIds = [...new Set(projectIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const rows = database.select({ noteId: projectNotes.noteId }).from(projectNotes).where(inArray(projectNotes.projectId, uniqueIds)).all();
+  deleteNotesByIds(database, rows.map((row) => row.noteId));
+}
+
+export function deleteTaskNotesForIds(database: DbClient, taskIds: number[]): void {
+  const uniqueIds = [...new Set(taskIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const rows = database.select({ noteId: taskNotes.noteId }).from(taskNotes).where(inArray(taskNotes.taskId, uniqueIds)).all();
+  deleteNotesByIds(database, rows.map((row) => row.noteId));
+}
+
+export function deleteTicketNotesForIds(database: DbClient, ticketIds: number[]): void {
+  const uniqueIds = [...new Set(ticketIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const rows = database.select({ noteId: ticketNotes.noteId }).from(ticketNotes).where(inArray(ticketNotes.ticketId, uniqueIds)).all();
+  deleteNotesByIds(database, rows.map((row) => row.noteId));
 }
 
 export function deleteTicketNote(database: DbClient, ticketId: number, noteId: number): void {
