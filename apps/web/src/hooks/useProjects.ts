@@ -1,5 +1,6 @@
-import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import type { ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import {
   createProject as createProjectRequest,
   deleteProject as deleteProjectRequest,
@@ -8,65 +9,94 @@ import {
   setProjectTags,
   updateProject as updateProjectRequest
 } from "../api/projects";
-import { errorMessage } from "./errors";
+import { invalidateProjectScope, invalidateProjects } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export function useProjects(projectId?: number) {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const validProjectId = projectId !== undefined && Number.isFinite(projectId) ? projectId : undefined;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const items = await getProjects();
-      setProjects(items);
-      if (projectId) {
-        setProject(await getProject(projectId));
-      }
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const projectsQuery = useQuery({
+    queryKey: queryKeys.projects.list(),
+    queryFn: getProjects
+  });
+
+  const projectQuery = useQuery({
+    queryKey: queryKeys.projects.detail(validProjectId ?? 0),
+    queryFn: () => getProject(validProjectId as number),
+    enabled: validProjectId !== undefined
+  });
+
+  const reload = useCallback(async () => {
+    await projectsQuery.refetch();
+    if (validProjectId !== undefined) {
+      await projectQuery.refetch();
     }
-  }, [projectId]);
+  }, [projectQuery, projectsQuery, validProjectId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const createProject = useCallback(
-    async (input: ProjectInput, tagIds: number[] = []) => {
+  const createProjectMutation = useMutation({
+    mutationFn: async ({ input, tagIds }: { input: ProjectInput; tagIds: number[] }) => {
       const created = await createProjectRequest(input);
       if (tagIds.length > 0) {
         await setProjectTags(created.id, tagIds);
       }
-      await load();
       return created;
     },
-    [load]
-  );
+    onSuccess: async (created) => {
+      await invalidateProjectScope(queryClient, created.id);
+    }
+  });
 
-  const updateProject = useCallback(
-    async (id: number, input: ProjectUpdate, tagIds?: number[]) => {
+  const updateProjectMutation = useMutation({
+    mutationFn: async ({ id, input, tagIds }: { id: number; input: ProjectUpdate; tagIds?: number[] }) => {
       const updated = await updateProjectRequest(id, input);
       if (tagIds) {
         await setProjectTags(id, tagIds);
       }
-      await load();
       return updated;
     },
-    [load]
+    onSuccess: async (updated) => {
+      await invalidateProjectScope(queryClient, updated.id);
+    }
+  });
+
+  const removeProjectMutation = useMutation({
+    mutationFn: deleteProjectRequest,
+    onSuccess: async () => {
+      await invalidateProjects(queryClient);
+    }
+  });
+
+  const createProject = useCallback(
+    async (input: ProjectInput, tagIds: number[] = []) => {
+      return createProjectMutation.mutateAsync({ input, tagIds });
+    },
+    [createProjectMutation]
+  );
+
+  const updateProject = useCallback(
+    async (id: number, input: ProjectUpdate, tagIds?: number[]) => {
+      return updateProjectMutation.mutateAsync({ id, input, tagIds });
+    },
+    [updateProjectMutation]
   );
 
   const removeProject = useCallback(
     async (id: number) => {
-      await deleteProjectRequest(id);
-      await load();
+      await removeProjectMutation.mutateAsync(id);
     },
-    [load]
+    [removeProjectMutation]
   );
 
-  return { projects, project, loading, error, reload: load, createProject, updateProject, removeProject };
+  return {
+    projects: projectsQuery.data ?? [],
+    project: projectQuery.data ?? null,
+    loading: projectsQuery.isLoading || projectQuery.isLoading,
+    error: toQueryError(projectsQuery.error ?? projectQuery.error),
+    reload,
+    createProject,
+    updateProject,
+    removeProject
+  };
 }

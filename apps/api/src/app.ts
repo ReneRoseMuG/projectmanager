@@ -21,6 +21,7 @@ import { registerUseCasesRoutes } from "./routes/use-cases.js";
 import { registerWikiRoutes } from "./routes/wiki.js";
 import { config } from "./config.js";
 import { createGoogleDriveBackupClient, type GoogleDriveBackupClient } from "./services/google-drive.service.js";
+import { getEffectiveGoogleDriveBackupFolderId } from "./services/drive-config.service.js";
 import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
 import { registerAdminSeedRunRoutes } from "./routes/admin-seed-runs.js";
 import { errorHandler } from "./utils/errors.js";
@@ -29,15 +30,16 @@ import type Database from "better-sqlite3";
 export async function buildApp(
   injectedDb: typeof db = db,
   injectedSqlite: Database.Database = sqlite,
-  injectedDriveClient: GoogleDriveBackupClient = createGoogleDriveBackupClient()
+  injectedDriveClient?: GoogleDriveBackupClient
 ): Promise<FastifyInstance> {
   assertSafeTestRuntimeTargets(config);
 
   const app = Fastify({ logger: true });
+  const driveClient = injectedDriveClient ?? createGoogleDriveBackupClient(() => getEffectiveGoogleDriveBackupFolderId(injectedDb));
 
   app.decorate("db", injectedDb);
   app.decorate("sqlite", injectedSqlite);
-  app.decorate("driveClient", injectedDriveClient);
+  app.decorate("driveClient", driveClient);
   app.setErrorHandler(errorHandler);
 
   await registerCors(app);

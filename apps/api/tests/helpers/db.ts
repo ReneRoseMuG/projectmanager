@@ -41,12 +41,14 @@ export function createFileTestDb(databasePath: string) {
 export function truncateAll(sqlite: Database.Database): void {
   const tables = [
     "seed_run_items",
+    "app_settings",
     "task_use_cases",
     "task_features",
     "project_features",
     "backlog_items",
     "use_cases",
     "wiki_pages",
+    "feature_relations",
     "features",
     "comments",
     "task_tags",

@@ -1,9 +1,12 @@
 import type { WikiImportReport } from "@taskmanager/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { previewWikiImport, runWikiImport } from "../api/imports";
+import { invalidateSeedData } from "../queries/invalidation";
 import { errorMessage } from "./errors";
 
 export function useWikiImport(projectId?: number) {
+  const queryClient = useQueryClient();
   const [preview, setPreview] = useState<WikiImportReport | null>(null);
   const [result, setResult] = useState<WikiImportReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,6 +47,7 @@ export function useWikiImport(projectId?: number) {
         const report = await runWikiImport(projectId, { sourcePath });
         setResult(report);
         setPreview(report);
+        await invalidateSeedData(queryClient);
         return report;
       } catch (runError) {
         setError(errorMessage(runError));
@@ -52,7 +56,7 @@ export function useWikiImport(projectId?: number) {
         setLoading(false);
       }
     },
-    [projectId]
+    [projectId, queryClient]
   );
 
   return {

@@ -2,6 +2,10 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 17.05.26 | Feature | Query-Sync-Testabdeckung | ✅ |
+| 17.05.26 | Fix | Test-only Fehlerbehebung | ✅ |
+| 17.05.26 | Feature | Drive-Konfiguration UI | ✅ |
+| 17.05.26 | Feature | Global Query Sync | ✅ |
 | 17.05.26 | Fix | Board Card Width | ✅ |
 | 17.05.26 | Fix | ListBoard Add Buttons | ✅ |
 | 17.05.26 | Feature | Attachment-Previews | ✅ |

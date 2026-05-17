@@ -1,5 +1,6 @@
-import type { Feature, FeatureInput, FeatureUpdate } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import type { FeatureInput, FeatureUpdate } from "@taskmanager/shared-types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import {
   createFeature as createFeatureRequest,
   deleteFeature as deleteFeatureRequest,
@@ -7,61 +8,82 @@ import {
   getFeatures,
   updateFeature as updateFeatureRequest
 } from "../api/features";
-import { errorMessage } from "./errors";
+import { invalidateFeatureScope } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export function useFeatures(featureId?: number) {
-  const [features, setFeatures] = useState<Feature[]>([]);
-  const [feature, setFeature] = useState<Feature | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const validFeatureId = featureId !== undefined && Number.isFinite(featureId) ? featureId : undefined;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const items = await getFeatures();
-      setFeatures(items);
-      if (featureId) {
-        setFeature(await getFeature(featureId));
-      } else {
-        setFeature(null);
-      }
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const featuresQuery = useQuery({
+    queryKey: queryKeys.features.list(),
+    queryFn: getFeatures
+  });
+
+  const featureQuery = useQuery({
+    queryKey: queryKeys.features.detail(validFeatureId ?? 0),
+    queryFn: () => getFeature(validFeatureId as number),
+    enabled: validFeatureId !== undefined
+  });
+
+  const reload = useCallback(async () => {
+    await featuresQuery.refetch();
+    if (validFeatureId !== undefined) {
+      await featureQuery.refetch();
     }
-  }, [featureId]);
+  }, [featureQuery, featuresQuery, validFeatureId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const createFeatureMutation = useMutation({
+    mutationFn: createFeatureRequest,
+    onSuccess: async (created) => {
+      await invalidateFeatureScope(queryClient, created.id);
+    }
+  });
+
+  const updateFeatureMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: FeatureUpdate }) => updateFeatureRequest(id, input),
+    onSuccess: async (updated) => {
+      await invalidateFeatureScope(queryClient, updated.id);
+    }
+  });
+
+  const removeFeatureMutation = useMutation({
+    mutationFn: deleteFeatureRequest,
+    onSuccess: async (_result, id) => {
+      await invalidateFeatureScope(queryClient, id);
+    }
+  });
 
   const createFeature = useCallback(
     async (input: FeatureInput) => {
-      const created = await createFeatureRequest(input);
-      await load();
-      return created;
+      return createFeatureMutation.mutateAsync(input);
     },
-    [load]
+    [createFeatureMutation]
   );
 
   const updateFeature = useCallback(
     async (id: number, input: FeatureUpdate) => {
-      const updated = await updateFeatureRequest(id, input);
-      await load();
-      return updated;
+      return updateFeatureMutation.mutateAsync({ id, input });
     },
-    [load]
+    [updateFeatureMutation]
   );
 
   const removeFeature = useCallback(
     async (id: number) => {
-      await deleteFeatureRequest(id);
-      await load();
+      await removeFeatureMutation.mutateAsync(id);
     },
-    [load]
+    [removeFeatureMutation]
   );
 
-  return { features, feature, loading, error, reload: load, createFeature, updateFeature, removeFeature };
+  return {
+    features: featuresQuery.data ?? [],
+    feature: featureQuery.data ?? null,
+    loading: featuresQuery.isLoading || featureQuery.isLoading,
+    error: toQueryError(featuresQuery.error ?? featureQuery.error),
+    reload,
+    createFeature,
+    updateFeature,
+    removeFeature
+  };
 }

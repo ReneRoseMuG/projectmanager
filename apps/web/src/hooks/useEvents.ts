@@ -1,59 +1,80 @@
 import type { CalendarEvent, EventInput, EventUpdate } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import {
   createEvent as createEventRequest,
   deleteEvent as deleteEventRequest,
   getEvents,
   updateEvent as updateEventRequest
 } from "../api/events";
-import { errorMessage } from "./errors";
+import { invalidateEvents } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
+
+function rangeKey(range?: { from?: string; to?: string }): string {
+  return `${range?.from ?? "open"}:${range?.to ?? "open"}`;
+}
 
 export function useEvents(range?: { from?: string; to?: string }) {
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const eventsQuery = useQuery({
+    queryKey: queryKeys.events.list(rangeKey(range)),
+    queryFn: () => getEvents(range)
+  });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setEvents(await getEvents(range));
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const reload = useCallback(async () => {
+    await eventsQuery.refetch();
+  }, [eventsQuery]);
+
+  const createEventMutation = useMutation({
+    mutationFn: createEventRequest,
+    onSuccess: async () => {
+      await invalidateEvents(queryClient);
     }
-  }, [range]);
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const updateEventMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: EventUpdate }) => updateEventRequest(id, input),
+    onSuccess: async () => {
+      await invalidateEvents(queryClient);
+    }
+  });
+
+  const removeEventMutation = useMutation({
+    mutationFn: deleteEventRequest,
+    onSuccess: async () => {
+      await invalidateEvents(queryClient);
+    }
+  });
 
   const createEvent = useCallback(
     async (input: EventInput) => {
-      const created = await createEventRequest(input);
-      await load();
-      return created;
+      return createEventMutation.mutateAsync(input);
     },
-    [load]
+    [createEventMutation]
   );
 
   const updateEvent = useCallback(
     async (id: number, input: EventUpdate) => {
-      const updated = await updateEventRequest(id, input);
-      await load();
-      return updated;
+      return updateEventMutation.mutateAsync({ id, input });
     },
-    [load]
+    [updateEventMutation]
   );
 
   const removeEvent = useCallback(
     async (id: number) => {
-      await deleteEventRequest(id);
-      await load();
+      await removeEventMutation.mutateAsync(id);
     },
-    [load]
+    [removeEventMutation]
   );
 
-  return { events, loading, error, reload: load, createEvent, updateEvent, removeEvent };
+  return {
+    events: eventsQuery.data ?? ([] as CalendarEvent[]),
+    loading: eventsQuery.isLoading,
+    error: toQueryError(eventsQuery.error),
+    reload,
+    createEvent,
+    updateEvent,
+    removeEvent
+  };
 }

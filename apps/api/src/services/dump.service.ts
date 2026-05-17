@@ -32,6 +32,7 @@ function createArchive(): Archiver {
 }
 
 const DUMP_TABLES = [
+  { key: "appSettings", tableName: "app_settings" },
   { key: "seedRuns", tableName: "seed_runs" },
   { key: "projects", tableName: "projects" },
   { key: "tags", tableName: "tags" },

@@ -15,7 +15,7 @@
  * Nachweis eines echten Roundtrips gegen temporäre SQLite-Datei und temporäre Datei-Verzeichnisse
  * sowie Absicherung der fehlertoleranten, aber konsistenzerhaltenden Importlogik.
  */
-import type { DumpDriveApplyResult, DumpDriveFile, DumpDrivePreviewResult } from "@taskmanager/shared-types";
+import type { DumpDriveApplyResult, DumpDriveConfig, DumpDriveFile, DumpDrivePreviewResult } from "@taskmanager/shared-types";
 import * as archiverPackage from "archiver";
 import type { Archiver } from "archiver";
 import crypto from "node:crypto";
@@ -103,8 +103,15 @@ let tempRoot: string;
 let uploadDir: string;
 let contentDir: string;
 let backupDir: string;
+let previewDir: string;
 let testDb: TestDb;
 let driveClient: FakeDriveClient;
+const originalGoogleConfig = {
+  googleDriveBackupFolderId: config.googleDriveBackupFolderId,
+  googleDriveClientId: config.googleDriveClientId,
+  googleDriveClientSecret: config.googleDriveClientSecret,
+  googleDriveRefreshToken: config.googleDriveRefreshToken
+};
 
 function quoteIdentifier(value: string): string {
   return `"${value.replace(/"/g, "\"\"")}"`;
@@ -162,6 +169,8 @@ function seedCompleteDataset(): void {
   fs.writeFileSync(path.join(contentDir, "wiki", "root.md"), "# Wiki Root", "utf8");
 
   testDb.sqlite.exec(`
+    INSERT INTO app_settings (key, value, updated_at)
+      VALUES ('googleDriveBackupFolderId', 'drive-folder-seeded', '2026-05-17T08:00:00');
     INSERT INTO projects (id, name, description, status, color, start_date, due_date, created_at, updated_at)
       VALUES (1, 'Projekt Alpha', 'Beschreibung', 'active', '#123456', '2026-05-01', '2026-05-31', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO tags (id, name, color) VALUES (1, 'Wichtig', '#ff0000');
@@ -253,12 +262,19 @@ beforeEach(() => {
   uploadDir = path.join(tempRoot, "uploads");
   contentDir = path.join(tempRoot, "content");
   backupDir = path.join(tempRoot, "backups");
+  previewDir = path.join(tempRoot, "previews");
   fs.mkdirSync(uploadDir, { recursive: true });
   fs.mkdirSync(contentDir, { recursive: true });
   fs.mkdirSync(backupDir, { recursive: true });
+  fs.mkdirSync(previewDir, { recursive: true });
   config.uploadDir = uploadDir;
   config.backupWorkDir = backupDir;
+  config.previewCacheDir = previewDir;
   config.databasePath = path.join(tempRoot, "taskmanager.sqlite");
+  config.googleDriveBackupFolderId = null;
+  config.googleDriveClientId = "test-client-id";
+  config.googleDriveClientSecret = "test-client-secret";
+  config.googleDriveRefreshToken = "test-refresh-token";
   setContentBaseDir(contentDir);
   testDb = createFileTestDb(config.databasePath);
   driveClient = new FakeDriveClient();
@@ -268,6 +284,10 @@ beforeEach(() => {
 afterEach(() => {
   testDb.sqlite.close();
   fs.rmSync(tempRoot, { recursive: true, force: true });
+  config.googleDriveBackupFolderId = originalGoogleConfig.googleDriveBackupFolderId;
+  config.googleDriveClientId = originalGoogleConfig.googleDriveClientId;
+  config.googleDriveClientSecret = originalGoogleConfig.googleDriveClientSecret;
+  config.googleDriveRefreshToken = originalGoogleConfig.googleDriveRefreshToken;
 });
 
 describe("Dump table contract", () => {
@@ -279,6 +299,40 @@ describe("Dump table contract", () => {
 
     expect(registeredTables).toEqual(databaseTables);
     expect(new Set(DUMP_TABLE_KEYS).size).toBe(DUMP_TABLE_KEYS.length);
+  });
+});
+
+describe("Google Drive backup config", () => {
+  it("speichert eine kopierte Google-Drive-Ordner-URL als normalisierte Folder-ID", async () => {
+    const app = await buildTestApp(testDb, { driveClient });
+
+    const response = await supertest(app.server)
+      .put("/api/dumps/drive/config")
+      .send({ folderInput: "https://drive.google.com/drive/folders/drive-folder-123_ABC?usp=sharing" })
+      .expect(200);
+    const updated = response.body as DumpDriveConfig;
+
+    expect(updated.folderId).toBe("drive-folder-123_ABC");
+    expect(updated.folderUrl).toBe("https://drive.google.com/drive/folders/drive-folder-123_ABC");
+    expect(updated.source).toBe("database");
+    expect(updated.ready).toBe(true);
+    expect(testDb.sqlite.prepare("SELECT value FROM app_settings WHERE key = ?").get("googleDriveBackupFolderId")).toEqual({
+      value: "drive-folder-123_ABC"
+    });
+
+    const loaded = (await supertest(app.server).get("/api/dumps/drive/config").expect(200)).body as DumpDriveConfig;
+    expect(loaded.folderId).toBe("drive-folder-123_ABC");
+    await app.close();
+  });
+
+  it("weist ungültige Ordner-Eingaben zurück und lässt die gespeicherte ID unverändert", async () => {
+    const app = await buildTestApp(testDb, { driveClient });
+    const before = testDb.sqlite.prepare("SELECT value FROM app_settings WHERE key = ?").get("googleDriveBackupFolderId");
+
+    await supertest(app.server).put("/api/dumps/drive/config").send({ folderInput: "C:\\Backup\\Google Drive" }).expect(400);
+
+    expect(testDb.sqlite.prepare("SELECT value FROM app_settings WHERE key = ?").get("googleDriveBackupFolderId")).toEqual(before);
+    await app.close();
   });
 });
 

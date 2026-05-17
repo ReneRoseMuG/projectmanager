@@ -1,5 +1,6 @@
 import type { WikiBreadcrumb, WikiPage, WikiPageInput, WikiPageUpdate } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import {
   createWikiPage as createWikiPageRequest,
   deleteWikiPage as deleteWikiPageRequest,
@@ -9,10 +10,18 @@ import {
   getWikiPage,
   updateWikiPage as updateWikiPageRequest
 } from "../api/wiki";
-import { errorMessage } from "./errors";
+import { invalidateWiki } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export interface WikiTreeNode extends WikiPage {
   children: WikiTreeNode[];
+}
+
+interface WikiData {
+  tree: WikiTreeNode[];
+  page: WikiPage | null;
+  breadcrumb: WikiBreadcrumb[];
 }
 
 async function loadNode(page: WikiPage): Promise<WikiTreeNode> {
@@ -23,63 +32,81 @@ async function loadNode(page: WikiPage): Promise<WikiTreeNode> {
   };
 }
 
+async function loadWikiData(pageId?: number): Promise<WikiData> {
+  const roots = await getRootWikiPages();
+  const tree = await Promise.all(roots.map(loadNode));
+  if (!pageId) {
+    return { tree, page: null, breadcrumb: [] };
+  }
+
+  const [page, breadcrumb] = await Promise.all([getWikiPage(pageId), getWikiBreadcrumb(pageId)]);
+  return { tree, page, breadcrumb };
+}
+
 export function useWiki(pageId?: number) {
-  const [tree, setTree] = useState<WikiTreeNode[]>([]);
-  const [page, setPage] = useState<WikiPage | null>(null);
-  const [breadcrumb, setBreadcrumb] = useState<WikiBreadcrumb[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const validPageId = pageId !== undefined && Number.isFinite(pageId) ? pageId : undefined;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const roots = await getRootWikiPages();
-      setTree(await Promise.all(roots.map(loadNode)));
-      if (pageId) {
-        const [loadedPage, loadedBreadcrumb] = await Promise.all([getWikiPage(pageId), getWikiBreadcrumb(pageId)]);
-        setPage(loadedPage);
-        setBreadcrumb(loadedBreadcrumb);
-      } else {
-        setPage(null);
-        setBreadcrumb([]);
-      }
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const wikiQuery = useQuery({
+    queryKey: validPageId !== undefined ? queryKeys.wiki.detail(validPageId) : queryKeys.wiki.tree(),
+    queryFn: () => loadWikiData(validPageId)
+  });
+
+  const reload = useCallback(async () => {
+    await wikiQuery.refetch();
+  }, [wikiQuery]);
+
+  const createWikiPageMutation = useMutation({
+    mutationFn: createWikiPageRequest,
+    onSuccess: async () => {
+      await invalidateWiki(queryClient);
     }
-  }, [pageId]);
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const updateWikiPageMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: WikiPageUpdate }) => updateWikiPageRequest(id, input),
+    onSuccess: async () => {
+      await invalidateWiki(queryClient);
+    }
+  });
+
+  const removeWikiPageMutation = useMutation({
+    mutationFn: deleteWikiPageRequest,
+    onSuccess: async () => {
+      await invalidateWiki(queryClient);
+    }
+  });
 
   const createWikiPage = useCallback(
     async (input: WikiPageInput) => {
-      const created = await createWikiPageRequest(input);
-      await load();
-      return created;
+      return createWikiPageMutation.mutateAsync(input);
     },
-    [load]
+    [createWikiPageMutation]
   );
 
   const updateWikiPage = useCallback(
     async (id: number, input: WikiPageUpdate) => {
-      const updated = await updateWikiPageRequest(id, input);
-      await load();
-      return updated;
+      return updateWikiPageMutation.mutateAsync({ id, input });
     },
-    [load]
+    [updateWikiPageMutation]
   );
 
   const removeWikiPage = useCallback(
     async (id: number) => {
-      await deleteWikiPageRequest(id);
-      await load();
+      await removeWikiPageMutation.mutateAsync(id);
     },
-    [load]
+    [removeWikiPageMutation]
   );
 
-  return { tree, page, breadcrumb, loading, error, reload: load, createWikiPage, updateWikiPage, removeWikiPage };
+  return {
+    tree: wikiQuery.data?.tree ?? [],
+    page: wikiQuery.data?.page ?? null,
+    breadcrumb: wikiQuery.data?.breadcrumb ?? [],
+    loading: wikiQuery.isLoading,
+    error: toQueryError(wikiQuery.error),
+    reload,
+    createWikiPage,
+    updateWikiPage,
+    removeWikiPage
+  };
 }

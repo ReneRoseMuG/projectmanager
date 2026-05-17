@@ -1,4 +1,5 @@
 import { PROJECT_STATUSES, type Project, type ProjectInput, type ProjectStatus } from "@taskmanager/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ProjectForm } from "../components/projects/ProjectForm";
 import { ProjectListBoardView } from "../components/projects/ProjectListBoardView";
@@ -10,9 +11,11 @@ import { errorMessage } from "../hooks/errors";
 import { useProjectFeatureLinks } from "../hooks/useDocLinks";
 import { useFeatures } from "../hooks/useFeatures";
 import { useProjects } from "../hooks/useProjects";
+import { invalidateFeatureScope, invalidateProjectScope } from "../queries/invalidation";
 import { projectStatusLabels } from "../utils/domainLabels";
 
 export function ProjectsPage() {
+  const queryClient = useQueryClient();
   const { projects, loading, error, createProject, updateProject, removeProject } = useProjects();
   const allFeatures = useFeatures();
   const { showToast } = useToast();
@@ -49,18 +52,23 @@ export function ProjectsPage() {
       if (editingProject) {
         await updateProject(editingProject.id, input, tagIds);
         await setProjectFeatures(editingProject.id, featureIds);
-        await projectFeatureLinks.reload();
+        await invalidateProjectScope(queryClient, editingProject.id);
+        await invalidateFeatureScope(queryClient);
         showToast({ tone: "success", title: "Projekt aktualisiert" });
         return;
       }
       const created = await createProject(input, tagIds);
       if (featureIds.length > 0) {
         await setProjectFeatures(created.id, featureIds);
+        await invalidateProjectScope(queryClient, created.id);
+        await invalidateFeatureScope(queryClient);
       }
       showToast({ tone: "success", title: "Projekt erstellt" });
     } catch (submitError) {
       showToast({ tone: "error", title: "Projekt konnte nicht gespeichert werden", message: errorMessage(submitError) });
       throw submitError;
+    } finally {
+      await projectFeatureLinks.reload();
     }
   };
 

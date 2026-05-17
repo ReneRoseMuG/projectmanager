@@ -1,4 +1,5 @@
 import type { Attachment, BacklogItem, Feature, FeatureInput, Note, ProjectInput, Task, TaskStatus } from "@taskmanager/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, MoreHorizontal } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { useState } from "react";
@@ -34,7 +35,9 @@ import { useProjects } from "../hooks/useProjects";
 import { useTasks } from "../hooks/useTasks";
 import { useViewMode } from "../hooks/useViewMode";
 import { useWikiImport } from "../hooks/useWikiImport";
+import { invalidateFeatureScope, invalidateTags, invalidateTaskScope, invalidateUseCaseScope } from "../queries/invalidation";
 import { formatHumanDate } from "../utils/date";
+import { deriveProjectTaskStats } from "../utils/projectTaskStats";
 
 type ProjectTab = "details" | "features" | "tasks" | "comments" | "attachments" | "notes" | "backlog" | "import";
 
@@ -52,6 +55,7 @@ const tabs: Array<{ value: ProjectTab; label: string }> = [
 export function ProjectDetailPage() {
   const params = useParams();
   const projectId = Number(params.id);
+  const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const { project, loading: projectLoading, updateProject } = useProjects(projectId);
@@ -250,11 +254,8 @@ export function ProjectDetailPage() {
     return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Projekt nicht gefunden</div>;
   }
 
-  const loadedTaskCount = tasks.tasks.length;
-  const totalTasks = loadedTaskCount > 0 ? loadedTaskCount : project.totalTaskCount;
-  const doneTasks = loadedTaskCount > 0 ? tasks.tasks.filter((task) => task.status === "done").length : project.doneTaskCount;
-  const openTasks = loadedTaskCount > 0 ? tasks.tasks.filter((task) => task.status !== "done").length : project.openTaskCount;
-  const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  const taskDataAvailable = !tasks.loading && !tasks.error;
+  const { totalTasks, doneTasks, openTasks, progress } = deriveProjectTaskStats(project, tasks.tasks, taskDataAvailable);
   const tabCounts: Record<ProjectTab, number> = {
     details: 0,
     features: projectFeatureLinks.features.length,
@@ -483,13 +484,17 @@ export function ProjectDetailPage() {
             if (created) {
               if (tagIds.length > 0) {
                 await setTaskTags(created.id, tagIds);
+                await invalidateTags(queryClient);
               }
               if (featureIds.length > 0) {
                 await setTaskFeatures(created.id, featureIds);
+                await invalidateFeatureScope(queryClient);
               }
               if (useCaseIds.length > 0) {
                 await setTaskUseCases(created.id, useCaseIds);
+                await invalidateUseCaseScope(queryClient);
               }
+              await invalidateTaskScope(queryClient, created.projectId, created.id);
               await tasks.reload();
             }
             showToast({ tone: "success", title: "Aufgabe erstellt" });

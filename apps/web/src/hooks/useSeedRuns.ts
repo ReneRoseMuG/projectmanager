@@ -1,89 +1,78 @@
-import type { SeedRun, SeedRunDeletePreview, SeedRunDeleteResult } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import type { SeedRunDeletePreview, SeedRunDeleteResult } from "@taskmanager/shared-types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import {
   createSeedRun as createSeedRunRequest,
   deleteSeedRun as deleteSeedRunRequest,
   getSeedRuns,
   previewSeedRunDelete as previewSeedRunDeleteRequest
 } from "../api/seed-runs";
-import { errorMessage } from "./errors";
+import { invalidateSeedData } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export function useSeedRuns() {
-  const [seedRuns, setSeedRuns] = useState<SeedRun[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const seedRunsQuery = useQuery({
+    queryKey: queryKeys.seedRuns.list(),
+    queryFn: getSeedRuns
+  });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setSeedRuns(await getSeedRuns());
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const reload = useCallback(async () => {
+    await seedRunsQuery.refetch();
+  }, [seedRunsQuery]);
+
+  const createSeedRunMutation = useMutation({
+    mutationFn: (label: string) => createSeedRunRequest({ label: label.trim() || null }),
+    onSuccess: async () => {
+      await invalidateSeedData(queryClient);
     }
-  }, []);
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const deleteSeedRunMutation = useMutation({
+    mutationFn: (id: string) => deleteSeedRunRequest(id, { confirmationId: id }),
+    onSuccess: async () => {
+      await invalidateSeedData(queryClient);
+    }
+  });
 
   const createSeedRun = useCallback(
-    async (label: string): Promise<SeedRun | null> => {
-      setCreating(true);
-      setError(null);
+    async (label: string) => {
       try {
-        const created = await createSeedRunRequest({ label: label.trim() || null });
-        await load();
-        return created;
-      } catch (requestError) {
-        setError(errorMessage(requestError));
+        return await createSeedRunMutation.mutateAsync(label);
+      } catch {
         return null;
-      } finally {
-        setCreating(false);
       }
     },
-    [load]
+    [createSeedRunMutation]
   );
 
   const previewDelete = useCallback(async (id: string): Promise<SeedRunDeletePreview | null> => {
-    setError(null);
     try {
       return await previewSeedRunDeleteRequest(id);
-    } catch (requestError) {
-      setError(errorMessage(requestError));
+    } catch {
       return null;
     }
   }, []);
 
   const deleteSeedRun = useCallback(
     async (id: string): Promise<SeedRunDeleteResult | null> => {
-      setDeletingId(id);
-      setError(null);
       try {
-        const deleted = await deleteSeedRunRequest(id, { confirmationId: id });
-        await load();
-        return deleted;
-      } catch (requestError) {
-        setError(errorMessage(requestError));
+        return await deleteSeedRunMutation.mutateAsync(id);
+      } catch {
         return null;
-      } finally {
-        setDeletingId(null);
       }
     },
-    [load]
+    [deleteSeedRunMutation]
   );
 
   return {
-    seedRuns,
-    loading,
-    creating,
-    deletingId,
-    error,
-    reload: load,
+    seedRuns: seedRunsQuery.data ?? [],
+    loading: seedRunsQuery.isLoading,
+    creating: createSeedRunMutation.isPending,
+    deletingId: deleteSeedRunMutation.isPending ? (deleteSeedRunMutation.variables ?? null) : null,
+    error: toQueryError(seedRunsQuery.error ?? createSeedRunMutation.error ?? deleteSeedRunMutation.error),
+    reload,
     createSeedRun,
     previewDelete,
     deleteSeedRun

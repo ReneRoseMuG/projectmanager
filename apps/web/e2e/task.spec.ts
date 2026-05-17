@@ -55,11 +55,12 @@ async function createUseCase(request: APIRequestContext, featureId: number, titl
 
 async function openProject(page: Page, projectId: number) {
   await page.goto(`/projects/${projectId}`);
-  await expect(page.getByRole("button", { name: /Aufgaben/ })).toBeVisible();
+  await page.getByRole("button", { name: /Aufgaben/ }).click();
+  await expect(page.getByRole("button", { name: "Neue Aufgabe" })).toBeVisible();
 }
 
 async function fillTaskTitle(page: Page, title: string) {
-  await page.locator(".fixed").last().locator("input[required]").fill(title);
+  await activeModal(page).locator("input[required]").first().fill(title);
 }
 
 async function openTaskDetail(page: Page, title: string) {
@@ -72,6 +73,14 @@ function taskButton(page: Page, title: string) {
 
 function activeModal(page: Page) {
   return page.locator(".fixed.inset-0").last();
+}
+
+function relationPanel(page: Page, title: string) {
+  return activeModal(page).getByRole("heading", { name: title, exact: true }).locator("xpath=ancestor::section[1]");
+}
+
+function featureCheckbox(page: Page, title: string) {
+  return relationPanel(page, "Features").getByRole("checkbox", { name: new RegExp(title) });
 }
 
 test.describe("Task CRUD", () => {
@@ -107,7 +116,7 @@ test.describe("Task CRUD", () => {
 
     await page.getByRole("button", { name: "Neue Aufgabe" }).click();
     await fillTaskTitle(page, "E2E Feature Aufgabe");
-    await page.getByRole("checkbox", { name: new RegExp(feature.title) }).check({ force: true });
+    await activeModal(page).locator("label").filter({ hasText: feature.title }).click();
     await page.getByRole("button", { name: "Aufgabe anlegen" }).click();
     await openTaskDetail(page, "E2E Feature Aufgabe");
     await activeModal(page).getByRole("button", { name: /Features/ }).click();
@@ -127,25 +136,31 @@ test.describe("Task CRUD", () => {
 
   test("Task bearbeiten: Titel ändern → Speichern → neuer Titel auf TaskCard", async ({ page, request }) => {
     const project = await createProject(request, "E2E Task Edit");
-    await createTask(request, project.id, "E2E Alter Titel");
+    const task = await createTask(request, project.id, "E2E Alter Titel");
     await openProject(page, project.id);
 
     await openTaskDetail(page, "E2E Alter Titel");
     await fillTaskTitle(page, "E2E Neuer Titel");
-    await page.getByRole("button", { name: "Speichern" }).click();
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes(`/api/tasks/${task.id}`) && response.request().method() === "PUT"),
+      page.getByRole("button", { name: "Speichern" }).click()
+    ]);
 
-    await expect(page.getByText("E2E Neuer Titel")).toBeVisible();
+    await expect(taskButton(page, "E2E Neuer Titel")).toBeVisible();
   });
 
   test("Task löschen: Delete-Icon → ConfirmDialog → Task verschwindet aus Liste", async ({ page, request }) => {
     const project = await createProject(request, "E2E Task Delete");
-    await createTask(request, project.id, "E2E Löschen");
+    const task = await createTask(request, project.id, "E2E Löschen");
     await openProject(page, project.id);
 
-    await page.locator("article").filter({ hasText: "E2E Löschen" }).getByRole("button", { name: "Löschen" }).click();
-    await page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click();
+    await page.locator("article").filter({ hasText: "E2E Löschen" }).getByRole("button", { name: "Löschen", exact: true }).click();
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes(`/api/tasks/${task.id}`) && response.request().method() === "DELETE"),
+      page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click()
+    ]);
 
-    await expect(page.getByText("E2E Löschen")).not.toBeVisible();
+    await expect(page.locator("article").filter({ hasText: "E2E Löschen" })).toHaveCount(0);
   });
 
   test("View Toggle: Board-Modus zeigt Kanban-Spalten", async ({ page, request }) => {
@@ -178,9 +193,9 @@ test.describe("Task CRUD", () => {
     await openTaskDetail(page, "E2E Kommentar Task");
     await activeModal(page).getByRole("button", { name: /Kommentare/ }).click();
     await activeModal(page).locator('[contenteditable="true"]').fill("E2E Kommentar");
-    await page.getByRole("button", { name: "Kommentar speichern" }).click();
+    await activeModal(page).getByRole("button", { name: "Kommentar", exact: true }).click();
 
-    await expect(page.getByText("E2E Kommentar")).toBeVisible();
+    await expect(activeModal(page).getByText("E2E Kommentar", { exact: true })).toBeVisible();
   });
 
   test("Kommentar löschen → verschwindet", async ({ page, request }) => {
@@ -204,13 +219,16 @@ test.describe("Task CRUD", () => {
 
     await openTaskDetail(page, "E2E Persist Task");
     await activeModal(page).getByRole("button", { name: /Features/ }).click();
-    await page.getByRole("checkbox", { name: new RegExp(feature.title) }).check({ force: true });
-    await activeModal(page).getByRole("button", { name: "Speichern" }).click();
+    await featureCheckbox(page, feature.title).check({ force: true });
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes(`/api/tasks/${task.id}/features`) && response.request().method() === "PUT"),
+      relationPanel(page, "Features").getByRole("button", { name: "Speichern", exact: true }).click()
+    ]);
     await page.reload();
-    await page.goto(`/projects/${project.id}`);
+    await openProject(page, project.id);
     await openTaskDetail(page, "E2E Persist Task");
     await activeModal(page).getByRole("button", { name: /Features/ }).click();
 
-    await expect(page.getByRole("checkbox", { name: new RegExp(feature.title) })).toBeChecked();
+    await expect(featureCheckbox(page, feature.title)).toBeChecked();
   });
 });

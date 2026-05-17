@@ -1,37 +1,41 @@
 import type { Tag } from "@taskmanager/shared-types";
-import { useCallback, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { createTag as createTagRequest, getTags } from "../api/tags";
-import { errorMessage } from "./errors";
+import { invalidateTags } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
 
 export function useTags() {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const tagsQuery = useQuery({
+    queryKey: queryKeys.tags.list(),
+    queryFn: getTags
+  });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setTags(await getTags());
-    } catch (requestError) {
-      setError(errorMessage(requestError));
-    } finally {
-      setLoading(false);
+  const reload = useCallback(async () => {
+    await invalidateTags(queryClient);
+  }, [queryClient]);
+
+  const createTagMutation = useMutation({
+    mutationFn: createTagRequest,
+    onSuccess: async () => {
+      await invalidateTags(queryClient);
     }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  });
 
   const createTag = useCallback(
     async (input: { name: string; color: string }) => {
-      const tag = await createTagRequest(input);
-      await load();
-      return tag;
+      return createTagMutation.mutateAsync(input);
     },
-    [load]
+    [createTagMutation]
   );
 
-  return { tags, loading, error, reload: load, createTag };
+  return {
+    tags: tagsQuery.data ?? ([] as Tag[]),
+    loading: tagsQuery.isLoading,
+    error: toQueryError(tagsQuery.error),
+    reload,
+    createTag
+  };
 }
