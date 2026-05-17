@@ -165,7 +165,7 @@ export function FeatureDetailPage() {
   const feature = features.feature;
   const tabMeta =
     activeTab === "details"
-      ? "Pflichtfelder mit *"
+      ? "Stammdaten"
       : activeTab === "useCases"
         ? `${useCases.useCases.length} Use Cases · Doppelklick öffnet Detail`
         : "Projekt-Relationen dieses Features";

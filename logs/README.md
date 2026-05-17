@@ -2,6 +2,10 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 17.05.26 | Fix | Form-Footer-Hinweise | ✅ |
+| 17.05.26 | Fix | Create-Form Pflichtfeld-Markierungen | ✅ |
+| 17.05.26 | Fix | Project-Form Footer-Text | ✅ |
+| 17.05.26 | Fix | Project-Form Kürzel-Layout | ✅ |
 | 17.05.26 | Fix | Feature Rich-Text-Editor | ✅ |
 | 17.05.26 | Feature | Feature-Projekt-Relation UI | ✅ |
 | 17.05.26 | Feature | Feature-Detail Use-Case Overlay | ✅ |

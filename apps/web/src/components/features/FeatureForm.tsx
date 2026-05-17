@@ -24,13 +24,8 @@ const statuses: Array<{ value: FeatureStatus; label: string; className: string }
   { value: "archived", label: "Archiviert", className: "data-[active=true]:bg-steel-100 data-[active=true]:text-steel-700" }
 ];
 
-function FieldLabel({ children, required = false }: { children: string; required?: boolean }) {
-  return (
-    <span>
-      {children}
-      {required ? <span className="text-crimson">*</span> : null}
-    </span>
-  );
+function FieldLabel({ children }: { children: string; required?: boolean }) {
+  return <span>{children}</span>;
 }
 
 function FormCard({ title, children }: { title: string; children: ReactNode }) {

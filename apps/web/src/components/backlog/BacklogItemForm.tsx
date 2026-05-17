@@ -93,7 +93,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose }: Bac
         <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
           <section className={cardClass}>
             <label className="grid gap-1 text-sm font-semibold text-ink">
-              Titel <span className="text-crimson">*</span>
+              Titel
               <input className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-tangerine focus:ring-2 focus:ring-tangerine/15" value={title} onChange={(event) => setTitle(event.target.value)} required />
             </label>
             <label className="mt-4 grid gap-1 text-sm font-semibold text-ink">
@@ -180,8 +180,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose }: Bac
           </section>
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
-          <span className="text-sm text-slate-500">{item ? `Item #${item.id}` : "Neu - wird beim Speichern angelegt"}</span>
+        <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">
           <div className="flex items-center gap-2">
             <Button variant="ghost" className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={16} />} disabled={!item}>
               Löschen

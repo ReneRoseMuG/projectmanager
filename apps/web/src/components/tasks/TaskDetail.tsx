@@ -1,5 +1,5 @@
 import type { Note, Priority, Tag, TaskStatus } from "@taskmanager/shared-types";
-import { CalendarDays, Check, FileText, Link2, MessageSquare, MoreHorizontal, Paperclip, Save, StickyNote, UserRound, X } from "lucide-react";
+import { CalendarDays, Check, Link2, MoreHorizontal, Paperclip, Save, StickyNote, UserRound, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useAttachments } from "../../hooks/useAttachments";
@@ -542,11 +542,7 @@ export function TaskDetail({ taskId, open, onClose, onChanged }: TaskDetailProps
             ) : null}
           </main>
 
-          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
-            <div className="flex items-center gap-2 text-sm text-slate-500">
-              {activeTab === "details" ? <FileText size={16} /> : activeTab === "comments" ? <MessageSquare size={16} /> : <StickyNote size={16} />}
-              <span>{activeTab === "details" ? "Änderungen an Details werden hier gespeichert." : "Speichern ist nur im Details-Tab aktiv."}</span>
-            </div>
+          <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">
             <Button type="submit" form="task-detail-form" variant="primary" icon={<Save size={16} />} disabled={activeTab !== "details"}>
               Speichern
             </Button>

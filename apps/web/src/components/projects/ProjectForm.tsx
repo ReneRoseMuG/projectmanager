@@ -116,13 +116,13 @@ export function ProjectForm({ open, project, onSubmit, onClose }: ProjectFormPro
         <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
           <section className={cardClass}>
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
-              <label className="grid gap-1 text-sm font-semibold text-ink">
-                Projektname <span className="text-crimson">*</span>
-                <input className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-fern focus:ring-2 focus:ring-fern/15" value={name} onChange={(event) => setName(event.target.value)} required />
+              <label className="grid min-w-0 gap-1 text-sm font-semibold text-ink">
+                Projektname
+                <input className="h-11 w-full min-w-0 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-fern focus:ring-2 focus:ring-fern/15" value={name} onChange={(event) => setName(event.target.value)} required />
               </label>
-              <label className="grid gap-1 text-sm font-semibold text-ink">
+              <label className="grid min-w-0 gap-1 text-sm font-semibold text-ink">
                 Kürzel
-                <input className="h-11 rounded-md border border-line bg-shell px-3 font-mono text-sm uppercase text-slate-600 outline-none" value={code} readOnly maxLength={5} />
+                <input className="h-11 w-full min-w-0 rounded-md border border-line bg-shell px-3 font-mono text-sm uppercase text-slate-600 outline-none" value={code} readOnly maxLength={5} />
               </label>
             </div>
             <label className="mt-4 grid gap-1 text-sm font-semibold text-ink">
@@ -196,8 +196,7 @@ export function ProjectForm({ open, project, onSubmit, onClose }: ProjectFormPro
           </section>
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
-          <span className="text-sm text-slate-500">{project ? `Zuletzt gespeichert ${formatHumanDate(project.updatedAt)}` : "Neu - wird beim Speichern angelegt"}</span>
+        <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">
           <div className="flex items-center gap-2">
             <Button onClick={onClose}>Abbrechen</Button>
             <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>

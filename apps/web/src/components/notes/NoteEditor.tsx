@@ -139,7 +139,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
             <section className={cardClass}>
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem]">
                 <label className="grid gap-1 text-sm font-semibold text-ink">
-                  Titel <span className="text-crimson">*</span>
+                  Titel
                   <input
                     className="h-11 rounded-md border border-line bg-white px-3 text-lg font-semibold outline-none transition focus:border-violet focus:ring-2 focus:ring-violet/15"
                     value={title}
@@ -173,8 +173,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
             </section>
           </div>
 
-          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
-            <span className="text-sm text-slate-500">{saving ? "Speichert" : dirty ? "Ungespeichert" : "Gespeichert"}</span>
+          <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">
             <div className="flex items-center gap-2">
               <Button variant="ghost" className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={16} />} disabled>
                 Löschen

@@ -2,7 +2,6 @@ import type { Feature, FeatureStatus, FeatureUpdate } from "@taskmanager/shared-
 import { LinkIcon, RotateCcw, Save } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { formatHumanDate } from "../../utils/date";
 import { Button } from "../ui/Button";
 import { RichTextEditor } from "../ui/RichTextEditor";
 
@@ -19,13 +18,8 @@ const statuses: Array<{ value: FeatureStatus; label: string; className: string }
   { value: "archived", label: "Archiviert", className: "data-[active=true]:bg-steel-100 data-[active=true]:text-steel-700" }
 ];
 
-function FieldLabel({ children, required = false }: { children: string; required?: boolean }) {
-  return (
-    <span>
-      {children}
-      {required ? <span className="text-crimson">*</span> : null}
-    </span>
-  );
+function FieldLabel({ children }: { children: string; required?: boolean }) {
+  return <span>{children}</span>;
 }
 
 function FormCard({ title, children }: { title: string; children: ReactNode }) {
@@ -133,8 +127,7 @@ export function FeatureDetail({ feature, onSave }: FeatureDetailProps) {
       </div>
       </FormCard>
 
-      <footer className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white p-4 shadow-sm">
-        <span className="text-xs font-semibold text-slate-500">Zuletzt gespeichert: {formatHumanDate(feature.updatedAt)}</span>
+      <footer className="flex flex-wrap items-center justify-end gap-3 rounded-xl border border-line bg-white p-4 shadow-sm">
         <div className="flex gap-2">
           <Button icon={<RotateCcw size={16} />} variant="secondary" onClick={resetFields}>
             Verwerfen

@@ -29,13 +29,8 @@ const statuses: StatusOption[] = [
   { value: "archived", label: "Archiviert", activeClassName: "border-steel-500 bg-steel-500 text-white", dotClassName: "bg-steel-500" }
 ];
 
-function FieldLabel({ children, required = false }: { children: string; required?: boolean }) {
-  return (
-    <span className="inline-flex items-center">
-      {children}
-      {required ? <span className="ml-1 text-crimson">*</span> : null}
-    </span>
-  );
+function FieldLabel({ children }: { children: string; required?: boolean }) {
+  return <span className="inline-flex items-center">{children}</span>;
 }
 
 function FormCard({ title, helper, children }: { title: string; helper?: string; children: ReactNode }) {
@@ -103,8 +98,6 @@ export function UseCaseForm({ open, useCase, featureTitle, onSubmit, onDelete, o
 
   const badgeText = useCase ? `USE CASE #${useCase.sortOrder} · /uc/${useCase.slug}` : "NEUER USE CASE · /uc/…";
   const titleText = useCase ? useCase.title : "Neuer Use Case";
-  const savedHint = useCase ? `Use Case #${useCase.sortOrder} · zuletzt gespeichert` : "Noch nicht gespeichert";
-
   return (
     <Modal open={open} title={titleText} size="xl" showHeader={false} bodyClassName="p-0" onClose={onClose}>
       <header className="relative overflow-hidden bg-gradient-to-br from-violet to-magenta px-6 py-5 text-white">
@@ -216,11 +209,7 @@ export function UseCaseForm({ open, useCase, featureTitle, onSubmit, onDelete, o
           </div>
         </FormCard>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-          <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
-            <span className="h-1.5 w-1.5 rounded-full bg-fern" />
-            {savedHint}
-          </span>
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-line pt-4">
           <div className="flex gap-2">
             <Button onClick={onClose}>Abbrechen</Button>
             <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>

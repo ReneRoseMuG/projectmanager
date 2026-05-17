@@ -114,7 +114,7 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose }: Wi
           <section className={cardClass}>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-1 text-sm font-semibold text-ink">
-                Titel <span className="text-crimson">*</span>
+                Titel
                 <input className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/15" value={title} onChange={(event) => { setTitle(event.target.value); setDirty(true); }} required />
               </label>
               <label className="grid gap-1 text-sm font-semibold text-ink">
@@ -165,8 +165,7 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose }: Wi
           </section>
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
-          <span className="text-sm text-slate-500">{saving ? "Veröffentlicht" : "Bereit zum Veröffentlichen"}</span>
+        <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">
           <div className="flex items-center gap-2">
             <Button onClick={() => void requestClose()}>Verwerfen</Button>
             <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
