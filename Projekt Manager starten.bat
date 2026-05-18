@@ -1,4 +1,6 @@
 @echo off
+chcp 65001 > nul
+setlocal
 title Taskmanager
 
 set "SCRIPT_DIR=%~dp0"
@@ -17,9 +19,47 @@ if not defined APP_DIR (
 )
 
 cd /d "%APP_DIR%"
-echo Starte Taskmanager aus: %CD%
-echo Beende laufende Instanzen...
-taskkill /f /im node.exe > nul 2>&1
+set "APP_DIR=%CD%"
+set "API_DIR=%APP_DIR%\apps\api"
+set "DATABASE_PATH=%API_DIR%\data\taskmanager.sqlite"
+set "UPLOAD_DIR=%API_DIR%\uploads"
+set "PREVIEW_CACHE_DIR=%API_DIR%\previews"
+set "CONTENT_DIR=%API_DIR%\content"
+set "BACKUP_WORK_DIR=%API_DIR%\backups"
+set "PORT=3001"
+set "CORS_ORIGIN=http://localhost:5173"
+set "VITE_API_URL=http://localhost:3001/api"
+set "NODE_ENV=production"
+set "TASKMANAGER_TEST_MODE="
+
+echo Starte Taskmanager im lokalen Produktionsmodus.
+echo Projektordner: %APP_DIR%
+echo Geschützte Datenbank: %DATABASE_PATH%
+echo Stoppe laufende Taskmanager-Ports...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 3001,5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"
 timeout /t 1 /nobreak > nul
-start "" /b cmd /c "timeout /t 8 /nobreak > nul & start http://localhost:5173"
-npm run dev
+
+echo Baue Production-Bundle...
+call npm run build
+if errorlevel 1 (
+  echo Build fehlgeschlagen.
+  pause
+  exit /b 1
+)
+
+echo Aktualisiere Datenbankschema ohne Datenlöschung...
+call npm run db:migrate
+if errorlevel 1 (
+  echo Datenbankmigration fehlgeschlagen.
+  pause
+  exit /b 1
+)
+
+start "Taskmanager API" /D "%APP_DIR%" cmd /k "npm run start -w apps/api"
+start "Taskmanager Web" /D "%APP_DIR%" cmd /k "npm run preview -w apps/web -- --host 0.0.0.0 --port 5173"
+timeout /t 5 /nobreak > nul
+start "" "http://localhost:5173"
+
+echo Taskmanager läuft unter http://localhost:5173
+echo Dieses Fenster kann geschlossen werden; API und Web laufen in eigenen Fenstern.
+pause

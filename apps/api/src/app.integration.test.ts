@@ -2,11 +2,11 @@ import type { Attachment, BacklogItem, Comment, Event, Feature, FeatureRelation,
 import type { FastifyInstance } from "fastify";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { vitestRuntimeRoot } from "./runtime-safety.js";
 
 /**
  * Test Scope:
@@ -29,8 +29,10 @@ describe("Taskmanager API integration", () => {
   let closeDatabase: (() => void) | null = null;
 
   beforeAll(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "taskmanager-api-"));
-    process.env.DATABASE_PATH = path.join(tempDir, "taskmanager.sqlite");
+    tempDir = path.join(vitestRuntimeRoot, "app-integration");
+    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.mkdir(path.join(tempDir, "data"), { recursive: true });
+    process.env.DATABASE_PATH = path.join(tempDir, "data", "taskmanager.sqlite");
     process.env.UPLOAD_DIR = path.join(tempDir, "uploads");
     process.env.PREVIEW_CACHE_DIR = path.join(tempDir, "previews");
     process.env.CONTENT_DIR = path.join(tempDir, "content");

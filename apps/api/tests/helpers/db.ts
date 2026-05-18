@@ -1,9 +1,12 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as schema from "../../src/db/schema.js";
-import { assertSafeTestDatabasePath } from "../../src/runtime-safety.js";
+import { assertSafeTestDatabasePath, vitestRuntimeRoot } from "../../src/runtime-safety.js";
 
 export type TestDb = ReturnType<typeof createTestDb>;
 
@@ -24,14 +27,13 @@ function migrateTestDb(sqlite: Database.Database) {
 }
 
 export function createTestDb() {
-  const sqlite = new Database(":memory:");
-  sqlite.pragma("journal_mode = WAL");
-
-  return migrateTestDb(sqlite);
+  const databasePath = path.join(vitestRuntimeRoot, "databases", `${process.pid}-${crypto.randomUUID()}.sqlite`);
+  return createFileTestDb(databasePath);
 }
 
 export function createFileTestDb(databasePath: string) {
   assertSafeTestDatabasePath(databasePath, "createFileTestDb databasePath");
+  fs.mkdirSync(path.dirname(databasePath), { recursive: true });
   const sqlite = new Database(databasePath);
   sqlite.pragma("journal_mode = WAL");
 

@@ -20,11 +20,11 @@ import * as archiverPackage from "archiver";
 import type { Archiver } from "archiver";
 import crypto from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import supertest from "supertest";
 import unzipper from "unzipper";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { vitestRuntimeRoot } from "../../src/runtime-safety.js";
 import { config } from "../../src/config.js";
 import {
   applyDriveDump,
@@ -259,7 +259,7 @@ async function replaceDumpJson(original: Buffer, data: Record<string, unknown>, 
 }
 
 beforeEach(() => {
-  tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "taskmanager-dump-drive-"));
+  tempRoot = path.join(vitestRuntimeRoot, "dump-drive", crypto.randomUUID());
   uploadDir = path.join(tempRoot, "uploads");
   contentDir = path.join(tempRoot, "content");
   backupDir = path.join(tempRoot, "backups");

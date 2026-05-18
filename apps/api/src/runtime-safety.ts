@@ -14,10 +14,13 @@ const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 export const apiRoot = path.resolve(moduleDir, "..");
 export const testRuntimeRoot = path.resolve(apiRoot, ".test-runtime");
+export const vitestRuntimeRoot = path.resolve(testRuntimeRoot, "vitest");
+export const protectedDataRoot = path.resolve(apiRoot, "data");
+export const protectedDatabasePath = path.resolve(protectedDataRoot, "taskmanager.sqlite");
 
 const protectedRuntimePaths = {
-  dataDir: path.resolve(apiRoot, "data"),
-  databasePath: path.resolve(apiRoot, "data", "taskmanager.sqlite"),
+  dataDir: protectedDataRoot,
+  databasePath: protectedDatabasePath,
   uploadDir: path.resolve(apiRoot, "uploads"),
   previewCacheDir: path.resolve(apiRoot, "previews"),
   contentDir: path.resolve(apiRoot, "content"),
