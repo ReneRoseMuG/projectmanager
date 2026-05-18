@@ -2,6 +2,7 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 18.05.26 | Fix | Dev-Start ohne tsx | ✅ |
 | 18.05.26 | Fix | Browsertests | ✅ |
 | 18.05.26 | 5 | Verifikation und Upload-Fortschritt | ✅ |
 | 18.05.26 | 3/4 | E2E-Form-Specs | 🔴 |
