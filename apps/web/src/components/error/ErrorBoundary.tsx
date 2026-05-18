@@ -51,7 +51,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               Neu laden
             </Button>
             <Button onClick={() => window.location.assign("/")}>Zur Startseite</Button>
-            <Button onClick={() => window.location.assign("mailto:support@example.local?subject=Taskmanager%20Fehler")}>Fehler melden</Button>
+            <Button onClick={() => window.location.assign("mailto:support@example.local?subject=Projekt%20Manager%20Fehler")}>Fehler melden</Button>
           </div>
         </div>
       </div>

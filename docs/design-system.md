@@ -1,4 +1,4 @@
-# Design-System Taskmanager
+# Design-System Projekt Manager
 
 Stand: 17.05.26
 

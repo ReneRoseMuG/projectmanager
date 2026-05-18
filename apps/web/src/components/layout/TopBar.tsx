@@ -46,7 +46,7 @@ export function TopBar() {
   return (
     <header className="relative flex h-16 items-center justify-between border-b border-line bg-white px-4 md:px-6">
       <div className="flex items-center gap-3 md:hidden">
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-steel-900 text-sm text-white">TM</span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-steel-900 text-sm text-white">PM</span>
       </div>
       <div className="hidden min-w-0 flex-1 md:block" onClick={() => setSearchOpen(true)}>
         <SearchInput value={globalSearch} onChange={(value) => {

@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 > nul
 setlocal
-title Taskmanager
+title Projekt Manager
 
 set "SCRIPT_DIR=%~dp0"
 set "OFFICE_DIR=C:\Users\r.rose\repos\Projekt Manager"
@@ -32,10 +32,10 @@ set "VITE_API_URL=http://localhost:3001/api"
 set "NODE_ENV=production"
 set "TASKMANAGER_TEST_MODE="
 
-echo Starte Taskmanager im lokalen Produktionsmodus.
+echo Starte Projekt Manager im lokalen Produktionsmodus.
 echo Projektordner: %APP_DIR%
 echo Geschützte Datenbank: %DATABASE_PATH%
-echo Stoppe laufende Taskmanager-Ports...
+echo Stoppe laufende Projekt Manager-Ports...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 3001,5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"
 timeout /t 1 /nobreak > nul
 
@@ -55,11 +55,11 @@ if errorlevel 1 (
   exit /b 1
 )
 
-start "Taskmanager API" /D "%APP_DIR%" cmd /k "npm run start -w apps/api"
-start "Taskmanager Web" /D "%APP_DIR%" cmd /k "npm run preview -w apps/web -- --host 0.0.0.0 --port 5173"
+start "Projekt Manager API" /D "%APP_DIR%" cmd /k "npm run start -w apps/api"
+start "Projekt Manager Web" /D "%APP_DIR%" cmd /k "npm run preview -w apps/web -- --host 0.0.0.0 --port 5173"
 timeout /t 5 /nobreak > nul
 start "" "http://localhost:5173"
 
-echo Taskmanager läuft unter http://localhost:5173
+echo Projekt Manager läuft unter http://localhost:5173
 echo Dieses Fenster kann geschlossen werden; API und Web laufen in eigenen Fenstern.
 pause

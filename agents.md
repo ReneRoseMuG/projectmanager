@@ -1,4 +1,4 @@
-# agents.md – Taskmanager
+# agents.md – Projekt Manager
 
 Codex ist ein **ausführendes Werkzeug**. Er trifft keine eigenständigen Architektur-, Produkt- oder Scope-Entscheidungen. Bei Unklarheiten, Widersprüchen oder nicht eindeutig umsetzbaren Anforderungen bricht Codex die Umsetzung kontrolliert ab und dokumentiert den Blocker.
 
@@ -218,7 +218,7 @@ Kann eine Teilaufgabe nur teilweise umgesetzt werden, wird der Log mit Status `�
 Codex pflegt zusätzlich eine Datei `logs/README.md` als chronologische Übersicht:
 
 ```markdown
-# Log-Übersicht Taskmanager
+# Log-Übersicht Projekt Manager
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|

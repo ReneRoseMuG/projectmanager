@@ -25,7 +25,7 @@ import {
  */
 
 const originalNodeEnv = process.env.NODE_ENV;
-const originalTaskmanagerTestMode = process.env.TASKMANAGER_TEST_MODE;
+const originalProjectManagerTestMode = process.env.TASKMANAGER_TEST_MODE;
 
 function enableTestRuntime() {
   process.env.NODE_ENV = "test";
@@ -34,10 +34,10 @@ function enableTestRuntime() {
 
 afterEach(() => {
   process.env.NODE_ENV = originalNodeEnv;
-  if (originalTaskmanagerTestMode === undefined) {
+  if (originalProjectManagerTestMode === undefined) {
     delete process.env.TASKMANAGER_TEST_MODE;
   } else {
-    process.env.TASKMANAGER_TEST_MODE = originalTaskmanagerTestMode;
+    process.env.TASKMANAGER_TEST_MODE = originalProjectManagerTestMode;
   }
 });
 

@@ -23,9 +23,9 @@ export function Sidebar() {
   return (
     <aside className="hidden w-64 shrink-0 bg-gradient-to-b from-steel-700 to-steel-800 p-4 text-white md:block">
       <div className="mb-8 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-steel-700 shadow-lg">TM</span>
+        <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-steel-700 shadow-lg">PM</span>
         <div>
-          <strong className="block text-sm font-bold text-white">Taskmanager</strong>
+          <strong className="block text-sm font-bold text-white">Projekt Manager</strong>
           <span className="text-[11px] uppercase tracking-widest text-steel-300">Lokal</span>
         </div>
       </div>

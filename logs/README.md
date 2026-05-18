@@ -1,7 +1,11 @@
-# Log-Übersicht Taskmanager
+# Log-Übersicht Projekt Manager
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 18.05.26 | Fix | App-Name Projekt Manager | ✅ |
+| 18.05.26 | Fix | Responsive-Density-Auftrag | ✅ |
+| 18.05.26 | Fix | Projekt-Doppelklick Formular | ✅ |
+| 18.05.26 | Fix | Startdatei CRLF | ✅ |
 | 18.05.26 | Fix | Runtime-Datenbanken | ✅ |
 | 18.05.26 | Fix | Startdatei Pfaderkennung | ✅ |
 | 18.05.26 | Fix | Dev-Start ohne tsx | ✅ |

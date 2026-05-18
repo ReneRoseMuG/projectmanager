@@ -81,9 +81,10 @@ async function fillProjectForm(page: Page, name: string) {
   await activeModal(page).locator("input[required]").first().fill(name);
 }
 
-async function openProjectDetailFromList(page: Page, name: string) {
+async function openProjectFormFromList(page: Page, name: string) {
   await projectCard(page, name).dblclick();
-  await expect(page).toHaveURL(/\/projects\/\d+$/);
+  await expect(page).toHaveURL(/\/projects$/);
+  await expect(projectForm(page)).toBeVisible();
 }
 
 test.describe("Projekt CRUD", () => {
@@ -128,13 +129,13 @@ test.describe("Projekt CRUD", () => {
     }
   });
 
-  test("Projekt öffnen: Doppelklick → navigiert zu /projects/:id", async ({ page, request }) => {
+  test("Projekt öffnen: Doppelklick öffnet Bearbeiten-Formular", async ({ page, request }) => {
     const project = await createProject(request, "E2E Project Open");
     try {
       await openProjectList(page);
-      await openProjectDetailFromList(page, project.name);
+      await openProjectFormFromList(page, project.name);
 
-      await expect(page.getByRole("heading", { name: project.name })).toBeVisible();
+      await expect(projectForm(page).locator("input[required]").first()).toHaveValue(project.name);
     } finally {
       await deleteProject(request, project.id);
     }

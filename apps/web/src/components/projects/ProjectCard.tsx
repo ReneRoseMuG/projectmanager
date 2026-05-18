@@ -1,6 +1,5 @@
 import type { Project } from "@taskmanager/shared-types";
 import { Archive, Edit3, FolderOpen, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { projectStatusLabels, projectStatusTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { TagBadge } from "../tags/TagBadge";
@@ -28,10 +27,9 @@ function getProjectCode(name: string) {
 }
 
 export function ProjectCard({ project, variant = "card", onEdit, onDelete }: ProjectCardProps) {
-  const navigate = useNavigate();
   const accent = project.color ?? "var(--color-steel-700)";
   const progress = project.totalTaskCount > 0 ? Math.round((project.doneTaskCount / project.totalTaskCount) * 100) : 0;
-  const openProject = () => navigate(`/projects/${project.id}`);
+  const openProject = () => onEdit(project);
   const description = richTextToPlainText(project.description);
 
   if (variant === "row") {
@@ -55,7 +53,7 @@ export function ProjectCard({ project, variant = "card", onEdit, onDelete }: Pro
             meta={<span className="text-xs font-semibold text-slate-500">{project.openTaskCount} offen</span>}
             actions={
               <>
-                <Button aria-label="Öffnen" title="Öffnen" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onEdit(project)} />
+                <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onEdit(project)} />
                 <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(project)} />
               </>
             }

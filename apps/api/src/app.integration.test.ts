@@ -21,9 +21,9 @@ import { vitestRuntimeRoot } from "./runtime-safety.js";
  * - Upload ohne Datei wird als BAD_REQUEST abgelehnt.
  *
  * Ziel:
- * Die HTTP-Verträge der Taskmanager-API werden über echte Fastify-Routen und eine Temp-DB abgesichert.
+ * Die HTTP-Verträge der Projekt Manager API werden über echte Fastify-Routen und eine Temp-DB abgesichert.
  */
-describe("Taskmanager API integration", () => {
+describe("Projekt Manager API integration", () => {
   let app: FastifyInstance;
   let tempDir: string;
   let closeDatabase: (() => void) | null = null;
