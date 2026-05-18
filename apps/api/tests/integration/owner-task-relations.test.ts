@@ -181,6 +181,27 @@ describe("Owner task relation API", () => {
     expect(featureTasks.body[0].boardPosition).not.toBe(4096);
   });
 
+  it("Owner-Boards bleiben zwischen zwei Ownern desselben Typs isoliert", async () => {
+    const firstProjectOwner = await createOwner(app, ownerCases[0]);
+    const secondProjectOwner = await createOwner(app, ownerCases[0]);
+    const task = await supertest(app.server).post(firstProjectOwner.path).send({ title: "Isolierte Owner-Aufgabe", status: "todo" }).expect(201);
+
+    const firstTasks = await supertest(app.server).get(firstProjectOwner.path).expect(200);
+    const secondTasksBeforeLink = await supertest(app.server).get(secondProjectOwner.path).expect(200);
+
+    expect(firstTasks.body.map((item: TaskBoardItem) => item.id)).toEqual([task.body.id]);
+    expect(secondTasksBeforeLink.body).toEqual([]);
+
+    await supertest(app.server).post(taskLinkPath(secondProjectOwner, task.body.id)).expect(200);
+    await supertest(app.server).delete(taskLinkPath(firstProjectOwner, task.body.id)).expect(204);
+
+    const firstTasksAfterUnlink = await supertest(app.server).get(firstProjectOwner.path).expect(200);
+    const secondTasksAfterUnlink = await supertest(app.server).get(secondProjectOwner.path).expect(200);
+
+    expect(firstTasksAfterUnlink.body).toEqual([]);
+    expect(secondTasksAfterUnlink.body.map((item: TaskBoardItem) => item.id)).toEqual([task.body.id]);
+  });
+
   it("Mehrfach verknüpfte Aufgaben bleiben blockiert, bis alle Owner-Links entfernt sind", async () => {
     const projectOwner = await createOwner(app, ownerCases[0]);
     const featureOwner = await createOwner(app, ownerCases[1]);

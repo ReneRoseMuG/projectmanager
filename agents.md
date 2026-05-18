@@ -132,7 +132,7 @@ Der Plan muss ausreichend Kontext enthalten, damit der Nutzer die Tragweite der 
 | `branch <name>` | Branch von `main` anlegen, Remote-Tracking einrichten, sofort pushen |
 | `plan` | Auftrag klassifizieren → Analyse → Plan ausgeben, ohne Branch-Rückfrage |
 | `audit` | Vollen Audit gemäß Abschnitt 12 als reinen Report-Auftrag ausführen |
-| `test` / `Test` | Alle verfügbaren Tests ausführen; bei möglicher State- oder Daten-Vermischung seriell ausführen; anschließend Anzahl der ausgeführten, grünen und roten Tests berichten |
+| `test` / `Test` | Vollständigen Testlauf gemäß Abschnitt 12 seriell ausführen, inklusive Browser-/E2E-Tests; anschließend Testanzahlen und Fehlergruppierung berichten |
 | `log <kurztitel>` | Schritt-Log manuell auslösen (ergänzt automatisches Log) |
 | `save` | Alle offenen Änderungen stagen, eine sinnvolle Commit-Message wählen, alles committen und auf den aktuellen Branch pushen |
 
@@ -437,10 +437,35 @@ Jede neue Testdatei enthält einen Pflicht-Kommentar:
 
 > ⚠️ Die vollständigen Kommandos werden ergänzt, sobald die Testinfrastruktur steht.
 
-### Voller Testlauf umfasst (Platzhalter)
+### Voller Testlauf umfasst
 
 - `npm run test -w apps/api`
-- _(E2E wird ergänzt)_
+- `npm run test -w apps/web`
+- `npm run e2e -w apps/web`
+
+Alle Testkommandos werden seriell ausgeführt. Ein fehlgeschlagenes Kommando unterbricht den Gesamtlauf nicht; alle weiteren Testkommandos werden trotzdem ausgeführt.
+
+Nach dem Testlauf berichtet Codex:
+- welche Kommandos ausgeführt wurden,
+- pro Kommando: Status, Anzahl grün, rot, übersprungen und blockiert,
+- gesamt: Anzahl ausgeführt, grün, rot, übersprungen und blockiert,
+- Infrastrukturfehler getrennt von Testfehlern, zum Beispiel Serverstart, fehlende native Bindings oder belegte Ports.
+
+Blockierte Browser-Tests zählen nicht als rote Testfälle, wenn der Runner keine Tests ausführt. Sie werden als `blockiert` mit konkreter Ursache berichtet.
+
+Fehler werden zusätzlich in zwei Gruppen eingeordnet:
+
+**Kann durch Test-Fixes gelöst werden**
+
+Beispiele: veraltete Selektoren, falsche Testannahmen, Timing-/Waiting-Probleme, Mock-/Fixture-Probleme oder E2E-Flows, die noch auf eine alte UI-Struktur zeigen.
+
+**Muss in Produktionscode gelöst werden**
+
+Diese Gruppe wird nach Schweregrad absteigend berichtet:
+- **Kritisch:** Datenverlust, falsche API-Schreiboperationen, Sicherheits- oder Runtime-Isolation verletzt
+- **Hoch:** Hauptworkflow kaputt, Create/Edit/Delete nicht möglich, Navigation blockiert
+- **Mittel:** falsche Anzeige, fehlende Invalidierung, fehlerhafte Relation-, Counter- oder Toast-Logik
+- **Niedrig:** UX-, Text-, A11y- oder Layout-Abweichungen ohne Funktionsverlust
 
 ### Voller Audit umfasst (Platzhalter)
 

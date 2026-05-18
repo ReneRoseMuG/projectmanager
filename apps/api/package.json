@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "predev:e2e": "node scripts/prepare-e2e-runtime.mjs",
-    "dev:e2e": "npm run db:migrate && tsx watch src/index.ts",
+    "dev:e2e": "npm run build && node scripts/copy-migrations-to-dist.mjs && node dist/db/migrate.js && node dist/index.js",
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate:sqlite --config=drizzle.config.ts",
     "db:migrate": "tsx src/db/migrate.ts",

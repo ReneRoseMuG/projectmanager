@@ -1,28 +1,21 @@
-import type { Task, TaskStatus } from "@taskmanager/shared-types";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { LinkIcon, ListTodo } from "lucide-react";
-import { useMemo, useState } from "react";
-import { getTasks, type TaskOwner } from "../../api/tasks";
+import type { Task, TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { createEntityComment } from "../../api/comments";
+import { createTaskNote } from "../../api/notes";
+import { createSubtask, type TaskOwner } from "../../api/tasks";
 import { setTaskTags } from "../../api/tags";
+import { createOwnerTicket, linkOwnerTicket } from "../../api/tickets";
+import { uploadTaskAttachment } from "../../api/attachments";
 import { errorMessage } from "../../hooks/errors";
 import { useTasks } from "../../hooks/useTasks";
 import { useViewMode } from "../../hooks/useViewMode";
 import { invalidateTags } from "../../queries/invalidation";
-import { queryKeys } from "../../queries/queryKeys";
-import { priorityBadgeTones, priorityLabels, taskStatusLabels, taskStatusTones } from "../../utils/domainLabels";
-import { richTextToPlainText } from "../../utils/richText";
-import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
-import { useConfirm } from "../ui/ConfirmDialogProvider";
-import { EmptyState } from "../ui/EmptyState";
-import { Modal } from "../ui/Modal";
-import { Pill } from "../ui/Pill";
-import { SearchInput } from "../ui/SearchInput";
-import { TaskListSkeleton } from "../ui/Skeleton";
+import { OwnerRelationBoard } from "../ui/OwnerRelationBoard";
 import { useToast } from "../ui/ToastProvider";
-import { TaskDetail } from "./TaskDetail";
-import { TaskForm } from "./TaskForm";
+import { TaskLinkDialog } from "./TaskLinkDialog";
 import { TaskListBoardView } from "./TaskListBoardView";
+import { TaskModal, type TaskModalInput } from "./TaskModal";
 
 interface OwnerTaskBoardProps {
   owner: TaskOwner;
@@ -31,76 +24,140 @@ interface OwnerTaskBoardProps {
 export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
-  const { confirm } = useConfirm();
   const taskController = useTasks(owner);
   const { viewMode, setViewMode } = useViewMode();
-  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [newTaskStatus, setNewTaskStatus] = useState<TaskStatus>("todo");
-  const [detailTaskId, setDetailTaskId] = useState<number | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [savingLabel, setSavingLabel] = useState<string | undefined>();
 
   const openTaskForm = (status: TaskStatus = "todo") => {
+    setEditingTask(null);
     setNewTaskStatus(status);
-    setTaskFormOpen(true);
+    setTaskModalOpen(true);
   };
 
-  const unlinkTask = async (task: Task) => {
-    const approved = await confirm({
-      title: "Zuordnung entfernen?",
-      body: `Die Aufgabe "${task.title}" wird nur aus diesem Bereich entfernt.`,
-      severity: "danger",
-      confirmLabel: "Entfernen"
-    });
-    if (!approved) {
-      return;
+  const closeTaskModal = () => {
+    setTaskModalOpen(false);
+    setEditingTask(null);
+    setSavingLabel(undefined);
+  };
+
+  const submitTaskModal = async (input: TaskModalInput): Promise<Task | void> => {
+    const { tagIds, pendingSubtasks, pendingTickets, pendingComments, pendingNotes, pendingFiles, ...taskInput } = input;
+
+    if (editingTask) {
+      try {
+        const updated = await taskController.updateTask(editingTask.id, taskInput);
+        await setTaskTags(editingTask.id, tagIds);
+        await invalidateTags(queryClient);
+        await taskController.reload();
+        showToast({ tone: "success", title: "Aufgabe gespeichert" });
+        return updated ?? editingTask;
+      } catch (taskError) {
+        showToast({ tone: "error", title: "Aufgabe konnte nicht gespeichert werden", message: errorMessage(taskError) });
+        throw taskError;
+      }
     }
 
+    let created: TaskBoardItem | null = null;
     try {
-      await taskController.unlinkTask(task.id);
-      showToast({ tone: "success", title: "Aufgaben-Zuordnung entfernt" });
+      created = await taskController.createTask(taskInput);
+      if (!created) {
+        throw new Error("Aufgabe konnte nicht erstellt werden");
+      }
+      setEditingTask(created);
+
+      if (tagIds.length > 0) {
+        await setTaskTags(created.id, tagIds);
+        await invalidateTags(queryClient);
+      }
+
+      for (const subtask of pendingSubtasks) {
+        await createSubtask(created.id, subtask);
+      }
+
+      const ticketOwner = { type: "task" as const, id: created.id };
+      for (const ticket of pendingTickets) {
+        if (ticket.kind === "existing") {
+          await linkOwnerTicket(ticketOwner, ticket.ticket.id);
+        } else {
+          await createOwnerTicket(ticketOwner, ticket.draft);
+        }
+      }
+
+      for (const comment of pendingComments) {
+        await createEntityComment("task", created.id, { body: comment.text });
+      }
+
+      for (const note of pendingNotes) {
+        await createTaskNote(created.id, note);
+      }
+
+      for (let index = 0; index < pendingFiles.length; index += 1) {
+        const file = pendingFiles[index];
+        if (!file) {
+          continue;
+        }
+        setSavingLabel(`Speichern… (Datei ${index + 1} von ${pendingFiles.length})`);
+        await uploadTaskAttachment(created.id, file.file);
+      }
+
+      await taskController.reload();
+      showToast({ tone: "success", title: "Aufgabe erstellt" });
+      return created;
     } catch (taskError) {
-      showToast({ tone: "error", title: "Aufgaben-Zuordnung konnte nicht entfernt werden", message: errorMessage(taskError) });
+      if (created) {
+        setEditingTask(created);
+        await taskController.reload();
+        showToast({ tone: "error", title: "Aufgabe wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(taskError) });
+      } else {
+        showToast({ tone: "error", title: "Aufgabe konnte nicht erstellt werden", message: errorMessage(taskError) });
+      }
+      throw taskError;
+    } finally {
+      setSavingLabel(undefined);
     }
   };
 
   return (
     <>
-      <TaskListBoardView
-        tasks={taskController.tasks}
+      <OwnerRelationBoard<TaskBoardItem>
+        items={taskController.tasks}
         loading={taskController.loading}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onAdd={() => openTaskForm()}
-        onAddStatus={openTaskForm}
-        onOpen={(task) => setDetailTaskId(task.id)}
-        onDelete={(task) => void unlinkTask(task)}
-        linkAction={
-          <Button variant="secondary" icon={<LinkIcon size={17} />} onClick={() => setLinkDialogOpen(true)}>
-            Verknüpfen
-          </Button>
-        }
+        onCreateItem={(status) => openTaskForm(toTaskStatus(status))}
+        onLinkItem={() => setLinkDialogOpen(true)}
+        onUnlinkItem={(task) => taskController.unlinkTask(task.id)}
+        onOpenItem={(task) => {
+          setEditingTask(task);
+          setTaskModalOpen(true);
+        }}
+        confirmUnlinkTitle={() => "Zuordnung entfernen?"}
+        confirmUnlinkBody={(task) => `Die Aufgabe "${task.title}" wird nur aus diesem Bereich entfernt.`}
+        renderListBoardView={(props) => (
+          <TaskListBoardView
+            tasks={props.items}
+            loading={props.loading}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onAdd={props.onAdd}
+            onAddStatus={(status) => props.onAddStatus?.(status)}
+            onOpen={(task) => props.onOpen(task as TaskBoardItem)}
+            onDelete={(task) => props.onDelete(task as TaskBoardItem)}
+            linkAction={props.linkAction}
+          />
+        )}
       />
 
-      <TaskForm
-        open={taskFormOpen}
-        title="Neue Aufgabe"
+      <TaskModal
+        open={taskModalOpen}
+        task={editingTask}
         initialStatus={newTaskStatus}
-        onSubmit={async (input) => {
-          try {
-            const { tagIds, ...taskInput } = input;
-            const created = await taskController.createTask(taskInput);
-            if (created && tagIds.length > 0) {
-              await setTaskTags(created.id, tagIds);
-              await invalidateTags(queryClient);
-            }
-            await taskController.reload();
-            showToast({ tone: "success", title: "Aufgabe erstellt" });
-          } catch (taskError) {
-            showToast({ tone: "error", title: "Aufgabe konnte nicht erstellt werden", message: errorMessage(taskError) });
-            throw taskError;
-          }
-        }}
-        onClose={() => setTaskFormOpen(false)}
+        savingLabel={savingLabel}
+        onSubmit={submitTaskModal}
+        onClose={closeTaskModal}
+        onChanged={taskController.reload}
       />
 
       <TaskLinkDialog
@@ -117,91 +174,13 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
         }}
         onClose={() => setLinkDialogOpen(false)}
       />
-
-      <TaskDetail
-        open={Boolean(detailTaskId)}
-        taskId={detailTaskId}
-        onClose={() => setDetailTaskId(null)}
-        onChanged={async () => {
-          await taskController.reload();
-        }}
-      />
     </>
   );
 }
 
-function TaskLinkDialog({
-  open,
-  currentTasks,
-  onLink,
-  onClose
-}: {
-  open: boolean;
-  currentTasks: Task[];
-  onLink: (task: Task) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [searchValue, setSearchValue] = useState("");
-  const [linkingTaskId, setLinkingTaskId] = useState<number | null>(null);
-  const allTasksQuery = useQuery({
-    queryKey: queryKeys.tasks.list(),
-    queryFn: getTasks,
-    enabled: open
-  });
-  const currentTaskIds = useMemo(() => new Set(currentTasks.map((task) => task.id)), [currentTasks]);
-  const availableTasks = useMemo(() => {
-    const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
-    return (allTasksQuery.data ?? [])
-      .filter((task) => !currentTaskIds.has(task.id))
-      .filter((task) => {
-        if (!normalized) {
-          return true;
-        }
-        const values = [task.title, richTextToPlainText(task.description), task.status, task.priority, ...task.tags.map((tag) => tag.name)];
-        return values.some((value) => (value ?? "").toLocaleLowerCase("de-DE").includes(normalized));
-      });
-  }, [allTasksQuery.data, currentTaskIds, searchValue]);
-
-  const linkTask = async (task: Task) => {
-    setLinkingTaskId(task.id);
-    try {
-      await onLink(task);
-    } finally {
-      setLinkingTaskId(null);
-    }
-  };
-
-  return (
-    <Modal open={open} title="Aufgabe verknüpfen" size="lg" onClose={onClose}>
-      <div className="grid gap-4">
-        <SearchInput value={searchValue} onChange={setSearchValue} placeholder="Aufgaben suchen" />
-        {allTasksQuery.isLoading ? <TaskListSkeleton /> : null}
-        {!allTasksQuery.isLoading && availableTasks.length === 0 ? (
-          <EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben verfügbar" body="Es gibt keine unverknüpfte Aufgabe für diese Suche." tone="fern" variant="tinted" />
-        ) : null}
-        {!allTasksQuery.isLoading && availableTasks.length > 0 ? (
-          <div className="grid max-h-[52vh] gap-2 overflow-auto pr-1">
-            {availableTasks.map((task) => {
-              const description = richTextToPlainText(task.description);
-              return (
-                <div key={task.id} className="grid gap-3 rounded-md border border-line bg-white p-3 shadow-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                  <div className="min-w-0">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="truncate text-sm font-semibold text-ink">{task.title}</span>
-                      <Pill tone={taskStatusTones[task.status]}>{taskStatusLabels[task.status]}</Pill>
-                      <Badge tone={priorityBadgeTones[task.priority]}>{priorityLabels[task.priority]}</Badge>
-                    </div>
-                    {description ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{description}</p> : null}
-                  </div>
-                  <Button variant="secondary" icon={<LinkIcon size={17} />} loading={linkingTaskId === task.id} onClick={() => void linkTask(task)}>
-                    Verknüpfen
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
-    </Modal>
-  );
+function toTaskStatus(status?: string): TaskStatus {
+  if (status === "in_progress" || status === "done") {
+    return status;
+  }
+  return "todo";
 }

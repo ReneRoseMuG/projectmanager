@@ -1,45 +1,18 @@
-import type { Attachment, Feature, FeatureUpdate, Project, UseCase, UseCaseInput, UseCaseUpdate } from "@taskmanager/shared-types";
-import { ChevronRight, Paperclip } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import type { Feature, FeatureInput, FeatureUpdate } from "@taskmanager/shared-types";
+import { ChevronRight, Edit3 } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { AttachmentList } from "../components/attachments/AttachmentList";
-import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
-import { FeatureDetail } from "../components/features/FeatureDetail";
-import { FeatureProjectPanel } from "../components/features/FeatureProjectPanel";
-import { OwnerTaskBoard } from "../components/tasks/OwnerTaskBoard";
-import { OwnerTicketBoard } from "../components/tickets/OwnerTicketBoard";
-import { CommentThread } from "../components/ui/CommentThread";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { FeatureForm } from "../components/features/FeatureForm";
+import { Button } from "../components/ui/Button";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { Pill } from "../components/ui/Pill";
 import { TaskListSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
-import { UseCaseForm } from "../components/usecases/UseCaseForm";
-import { UseCaseListBoardView } from "../components/usecases/UseCaseListBoardView";
 import { errorMessage } from "../hooks/errors";
-import { useAttachments } from "../hooks/useAttachments";
-import { useFeatureProjectLinks } from "../hooks/useDocLinks";
-import { useEntityComments } from "../hooks/useEntityComments";
 import { useFeatures } from "../hooks/useFeatures";
-import { useTasks } from "../hooks/useTasks";
-import { useTickets } from "../hooks/useTickets";
-import { useUseCases } from "../hooks/useUseCases";
-import type { ViewMode } from "../types";
 import { formatHumanDate } from "../utils/date";
 import { featureStatusLabels, featureStatusTones } from "../utils/domainLabels";
-
-type FeatureTab = "details" | "useCases" | "tasks" | "tickets" | "projects" | "attachments" | "comments";
-
-const featureTabs: FeatureTab[] = ["details", "useCases", "tasks", "tickets", "projects", "attachments", "comments"];
-
-const tabLabels: Record<FeatureTab, string> = {
-  details: "Stammdaten",
-  useCases: "Use Cases",
-  tasks: "Aufgaben",
-  tickets: "Tickets",
-  projects: "Projekte",
-  attachments: "Dateien",
-  comments: "Kommentare"
-};
+import { richTextToPlainText } from "../utils/richText";
 
 export function FeatureDetailPage() {
   const params = useParams();
@@ -48,76 +21,20 @@ export function FeatureDetailPage() {
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const features = useFeatures(Number.isFinite(featureId) ? featureId : undefined);
-  const useCases = useUseCases(Number.isFinite(featureId) ? featureId : undefined);
-  const projectLinks = useFeatureProjectLinks(Number.isFinite(featureId) ? featureId : undefined);
-  const taskOwner = Number.isFinite(featureId) ? { type: "feature" as const, id: featureId } : undefined;
-  const featureTasks = useTasks(taskOwner);
-  const featureTickets = useTickets(taskOwner ?? null);
-  const attachments = useAttachments(Number.isFinite(featureId) ? { type: "feature", id: featureId } : null);
-  const featureComments = useEntityComments("feature", Number.isFinite(featureId) ? featureId : undefined);
-  const [activeTab, setActiveTab] = useState<FeatureTab>("details");
-  const [useCaseViewMode, setUseCaseViewMode] = useState<ViewMode>("kanban");
-  const [projectViewMode, setProjectViewMode] = useState<ViewMode>("kanban");
-  const [useCaseFormOpen, setUseCaseFormOpen] = useState(false);
-  const [editingUseCase, setEditingUseCase] = useState<UseCase | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
 
-  const saveFeature = async (id: number, input: FeatureUpdate) => {
+  const saveFeature = async (input: FeatureInput) => {
+    if (!features.feature) {
+      return;
+    }
     try {
-      await features.updateFeature(id, input);
+      const updated = await features.updateFeature(features.feature.id, input as FeatureUpdate);
+      await features.reload();
       showToast({ tone: "success", title: "Feature gespeichert" });
+      return updated;
     } catch (featureError) {
       showToast({ tone: "error", title: "Feature konnte nicht gespeichert werden", message: errorMessage(featureError) });
       throw featureError;
-    }
-  };
-
-  const addProjectToFeature = async (project: Project) => {
-    try {
-      await projectLinks.addProjectToFeature(project.id);
-      showToast({ tone: "success", title: "Projekt verknüpft" });
-    } catch (projectError) {
-      showToast({ tone: "error", title: "Projekt konnte nicht verknüpft werden", message: errorMessage(projectError) });
-      throw projectError;
-    }
-  };
-
-  const removeProjectFromFeature = async (project: Project) => {
-    try {
-      await projectLinks.removeProjectFromFeature(project.id);
-      showToast({ tone: "success", title: "Projekt-Zuordnung entfernt" });
-    } catch (projectError) {
-      showToast({ tone: "error", title: "Projekt-Zuordnung konnte nicht entfernt werden", message: errorMessage(projectError) });
-      throw projectError;
-    }
-  };
-
-  const uploadAttachment = async (file: File) => {
-    try {
-      const uploaded = await attachments.uploadAttachment(file);
-      showToast({ tone: "success", title: "Datei hochgeladen" });
-      return uploaded;
-    } catch (attachmentError) {
-      showToast({ tone: "error", title: "Datei konnte nicht hochgeladen werden", message: errorMessage(attachmentError) });
-      throw attachmentError;
-    }
-  };
-
-  const deleteAttachment = async (attachment: Attachment) => {
-    const approved = await confirm({
-      title: "Datei löschen?",
-      body: attachment.originalName,
-      severity: "danger",
-      confirmLabel: "Löschen"
-    });
-    if (!approved) {
-      return;
-    }
-
-    try {
-      await attachments.removeAttachment(attachment.id);
-      showToast({ tone: "success", title: "Datei gelöscht" });
-    } catch (attachmentError) {
-      showToast({ tone: "error", title: "Datei konnte nicht gelöscht werden", message: errorMessage(attachmentError) });
     }
   };
 
@@ -129,88 +46,17 @@ export function FeatureDetailPage() {
       confirmLabel: "Löschen"
     });
     if (!approved) {
-      return;
+      return false;
     }
     try {
       await features.removeFeature(feature.id);
       showToast({ tone: "success", title: "Feature gelöscht" });
       navigate("/features");
+      return true;
     } catch (featureError) {
       showToast({ tone: "error", title: "Feature konnte nicht gelöscht werden", message: errorMessage(featureError) });
-    }
-  };
-
-  const createUseCase = async (input: UseCaseInput) => {
-    try {
-      await useCases.createUseCase(input);
-      await features.reload();
-      showToast({ tone: "success", title: "Use Case erstellt" });
-    } catch (useCaseError) {
-      showToast({ tone: "error", title: "Use Case konnte nicht erstellt werden", message: errorMessage(useCaseError) });
-      throw useCaseError;
-    }
-  };
-
-  const saveUseCase = async (id: number, input: UseCaseUpdate) => {
-    try {
-      await useCases.updateUseCase(id, input);
-      await features.reload();
-      showToast({ tone: "success", title: "Use Case gespeichert" });
-    } catch (useCaseError) {
-      showToast({ tone: "error", title: "Use Case konnte nicht gespeichert werden", message: errorMessage(useCaseError) });
-      throw useCaseError;
-    }
-  };
-
-  const deleteUseCase = async (useCase: UseCase) => {
-    const approved = await confirm({
-      title: "Use Case löschen?",
-      body: `Der Use Case "${useCase.title}" wird entfernt.`,
-      severity: "danger",
-      confirmLabel: "Löschen"
-    });
-    if (!approved) {
       return false;
     }
-    try {
-      await useCases.removeUseCase(useCase.id);
-      await features.reload();
-      setEditingUseCase(null);
-      showToast({ tone: "success", title: "Use Case gelöscht" });
-      return true;
-    } catch (useCaseError) {
-      showToast({ tone: "error", title: "Use Case konnte nicht gelöscht werden", message: errorMessage(useCaseError) });
-      return false;
-    }
-  };
-
-  const openCreateUseCaseForm = () => {
-    setEditingUseCase(null);
-    setUseCaseFormOpen(true);
-  };
-
-  const openUseCaseForm = async (useCase: UseCase) => {
-    try {
-      const loadedUseCase = await useCases.loadUseCase(useCase.id);
-      setEditingUseCase(loadedUseCase);
-      setUseCaseFormOpen(true);
-    } catch (useCaseError) {
-      showToast({ tone: "error", title: "Use Case konnte nicht geladen werden", message: errorMessage(useCaseError) });
-    }
-  };
-
-  const submitUseCaseForm = async (input: UseCaseInput) => {
-    if (editingUseCase) {
-      await saveUseCase(editingUseCase.id, input);
-      setEditingUseCase(null);
-      return;
-    }
-    await createUseCase(input);
-  };
-
-  const closeUseCaseForm = () => {
-    setUseCaseFormOpen(false);
-    setEditingUseCase(null);
   };
 
   if (features.loading) {
@@ -222,19 +68,13 @@ export function FeatureDetailPage() {
   }
 
   const feature = features.feature;
-  const tabCounts: Partial<Record<FeatureTab, number>> = {
-    useCases: useCases.useCases.length,
-    tasks: featureTasks.tasks.length,
-    tickets: featureTickets.tickets.length,
-    projects: projectLinks.linkedProjects.length,
-    attachments: attachments.attachments.length,
-    comments: featureComments.comments.length
-  };
+  const description = richTextToPlainText(feature.description);
+
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
       <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-steel-700 via-steel-600 to-violet p-6 text-white shadow-steel">
         <div className="flex flex-wrap items-start justify-between gap-5">
-          <div className="grid gap-3">
+          <div className="grid min-w-0 gap-3">
             <nav className="flex items-center gap-2 text-sm text-white/70">
               <Link className="hover:text-white" to="/features">
                 Features
@@ -245,8 +85,12 @@ export function FeatureDetailPage() {
             <div>
               <h1 className="text-[28px] font-bold text-white">{feature.title}</h1>
               <p className="mt-1 font-mono text-xs text-white/75">/features/{feature.slug}</p>
+              {description ? <p className="mt-3 max-w-3xl text-sm leading-6 text-white/80">{description}</p> : null}
             </div>
           </div>
+          <Button className="border-white/20 bg-white/10 text-white hover:bg-white/20" icon={<Edit3 size={17} />} variant="ghost" onClick={() => setFormOpen(true)}>
+            Bearbeiten
+          </Button>
         </div>
         <div className="mt-6 flex flex-wrap gap-5 border-t border-white/15 pt-4">
           <HeroStat label="Status">
@@ -258,118 +102,7 @@ export function FeatureDetailPage() {
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="inline-flex rounded-lg border border-line bg-white p-1 shadow-sm" role="tablist" aria-label="Feature-Detail">
-          {featureTabs.map((tab) => (
-            <button
-              key={tab}
-              className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-semibold transition ${
-                activeTab === tab ? "bg-steel-700 text-white" : "text-slate-600 hover:bg-steel-50 hover:text-ink"
-              }`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tabLabels[tab]}
-              {tabCounts[tab] !== undefined ? (
-                <span className={`rounded-full px-1.5 text-[11px] ${activeTab === tab ? "bg-white/20 text-white" : "bg-steel-100 text-slate-600"}`}>
-                  {tabCounts[tab]}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {useCases.error ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">{useCases.error}</div> : null}
-      {useCases.detailLoading ? <div className="rounded-lg border border-line bg-white p-4 text-sm font-semibold text-slate-500">Use Case wird geladen...</div> : null}
-
-      {activeTab === "details" ? <FeatureDetail feature={feature} onSave={saveFeature} onDelete={deleteFeature} /> : null}
-      {activeTab === "useCases" && useCases.loading ? <TaskListSkeleton /> : null}
-      {activeTab === "useCases" && !useCases.loading ? (
-        <UseCaseListBoardView
-          useCases={useCases.useCases}
-          viewMode={useCaseViewMode}
-          onViewModeChange={setUseCaseViewMode}
-          onCreate={openCreateUseCaseForm}
-          onOpen={(useCase) => void openUseCaseForm(useCase)}
-        />
-      ) : null}
-      {activeTab === "tasks" && taskOwner ? <OwnerTaskBoard owner={taskOwner} /> : null}
-      {activeTab === "tickets" && taskOwner ? <OwnerTicketBoard owner={taskOwner} /> : null}
-      {activeTab === "projects" && projectLinks.loading ? <TaskListSkeleton /> : null}
-      {activeTab === "projects" && !projectLinks.loading ? (
-        <div className="grid gap-4">
-          {projectLinks.error ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">{projectLinks.error}</div> : null}
-          <FeatureProjectPanel
-            projects={projectLinks.linkedProjects}
-            availableProjects={projectLinks.projects}
-            viewMode={projectViewMode}
-            onViewModeChange={setProjectViewMode}
-            onAddProject={addProjectToFeature}
-            onRemoveProject={removeProjectFromFeature}
-            onOpen={(project) => navigate(`/projects/${project.id}`)}
-          />
-        </div>
-      ) : null}
-      {activeTab === "attachments" ? (
-        attachments.loading ? (
-          <TaskListSkeleton />
-        ) : (
-          <div className="grid gap-4">
-            {attachments.error ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">{attachments.error}</div> : null}
-            <div className="flex items-center gap-2 rounded-lg border border-line bg-white p-4 shadow-sm">
-              <Paperclip size={18} className="text-steel-700" />
-              <span className="text-sm font-bold uppercase tracking-wide text-ink">Dateien</span>
-            </div>
-            <AttachmentUploader onUpload={uploadAttachment} />
-            <AttachmentList attachments={attachments.attachments} onDelete={(attachment) => void deleteAttachment(attachment)} />
-          </div>
-        )
-      ) : null}
-      {activeTab === "comments" ? (
-        featureComments.loading ? (
-          <TaskListSkeleton />
-        ) : (
-          <div className="grid gap-4">
-            {featureComments.error ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">{featureComments.error}</div> : null}
-            <CommentThread
-              comments={featureComments.comments}
-              entityLabel="Feature"
-              onCreate={async (input) => {
-                try {
-                  await featureComments.createComment(input);
-                  showToast({ tone: "success", title: "Kommentar erstellt" });
-                } catch (commentError) {
-                  showToast({ tone: "error", title: "Kommentar konnte nicht erstellt werden", message: errorMessage(commentError) });
-                  throw commentError;
-                }
-              }}
-              onDelete={async (id) => {
-                try {
-                  await featureComments.removeComment(id);
-                  showToast({ tone: "success", title: "Kommentar gelöscht" });
-                } catch (commentError) {
-                  showToast({ tone: "error", title: "Kommentar konnte nicht gelöscht werden", message: errorMessage(commentError) });
-                  throw commentError;
-                }
-              }}
-            />
-          </div>
-        )
-      ) : null}
-
-      <UseCaseForm
-        open={useCaseFormOpen}
-        useCase={editingUseCase}
-        featureTitle={feature.title}
-        currentFeatureId={feature.id}
-        features={features.features}
-        onSubmit={submitUseCaseForm}
-        onDelete={deleteUseCase}
-        onClose={closeUseCaseForm}
-      />
+      <FeatureForm open={formOpen} feature={feature} onSubmit={saveFeature} onDelete={deleteFeature} onClose={() => setFormOpen(false)} />
     </div>
   );
 }

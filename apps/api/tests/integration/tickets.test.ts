@@ -166,6 +166,23 @@ describe("Tickets API", () => {
     }
   });
 
+  it("owner ticket lists stay isolated until an explicit link is created", async () => {
+    const owners = await createOwners();
+    const projectOwner = owners[0];
+    const taskOwner = owners[1];
+    const ticket = await createTicket(app, projectOwner, { title: "Isolated owner ticket" });
+
+    await expectOwnerContains(projectOwner, ticket.id);
+    await expectOwnerDoesNotContain(taskOwner, ticket.id);
+
+    await supertest(app.server).post(`${taskOwner.path}/${ticket.id}`).expect(200);
+    await supertest(app.server).delete(`${projectOwner.path}/${ticket.id}`).expect(204);
+
+    await expectOwnerDoesNotContain(projectOwner, ticket.id);
+    await expectOwnerContains(taskOwner, ticket.id);
+    await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
+  });
+
   it("linking the same ticket twice is idempotent for an owner", async () => {
     const [owner] = await createOwners();
     const ticket = await createTicket(app, null, { title: "Idempotent ticket" });
@@ -183,6 +200,14 @@ describe("Tickets API", () => {
     const child = await createSubTicket(app, parent.id, { title: "Child" });
 
     await supertest(app.server).post(`${owner.path}/${child.id}`).expect(400);
+  });
+
+  it("owner ticket link and unlink negative cases return not found", async () => {
+    const [owner] = await createOwners();
+    const ticket = await createTicket(app, null, { title: "Unlinked ticket" });
+
+    await supertest(app.server).post(`${owner.path}/9999`).expect(404);
+    await supertest(app.server).delete(`${owner.path}/${ticket.id}`).expect(404);
   });
 
   it("unlinks owner-ticket relations without deleting the ticket", async () => {

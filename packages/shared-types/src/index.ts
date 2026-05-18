@@ -322,6 +322,31 @@ export interface UseCaseInput {
 
 export type UseCaseUpdate = Partial<UseCaseInput>;
 
+export type DraftTask =
+  | { kind: "new"; draft: Pick<TaskInput, "title" | "status" | "priority"> }
+  | { kind: "existing"; task: Task };
+
+export type DraftTicket =
+  | { kind: "new"; draft: Pick<TicketInput, "title" | "type" | "status" | "priority"> }
+  | { kind: "existing"; ticket: Ticket };
+
+export type DraftUseCase = { kind: "new"; draft: Pick<UseCaseInput, "title" | "slug" | "status"> } | { kind: "existing"; useCase: UseCase };
+
+export type DraftSubtask = {
+  title: string;
+  status: TaskStatus;
+  priority: Priority;
+};
+
+export type DraftComment = {
+  text: string;
+};
+
+export type DraftNote = {
+  title: string;
+  contentJson: JsonObject;
+};
+
 export interface WikiPage {
   id: number;
   parentId: number | null;

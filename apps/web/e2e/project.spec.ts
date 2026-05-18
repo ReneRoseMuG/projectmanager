@@ -43,15 +43,6 @@ async function createProject(request: APIRequestContext, titlePrefix: string, co
   return response.json();
 }
 
-async function createFeature(request: APIRequestContext, titlePrefix: string): Promise<FeatureFixture> {
-  const title = uniqueTitle(titlePrefix);
-  const response = await request.post(`${apiBaseUrl}/features`, {
-    data: { title, slug: slugify(title), status: "active", description: "E2E Feature", content: "", sortOrder: 0 }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
 async function deleteProject(request: APIRequestContext, projectId: number | null) {
   if (projectId) {
     await request.delete(`${apiBaseUrl}/projects/${projectId}`);
@@ -68,12 +59,17 @@ function activeModal(page: Page) {
   return page.locator(".fixed.inset-0").last();
 }
 
-function projectCard(page: Page, name: string) {
-  return page.locator("article:visible").filter({ hasText: name }).first();
+function projectForm(page: Page) {
+  return page.locator(".fixed.inset-0").filter({ has: page.getByRole("heading", { name: "Projekt bearbeiten" }) }).last();
 }
 
-function relationPanel(page: Page, title: string) {
-  return page.locator("section").filter({ has: page.getByRole("heading", { name: title }) }).first();
+async function openProjectTasksTab(page: Page) {
+  await projectForm(page).getByRole("button", { name: /Aufgaben/ }).click();
+  await expect(projectForm(page).getByRole("button", { name: "Neue Aufgabe", exact: true })).toBeVisible();
+}
+
+function projectCard(page: Page, name: string) {
+  return page.locator("article:visible").filter({ hasText: name }).first();
 }
 
 async function openProjectList(page: Page) {
@@ -151,8 +147,12 @@ test.describe("Projekt CRUD", () => {
     try {
       await page.goto(`/projects/${project.id}`);
       await expect(page.getByRole("heading", { name: project.name })).toBeVisible();
-      await page.locator("form").first().locator("input[required]").first().fill(updatedName);
-      await page.locator("form").first().getByRole("button", { name: "Speichern" }).click();
+      await page.getByRole("button", { name: "Bearbeiten" }).click();
+      await projectForm(page).locator("input[required]").first().fill(updatedName);
+      await Promise.all([
+        page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}`) && response.request().method() === "PATCH"),
+        projectForm(page).getByRole("button", { name: "Speichern" }).click()
+      ]);
 
       await expect(page.getByRole("heading", { name: updatedName })).toBeVisible();
     } finally {
@@ -171,25 +171,31 @@ test.describe("Projekt CRUD", () => {
     await deleteProject(request, project.id);
   });
 
-  test("Feature verknüpfen im Projektformular und im Features-Tab anzeigen", async ({ page, request }) => {
+  test("Feature erstellen im Projektformular und im Features-Tab anzeigen", async ({ page, request }) => {
     const project = await createProject(request, "E2E Project Feature Link");
-    const feature = await createFeature(request, "E2E Project Linked Feature");
+    const featureTitle = uniqueTitle("E2E Project Linked Feature");
+    const featureSlug = slugify(featureTitle);
+    let featureId: number | null = null;
 
     try {
-      await openProjectList(page);
-      await projectCard(page, project.name).getByRole("button", { name: "Bearbeiten" }).click();
-      await activeModal(page).locator("label").filter({ hasText: feature.title }).click();
+      await page.goto(`/projects/${project.id}`);
+      await page.getByRole("button", { name: "Bearbeiten" }).click();
+      await projectForm(page).getByRole("button", { name: /Features/ }).click();
+      await projectForm(page).getByRole("button", { name: "Neues Feature" }).click();
+      await activeModal(page).locator("input[required]").nth(0).fill(featureTitle);
+      await activeModal(page).locator("input[required]").nth(1).fill(featureSlug);
+
+      const createFeatureResponse = page.waitForResponse((response) => response.url().includes("/api/features") && response.request().method() === "POST");
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),
-        activeModal(page).getByRole("button", { name: "Speichern" }).click()
+        activeModal(page).getByRole("button", { name: "Feature anlegen" }).click()
       ]);
+      featureId = ((await (await createFeatureResponse).json()) as FeatureFixture).id;
 
-      await page.goto(`/projects/${project.id}`);
-      await page.getByRole("button", { name: /Features/ }).click();
-      await expect(page.getByText(feature.title)).toBeVisible();
+      await expect(projectForm(page).getByText(featureTitle)).toBeVisible();
     } finally {
       await deleteProject(request, project.id);
-      await deleteFeature(request, feature.id);
+      await deleteFeature(request, featureId);
     }
   });
 
@@ -199,12 +205,14 @@ test.describe("Projekt CRUD", () => {
 
     try {
       await page.goto(`/projects/${project.id}`);
-      await page.getByRole("button", { name: /Aufgaben/ }).click();
-      await page.getByRole("button", { name: "Neue Aufgabe" }).first().click();
+      await page.getByRole("button", { name: "Bearbeiten" }).click();
+      await openProjectTasksTab(page);
+      await projectForm(page).getByRole("button", { name: "Neue Aufgabe" }).first().click();
       await activeModal(page).locator("input[required]").first().fill(taskTitle);
       await activeModal(page).getByRole("button", { name: "Aufgabe anlegen" }).click();
 
-      await expect(projectCard(page, taskTitle)).toBeVisible();
+      await openProjectTasksTab(page);
+      await expect(projectForm(page).locator("article:visible").filter({ hasText: taskTitle }).first()).toBeVisible();
     } finally {
       await deleteProject(request, project.id);
     }

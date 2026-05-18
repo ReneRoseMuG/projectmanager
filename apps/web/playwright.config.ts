@@ -14,6 +14,7 @@ process.env.PLAYWRIGHT_API_BASE_URL = apiBaseUrl;
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
+  workers: 1,
   expect: {
     timeout: 5_000
   },

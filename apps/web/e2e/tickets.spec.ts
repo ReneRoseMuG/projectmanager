@@ -160,34 +160,38 @@ async function linkTicketInBoard(page: Page, scope: Page | Locator, title: strin
 async function removeTicketRelationInBoard(page: Page, scope: Page | Locator, title: string) {
   await ticketCard(scope, title).getByRole("button", { name: "Löschen", exact: true }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Entfernen" }).click();
-  await expect(page.getByRole("status")).toContainText("Ticket-Zuordnung entfernt");
+  await expect(page.getByRole("status")).toContainText("Zuordnung entfernt");
   await expect(ticketCard(scope, title)).toHaveCount(0);
 }
 
 async function openProjectTickets(page: Page, projectId: number) {
   await page.goto(`/projects/${projectId}`);
-  await page.getByRole("button", { name: /Tickets/ }).click();
-  await expect(page.getByRole("button", { name: "Neues Ticket" })).toBeVisible();
+  await page.getByRole("button", { name: "Bearbeiten" }).click();
+  await activeModal(page).getByRole("button", { name: /Tickets/ }).click();
+  await expect(activeModal(page).getByRole("button", { name: "Neues Ticket" })).toBeVisible();
 }
 
 async function openFeatureTickets(page: Page, featureId: number) {
   await page.goto(`/features/${featureId}`);
-  await page.getByRole("tab", { name: /Tickets/ }).click();
-  await expect(page.getByRole("button", { name: "Neues Ticket" })).toBeVisible();
+  await page.getByRole("button", { name: "Bearbeiten" }).click();
+  await activeModal(page).getByRole("button", { name: /Tickets/ }).click();
+  await expect(activeModal(page).getByRole("button", { name: "Neues Ticket" })).toBeVisible();
 }
 
 async function openTaskTickets(page: Page, projectId: number, taskTitle: string) {
   await page.goto(`/projects/${projectId}`);
-  await page.getByRole("button", { name: /Aufgaben/ }).click();
-  await ticketCard(page, taskTitle).dblclick();
+  await page.getByRole("button", { name: "Bearbeiten" }).click();
+  await activeModal(page).getByRole("button", { name: /Aufgaben/ }).click();
+  await ticketCard(activeModal(page), taskTitle).dblclick();
   await activeModal(page).getByRole("button", { name: /Tickets/ }).click();
   await expect(activeModal(page).getByRole("button", { name: "Neues Ticket" })).toBeVisible();
 }
 
 async function openUseCaseTickets(page: Page, featureId: number, useCaseTitle: string) {
   await page.goto(`/features/${featureId}`);
-  await page.getByRole("tab", { name: /Use Cases/ }).click();
-  await ticketCard(page, useCaseTitle).dblclick();
+  await page.getByRole("button", { name: "Bearbeiten" }).click();
+  await activeModal(page).getByRole("button", { name: /Use Cases/ }).click();
+  await ticketCard(activeModal(page), useCaseTitle).dblclick();
   await activeModal(page).getByRole("button", { name: /Tickets/ }).click();
   await expect(activeModal(page).getByRole("button", { name: "Neues Ticket" })).toBeVisible();
 }
@@ -200,9 +204,9 @@ test.describe("Owner-Ticket-Flows", () => {
 
     try {
       await openProjectTickets(page, project.id);
-      await createTicketInBoard(page, page, createdTitle);
-      await linkTicketInBoard(page, page, existingTicket.title);
-      await removeTicketRelationInBoard(page, page, existingTicket.title);
+      await createTicketInBoard(page, activeModal(page), createdTitle);
+      await linkTicketInBoard(page, activeModal(page), existingTicket.title);
+      await removeTicketRelationInBoard(page, activeModal(page), existingTicket.title);
     } finally {
       await cleanupProject(request, project.id);
       await cleanupTicketsByTitle(request, [createdTitle, existingTicket.title]);
@@ -233,9 +237,9 @@ test.describe("Owner-Ticket-Flows", () => {
 
     try {
       await openFeatureTickets(page, feature.id);
-      await createTicketInBoard(page, page, createdTitle);
-      await linkTicketInBoard(page, page, existingTicket.title);
-      await removeTicketRelationInBoard(page, page, existingTicket.title);
+      await createTicketInBoard(page, activeModal(page), createdTitle);
+      await linkTicketInBoard(page, activeModal(page), existingTicket.title);
+      await removeTicketRelationInBoard(page, activeModal(page), existingTicket.title);
     } finally {
       await cleanupFeature(request, feature.id);
       await cleanupTicketsByTitle(request, [createdTitle, existingTicket.title]);

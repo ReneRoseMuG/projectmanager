@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
 
 /**
@@ -30,6 +30,10 @@ interface FeatureFixture {
 
 interface IdFixture {
   id: number;
+}
+
+interface NoteFixture extends IdFixture {
+  title: string;
 }
 
 function uniqueTitle(prefix: string) {
@@ -78,26 +82,39 @@ function activeModal(page: Page) {
   return page.locator(".fixed.inset-0").last();
 }
 
-function visibleArticle(page: Page, text: string) {
-  return page.locator("article:visible").filter({ hasText: text }).first();
+function projectForm(page: Page) {
+  return page.locator(".fixed.inset-0").filter({ has: page.getByRole("heading", { name: "Projekt bearbeiten" }) }).last();
 }
 
-function tabWithCount(page: Page, label: string, count: number) {
-  return page.getByRole("button", { name: new RegExp(`^${escapeRegExp(label)}\\s+${count}$`) });
+function featureForm(page: Page) {
+  return page.locator(".fixed.inset-0").filter({ has: page.getByRole("heading", { name: "Feature bearbeiten" }) }).last();
 }
 
-async function expectTabCount(page: Page, label: string, count: number) {
-  await expect(tabWithCount(page, label, count)).toBeVisible();
+function visibleArticle(scope: Page | Locator, text: string) {
+  return scope.locator("article:visible").filter({ hasText: text }).first();
+}
+
+function tabWithCount(scope: Page | Locator, label: string, count: number) {
+  return scope.getByRole("button", { name: new RegExp(`^${escapeRegExp(label)}\\s+${count}$`) });
+}
+
+function tabByLabel(scope: Page | Locator, label: string) {
+  return scope.getByRole("button", { name: new RegExp(`^${escapeRegExp(label)}(?:\\s+\\d+)?$`) });
+}
+
+async function expectTabCount(scope: Page | Locator, label: string, count: number) {
+  await expect(tabWithCount(scope, label, count)).toBeVisible();
+}
+
+async function openTab(scope: Page | Locator, label: string) {
+  await tabByLabel(scope, label).click();
 }
 
 async function openProjectDetail(page: Page, project: ProjectFixture) {
   await page.goto(`/projects/${project.id}`);
   await expect(page.getByRole("heading", { name: project.name })).toBeVisible();
-}
-
-async function openProjectList(page: Page) {
-  await page.goto("/projects");
-  await expect(page.getByRole("heading", { name: "Projekte" })).toBeVisible();
+  await page.getByRole("button", { name: "Bearbeiten" }).click();
+  await expect(projectForm(page)).toBeVisible();
 }
 
 async function discardUnsavedNoteChangesIfNeeded(page: Page) {
@@ -116,11 +133,10 @@ test.describe("Globale UI-Aktualität", () => {
 
     try {
       await openProjectDetail(page, project);
-      await expectTabCount(page, "Aufgaben", 0);
-      await tabWithCount(page, "Aufgaben", 0).click();
-      await expect(page.getByRole("heading", { name: "Keine Aufgaben" })).toBeVisible();
+      await openTab(projectForm(page), "Aufgaben");
+      await expect(projectForm(page).getByRole("heading", { name: "Keine Aufgaben" })).toBeVisible();
 
-      await page.getByRole("button", { name: "Neue Aufgabe" }).click();
+      await projectForm(page).getByRole("button", { name: "Neue Aufgabe" }).click();
       await activeModal(page).locator("input[required]").first().fill(taskTitle);
       const createResponsePromise = page.waitForResponse(
         (response) => response.url().includes(`/api/projects/${project.id}/tasks`) && response.request().method() === "POST"
@@ -128,21 +144,21 @@ test.describe("Globale UI-Aktualität", () => {
       await activeModal(page).getByRole("button", { name: "Aufgabe anlegen" }).click();
       const createdTask = (await (await createResponsePromise).json()) as IdFixture;
 
-      await expectTabCount(page, "Aufgaben", 1);
-      await expect(visibleArticle(page, taskTitle)).toBeVisible();
-      await page.getByRole("button", { name: "Kanban" }).click();
-      await expect(page.getByRole("heading", { name: "Offen" })).toBeVisible();
-      await expect(visibleArticle(page, taskTitle)).toBeVisible();
+      await openTab(projectForm(page), "Aufgaben");
+      await expect(visibleArticle(projectForm(page), taskTitle)).toBeVisible();
+      await projectForm(page).getByRole("button", { name: "Kanban" }).click();
+      await expect(projectForm(page).getByRole("heading", { name: "Offen" })).toBeVisible();
+      await expect(visibleArticle(projectForm(page), taskTitle)).toBeVisible();
 
-      await visibleArticle(page, taskTitle).getByRole("button", { name: "Löschen", exact: true }).click();
+      await visibleArticle(projectForm(page), taskTitle).getByRole("button", { name: "Löschen", exact: true }).click();
       await Promise.all([
-        page.waitForResponse((response) => response.url().includes(`/api/tasks/${createdTask.id}`) && response.request().method() === "DELETE"),
-        page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click()
+        page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/tasks/${createdTask.id}`) && response.request().method() === "DELETE"),
+        page.getByRole("alertdialog").getByRole("button", { name: "Entfernen" }).click()
       ]);
 
-      await expectTabCount(page, "Aufgaben", 0);
-      await expect(page.locator("article:visible").filter({ hasText: taskTitle })).toHaveCount(0);
-      await expect(page.getByRole("heading", { name: "Keine Aufgaben" })).toBeVisible();
+      await openTab(projectForm(page), "Aufgaben");
+      await expect(projectForm(page).locator("article:visible").filter({ hasText: taskTitle })).toHaveCount(0);
+      await expect(projectForm(page).getByRole("heading", { name: "Keine Aufgaben" })).toBeVisible();
     } finally {
       await deleteProject(request, project.id);
     }
@@ -154,35 +170,37 @@ test.describe("Globale UI-Aktualität", () => {
 
     try {
       await openProjectDetail(page, project);
-      await expectTabCount(page, "Features", 0);
+      await expectTabCount(projectForm(page), "Features", 0);
 
-      await openProjectList(page);
-      await visibleArticle(page, project.name).getByRole("button", { name: "Bearbeiten" }).click();
-      await activeModal(page).locator("label").filter({ hasText: feature.title }).click();
+      await page.goto(`/features/${feature.id}`);
+      await page.getByRole("button", { name: "Bearbeiten" }).click();
+      await featureForm(page).getByRole("button", { name: /Projekte/ }).click();
+      await featureForm(page).getByRole("button", { name: "Projekt hinzufügen" }).click();
+      await activeModal(page).getByRole("combobox").selectOption({ label: project.name });
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),
-        activeModal(page).getByRole("button", { name: "Speichern" }).click()
+        activeModal(page).getByRole("button", { name: "Hinzufügen" }).click()
       ]);
 
       await openProjectDetail(page, project);
-      await expectTabCount(page, "Features", 1);
-      await tabWithCount(page, "Features", 1).click();
-      await expect(page.getByRole("row", { name: new RegExp(escapeRegExp(feature.title)) })).toBeVisible();
-      await page.getByRole("button", { name: "Board" }).click();
-      await expect(visibleArticle(page, feature.title)).toBeVisible();
+      await expectTabCount(projectForm(page), "Features", 1);
+      await tabWithCount(projectForm(page), "Features", 1).click();
+      await expect(projectForm(page).getByText(feature.title)).toBeVisible();
+      await projectForm(page).getByRole("button", { name: "Kanban" }).click();
+      await expect(visibleArticle(projectForm(page), feature.title)).toBeVisible();
 
-      await openProjectList(page);
-      await visibleArticle(page, project.name).getByRole("button", { name: "Bearbeiten" }).click();
-      await activeModal(page).locator("label").filter({ hasText: feature.title }).click();
+      await page.goto(`/features/${feature.id}`);
+      await page.getByRole("button", { name: "Bearbeiten" }).click();
+      await featureForm(page).getByRole("button", { name: /Projekte/ }).click();
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),
-        activeModal(page).getByRole("button", { name: "Speichern" }).click()
+        visibleArticle(featureForm(page), project.name).getByRole("button", { name: "Entfernen" }).click()
       ]);
 
       await openProjectDetail(page, project);
-      await expectTabCount(page, "Features", 0);
-      await tabWithCount(page, "Features", 0).click();
-      await expect(page.getByText(feature.title)).toHaveCount(0);
+      await expectTabCount(projectForm(page), "Features", 0);
+      await tabWithCount(projectForm(page), "Features", 0).click();
+      await expect(projectForm(page).getByText(feature.title)).toHaveCount(0);
     } finally {
       await deleteProject(request, project.id);
       await deleteFeature(request, feature.id);
@@ -195,11 +213,11 @@ test.describe("Globale UI-Aktualität", () => {
 
     try {
       await openProjectDetail(page, project);
-      await expectTabCount(page, "Backlog", 0);
-      await tabWithCount(page, "Backlog", 0).click();
-      await expect(page.getByRole("heading", { name: "Keine Backlog-Items" })).toBeVisible();
+      await expectTabCount(projectForm(page), "Backlog", 0);
+      await tabWithCount(projectForm(page), "Backlog", 0).click();
+      await expect(projectForm(page).getByRole("heading", { name: "Keine Backlog-Items" })).toBeVisible();
 
-      await page.getByRole("button", { name: "Neues Backlog-Item" }).click();
+      await projectForm(page).getByRole("button", { name: "Neues Backlog-Item" }).click();
       await activeModal(page).locator("input[required]").first().fill(backlogTitle);
       const createResponsePromise = page.waitForResponse(
         (response) => response.url().includes(`/api/projects/${project.id}/backlog`) && response.request().method() === "POST"
@@ -207,40 +225,40 @@ test.describe("Globale UI-Aktualität", () => {
       await activeModal(page).getByRole("button", { name: "Speichern" }).click();
       const createdBacklogItem = (await (await createResponsePromise).json()) as IdFixture;
 
-      await expectTabCount(page, "Backlog", 1);
-      await expect(page.getByRole("button", { name: /^Alle\s+1$/ })).toBeVisible();
-      await expect(page.getByRole("button", { name: /^Offen\s+1$/ })).toBeVisible();
-      await expect(visibleArticle(page, backlogTitle)).toBeVisible();
+      await expectTabCount(projectForm(page), "Backlog", 1);
+      await expect(projectForm(page).getByRole("button", { name: /^Alle\s+1$/ })).toBeVisible();
+      await expect(projectForm(page).getByRole("button", { name: /^Offen\s+1$/ })).toBeVisible();
+      await expect(visibleArticle(projectForm(page), backlogTitle)).toBeVisible();
 
-      await page.getByRole("button", { name: "Kanban" }).click();
-      await expect(visibleArticle(page, backlogTitle)).toBeVisible();
-      await page.getByRole("button", { name: "Liste", exact: true }).click();
+      await projectForm(page).getByRole("button", { name: "Kanban" }).click();
+      await expect(visibleArticle(projectForm(page), backlogTitle)).toBeVisible();
+      await projectForm(page).getByRole("button", { name: "Liste", exact: true }).click();
 
-      await visibleArticle(page, backlogTitle).getByRole("button", { name: "Bearbeiten" }).click();
+      await visibleArticle(projectForm(page), backlogTitle).getByRole("button", { name: "Bearbeiten" }).click();
       await activeModal(page).getByRole("button", { name: "In Arbeit" }).click();
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/backlog/${createdBacklogItem.id}`) && response.request().method() === "PATCH"),
         activeModal(page).getByRole("button", { name: "Speichern" }).click()
       ]);
 
-      await expect(page.getByRole("button", { name: /^Alle\s+1$/ })).toBeVisible();
-      await expect(page.getByRole("button", { name: /^Offen\s+0$/ })).toBeVisible();
-      await expect(page.getByRole("button", { name: /^In Arbeit\s+1$/ })).toBeVisible();
-      await page.getByRole("button", { name: /^In Arbeit\s+1$/ }).click();
-      await expect(visibleArticle(page, backlogTitle)).toBeVisible();
-      await page.getByRole("button", { name: /^Offen\s+0$/ }).click();
-      await expect(page.locator("article:visible").filter({ hasText: backlogTitle })).toHaveCount(0);
-      await page.getByRole("button", { name: /^Alle\s+1$/ }).click();
+      await expect(projectForm(page).getByRole("button", { name: /^Alle\s+1$/ })).toBeVisible();
+      await expect(projectForm(page).getByRole("button", { name: /^Offen\s+0$/ })).toBeVisible();
+      await expect(projectForm(page).getByRole("button", { name: /^In Arbeit\s+1$/ })).toBeVisible();
+      await projectForm(page).getByRole("button", { name: /^In Arbeit\s+1$/ }).click();
+      await expect(visibleArticle(projectForm(page), backlogTitle)).toBeVisible();
+      await projectForm(page).getByRole("button", { name: /^Offen\s+0$/ }).click();
+      await expect(projectForm(page).locator("article:visible").filter({ hasText: backlogTitle })).toHaveCount(0);
+      await projectForm(page).getByRole("button", { name: /^Alle\s+1$/ }).click();
 
-      await visibleArticle(page, backlogTitle).getByRole("button", { name: "Löschen" }).click();
+      await visibleArticle(projectForm(page), backlogTitle).getByRole("button", { name: "Löschen" }).click();
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/backlog/${createdBacklogItem.id}`) && response.request().method() === "DELETE"),
         page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click()
       ]);
 
-      await expectTabCount(page, "Backlog", 0);
-      await expect(page.getByRole("button", { name: /^Alle\s+0$/ })).toBeVisible();
-      await expect(page.locator("article:visible").filter({ hasText: backlogTitle })).toHaveCount(0);
+      await expectTabCount(projectForm(page), "Backlog", 0);
+      await expect(projectForm(page).getByRole("button", { name: /^Alle\s+0$/ })).toBeVisible();
+      await expect(projectForm(page).locator("article:visible").filter({ hasText: backlogTitle })).toHaveCount(0);
     } finally {
       await deleteProject(request, project.id);
     }
@@ -254,67 +272,65 @@ test.describe("Globale UI-Aktualität", () => {
     try {
       await openProjectDetail(page, project);
 
-      await expectTabCount(page, "Kommentare", 0);
-      await tabWithCount(page, "Kommentare", 0).click();
-      await expect(page.getByRole("heading", { name: "Noch keine Kommentare" })).toBeVisible();
-      const commentEditor = page.locator('[contenteditable="true"]').last();
+      await expectTabCount(projectForm(page), "Kommentare", 0);
+      await tabWithCount(projectForm(page), "Kommentare", 0).click();
+      await expect(projectForm(page).getByRole("heading", { name: "Noch keine Kommentare" })).toBeVisible();
+      const commentEditor = projectForm(page).locator('[contenteditable="true"]').last();
       await commentEditor.fill(commentText);
       await expect(commentEditor).toContainText(commentText);
       const createCommentResponsePromise = page.waitForResponse(
         (response) => response.url().includes(`/api/projects/${project.id}/comments`) && response.request().method() === "POST"
       );
-      await page.getByRole("button", { name: "Kommentar", exact: true }).click();
+      await projectForm(page).getByRole("button", { name: "Kommentar", exact: true }).click();
       const createdComment = (await (await createCommentResponsePromise).json()) as IdFixture;
-      await expectTabCount(page, "Kommentare", 1);
-      await expect(page.getByText(commentText, { exact: true })).toBeVisible();
+      await expectTabCount(projectForm(page), "Kommentare", 1);
+      await expect(projectForm(page).getByText(commentText, { exact: true })).toBeVisible();
 
       await Promise.all([
         page.waitForResponse(
           (response) => response.url().includes(`/api/projects/${project.id}/comments/${createdComment.id}`) && response.request().method() === "DELETE"
         ),
-        visibleArticle(page, commentText).getByRole("button", { name: "Löschen" }).click()
+        visibleArticle(projectForm(page), commentText).getByRole("button", { name: "Löschen" }).click()
       ]);
-      await expectTabCount(page, "Kommentare", 0);
+      await expectTabCount(projectForm(page), "Kommentare", 0);
 
-      await expectTabCount(page, "Notizen", 0);
-      await tabWithCount(page, "Notizen", 0).click();
-      const createNoteResponsePromise = page.waitForResponse(
-        (response) => response.url().includes(`/api/projects/${project.id}/notes`) && response.request().method() === "POST"
-      );
-      await page.getByRole("button", { name: "Neue Notiz" }).click();
-      const createdNote = (await (await createNoteResponsePromise).json()) as IdFixture;
-      await expectTabCount(page, "Notizen", 1);
+      await expectTabCount(projectForm(page), "Notizen", 0);
+      await tabWithCount(projectForm(page), "Notizen", 0).click();
+      await projectForm(page).getByRole("button", { name: "Neue Notiz", exact: true }).click();
+      await expect(activeModal(page).getByRole("heading", { name: "Ohne Titel" })).toBeVisible();
       await activeModal(page).getByRole("button", { name: "Schließen" }).first().click();
       await discardUnsavedNoteChangesIfNeeded(page);
-      await expect(visibleArticle(page, "Ohne Titel")).toBeVisible();
+      await expectTabCount(projectForm(page), "Notizen", 1);
+      await expect(visibleArticle(projectForm(page), "Ohne Titel")).toBeVisible();
+      const notesResponse = await request.get(`${apiBaseUrl}/projects/${project.id}/notes`);
+      const createdNote = ((await notesResponse.json()) as NoteFixture[]).find((note) => note.title === "Ohne Titel");
+      expect(createdNote).toBeTruthy();
 
-      await visibleArticle(page, "Ohne Titel").getByRole("button", { name: "Löschen" }).click();
       await Promise.all([
-        page.waitForResponse((response) => response.url().includes(`/api/notes/${createdNote.id}`) && response.request().method() === "DELETE"),
-        page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click()
+        page.waitForResponse((response) => response.url().includes(`/api/notes/${createdNote?.id}`) && response.request().method() === "DELETE"),
+        visibleArticle(projectForm(page), "Ohne Titel").getByRole("button", { name: "Löschen" }).click()
       ]);
-      await expectTabCount(page, "Notizen", 0);
+      await expectTabCount(projectForm(page), "Notizen", 0);
 
-      await expectTabCount(page, "Dateien", 0);
-      await tabWithCount(page, "Dateien", 0).click();
+      await expectTabCount(projectForm(page), "Dateien", 0);
+      await tabWithCount(projectForm(page), "Dateien", 0).click();
       const createAttachmentResponsePromise = page.waitForResponse(
         (response) => response.url().includes(`/api/projects/${project.id}/attachments`) && response.request().method() === "POST"
       );
-      await page.locator('input[type="file"]').setInputFiles({
+      await projectForm(page).locator('input[type="file"]').setInputFiles({
         name: attachmentName,
         mimeType: "text/plain",
         buffer: Buffer.from("E2E attachment freshness")
       });
       const createdAttachment = (await (await createAttachmentResponsePromise).json()) as IdFixture;
-      await expectTabCount(page, "Dateien", 1);
-      await expect(visibleArticle(page, attachmentName)).toBeVisible();
+      await expectTabCount(projectForm(page), "Dateien", 1);
+      await expect(visibleArticle(projectForm(page), attachmentName)).toBeVisible();
 
-      await visibleArticle(page, attachmentName).getByRole("button", { name: "Löschen" }).click();
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/attachments/${createdAttachment.id}`) && response.request().method() === "DELETE"),
-        page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click()
+        visibleArticle(projectForm(page), attachmentName).getByRole("button", { name: "Löschen" }).click()
       ]);
-      await expectTabCount(page, "Dateien", 0);
+      await expectTabCount(projectForm(page), "Dateien", 0);
     } finally {
       await deleteProject(request, project.id);
     }

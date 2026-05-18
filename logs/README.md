@@ -2,6 +2,20 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 18.05.26 | Fix | Browsertests | ✅ |
+| 18.05.26 | 5 | Verifikation und Upload-Fortschritt | ✅ |
+| 18.05.26 | 3/4 | E2E-Form-Specs | 🔴 |
+| 18.05.26 | 2 | Form-Unit-Tests | ⚠️ |
+| 18.05.26 | 1 | Pending-Komponenten-Tests | ✅ |
+| 18.05.26 | 0 | Playwright-Startblocker | 🔴 |
+| 18.05.26 | Fix | Test-Kommando | ✅ |
+| 18.05.26 | 7 | Tests und Verifikation | ⚠️ |
+| 18.05.26 | 6 | ProjectForm | ✅ |
+| 18.05.26 | 5 | FeatureForm | ✅ |
+| 18.05.26 | 4 | TaskModal | ✅ |
+| 18.05.26 | 3 | UseCase-Formular | ✅ |
+| 18.05.26 | 2 | Owner-Board-Migration | ✅ |
+| 18.05.26 | 1 | Foundation Owner-Relation-Board | ✅ |
 | 18.05.26 | Feature | Owner-Aufgabenbeziehungen Tests | ⚠️ |
 | 18.05.26 | Feature | Owner-Join-Tabellen für Tickets | ✅ |
 | 18.05.26 | Feature | Owner-Join-Tabellen für Aufgaben | ✅ |

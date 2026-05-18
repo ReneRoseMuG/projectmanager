@@ -1,5 +1,11 @@
-import { PROJECT_STATUSES, type Project, type ProjectInput, type ProjectStatus } from "@taskmanager/shared-types";
+import { PROJECT_STATUSES, type DraftComment, type DraftNote, type DraftTask, type DraftTicket, type Project, type ProjectInput, type ProjectStatus } from "@taskmanager/shared-types";
 import { useMemo, useState } from "react";
+import { uploadProjectAttachment } from "../api/attachments";
+import { createEntityComment } from "../api/comments";
+import { setProjectFeatures } from "../api/doc-links";
+import { createProjectNote } from "../api/notes";
+import { createOwnerTask, linkOwnerTask } from "../api/tasks";
+import { createOwnerTicket, linkOwnerTicket } from "../api/tickets";
 import { ProjectForm } from "../components/projects/ProjectForm";
 import { ProjectListBoardView } from "../components/projects/ProjectListBoardView";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
@@ -7,6 +13,7 @@ import { FilterChips } from "../components/ui/FilterChips";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useProjects } from "../hooks/useProjects";
+import type { DraftFile } from "../types";
 import { projectStatusLabels } from "../utils/domainLabels";
 
 export function ProjectsPage() {
@@ -15,6 +22,8 @@ export function ProjectsPage() {
   const { confirm } = useConfirm();
   const [formOpen, setFormOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [createdProject, setCreatedProject] = useState<Project | null>(null);
+  const [savingLabel, setSavingLabel] = useState<string | undefined>();
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
 
   const statusOptions = useMemo(
@@ -36,18 +45,27 @@ export function ProjectsPage() {
 
   const openCreate = () => {
     setEditingProject(null);
+    setCreatedProject(null);
     setFormOpen(true);
   };
 
   const submit = async (input: ProjectInput, tagIds: number[]) => {
     try {
       if (editingProject) {
-        await updateProject(editingProject.id, input, tagIds);
+        const updated = await updateProject(editingProject.id, input, tagIds);
         showToast({ tone: "success", title: "Projekt aktualisiert" });
-        return;
+        return updated;
       }
-      await createProject(input, tagIds);
+      if (createdProject) {
+        const updated = await updateProject(createdProject.id, input, tagIds);
+        setCreatedProject(updated);
+        showToast({ tone: "success", title: "Projekt aktualisiert" });
+        return updated;
+      }
+      const created = await createProject(input, tagIds);
+      setCreatedProject(created);
       showToast({ tone: "success", title: "Projekt erstellt" });
+      return created;
     } catch (submitError) {
       showToast({ tone: "error", title: "Projekt konnte nicht gespeichert werden", message: errorMessage(submitError) });
       throw submitError;
@@ -62,13 +80,61 @@ export function ProjectsPage() {
       confirmLabel: "Löschen"
     });
     if (!approved) {
-      return;
+      return false;
     }
     try {
       await removeProject(project.id);
       showToast({ tone: "success", title: "Projekt gelöscht" });
+      return true;
     } catch (deleteError) {
       showToast({ tone: "error", title: "Projekt konnte nicht gelöscht werden", message: errorMessage(deleteError) });
+      return false;
+    }
+  };
+
+  const postCreateProject = async (
+    projectId: number,
+    pending: { tasks: DraftTask[]; tickets: DraftTicket[]; featureIds: number[]; comments: DraftComment[]; notes: DraftNote[]; files: DraftFile[] }
+  ) => {
+    const owner = { type: "project" as const, id: projectId };
+    try {
+      if (pending.featureIds.length > 0) {
+        await setProjectFeatures(projectId, pending.featureIds);
+      }
+      for (const task of pending.tasks) {
+        if (task.kind === "existing") {
+          await linkOwnerTask(owner, task.task.id);
+        } else {
+          await createOwnerTask(owner, task.draft);
+        }
+      }
+      for (const ticket of pending.tickets) {
+        if (ticket.kind === "existing") {
+          await linkOwnerTicket(owner, ticket.ticket.id);
+        } else {
+          await createOwnerTicket(owner, ticket.draft);
+        }
+      }
+      for (const comment of pending.comments) {
+        await createEntityComment("project", projectId, { body: comment.text });
+      }
+      for (const note of pending.notes) {
+        await createProjectNote(projectId, note);
+      }
+      for (let index = 0; index < pending.files.length; index += 1) {
+        const file = pending.files[index];
+        if (!file) {
+          continue;
+        }
+        setSavingLabel(`Speichern… (Datei ${index + 1} von ${pending.files.length})`);
+        await uploadProjectAttachment(projectId, file.file);
+      }
+      showToast({ tone: "success", title: "Projekt-Zuordnungen gespeichert" });
+    } catch (postCreateError) {
+      showToast({ tone: "error", title: "Projekt wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
+      throw postCreateError;
+    } finally {
+      setSavingLabel(undefined);
     }
   };
 
@@ -88,6 +154,7 @@ export function ProjectsPage() {
         onCreate={openCreate}
         onEdit={(project) => {
           setEditingProject(project);
+          setCreatedProject(null);
           setFormOpen(true);
         }}
         onDelete={(project) => void deleteProject(project)}
@@ -96,9 +163,17 @@ export function ProjectsPage() {
 
       <ProjectForm
         open={formOpen}
-        project={editingProject}
+        project={editingProject ?? createdProject}
         onSubmit={submit}
-        onClose={() => setFormOpen(false)}
+        onDelete={deleteProject}
+        savingLabel={savingLabel}
+        onPostCreate={postCreateProject}
+        onClose={() => {
+          setFormOpen(false);
+          setEditingProject(null);
+          setCreatedProject(null);
+          setSavingLabel(undefined);
+        }}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
 const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL ?? "http://127.0.0.1:3101/api";
 
@@ -31,8 +31,8 @@ async function createTask(request: APIRequestContext, projectId: number, title: 
 
 async function openProject(page: Page, projectId: number) {
   await page.goto(`/projects/${projectId}`);
-  await page.getByRole("button", { name: /Aufgaben/ }).click();
-  await expect(page.getByRole("button", { name: "Neue Aufgabe" })).toBeVisible();
+  await page.getByRole("button", { name: "Bearbeiten" }).click();
+  await openProjectTasksTab(page);
 }
 
 async function fillTaskTitle(page: Page, title: string) {
@@ -40,15 +40,25 @@ async function fillTaskTitle(page: Page, title: string) {
 }
 
 async function openTaskDetail(page: Page, title: string) {
-  await taskCard(page, title).dblclick();
+  await taskCard(projectForm(page), title).dblclick();
 }
 
-function taskCard(page: Page, title: string) {
-  return page.locator("article:visible").filter({ hasText: title }).first();
+function taskCard(scope: Page | Locator, title: string) {
+  return scope.locator("article:visible").filter({ hasText: title }).first();
 }
 
 function activeModal(page: Page) {
   return page.locator(".fixed.inset-0").last();
+}
+
+function projectForm(page: Page) {
+  return page.locator(".fixed.inset-0").filter({ has: page.getByRole("heading", { name: "Projekt bearbeiten" }) }).last();
+}
+
+async function openProjectTasksTab(page: Page) {
+  const form = projectForm(page);
+  await form.getByRole("button", { name: /Aufgaben/ }).click();
+  await expect(form.getByRole("button", { name: "Neue Aufgabe", exact: true })).toBeVisible();
 }
 
 test.describe("Task CRUD", () => {
@@ -56,11 +66,12 @@ test.describe("Task CRUD", () => {
     const project = await createProject(request, "E2E Task Create");
     await openProject(page, project.id);
 
-    await page.getByRole("button", { name: "Neue Aufgabe" }).click();
+    await projectForm(page).getByRole("button", { name: "Neue Aufgabe" }).click();
     await fillTaskTitle(page, "E2E Neue Aufgabe");
     await page.getByRole("button", { name: "Aufgabe anlegen" }).click();
 
-    await expect(taskCard(page, "E2E Neue Aufgabe")).toBeVisible();
+    await openProjectTasksTab(page);
+    await expect(taskCard(projectForm(page), "E2E Neue Aufgabe")).toBeVisible();
   });
 
   test("Task erstellen mit Tags → Tags erscheinen auf TaskCard", async ({ page, request }) => {
@@ -69,12 +80,13 @@ test.describe("Task CRUD", () => {
     await request.post(`${apiBaseUrl}/tags`, { data: { name: tagName, color: "#4682B4" } });
     await openProject(page, project.id);
 
-    await page.getByRole("button", { name: "Neue Aufgabe" }).click();
+    await projectForm(page).getByRole("button", { name: "Neue Aufgabe" }).click();
     await fillTaskTitle(page, "E2E Tag Aufgabe");
-    await page.getByRole("button", { name: tagName }).click();
+    await activeModal(page).getByRole("button", { name: tagName }).click();
     await page.getByRole("button", { name: "Aufgabe anlegen" }).click();
 
-    await expect(page.getByText(tagName)).toBeVisible();
+    await openProjectTasksTab(page);
+    await expect(taskCard(projectForm(page), "E2E Tag Aufgabe").getByText(tagName)).toBeVisible();
   });
 
   test("Task öffnen: Doppelklick → TaskDetail Modal öffnet sich", async ({ page, request }) => {
@@ -84,7 +96,8 @@ test.describe("Task CRUD", () => {
 
     await openTaskDetail(page, "E2E Öffnen");
 
-    await expect(activeModal(page).locator("h2", { hasText: "E2E Öffnen" })).toBeVisible();
+    await expect(activeModal(page).getByRole("heading", { name: "Aufgabe bearbeiten" })).toBeVisible();
+    await expect(activeModal(page).locator("input[required]").first()).toHaveValue("E2E Öffnen");
   });
 
   test("Task bearbeiten: Titel ändern → Speichern → neuer Titel auf TaskCard", async ({ page, request }) => {
@@ -96,10 +109,10 @@ test.describe("Task CRUD", () => {
     await fillTaskTitle(page, "E2E Neuer Titel");
     await Promise.all([
       page.waitForResponse((response) => response.url().includes(`/api/tasks/${task.id}`) && response.request().method() === "PATCH"),
-      page.getByRole("button", { name: "Speichern" }).click()
+      activeModal(page).getByRole("button", { name: "Speichern" }).click()
     ]);
 
-    await expect(taskCard(page, "E2E Neuer Titel")).toBeVisible();
+    await expect(taskCard(projectForm(page), "E2E Neuer Titel")).toBeVisible();
   });
 
   test("Task-Zuordnung entfernen: Delete-Icon → ConfirmDialog → Task bleibt global erhalten", async ({ page, request }) => {
@@ -107,13 +120,13 @@ test.describe("Task CRUD", () => {
     const task = await createTask(request, project.id, "E2E Löschen");
     await openProject(page, project.id);
 
-    await page.locator("article").filter({ hasText: "E2E Löschen" }).getByRole("button", { name: "Löschen", exact: true }).click();
+    await taskCard(projectForm(page), "E2E Löschen").getByRole("button", { name: "Löschen", exact: true }).click();
     await Promise.all([
       page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/tasks/${task.id}`) && response.request().method() === "DELETE"),
       page.getByRole("alertdialog").getByRole("button", { name: "Entfernen" }).click()
     ]);
 
-    await expect(page.locator("article").filter({ hasText: "E2E Löschen" })).toHaveCount(0);
+    await expect(projectForm(page).locator("article:visible").filter({ hasText: "E2E Löschen" })).toHaveCount(0);
     const detail = await request.get(`${apiBaseUrl}/tasks/${task.id}`);
     expect(detail.ok()).toBeTruthy();
   });
@@ -123,11 +136,11 @@ test.describe("Task CRUD", () => {
     await createTask(request, project.id, "E2E Board Task");
     await openProject(page, project.id);
 
-    await page.getByRole("button", { name: "Kanban" }).click();
+    await projectForm(page).getByRole("button", { name: "Kanban" }).click();
 
-    await expect(page.getByRole("heading", { name: "Offen" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "In Arbeit" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Erledigt" })).toBeVisible();
+    await expect(projectForm(page).getByRole("heading", { name: "Offen" })).toBeVisible();
+    await expect(projectForm(page).getByRole("heading", { name: "In Arbeit" })).toBeVisible();
+    await expect(projectForm(page).getByRole("heading", { name: "Erledigt" })).toBeVisible();
   });
 
   test("View Toggle: Listen-Modus zeigt Zeilen-Layout", async ({ page, request }) => {
@@ -135,9 +148,9 @@ test.describe("Task CRUD", () => {
     await createTask(request, project.id, "E2E Liste Task");
     await openProject(page, project.id);
 
-    await page.getByRole("button", { name: "Liste", exact: true }).first().click();
+    await projectForm(page).getByRole("button", { name: "Liste", exact: true }).first().click();
 
-    await expect(taskCard(page, "E2E Liste Task")).toBeVisible();
+    await expect(taskCard(projectForm(page), "E2E Liste Task")).toBeVisible();
   });
 
   test("Kommentar erstellen → erscheint im Kommentare-Tab", async ({ page, request }) => {

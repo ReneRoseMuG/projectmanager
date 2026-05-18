@@ -1,30 +1,138 @@
-import type { Feature, FeatureInput, FeatureStatus } from "@taskmanager/shared-types";
-import { BookOpen, LinkIcon } from "lucide-react";
+import type {
+  DraftComment,
+  DraftTask,
+  DraftTicket,
+  DraftUseCase,
+  Feature,
+  FeatureInput,
+  FeatureStatus,
+  Priority,
+  Project,
+  TaskStatus,
+  TicketStatus,
+  TicketType,
+  UseCase,
+  UseCaseInput,
+  UseCaseUpdate
+} from "@taskmanager/shared-types";
+import { BookOpen, Bug, FileText, FolderKanban, LinkIcon, ListTodo, Paperclip, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import type { DraftFile, ViewMode } from "../../types";
+import { errorMessage } from "../../hooks/errors";
+import { useAttachments } from "../../hooks/useAttachments";
+import { useEntityComments } from "../../hooks/useEntityComments";
+import { useFeatureProjectLinks } from "../../hooks/useDocLinks";
+import { useProjects } from "../../hooks/useProjects";
+import { useUseCases } from "../../hooks/useUseCases";
+import {
+  featureStatusLabels,
+  priorityLabels,
+  taskStatusLabels,
+  taskStatusTones,
+  ticketStatusLabels,
+  ticketStatusTones,
+  ticketTypeLabels
+} from "../../utils/domainLabels";
+import { AttachmentList } from "../attachments/AttachmentList";
+import { AttachmentUploader } from "../attachments/AttachmentUploader";
+import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
+import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
+import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
+import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
+import { UseCaseForm } from "../usecases/UseCaseForm";
+import { UseCaseListBoardView } from "../usecases/UseCaseListBoardView";
+import { Button } from "../ui/Button";
+import { CommentThread } from "../ui/CommentThread";
+import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
+import { Modal } from "../ui/Modal";
+import { PendingCommentList } from "../ui/PendingCommentList";
+import { PendingFileList } from "../ui/PendingFileList";
+import { PendingRelationList } from "../ui/PendingRelationList";
+import { RadioList } from "../ui/RadioList";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import { Section } from "../ui/Section";
+import { SectionHeader } from "../ui/SectionHeader";
 import { SegmentedControl } from "../ui/SegmentedControl";
+import { Select } from "../ui/Select";
+import { TaskListSkeleton } from "../ui/Skeleton";
+import { TabBar, type Tab } from "../ui/TabBar";
+import { useToast } from "../ui/ToastProvider";
+import { FeatureProjectPanel } from "./FeatureProjectPanel";
 
 interface FeatureFormProps {
   open: boolean;
   feature?: Feature | null;
-  onSubmit: (input: FeatureInput) => Promise<void>;
-  onProjectLinksChanged?: () => void | Promise<void>;
+  onSubmit: (input: FeatureInput) => Promise<Feature | void>;
   onClose: () => void;
+  onDelete?: (feature: Feature) => Promise<boolean>;
+  savingLabel?: string;
+  onPostCreate?: (
+    featureId: number,
+    pending: {
+      tasks: DraftTask[];
+      tickets: DraftTicket[];
+      useCases: DraftUseCase[];
+      projectIds: number[];
+      comments: DraftComment[];
+      files: DraftFile[];
+    }
+  ) => Promise<void>;
 }
 
-const statuses: Array<{ value: FeatureStatus; label: string }> = [
-  { value: "draft", label: "Entwurf" },
-  { value: "active", label: "Aktiv" },
-  { value: "done", label: "Erledigt" },
-  { value: "archived", label: "Archiviert" }
+type FeatureFormTab = "details" | "useCases" | "tasks" | "tickets" | "projects" | "comments" | "attachments";
+
+const tabs: Array<Tab<FeatureFormTab>> = [
+  { value: "details", label: "Details" },
+  { value: "useCases", label: "Use Cases" },
+  { value: "tasks", label: "Aufgaben" },
+  { value: "tickets", label: "Tickets" },
+  { value: "projects", label: "Projekte" },
+  { value: "comments", label: "Kommentare" },
+  { value: "attachments", label: "Dateien" }
 ];
 
-export function FeatureForm({ open, feature, onSubmit, onClose }: FeatureFormProps) {
+const statuses: Array<{ value: FeatureStatus; label: string }> = [
+  { value: "draft", label: featureStatusLabels.draft },
+  { value: "active", label: featureStatusLabels.active },
+  { value: "done", label: featureStatusLabels.done },
+  { value: "archived", label: featureStatusLabels.archived }
+];
+
+const taskStatuses: Array<{ value: TaskStatus; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
+  { value: "todo", label: taskStatusLabels.todo, activeColor: "crimson" },
+  { value: "in_progress", label: taskStatusLabels.in_progress, activeColor: "tangerine" },
+  { value: "done", label: taskStatusLabels.done, activeColor: "fern" }
+];
+
+const ticketStatuses: Array<{ value: TicketStatus; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
+  { value: "open", label: ticketStatusLabels.open, activeColor: "crimson" },
+  { value: "in_progress", label: ticketStatusLabels.in_progress, activeColor: "tangerine" },
+  { value: "in_review", label: ticketStatusLabels.in_review, activeColor: "violet" },
+  { value: "resolved", label: ticketStatusLabels.resolved, activeColor: "fern" },
+  { value: "closed", label: ticketStatusLabels.closed, activeColor: "fern" }
+];
+
+const priorities: Array<{ value: Priority; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
+  { value: "low", label: priorityLabels.low, activeColor: "fern" },
+  { value: "medium", label: priorityLabels.medium, activeColor: "violet" },
+  { value: "high", label: priorityLabels.high, activeColor: "tangerine" },
+  { value: "urgent", label: priorityLabels.urgent, activeColor: "crimson" }
+];
+
+export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, savingLabel, onPostCreate }: FeatureFormProps) {
+  const featureId = feature?.id;
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
+  const projects = useProjects();
+  const useCases = useUseCases(featureId);
+  const projectLinks = useFeatureProjectLinks(featureId);
+  const comments = useEntityComments("feature", featureId);
+  const attachments = useAttachments(featureId ? { type: "feature", id: featureId } : null);
+  const [activeTab, setActiveTab] = useState<FeatureFormTab>("details");
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [status, setStatus] = useState<FeatureStatus>("draft");
@@ -32,9 +140,38 @@ export function FeatureForm({ open, feature, onSubmit, onClose }: FeatureFormPro
   const [sortOrder, setSortOrder] = useState(0);
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [useCaseViewMode, setUseCaseViewMode] = useState<ViewMode>("kanban");
+  const [projectViewMode, setProjectViewMode] = useState<ViewMode>("kanban");
+  const [useCaseFormOpen, setUseCaseFormOpen] = useState(false);
+  const [editingUseCase, setEditingUseCase] = useState<UseCase | null>(null);
+  const [pendingUseCases, setPendingUseCases] = useState<DraftUseCase[]>([]);
+  const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
+  const [pendingTickets, setPendingTickets] = useState<DraftTicket[]>([]);
+  const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
+  const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<DraftFile[]>([]);
+  const [useCaseDraftOpen, setUseCaseDraftOpen] = useState(false);
+  const [taskLinkOpen, setTaskLinkOpen] = useState(false);
+  const [taskDraftOpen, setTaskDraftOpen] = useState(false);
+  const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
+  const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
+  const [projectLinkOpen, setProjectLinkOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
+      setPendingUseCases([]);
+      setPendingTasks([]);
+      setPendingTickets([]);
+      setPendingProjects([]);
+      setPendingComments([]);
+      setPendingFiles([]);
+      setUseCaseDraftOpen(false);
+      setTaskLinkOpen(false);
+      setTaskDraftOpen(false);
+      setTicketLinkOpen(false);
+      setTicketDraftOpen(false);
+      setProjectLinkOpen(false);
       return;
     }
     setTitle(feature?.title ?? "");
@@ -43,20 +180,24 @@ export function FeatureForm({ open, feature, onSubmit, onClose }: FeatureFormPro
     setDescription(feature?.description ?? "");
     setSortOrder(feature?.sortOrder ?? 0);
     setContent(feature?.content ?? "");
-  }, [open, feature]);
+    setActiveTab("details");
+  }, [feature, open]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     try {
-      await onSubmit({
-        title,
-        slug,
-        status,
-        description,
-        sortOrder,
-        content
-      });
+      const created = await onSubmit({ title, slug, status, description, sortOrder, content });
+      if (!feature && created && onPostCreate) {
+        await onPostCreate(created.id, {
+          tasks: pendingTasks,
+          tickets: pendingTickets,
+          useCases: pendingUseCases,
+          projectIds: pendingProjects.map((project) => project.id),
+          comments: pendingComments,
+          files: pendingFiles
+        });
+      }
       onClose();
     } catch {
       // Error feedback is handled by the page-level toast.
@@ -65,43 +206,529 @@ export function FeatureForm({ open, feature, onSubmit, onClose }: FeatureFormPro
     }
   };
 
+  const deleteCurrentFeature = async () => {
+    if (!feature || !onDelete) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const deleted = await onDelete(feature);
+      if (deleted) {
+        onClose();
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const saveUseCase = async (id: number, input: UseCaseUpdate) => {
+    try {
+      await useCases.updateUseCase(id, input);
+      showToast({ tone: "success", title: "Use Case gespeichert" });
+    } catch (useCaseError) {
+      showToast({ tone: "error", title: "Use Case konnte nicht gespeichert werden", message: errorMessage(useCaseError) });
+      throw useCaseError;
+    }
+  };
+
+  const createUseCase = async (input: UseCaseInput) => {
+    try {
+      const created = await useCases.createUseCase(input);
+      showToast({ tone: "success", title: "Use Case erstellt" });
+      return created;
+    } catch (useCaseError) {
+      showToast({ tone: "error", title: "Use Case konnte nicht erstellt werden", message: errorMessage(useCaseError) });
+      throw useCaseError;
+    }
+  };
+
+  const submitUseCaseForm = async (input: UseCaseInput) => {
+    if (editingUseCase) {
+      await saveUseCase(editingUseCase.id, input);
+      setEditingUseCase(null);
+      return;
+    }
+    return createUseCase(input);
+  };
+
+  const uploadAttachment = async (file: File) => {
+    try {
+      const uploaded = await attachments.uploadAttachment(file);
+      showToast({ tone: "success", title: "Datei hochgeladen" });
+      return uploaded;
+    } catch (attachmentError) {
+      showToast({ tone: "error", title: "Datei konnte nicht hochgeladen werden", message: errorMessage(attachmentError) });
+      throw attachmentError;
+    }
+  };
+
+  const tabItems = tabs.map((tab) => {
+    if (tab.value === "useCases") {
+      return { ...tab, count: feature ? useCases.useCases.length : pendingUseCases.length };
+    }
+    if (tab.value === "tasks") {
+      return { ...tab, count: feature ? undefined : pendingTasks.length };
+    }
+    if (tab.value === "tickets") {
+      return { ...tab, count: feature ? undefined : pendingTickets.length };
+    }
+    if (tab.value === "projects") {
+      return { ...tab, count: feature ? projectLinks.linkedProjects.length : pendingProjects.length };
+    }
+    if (tab.value === "comments") {
+      return { ...tab, count: feature ? comments.comments.length : pendingComments.length };
+    }
+    if (tab.value === "attachments") {
+      return { ...tab, count: feature ? attachments.attachments.length : pendingFiles.length };
+    }
+    return tab;
+  });
+
   return (
-    <FormModal
-      open={open}
-      title={feature ? "Feature bearbeiten" : "Neues Feature"}
-      subtitle="Feature-Inhalt und Status in einem Formular pflegen."
-      icon={<BookOpen size={20} />}
-      breadcrumb={["Features", feature ? "Bearbeiten" : "Neu"]}
-      submitLabel={feature ? "Speichern" : "Feature anlegen"}
-      saving={saving}
-      onSubmit={submit}
-      onClose={onClose}
-    >
-      <Section title="Stammdaten">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem]">
-          <FormField label="Titel" required className="min-w-0">
-            <Input autoFocus={!feature} value={title} onChange={(event) => setTitle(event.target.value)} required />
+    <>
+      <FormModal
+        open={open}
+        title={feature ? "Feature bearbeiten" : "Neues Feature"}
+        subtitle="Feature-Inhalt und Beziehungen in einem Formular pflegen."
+        icon={<BookOpen size={20} />}
+        breadcrumb={["Features", feature ? "Bearbeiten" : "Neu"]}
+        submitLabel={saving ? savingLabel ?? "Speichern…" : feature ? "Speichern" : "Feature anlegen"}
+        saving={saving}
+        footerStart={
+          feature && onDelete ? (
+            <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" disabled={deleting} onClick={() => void deleteCurrentFeature()}>
+              Löschen
+            </Button>
+          ) : undefined
+        }
+        onSubmit={submit}
+        onClose={onClose}
+      >
+        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+
+        {activeTab === "details" ? (
+          <>
+            <Section title="Stammdaten">
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem]">
+                <FormField label="Titel" required className="min-w-0">
+                  <Input autoFocus={!feature} value={title} onChange={(event) => setTitle(event.target.value)} required />
+                </FormField>
+                <FormField label="Slug" required className="min-w-0">
+                  <Input iconLeft={<LinkIcon size={16} />} variant="mono" value={slug} onChange={(event) => setSlug(event.target.value)} required />
+                </FormField>
+                <FormField label="Sortierung" className="min-w-0">
+                  <Input type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
+                </FormField>
+              </div>
+            </Section>
+            <Section title="Status">
+              <SegmentedControl value={status} options={statuses} onChange={setStatus} />
+            </Section>
+            <Section title="Kurzbeschreibung">
+              <RichTextEditor content={description} placeholder="Kurzbeschreibung" toolbar="full" minHeight="8rem" onChange={setDescription} />
+            </Section>
+            <Section title="Inhalt">
+              <RichTextEditor content={content} placeholder="Feature-Inhalt" toolbar="full" onChange={setContent} />
+            </Section>
+          </>
+        ) : null}
+
+        {activeTab === "useCases" ? (
+          <Section title="Use Cases">
+            {feature ? (
+              useCases.loading ? (
+                <TaskListSkeleton />
+              ) : (
+                <UseCaseListBoardView
+                  useCases={useCases.useCases}
+                  viewMode={useCaseViewMode}
+                  onViewModeChange={setUseCaseViewMode}
+                  onCreate={() => {
+                    setEditingUseCase(null);
+                    setUseCaseFormOpen(true);
+                  }}
+                  onOpen={(useCase) => {
+                    setEditingUseCase(useCase);
+                    setUseCaseFormOpen(true);
+                  }}
+                />
+              )
+            ) : (
+              <PendingRelationList
+                existingItems={[]}
+                draftItems={pendingUseCases.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                emptyIcon={<FileText size={22} />}
+                emptyTitle="Keine Use Cases vorgemerkt"
+                showLinkExisting={false}
+                onCreateNew={() => setUseCaseDraftOpen(true)}
+                onRemoveExisting={() => undefined}
+                onRemoveDraft={(index) => setPendingUseCases((items) => items.filter((_, itemIndex) => itemIndex !== index))}
+              />
+            )}
+          </Section>
+        ) : null}
+
+        {activeTab === "tasks" ? (
+          <Section title="Aufgaben">
+            {feature ? (
+              <OwnerTaskBoard owner={{ type: "feature", id: feature.id }} />
+            ) : (
+              <PendingRelationList
+                existingItems={pendingTasks.flatMap((item) =>
+                  item.kind === "existing" ? [{ id: item.task.id, title: item.task.title, statusLabel: taskStatusLabels[item.task.status], statusTone: taskStatusTones[item.task.status] }] : []
+                )}
+                draftItems={pendingTasks.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                emptyIcon={<ListTodo size={22} />}
+                emptyTitle="Keine Aufgaben vorgemerkt"
+                onLinkExisting={() => setTaskLinkOpen(true)}
+                onCreateNew={() => setTaskDraftOpen(true)}
+                onRemoveExisting={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "existing", index))}
+                onRemoveDraft={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "new", index))}
+              />
+            )}
+          </Section>
+        ) : null}
+
+        {activeTab === "tickets" ? (
+          <Section title="Tickets">
+            {feature ? (
+              <OwnerTicketBoard owner={{ type: "feature", id: feature.id }} />
+            ) : (
+              <PendingRelationList
+                existingItems={pendingTickets.flatMap((item) =>
+                  item.kind === "existing"
+                    ? [{ id: item.ticket.id, title: item.ticket.title, statusLabel: ticketStatusLabels[item.ticket.status], statusTone: ticketStatusTones[item.ticket.status] }]
+                    : []
+                )}
+                draftItems={pendingTickets.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                emptyIcon={<Bug size={22} />}
+                emptyTitle="Keine Tickets vorgemerkt"
+                onLinkExisting={() => setTicketLinkOpen(true)}
+                onCreateNew={() => setTicketDraftOpen(true)}
+                onRemoveExisting={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "existing", index))}
+                onRemoveDraft={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "new", index))}
+              />
+            )}
+          </Section>
+        ) : null}
+
+        {activeTab === "projects" ? (
+          <Section title="Projekte">
+            {feature ? (
+              <FeatureProjectPanel
+                projects={projectLinks.linkedProjects}
+                availableProjects={projectLinks.projects}
+                viewMode={projectViewMode}
+                onViewModeChange={setProjectViewMode}
+                onAddProject={(project) => projectLinks.addProjectToFeature(project.id)}
+                onRemoveProject={(project) => projectLinks.removeProjectFromFeature(project.id)}
+                onOpen={() => undefined}
+              />
+            ) : (
+              <PendingRelationList
+                existingItems={pendingProjects.map((project) => ({ id: project.id, title: project.name }))}
+                draftItems={[]}
+                emptyIcon={<FolderKanban size={22} />}
+                emptyTitle="Keine Projekte vorgemerkt"
+                showCreateNew={false}
+                onLinkExisting={() => setProjectLinkOpen(true)}
+                onRemoveExisting={(index) => setPendingProjects((items) => items.filter((_, itemIndex) => itemIndex !== index))}
+                onRemoveDraft={() => undefined}
+              />
+            )}
+          </Section>
+        ) : null}
+
+        {activeTab === "comments" ? (
+          <Section title="Kommentare">
+            {feature ? (
+              <CommentThread comments={comments.comments} entityLabel="Feature" onCreate={comments.createComment} onDelete={comments.removeComment} />
+            ) : (
+              <PendingCommentList comments={pendingComments} onAdd={(comment) => setPendingComments((items) => [...items, comment])} onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+            )}
+          </Section>
+        ) : null}
+
+        {activeTab === "attachments" ? (
+          <Section>
+            <div className="mb-4 flex items-center gap-2">
+              <Paperclip size={18} className="text-fern" />
+              <SectionHeader title="Dateien" />
+            </div>
+            {feature ? (
+              <div className="grid gap-4">
+                <AttachmentUploader onUpload={uploadAttachment} />
+                <AttachmentList
+                  attachments={attachments.attachments}
+                  onDelete={(attachment) => {
+                    void confirm({
+                      title: "Datei löschen?",
+                      body: attachment.originalName,
+                      severity: "danger",
+                      confirmLabel: "Löschen"
+                    }).then((approved) => {
+                      if (approved) {
+                        void attachments
+                          .removeAttachment(attachment.id)
+                          .then(() => showToast({ tone: "success", title: "Datei gelöscht" }))
+                          .catch((attachmentError: unknown) => showToast({ tone: "error", title: "Datei konnte nicht gelöscht werden", message: errorMessage(attachmentError) }));
+                      }
+                    });
+                  }}
+                />
+              </div>
+            ) : (
+              <PendingFileList files={pendingFiles} onAdd={(files) => setPendingFiles((items) => [...items, ...files])} onRemove={(index) => setPendingFiles((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+            )}
+          </Section>
+        ) : null}
+      </FormModal>
+
+      <UseCaseForm
+        open={useCaseFormOpen}
+        useCase={editingUseCase}
+        featureTitle={feature?.title}
+        currentFeatureId={feature?.id}
+        features={feature ? [feature] : []}
+        onSubmit={submitUseCaseForm}
+        onClose={() => {
+          setUseCaseFormOpen(false);
+          setEditingUseCase(null);
+        }}
+      />
+      <TaskLinkDialog
+        open={taskLinkOpen}
+        currentTasks={pendingTasks.flatMap((item) => (item.kind === "existing" ? [item.task] : []))}
+        onLink={async (task) => {
+          setPendingTasks((items) => [...items, { kind: "existing", task }]);
+          setTaskLinkOpen(false);
+        }}
+        onClose={() => setTaskLinkOpen(false)}
+      />
+      <TicketLinkDialog
+        open={ticketLinkOpen}
+        currentTickets={pendingTickets.flatMap((item) => (item.kind === "existing" ? [item.ticket] : []))}
+        onLink={async (ticket) => {
+          setPendingTickets((items) => [...items, { kind: "existing", ticket }]);
+          setTicketLinkOpen(false);
+        }}
+        onClose={() => setTicketLinkOpen(false)}
+      />
+      <ProjectLinkDialog
+        open={projectLinkOpen}
+        projects={projects.projects}
+        excludeIds={pendingProjects.map((project) => project.id)}
+        onLink={(project) => setPendingProjects((items) => [...items, project])}
+        onClose={() => setProjectLinkOpen(false)}
+      />
+      <UseCaseDraftDialog
+        open={useCaseDraftOpen}
+        onCreate={(draft) => setPendingUseCases((items) => [...items, { kind: "new", draft }])}
+        onClose={() => setUseCaseDraftOpen(false)}
+      />
+      <TaskDraftDialog
+        open={taskDraftOpen}
+        onCreate={(draft) => setPendingTasks((items) => [...items, { kind: "new", draft }])}
+        onClose={() => setTaskDraftOpen(false)}
+      />
+      <TicketDraftDialog
+        open={ticketDraftOpen}
+        onCreate={(draft) => setPendingTickets((items) => [...items, { kind: "new", draft }])}
+        onClose={() => setTicketDraftOpen(false)}
+      />
+    </>
+  );
+}
+
+function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(items: TItem[], kind: TItem["kind"], removeIndex: number): TItem[] {
+  let currentIndex = -1;
+  return items.filter((item) => {
+    if (item.kind !== kind) {
+      return true;
+    }
+    currentIndex += 1;
+    return currentIndex !== removeIndex;
+  });
+}
+
+function ProjectLinkDialog({ open, projects, excludeIds, onLink, onClose }: { open: boolean; projects: Project[]; excludeIds: number[]; onLink: (project: Project) => void; onClose: () => void }) {
+  const [selectedProjectId, setSelectedProjectId] = useState<number | "">("");
+  const availableProjects = projects.filter((project) => !excludeIds.includes(project.id));
+  const firstProjectId = availableProjects[0]?.id ?? "";
+
+  useEffect(() => {
+    if (open) {
+      setSelectedProjectId(firstProjectId);
+    }
+  }, [firstProjectId, open]);
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    const project = availableProjects.find((item) => item.id === selectedProjectId);
+    if (!project) {
+      return;
+    }
+    onLink(project);
+    onClose();
+  };
+
+  return (
+    <Modal open={open} title="Projekt verknüpfen" size="md" onClose={onClose}>
+      <form className="grid gap-4" onSubmit={submit}>
+        <Select label="Projekt" value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value ? Number(event.target.value) : "")}>
+          {availableProjects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </Select>
+        <footer className="flex justify-end gap-2">
+          <Button onClick={onClose}>Abbrechen</Button>
+          <Button type="submit" variant="primary" disabled={!selectedProjectId}>
+            Verknüpfen
+          </Button>
+        </footer>
+      </form>
+    </Modal>
+  );
+}
+
+function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftUseCase, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+  const [title, setTitle] = useState("");
+  const [slug, setSlug] = useState("");
+  const [status, setStatus] = useState<FeatureStatus>("draft");
+  const trimmedTitle = title.trim();
+  const trimmedSlug = slug.trim();
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    if (!trimmedTitle || !trimmedSlug) {
+      return;
+    }
+    onCreate({ title: trimmedTitle, slug: trimmedSlug, status });
+    setTitle("");
+    setSlug("");
+    setStatus("draft");
+    onClose();
+  };
+
+  return (
+    <Modal open={open} title="Use Case vormerken" size="md" onClose={onClose}>
+      <form className="grid gap-4" onSubmit={submit}>
+        <FormField label="Titel" required>
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+        </FormField>
+        <FormField label="Slug" required>
+          <Input value={slug} onChange={(event) => setSlug(event.target.value)} required variant="mono" />
+        </FormField>
+        <FormField label="Status">
+          <SegmentedControl value={status} options={statuses} onChange={setStatus} />
+        </FormField>
+        <footer className="flex justify-end gap-2">
+          <Button onClick={onClose}>Abbrechen</Button>
+          <Button type="submit" variant="primary" disabled={!trimmedTitle || !trimmedSlug}>
+            Vormerken
+          </Button>
+        </footer>
+      </form>
+    </Modal>
+  );
+}
+
+function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+  const [title, setTitle] = useState("");
+  const [status, setStatus] = useState<TaskStatus>("todo");
+  const [priority, setPriority] = useState<Priority>("medium");
+  const trimmedTitle = title.trim();
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    if (!trimmedTitle) {
+      return;
+    }
+    onCreate({ title: trimmedTitle, status, priority });
+    setTitle("");
+    setStatus("todo");
+    setPriority("medium");
+    onClose();
+  };
+
+  return (
+    <Modal open={open} title="Aufgabe vormerken" size="md" onClose={onClose}>
+      <form className="grid gap-4" onSubmit={submit}>
+        <FormField label="Titel" required>
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+        </FormField>
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="Status">
+            <RadioList value={status} options={taskStatuses} onChange={setStatus} />
           </FormField>
-          <FormField label="Slug" required className="min-w-0">
-            <Input iconLeft={<LinkIcon size={16} />} variant="mono" value={slug} onChange={(event) => setSlug(event.target.value)} required />
-          </FormField>
-          <FormField label="Sortierung" className="min-w-0">
-            <Input type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
+          <FormField label="Priorität">
+            <RadioList value={priority} options={priorities} onChange={setPriority} />
           </FormField>
         </div>
-      </Section>
+        <footer className="flex justify-end gap-2">
+          <Button onClick={onClose}>Abbrechen</Button>
+          <Button type="submit" variant="primary" disabled={!trimmedTitle}>
+            Vormerken
+          </Button>
+        </footer>
+      </form>
+    </Modal>
+  );
+}
 
-      <Section title="Status">
-        <SegmentedControl value={status} options={statuses} onChange={setStatus} />
-      </Section>
+function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState<TicketType>("bug");
+  const [status, setStatus] = useState<TicketStatus>("open");
+  const [priority, setPriority] = useState<Priority>("medium");
+  const trimmedTitle = title.trim();
 
-      <Section title="Kurzbeschreibung">
-        <RichTextEditor content={description} placeholder="Kurzbeschreibung" toolbar="full" minHeight="8rem" onChange={setDescription} />
-      </Section>
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    if (!trimmedTitle) {
+      return;
+    }
+    onCreate({ title: trimmedTitle, type, status, priority });
+    setTitle("");
+    setType("bug");
+    setStatus("open");
+    setPriority("medium");
+    onClose();
+  };
 
-      <Section title="Inhalt">
-        <RichTextEditor content={content} placeholder="Feature-Inhalt" toolbar="full" onChange={setContent} />
-      </Section>
-    </FormModal>
+  return (
+    <Modal open={open} title="Ticket vormerken" size="md" onClose={onClose}>
+      <form className="grid gap-4" onSubmit={submit}>
+        <FormField label="Titel" required>
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+        </FormField>
+        <Select label="Typ" value={type} onChange={(event) => setType(event.target.value as TicketType)}>
+          <option value="bug">{ticketTypeLabels.bug}</option>
+          <option value="improvement">{ticketTypeLabels.improvement}</option>
+          <option value="question">{ticketTypeLabels.question}</option>
+          <option value="task">{ticketTypeLabels.task}</option>
+        </Select>
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField label="Status">
+            <RadioList value={status} options={ticketStatuses} onChange={setStatus} />
+          </FormField>
+          <FormField label="Priorität">
+            <RadioList value={priority} options={priorities} onChange={setPriority} />
+          </FormField>
+        </div>
+        <footer className="flex justify-end gap-2">
+          <Button onClick={onClose}>Abbrechen</Button>
+          <Button type="submit" variant="primary" disabled={!trimmedTitle}>
+            Vormerken
+          </Button>
+        </footer>
+      </form>
+    </Modal>
   );
 }
