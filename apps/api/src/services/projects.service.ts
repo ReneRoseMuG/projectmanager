@@ -1,12 +1,12 @@
 import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { backlogItems, projects, tasks, tickets } from "../db/schema.js";
+import { backlogItems, projects, projectTasks, tasks } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import { deleteProjectAttachmentsForIds, deleteTaskAttachmentsForIds, deleteTicketAttachmentsForIds } from "./attachments.service.js";
+import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
 import { deleteCommentsForEntities, deleteCommentsForEntity } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
-import { deleteProjectNotesForIds, deleteTaskNotesForIds, deleteTicketNotesForIds } from "./notes.service.js";
+import { deleteProjectNotesForIds } from "./notes.service.js";
 import { getProjectTags, getProjectTagsMap } from "./tags.service.js";
 
 type ProjectRecord = typeof projects.$inferSelect;
@@ -53,9 +53,10 @@ function getProjectTaskCounts(database: DbClient, projectIds: number[]): Map<num
   }
 
   const rows = database
-    .select({ projectId: tasks.projectId, status: tasks.status })
-    .from(tasks)
-    .where(inArray(tasks.projectId, projectIds))
+    .select({ projectId: projectTasks.ownerId, status: tasks.status })
+    .from(projectTasks)
+    .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
+    .where(inArray(projectTasks.ownerId, projectIds))
     .all();
 
   for (const row of rows) {
@@ -155,21 +156,13 @@ export async function deleteProject(database: DbClient, id: number): Promise<voi
     throw notFound(`Project with id ${id} not found`);
   }
 
-  const taskIds = database.select({ id: tasks.id }).from(tasks).where(eq(tasks.projectId, id)).all().map((task) => task.id);
-  const ticketIds = database.select({ id: tickets.id }).from(tickets).where(eq(tickets.projectId, id)).all().map((ticket) => ticket.id);
   const backlogItemIds = database.select({ id: backlogItems.id }).from(backlogItems).where(eq(backlogItems.projectId, id)).all().map((item) => item.id);
 
   await deleteProjectAttachmentsForIds(database, [id]);
-  await deleteTaskAttachmentsForIds(database, taskIds);
-  await deleteTicketAttachmentsForIds(database, ticketIds);
 
   deleteCommentsForEntity(database, "project", id);
-  deleteCommentsForEntities(database, "task", taskIds);
-  deleteCommentsForEntities(database, "ticket", ticketIds);
   deleteCommentsForEntities(database, "backlogItem", backlogItemIds);
   deleteProjectNotesForIds(database, [id]);
-  deleteTaskNotesForIds(database, taskIds);
-  deleteTicketNotesForIds(database, ticketIds);
 
   const result = database.delete(projects).where(eq(projects.id, id)).run();
   if (result.changes === 0) {

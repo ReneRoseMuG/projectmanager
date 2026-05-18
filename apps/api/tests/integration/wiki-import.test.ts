@@ -89,11 +89,11 @@ describe("Wiki Import API", () => {
     expect(tasks.body).toHaveLength(1);
     expect(tasks.body[0]).toMatchObject({ title: "Importierte Aufgabe", priority: "high" });
 
-    const taskFeatures = await supertest(app.server).get(`/api/tasks/${tasks.body[0].id}/features`).expect(200);
-    expect(taskFeatures.body.map((feature: { slug: string }) => feature.slug)).toEqual(["ft-01-kalendertermine"]);
+    const featureTasks = await supertest(app.server).get(`/api/features/${features.body[0].id}/tasks`).expect(200);
+    expect(featureTasks.body.map((task: { id: number }) => task.id)).toEqual([tasks.body[0].id]);
 
-    const taskUseCases = await supertest(app.server).get(`/api/tasks/${tasks.body[0].id}/use-cases`).expect(200);
-    expect(taskUseCases.body.map((useCase: { slug: string }) => useCase.slug)).toEqual(["uc-01-01-termin-anlegen"]);
+    const useCaseTasks = await supertest(app.server).get(`/api/use-cases/${useCases.body[0].id}/tasks`).expect(200);
+    expect(useCaseTasks.body.map((task: { id: number }) => task.id)).toEqual([tasks.body[0].id]);
   });
 
   it("POST run kann wiederholt werden und aktualisiert per Slug und Import-Key", async () => {

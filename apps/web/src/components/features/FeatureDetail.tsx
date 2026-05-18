@@ -1,5 +1,5 @@
 import type { Feature, FeatureStatus, FeatureUpdate } from "@taskmanager/shared-types";
-import { LinkIcon, RotateCcw, Save } from "lucide-react";
+import { LinkIcon, RotateCcw, Save, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
@@ -21,7 +21,7 @@ const statuses: Array<{ value: FeatureStatus; label: string; activeClassName: st
   { value: "archived", label: "Archiviert", activeClassName: "data-[active=true]:bg-steel-100 data-[active=true]:text-steel-700" }
 ];
 
-export function FeatureDetail({ feature, onSave }: FeatureDetailProps) {
+export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps) {
   const [title, setTitle] = useState(feature.title);
   const [slug, setSlug] = useState(feature.slug);
   const [status, setStatus] = useState<FeatureStatus>(feature.status);
@@ -88,7 +88,7 @@ export function FeatureDetail({ feature, onSave }: FeatureDetailProps) {
       <Section title="Kurzbeschreibung">
       <div className="grid gap-1 text-sm font-medium">
         {/* TODO: migrate existing markdown content to HTML. */}
-        <RichTextEditor content={description} placeholder="Kurzbeschreibung" toolbar="minimal" minHeight="6rem" onChange={setDescription} />
+        <RichTextEditor content={description} placeholder="Kurzbeschreibung" toolbar="full" minHeight="6rem" onChange={setDescription} />
       </div>
       </Section>
 
@@ -99,7 +99,10 @@ export function FeatureDetail({ feature, onSave }: FeatureDetailProps) {
       </div>
       </Section>
 
-      <footer className="flex flex-wrap items-center justify-end gap-3 rounded-xl border border-line bg-white p-4 shadow-sm">
+      <footer className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white/95 p-4 shadow-panel backdrop-blur">
+        <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(feature)}>
+          Löschen
+        </Button>
         <div className="flex gap-2">
           <Button icon={<RotateCcw size={16} />} variant="secondary" onClick={resetFields}>
             Verwerfen

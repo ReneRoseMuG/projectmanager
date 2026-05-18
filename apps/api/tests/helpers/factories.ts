@@ -15,7 +15,6 @@ export interface TestProject {
 
 export interface TestTask {
   id: number;
-  projectId: number;
   parentId: number | null;
   title: string;
   description: string | null;
@@ -23,7 +22,7 @@ export interface TestTask {
   priority: string;
   assignee: string | null;
   dueDate: string | null;
-  position: number;
+  boardPosition?: number;
   createdAt: string;
   updatedAt: string;
   tags: TestTag[];
@@ -32,14 +31,12 @@ export interface TestTask {
 
 export interface TestTicket {
   id: number;
-  projectId: number;
   parentId: number | null;
   type: string;
   title: string;
   description: string | null;
   status: string;
   priority: string;
-  severity: string | null;
   resolution: string | null;
   reporter: string | null;
   assignee: string | null;
@@ -197,14 +194,13 @@ export async function createSubtask(
 
 export async function createTicket(
   app: FastifyInstance,
-  projectId: number,
+  owner: number | { type: "project" | "task" | "feature" | "useCase"; id: number } | null,
   overrides: Partial<{
     title: string;
     type: string;
     description: string | null;
     status: string;
     priority: string;
-    severity: string | null;
     assignee: string | null;
   }> = {}
 ): Promise<TestTicket> {
@@ -216,7 +212,19 @@ export async function createTicket(
     ...overrides
   };
 
-  const res = await supertest(app.server).post(`/api/projects/${projectId}/tickets`).send(body).expect(201);
+  const path =
+    owner === null
+      ? "/api/tickets"
+      : typeof owner === "number"
+        ? `/api/projects/${owner}/tickets`
+        : owner.type === "project"
+          ? `/api/projects/${owner.id}/tickets`
+          : owner.type === "task"
+            ? `/api/tasks/${owner.id}/tickets`
+            : owner.type === "feature"
+              ? `/api/features/${owner.id}/tickets`
+              : `/api/use-cases/${owner.id}/tickets`;
+  const res = await supertest(app.server).post(path).send(body).expect(201);
   return res.body as TestTicket;
 }
 

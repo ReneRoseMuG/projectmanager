@@ -7,7 +7,7 @@ import {
   type Project,
   type ProjectStatus,
   type Tag,
-  type Task,
+  type TaskBoardItem,
   type TaskStatus,
   type UseCase
 } from "@taskmanager/shared-types";
@@ -63,10 +63,9 @@ export function buildProject(overrides: Partial<Project> = {}): Project {
   };
 }
 
-export function buildTask(overrides: Partial<Task> = {}): Task {
+export function buildTask(overrides: Partial<TaskBoardItem> = {}): TaskBoardItem {
   return {
     id: 1,
-    projectId: 1,
     parentId: null,
     title: "Aufgabe Offen",
     description: "Eine vollständig beschriebene Aufgabe",
@@ -74,7 +73,7 @@ export function buildTask(overrides: Partial<Task> = {}): Task {
     priority: "high",
     assignee: "Max Mustermann",
     dueDate: "2026-12-31",
-    position: 1,
+    boardPosition: 1,
     createdAt,
     updatedAt,
     tags: [buildTag()],
@@ -147,13 +146,13 @@ export function buildProjectSet(): Project[] {
   );
 }
 
-export function buildTaskSet(): Task[] {
+export function buildTaskSet(): TaskBoardItem[] {
   return TASK_STATUSES.map((status, index) =>
     buildTask({
       id: index + 1,
       title: `Aufgabe ${taskStatusLabels[status]}`,
       status,
-      position: index + 1,
+      boardPosition: index + 1,
       tags: [buildTag({ id: index + 1, name: `Tag ${taskStatusLabels[status]}` })]
     })
   );

@@ -1,4 +1,4 @@
-import type { Attachment, BacklogItem, Comment, Event, Feature, FeatureRelation, Note, Project, Tag, Task, TaskDetail, UseCase, WikiImportReport } from "@taskmanager/shared-types";
+import type { Attachment, BacklogItem, Comment, Event, Feature, FeatureRelation, Note, Project, Tag, Task, TaskBoardItem, TaskDetail, UseCase, WikiImportReport } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import fs from "node:fs/promises";
@@ -89,14 +89,18 @@ describe("Taskmanager API integration", () => {
         .post(`/api/projects/${createdProject.id}/tasks`)
         .send({ title: "API testen", dueDate: "2026-05-20" })
         .expect(201)
-    ).body as Task;
+    ).body as TaskBoardItem;
     expect(createdTask.status).toBe("todo");
+    expect(createdTask.boardPosition).toBeGreaterThan(0);
 
     const updatedTask = (await request(app.server).patch(`/api/tasks/${createdTask.id}`).send({ priority: "high" }).expect(200)).body as Task;
     expect(updatedTask.priority).toBe("high");
 
-    const movedTask = (await request(app.server).patch(`/api/tasks/${createdTask.id}/position`).send({ status: "in_progress", position: 512 }).expect(200)).body as Task;
+    const movedTask = (
+      await request(app.server).patch(`/api/projects/${createdProject.id}/tasks/${createdTask.id}/board`).send({ status: "in_progress", position: 512 }).expect(200)
+    ).body as TaskBoardItem;
     expect(movedTask.status).toBe("in_progress");
+    expect(movedTask.boardPosition).toBe(512);
 
     const taskTags = (await request(app.server).put(`/api/tasks/${createdTask.id}/tags`).send({ tagIds: [createdTag.id] }).expect(200)).body as Tag[];
     expect(taskTags).toHaveLength(1);
@@ -192,6 +196,7 @@ describe("Taskmanager API integration", () => {
     expect(taskDetail.subtasks.map((item) => item.id)).toContain(subtask.id);
 
     await request(app.server).delete(`/api/tasks/${subtask.id}`).expect(204);
+    await request(app.server).delete(`/api/projects/${createdProject.id}/tasks/${createdTask.id}`).expect(204);
     await request(app.server).delete(`/api/tasks/${createdTask.id}`).expect(204);
     await request(app.server).delete(`/api/tags/${createdTag.id}`).expect(204);
     await request(app.server).delete(`/api/projects/${createdProject.id}`).expect(204);
@@ -311,12 +316,15 @@ describe("Taskmanager API integration", () => {
       ])
     );
 
-    const tasks = (await request(app.server).get(`/api/projects/${project.id}/tasks`).expect(200)).body as Task[];
+    const tasks = (await request(app.server).get(`/api/projects/${project.id}/tasks`).expect(200)).body as TaskBoardItem[];
     const importedTask = tasks.find((task) => task.title === "Alpha task");
     expect(importedTask).toBeDefined();
-    const taskFeatures = (await request(app.server).get(`/api/tasks/${importedTask?.id}/features`).expect(200)).body as Feature[];
-    const taskUseCases = (await request(app.server).get(`/api/tasks/${importedTask?.id}/use-cases`).expect(200)).body as UseCase[];
-    expect(taskFeatures.map((feature) => feature.id)).toContain(alpha?.id);
-    expect(taskUseCases.map((useCase) => useCase.slug)).toContain("uc-01-01-alpha-start");
+    const alphaTasks = (await request(app.server).get(`/api/features/${alpha?.id}/tasks`).expect(200)).body as TaskBoardItem[];
+    const useCases = (await request(app.server).get(`/api/features/${alpha?.id}/use-cases`).expect(200)).body as UseCase[];
+    const alphaUseCase = useCases.find((useCase) => useCase.slug === "uc-01-01-alpha-start");
+    expect(alphaTasks.map((task) => task.id)).toContain(importedTask?.id);
+    expect(alphaUseCase).toBeDefined();
+    const useCaseTasks = (await request(app.server).get(`/api/use-cases/${alphaUseCase?.id}/tasks`).expect(200)).body as TaskBoardItem[];
+    expect(useCaseTasks.map((task) => task.id)).toContain(importedTask?.id);
   });
 });

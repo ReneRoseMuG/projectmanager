@@ -80,7 +80,7 @@ describe("FeatureListBoardView", () => {
     const { container } = renderFeatureList({ features, onCreate });
 
     expectToolbar();
-    expect(container.querySelector(".lg\\:grid-cols-3")).toBeInTheDocument();
+    expect(container.querySelector(".grid-flow-col")).toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns.length).toBe(statusColumns.length);
@@ -121,10 +121,10 @@ describe("FeatureListBoardView", () => {
     const features = buildFeatureSet();
     const { container } = renderFeatureList({ features });
 
-    expect(container.querySelector(".lg\\:grid-cols-3")).toBeInTheDocument();
+    expect(container.querySelector(".grid-flow-col")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
-    expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
+    expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
     const cards = container.querySelectorAll("article.rounded-2xl");
     expect(cards).toHaveLength(features.length);
     expectItemCardClasses(cards);

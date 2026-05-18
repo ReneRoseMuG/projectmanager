@@ -1,6 +1,7 @@
 import type { Feature, FeatureStatus } from "@taskmanager/shared-types";
 import { BookOpen } from "lucide-react";
 import { useMemo, useState } from "react";
+import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { FeatureCard } from "./FeatureCard";
@@ -24,7 +25,7 @@ function matchesSearch(feature: Feature, searchValue: string) {
   if (!normalized) {
     return true;
   }
-  return [feature.title, feature.slug, feature.description ?? ""].some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
+  return [feature.title, feature.slug, richTextToPlainText(feature.description)].some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
 }
 
 /** Feature-specific ListBoardView adapter with status board columns. */

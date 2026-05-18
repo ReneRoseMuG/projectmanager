@@ -1,38 +1,41 @@
-import type { Attachment, Feature, FeatureUpdate, Task, UseCase, UseCaseInput, UseCaseUpdate } from "@taskmanager/shared-types";
-import { ChevronRight, FolderKanban, ListTodo, MoreHorizontal, Paperclip, Save, Trash2 } from "lucide-react";
+import type { Attachment, Feature, FeatureUpdate, Project, UseCase, UseCaseInput, UseCaseUpdate } from "@taskmanager/shared-types";
+import { ChevronRight, Paperclip } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { AttachmentList } from "../components/attachments/AttachmentList";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
 import { FeatureDetail } from "../components/features/FeatureDetail";
-import { Button } from "../components/ui/Button";
+import { FeatureProjectPanel } from "../components/features/FeatureProjectPanel";
+import { OwnerTaskBoard } from "../components/tasks/OwnerTaskBoard";
+import { OwnerTicketBoard } from "../components/tickets/OwnerTicketBoard";
 import { CommentThread } from "../components/ui/CommentThread";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
-import { EmptyState } from "../components/ui/EmptyState";
 import { Pill } from "../components/ui/Pill";
-import { RelationPanel } from "../components/ui/RelationPanel";
 import { TaskListSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { UseCaseForm } from "../components/usecases/UseCaseForm";
 import { UseCaseListBoardView } from "../components/usecases/UseCaseListBoardView";
 import { errorMessage } from "../hooks/errors";
 import { useAttachments } from "../hooks/useAttachments";
-import { useFeatureProjectLinks, useFeatureTaskLinks } from "../hooks/useDocLinks";
+import { useFeatureProjectLinks } from "../hooks/useDocLinks";
 import { useEntityComments } from "../hooks/useEntityComments";
 import { useFeatures } from "../hooks/useFeatures";
+import { useTasks } from "../hooks/useTasks";
+import { useTickets } from "../hooks/useTickets";
 import { useUseCases } from "../hooks/useUseCases";
 import type { ViewMode } from "../types";
 import { formatHumanDate } from "../utils/date";
-import { featureStatusLabels, featureStatusTones, priorityLabels, priorityPillTones, projectStatusLabels, taskStatusLabels, taskStatusTones } from "../utils/domainLabels";
+import { featureStatusLabels, featureStatusTones } from "../utils/domainLabels";
 
-type FeatureTab = "details" | "useCases" | "tasks" | "projects" | "attachments" | "comments";
+type FeatureTab = "details" | "useCases" | "tasks" | "tickets" | "projects" | "attachments" | "comments";
 
-const featureTabs: FeatureTab[] = ["details", "useCases", "tasks", "projects", "attachments", "comments"];
+const featureTabs: FeatureTab[] = ["details", "useCases", "tasks", "tickets", "projects", "attachments", "comments"];
 
 const tabLabels: Record<FeatureTab, string> = {
   details: "Stammdaten",
   useCases: "Use Cases",
   tasks: "Aufgaben",
+  tickets: "Tickets",
   projects: "Projekte",
   attachments: "Dateien",
   comments: "Kommentare"
@@ -47,25 +50,16 @@ export function FeatureDetailPage() {
   const features = useFeatures(Number.isFinite(featureId) ? featureId : undefined);
   const useCases = useUseCases(Number.isFinite(featureId) ? featureId : undefined);
   const projectLinks = useFeatureProjectLinks(Number.isFinite(featureId) ? featureId : undefined);
-  const taskLinks = useFeatureTaskLinks(Number.isFinite(featureId) ? featureId : undefined);
+  const taskOwner = Number.isFinite(featureId) ? { type: "feature" as const, id: featureId } : undefined;
+  const featureTasks = useTasks(taskOwner);
+  const featureTickets = useTickets(taskOwner ?? null);
   const attachments = useAttachments(Number.isFinite(featureId) ? { type: "feature", id: featureId } : null);
   const featureComments = useEntityComments("feature", Number.isFinite(featureId) ? featureId : undefined);
   const [activeTab, setActiveTab] = useState<FeatureTab>("details");
   const [useCaseViewMode, setUseCaseViewMode] = useState<ViewMode>("kanban");
+  const [projectViewMode, setProjectViewMode] = useState<ViewMode>("kanban");
   const [useCaseFormOpen, setUseCaseFormOpen] = useState(false);
   const [editingUseCase, setEditingUseCase] = useState<UseCase | null>(null);
-  const [selectedProjectIds, setSelectedProjectIds] = useState<number[]>([]);
-  const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
-  const [projectLinksSaving, setProjectLinksSaving] = useState(false);
-  const [taskLinksSaving, setTaskLinksSaving] = useState(false);
-
-  useEffect(() => {
-    setSelectedProjectIds(projectLinks.linkedProjects.map((project) => project.id));
-  }, [projectLinks.linkedProjects]);
-
-  useEffect(() => {
-    setSelectedTaskIds(taskLinks.linkedTasks.map((task) => task.id));
-  }, [taskLinks.linkedTasks]);
 
   const saveFeature = async (id: number, input: FeatureUpdate) => {
     try {
@@ -77,27 +71,23 @@ export function FeatureDetailPage() {
     }
   };
 
-  const saveProjectLinks = async () => {
-    setProjectLinksSaving(true);
+  const addProjectToFeature = async (project: Project) => {
     try {
-      await projectLinks.setProjectsForFeature(selectedProjectIds);
-      showToast({ tone: "success", title: "Projekt-Verknüpfungen gespeichert" });
+      await projectLinks.addProjectToFeature(project.id);
+      showToast({ tone: "success", title: "Projekt verknüpft" });
     } catch (projectError) {
-      showToast({ tone: "error", title: "Projekt-Verknüpfungen konnten nicht gespeichert werden", message: errorMessage(projectError) });
-    } finally {
-      setProjectLinksSaving(false);
+      showToast({ tone: "error", title: "Projekt konnte nicht verknüpft werden", message: errorMessage(projectError) });
+      throw projectError;
     }
   };
 
-  const saveTaskLinks = async () => {
-    setTaskLinksSaving(true);
+  const removeProjectFromFeature = async (project: Project) => {
     try {
-      await taskLinks.setTasksForFeature(selectedTaskIds);
-      showToast({ tone: "success", title: "Aufgaben-Verknüpfungen gespeichert" });
-    } catch (taskError) {
-      showToast({ tone: "error", title: "Aufgaben-Verknüpfungen konnten nicht gespeichert werden", message: errorMessage(taskError) });
-    } finally {
-      setTaskLinksSaving(false);
+      await projectLinks.removeProjectFromFeature(project.id);
+      showToast({ tone: "success", title: "Projekt-Zuordnung entfernt" });
+    } catch (projectError) {
+      showToast({ tone: "error", title: "Projekt-Zuordnung konnte nicht entfernt werden", message: errorMessage(projectError) });
+      throw projectError;
     }
   };
 
@@ -234,20 +224,12 @@ export function FeatureDetailPage() {
   const feature = features.feature;
   const tabCounts: Partial<Record<FeatureTab, number>> = {
     useCases: useCases.useCases.length,
-    tasks: taskLinks.linkedTasks.length,
+    tasks: featureTasks.tasks.length,
+    tickets: featureTickets.tickets.length,
     projects: projectLinks.linkedProjects.length,
     attachments: attachments.attachments.length,
     comments: featureComments.comments.length
   };
-  const tabMeta: Record<FeatureTab, string> = {
-    details: "Stammdaten",
-    useCases: `${useCases.useCases.length} Use Cases · Doppelklick öffnet Detail`,
-    tasks: `${taskLinks.linkedTasks.length} Aufgaben verknüpft`,
-    projects: "Projekt-Relationen dieses Features",
-    attachments: `${attachments.attachments.length} Dateien`,
-    comments: `${featureComments.comments.length} Kommentare`
-  };
-
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
       <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-steel-700 via-steel-600 to-violet p-6 text-white shadow-steel">
@@ -263,28 +245,7 @@ export function FeatureDetailPage() {
             <div>
               <h1 className="text-[28px] font-bold text-white">{feature.title}</h1>
               <p className="mt-1 font-mono text-xs text-white/75">/features/{feature.slug}</p>
-              <p className="mt-3 max-w-[760px] text-[15px] text-white/90">{feature.description || "Keine Kurzbeschreibung"}</p>
             </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              className="border border-white/24 bg-white/14 text-white hover:bg-white/20"
-              icon={<Trash2 size={16} />}
-              variant="ghost"
-              onClick={() => void deleteFeature(feature)}
-            >
-              Löschen
-            </Button>
-            <Button
-              aria-label="Weitere Aktionen"
-              title="Weitere Aktionen"
-              className="border border-white/24 bg-white/14 text-white hover:bg-white/20"
-              icon={<MoreHorizontal size={16} />}
-              variant="ghost"
-            />
-            <Button className="bg-white text-steel-700 hover:bg-steel-50" form="feature-detail-form" icon={<Save size={16} />} type="submit" variant="ghost">
-              Speichern
-            </Button>
           </div>
         </div>
         <div className="mt-6 flex flex-wrap gap-5 border-t border-white/15 pt-4">
@@ -297,7 +258,7 @@ export function FeatureDetailPage() {
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="inline-flex rounded-lg border border-line bg-white p-1 shadow-sm" role="tablist" aria-label="Feature-Detail">
           {featureTabs.map((tab) => (
             <button
@@ -319,7 +280,6 @@ export function FeatureDetailPage() {
             </button>
           ))}
         </div>
-        <span className="text-xs font-semibold text-slate-500">{tabMeta[activeTab]}</span>
       </div>
 
       {useCases.error ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">{useCases.error}</div> : null}
@@ -336,84 +296,20 @@ export function FeatureDetailPage() {
           onOpen={(useCase) => void openUseCaseForm(useCase)}
         />
       ) : null}
-      {activeTab === "tasks" && taskLinks.loading ? <TaskListSkeleton /> : null}
-      {activeTab === "tasks" && !taskLinks.loading ? (
-        <div className="grid gap-4">
-          {taskLinks.error ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">{taskLinks.error}</div> : null}
-          <RelationPanel
-            items={taskLinks.tasks}
-            selectedIds={selectedTaskIds}
-            onChange={setSelectedTaskIds}
-            onSave={saveTaskLinks}
-            saving={taskLinksSaving}
-            title="Aufgaben"
-            searchKeys={["title", "description", "assignee", "status", "priority"]}
-            groupBy="status"
-            groupLabel={(value) => taskStatusLabels[value as Task["status"]] ?? String(value)}
-            emptyAvailable={
-              <EmptyState
-                icon={<ListTodo size={22} />}
-                title="Keine Aufgaben vorhanden"
-                body="Lege zuerst Aufgaben an, um sie hier zu verknüpfen."
-                tone="neutral"
-                variant="tinted"
-              />
-            }
-            renderItem={(task) => (
-              <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]">
-                <span className="flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-steel-100 text-steel-700" aria-hidden="true">
-                  <ListTodo size={17} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[14px] font-semibold text-ink">{task.title}</span>
-                  <span className="block truncate text-[12px] text-slate-500">{task.description || task.assignee || "Keine Beschreibung"}</span>
-                </span>
-                <span className="hidden md:inline-flex">
-                  <Pill tone={taskStatusTones[task.status]}>{taskStatusLabels[task.status]}</Pill>
-                </span>
-                <span className="hidden items-center gap-2 md:inline-flex">
-                  <Pill tone={priorityPillTones[task.priority]}>{priorityLabels[task.priority]}</Pill>
-                  <span className="text-xs font-semibold text-slate-500">{task.dueDate ? formatHumanDate(task.dueDate) : "Kein Datum"}</span>
-                </span>
-              </span>
-            )}
-          />
-        </div>
-      ) : null}
+      {activeTab === "tasks" && taskOwner ? <OwnerTaskBoard owner={taskOwner} /> : null}
+      {activeTab === "tickets" && taskOwner ? <OwnerTicketBoard owner={taskOwner} /> : null}
       {activeTab === "projects" && projectLinks.loading ? <TaskListSkeleton /> : null}
       {activeTab === "projects" && !projectLinks.loading ? (
         <div className="grid gap-4">
           {projectLinks.error ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">{projectLinks.error}</div> : null}
-          <RelationPanel
-            items={projectLinks.projects}
-            selectedIds={selectedProjectIds}
-            onChange={setSelectedProjectIds}
-            onSave={saveProjectLinks}
-            saving={projectLinksSaving}
-            title="Projekte"
-            searchKeys={["name", "description", "status"]}
-            emptyAvailable={
-              <EmptyState
-                icon={<FolderKanban size={22} />}
-                title="Keine Projekte vorhanden"
-                body="Lege zuerst Projekte an, um sie hier zu verknüpfen."
-                tone="violet"
-                variant="tinted"
-              />
-            }
-            renderItem={(project) => (
-              <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]">
-                <span className="flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-violet/10 text-violet" aria-hidden="true">
-                  <FolderKanban size={17} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[14px] font-semibold text-ink">{project.name}</span>
-                  <span className="block truncate text-[12px] text-slate-500">{project.description || "Keine Beschreibung"}</span>
-                </span>
-                <span className="hidden rounded-md bg-steel-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 md:inline-flex">{projectStatusLabels[project.status]}</span>
-                <span className="hidden text-xs font-semibold text-slate-500 md:inline-flex">Aktualisiert {formatHumanDate(project.updatedAt)}</span>
-              </span>
-            )}
+          <FeatureProjectPanel
+            projects={projectLinks.linkedProjects}
+            availableProjects={projectLinks.projects}
+            viewMode={projectViewMode}
+            onViewModeChange={setProjectViewMode}
+            onAddProject={addProjectToFeature}
+            onRemoveProject={removeProjectFromFeature}
+            onOpen={(project) => navigate(`/projects/${project.id}`)}
           />
         </div>
       ) : null}

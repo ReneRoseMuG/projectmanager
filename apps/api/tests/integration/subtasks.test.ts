@@ -34,7 +34,6 @@ describe("Subtasks API", () => {
       .send({ title: "Subtask", status: "todo" })
       .expect(201);
 
-    expect(res.body.projectId).toBe(project.id);
     expect(res.body.parentId).toBe(parent.id);
     expect(res.body.title).toBe("Subtask");
   });

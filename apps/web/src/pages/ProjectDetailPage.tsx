@@ -1,7 +1,6 @@
-import type { Attachment, BacklogItem, Feature, FeatureInput, Note, ProjectInput, Task, TaskStatus } from "@taskmanager/shared-types";
-import { useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, MoreHorizontal } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import type { Attachment, BacklogItem, Feature, FeatureInput, Note, ProjectInput } from "@taskmanager/shared-types";
+import { ChevronRight } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
 import { AttachmentList } from "../components/attachments/AttachmentList";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
@@ -13,18 +12,13 @@ import { WikiImportPanel } from "../components/imports/WikiImportPanel";
 import { NoteEditor } from "../components/notes/NoteEditor";
 import { NoteList } from "../components/notes/NoteList";
 import { ProjectInlineForm } from "../components/projects/ProjectInlineForm";
-import { TaskDetail } from "../components/tasks/TaskDetail";
-import { TaskForm } from "../components/tasks/TaskForm";
-import { TaskListBoardView } from "../components/tasks/TaskListBoardView";
+import { OwnerTaskBoard } from "../components/tasks/OwnerTaskBoard";
 import { ProjectTicketPanel } from "../components/tickets/ProjectTicketPanel";
-import { Button } from "../components/ui/Button";
 import { CommentThread } from "../components/ui/CommentThread";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton, TaskListSkeleton } from "../components/ui/Skeleton";
 import { TabBar, type Tab } from "../components/ui/TabBar";
 import { useToast } from "../components/ui/ToastProvider";
-import { setTaskFeatures, setTaskUseCases } from "../api/doc-links";
-import { setTaskTags } from "../api/tags";
 import { errorMessage } from "../hooks/errors";
 import { useAttachments } from "../hooks/useAttachments";
 import { useBacklog } from "../hooks/useBacklog";
@@ -35,11 +29,11 @@ import { useProjectFeatureLinks } from "../hooks/useDocLinks";
 import { useProjects } from "../hooks/useProjects";
 import { useTasks } from "../hooks/useTasks";
 import { useTickets } from "../hooks/useTickets";
-import { useViewMode } from "../hooks/useViewMode";
 import { useWikiImport } from "../hooks/useWikiImport";
-import { invalidateFeatureScope, invalidateTags, invalidateTaskScope, invalidateUseCaseScope } from "../queries/invalidation";
+import type { ViewMode } from "../types";
 import { formatHumanDate } from "../utils/date";
 import { deriveProjectTaskStats } from "../utils/projectTaskStats";
+import { richTextToPlainText } from "../utils/richText";
 
 type ProjectTab = "details" | "features" | "tasks" | "tickets" | "comments" | "attachments" | "notes" | "backlog" | "import";
 
@@ -58,12 +52,13 @@ const tabs: Array<{ value: ProjectTab; label: string }> = [
 export function ProjectDetailPage() {
   const params = useParams();
   const projectId = Number(params.id);
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const { project, loading: projectLoading, updateProject } = useProjects(projectId);
-  const tasks = useTasks(projectId);
-  const projectTickets = useTickets(projectId);
+  const taskOwner = Number.isFinite(projectId) ? { type: "project" as const, id: projectId } : undefined;
+  const tasks = useTasks(taskOwner);
+  const projectTickets = useTickets(taskOwner ?? null);
   const allFeatures = useFeatures();
   const projectFeatureLinks = useProjectFeatureLinks(Number.isFinite(projectId) ? projectId : undefined);
   const backlog = useBacklog(Number.isFinite(projectId) ? projectId : undefined);
@@ -71,23 +66,15 @@ export function ProjectDetailPage() {
   const attachments = useAttachments(Number.isFinite(projectId) ? { type: "project", id: projectId } : null);
   const projectComments = useEntityComments("project", Number.isFinite(projectId) ? projectId : undefined);
   const wikiImport = useWikiImport(Number.isFinite(projectId) ? projectId : undefined);
-  const { viewMode, setViewMode } = useViewMode();
   const [activeTab, setActiveTab] = useState<ProjectTab>("details");
-  const [taskFormOpen, setTaskFormOpen] = useState(false);
-  const [newTaskStatus, setNewTaskStatus] = useState<TaskStatus>("todo");
+  const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
   const [backlogFormOpen, setBacklogFormOpen] = useState(false);
-  const [detailTaskId, setDetailTaskId] = useState<number | null>(null);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editingBacklogItem, setEditingBacklogItem] = useState<BacklogItem | null>(null);
   const [featureFormOpen, setFeatureFormOpen] = useState(false);
-  const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
   const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
 
-  const openTask = (task: Task) => setDetailTaskId(task.id);
-  const openFeature = (feature: Feature) => {
-    setEditingFeature(feature);
-    setFeatureFormOpen(true);
-  };
+  const openFeature = (feature: Feature) => navigate(`/features/${feature.id}`);
 
   const createNote = async () => {
     try {
@@ -130,24 +117,6 @@ export function ProjectDetailPage() {
     }
   };
 
-  const deleteTask = async (task: Task) => {
-    const approved = await confirm({
-      title: "Aufgabe löschen?",
-      body: `Die Aufgabe "${task.title}" wird entfernt.`,
-      severity: "danger",
-      confirmLabel: "Löschen"
-    });
-    if (!approved) {
-      return;
-    }
-    try {
-      await tasks.removeTask(task.id);
-      showToast({ tone: "success", title: "Aufgabe gelöscht" });
-    } catch (taskError) {
-      showToast({ tone: "error", title: "Aufgabe konnte nicht gelöscht werden", message: errorMessage(taskError) });
-    }
-  };
-
   const reloadFeatureRelations = async () => {
     await allFeatures.reload();
     await projectFeatureLinks.reload();
@@ -168,19 +137,11 @@ export function ProjectDetailPage() {
   };
 
   const openCreateFeatureForm = () => {
-    setEditingFeature(null);
     setFeatureFormOpen(true);
   };
 
   const submitFeatureForm = async (input: FeatureInput) => {
     try {
-      if (editingFeature) {
-        await allFeatures.updateFeature(editingFeature.id, input);
-        await reloadFeatureRelations();
-        showToast({ tone: "success", title: "Feature gespeichert" });
-        return;
-      }
-
       const created = await allFeatures.createFeature(input);
       const linkedFeatureIds = projectFeatureLinks.features.map((feature) => feature.id);
       await projectFeatureLinks.setFeaturesForProject([...new Set([...linkedFeatureIds, created.id])]);
@@ -259,6 +220,7 @@ export function ProjectDetailPage() {
   }
 
   const taskDataAvailable = !tasks.loading && !tasks.error;
+  const projectDescription = richTextToPlainText(project.description);
   const { totalTasks, doneTasks, openTasks, progress } = deriveProjectTaskStats(project, tasks.tasks, taskDataAvailable);
   const tabCounts: Record<ProjectTab, number> = {
     details: 0,
@@ -275,11 +237,6 @@ export function ProjectDetailPage() {
     ...tab,
     count: tab.value === "details" ? undefined : tabCounts[tab.value]
   }));
-  const openTaskForm = (status: TaskStatus = "todo") => {
-    setNewTaskStatus(status);
-    setTaskFormOpen(true);
-  };
-
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
       <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-steel-700 via-steel-600 to-violet p-6 text-white shadow-steel">
@@ -295,16 +252,7 @@ export function ProjectDetailPage() {
                 <span className="text-white">{project.name}</span>
               </nav>
               <h1 className="mt-3 text-[30px] font-bold leading-tight tracking-normal text-white">{project.name}</h1>
-              <p className="mt-1 max-w-[720px] text-[15px] leading-6 text-white/85">{project.description || "Keine Beschreibung"}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Button
-                aria-label="Mehr Optionen"
-                title="Mehr Optionen"
-                className="border border-white/20 bg-white/10 text-white hover:bg-white/20"
-                icon={<MoreHorizontal size={16} />}
-                variant="ghost"
-              />
+              {projectDescription ? <p className="mt-1 max-w-[720px] text-[15px] leading-6 text-white/85">{projectDescription}</p> : null}
             </div>
           </div>
 
@@ -373,18 +321,7 @@ export function ProjectDetailPage() {
         )
       ) : null}
 
-      {activeTab === "tasks" ? (
-        <TaskListBoardView
-            tasks={tasks.tasks}
-            loading={tasks.loading}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            onAdd={() => openTaskForm()}
-            onAddStatus={openTaskForm}
-            onOpen={openTask}
-            onDelete={(task) => void deleteTask(task)}
-          />
-      ) : null}
+      {activeTab === "tasks" && taskOwner ? <OwnerTaskBoard owner={taskOwner} /> : null}
 
       {activeTab === "tickets" ? <ProjectTicketPanel projectId={projectId} /> : null}
 
@@ -396,8 +333,8 @@ export function ProjectDetailPage() {
             {projectFeatureLinks.error ? <div className="text-sm text-crimson">{projectFeatureLinks.error}</div> : null}
             <ProjectFeaturePanel
               features={projectFeatureLinks.features}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
+              viewMode={featureViewMode}
+              onViewModeChange={setFeatureViewMode}
               onCreate={openCreateFeatureForm}
               onOpen={openFeature}
             />
@@ -479,47 +416,12 @@ export function ProjectDetailPage() {
         )
       ) : null}
 
-      <TaskForm
-        open={taskFormOpen}
-        title="Neue Aufgabe"
-        initialStatus={newTaskStatus}
-        features={allFeatures.features}
-        onSubmit={async (input) => {
-          try {
-            const { tagIds, featureIds, useCaseIds, ...taskInput } = input;
-            const created = await tasks.createTask(taskInput);
-            if (created) {
-              if (tagIds.length > 0) {
-                await setTaskTags(created.id, tagIds);
-                await invalidateTags(queryClient);
-              }
-              if (featureIds.length > 0) {
-                await setTaskFeatures(created.id, featureIds);
-                await invalidateFeatureScope(queryClient);
-              }
-              if (useCaseIds.length > 0) {
-                await setTaskUseCases(created.id, useCaseIds);
-                await invalidateUseCaseScope(queryClient);
-              }
-              await invalidateTaskScope(queryClient, created.projectId, created.id);
-              await tasks.reload();
-            }
-            showToast({ tone: "success", title: "Aufgabe erstellt" });
-          } catch (taskError) {
-            showToast({ tone: "error", title: "Aufgabe konnte nicht erstellt werden", message: errorMessage(taskError) });
-            throw taskError;
-          }
-        }}
-        onClose={() => setTaskFormOpen(false)}
-      />
       <FeatureForm
         open={featureFormOpen}
-        feature={editingFeature}
         onSubmit={submitFeatureForm}
         onProjectLinksChanged={reloadFeatureRelations}
         onClose={() => {
           setFeatureFormOpen(false);
-          setEditingFeature(null);
         }}
       />
       <BacklogItemForm
@@ -530,14 +432,6 @@ export function ProjectDetailPage() {
         onClose={() => {
           setBacklogFormOpen(false);
           setEditingBacklogItem(null);
-        }}
-      />
-      <TaskDetail
-        open={Boolean(detailTaskId)}
-        taskId={detailTaskId}
-        onClose={() => setDetailTaskId(null)}
-        onChanged={async () => {
-          await tasks.reload();
         }}
       />
     </div>

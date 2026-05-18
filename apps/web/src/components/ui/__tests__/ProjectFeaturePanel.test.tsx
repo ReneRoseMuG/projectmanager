@@ -47,13 +47,13 @@ describe("ProjectFeaturePanel", () => {
     const features = buildFeatureSet();
     const { container } = renderProjectFeaturePanel({ features });
 
-    expect(screen.getByRole("heading", { name: "Features · 4" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Board" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Neues Feature" })).toBeInTheDocument();
     expect(screen.queryByText("Neues Feature")).not.toBeInTheDocument();
 
-    const columns = container.querySelectorAll("section.rounded-xl");
+    const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns).toHaveLength(4);
     expect(screen.getByRole("heading", { name: "Entwurf" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Aktiv" })).toBeInTheDocument();
@@ -69,12 +69,12 @@ describe("ProjectFeaturePanel", () => {
   it("begrenzt Board-Karten auf die Breite ihrer Statusspalten", () => {
     const { container } = renderProjectFeaturePanel();
 
-    const columns = container.querySelectorAll("section.rounded-xl");
+    const columns = container.querySelectorAll("section.rounded-lg");
     columns.forEach((column) => {
       expect(column).toHaveClass("min-w-0");
     });
 
-    const cards = container.querySelectorAll("article.rounded-xl");
+    const cards = container.querySelectorAll("article.rounded-2xl");
     expect(cards).toHaveLength(4);
     cards.forEach((card) => {
       expect(card).toHaveClass("min-w-0");
@@ -91,18 +91,19 @@ describe("ProjectFeaturePanel", () => {
     expect(screen.queryByText(/verknüpft/i)).not.toBeInTheDocument();
   });
 
-  it("rendert den Listenmodus als Ergebnistabelle und öffnet Features", () => {
+  it("rendert den Listenmodus als Ergebniszeilen und öffnet Features", () => {
     const features = buildFeatureSet();
     const onOpen = vi.fn();
     const { container } = renderProjectFeaturePanel({ features, viewMode: "list", onOpen });
 
-    const table = container.querySelector("table");
-    expect(table).toBeInTheDocument();
+    expect(container.querySelector("table")).not.toBeInTheDocument();
+    const rows = container.querySelectorAll("article.rounded-xl");
+    expect(rows).toHaveLength(features.length);
     features.forEach((feature) => {
       expect(screen.getByText(feature.title)).toBeInTheDocument();
     });
 
-    const activeRow = screen.getByText("Feature Aktiv").closest("tr");
+    const activeRow = screen.getByText("Feature Aktiv").closest("article");
     expect(activeRow).toBeInTheDocument();
     expect(within(activeRow as HTMLElement).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
     fireEvent.doubleClick(activeRow as HTMLElement);
@@ -122,7 +123,7 @@ describe("ProjectFeaturePanel", () => {
   it("zeigt EmptyState wenn keine Features verknüpft sind", () => {
     const { container } = renderProjectFeaturePanel({ features: [] });
 
-    expect(screen.getByText("Keine Features verknüpft")).toBeInTheDocument();
+    expect(screen.getByText("Keine Features")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Neues Feature" })).toHaveLength(1);
     expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
     expect(container.querySelector("table")).not.toBeInTheDocument();

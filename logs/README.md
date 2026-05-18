@@ -2,6 +2,23 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 18.05.26 | Feature | Owner-Aufgabenbeziehungen Tests | ⚠️ |
+| 18.05.26 | Feature | Owner-Join-Tabellen für Tickets | ✅ |
+| 18.05.26 | Feature | Owner-Join-Tabellen für Aufgaben | ✅ |
+| 18.05.26 | Feature | Feature-Projekt-Zuordnung Board View | ⚠️ |
+| 18.05.26 | Fix | Projekt-Tabs Toolbar | ✅ |
+| 18.05.26 | Fix | Task-Liste Statuskreis | ✅ |
+| 18.05.26 | Fix | Use-Case Formular Status und Text | ✅ |
+| 18.05.26 | Fix | Sticky Form Footer und Use Case Detail | ✅ |
+| 18.05.26 | Fix | Feature-Hero und Tab-Meta | ✅ |
+| 18.05.26 | Fix | Feature-Kurzbeschreibung Markdown | ✅ |
+| 18.05.26 | Fix | Editor-Toolbar Icons | ✅ |
+| 18.05.26 | Fix | Formular schließen und Iconbuttons | ✅ |
+| 18.05.26 | Fix | Beschreibungseditoren und Tabs | ✅ |
+| 18.05.26 | Fix | Task-Detail Bereinigung | ✅ |
+| 18.05.26 | Fix | Feature-Öffnung, Rich-Text und Projektheader | ✅ |
+| 18.05.26 | Fix | Fake-Benutzer und Projektboard | ✅ |
+| 18.05.26 | Fix | Karten Rich-Text Preview | ✅ |
 | 18.05.26 | Fix | Projektformular Feature-Vorauswahl | ✅ |
 | 18.05.26 | Fix | App-Datenbank leeren | ✅ |
 | 17.05.26 | Fix | Delete-Cascade-Tests | ✅ |

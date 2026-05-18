@@ -2,6 +2,7 @@ import type { UseCase } from "@taskmanager/shared-types";
 import { BookOpen } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
+import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { UseCaseCard } from "./UseCaseCard";
@@ -32,7 +33,7 @@ function matchesSearch(useCase: UseCase, searchValue: string) {
     return true;
   }
 
-  const values = [useCase.title, useCase.slug, useCase.description ?? "", useCase.status];
+  const values = [useCase.title, useCase.slug, richTextToPlainText(useCase.description), useCase.status];
   return values.some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
 }
 

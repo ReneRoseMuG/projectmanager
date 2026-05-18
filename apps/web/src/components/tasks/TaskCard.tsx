@@ -1,8 +1,8 @@
 import type { Task } from "@taskmanager/shared-types";
-import { CalendarClock, Check, CheckCircle2, Edit3, Trash2 } from "lucide-react";
+import { CalendarClock, CheckCircle2, Edit3, Trash2 } from "lucide-react";
 import { formatHumanDate, isOverdue } from "../../utils/date";
 import { priorityBadgeTones, priorityLabels, taskStatusLabels, taskStatusTones } from "../../utils/domainLabels";
-import { Avatar } from "../ui/Avatar";
+import { richTextToPlainText } from "../../utils/richText";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { ItemCard } from "../ui/ItemCard";
@@ -24,22 +24,18 @@ const priorityAccent: Record<Task["priority"], string> = {
   low: "var(--color-steel-400)"
 };
 
-const checkboxTone: Record<Task["status"], string> = {
-  todo: "border-steel-400 bg-white text-transparent",
-  in_progress: "border-tangerine bg-tangerine text-white",
-  done: "border-fern bg-fern text-white"
-};
-
 const tagTones: Array<"violet" | "teal" | "magenta" | "fern" | "steel"> = ["violet", "teal", "magenta", "fern", "steel"];
 
 export function TaskCard({ task, compact = false, variant = "card", onOpen, onDelete }: TaskCardProps) {
+  const description = richTextToPlainText(task.description);
+
   if (variant === "row") {
     return (
       <>
         <div className="md:hidden">
           <TaskCard task={task} compact={compact} onOpen={onOpen} onDelete={onDelete} />
         </div>
-        <TaskRow task={task} onOpen={onOpen} onDelete={onDelete} />
+        <TaskRow task={task} description={description} onOpen={onOpen} onDelete={onDelete} />
       </>
     );
   }
@@ -48,7 +44,7 @@ export function TaskCard({ task, compact = false, variant = "card", onOpen, onDe
     <ItemCard
       accentColor={priorityAccent[task.priority]}
       header={<TaskCardHeader task={task} />}
-      body={<TaskCardBody task={task} />}
+      body={<TaskCardBody description={description} />}
       footer={<TaskCardFooter task={task} />}
       onOpen={() => onOpen(task)}
       onEdit={() => onOpen(task)}
@@ -70,8 +66,8 @@ function TaskCardHeader({ task }: { task: Task }) {
   );
 }
 
-function TaskCardBody({ task }: { task: Task }) {
-  return task.description ? <p className="line-clamp-3 text-xs text-slate-600">{task.description}</p> : null;
+function TaskCardBody({ description }: { description: string }) {
+  return description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null;
 }
 
 function TaskCardFooter({ task }: { task: Task }) {
@@ -109,7 +105,7 @@ function TaskCardFooter({ task }: { task: Task }) {
   );
 }
 
-function TaskRow({ task, onOpen, onDelete }: { task: Task; onOpen: (task: Task) => void; onDelete?: (task: Task) => void }) {
+function TaskRow({ task, description, onOpen, onDelete }: { task: Task; description: string; onOpen: (task: Task) => void; onDelete?: (task: Task) => void }) {
   const overdue = task.status !== "done" && isOverdue(task.dueDate);
   const primaryTag = task.tags[0];
 
@@ -117,13 +113,8 @@ function TaskRow({ task, onOpen, onDelete }: { task: Task; onOpen: (task: Task) 
     <div className="hidden md:block">
       <ItemRow
         accentColor={priorityAccent[task.priority]}
-        statusIndicator={
-          <span className={`flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 ${checkboxTone[task.status]}`} aria-hidden="true">
-            {task.status !== "todo" ? <Check size={14} strokeWidth={3} /> : null}
-          </span>
-        }
         title={task.title}
-        description={task.description || "Keine Beschreibung"}
+        description={description}
         pills={
           <>
             <Pill tone={taskStatusTones[task.status]}>{taskStatusLabels[task.status]}</Pill>
@@ -131,18 +122,15 @@ function TaskRow({ task, onOpen, onDelete }: { task: Task; onOpen: (task: Task) 
           </>
         }
         meta={
-          <div className="flex items-center gap-3">
-            <span className={`inline-flex min-w-[82px] items-center gap-1 text-xs font-semibold ${overdue ? "text-crimson" : "text-slate-500"}`}>
-              <CalendarClock size={14} />
-              {task.dueDate ? formatHumanDate(task.dueDate) : "Ohne Datum"}
-            </span>
-            <Avatar name={task.assignee} />
-          </div>
+          <span className={`inline-flex min-w-[82px] items-center gap-1 text-xs font-semibold ${overdue ? "text-crimson" : "text-slate-500"}`}>
+            <CalendarClock size={14} />
+            {task.dueDate ? formatHumanDate(task.dueDate) : "Ohne Datum"}
+          </span>
         }
         actions={
           <>
-            <Button aria-label="Öffnen" title="Öffnen" className="h-8 w-8" icon={<Edit3 size={15} />} variant="ghost" onClick={() => onOpen(task)} />
-            {onDelete ? <Button aria-label="Löschen" title="Löschen" className="h-8 w-8" icon={<Trash2 size={15} />} variant="ghost" onClick={() => onDelete(task)} /> : null}
+            <Button aria-label="Öffnen" title="Öffnen" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(task)} />
+            {onDelete ? <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(task)} /> : null}
           </>
         }
         onOpen={() => onOpen(task)}

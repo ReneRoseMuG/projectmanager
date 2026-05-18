@@ -34,7 +34,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
       <section className="rounded-lg border border-line bg-white p-4 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="font-semibold text-ink">Subtasks</h3>
+            <h3 className="font-semibold text-ink">Tasks</h3>
             <p className="text-sm text-slate-500">
               {completed} von {subtasks.length} erledigt
             </p>
@@ -47,7 +47,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
       </section>
 
       <section className="grid gap-2 rounded-lg border border-line bg-white p-4 shadow-card">
-        {subtasks.length === 0 ? <EmptyState icon={<ListChecks size={20} />} title="Noch keine Subtasks" body="Zerlege die Aufgabe in kleinere Schritte." tone="fern" variant="default" className="p-6" /> : null}
+        {subtasks.length === 0 ? <EmptyState icon={<ListChecks size={20} />} title="Noch keine Tasks" body="Zerlege die Aufgabe in kleinere Schritte." tone="fern" variant="default" className="p-6" /> : null}
         {subtasks.map((subtask) => {
           const done = subtask.status === "done";
           return (
@@ -63,7 +63,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
                 <Check size={15} />
               </button>
               <span className={`min-w-0 flex-1 truncate text-sm font-medium ${done ? "text-slate-500 line-through" : "text-ink"}`}>{subtask.title}</span>
-              <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={15} />} variant="ghost" className="h-8 w-8" onClick={() => void onDelete(subtask.id).catch(() => undefined)} />
+              <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={18} />} variant="ghost" className="h-10 w-10" onClick={() => void onDelete(subtask.id).catch(() => undefined)} />
             </div>
           );
         })}
@@ -71,7 +71,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
         <div className="mt-2 flex gap-2 rounded-md border border-dashed border-steel-300 bg-steel-100/35 p-2">
           <input
             className="h-10 min-w-0 flex-1 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
-            placeholder="Neuen Subtask hinzufügen"
+            placeholder="Neue Aufgabe hinzufügen"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             onKeyDown={(event) => {

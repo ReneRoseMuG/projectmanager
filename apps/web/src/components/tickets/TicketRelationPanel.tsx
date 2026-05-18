@@ -109,9 +109,9 @@ function RelationSection({
               <Button
                 aria-label="Relation entfernen"
                 title="Relation entfernen"
-                className="h-9 w-9 justify-self-end"
+                className="h-10 w-10 justify-self-end"
                 variant="ghost"
-                icon={<Trash2 size={15} />}
+                icon={<Trash2 size={18} />}
                 onClick={() => onRemove({ targetTicketId: relation.ticket.id, relationType: relation.relationType })}
               />
             </div>

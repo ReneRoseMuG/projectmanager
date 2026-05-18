@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
 import { ticketStatusLabels } from "../../utils/domainLabels";
+import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { TicketCard } from "./TicketCard";
@@ -16,6 +17,7 @@ interface TicketListBoardViewProps {
   onAddStatus?: (status: Ticket["status"]) => void;
   onOpen: (ticket: Ticket) => void;
   onDelete: (ticket: Ticket) => void;
+  linkAction?: ReactNode;
   filters?: ReactNode;
   loading?: boolean;
 }
@@ -44,19 +46,18 @@ function matchesSearch(ticket: Ticket, searchValue: string) {
 
   const values = [
     ticket.title,
-    ticket.description,
+    richTextToPlainText(ticket.description),
     ticket.assignee,
     ticket.reporter,
     ticket.status,
     ticket.type,
-    ticket.severity,
     ticket.priority,
     ...ticket.tags.map((tag) => tag.name)
   ];
   return values.some((value) => (value ?? "").toLocaleLowerCase("de-DE").includes(normalized));
 }
 
-export function TicketListBoardView({ tickets, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, filters, loading = false }: TicketListBoardViewProps) {
+export function TicketListBoardView({ tickets, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, linkAction, filters, loading = false }: TicketListBoardViewProps) {
   const [searchValue, setSearchValue] = useState("");
   const visibleTickets = useMemo(() => tickets.filter((ticket) => matchesSearch(ticket, searchValue)), [searchValue, tickets]);
 
@@ -73,6 +74,7 @@ export function TicketListBoardView({ tickets, viewMode, onViewModeChange, onAdd
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={filters}
+      secondaryAction={linkAction}
       loading={loading}
       emptyState={<EmptyState icon={<Bug size={22} />} title="Keine Tickets" body="Für diesen Kontext sind noch keine Tickets vorhanden." tone="violet" variant="tinted" />}
       renderCard={(ticket) => <TicketCard ticket={ticket} onOpen={onOpen} onDelete={onDelete} />}

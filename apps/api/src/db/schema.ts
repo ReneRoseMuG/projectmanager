@@ -10,7 +10,6 @@ export const FEATURE_RELATION_TYPES = ["related", "depends_on", "consumed_by"] a
 export const BACKLOG_STATUSES = ["open", "in_progress", "done", "rejected"] as const;
 export const TICKET_TYPES = ["bug", "improvement", "question", "task"] as const;
 export const TICKET_STATUSES = ["open", "in_progress", "in_review", "resolved", "closed"] as const;
-export const TICKET_SEVERITIES = ["critical", "major", "minor", "trivial"] as const;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
 export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "backlogItem", "wikiPage", "ticket"] as const;
@@ -63,9 +62,6 @@ export const tasks = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     seedRunId: text("seed_run_id").references(() => seedRuns.id),
-    projectId: integer("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
     parentId: integer("parent_id").references((): AnySQLiteColumn => tasks.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     description: text("description"),
@@ -74,13 +70,9 @@ export const tasks = sqliteTable(
     assignee: text("assignee"),
     dueDate: text("due_date"),
     importKey: text("import_key"),
-    position: real("position").notNull().default(0),
     createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
     updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
-  },
-  (table) => ({
-    projectImportKeyUnique: uniqueIndex("tasks_project_import_key_unique").on(table.projectId, table.importKey)
-  })
+  }
 );
 
 export const comments = sqliteTable("comments", {
@@ -288,39 +280,66 @@ export const projectFeatures = sqliteTable("project_features", {
     .references(() => features.id, { onDelete: "cascade" })
 });
 
-export const taskFeatures = sqliteTable("task_features", {
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
-  taskId: integer("task_id")
-    .notNull()
-    .references(() => tasks.id, { onDelete: "cascade" }),
-  featureId: integer("feature_id")
-    .notNull()
-    .references(() => features.id, { onDelete: "cascade" })
-});
+export const projectTasks = sqliteTable(
+  "project_tasks",
+  {
+    seedRunId: text("seed_run_id").references(() => seedRuns.id),
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    projectTaskUnique: uniqueIndex("project_tasks_owner_task_unique").on(table.ownerId, table.taskId)
+  })
+);
 
-export const taskUseCases = sqliteTable("task_use_cases", {
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
-  taskId: integer("task_id")
-    .notNull()
-    .references(() => tasks.id, { onDelete: "cascade" }),
-  useCaseId: integer("use_case_id")
-    .notNull()
-    .references(() => useCases.id, { onDelete: "cascade" })
-});
+export const featureTasks = sqliteTable(
+  "feature_tasks",
+  {
+    seedRunId: text("seed_run_id").references(() => seedRuns.id),
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => features.id, { onDelete: "cascade" }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    featureTaskUnique: uniqueIndex("feature_tasks_owner_task_unique").on(table.ownerId, table.taskId)
+  })
+);
+
+export const useCaseTasks = sqliteTable(
+  "use_case_tasks",
+  {
+    seedRunId: text("seed_run_id").references(() => seedRuns.id),
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => useCases.id, { onDelete: "cascade" }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    useCaseTaskUnique: uniqueIndex("use_case_tasks_owner_task_unique").on(table.ownerId, table.taskId)
+  })
+);
 
 export const tickets = sqliteTable("tickets", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   seedRunId: text("seed_run_id").references(() => seedRuns.id),
-  projectId: integer("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
   parentId: integer("parent_id").references((): AnySQLiteColumn => tickets.id, { onDelete: "cascade" }),
   type: text("type", { enum: TICKET_TYPES }).notNull().default("bug"),
   title: text("title").notNull(),
   description: text("description"),
   status: text("status", { enum: TICKET_STATUSES }).notNull().default("open"),
   priority: text("priority", { enum: PRIORITIES }).notNull().default("medium"),
-  severity: text("severity", { enum: TICKET_SEVERITIES }),
   resolution: text("resolution", { enum: TICKET_RESOLUTIONS }),
   reporter: text("reporter"),
   assignee: text("assignee"),
@@ -332,6 +351,74 @@ export const tickets = sqliteTable("tickets", {
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
+
+export const projectTickets = sqliteTable(
+  "project_tickets",
+  {
+    seedRunId: text("seed_run_id").references(() => seedRuns.id),
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    ticketId: integer("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    projectTicketUnique: uniqueIndex("project_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
+  })
+);
+
+export const taskTickets = sqliteTable(
+  "task_tickets",
+  {
+    seedRunId: text("seed_run_id").references(() => seedRuns.id),
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    ticketId: integer("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    taskTicketUnique: uniqueIndex("task_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
+  })
+);
+
+export const featureTickets = sqliteTable(
+  "feature_tickets",
+  {
+    seedRunId: text("seed_run_id").references(() => seedRuns.id),
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => features.id, { onDelete: "cascade" }),
+    ticketId: integer("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    featureTicketUnique: uniqueIndex("feature_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
+  })
+);
+
+export const useCaseTickets = sqliteTable(
+  "use_case_tickets",
+  {
+    seedRunId: text("seed_run_id").references(() => seedRuns.id),
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => useCases.id, { onDelete: "cascade" }),
+    ticketId: integer("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    useCaseTicketUnique: uniqueIndex("use_case_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
+  })
+);
 
 export const ticketRelations = sqliteTable(
   "ticket_relations",

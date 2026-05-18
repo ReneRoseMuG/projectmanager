@@ -210,7 +210,7 @@ export function AttachmentPreview({ attachment, onDelete }: AttachmentPreviewPro
           <a className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink transition hover:bg-line/50" href={url} target="_blank" rel="noreferrer" title="Öffnen" aria-label="Öffnen">
             <Download size={16} />
           </a>
-          <Button aria-label="Löschen" title="Löschen" className="h-9 w-9" icon={<Trash2 size={16} />} variant="ghost" onClick={() => onDelete(attachment)} />
+          <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(attachment)} />
         </div>
       </div>
 

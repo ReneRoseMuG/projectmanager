@@ -1,7 +1,7 @@
 /**
  * Test Scope: Tasks API
  *
- * Covers task CRUD, task details, positions, status transitions, and cascades.
+ * Covers task CRUD, owner-board positions, task details, status transitions, and cascades.
  */
 
 import type { FastifyInstance } from "fastify";
@@ -50,7 +50,6 @@ describe("Tasks API", () => {
       .expect(201);
 
     expect(res.body).toMatchObject({
-      projectId: project.id,
       parentId: null,
       title: "Neue Aufgabe",
       description: "Beschreibung",
@@ -59,7 +58,7 @@ describe("Tasks API", () => {
       assignee: "Max",
       dueDate: "2026-06-30"
     });
-    expect(res.body.position).toBeGreaterThan(0);
+    expect(res.body.boardPosition).toBeGreaterThan(0);
   });
 
   it("POST zu nicht existierentem Projekt gibt 404 zurueck", async () => {
@@ -131,30 +130,54 @@ describe("Tasks API", () => {
     });
   });
 
-  it("PATCH /api/tasks/:id/position aktualisiert Status und Position", async () => {
+  it("PATCH /api/projects/:id/tasks/:taskId/board aktualisiert Status und Owner-Position", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
 
     const res = await supertest(app.server)
-      .patch(`/api/tasks/${task.id}/position`)
+      .patch(`/api/projects/${project.id}/tasks/${task.id}/board`)
       .send({ status: "done", position: 42 })
       .expect(200);
 
     expect(res.body.status).toBe("done");
-    expect(res.body.position).toBe(42);
+    expect(res.body.boardPosition).toBe(42);
   });
 
-  it("PATCH /:id/position ohne status gibt 400 zurueck", async () => {
+  it("PATCH /api/projects/:id/tasks/:taskId/board ohne status gibt 400 zurueck", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
 
-    await supertest(app.server).patch(`/api/tasks/${task.id}/position`).send({ position: 42 }).expect(400);
+    await supertest(app.server).patch(`/api/projects/${project.id}/tasks/${task.id}/board`).send({ position: 42 }).expect(400);
   });
 
-  it("DELETE /api/tasks/:id loescht die Aufgabe", async () => {
+  it("POST /api/projects/:id/tasks/:taskId verknüpft eine vorhandene Aufgabe", async () => {
+    const firstProject = await createProject(app, { name: "Erstes Projekt" });
+    const secondProject = await createProject(app, { name: "Zweites Projekt" });
+    const task = await createTask(app, firstProject.id, { title: "Vorhandene Aufgabe" });
+
+    const link = await supertest(app.server).post(`/api/projects/${secondProject.id}/tasks/${task.id}`).expect(200);
+    expect(link.body).toMatchObject({ id: task.id, title: "Vorhandene Aufgabe" });
+
+    const secondBoard = await supertest(app.server).get(`/api/projects/${secondProject.id}/tasks`).expect(200);
+    expect(secondBoard.body.map((item: { id: number }) => item.id)).toEqual([task.id]);
+  });
+
+  it("DELETE /api/projects/:id/tasks/:taskId entfernt nur die Zuordnung", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
 
+    await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
+    await supertest(app.server).get(`/api/tasks/${task.id}`).expect(200);
+
+    const board = await supertest(app.server).get(`/api/projects/${project.id}/tasks`).expect(200);
+    expect(board.body).toHaveLength(0);
+  });
+
+  it("DELETE /api/tasks/:id loescht die Aufgabe nach entfernter Owner-Zuordnung", async () => {
+    const project = await createProject(app);
+    const task = await createTask(app, project.id);
+
+    await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
     await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
     await supertest(app.server).get(`/api/tasks/${task.id}`).expect(404);
   });
@@ -165,6 +188,7 @@ describe("Tasks API", () => {
     const subtask = await createSubtask(app, task.id);
     await createComment(app, task.id);
 
+    await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
     await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
     await supertest(app.server).get(`/api/tasks/${subtask.id}`).expect(404);
     await supertest(app.server).get(`/api/tasks/${task.id}/comments`).expect(404);

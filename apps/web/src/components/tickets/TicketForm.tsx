@@ -1,4 +1,4 @@
-import type { Priority, Tag, Ticket, TicketInput, TicketResolution, TicketSeverity, TicketStatus, TicketType } from "@taskmanager/shared-types";
+import type { Priority, Tag, Ticket, TicketInput, TicketResolution, TicketStatus, TicketType } from "@taskmanager/shared-types";
 import { Bug, UserRound } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
@@ -6,7 +6,6 @@ import { toDateInput } from "../../utils/date";
 import {
   priorityLabels,
   ticketResolutionLabels,
-  ticketSeverityLabels,
   ticketStatusLabels,
   ticketTypeLabels
 } from "../../utils/domainLabels";
@@ -34,7 +33,6 @@ interface TicketFormProps {
 }
 
 type RadioColor = "fern" | "tangerine" | "crimson" | "violet";
-type SeverityChoice = TicketSeverity | "none";
 
 const statusColors: Record<TicketStatus, RadioColor> = {
   open: "violet",
@@ -58,14 +56,6 @@ const priorityColors: Record<Priority, RadioColor> = {
   urgent: "crimson"
 };
 
-const severityColors: Record<SeverityChoice, RadioColor> = {
-  none: "violet",
-  critical: "crimson",
-  major: "tangerine",
-  minor: "tangerine",
-  trivial: "fern"
-};
-
 const statuses = (["open", "in_progress", "in_review", "resolved", "closed"] as TicketStatus[]).map((value) => ({
   value,
   label: ticketStatusLabels[value],
@@ -84,12 +74,6 @@ const priorities = (["low", "medium", "high", "urgent"] as Priority[]).map((valu
   activeColor: priorityColors[value]
 }));
 
-const severities = (["none", "critical", "major", "minor", "trivial"] as SeverityChoice[]).map((value) => ({
-  value,
-  label: value === "none" ? "Kein" : ticketSeverityLabels[value],
-  activeColor: severityColors[value]
-}));
-
 const resolutionOptions = (["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as TicketResolution[]).map((value) => ({
   value,
   label: ticketResolutionLabels[value],
@@ -106,7 +90,6 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
   const [assignee, setAssignee] = useState("");
   const [reporter, setReporter] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [severity, setSeverity] = useState<SeverityChoice>("none");
   const [environment, setEnvironment] = useState("");
   const [affectedVersion, setAffectedVersion] = useState("");
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
@@ -125,7 +108,6 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
     setAssignee(ticket?.assignee ?? "");
     setReporter(ticket?.reporter ?? "");
     setDueDate(toDateInput(ticket?.dueDate));
-    setSeverity(ticket?.severity ?? "none");
     setEnvironment(ticket?.environment ?? "");
     setAffectedVersion(ticket?.affectedVersion ?? "");
     setSelectedTags(ticket?.tags ?? []);
@@ -142,7 +124,6 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
         status,
         priority,
         resolution: status === "resolved" || status === "closed" ? resolution : null,
-        severity: type === "bug" && severity !== "none" ? severity : null,
         reporter,
         assignee,
         environment: type === "bug" ? environment : null,
@@ -176,7 +157,7 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
             <Input value={ticketTitle} onChange={(event) => setTicketTitle(event.target.value)} required autoFocus={!ticket} />
           </FormField>
           <FormField label="Beschreibung">
-            <RichTextEditor content={description} placeholder="Beschreibung" toolbar="minimal" minHeight="8rem" onChange={setDescription} />
+            <RichTextEditor content={description} placeholder="Beschreibung" toolbar="full" minHeight="8rem" onChange={setDescription} />
           </FormField>
         </div>
       </Section>
@@ -219,10 +200,7 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
 
       {type === "bug" ? (
         <Section title="Details">
-          <div className="grid gap-4 md:grid-cols-3">
-            <FormField label="Schweregrad">
-              <RadioList value={severity} options={severities} onChange={setSeverity} />
-            </FormField>
+          <div className="grid gap-4 md:grid-cols-2">
             <FormField label="Umgebung">
               <Input value={environment} placeholder="z. B. Production v1.2, Chrome 120" onChange={(event) => setEnvironment(event.target.value)} />
             </FormField>

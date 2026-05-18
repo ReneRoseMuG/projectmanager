@@ -21,7 +21,7 @@ import { getContentBaseDir } from "./content.service.js";
 import type { GoogleDriveBackupClient } from "./google-drive.service.js";
 
 const APP_ID = "taskmanager";
-const DUMP_FORMAT_VERSION = 3;
+const DUMP_FORMAT_VERSION = 5;
 const DUMP_FILENAME_PREFIX = "taskmanager_dump_";
 const ZipArchive = (archiverPackage as unknown as {
   ZipArchive: new (options: { zlib: { level: number } }) => Archiver;
@@ -54,9 +54,14 @@ const DUMP_TABLES = [
   { key: "events", tableName: "events" },
   { key: "backlogItems", tableName: "backlog_items" },
   { key: "projectFeatures", tableName: "project_features" },
-  { key: "taskFeatures", tableName: "task_features" },
+  { key: "projectTasks", tableName: "project_tasks" },
+  { key: "featureTasks", tableName: "feature_tasks" },
+  { key: "projectTickets", tableName: "project_tickets" },
+  { key: "taskTickets", tableName: "task_tickets" },
+  { key: "featureTickets", tableName: "feature_tickets" },
+  { key: "useCaseTickets", tableName: "use_case_tickets" },
   { key: "ticketRelations", tableName: "ticket_relations" },
-  { key: "taskUseCases", tableName: "task_use_cases" },
+  { key: "useCaseTasks", tableName: "use_case_tasks" },
   { key: "seedRunItems", tableName: "seed_run_items" }
 ] as const;
 

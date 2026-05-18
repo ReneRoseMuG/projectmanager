@@ -29,9 +29,9 @@ export function ItemCard({ accentColor, onOpen, onEdit, onDelete, header, body, 
               <Button
                 aria-label="Bearbeiten"
                 title="Bearbeiten"
-                icon={<Edit3 size={16} />}
+                icon={<Edit3 size={18} />}
                 variant="ghost"
-                className="h-8 w-8"
+                className="h-10 w-10"
                 onClick={(event) => {
                   event.stopPropagation();
                   onEdit();
@@ -42,9 +42,9 @@ export function ItemCard({ accentColor, onOpen, onEdit, onDelete, header, body, 
               <Button
                 aria-label="Löschen"
                 title="Löschen"
-                icon={<Trash2 size={16} />}
+                icon={<Trash2 size={18} />}
                 variant="ghost"
-                className="h-8 w-8"
+                className="h-10 w-10"
                 onClick={(event) => {
                   event.stopPropagation();
                   onDelete();

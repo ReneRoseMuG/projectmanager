@@ -178,10 +178,10 @@ function seedCompleteDataset(): void {
       VALUES (1, 'Notiz', '{"type":"doc"}', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO features (id, title, slug, status, description, content_path, sort_order, created_at, updated_at)
       VALUES (1, 'Feature Alpha', 'feature-alpha', 'active', 'Feature Beschreibung', 'content/features/feature-1-alpha.md', 10, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO tasks (id, project_id, parent_id, title, description, status, priority, assignee, due_date, import_key, position, created_at, updated_at)
-      VALUES (1, 1, NULL, 'Task Alpha', 'Task Beschreibung', 'todo', 'high', 'Ada', '2026-05-20', 'task-alpha', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO tasks (id, project_id, parent_id, title, description, status, priority, assignee, due_date, import_key, position, created_at, updated_at)
-      VALUES (2, 1, 1, 'Subtask Alpha', NULL, 'in_progress', 'medium', NULL, NULL, 'subtask-alpha', 2, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO tasks (id, parent_id, title, description, status, priority, assignee, due_date, import_key, created_at, updated_at)
+      VALUES (1, NULL, 'Task Alpha', 'Task Beschreibung', 'todo', 'high', 'Ada', '2026-05-20', 'task-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO tasks (id, parent_id, title, description, status, priority, assignee, due_date, import_key, created_at, updated_at)
+      VALUES (2, 1, 'Subtask Alpha', NULL, 'in_progress', 'medium', NULL, NULL, 'subtask-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO use_cases (id, feature_id, title, slug, status, description, content_path, sort_order, created_at, updated_at)
       VALUES (1, 1, 'Use Case Alpha', 'use-case-alpha', 'active', 'UC Beschreibung', 'content/usecases/usecase-1-alpha.md', 20, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO wiki_pages (id, parent_id, project_id, title, slug, content_path, sort_order, created_at, updated_at)
@@ -203,8 +203,9 @@ function seedCompleteDataset(): void {
     INSERT INTO backlog_items (id, project_id, feature_id, use_case_id, title, description, status, priority, sort_order, created_at, updated_at)
       VALUES (1, 1, 1, 1, 'Backlog Alpha', 'Backlog Beschreibung', 'open', 'urgent', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO project_features (project_id, feature_id) VALUES (1, 1);
-    INSERT INTO task_features (task_id, feature_id) VALUES (1, 1);
-    INSERT INTO task_use_cases (task_id, use_case_id) VALUES (1, 1);
+    INSERT INTO project_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
+    INSERT INTO feature_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
+    INSERT INTO use_case_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
   `);
 }
 
@@ -340,6 +341,7 @@ describe("Google Drive dump roundtrip", () => {
   it("sichert und aktualisiert DB, uploads und content als echten Roundtrip", async () => {
     const before = collectSnapshot();
     const app = await buildTestApp(testDb, { enableMultipart: true, driveClient });
+    setContentBaseDir(contentDir);
 
     const saveResponse = await supertest(app.server).post("/api/dumps/drive/save").expect(200);
     expect(String((saveResponse.body as { filename: string }).filename)).toMatch(/^taskmanager_dump_/);
@@ -430,11 +432,11 @@ describe("Dump import failure safety", () => {
     const data = await parseZipJson(archive.buffer, "data.json");
     const manifest = await parseZipJson(archive.buffer, "manifest.json");
     const tables = data.tables as Record<string, Array<Record<string, unknown>>>;
-    tables.tasks[0] = { ...tables.tasks[0], project_id: 9999 };
+    tables.projectTasks[0] = { ...tables.projectTasks[0], owner_id: 9999 };
     const manifestTables = manifest.tables as Record<string, { rowCount: number; sha256: string }>;
-    manifestTables.tasks = {
-      ...manifestTables.tasks,
-      sha256: sha256Json(tables.tasks)
+    manifestTables.projectTasks = {
+      ...manifestTables.projectTasks,
+      sha256: sha256Json(tables.projectTasks)
     };
     const badArchive = await replaceDumpJson(archive.buffer, data, manifest);
     const file = driveClient.addFile(archive.filename, badArchive);

@@ -35,7 +35,7 @@ export function useUseCases(featureId?: number) {
       setDetailLoading(true);
       try {
         const cached = queryClient.getQueryData<UseCase>(queryKeys.useCases.detail(id));
-        const loaded = cached ?? (await getUseCase(id));
+        const loaded = cached?.content !== undefined ? cached : await getUseCase(id);
         queryClient.setQueryData(queryKeys.useCases.detail(id), loaded);
         setSelectedUseCase(loaded);
         return loaded;

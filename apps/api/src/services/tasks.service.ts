@@ -1,19 +1,31 @@
-import type { Task, TaskDetail, TaskInput, TaskPositionInput, TaskUpdate } from "@taskmanager/shared-types";
+import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { projects, tasks } from "../db/schema.js";
-import { badRequest, notFound } from "../utils/errors.js";
+import { featureTasks, features, projectTasks, projects, tasks, useCases, useCaseTasks } from "../db/schema.js";
+import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
 import { deleteCommentsForEntities, listComments } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 import { deleteTaskNotesForIds, listTaskNotes } from "./notes.service.js";
 import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 
+export type TaskOwner = { type: "project" | "feature" | "useCase"; id: number };
+
 type TaskRecord = typeof tasks.$inferSelect;
-type MappableTaskRecord = Pick<
-  TaskRecord,
-  "id" | "projectId" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "position" | "createdAt" | "updatedAt"
->;
+type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "createdAt" | "updatedAt">;
+
+const taskSelect = {
+  id: tasks.id,
+  parentId: tasks.parentId,
+  title: tasks.title,
+  description: tasks.description,
+  status: tasks.status,
+  priority: tasks.priority,
+  assignee: tasks.assignee,
+  dueDate: tasks.dueDate,
+  createdAt: tasks.createdAt,
+  updatedAt: tasks.updatedAt
+};
 
 export function mapTask(
   database: DbClient,
@@ -23,7 +35,6 @@ export function mapTask(
 ): Task {
   return {
     id: record.id,
-    projectId: record.projectId,
     parentId: record.parentId,
     title: record.title,
     description: record.description,
@@ -31,11 +42,17 @@ export function mapTask(
     priority: record.priority,
     assignee: record.assignee,
     dueDate: record.dueDate,
-    position: record.position,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     tags,
     subtaskCount
+  };
+}
+
+function mapTaskBoardItem(database: DbClient, record: MappableTaskRecord & { boardPosition: number }, tags?: Task["tags"], subtaskCount?: number): TaskBoardItem {
+  return {
+    ...mapTask(database, record, tags, subtaskCount),
+    boardPosition: record.boardPosition
   };
 }
 
@@ -44,6 +61,32 @@ function ensureProjectExists(database: DbClient, projectId: number): void {
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
+}
+
+function ensureFeatureExists(database: DbClient, featureId: number): void {
+  const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
+  if (!feature) {
+    throw notFound(`Feature with id ${featureId} not found`);
+  }
+}
+
+function ensureUseCaseExists(database: DbClient, useCaseId: number): void {
+  const useCase = database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, useCaseId)).get();
+  if (!useCase) {
+    throw notFound(`Use case with id ${useCaseId} not found`);
+  }
+}
+
+function ensureOwnerExists(database: DbClient, owner: TaskOwner): void {
+  if (owner.type === "project") {
+    ensureProjectExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "feature") {
+    ensureFeatureExists(database, owner.id);
+    return;
+  }
+  ensureUseCaseExists(database, owner.id);
 }
 
 function getTaskRecord(database: DbClient, id: number): TaskRecord {
@@ -71,8 +114,8 @@ function getSubtaskCounts(database: DbClient, taskIds: number[]): Map<number, nu
 }
 
 function collectTaskSubtreeIds(database: DbClient, taskId: number): number[] {
-  const root = getTaskRecord(database, taskId);
-  const rows = database.select({ id: tasks.id, parentId: tasks.parentId }).from(tasks).where(eq(tasks.projectId, root.projectId)).all();
+  getTaskRecord(database, taskId);
+  const rows = database.select({ id: tasks.id, parentId: tasks.parentId }).from(tasks).all();
   const childrenByParent = new Map<number, number[]>();
 
   for (const row of rows) {
@@ -96,38 +139,127 @@ function collectTaskSubtreeIds(database: DbClient, taskId: number): number[] {
   return ids;
 }
 
-function nextPosition(database: DbClient, projectId: number, status: TaskRecord["status"], parentId: number | null): number {
-  const where = parentId === null
-    ? and(eq(tasks.projectId, projectId), eq(tasks.status, status), isNull(tasks.parentId))
-    : and(eq(tasks.projectId, projectId), eq(tasks.status, status), eq(tasks.parentId, parentId));
+function taskDeleteBlockers(database: DbClient, taskIds: number[]): string[] {
+  const blockers: string[] = [];
 
-  const positions = database.select({ position: tasks.position }).from(tasks).where(where).all();
-  const max = positions.reduce((current, row) => Math.max(current, row.position), 0);
-  return max + 1024;
+  if (database.select({ taskId: projectTasks.taskId }).from(projectTasks).where(inArray(projectTasks.taskId, taskIds)).get()) {
+    blockers.push("Projekt-Verknüpfungen");
+  }
+  if (database.select({ taskId: featureTasks.taskId }).from(featureTasks).where(inArray(featureTasks.taskId, taskIds)).get()) {
+    blockers.push("Feature-Verknüpfungen");
+  }
+  if (database.select({ taskId: useCaseTasks.taskId }).from(useCaseTasks).where(inArray(useCaseTasks.taskId, taskIds)).get()) {
+    blockers.push("Use-Case-Verknüpfungen");
+  }
+
+  return blockers;
 }
 
-export function listProjectTasks(database: DbClient, projectId: number): Task[] {
-  ensureProjectExists(database, projectId);
-  const rows = database
-    .select()
-    .from(tasks)
-    .where(and(eq(tasks.projectId, projectId), isNull(tasks.parentId)))
-    .orderBy(tasks.status, tasks.position)
+function nextOwnerPosition(database: DbClient, owner: TaskOwner, status: TaskRecord["status"]): number {
+  const rows = selectOwnerTaskRows(database, owner).filter((task) => task.status === status);
+  return rows.reduce((current, row) => Math.max(current, row.boardPosition), 0) + 1024;
+}
+
+function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Array<MappableTaskRecord & { boardPosition: number }> {
+  if (owner.type === "project") {
+    return database
+      .select({ ...taskSelect, boardPosition: projectTasks.position })
+      .from(projectTasks)
+      .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
+      .where(and(eq(projectTasks.ownerId, owner.id), isNull(tasks.parentId)))
+      .orderBy(tasks.status, projectTasks.position)
+      .all();
+  }
+  if (owner.type === "feature") {
+    return database
+      .select({ ...taskSelect, boardPosition: featureTasks.position })
+      .from(featureTasks)
+      .innerJoin(tasks, eq(featureTasks.taskId, tasks.id))
+      .where(and(eq(featureTasks.ownerId, owner.id), isNull(tasks.parentId)))
+      .orderBy(tasks.status, featureTasks.position)
+      .all();
+  }
+
+  return database
+    .select({ ...taskSelect, boardPosition: useCaseTasks.position })
+    .from(useCaseTasks)
+    .innerJoin(tasks, eq(useCaseTasks.taskId, tasks.id))
+    .where(and(eq(useCaseTasks.ownerId, owner.id), isNull(tasks.parentId)))
+    .orderBy(tasks.status, useCaseTasks.position)
     .all();
+}
+
+function getOwnerTaskRow(database: DbClient, owner: TaskOwner, taskId: number): (MappableTaskRecord & { boardPosition: number }) | undefined {
+  return selectOwnerTaskRows(database, owner).find((task) => task.id === taskId);
+}
+
+function insertOwnerTask(database: DbClient, owner: TaskOwner, taskId: number, position: number): void {
+  if (owner.type === "project") {
+    database.insert(projectTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
+    return;
+  }
+  if (owner.type === "feature") {
+    database.insert(featureTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
+    return;
+  }
+  database.insert(useCaseTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
+}
+
+function updateOwnerTaskPosition(database: DbClient, owner: TaskOwner, taskId: number, position: number): void {
+  if (owner.type === "project") {
+    database.update(projectTasks).set({ position }).where(and(eq(projectTasks.ownerId, owner.id), eq(projectTasks.taskId, taskId))).run();
+    return;
+  }
+  if (owner.type === "feature") {
+    database.update(featureTasks).set({ position }).where(and(eq(featureTasks.ownerId, owner.id), eq(featureTasks.taskId, taskId))).run();
+    return;
+  }
+  database.update(useCaseTasks).set({ position }).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId))).run();
+}
+
+function deleteOwnerTaskLink(database: DbClient, owner: TaskOwner, taskId: number): number {
+  if (owner.type === "project") {
+    return database.delete(projectTasks).where(and(eq(projectTasks.ownerId, owner.id), eq(projectTasks.taskId, taskId))).run().changes;
+  }
+  if (owner.type === "feature") {
+    return database.delete(featureTasks).where(and(eq(featureTasks.ownerId, owner.id), eq(featureTasks.taskId, taskId))).run().changes;
+  }
+  return database.delete(useCaseTasks).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId))).run().changes;
+}
+
+function insertTask(database: DbClient, input: TaskInput, parentId: number | null = null): TaskRecord {
+  const title = requireNonEmpty(input.title, "title");
+  const now = nowIso();
+
+  return database
+    .insert(tasks)
+    .values({
+      parentId,
+      title,
+      description: cleanNullable(input.description) ?? null,
+      status: input.status ?? "todo",
+      priority: input.priority ?? "medium",
+      assignee: cleanNullable(input.assignee) ?? null,
+      dueDate: input.dueDate ?? null,
+      createdAt: now,
+      updatedAt: now
+    })
+    .returning()
+    .get();
+}
+
+export function listOwnerTasks(database: DbClient, owner: TaskOwner): TaskBoardItem[] {
+  ensureOwnerExists(database, owner);
+  const rows = selectOwnerTaskRows(database, owner);
   const ids = rows.map((task) => task.id);
   const tagsByTask = getTaskTagsMap(database, ids);
   const subtaskCounts = getSubtaskCounts(database, ids);
 
-  return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
+  return rows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
 }
 
 export function listTasks(database: DbClient): Task[] {
-  const rows = database
-    .select()
-    .from(tasks)
-    .where(isNull(tasks.parentId))
-    .orderBy(tasks.projectId, tasks.status, tasks.position)
-    .all();
+  const rows = database.select(taskSelect).from(tasks).where(isNull(tasks.parentId)).orderBy(tasks.status, tasks.updatedAt).all();
   const ids = rows.map((task) => task.id);
   const tagsByTask = getTaskTagsMap(database, ids);
   const subtaskCounts = getSubtaskCounts(database, ids);
@@ -136,53 +268,67 @@ export function listTasks(database: DbClient): Task[] {
 }
 
 export function listSubtasks(database: DbClient, taskId: number): Task[] {
-  const parent = getTaskRecord(database, taskId);
-  const rows = database
-    .select()
-    .from(tasks)
-    .where(eq(tasks.parentId, taskId))
-    .orderBy(tasks.position)
-    .all();
+  getTaskRecord(database, taskId);
+  const rows = database.select(taskSelect).from(tasks).where(eq(tasks.parentId, taskId)).orderBy(tasks.createdAt, tasks.id).all();
   const ids = rows.map((task) => task.id);
   const tagsByTask = getTaskTagsMap(database, ids);
   const subtaskCounts = getSubtaskCounts(database, ids);
 
-  return rows
-    .filter((task) => task.projectId === parent.projectId)
-    .map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
+  return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
 }
 
-export function createTask(database: DbClient, projectId: number, input: TaskInput, parentId: number | null = null): Task {
-  ensureProjectExists(database, projectId);
-  if (parentId !== null) {
-    const parent = getTaskRecord(database, parentId);
-    if (parent.projectId !== projectId) {
-      throw badRequest("Subtask must belong to the same project as its parent");
-    }
+export function createOwnerTask(database: DbClient, owner: TaskOwner, input: TaskInput): TaskBoardItem {
+  ensureOwnerExists(database, owner);
+  const status = input.status ?? "todo";
+  const position = nextOwnerPosition(database, owner, status);
+  const created = database.transaction((tx) => {
+    const task = insertTask(tx as unknown as DbClient, input);
+    insertOwnerTask(tx as unknown as DbClient, owner, task.id, position);
+    return task;
+  });
+
+  return mapTaskBoardItem(database, { ...created, boardPosition: position }, [], 0);
+}
+
+export function linkOwnerTask(database: DbClient, owner: TaskOwner, taskId: number): TaskBoardItem {
+  ensureOwnerExists(database, owner);
+  const task = getTaskRecord(database, taskId);
+  if (task.parentId !== null) {
+    throw badRequest("Subtasks cannot be linked to owners");
   }
 
-  const title = requireNonEmpty(input.title, "title");
-  const status = input.status ?? "todo";
-  const now = nowIso();
-  const created = database
-    .insert(tasks)
-    .values({
-      projectId,
-      parentId,
-      title,
-      description: cleanNullable(input.description) ?? null,
-      status,
-      priority: input.priority ?? "medium",
-      assignee: cleanNullable(input.assignee) ?? null,
-      dueDate: input.dueDate ?? null,
-      position: nextPosition(database, projectId, status, parentId),
-      createdAt: now,
-      updatedAt: now
-    })
-    .returning()
-    .get();
+  const existing = getOwnerTaskRow(database, owner, taskId);
+  if (existing) {
+    return mapTaskBoardItem(database, existing);
+  }
 
-  return mapTask(database, created, [], 0);
+  const position = nextOwnerPosition(database, owner, task.status);
+  insertOwnerTask(database, owner, taskId, position);
+  return mapTaskBoardItem(database, { ...task, boardPosition: position });
+}
+
+export function unlinkOwnerTask(database: DbClient, owner: TaskOwner, taskId: number): void {
+  ensureOwnerExists(database, owner);
+  const changes = deleteOwnerTaskLink(database, owner, taskId);
+  if (changes === 0) {
+    throw notFound(`Task ${taskId} is not linked to ${owner.type} ${owner.id}`);
+  }
+}
+
+export function updateOwnerTaskBoard(database: DbClient, owner: TaskOwner, taskId: number, input: TaskBoardPositionInput): TaskBoardItem {
+  ensureOwnerExists(database, owner);
+  const linked = getOwnerTaskRow(database, owner, taskId);
+  if (!linked) {
+    throw notFound(`Task ${taskId} is not linked to ${owner.type} ${owner.id}`);
+  }
+
+  const updated = database.update(tasks).set({ status: input.status, updatedAt: nowIso() }).where(eq(tasks.id, taskId)).returning().get();
+  if (!updated) {
+    throw notFound(`Task with id ${taskId} not found`);
+  }
+  updateOwnerTaskPosition(database, owner, taskId, input.position);
+
+  return mapTaskBoardItem(database, { ...updated, boardPosition: input.position });
 }
 
 export function createSubtask(database: DbClient, taskId: number, input: TaskInput): Task {
@@ -191,7 +337,7 @@ export function createSubtask(database: DbClient, taskId: number, input: TaskInp
     throw badRequest("Subtasks cannot have subtasks");
   }
 
-  return createTask(database, parent.projectId, input, parent.id);
+  return mapTask(database, insertTask(database, input, parent.id), [], 0);
 }
 
 export function getTask(database: DbClient, id: number): Task {
@@ -245,23 +391,12 @@ export function updateTask(database: DbClient, id: number, input: TaskUpdate): T
   return mapTask(database, updated);
 }
 
-export function updateTaskPosition(database: DbClient, id: number, input: TaskPositionInput): Task {
-  const updated = database
-    .update(tasks)
-    .set({ status: input.status, position: input.position, updatedAt: nowIso() })
-    .where(eq(tasks.id, id))
-    .returning()
-    .get();
-
-  if (!updated) {
-    throw notFound(`Task with id ${id} not found`);
-  }
-
-  return mapTask(database, updated);
-}
-
 export async function deleteTask(database: DbClient, id: number): Promise<void> {
   const taskIds = collectTaskSubtreeIds(database, id);
+  const blockers = taskDeleteBlockers(database, taskIds);
+  if (blockers.length > 0) {
+    throw conflict(`Aufgabe kann nicht gelöscht werden, solange Beziehungen bestehen: ${blockers.join(", ")}.`);
+  }
 
   await deleteTaskAttachmentsForIds(database, taskIds);
   deleteCommentsForEntities(database, "task", taskIds);

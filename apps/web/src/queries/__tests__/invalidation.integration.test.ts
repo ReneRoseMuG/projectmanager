@@ -144,7 +144,7 @@ describe("Query invalidation integration", () => {
     queryClient = createQueryClient();
     seedKnownQueries(queryClient);
 
-    await invalidateTaskScope(queryClient, projectId, taskId);
+    await invalidateTaskScope(queryClient, taskId);
 
     expectInvalidated(queryClient, [
       "projectsList",

@@ -141,11 +141,11 @@ describe("Projects API", () => {
     await supertest(app.server).delete("/api/projects/9999").expect(404);
   });
 
-  it("DELETE /api/projects/:id entfernt auch zugehoerige Tasks (Cascade)", async () => {
+  it("DELETE /api/projects/:id entfernt nur die Task-Zuordnungen", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
 
     await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
-    await supertest(app.server).get(`/api/tasks/${task.id}`).expect(404);
+    await supertest(app.server).get(`/api/tasks/${task.id}`).expect(200);
   });
 });

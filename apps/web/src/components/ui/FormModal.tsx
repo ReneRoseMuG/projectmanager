@@ -13,15 +13,22 @@ interface FormModalProps {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
   saving?: boolean;
   submitLabel?: string;
+  footerStart?: ReactNode;
+  headerMeta?: ReactNode;
   children: ReactNode;
 }
 
 /** Form modal template with shared gradient header, scroll body and fixed footer. */
-export function FormModal({ open, onClose, title, subtitle, icon, breadcrumb = [], onSubmit, saving = false, submitLabel = "Speichern", children }: FormModalProps) {
+export function FormModal({ open, onClose, title, subtitle, icon, breadcrumb = [], onSubmit, saving = false, submitLabel = "Speichern", footerStart, headerMeta, children }: FormModalProps) {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.stopPropagation();
+    return onSubmit(event);
+  };
+
   return (
     <Modal open={open} title={title} size="xl" showHeader={false} bodyClassName="p-0" onClose={onClose}>
-      <form className="flex max-h-[calc(100vh-64px)] flex-col bg-shell" onSubmit={onSubmit}>
-        <header className="relative overflow-hidden bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
+      <form className="flex max-h-[calc(100vh-64px)] flex-col bg-shell" onSubmit={submit}>
+        <header className="relative shrink-0 overflow-hidden bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
           <div className="pointer-events-none absolute -right-8 -top-32 h-80 w-80 rounded-full bg-white/12 blur-sm" />
           <div className="relative flex items-start justify-between gap-4">
             <div className="grid gap-2">
@@ -40,6 +47,7 @@ export function FormModal({ open, onClose, title, subtitle, icon, breadcrumb = [
                 <div>
                   <h2 className="text-2xl font-bold tracking-normal">{title}</h2>
                   {subtitle ? <p className="text-sm text-white/75">{subtitle}</p> : null}
+                  {headerMeta ? <div className="mt-3 flex flex-wrap items-center gap-2">{headerMeta}</div> : null}
                 </div>
               </div>
             </div>
@@ -49,13 +57,16 @@ export function FormModal({ open, onClose, title, subtitle, icon, breadcrumb = [
           </div>
         </header>
 
-        <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">{children}</div>
+        <div className="grid min-h-0 flex-1 gap-4 overflow-auto p-4 md:p-5">{children}</div>
 
-        <footer className="sticky bottom-0 flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">
-          <Button onClick={onClose}>Abbrechen</Button>
-          <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
-            {submitLabel}
-          </Button>
+        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
+          <div className="flex flex-wrap items-center gap-2">{footerStart}</div>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button onClick={onClose}>Abbrechen</Button>
+            <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
+              {submitLabel}
+            </Button>
+          </div>
         </footer>
       </form>
     </Modal>

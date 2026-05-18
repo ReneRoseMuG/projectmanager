@@ -3,6 +3,7 @@ import type { Ticket } from "@taskmanager/shared-types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGlobalSearchData } from "../../hooks/useGlobalSearchData";
+import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 
 interface GlobalSearchProps {
@@ -35,16 +36,16 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const projectResults = projects
-      .filter((project) => !normalized || project.name.toLowerCase().includes(normalized) || (project.description ?? "").toLowerCase().includes(normalized))
+      .filter((project) => !normalized || project.name.toLowerCase().includes(normalized) || richTextToPlainText(project.description).toLowerCase().includes(normalized))
       .map((project) => ({ id: `project-${project.id}`, type: "Projekte", title: project.name, meta: `PROJECT-${project.id}`, to: `/projects/${project.id}`, icon: <FolderKanban size={17} /> }));
     const featureResults = features
       .filter((feature) => !normalized || feature.title.toLowerCase().includes(normalized) || feature.slug.toLowerCase().includes(normalized))
       .map((feature) => ({ id: `feature-${feature.id}`, type: "Features", title: feature.title, meta: feature.slug, to: `/features/${feature.id}`, icon: <BookOpen size={17} /> }));
     const taskResults = tasks
-      .filter((task) => !normalized || task.title.toLowerCase().includes(normalized) || (task.description ?? "").toLowerCase().includes(normalized))
-      .map((task) => ({ id: `task-${task.id}`, type: "Aufgaben", title: task.title, meta: `TASK-${task.id}`, to: `/projects/${task.projectId}`, icon: <ListTodo size={17} /> }));
+      .filter((task) => !normalized || task.title.toLowerCase().includes(normalized) || richTextToPlainText(task.description).toLowerCase().includes(normalized))
+      .map((task) => ({ id: `task-${task.id}`, type: "Aufgaben", title: task.title, meta: `TASK-${task.id}`, to: "/projects", icon: <ListTodo size={17} /> }));
     const ticketResults = tickets
-      .filter((ticket) => !normalized || ticket.title.toLowerCase().includes(normalized) || (ticket.description ?? "").toLowerCase().includes(normalized))
+      .filter((ticket) => !normalized || ticket.title.toLowerCase().includes(normalized) || richTextToPlainText(ticket.description).toLowerCase().includes(normalized))
       .map((ticket) => ({ id: `ticket-${ticket.id}`, type: "Tickets", title: ticket.title, meta: `TICKET-${ticket.id}`, to: "/tickets", icon: ticketIcon(ticket) }));
     const noteResults = notes
       .filter((note) => !normalized || note.title.toLowerCase().includes(normalized))

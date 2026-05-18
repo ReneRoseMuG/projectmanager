@@ -96,7 +96,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose }: FeatureFormPro
       </Section>
 
       <Section title="Kurzbeschreibung">
-        <RichTextEditor content={description} placeholder="Kurzbeschreibung" toolbar="minimal" minHeight="8rem" onChange={setDescription} />
+        <RichTextEditor content={description} placeholder="Kurzbeschreibung" toolbar="full" minHeight="8rem" onChange={setDescription} />
       </Section>
 
       <Section title="Inhalt">

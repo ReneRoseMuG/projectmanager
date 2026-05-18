@@ -2,13 +2,13 @@
  * Test Scope: Tickets API
  *
  * Covered rules:
- * - CRUD, sub-tickets, relations, tags, notes, comments, attachments, status transitions, cascade delete, validation.
+ * - CRUD, owner links for projects/tasks/features/use cases, sub-tickets, relations, tags, notes, comments, attachments and validation.
  *
  * Failure cases:
- * - Missing title, invalid enum values, unknown resources, duplicate relations, self-relations.
+ * - Missing title, invalid enum values, unknown owners, duplicate relations and self-relations.
  *
  * Goal:
- * Ensure the ticket domain behaves consistently with project ownership and shared infrastructure.
+ * Ensure tickets are owner-independent domain objects that can be linked to multiple owner domains safely.
  */
 
 import type { FastifyInstance } from "fastify";
@@ -17,10 +17,25 @@ import os from "node:os";
 import path from "node:path";
 import supertest from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { buildTestApp, createProject, createSubTicket, createTag, createTestDb, createTicket, truncateAll, type TestDb } from "../helpers/index.js";
+import {
+  buildTestApp,
+  createFeature,
+  createProject,
+  createSubTicket,
+  createTag,
+  createTask,
+  createTestDb,
+  createTicket,
+  createUseCase,
+  truncateAll,
+  type TestDb,
+  type TestTicket
+} from "../helpers/index.js";
 
 const uploadDir = path.join(os.tmpdir(), `taskmanager-api-ticket-attachments-${process.pid}`);
 const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-ticket-previews-${process.pid}`);
+
+type TicketOwner = { type: "project" | "task" | "feature" | "useCase"; id: number; path: string };
 
 describe("Tickets API", () => {
   let testDb: TestDb;
@@ -49,18 +64,39 @@ describe("Tickets API", () => {
     await fs.rm(previewCacheDir, { recursive: true, force: true });
   });
 
-  it("POST /api/projects/:id/tickets creates a ticket", async () => {
+  async function createOwners(): Promise<TicketOwner[]> {
     const project = await createProject(app);
+    const task = await createTask(app, project.id, { title: "Owner task" });
+    const feature = await createFeature(app, { title: "Owner feature" });
+    const useCase = await createUseCase(app, feature.id, { title: "Owner use case" });
 
+    return [
+      { type: "project", id: project.id, path: `/api/projects/${project.id}/tickets` },
+      { type: "task", id: task.id, path: `/api/tasks/${task.id}/tickets` },
+      { type: "feature", id: feature.id, path: `/api/features/${feature.id}/tickets` },
+      { type: "useCase", id: useCase.id, path: `/api/use-cases/${useCase.id}/tickets` }
+    ];
+  }
+
+  async function expectOwnerContains(owner: TicketOwner, ticketId: number): Promise<void> {
+    const res = await supertest(app.server).get(owner.path).expect(200);
+    expect((res.body as TestTicket[]).map((ticket) => ticket.id)).toContain(ticketId);
+  }
+
+  async function expectOwnerDoesNotContain(owner: TicketOwner, ticketId: number): Promise<void> {
+    const res = await supertest(app.server).get(owner.path).expect(200);
+    expect((res.body as TestTicket[]).map((ticket) => ticket.id)).not.toContain(ticketId);
+  }
+
+  it("POST /api/tickets creates an owner-independent ticket", async () => {
     const res = await supertest(app.server)
-      .post(`/api/projects/${project.id}/tickets`)
+      .post("/api/tickets")
       .send({
         title: "Login fails",
         type: "bug",
         description: "Cannot sign in",
         status: "open",
         priority: "high",
-        severity: "critical",
         reporter: "QA",
         assignee: "Dev",
         environment: "Local",
@@ -70,13 +106,11 @@ describe("Tickets API", () => {
       .expect(201);
 
     expect(res.body).toMatchObject({
-      projectId: project.id,
       parentId: null,
       title: "Login fails",
       type: "bug",
       status: "open",
       priority: "high",
-      severity: "critical",
       reporter: "QA",
       assignee: "Dev",
       environment: "Local",
@@ -84,54 +118,99 @@ describe("Tickets API", () => {
       dueDate: "2026-06-30",
       resolvedAt: null
     });
+    expect(res.body).not.toHaveProperty("projectId");
+    expect(res.body).not.toHaveProperty("severity");
     expect(res.body.position).toBeGreaterThan(0);
   });
 
-  it("POST /api/projects/:id/tickets without title returns 400", async () => {
-    const project = await createProject(app);
-    await supertest(app.server).post(`/api/projects/${project.id}/tickets`).send({ status: "open" }).expect(400);
+  it("POST /api/tickets without title returns 400", async () => {
+    await supertest(app.server).post("/api/tickets").send({ status: "open" }).expect(400);
   });
 
-  it("POST /api/projects/:id/tickets with invalid type returns 400", async () => {
-    const project = await createProject(app);
-    await supertest(app.server).post(`/api/projects/${project.id}/tickets`).send({ title: "Invalid", type: "invalid" }).expect(400);
+  it("POST /api/tickets with invalid priority returns 400", async () => {
+    await supertest(app.server).post("/api/tickets").send({ title: "Invalid", priority: "blocker" }).expect(400);
   });
 
-  it("POST /api/projects/:id/tickets with invalid severity returns 400", async () => {
-    const project = await createProject(app);
-    await supertest(app.server).post(`/api/projects/${project.id}/tickets`).send({ title: "Invalid", severity: "blocker" }).expect(400);
+  it("POST /api/tickets with invalid type returns 400", async () => {
+    await supertest(app.server).post("/api/tickets").send({ title: "Invalid", type: "invalid" }).expect(400);
   });
 
-  it("POST /api/projects/9999/tickets returns 404", async () => {
+  it("POST /api/tickets with invalid status returns 400", async () => {
+    await supertest(app.server).post("/api/tickets").send({ title: "Invalid", status: "waiting" }).expect(400);
+  });
+
+  it("creates tickets directly for project, task, feature and use case owners", async () => {
+    const owners = await createOwners();
+
+    for (const owner of owners) {
+      const res = await supertest(app.server).post(owner.path).send({ title: `${owner.type} ticket`, status: "open" }).expect(201);
+      expect(res.body.title).toBe(`${owner.type} ticket`);
+      await expectOwnerContains(owner, res.body.id);
+    }
+  });
+
+  it("POST to unknown project, task, feature and use case owners returns 404", async () => {
     await supertest(app.server).post("/api/projects/9999/tickets").send({ title: "Missing project" }).expect(404);
+    await supertest(app.server).post("/api/tasks/9999/tickets").send({ title: "Missing task" }).expect(404);
+    await supertest(app.server).post("/api/features/9999/tickets").send({ title: "Missing feature" }).expect(404);
+    await supertest(app.server).post("/api/use-cases/9999/tickets").send({ title: "Missing use case" }).expect(404);
   });
 
-  it("GET /api/projects/:id/tickets returns top-level tickets", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id, { title: "Parent" });
-    const subTicket = await createSubTicket(app, ticket.id, { title: "Child" });
+  it("links an existing ticket to project, task, feature and use case owners", async () => {
+    const owners = await createOwners();
+    const ticket = await createTicket(app, null, { title: "Reusable ticket" });
 
-    const res = await supertest(app.server).get(`/api/projects/${project.id}/tickets`).expect(200);
-
-    expect(res.body).toHaveLength(1);
-    expect(res.body[0].id).toBe(ticket.id);
-    expect(res.body.find((item: { id: number }) => item.id === subTicket.id)).toBeUndefined();
+    for (const owner of owners) {
+      await supertest(app.server).post(`${owner.path}/${ticket.id}`).expect(200);
+      await expectOwnerContains(owner, ticket.id);
+    }
   });
 
-  it("GET /api/tickets returns top-level tickets across projects", async () => {
-    const firstProject = await createProject(app, { name: "First" });
-    const secondProject = await createProject(app, { name: "Second" });
-    await createTicket(app, firstProject.id, { title: "First ticket" });
-    await createTicket(app, secondProject.id, { title: "Second ticket" });
+  it("linking the same ticket twice is idempotent for an owner", async () => {
+    const [owner] = await createOwners();
+    const ticket = await createTicket(app, null, { title: "Idempotent ticket" });
+
+    await supertest(app.server).post(`${owner.path}/${ticket.id}`).expect(200);
+    await supertest(app.server).post(`${owner.path}/${ticket.id}`).expect(200);
+
+    const res = await supertest(app.server).get(owner.path).expect(200);
+    expect((res.body as TestTicket[]).filter((item) => item.id === ticket.id)).toHaveLength(1);
+  });
+
+  it("does not link sub-tickets to owners", async () => {
+    const [owner] = await createOwners();
+    const parent = await createTicket(app, null, { title: "Parent" });
+    const child = await createSubTicket(app, parent.id, { title: "Child" });
+
+    await supertest(app.server).post(`${owner.path}/${child.id}`).expect(400);
+  });
+
+  it("unlinks owner-ticket relations without deleting the ticket", async () => {
+    const owners = await createOwners();
+    const ticket = await createTicket(app, null, { title: "Unlinkable ticket" });
+
+    for (const owner of owners) {
+      await supertest(app.server).post(`${owner.path}/${ticket.id}`).expect(200);
+      await supertest(app.server).delete(`${owner.path}/${ticket.id}`).expect(204);
+      await expectOwnerDoesNotContain(owner, ticket.id);
+      await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
+    }
+  });
+
+  it("GET /api/tickets returns top-level tickets globally", async () => {
+    const owners = await createOwners();
+    const ownerTicket = await createTicket(app, { type: "project", id: owners[0].id }, { title: "Owner ticket" });
+    const globalTicket = await createTicket(app, null, { title: "Global ticket" });
+    const subTicket = await createSubTicket(app, ownerTicket.id, { title: "Child" });
 
     const res = await supertest(app.server).get("/api/tickets").expect(200);
 
-    expect(res.body).toHaveLength(2);
+    expect((res.body as TestTicket[]).map((ticket) => ticket.id)).toEqual(expect.arrayContaining([ownerTicket.id, globalTicket.id]));
+    expect((res.body as TestTicket[]).map((ticket) => ticket.id)).not.toContain(subTicket.id);
   });
 
   it("GET /api/tickets/:id returns ticket detail", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+    const ticket = await createTicket(app, null);
 
     const res = await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
 
@@ -143,8 +222,7 @@ describe("Tickets API", () => {
   });
 
   it("PATCH /api/tickets/:id updates fields", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+    const ticket = await createTicket(app, null);
 
     const res = await supertest(app.server)
       .patch(`/api/tickets/${ticket.id}`)
@@ -154,36 +232,25 @@ describe("Tickets API", () => {
     expect(res.body).toMatchObject({ title: "Updated", status: "in_progress", priority: "urgent", assignee: "Erika", resolution: "fixed" });
   });
 
-  it("PATCH /api/tickets/:id sets resolvedAt for resolved status", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+  it("PATCH /api/tickets/:id sets resolvedAt for resolved and closed status", async () => {
+    const resolvedTicket = await createTicket(app, null);
+    const closedTicket = await createTicket(app, null, { title: "Closed" });
 
-    const res = await supertest(app.server).patch(`/api/tickets/${ticket.id}`).send({ status: "resolved" }).expect(200);
+    const resolved = await supertest(app.server).patch(`/api/tickets/${resolvedTicket.id}`).send({ status: "resolved" }).expect(200);
+    const closed = await supertest(app.server).patch(`/api/tickets/${closedTicket.id}`).send({ status: "closed" }).expect(200);
 
-    expect(res.body.status).toBe("resolved");
-    expect(res.body.resolvedAt).toEqual(expect.any(String));
-  });
-
-  it("PATCH /api/tickets/:id sets resolvedAt for closed status", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
-
-    const res = await supertest(app.server).patch(`/api/tickets/${ticket.id}`).send({ status: "closed" }).expect(200);
-
-    expect(res.body.status).toBe("closed");
-    expect(res.body.resolvedAt).toEqual(expect.any(String));
+    expect(resolved.body.resolvedAt).toEqual(expect.any(String));
+    expect(closed.body.resolvedAt).toEqual(expect.any(String));
   });
 
   it("PATCH /api/tickets/:id with invalid resolution returns 400", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+    const ticket = await createTicket(app, null);
 
     await supertest(app.server).patch(`/api/tickets/${ticket.id}`).send({ resolution: "later" }).expect(400);
   });
 
   it("PATCH /api/tickets/:id/position updates status and position", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+    const ticket = await createTicket(app, null);
 
     const res = await supertest(app.server).patch(`/api/tickets/${ticket.id}/position`).send({ status: "in_review", position: 42 }).expect(200);
 
@@ -191,31 +258,43 @@ describe("Tickets API", () => {
     expect(res.body.position).toBe(42);
   });
 
-  it("DELETE /api/tickets/:id deletes a ticket", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+  it("DELETE /api/tickets/:id deletes an unlinked ticket", async () => {
+    const ticket = await createTicket(app, null);
 
     await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
     await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(404);
   });
 
-  it("DELETE /api/tickets/9999 returns 404", async () => {
-    await supertest(app.server).delete("/api/tickets/9999").expect(404);
+  it("DELETE /api/tickets/:id blocks owner-linked tickets until the relation is removed", async () => {
+    const [owner] = await createOwners();
+    const ticket = await createTicket(app, owner, { title: "Linked ticket" });
+
+    const blocked = await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(409);
+    expect(blocked.body.message).toContain("Beziehungen");
+
+    await supertest(app.server).delete(`${owner.path}/${ticket.id}`).expect(204);
+    await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
   });
 
-  it("POST /api/tickets/:id/sub-tickets creates a sub-ticket with parent project", async () => {
-    const project = await createProject(app);
-    const parent = await createTicket(app, project.id);
+  it("DELETE /api/tickets/:id blocks parent tickets with sub-tickets", async () => {
+    const parent = await createTicket(app, null, { title: "Parent" });
+    const child = await createSubTicket(app, parent.id, { title: "Child" });
+
+    await supertest(app.server).delete(`/api/tickets/${parent.id}`).expect(409);
+    await supertest(app.server).get(`/api/tickets/${child.id}`).expect(200);
+  });
+
+  it("POST /api/tickets/:id/sub-tickets creates a sub-ticket", async () => {
+    const parent = await createTicket(app, null);
 
     const subTicket = await createSubTicket(app, parent.id, { title: "Sub" });
 
-    expect(subTicket.projectId).toBe(project.id);
     expect(subTicket.parentId).toBe(parent.id);
+    expect(subTicket).not.toHaveProperty("projectId");
   });
 
   it("GET /api/tickets/:id includes subTickets and subTicketCount", async () => {
-    const project = await createProject(app);
-    const parent = await createTicket(app, project.id);
+    const parent = await createTicket(app, null);
     await createSubTicket(app, parent.id, { title: "Sub A" });
     await createSubTicket(app, parent.id, { title: "Sub B" });
 
@@ -225,77 +304,43 @@ describe("Tickets API", () => {
     expect(res.body.subTickets).toHaveLength(2);
   });
 
-  it("Deleting a parent ticket deletes its sub-tickets", async () => {
-    const project = await createProject(app);
-    const parent = await createTicket(app, project.id);
-    const child = await createSubTicket(app, parent.id);
-
-    await supertest(app.server).delete(`/api/tickets/${parent.id}`).expect(204);
-    await supertest(app.server).get(`/api/tickets/${child.id}`).expect(404);
-  });
-
-  it("POST /api/tickets/:id/relations creates an outgoing relation", async () => {
-    const project = await createProject(app);
-    const source = await createTicket(app, project.id, { title: "Source" });
-    const target = await createTicket(app, project.id, { title: "Target" });
+  it("POST /api/tickets/:id/relations creates outgoing and incoming relations", async () => {
+    const source = await createTicket(app, null, { title: "Source" });
+    const target = await createTicket(app, null, { title: "Target" });
 
     await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send({ targetTicketId: target.id, relationType: "blocks" }).expect(201);
 
-    const res = await supertest(app.server).get(`/api/tickets/${source.id}/relations`).expect(200);
-    expect(res.body[0]).toMatchObject({ relationType: "blocks", direction: "outgoing", ticket: { id: target.id } });
+    const outgoing = await supertest(app.server).get(`/api/tickets/${source.id}/relations`).expect(200);
+    const incoming = await supertest(app.server).get(`/api/tickets/${target.id}/relations`).expect(200);
+    expect(outgoing.body[0]).toMatchObject({ relationType: "blocks", direction: "outgoing", ticket: { id: target.id } });
+    expect(incoming.body[0]).toMatchObject({ relationType: "blocks", direction: "incoming", ticket: { id: source.id } });
   });
 
-  it("Relation counterpart is returned as incoming", async () => {
-    const project = await createProject(app);
-    const source = await createTicket(app, project.id, { title: "Source" });
-    const target = await createTicket(app, project.id, { title: "Target" });
+  it("DELETE /api/tickets/:id blocks tickets with ticket relations until the relation is removed", async () => {
+    const source = await createTicket(app, null);
+    const target = await createTicket(app, null);
+    const body = { targetTicketId: target.id, relationType: "related" };
 
-    await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send({ targetTicketId: target.id, relationType: "blocks" }).expect(201);
-
-    const res = await supertest(app.server).get(`/api/tickets/${target.id}/relations`).expect(200);
-    expect(res.body[0]).toMatchObject({ relationType: "blocks", direction: "incoming", ticket: { id: source.id } });
+    await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send(body).expect(201);
+    await supertest(app.server).delete(`/api/tickets/${source.id}`).expect(409);
+    await supertest(app.server).delete(`/api/tickets/${source.id}/relations`).send(body).expect(204);
+    await supertest(app.server).delete(`/api/tickets/${source.id}`).expect(204);
+    await supertest(app.server).get(`/api/tickets/${target.id}/relations`).expect(200, []);
   });
 
-  it("Duplicate relations return 400", async () => {
-    const project = await createProject(app);
-    const source = await createTicket(app, project.id);
-    const target = await createTicket(app, project.id);
+  it("Duplicate, self and unknown relations are rejected", async () => {
+    const source = await createTicket(app, null);
+    const target = await createTicket(app, null);
     const body = { targetTicketId: target.id, relationType: "related" };
 
     await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send(body).expect(201);
     await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send(body).expect(400);
-  });
-
-  it("Self-relations return 400", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
-
-    await supertest(app.server).post(`/api/tickets/${ticket.id}/relations`).send({ targetTicketId: ticket.id, relationType: "related" }).expect(400);
-  });
-
-  it("Relations to unknown tickets return 404", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
-
-    await supertest(app.server).post(`/api/tickets/${ticket.id}/relations`).send({ targetTicketId: 9999, relationType: "related" }).expect(404);
-  });
-
-  it("DELETE /api/tickets/:id/relations removes a relation", async () => {
-    const project = await createProject(app);
-    const source = await createTicket(app, project.id);
-    const target = await createTicket(app, project.id);
-    const body = { targetTicketId: target.id, relationType: "duplicate" };
-
-    await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send(body).expect(201);
-    await supertest(app.server).delete(`/api/tickets/${source.id}/relations`).send(body).expect(204);
-
-    const res = await supertest(app.server).get(`/api/tickets/${source.id}/relations`).expect(200);
-    expect(res.body).toHaveLength(0);
+    await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send({ targetTicketId: source.id, relationType: "related" }).expect(400);
+    await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send({ targetTicketId: 9999, relationType: "related" }).expect(404);
   });
 
   it("PUT /api/tickets/:id/tags sets and replaces tags", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+    const ticket = await createTicket(app, null);
     const firstTag = await createTag(app, { name: "ticket-a" });
     const secondTag = await createTag(app, { name: "ticket-b" });
 
@@ -307,8 +352,7 @@ describe("Tickets API", () => {
   });
 
   it("Ticket tags are included in detail responses", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+    const ticket = await createTicket(app, null);
     const tag = await createTag(app, { name: "detail-tag" });
 
     await supertest(app.server).put(`/api/tickets/${ticket.id}/tags`).send({ tagIds: [tag.id] }).expect(200);
@@ -317,18 +361,8 @@ describe("Tickets API", () => {
     expect(res.body.tags[0].id).toBe(tag.id);
   });
 
-  it("POST /api/tickets/:id/notes creates a note", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
-
-    const res = await supertest(app.server).post(`/api/tickets/${ticket.id}/notes`).send({ title: "Ticket note", contentJson: { type: "doc" } }).expect(201);
-
-    expect(res.body.title).toBe("Ticket note");
-  });
-
-  it("Ticket notes appear in detail and can be removed", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+  it("POST /api/tickets/:id/notes creates and removes a note", async () => {
+    const ticket = await createTicket(app, null);
     const note = await supertest(app.server).post(`/api/tickets/${ticket.id}/notes`).send({ title: "Ticket note" }).expect(201);
 
     let detail = await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
@@ -340,8 +374,7 @@ describe("Tickets API", () => {
   });
 
   it("POST /api/tickets/:id/comments creates a comment", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+    const ticket = await createTicket(app, null);
 
     const res = await supertest(app.server).post(`/api/tickets/${ticket.id}/comments`).send({ body: "Ticket comment" }).expect(201);
 
@@ -349,8 +382,7 @@ describe("Tickets API", () => {
   });
 
   it("Ticket comments appear in detail", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+    const ticket = await createTicket(app, null);
     await supertest(app.server).post(`/api/tickets/${ticket.id}/comments`).send({ body: "Ticket comment" }).expect(201);
 
     const res = await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
@@ -359,8 +391,7 @@ describe("Tickets API", () => {
   });
 
   it("POST /api/tickets/:id/attachments uploads a ticket file", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+    const ticket = await createTicket(app, null);
 
     const res = await supertest(app.server)
       .post(`/api/tickets/${ticket.id}/attachments`)
@@ -371,8 +402,7 @@ describe("Tickets API", () => {
   });
 
   it("Ticket attachments appear in detail", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+    const ticket = await createTicket(app, null);
     const upload = await supertest(app.server)
       .post(`/api/tickets/${ticket.id}/attachments`)
       .attach("file", Buffer.from("Ticket file"), { filename: "ticket.txt", contentType: "text/plain" })
@@ -383,11 +413,12 @@ describe("Tickets API", () => {
     expect(res.body.attachments[0].id).toBe(upload.body.id);
   });
 
-  it("Deleting a project deletes its tickets", async () => {
-    const project = await createProject(app);
-    const ticket = await createTicket(app, project.id);
+  it("deleting a project removes only the project-ticket link", async () => {
+    const [owner] = await createOwners();
+    const ticket = await createTicket(app, owner, { title: "Project owned ticket" });
 
-    await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
-    await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(404);
+    await supertest(app.server).delete(`/api/projects/${owner.id}`).expect(204);
+
+    await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
   });
 });

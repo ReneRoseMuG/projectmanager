@@ -1,4 +1,4 @@
-import { Link2, MoreHorizontal, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Modal } from "./Modal";
 import { TabBar, type Tab } from "./TabBar";
@@ -23,7 +23,7 @@ export function DetailModal<T extends string>({ open, onClose, title, subtitle, 
   return (
     <Modal open={open} title={title} size="xl" showHeader={false} bodyClassName="p-0" onClose={onClose}>
       <div className="flex max-h-[calc(100vh-64px)] flex-col bg-shell">
-        <header className="relative overflow-hidden border-b border-steel-700 bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
+        <header className="relative shrink-0 overflow-hidden border-b border-steel-700 bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
           <div className="pointer-events-none absolute -right-8 -top-32 h-80 w-80 rounded-full bg-white/12 blur-sm" />
           <div className="relative grid gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -40,12 +40,6 @@ export function DetailModal<T extends string>({ open, onClose, title, subtitle, 
                 <span />
               )}
               <div className="flex items-center gap-2">
-                <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 transition hover:bg-white/12 hover:text-white" aria-label="Link kopieren" title="Link kopieren">
-                  <Link2 size={17} />
-                </button>
-                <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 transition hover:bg-white/12 hover:text-white" aria-label="Mehr Optionen" title="Mehr Optionen">
-                  <MoreHorizontal size={18} />
-                </button>
                 <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 transition hover:bg-white/12 hover:text-white" aria-label="Schließen" title="Schließen" onClick={onClose}>
                   <X size={18} />
                 </button>
@@ -68,8 +62,8 @@ export function DetailModal<T extends string>({ open, onClose, title, subtitle, 
         </header>
 
         <TabBar tabs={tabs} active={activeTab} onChange={onTabChange} />
-        <main className="min-h-[420px] flex-1 overflow-auto p-4 md:p-5">{children}</main>
-        {footer ? <footer className="sticky bottom-0 flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">{footer}</footer> : null}
+        <main className="min-h-0 flex-1 overflow-auto p-4 md:p-5">{children}</main>
+        {footer ? <footer className="shrink-0 border-t border-line bg-white px-5 py-4"><div className="flex flex-wrap items-center justify-end gap-3">{footer}</div></footer> : null}
       </div>
     </Modal>
   );

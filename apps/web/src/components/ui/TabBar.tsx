@@ -16,7 +16,7 @@ interface TabBarProps<T extends string> {
 /** Horizontally scrollable tab bar with optional counts and icons. */
 export function TabBar<T extends string>({ tabs, active, onChange }: TabBarProps<T>) {
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b border-line bg-white px-4 md:px-5">
+    <nav className="relative z-10 flex min-h-12 shrink-0 gap-1 overflow-x-auto border-b border-line bg-white px-4 md:px-5">
       {tabs.map((tab) => {
         const selected = active === tab.value;
 

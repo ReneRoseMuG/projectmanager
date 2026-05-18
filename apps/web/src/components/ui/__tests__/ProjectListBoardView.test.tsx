@@ -93,7 +93,7 @@ describe("ProjectListBoardView", () => {
     const { container } = renderProjectList({ projects, onCreate });
 
     expectToolbar();
-    expect(container.querySelector(".lg\\:grid-cols-3")).toBeInTheDocument();
+    expect(container.querySelector(".grid-flow-col")).toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns.length).toBe(statusColumns.length);
@@ -139,7 +139,7 @@ describe("ProjectListBoardView", () => {
     expect(container.querySelector("article.rounded-2xl")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
-    expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
+    expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
     const rows = container.querySelectorAll("article.rounded-xl");
     expect(rows).toHaveLength(projects.length);
     expectItemRowClasses(rows);

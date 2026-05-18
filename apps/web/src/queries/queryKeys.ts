@@ -2,6 +2,7 @@ import type { CommentEntityType } from "@taskmanager/shared-types";
 
 export type NoteOwnerType = "project" | "task" | "ticket";
 export type QueryOwnerType = "project" | "task" | "feature" | "ticket";
+export type TicketOwnerType = "project" | "task" | "feature" | "useCase";
 
 export const queryKeys = {
   projects: {
@@ -9,6 +10,7 @@ export const queryKeys = {
     list: () => [...queryKeys.projects.root, "list"] as const,
     detail: (projectId: number) => [...queryKeys.projects.root, "detail", projectId] as const,
     tasks: (projectId: number) => [...queryKeys.projects.detail(projectId), "tasks"] as const,
+    tickets: (projectId: number) => [...queryKeys.projects.detail(projectId), "tickets"] as const,
     backlog: (projectId: number) => [...queryKeys.projects.detail(projectId), "backlog"] as const,
     features: (projectId: number) => [...queryKeys.projects.detail(projectId), "features"] as const
   },
@@ -16,6 +18,7 @@ export const queryKeys = {
     root: ["tasks"] as const,
     list: () => [...queryKeys.tasks.root, "list"] as const,
     detail: (taskId: number) => [...queryKeys.tasks.root, "detail", taskId] as const,
+    tickets: (taskId: number) => [...queryKeys.tasks.detail(taskId), "tickets"] as const,
     features: (taskId: number) => [...queryKeys.tasks.detail(taskId), "features"] as const,
     useCases: (taskId: number) => [...queryKeys.tasks.detail(taskId), "useCases"] as const
   },
@@ -25,12 +28,14 @@ export const queryKeys = {
     detail: (featureId: number) => [...queryKeys.features.root, "detail", featureId] as const,
     useCases: (featureId: number) => [...queryKeys.features.detail(featureId), "useCases"] as const,
     projects: (featureId: number) => [...queryKeys.features.detail(featureId), "projects"] as const,
-    tasks: (featureId: number) => [...queryKeys.features.detail(featureId), "tasks"] as const
+    tasks: (featureId: number) => [...queryKeys.features.detail(featureId), "tasks"] as const,
+    tickets: (featureId: number) => [...queryKeys.features.detail(featureId), "tickets"] as const
   },
   useCases: {
     root: ["useCases"] as const,
     detail: (useCaseId: number) => [...queryKeys.useCases.root, "detail", useCaseId] as const,
-    tasks: (useCaseId: number) => [...queryKeys.useCases.detail(useCaseId), "tasks"] as const
+    tasks: (useCaseId: number) => [...queryKeys.useCases.detail(useCaseId), "tasks"] as const,
+    tickets: (useCaseId: number) => [...queryKeys.useCases.detail(useCaseId), "tickets"] as const
   },
   comments: {
     root: ["comments"] as const,
@@ -74,7 +79,8 @@ export const queryKeys = {
     root: ["tickets"] as const,
     list: () => [...queryKeys.tickets.root, "list"] as const,
     detail: (ticketId: number) => [...queryKeys.tickets.root, "detail", ticketId] as const,
-    byProject: (projectId: number) => [...queryKeys.projects.detail(projectId), "tickets"] as const,
+    byOwner: (ownerType: TicketOwnerType, ownerId: number) => [...queryKeys.tickets.root, ownerType, ownerId] as const,
+    byProject: (projectId: number) => queryKeys.projects.tickets(projectId),
     relations: (ticketId: number) => [...queryKeys.tickets.detail(ticketId), "relations"] as const,
     subTickets: (ticketId: number) => [...queryKeys.tickets.detail(ticketId), "subTickets"] as const
   },

@@ -1,24 +1,29 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { CommentInput, NoteInput, TicketInput, TicketPositionInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
-import { PRIORITIES, TICKET_RELATION_TYPES, TICKET_RESOLUTIONS, TICKET_SEVERITIES, TICKET_STATUSES, TICKET_TYPES } from "../db/schema.js";
+import { PRIORITIES, TICKET_RELATION_TYPES, TICKET_RESOLUTIONS, TICKET_STATUSES, TICKET_TYPES } from "../db/schema.js";
 import { createTicketAttachment, deleteAttachment, listTicketAttachments } from "../services/attachments.service.js";
 import { createEntityComment, deleteEntityComment, listEntityComments } from "../services/comments.service.js";
 import { createTicketNote, deleteTicketNote, listTicketNotes } from "../services/notes.service.js";
 import { setTicketTags } from "../services/tags.service.js";
 import {
   addTicketRelation,
+  createOwnerTicket,
   createSubTicket,
   createTicket,
   deleteTicket,
   getTicketDetail,
+  linkOwnerTicket,
+  listOwnerTickets,
   listProjectTickets,
   listSubTickets,
   listTicketRelations,
   listTickets,
   removeTicketRelation,
+  unlinkOwnerTicket,
   updateTicket,
   updateTicketPosition
 } from "../services/tickets.service.js";
+import type { TicketOwner } from "../services/tickets.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema, projectIdParamSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
 
@@ -42,7 +47,6 @@ const ticketBodySchema = {
     description: { type: ["string", "null"] },
     status: { type: "string", enum: TICKET_STATUSES },
     priority: { type: "string", enum: PRIORITIES },
-    severity: { type: ["string", "null"], enum: [...TICKET_SEVERITIES, null] },
     reporter: { type: ["string", "null"] },
     assignee: { type: ["string", "null"] },
     environment: { type: ["string", "null"] },
@@ -108,6 +112,15 @@ const idAndChildIdParamSchema = {
   }
 } as const;
 
+const ownerTicketParamSchema = {
+  type: "object",
+  required: ["id", "ticketId"],
+  properties: {
+    id: { type: "integer", minimum: 1 },
+    ticketId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
 const uploadBodySchema = {
   consumes: ["multipart/form-data"],
   body: {
@@ -136,6 +149,12 @@ async function readUpload(request: FastifyRequest) {
 export async function registerTicketsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/tickets", { schema: { response: { 200: arrayResponseSchema } } }, async () => listTickets(app.db));
 
+  app.post<{ Body: TicketInput }>(
+    "/tickets",
+    { schema: { body: ticketBodySchema, response: { 201: objectResponseSchema } } },
+    async (request, reply) => reply.status(201).send(createTicket(app.db, request.body))
+  );
+
   app.get<{ Params: { projectId: number } }>(
     "/projects/:projectId/tickets",
     { schema: { params: projectIdParamSchema, response: { 200: arrayResponseSchema } } },
@@ -145,8 +164,46 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: { projectId: number }; Body: TicketInput }>(
     "/projects/:projectId/tickets",
     { schema: { params: projectIdParamSchema, body: ticketBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createTicket(app.db, request.params.projectId, request.body))
+    async (request, reply) => reply.status(201).send(createOwnerTicket(app.db, { type: "project", id: request.params.projectId }, request.body))
   );
+
+  const ownerRoutes: Array<{ path: string; ownerType: TicketOwner["type"] }> = [
+    { path: "/projects/:id/tickets", ownerType: "project" },
+    { path: "/tasks/:id/tickets", ownerType: "task" },
+    { path: "/features/:id/tickets", ownerType: "feature" },
+    { path: "/use-cases/:id/tickets", ownerType: "useCase" }
+  ];
+
+  for (const route of ownerRoutes.slice(1)) {
+    app.get<{ Params: { id: number } }>(
+      route.path,
+      { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+      async (request) => listOwnerTickets(app.db, { type: route.ownerType, id: request.params.id })
+    );
+
+    app.post<{ Params: { id: number }; Body: TicketInput }>(
+      route.path,
+      { schema: { params: idParamSchema, body: ticketBodySchema, response: { 201: objectResponseSchema } } },
+      async (request, reply) => reply.status(201).send(createOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.body))
+    );
+  }
+
+  for (const route of ownerRoutes) {
+    app.post<{ Params: { id: number; ticketId: number } }>(
+      `${route.path}/:ticketId`,
+      { schema: { params: ownerTicketParamSchema, response: { 200: objectResponseSchema } } },
+      async (request) => linkOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.params.ticketId)
+    );
+
+    app.delete<{ Params: { id: number; ticketId: number } }>(
+      `${route.path}/:ticketId`,
+      { schema: { params: ownerTicketParamSchema, response: { 204: { type: "null" } } } },
+      async (request, reply) => {
+        unlinkOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.params.ticketId);
+        return reply.status(204).send();
+      }
+    );
+  }
 
   app.get<{ Params: { id: number } }>(
     "/tickets/:id",

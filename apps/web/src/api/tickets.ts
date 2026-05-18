@@ -13,20 +13,51 @@ import type {
 } from "@taskmanager/shared-types";
 import { api } from "./client";
 
+export type TicketOwner = { type: "project" | "task" | "feature" | "useCase"; id: number };
+
+function ownerPath(owner: TicketOwner): string {
+  if (owner.type === "project") {
+    return `projects/${owner.id}`;
+  }
+  if (owner.type === "task") {
+    return `tasks/${owner.id}`;
+  }
+  if (owner.type === "feature") {
+    return `features/${owner.id}`;
+  }
+  return `use-cases/${owner.id}`;
+}
+
 export async function getTickets(): Promise<Ticket[]> {
   return api.get("tickets").json<Ticket[]>();
 }
 
+export async function getOwnerTickets(owner: TicketOwner): Promise<Ticket[]> {
+  return api.get(`${ownerPath(owner)}/tickets`).json<Ticket[]>();
+}
+
 export async function getProjectTickets(projectId: number): Promise<Ticket[]> {
-  return api.get(`projects/${projectId}/tickets`).json<Ticket[]>();
+  return getOwnerTickets({ type: "project", id: projectId });
 }
 
 export async function getTicket(id: number): Promise<TicketDetail> {
   return api.get(`tickets/${id}`).json<TicketDetail>();
 }
 
-export async function createTicket(projectId: number, input: TicketInput): Promise<Ticket> {
-  return api.post(`projects/${projectId}/tickets`, { json: input }).json<Ticket>();
+export async function createTicket(input: TicketInput): Promise<Ticket> {
+  return api.post("tickets", { json: input }).json<Ticket>();
+}
+
+export async function createOwnerTicket(owner: TicketOwner, input: TicketInput): Promise<Ticket> {
+  return api.post(`${ownerPath(owner)}/tickets`, { json: input }).json<Ticket>();
+}
+
+export async function linkOwnerTicket(owner: TicketOwner, ticketId: number): Promise<Ticket> {
+  return api.post(`${ownerPath(owner)}/tickets/${ticketId}`).json<Ticket>();
+}
+
+export async function unlinkOwnerTicket(owner: TicketOwner, ticketId: number): Promise<void> {
+  await api.delete(`${ownerPath(owner)}/tickets/${ticketId}`);
 }
 
 export async function updateTicket(id: number, input: TicketUpdate): Promise<Ticket> {

@@ -7,11 +7,11 @@ import type {
   WikiImportRunRequest,
   WikiImportSummary
 } from "@taskmanager/shared-types";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import fs from "node:fs";
 import path from "node:path";
 import type { DbClient } from "../db/client.js";
-import { backlogItems, featureRelations, features, projectFeatures, projects, taskFeatures, taskUseCases, tasks, useCases } from "../db/schema.js";
+import { backlogItems, featureRelations, features, featureTasks, projectFeatures, projects, projectTasks, tasks, useCases, useCaseTasks } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import {
   buildFilename,
@@ -97,7 +97,6 @@ interface StoredUseCase {
 
 interface StoredTask {
   id: number;
-  projectId: number;
   importKey: string | null;
 }
 
@@ -731,9 +730,10 @@ function getUseCaseBySlug(database: DbClient, slug: string): StoredUseCase | und
 
 function getTaskByImportKey(database: DbClient, projectId: number, importKey: string): StoredTask | undefined {
   return database
-    .select({ id: tasks.id, projectId: tasks.projectId, importKey: tasks.importKey })
-    .from(tasks)
-    .where(and(eq(tasks.projectId, projectId), eq(tasks.importKey, importKey)))
+    .select({ id: tasks.id, importKey: tasks.importKey })
+    .from(projectTasks)
+    .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
+    .where(and(eq(projectTasks.ownerId, projectId), eq(tasks.importKey, importKey)))
     .get();
 }
 
@@ -782,9 +782,10 @@ function writeStoredContent(contentPath: string, content: string): void {
 
 function nextTaskPosition(database: DbClient, projectId: number): number {
   const rows = database
-    .select({ position: tasks.position })
-    .from(tasks)
-    .where(and(eq(tasks.projectId, projectId), eq(tasks.status, "todo"), isNull(tasks.parentId)))
+    .select({ position: projectTasks.position })
+    .from(projectTasks)
+    .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
+    .where(and(eq(projectTasks.ownerId, projectId), eq(tasks.status, "todo")))
     .all();
 
   return rows.reduce((current, row) => Math.max(current, row.position), 0) + 1024;
@@ -803,9 +804,9 @@ function hasProjectFeature(database: DbClient, projectId: number, featureId: num
 function hasTaskFeature(database: DbClient, taskId: number, featureId: number): boolean {
   return Boolean(
     database
-      .select({ taskId: taskFeatures.taskId })
-      .from(taskFeatures)
-      .where(and(eq(taskFeatures.taskId, taskId), eq(taskFeatures.featureId, featureId)))
+      .select({ taskId: featureTasks.taskId })
+      .from(featureTasks)
+      .where(and(eq(featureTasks.taskId, taskId), eq(featureTasks.ownerId, featureId)))
       .get()
   );
 }
@@ -813,9 +814,9 @@ function hasTaskFeature(database: DbClient, taskId: number, featureId: number): 
 function hasTaskUseCase(database: DbClient, taskId: number, useCaseId: number): boolean {
   return Boolean(
     database
-      .select({ taskId: taskUseCases.taskId })
-      .from(taskUseCases)
-      .where(and(eq(taskUseCases.taskId, taskId), eq(taskUseCases.useCaseId, useCaseId)))
+      .select({ taskId: useCaseTasks.taskId })
+      .from(useCaseTasks)
+      .where(and(eq(useCaseTasks.taskId, taskId), eq(useCaseTasks.ownerId, useCaseId)))
       .get()
   );
 }
@@ -1080,7 +1081,6 @@ function upsertTask(database: DbClient, projectId: number, task: ParsedTask, exe
   const created = database
     .insert(tasks)
     .values({
-      projectId,
       parentId: null,
       title: task.title,
       description: task.description,
@@ -1089,12 +1089,12 @@ function upsertTask(database: DbClient, projectId: number, task: ParsedTask, exe
       assignee: null,
       dueDate: null,
       importKey: task.importKey,
-      position: nextTaskPosition(database, projectId),
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: tasks.id, projectId: tasks.projectId, importKey: tasks.importKey })
+    .returning({ id: tasks.id, importKey: tasks.importKey })
     .get();
+  database.insert(projectTasks).values({ ownerId: projectId, taskId: created.id, position: nextTaskPosition(database, projectId) }).run();
 
   return { record: created, action: "created" };
 }
@@ -1123,7 +1123,7 @@ function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, tas
   }
 
   if (execute) {
-    database.insert(taskFeatures).values({ taskId, featureId: feature.id }).run();
+    database.insert(featureTasks).values({ ownerId: feature.id, taskId, position: 0 }).run();
   }
 
   addResult(report, {
@@ -1159,7 +1159,7 @@ function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, tas
   }
 
   if (execute) {
-    database.insert(taskUseCases).values({ taskId, useCaseId: useCase.id }).run();
+    database.insert(useCaseTasks).values({ ownerId: useCase.id, taskId, position: 0 }).run();
   }
 
   addResult(report, {

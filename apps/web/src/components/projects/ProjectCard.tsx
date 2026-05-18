@@ -2,8 +2,8 @@ import type { Project } from "@taskmanager/shared-types";
 import { Archive, Edit3, FolderOpen, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { projectStatusLabels, projectStatusTones } from "../../utils/domainLabels";
+import { richTextToPlainText } from "../../utils/richText";
 import { TagBadge } from "../tags/TagBadge";
-import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
@@ -32,6 +32,7 @@ export function ProjectCard({ project, variant = "card", onEdit, onDelete }: Pro
   const accent = project.color ?? "var(--color-steel-700)";
   const progress = project.totalTaskCount > 0 ? Math.round((project.doneTaskCount / project.totalTaskCount) * 100) : 0;
   const openProject = () => navigate(`/projects/${project.id}`);
+  const description = richTextToPlainText(project.description);
 
   if (variant === "row") {
     return (
@@ -44,7 +45,7 @@ export function ProjectCard({ project, variant = "card", onEdit, onDelete }: Pro
             accentColor={accent}
             statusIndicator={<ProjectAvatar project={project} />}
             title={project.name}
-            description={project.description || "Keine Beschreibung"}
+            description={description}
             pills={
               <>
                 <Pill tone={projectStatusTones[project.status]}>{projectStatusLabels[project.status]}</Pill>
@@ -54,8 +55,8 @@ export function ProjectCard({ project, variant = "card", onEdit, onDelete }: Pro
             meta={<span className="text-xs font-semibold text-slate-500">{project.openTaskCount} offen</span>}
             actions={
               <>
-                <Button aria-label="Öffnen" title="Öffnen" className="h-8 w-8" icon={<Edit3 size={15} />} variant="ghost" onClick={() => onEdit(project)} />
-                <Button aria-label="Löschen" title="Löschen" className="h-8 w-8" icon={<Trash2 size={15} />} variant="ghost" onClick={() => onDelete(project)} />
+                <Button aria-label="Öffnen" title="Öffnen" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onEdit(project)} />
+                <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(project)} />
               </>
             }
             onOpen={openProject}
@@ -69,7 +70,7 @@ export function ProjectCard({ project, variant = "card", onEdit, onDelete }: Pro
     <ItemCard
       accentColor={accent}
       header={<ProjectCardHeader project={project} />}
-      body={<ProjectCardBody project={project} />}
+      body={<ProjectCardBody description={description} />}
       footer={<ProjectCardFooter project={project} progress={progress} accent={accent} />}
       onOpen={openProject}
       onEdit={() => onEdit(project)}
@@ -110,22 +111,15 @@ function ProjectCardHeader({ project }: { project: Project }) {
   );
 }
 
-function ProjectCardBody({ project }: { project: Project }) {
-  return <p className="line-clamp-3 min-h-10 text-sm text-slate-600">{project.description || "Keine Beschreibung"}</p>;
+function ProjectCardBody({ description }: { description: string }) {
+  return description ? <p className="line-clamp-3 text-sm text-slate-600">{description}</p> : null;
 }
 
 function ProjectCardFooter({ project, progress, accent }: { project: Project; progress: number; accent: string }) {
   return (
     <div className="grid gap-3 border-t border-line pt-3">
       {project.totalTaskCount > 0 ? <ProgressBar value={progress} color={accent} label={`${project.doneTaskCount} / ${project.totalTaskCount} erledigt`} /> : null}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex -space-x-2" aria-hidden="true">
-          {[project.name, "Team", project.openTaskCount > 0 ? `+${project.openTaskCount}` : "OK"].map((name, index) => (
-            <Avatar key={`${name}-${index}`} name={name} size="sm" />
-          ))}
-        </div>
-        <span className="text-xs font-semibold text-slate-500">{project.openTaskCount} offen</span>
-      </div>
+      <span className="justify-self-end text-xs font-semibold text-slate-500">{project.openTaskCount} offen</span>
     </div>
   );
 }

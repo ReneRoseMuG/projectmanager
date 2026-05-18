@@ -4,13 +4,12 @@ import { formatHumanDate, isOverdue } from "../../utils/date";
 import {
   priorityBadgeTones,
   priorityLabels,
-  ticketSeverityLabels,
-  ticketSeverityTones,
   ticketStatusLabels,
   ticketStatusTones,
   ticketTypeLabels,
   ticketTypeTones
 } from "../../utils/domainLabels";
+import { richTextToPlainText } from "../../utils/richText";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
@@ -44,13 +43,15 @@ const statusDot: Record<Ticket["status"], string> = {
 const tagTones = ["violet", "teal", "magenta", "fern", "steel"] as const;
 
 export function TicketCard({ ticket, compact = false, variant = "card", onOpen, onDelete }: TicketCardProps) {
+  const description = richTextToPlainText(ticket.description);
+
   if (variant === "row") {
     return (
       <>
         <div className="md:hidden">
           <TicketCard ticket={ticket} compact={compact} onOpen={onOpen} onDelete={onDelete} />
         </div>
-        <TicketRow ticket={ticket} onOpen={onOpen} onDelete={onDelete} />
+        <TicketRow ticket={ticket} description={description} onOpen={onOpen} onDelete={onDelete} />
       </>
     );
   }
@@ -59,7 +60,7 @@ export function TicketCard({ ticket, compact = false, variant = "card", onOpen, 
     <ItemCard
       accentColor={priorityAccent[ticket.priority]}
       header={<TicketCardHeader ticket={ticket} />}
-      body={<TicketCardBody ticket={ticket} />}
+      body={<TicketCardBody description={description} />}
       footer={<TicketCardFooter ticket={ticket} />}
       onOpen={() => onOpen(ticket)}
       onEdit={() => onOpen(ticket)}
@@ -76,14 +77,13 @@ function TicketCardHeader({ ticket }: { ticket: Ticket }) {
       <div className="flex flex-wrap items-center gap-2">
         <Pill tone={ticketStatusTones[ticket.status]}>{ticketStatusLabels[ticket.status]}</Pill>
         <Badge tone={ticketTypeTones[ticket.type]}>{ticketTypeLabels[ticket.type]}</Badge>
-        {ticket.severity ? <Badge tone={ticketSeverityTones[ticket.severity]}>{ticketSeverityLabels[ticket.severity]}</Badge> : null}
       </div>
     </div>
   );
 }
 
-function TicketCardBody({ ticket }: { ticket: Ticket }) {
-  return ticket.description ? <p className="line-clamp-3 text-xs text-slate-600">{ticket.description}</p> : null;
+function TicketCardBody({ description }: { description: string }) {
+  return description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null;
 }
 
 function TicketCardFooter({ ticket }: { ticket: Ticket }) {
@@ -121,7 +121,7 @@ function TicketCardFooter({ ticket }: { ticket: Ticket }) {
   );
 }
 
-function TicketRow({ ticket, onOpen, onDelete }: { ticket: Ticket; onOpen: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void }) {
+function TicketRow({ ticket, description, onOpen, onDelete }: { ticket: Ticket; description: string; onOpen: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void }) {
   const overdue = ticket.status !== "resolved" && ticket.status !== "closed" && isOverdue(ticket.dueDate);
 
   return (
@@ -130,7 +130,7 @@ function TicketRow({ ticket, onOpen, onDelete }: { ticket: Ticket; onOpen: (tick
         accentColor={priorityAccent[ticket.priority]}
         statusIndicator={<span className={`block h-3 w-3 rounded-full ${statusDot[ticket.status]}`} aria-hidden="true" />}
         title={ticket.title}
-        description={ticket.description || "Keine Beschreibung"}
+        description={description}
         pills={
           <>
             <Pill tone={ticketStatusTones[ticket.status]}>{ticketStatusLabels[ticket.status]}</Pill>
@@ -149,8 +149,8 @@ function TicketRow({ ticket, onOpen, onDelete }: { ticket: Ticket; onOpen: (tick
         }
         actions={
           <>
-            <Button aria-label="Öffnen" title="Öffnen" className="h-8 w-8" icon={<Edit3 size={15} />} variant="ghost" onClick={() => onOpen(ticket)} />
-            {onDelete ? <Button aria-label="Löschen" title="Löschen" className="h-8 w-8" icon={<Trash2 size={15} />} variant="ghost" onClick={() => onDelete(ticket)} /> : null}
+            <Button aria-label="Öffnen" title="Öffnen" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(ticket)} />
+            {onDelete ? <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(ticket)} /> : null}
           </>
         }
         onOpen={() => onOpen(ticket)}

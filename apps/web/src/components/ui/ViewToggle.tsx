@@ -13,17 +13,17 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
       <Button
         aria-label="Liste"
         title="Liste"
-        icon={<ListTodo size={17} />}
+        icon={<ListTodo size={20} />}
         variant={value === "list" ? "primary" : "ghost"}
-        className="h-8 w-8"
+        className="h-10 w-10"
         onClick={() => onChange("list")}
       />
       <Button
         aria-label="Kanban"
         title="Kanban"
-        icon={<Columns3 size={17} />}
+        icon={<Columns3 size={20} />}
         variant={value === "kanban" ? "primary" : "ghost"}
-        className="h-8 w-8"
+        className="h-10 w-10"
         onClick={() => onChange("kanban")}
       />
     </div>

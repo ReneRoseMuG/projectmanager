@@ -2,10 +2,14 @@ import type { TicketInput, TicketPositionInput, TicketUpdate } from "@taskmanage
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
+  createOwnerTicket as createOwnerTicketRequest,
   createTicket as createTicketRequest,
   deleteTicket as deleteTicketRequest,
-  getProjectTickets,
+  getOwnerTickets,
   getTickets,
+  linkOwnerTicket as linkOwnerTicketRequest,
+  type TicketOwner,
+  unlinkOwnerTicket as unlinkOwnerTicketRequest,
   updateTicket as updateTicketRequest,
   updateTicketPosition as updateTicketPositionRequest
 } from "../api/tickets";
@@ -13,13 +17,31 @@ import { invalidateTicketScope } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
-export function useTickets(projectId?: number) {
+function ownerTicketKey(owner?: TicketOwner | null) {
+  if (!owner) {
+    return queryKeys.tickets.list();
+  }
+  if (owner.type === "project") {
+    return queryKeys.projects.tickets(owner.id);
+  }
+  if (owner.type === "task") {
+    return queryKeys.tasks.tickets(owner.id);
+  }
+  if (owner.type === "feature") {
+    return queryKeys.features.tickets(owner.id);
+  }
+  return queryKeys.useCases.tickets(owner.id);
+}
+
+export function useTickets(owner?: TicketOwner | null) {
   const queryClient = useQueryClient();
-  const validProjectId = projectId !== undefined && Number.isFinite(projectId) ? projectId : undefined;
+  const validOwner = owner && Number.isFinite(owner.id) ? owner : undefined;
+  const enabled = owner !== null;
 
   const ticketsQuery = useQuery({
-    queryKey: validProjectId !== undefined ? queryKeys.tickets.byProject(validProjectId) : queryKeys.tickets.list(),
-    queryFn: () => (validProjectId !== undefined ? getProjectTickets(validProjectId) : getTickets())
+    queryKey: ownerTicketKey(validOwner),
+    queryFn: () => (validOwner !== undefined ? getOwnerTickets(validOwner) : getTickets()),
+    enabled
   });
 
   const reload = useCallback(async () => {
@@ -28,34 +50,55 @@ export function useTickets(projectId?: number) {
 
   const createTicketMutation = useMutation({
     mutationFn: async (input: TicketInput) => {
-      if (validProjectId === undefined) {
-        return null;
-      }
-      return createTicketRequest(validProjectId, input);
+      return validOwner !== undefined ? createOwnerTicketRequest(validOwner, input) : createTicketRequest(input);
     },
     onSuccess: async (created) => {
-      await invalidateTicketScope(queryClient, created?.projectId ?? validProjectId, created?.id);
+      await invalidateTicketScope(queryClient, validOwner, created?.id);
+    }
+  });
+
+  const linkTicketMutation = useMutation({
+    mutationFn: async (ticketId: number) => {
+      if (validOwner === undefined) {
+        return null;
+      }
+      return linkOwnerTicketRequest(validOwner, ticketId);
+    },
+    onSuccess: async (linked) => {
+      await invalidateTicketScope(queryClient, validOwner, linked?.id);
+    }
+  });
+
+  const unlinkTicketMutation = useMutation({
+    mutationFn: async (ticketId: number) => {
+      if (validOwner === undefined) {
+        return;
+      }
+      await unlinkOwnerTicketRequest(validOwner, ticketId);
+    },
+    onSuccess: async (_result, ticketId) => {
+      await invalidateTicketScope(queryClient, validOwner, ticketId);
     }
   });
 
   const updateTicketMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TicketUpdate }) => updateTicketRequest(id, input),
     onSuccess: async (updated) => {
-      await invalidateTicketScope(queryClient, updated.projectId, updated.id);
+      await invalidateTicketScope(queryClient, validOwner, updated.id);
     }
   });
 
   const updateTicketPositionMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TicketPositionInput }) => updateTicketPositionRequest(id, input),
     onSuccess: async (updated) => {
-      await invalidateTicketScope(queryClient, updated.projectId, updated.id);
+      await invalidateTicketScope(queryClient, validOwner, updated.id);
     }
   });
 
   const removeTicketMutation = useMutation({
     mutationFn: deleteTicketRequest,
     onSuccess: async (_result, id) => {
-      await invalidateTicketScope(queryClient, validProjectId, id);
+      await invalidateTicketScope(queryClient, validOwner, id);
     }
   });
 
@@ -64,6 +107,20 @@ export function useTickets(projectId?: number) {
       return createTicketMutation.mutateAsync(input);
     },
     [createTicketMutation]
+  );
+
+  const linkTicket = useCallback(
+    async (ticketId: number) => {
+      return linkTicketMutation.mutateAsync(ticketId);
+    },
+    [linkTicketMutation]
+  );
+
+  const unlinkTicket = useCallback(
+    async (ticketId: number) => {
+      await unlinkTicketMutation.mutateAsync(ticketId);
+    },
+    [unlinkTicketMutation]
   );
 
   const updateTicket = useCallback(
@@ -93,6 +150,8 @@ export function useTickets(projectId?: number) {
     error: toQueryError(ticketsQuery.error),
     reload,
     createTicket,
+    linkTicket,
+    unlinkTicket,
     updateTicket,
     updateTicketPosition,
     removeTicket

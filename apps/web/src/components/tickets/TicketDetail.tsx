@@ -13,11 +13,11 @@ import {
   priorityLabels,
   priorityPillTones,
   ticketResolutionLabels,
-  ticketSeverityLabels,
   ticketStatusLabels,
   ticketStatusTones,
   ticketTypeLabels
 } from "../../utils/domainLabels";
+import { richTextToPlainText } from "../../utils/richText";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { NoteEditor } from "../notes/NoteEditor";
@@ -58,7 +58,7 @@ export function TicketDetail({ ticketId, open, onClose, onChanged }: TicketDetai
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const detail = useTicketDetail(open ? ticketId : null);
-  const projectTickets = useTickets(detail.ticket?.projectId);
+  const allTickets = useTickets(open ? undefined : null);
   const comments = useEntityComments("ticket", open ? ticketId : null);
   const notes = useNotes(ticketId && open ? { type: "ticket", id: ticketId } : null);
   const attachments = useAttachments(ticketId && open ? { type: "ticket", id: ticketId } : null);
@@ -142,7 +142,7 @@ export function TicketDetail({ ticketId, open, onClose, onChanged }: TicketDetai
       open={open}
       title={ticket?.title ?? "Ticket"}
       subtitle={ticket ? `TICKET-${ticket.id}` : undefined}
-      breadcrumb={ticket ? [`Projekt #${ticket.projectId}`, "Tickets", `TICKET-${ticket.id}`] : ["Tickets"]}
+      breadcrumb={ticket ? ["Tickets", `TICKET-${ticket.id}`] : ["Tickets"]}
       tabs={tabItems}
       activeTab={activeTab}
       onTabChange={setActiveTab}
@@ -202,7 +202,7 @@ export function TicketDetail({ ticketId, open, onClose, onChanged }: TicketDetai
           {activeTab === "relations" ? (
             <TicketRelationPanel
               currentTicketId={ticket.id}
-              tickets={projectTickets.tickets}
+              tickets={allTickets.tickets}
               relations={ticket.relations}
               onAdd={async (input) => {
                 await detail.addRelation(input);
@@ -303,6 +303,8 @@ export function TicketDetail({ ticketId, open, onClose, onChanged }: TicketDetai
 }
 
 function TicketReadOnlyDetails({ ticket }: { ticket: Ticket }) {
+  const description = richTextToPlainText(ticket.description);
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
       <div className="grid gap-4">
@@ -310,12 +312,11 @@ function TicketReadOnlyDetails({ ticket }: { ticket: Ticket }) {
           <div className="grid gap-4 md:grid-cols-2">
             <ReadonlyField label="Typ" value={ticketTypeLabels[ticket.type]} />
             <ReadonlyField label="Status" value={ticketStatusLabels[ticket.status]} />
-            <ReadonlyField label="Beschreibung" value={ticket.description || "Keine Beschreibung"} wide />
+            {description ? <ReadonlyField label="Beschreibung" value={description} wide /> : null}
           </div>
         </Section>
         <Section title="Ticket-Details">
           <div className="grid gap-4 md:grid-cols-2">
-            <ReadonlyField label="Schweregrad" value={ticket.severity ? ticketSeverityLabels[ticket.severity] : "Kein"} />
             <ReadonlyField label="Lösung" value={ticket.resolution ? ticketResolutionLabels[ticket.resolution] : "Keine"} />
             <ReadonlyField label="Umgebung" value={ticket.environment || "Nicht gepflegt"} />
             <ReadonlyField label="Betroffene Version" value={ticket.affectedVersion || "Nicht gepflegt"} />

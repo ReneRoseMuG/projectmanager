@@ -6,7 +6,6 @@ export const BACKLOG_STATUSES = ["open", "in_progress", "done", "rejected"] as c
 export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export const TICKET_TYPES = ["bug", "improvement", "question", "task"] as const;
 export const TICKET_STATUSES = ["open", "in_progress", "in_review", "resolved", "closed"] as const;
-export const TICKET_SEVERITIES = ["critical", "major", "minor", "trivial"] as const;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
 export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "backlogItem", "wikiPage", "ticket"] as const;
@@ -19,7 +18,6 @@ export type BacklogStatus = (typeof BACKLOG_STATUSES)[number];
 export type Priority = (typeof PRIORITIES)[number];
 export type TicketType = (typeof TICKET_TYPES)[number];
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
-export type TicketSeverity = (typeof TICKET_SEVERITIES)[number];
 export type TicketResolution = (typeof TICKET_RESOLUTIONS)[number];
 export type TicketRelationType = (typeof TICKET_RELATION_TYPES)[number];
 export type CommentEntityType = (typeof COMMENT_ENTITY_TYPES)[number];
@@ -69,7 +67,6 @@ export type ProjectUpdate = Partial<ProjectInput>;
 
 export interface Task {
   id: number;
-  projectId: number;
   parentId: number | null;
   title: string;
   description: string | null;
@@ -77,11 +74,14 @@ export interface Task {
   priority: Priority;
   assignee: string | null;
   dueDate: string | null;
-  position: number;
   createdAt: string;
   updatedAt: string;
   tags: Tag[];
   subtaskCount: number;
+}
+
+export interface TaskBoardItem extends Task {
+  boardPosition: number;
 }
 
 export interface TaskInput {
@@ -95,21 +95,19 @@ export interface TaskInput {
 
 export type TaskUpdate = Partial<TaskInput>;
 
-export interface TaskPositionInput {
+export interface TaskBoardPositionInput {
   status: TaskStatus;
   position: number;
 }
 
 export interface Ticket {
   id: number;
-  projectId: number;
   parentId: number | null;
   type: TicketType;
   title: string;
   description: string | null;
   status: TicketStatus;
   priority: Priority;
-  severity: TicketSeverity | null;
   resolution: TicketResolution | null;
   reporter: string | null;
   assignee: string | null;
@@ -145,7 +143,6 @@ export interface TicketInput {
   description?: string | null;
   status?: TicketStatus;
   priority?: Priority;
-  severity?: TicketSeverity | null;
   reporter?: string | null;
   assignee?: string | null;
   environment?: string | null;

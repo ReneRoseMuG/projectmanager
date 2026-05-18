@@ -1,12 +1,10 @@
-import type { Feature, Priority, Tag, Task, TaskInput, TaskStatus, UseCase } from "@taskmanager/shared-types";
-import { ClipboardList, UserRound } from "lucide-react";
+import type { Priority, Tag, Task, TaskInput, TaskStatus } from "@taskmanager/shared-types";
+import { ClipboardList } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
-import { getUseCases } from "../../api/use-cases";
 import { toDateInput } from "../../utils/date";
-import { FeatureRelationPanel } from "../features/FeatureRelationPanel";
+import { priorityLabels, taskStatusLabels } from "../../utils/domainLabels";
 import { TagPicker } from "../tags/TagPicker";
-import { UseCaseRelationPanel } from "../usecases/UseCaseRelationPanel";
 import { DatePicker } from "../ui/DatePicker";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
@@ -17,14 +15,11 @@ import { Section } from "../ui/Section";
 
 export interface TaskFormInput extends TaskInput {
   tagIds: number[];
-  featureIds: number[];
-  useCaseIds: number[];
 }
 
 interface TaskFormProps {
   open: boolean;
   task?: Task | null;
-  features?: Feature[];
   initialStatus?: TaskStatus;
   title?: string;
   onSubmit: (input: TaskFormInput) => Promise<void>;
@@ -32,29 +27,25 @@ interface TaskFormProps {
 }
 
 const statuses: Array<{ value: TaskStatus; label: string; activeColor: "fern" | "tangerine" | "crimson" }> = [
-  { value: "todo", label: "Offen", activeColor: "crimson" },
-  { value: "in_progress", label: "In Arbeit", activeColor: "tangerine" },
-  { value: "done", label: "Erledigt", activeColor: "fern" }
+  { value: "todo", label: taskStatusLabels.todo, activeColor: "crimson" },
+  { value: "in_progress", label: taskStatusLabels.in_progress, activeColor: "tangerine" },
+  { value: "done", label: taskStatusLabels.done, activeColor: "fern" }
 ];
 
 const priorities: Array<{ value: Priority; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
-  { value: "low", label: "Niedrig", activeColor: "fern" },
-  { value: "medium", label: "Mittel", activeColor: "violet" },
-  { value: "high", label: "Hoch", activeColor: "tangerine" },
-  { value: "urgent", label: "Dringend", activeColor: "crimson" }
+  { value: "low", label: priorityLabels.low, activeColor: "fern" },
+  { value: "medium", label: priorityLabels.medium, activeColor: "violet" },
+  { value: "high", label: priorityLabels.high, activeColor: "tangerine" },
+  { value: "urgent", label: priorityLabels.urgent, activeColor: "crimson" }
 ];
 
-export function TaskForm({ open, task, features = [], initialStatus = "todo", title = "Aufgabe", onSubmit, onClose }: TaskFormProps) {
+export function TaskForm({ open, task, initialStatus = "todo", title = "Aufgabe", onSubmit, onClose }: TaskFormProps) {
   const [taskTitle, setTaskTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>("todo");
   const [priority, setPriority] = useState<Priority>("medium");
-  const [assignee, setAssignee] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
-  const [selectedFeatureIds, setSelectedFeatureIds] = useState<number[]>([]);
-  const [selectedUseCaseIds, setSelectedUseCaseIds] = useState<number[]>([]);
-  const [availableUseCases, setAvailableUseCases] = useState<UseCase[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -65,37 +56,9 @@ export function TaskForm({ open, task, features = [], initialStatus = "todo", ti
     setDescription(task?.description ?? "");
     setStatus(task?.status ?? initialStatus);
     setPriority(task?.priority ?? "medium");
-    setAssignee(task?.assignee ?? "");
     setDueDate(toDateInput(task?.dueDate));
     setSelectedTags(task?.tags ?? []);
-    setSelectedFeatureIds([]);
-    setSelectedUseCaseIds([]);
   }, [initialStatus, open, task]);
-
-  useEffect(() => {
-    if (!open || selectedFeatureIds.length === 0) {
-      setAvailableUseCases([]);
-      setSelectedUseCaseIds([]);
-      return;
-    }
-
-    let cancelled = false;
-    const loadUseCases = async () => {
-      const lists = await Promise.all(selectedFeatureIds.map((featureId) => getUseCases(featureId)));
-      if (cancelled) {
-        return;
-      }
-      const merged = lists.flat();
-      const allowedIds = new Set(merged.map((useCase) => useCase.id));
-      setAvailableUseCases(merged);
-      setSelectedUseCaseIds((current) => current.filter((id) => allowedIds.has(id)));
-    };
-
-    void loadUseCases();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, selectedFeatureIds]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -106,11 +69,9 @@ export function TaskForm({ open, task, features = [], initialStatus = "todo", ti
         description,
         status,
         priority,
-        assignee,
+        assignee: null,
         dueDate: dueDate || null,
-        tagIds: selectedTags.map((tag) => tag.id),
-        featureIds: selectedFeatureIds,
-        useCaseIds: selectedUseCaseIds
+        tagIds: selectedTags.map((tag) => tag.id)
       });
       onClose();
     } catch {
@@ -124,9 +85,9 @@ export function TaskForm({ open, task, features = [], initialStatus = "todo", ti
     <FormModal
       open={open}
       title={task ? "Aufgabe bearbeiten" : title}
-      subtitle="Aufgabe, Tags und Dokumentverknüpfungen in einem Schritt pflegen."
+      subtitle="Aufgabe, Beschreibung, Status, Termin und Tags pflegen."
       icon={<ClipboardList size={20} />}
-      breadcrumb={["Projekt", task ? "Aufgabe bearbeiten" : "Neue Aufgabe"]}
+      breadcrumb={["Aufgaben", task ? "Bearbeiten" : "Neu"]}
       submitLabel={task ? "Speichern" : "Aufgabe anlegen"}
       saving={saving}
       onSubmit={submit}
@@ -138,13 +99,13 @@ export function TaskForm({ open, task, features = [], initialStatus = "todo", ti
             <Input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} required autoFocus={!task} />
           </FormField>
           <FormField label="Beschreibung">
-            <RichTextEditor content={description} placeholder="Beschreibung" toolbar="minimal" minHeight="8rem" onChange={setDescription} />
+            <RichTextEditor content={description} placeholder="Beschreibung" toolbar="full" minHeight="8rem" onChange={setDescription} />
           </FormField>
         </div>
       </Section>
 
       <Section title="Status & Priorität">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid items-start gap-4 md:grid-cols-2">
           <FormField label="Status">
             <RadioList value={status} options={statuses} onChange={setStatus} />
           </FormField>
@@ -154,25 +115,12 @@ export function TaskForm({ open, task, features = [], initialStatus = "todo", ti
         </div>
       </Section>
 
-      <Section title="Zuweisung">
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField label="Zuständig">
-            <Input iconLeft={<UserRound size={16} />} value={assignee} onChange={(event) => setAssignee(event.target.value)} />
-          </FormField>
-          <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-        </div>
+      <Section title="Termin">
+        <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
       </Section>
 
       <Section title="Tags">
         <TagPicker selected={selectedTags} onChange={setSelectedTags} />
-      </Section>
-
-      <Section title="Features">
-        <FeatureRelationPanel features={features} selectedIds={selectedFeatureIds} onChange={setSelectedFeatureIds} onSave={async () => undefined} showSave={false} />
-      </Section>
-
-      <Section title="Use Cases">
-        <UseCaseRelationPanel useCases={availableUseCases} selectedIds={selectedUseCaseIds} onChange={setSelectedUseCaseIds} onSave={async () => undefined} showSave={false} />
       </Section>
     </FormModal>
   );

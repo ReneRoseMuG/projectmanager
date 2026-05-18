@@ -2,12 +2,12 @@
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Projekt- und Task-Feature-Verknüpfungen verwenden vollständige PUT-Ersetzung.
- * - Task-Use-Case-Verknüpfungen können gesetzt und gelesen werden.
- * - Leere Arrays entfernen alle Verknüpfungen.
+ * - Projekt-Feature-Verknüpfungen verwenden vollständige PUT-Ersetzung.
+ * - Feature- und Use-Case-Aufgaben verwenden Owner-Task-Links ohne Task-Domänen-FKs.
  *
  * Fehlerfälle:
- * - Ungültige Feature- oder Use-Case-IDs liefern 400.
+ * - Ungültige Feature-IDs liefern 400.
+ * - Unbekannte Owner oder Aufgaben liefern 404.
  *
  * Ziel:
  * Junction-/Link-APIs gegen reale In-Memory-SQLite-Tabellen absichern.
@@ -56,7 +56,7 @@ describe("Doc Link APIs", () => {
     expect(res.body[0].id).toBe(feature.id);
   });
 
-  it("PUT ersetzt vollständig und leeres Array entfernt alle", async () => {
+  it("PUT ersetzt vollständig und leeres Array entfernt alle Projekt-Feature-Links", async () => {
     const project = await createProject(app);
     const first = await createFeature(app, { slug: "ft-replace-a" });
     const second = await createFeature(app, { slug: "ft-replace-b" });
@@ -81,49 +81,48 @@ describe("Doc Link APIs", () => {
     await supertest(app.server).put("/api/projects/9999/features").send({ featureIds: [feature.id] }).expect(404);
   });
 
-  it("PUT /tasks/:id/features und GET geben verknüpfte Features zurück", async () => {
+  it("POST /features/:id/tasks/:taskId und GET geben verknüpfte Aufgaben zurück", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
     const feature = await createFeature(app, { slug: "ft-task-link" });
 
-    await supertest(app.server).put(`/api/tasks/${task.id}/features`).send({ featureIds: [feature.id] }).expect(200);
-    const res = await supertest(app.server).get(`/api/tasks/${task.id}/features`).expect(200);
+    await supertest(app.server).post(`/api/features/${feature.id}/tasks/${task.id}`).expect(200);
+    const res = await supertest(app.server).get(`/api/features/${feature.id}/tasks`).expect(200);
 
     expect(res.body).toHaveLength(1);
-    expect(res.body[0].id).toBe(feature.id);
+    expect(res.body[0].id).toBe(task.id);
   });
 
-  it("PUT /tasks/:id/features ersetzt und entfernt mit leerem Array", async () => {
+  it("DELETE /features/:id/tasks/:taskId entfernt nur den Link", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
-    const first = await createFeature(app, { slug: "ft-task-replace-a" });
-    const second = await createFeature(app, { slug: "ft-task-replace-b" });
+    const feature = await createFeature(app, { slug: "ft-task-unlink" });
 
-    await supertest(app.server).put(`/api/tasks/${task.id}/features`).send({ featureIds: [first.id] }).expect(200);
-    const replaced = await supertest(app.server).put(`/api/tasks/${task.id}/features`).send({ featureIds: [second.id] }).expect(200);
-    expect(replaced.body.map((feature: { id: number }) => feature.id)).toEqual([second.id]);
+    await supertest(app.server).post(`/api/features/${feature.id}/tasks/${task.id}`).expect(200);
+    await supertest(app.server).delete(`/api/features/${feature.id}/tasks/${task.id}`).expect(204);
 
-    const empty = await supertest(app.server).put(`/api/tasks/${task.id}/features`).send({ featureIds: [] }).expect(200);
-    expect(empty.body).toEqual([]);
+    await supertest(app.server).get(`/api/tasks/${task.id}`).expect(200);
+    const res = await supertest(app.server).get(`/api/features/${feature.id}/tasks`).expect(200);
+    expect(res.body).toEqual([]);
   });
 
-  it("PUT /tasks/:id/use-cases und GET geben verknüpfte Use Cases zurück", async () => {
+  it("POST /use-cases/:id/tasks/:taskId und GET geben verknüpfte Aufgaben zurück", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
     const feature = await createFeature(app, { slug: "ft-uc-link" });
     const useCase = await createUseCase(app, feature.id, { slug: "uc-task-link" });
 
-    await supertest(app.server).put(`/api/tasks/${task.id}/use-cases`).send({ useCaseIds: [useCase.id] }).expect(200);
-    const res = await supertest(app.server).get(`/api/tasks/${task.id}/use-cases`).expect(200);
+    await supertest(app.server).post(`/api/use-cases/${useCase.id}/tasks/${task.id}`).expect(200);
+    const res = await supertest(app.server).get(`/api/use-cases/${useCase.id}/tasks`).expect(200);
 
     expect(res.body).toHaveLength(1);
-    expect(res.body[0].id).toBe(useCase.id);
+    expect(res.body[0].id).toBe(task.id);
   });
 
-  it("Ungültige Use-Case-ID liefert 400", async () => {
+  it("Unbekannter Use-Case-Task-Link liefert 404", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
 
-    await supertest(app.server).put(`/api/tasks/${task.id}/use-cases`).send({ useCaseIds: [9999] }).expect(400);
+    await supertest(app.server).post(`/api/use-cases/9999/tasks/${task.id}`).expect(404);
   });
 });

@@ -73,14 +73,14 @@ function TagRow({ tag, onReload }: { tag: Tag; onReload: () => Promise<void> }) 
       <div className="flex justify-end gap-1">
         {editing ? (
           <>
-            <Button aria-label="Speichern" title="Speichern" icon={<Check size={15} />} className="h-8 w-8" onClick={save} />
-            <Button aria-label="Abbrechen" title="Abbrechen" icon={<X size={15} />} variant="ghost" className="h-8 w-8" onClick={() => setEditing(false)} />
+            <Button aria-label="Speichern" title="Speichern" icon={<Check size={18} />} className="h-10 w-10" onClick={save} />
+            <Button aria-label="Abbrechen" title="Abbrechen" icon={<X size={18} />} variant="ghost" className="h-10 w-10" onClick={() => setEditing(false)} />
           </>
         ) : (
           <>
-            <Button aria-label="Bearbeiten" title="Bearbeiten" icon={<Pencil size={15} />} variant="ghost" className="h-8 w-8" onClick={() => setEditing(true)} />
-            <Button aria-label="Mergen" title="Mergen" icon={<GitMerge size={15} />} variant="ghost" className="h-8 w-8" onClick={() => showToast({ tone: "info", title: "Tag-Merge ist ein Folgeauftrag" })} />
-            <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={15} />} variant="ghost" className="h-8 w-8 text-crimson hover:bg-crimson/10" onClick={() => void remove()} />
+            <Button aria-label="Bearbeiten" title="Bearbeiten" icon={<Pencil size={18} />} variant="ghost" className="h-10 w-10" onClick={() => setEditing(true)} />
+            <Button aria-label="Mergen" title="Mergen" icon={<GitMerge size={18} />} variant="ghost" className="h-10 w-10" onClick={() => showToast({ tone: "info", title: "Tag-Merge ist ein Folgeauftrag" })} />
+            <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={18} />} variant="ghost" className="h-10 w-10 text-crimson hover:bg-crimson/10" onClick={() => void remove()} />
           </>
         )}
       </div>

@@ -34,7 +34,7 @@ function CommentItem({ comment, index, onDelete }: { comment: Comment; index: nu
             <time className="text-xs text-slate-500">{formatHumanDate(comment.createdAt)}</time>
           </div>
         </div>
-        <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={15} />} variant="ghost" className="h-8 w-8" onClick={() => void onDelete(comment.id).catch(() => undefined)} />
+        <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={18} />} variant="ghost" className="h-10 w-10" onClick={() => void onDelete(comment.id).catch(() => undefined)} />
       </div>
       <RichTextEditor content={toHtmlContent(comment.body)} readOnly toolbar="minimal" minHeight="0" onChange={() => undefined} />
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3 text-xs font-semibold text-slate-500">

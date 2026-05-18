@@ -1,18 +1,12 @@
 import type { Task } from "@taskmanager/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { getProjects } from "../api/projects";
-import { getProjectTasks } from "../api/tasks";
+import { getTasks } from "../api/tasks";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
 async function getCalendarTasks(): Promise<Task[]> {
-  const projects = await getProjects();
-  const allTasks: Task[] = [];
-  for (const project of projects) {
-    allTasks.push(...(await getProjectTasks(project.id)));
-  }
-  return allTasks;
+  return getTasks();
 }
 
 export function useCalendarTasks() {

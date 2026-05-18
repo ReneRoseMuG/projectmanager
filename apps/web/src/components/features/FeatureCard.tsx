@@ -2,6 +2,7 @@ import type { Feature } from "@taskmanager/shared-types";
 import { ArrowRight, BookOpen, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { featureStatusLabels, featureStatusTones } from "../../utils/domainLabels";
+import { richTextToPlainText } from "../../utils/richText";
 import { ItemCard } from "../ui/ItemCard";
 import { Pill } from "../ui/Pill";
 
@@ -14,6 +15,7 @@ interface FeatureCardProps {
 export function FeatureCard({ feature, onDelete }: FeatureCardProps) {
   const navigate = useNavigate();
   const open = () => navigate(`/features/${feature.id}`);
+  const description = richTextToPlainText(feature.description);
 
   return (
     <ItemCard
@@ -22,7 +24,7 @@ export function FeatureCard({ feature, onDelete }: FeatureCardProps) {
       onEdit={open}
       onDelete={() => onDelete(feature)}
       header={<FeatureCardHeader feature={feature} />}
-      body={<p className="line-clamp-3 text-sm text-slate-600">{feature.description || "Keine Kurzbeschreibung"}</p>}
+      body={description ? <p className="line-clamp-3 text-sm text-slate-600">{description}</p> : null}
       footer={<FeatureCardFooter feature={feature} />}
     />
   );

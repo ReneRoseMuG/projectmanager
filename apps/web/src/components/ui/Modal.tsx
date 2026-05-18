@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "./Button";
 
 interface ModalProps {
@@ -24,7 +25,7 @@ export function Modal({ open, title, size = "md", showHeader = true, bodyClassNa
     return null;
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-steel-900/55 p-4 backdrop-blur-[2px]">
       <div className={`flex max-h-[calc(100vh-64px)] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-modal ${sizes[size]}`}>
         {showHeader ? (
@@ -35,6 +36,7 @@ export function Modal({ open, title, size = "md", showHeader = true, bodyClassNa
         ) : null}
         <div className={`overflow-auto ${bodyClassName}`}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -5,11 +5,6 @@ import { useHealthCheck } from "../../hooks/useHealthCheck";
 import { GlobalSearch } from "../search/GlobalSearch";
 import { SearchInput } from "../ui/SearchInput";
 import { ApiHealthPopover } from "./ApiHealthPopover";
-import { AvatarMenu } from "./AvatarMenu";
-
-interface AvatarProps {
-  initials: string;
-}
 
 function ApiBadge({ online, latencyMs, onClick }: { online: boolean; latencyMs: number | null; onClick: () => void }) {
   const slow = online && latencyMs !== null && latencyMs > 250;
@@ -26,19 +21,10 @@ function ApiBadge({ online, latencyMs, onClick }: { online: boolean; latencyMs: 
   );
 }
 
-function Avatar({ initials, onClick }: AvatarProps & { onClick: () => void }) {
-  return (
-    <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-violet to-magenta text-xs font-bold text-white" onClick={onClick} aria-label="Avatar-Menü">
-      {initials}
-    </button>
-  );
-}
-
 export function TopBar() {
   const health = useHealthCheck();
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [avatarOpen, setAvatarOpen] = useState(false);
   const [apiOpen, setApiOpen] = useState(false);
 
   useEffect(() => {
@@ -78,10 +64,8 @@ export function TopBar() {
       </nav>
       <div className="hidden items-center gap-3 md:flex">
         <ApiBadge online={health.online} latencyMs={health.latencyMs} onClick={() => setApiOpen((current) => !current)} />
-        <Avatar initials="RM" onClick={() => setAvatarOpen((current) => !current)} />
       </div>
       {apiOpen ? <ApiHealthPopover online={health.online} latencyMs={health.latencyMs} onRefetch={health.refetch} /> : null}
-      {avatarOpen ? <AvatarMenu /> : null}
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </header>
   );

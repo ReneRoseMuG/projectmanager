@@ -7,6 +7,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Bold, Code2, Heading2, Heading3, ImageIcon, Italic, LinkIcon, List, ListOrdered, Quote, Underline as UnderlineIcon } from "lucide-react";
 import { useEffect } from "react";
+import { Markdown } from "tiptap-markdown";
 import { Button } from "./Button";
 
 interface RichTextEditorProps {
@@ -22,7 +23,7 @@ interface RichTextEditorProps {
 export function RichTextEditor({ content, onChange, placeholder = "", minHeight = "8rem", toolbar = "full", readOnly = false }: RichTextEditorProps) {
   const editor = useEditor(
     {
-      extensions: [StarterKit, Underline, Link.configure({ openOnClick: false }), Image, Placeholder.configure({ placeholder })],
+      extensions: [StarterKit, Underline, Link.configure({ openOnClick: false }), Image, Markdown.configure({ html: true }), Placeholder.configure({ placeholder })],
       content,
       editable: !readOnly,
       onUpdate: ({ editor: activeEditor }: { editor: Editor }) => {
@@ -30,7 +31,7 @@ export function RichTextEditor({ content, onChange, placeholder = "", minHeight 
       },
       editorProps: {
         attributes: {
-          class: "prose prose-sm max-w-none rounded-md border border-line bg-white p-4 outline-none focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10",
+          class: "rich-text-surface max-w-none rounded-md border border-line bg-white p-4 outline-none focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10",
           style: `min-height: ${minHeight};`
         }
       }
@@ -81,25 +82,27 @@ export function RichTextEditor({ content, onChange, placeholder = "", minHeight 
   };
 
   const showFullToolbar = toolbar === "full";
+  const toolbarIconSize = 18;
+  const toolbarButtonClassName = "h-10 w-10";
 
   return (
     <div className="grid gap-3">
-      {!readOnly ? <div className="flex flex-wrap gap-1 rounded-md border border-line bg-shell p-1">
-        <Button size="sm" title="Fett" aria-label="Fett" icon={<Bold size={16} />} variant={editor.isActive("bold") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleBold().run()} />
-        <Button size="sm" title="Kursiv" aria-label="Kursiv" icon={<Italic size={16} />} variant={editor.isActive("italic") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleItalic().run()} />
+      {!readOnly ? <div className="flex flex-wrap gap-1.5 rounded-md border border-line bg-shell p-1.5">
+        <Button title="Fett" aria-label="Fett" className={toolbarButtonClassName} icon={<Bold size={toolbarIconSize} />} variant={editor.isActive("bold") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleBold().run()} />
+        <Button title="Kursiv" aria-label="Kursiv" className={toolbarButtonClassName} icon={<Italic size={toolbarIconSize} />} variant={editor.isActive("italic") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleItalic().run()} />
         {showFullToolbar ? (
-          <Button size="sm" title="Unterstrichen" aria-label="Unterstrichen" icon={<UnderlineIcon size={16} />} variant={editor.isActive("underline") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleUnderline().run()} />
+          <Button title="Unterstrichen" aria-label="Unterstrichen" className={toolbarButtonClassName} icon={<UnderlineIcon size={toolbarIconSize} />} variant={editor.isActive("underline") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleUnderline().run()} />
         ) : null}
-        <Button size="sm" title="Link" aria-label="Link" icon={<LinkIcon size={16} />} variant={editor.isActive("link") ? "primary" : "ghost"} onClick={setLink} />
+        <Button title="Link" aria-label="Link" className={toolbarButtonClassName} icon={<LinkIcon size={toolbarIconSize} />} variant={editor.isActive("link") ? "primary" : "ghost"} onClick={setLink} />
         {showFullToolbar ? (
           <>
-            <Button size="sm" title="H2" aria-label="H2" icon={<Heading2 size={16} />} variant={editor.isActive("heading", { level: 2 }) ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} />
-            <Button size="sm" title="H3" aria-label="H3" icon={<Heading3 size={16} />} variant={editor.isActive("heading", { level: 3 }) ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} />
-            <Button size="sm" title="Liste" aria-label="Liste" icon={<List size={16} />} variant={editor.isActive("bulletList") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleBulletList().run()} />
-            <Button size="sm" title="Nummeriert" aria-label="Nummeriert" icon={<ListOrdered size={16} />} variant={editor.isActive("orderedList") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
-            <Button size="sm" title="Zitat" aria-label="Zitat" icon={<Quote size={16} />} variant={editor.isActive("blockquote") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleBlockquote().run()} />
-            <Button size="sm" title="Code" aria-label="Code" icon={<Code2 size={16} />} variant={editor.isActive("codeBlock") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleCodeBlock().run()} />
-            <Button size="sm" title="Bild" aria-label="Bild" icon={<ImageIcon size={16} />} variant="ghost" onClick={setImage} />
+            <Button title="H2" aria-label="H2" className={toolbarButtonClassName} icon={<Heading2 size={toolbarIconSize} />} variant={editor.isActive("heading", { level: 2 }) ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} />
+            <Button title="H3" aria-label="H3" className={toolbarButtonClassName} icon={<Heading3 size={toolbarIconSize} />} variant={editor.isActive("heading", { level: 3 }) ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} />
+            <Button title="Liste" aria-label="Liste" className={toolbarButtonClassName} icon={<List size={toolbarIconSize} />} variant={editor.isActive("bulletList") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleBulletList().run()} />
+            <Button title="Nummeriert" aria-label="Nummeriert" className={toolbarButtonClassName} icon={<ListOrdered size={toolbarIconSize} />} variant={editor.isActive("orderedList") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
+            <Button title="Zitat" aria-label="Zitat" className={toolbarButtonClassName} icon={<Quote size={toolbarIconSize} />} variant={editor.isActive("blockquote") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleBlockquote().run()} />
+            <Button title="Code" aria-label="Code" className={toolbarButtonClassName} icon={<Code2 size={toolbarIconSize} />} variant={editor.isActive("codeBlock") ? "primary" : "ghost"} onClick={() => editor.chain().focus().toggleCodeBlock().run()} />
+            <Button title="Bild" aria-label="Bild" className={toolbarButtonClassName} icon={<ImageIcon size={toolbarIconSize} />} variant="ghost" onClick={setImage} />
           </>
         ) : null}
       </div> : null}

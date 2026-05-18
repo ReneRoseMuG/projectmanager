@@ -1,6 +1,8 @@
-import type { Project, ProjectStatus } from "@taskmanager/shared-types";
+import { PROJECT_STATUSES, type Project } from "@taskmanager/shared-types";
 import { FolderKanban } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
+import { projectStatusLabels } from "../../utils/domainLabels";
+import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { ProjectCard } from "./ProjectCard";
@@ -14,12 +16,7 @@ interface ProjectListBoardViewProps {
   filters?: ReactNode;
 }
 
-const statusColumns: Array<{ value: ProjectStatus; label: string }> = [
-  { value: "active", label: "Aktiv" },
-  { value: "on_hold", label: "Pausiert" },
-  { value: "completed", label: "Abgeschlossen" },
-  { value: "archived", label: "Archiviert" }
-];
+const statusColumns = PROJECT_STATUSES.map((status) => ({ value: status, label: projectStatusLabels[status] }));
 
 function matchesSearch(project: Project, searchValue: string) {
   const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
@@ -27,7 +24,7 @@ function matchesSearch(project: Project, searchValue: string) {
     return true;
   }
 
-  const values = [project.name, project.description ?? "", project.status, ...project.tags.map((tag) => tag.name)];
+  const values = [project.name, richTextToPlainText(project.description), project.status, ...project.tags.map((tag) => tag.name)];
   return values.some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
 }
 

@@ -14,13 +14,15 @@ interface ItemRowProps {
 
 /** Shared row base for domain items in list layouts. */
 export function ItemRow({ accentColor, statusIndicator, title, description, pills, meta, actions, onOpen, className = "" }: ItemRowProps) {
+  const columns = statusIndicator ? "grid-cols-[auto_minmax(0,1fr)_auto_auto_auto]" : "grid-cols-[minmax(0,1fr)_auto_auto_auto]";
+
   return (
     <article
-      className={`grid grid-cols-[auto_minmax(0,1fr)_auto_auto_auto] items-center gap-4 rounded-xl border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:border-steel-300 hover:shadow-md ${onOpen ? "cursor-pointer" : ""} ${className}`}
+      className={`grid ${columns} items-center gap-4 rounded-xl border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:border-steel-300 hover:shadow-md ${onOpen ? "cursor-pointer" : ""} ${className}`}
       style={accentColor ? { borderLeftColor: accentColor } : undefined}
       onDoubleClick={onOpen}
     >
-      <span>{statusIndicator}</span>
+      {statusIndicator ? <span>{statusIndicator}</span> : null}
       <button type="button" className="min-w-0 text-left" onClick={onOpen}>
         <h3 className="truncate text-[14px] font-semibold text-ink">{title}</h3>
         {description ? <p className="truncate text-[12px] text-slate-500">{description}</p> : null}

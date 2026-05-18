@@ -2,6 +2,7 @@ import type { BacklogItem, BacklogStatus, Feature } from "@taskmanager/shared-ty
 import { Edit3, Inbox, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { backlogStatusLabels, backlogStatusTones, priorityBadgeTones, priorityLabels } from "../../utils/domainLabels";
+import { richTextToPlainText } from "../../utils/richText";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
@@ -41,7 +42,7 @@ function matchesSearch(item: BacklogItem, featureName: string, searchValue: stri
     return true;
   }
 
-  const values = [item.title, item.description ?? "", item.status, item.priority, featureName];
+  const values = [item.title, richTextToPlainText(item.description), item.status, item.priority, featureName];
   return values.some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
 }
 
@@ -77,6 +78,8 @@ export function BacklogListBoardView({ items, features, statusFilter, onStatusFi
 }
 
 function BacklogItemCard({ item, featureName, onEdit, onDelete }: { item: BacklogItem; featureName?: string; onEdit: (item: BacklogItem) => void; onDelete: (item: BacklogItem) => void }) {
+  const description = richTextToPlainText(item.description);
+
   return (
     <ItemCard
       accentColor={priorityAccent[item.priority]}
@@ -89,7 +92,7 @@ function BacklogItemCard({ item, featureName, onEdit, onDelete }: { item: Backlo
           </div>
         </div>
       }
-      body={<p className="line-clamp-3 text-xs text-slate-600">{item.description || "Keine Beschreibung"}</p>}
+      body={description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null}
       footer={featureName ? <Badge tone="teal">Feature: {featureName}</Badge> : <Badge tone="mute">Ohne Feature</Badge>}
       onEdit={() => onEdit(item)}
       onDelete={() => onDelete(item)}
@@ -99,18 +102,20 @@ function BacklogItemCard({ item, featureName, onEdit, onDelete }: { item: Backlo
 }
 
 function BacklogItemRow({ item, featureName, onEdit, onDelete }: { item: BacklogItem; featureName?: string; onEdit: (item: BacklogItem) => void; onDelete: (item: BacklogItem) => void }) {
+  const description = richTextToPlainText(item.description);
+
   return (
     <ItemRow
       accentColor={priorityAccent[item.priority]}
       statusIndicator={<Pill tone={backlogStatusTones[item.status]}>{backlogStatusLabels[item.status]}</Pill>}
       title={item.title}
-      description={item.description || "Keine Beschreibung"}
+      description={description}
       pills={<Badge tone={priorityBadgeTones[item.priority]}>{priorityLabels[item.priority]}</Badge>}
       meta={featureName ? <Badge tone="teal">{featureName}</Badge> : <Badge tone="mute">Ohne Feature</Badge>}
       actions={
         <>
-          <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-8 w-8" icon={<Edit3 size={15} />} variant="ghost" onClick={() => onEdit(item)} />
-          <Button aria-label="Löschen" title="Löschen" className="h-8 w-8" icon={<Trash2 size={15} />} variant="ghost" onClick={() => onDelete(item)} />
+          <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onEdit(item)} />
+          <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(item)} />
         </>
       }
       className={item.status === "rejected" ? "opacity-65" : ""}

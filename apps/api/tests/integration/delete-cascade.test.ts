@@ -87,19 +87,21 @@ import {
   comments,
   events,
   featureRelations,
+  featureTasks,
   features,
   notes,
   projectFeatures,
   projectNotes,
   projectTags,
-  taskFeatures,
+  projectTasks,
+  projectTickets,
   taskNotes,
   taskTags,
-  taskUseCases,
   ticketNotes,
   ticketRelations,
   ticketTags,
   tickets,
+  useCaseTasks,
   useCases,
   wikiPages
 } from "../../src/db/schema.js";
@@ -174,12 +176,16 @@ async function setProjectFeatures(app: FastifyInstance, projectId: number, featu
 
 /** Features einer Aufgabe zuweisen */
 async function setTaskFeatures(app: FastifyInstance, taskId: number, featureIds: number[]): Promise<void> {
-  await supertest(app.server).put(`/api/tasks/${taskId}/features`).send({ featureIds }).expect(200);
+  for (const featureId of featureIds) {
+    await supertest(app.server).post(`/api/features/${featureId}/tasks/${taskId}`).expect(200);
+  }
 }
 
 /** UseCases einer Aufgabe zuweisen */
 async function setTaskUseCases(app: FastifyInstance, taskId: number, useCaseIds: number[]): Promise<void> {
-  await supertest(app.server).put(`/api/tasks/${taskId}/use-cases`).send({ useCaseIds }).expect(200);
+  for (const useCaseId of useCaseIds) {
+    await supertest(app.server).post(`/api/use-cases/${useCaseId}/tasks/${taskId}`).expect(200);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +219,9 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      await supertest(app.server).get(`/api/tasks/${task.id}`).expect(404);
+      const remainingLinks = testDb.db.select().from(projectTasks).where(eq(projectTasks.ownerId, project.id)).all();
+      expect(remainingLinks).toHaveLength(0);
+      await supertest(app.server).get(`/api/tasks/${task.id}`).expect(200);
     });
 
     it("löscht Sub-Tasks der Projekt-Tasks rekursiv", async () => {
@@ -223,7 +231,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      await supertest(app.server).get(`/api/tasks/${sub.id}`).expect(404);
+      await supertest(app.server).get(`/api/tasks/${sub.id}`).expect(200);
     });
 
     it("löscht Task-Kommentare via task_id-FK (entityType=task)", async () => {
@@ -238,7 +246,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
         .from(comments)
         .where(and(eq(comments.entityType, "task"), eq(comments.entityId, task.id)))
         .all();
-      expect(remaining).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
     });
 
     it("löscht Kommentare mit entityType='project'", async () => {
@@ -270,7 +278,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining).toHaveLength(0);
     });
 
-    it("löscht Kommentare der Tickets (entityType='ticket')", async () => {
+    it("behält Kommentare der Tickets beim Entfernen des Projekt-Links", async () => {
       const project = await createProject(app);
       const ticket = await createTicket(app, project.id);
       await postComment(app, "tickets", ticket.id);
@@ -282,10 +290,10 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
         .from(comments)
         .where(and(eq(comments.entityType, "ticket"), eq(comments.entityId, ticket.id)))
         .all();
-      expect(remaining).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
     });
 
-    it("löscht Kommentare der Sub-Tickets (entityType='ticket')", async () => {
+    it("behält Kommentare der Sub-Tickets beim Entfernen des Projekt-Links", async () => {
       const project = await createProject(app);
       const ticket = await createTicket(app, project.id);
       const sub = await createSubTicket(app, ticket.id);
@@ -298,7 +306,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
         .from(comments)
         .where(and(eq(comments.entityType, "ticket"), eq(comments.entityId, sub.id)))
         .all();
-      expect(remaining).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
     });
 
     it("löscht den notes-Datensatz von Projekt-Notes (nicht nur den Join-Eintrag)", async () => {
@@ -319,10 +327,10 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
       const remaining = testDb.db.select().from(notes).where(eq(notes.id, note.id)).all();
-      expect(remaining).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
     });
 
-    it("löscht den notes-Datensatz von Ticket-Notes (nicht nur den Join-Eintrag)", async () => {
+    it("behält Ticket-Notes beim Entfernen des Projekt-Links", async () => {
       const project = await createProject(app);
       const ticket = await createTicket(app, project.id);
       const noteId = await createNoteForTicket(app, ticket.id);
@@ -330,7 +338,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
       const remaining = testDb.db.select().from(notes).where(eq(notes.id, noteId)).all();
-      expect(remaining).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
     });
 
     it("entfernt project_tags-Einträge (Tag selbst bleibt erhalten)", async () => {
@@ -359,18 +367,21 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining).toHaveLength(0);
     });
 
-    it("löscht Tickets und Sub-Tickets des Projekts", async () => {
+    it("entfernt project_tickets-Einträge, Ticket und Sub-Ticket bleiben erhalten", async () => {
       const project = await createProject(app);
       const ticket = await createTicket(app, project.id);
       const sub = await createSubTicket(app, ticket.id);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remainingTickets = testDb.db.select().from(tickets).where(eq(tickets.projectId, project.id)).all();
-      expect(remainingTickets).toHaveLength(0);
+      const remainingLinks = testDb.db.select().from(projectTickets).where(eq(projectTickets.ownerId, project.id)).all();
+      expect(remainingLinks).toHaveLength(0);
+
+      const remainingTicket = testDb.db.select().from(tickets).where(eq(tickets.id, ticket.id)).all();
+      expect(remainingTicket).toHaveLength(1);
 
       const remainingSub = testDb.db.select().from(tickets).where(eq(tickets.id, sub.id)).all();
-      expect(remainingSub).toHaveLength(0);
+      expect(remainingSub).toHaveLength(1);
     });
 
     it("setzt projectId bei Events auf null (Events bleiben erhalten)", async () => {
@@ -424,6 +435,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const sub1 = await createSubtask(app, task.id);
       const sub2 = await createSubtask(app, task.id);
 
+      await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
 
       await supertest(app.server).get(`/api/tasks/${sub1.id}`).expect(404);
@@ -435,6 +447,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const task = await createTask(app, project.id);
       await postComment(app, "tasks", task.id);
 
+      await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
 
       const remaining = testDb.db
@@ -450,6 +463,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const task = await createTask(app, project.id);
       const note = await createNoteForTask(app, task.id);
 
+      await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
 
       const remaining = testDb.db.select().from(notes).where(eq(notes.id, note.id)).all();
@@ -462,6 +476,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const sub = await createSubtask(app, task.id);
       const note = await createNoteForTask(app, sub.id);
 
+      await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
 
       const remaining = testDb.db.select().from(notes).where(eq(notes.id, note.id)).all();
@@ -474,38 +489,41 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const tag = await createTag(app);
       await setTaskTags(app, task.id, [tag.id]);
 
+      await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
 
       const remaining = testDb.db.select().from(taskTags).where(eq(taskTags.taskId, task.id)).all();
       expect(remaining).toHaveLength(0);
     });
 
-    it("entfernt task_features-Einträge (Feature bleibt erhalten)", async () => {
+    it("blockiert Löschen bei Feature-Aufgabenbeziehung", async () => {
       const project = await createProject(app);
       const task = await createTask(app, project.id);
       const feature = await createFeature(app);
+      await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await setTaskFeatures(app, task.id, [feature.id]);
 
-      await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
+      await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(409);
 
-      const remaining = testDb.db.select().from(taskFeatures).where(eq(taskFeatures.taskId, task.id)).all();
-      expect(remaining).toHaveLength(0);
+      const remaining = testDb.db.select().from(featureTasks).where(eq(featureTasks.taskId, task.id)).all();
+      expect(remaining).toHaveLength(1);
 
       const featureStillExists = testDb.db.select().from(features).where(eq(features.id, feature.id)).all();
       expect(featureStillExists).toHaveLength(1);
     });
 
-    it("entfernt task_use_cases-Einträge (UseCase bleibt erhalten)", async () => {
+    it("blockiert Löschen bei Use-Case-Aufgabenbeziehung", async () => {
       const project = await createProject(app);
       const task = await createTask(app, project.id);
       const feature = await createFeature(app);
       const useCase = await createUseCase(app, feature.id);
+      await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await setTaskUseCases(app, task.id, [useCase.id]);
 
-      await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
+      await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(409);
 
-      const remaining = testDb.db.select().from(taskUseCases).where(eq(taskUseCases.taskId, task.id)).all();
-      expect(remaining).toHaveLength(0);
+      const remaining = testDb.db.select().from(useCaseTasks).where(eq(useCaseTasks.taskId, task.id)).all();
+      expect(remaining).toHaveLength(1);
 
       const ucStillExists = testDb.db.select().from(useCases).where(eq(useCases.id, useCase.id)).all();
       expect(ucStillExists).toHaveLength(1);
@@ -568,7 +586,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(taskUseCases).where(eq(taskUseCases.useCaseId, uc.id)).all();
+      const remaining = testDb.db.select().from(useCaseTasks).where(eq(useCaseTasks.ownerId, uc.id)).all();
       expect(remaining).toHaveLength(0);
     });
 
@@ -619,7 +637,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(taskFeatures).where(eq(taskFeatures.featureId, feature.id)).all();
+      const remaining = testDb.db.select().from(featureTasks).where(eq(featureTasks.ownerId, feature.id)).all();
       expect(remaining).toHaveLength(0);
     });
 
@@ -676,7 +694,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/use-cases/${uc.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(taskUseCases).where(eq(taskUseCases.useCaseId, uc.id)).all();
+      const remaining = testDb.db.select().from(useCaseTasks).where(eq(useCaseTasks.ownerId, uc.id)).all();
       expect(remaining).toHaveLength(0);
     });
 
@@ -699,19 +717,17 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
   // =========================================================================
 
   describe("deleteTicket – alle abhängigen Objekte werden entfernt", () => {
-    it("löscht Sub-Tickets rekursiv", async () => {
-      const project = await createProject(app);
-      const ticket = await createTicket(app, project.id);
+    it("blockiert Ticket-Löschung bei vorhandenen Sub-Tickets", async () => {
+      const ticket = await createTicket(app, null);
       const sub = await createSubTicket(app, ticket.id);
 
-      await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
+      await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(409);
 
-      await supertest(app.server).get(`/api/tickets/${sub.id}`).expect(404);
+      await supertest(app.server).get(`/api/tickets/${sub.id}`).expect(200);
     });
 
     it("löscht Kommentare mit entityType='ticket'", async () => {
-      const project = await createProject(app);
-      const ticket = await createTicket(app, project.id);
+      const ticket = await createTicket(app, null);
       await postComment(app, "tickets", ticket.id);
 
       await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
@@ -724,13 +740,12 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining).toHaveLength(0);
     });
 
-    it("löscht Kommentare von Sub-Tickets (entityType='ticket')", async () => {
-      const project = await createProject(app);
-      const ticket = await createTicket(app, project.id);
-      const sub = await createSubTicket(app, ticket.id);
+    it("löscht Kommentare von direkt gelöschten Sub-Tickets (entityType='ticket')", async () => {
+      const parent = await createTicket(app, null);
+      const sub = await createSubTicket(app, parent.id);
       await postComment(app, "tickets", sub.id);
 
-      await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
+      await supertest(app.server).delete(`/api/tickets/${sub.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
@@ -741,8 +756,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
     });
 
     it("löscht den notes-Datensatz des Tickets (nicht nur den Join-Eintrag)", async () => {
-      const project = await createProject(app);
-      const ticket = await createTicket(app, project.id);
+      const ticket = await createTicket(app, null);
       const noteId = await createNoteForTicket(app, ticket.id);
 
       await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
@@ -751,22 +765,20 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining).toHaveLength(0);
     });
 
-    it("löscht notes-Datensätze von Sub-Tickets", async () => {
-      const project = await createProject(app);
-      const ticket = await createTicket(app, project.id);
-      const sub = await createSubTicket(app, ticket.id);
+    it("löscht notes-Datensätze von direkt gelöschten Sub-Tickets", async () => {
+      const parent = await createTicket(app, null);
+      const sub = await createSubTicket(app, parent.id);
       const noteId = await createNoteForTicket(app, sub.id);
 
-      await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
+      await supertest(app.server).delete(`/api/tickets/${sub.id}`).expect(204);
 
       const remaining = testDb.db.select().from(notes).where(eq(notes.id, noteId)).all();
       expect(remaining).toHaveLength(0);
     });
 
-    it("löscht ticket_relations auf beiden Seiten (source und target)", async () => {
-      const project = await createProject(app);
-      const ticketA = await createTicket(app, project.id);
-      const ticketB = await createTicket(app, project.id);
+    it("blockiert Ticket-Löschung bei vorhandenen Ticket-Relationen", async () => {
+      const ticketA = await createTicket(app, null);
+      const ticketB = await createTicket(app, null);
 
       await supertest(app.server)
         .post(`/api/tickets/${ticketA.id}/relations`)
@@ -780,20 +792,18 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
         .all();
       expect(before).toHaveLength(1);
 
-      // Ticket B löschen – Relation muss verschwinden (target-Seite cascade)
-      await supertest(app.server).delete(`/api/tickets/${ticketB.id}`).expect(204);
+      await supertest(app.server).delete(`/api/tickets/${ticketB.id}`).expect(409);
 
       const after = testDb.db
         .select()
         .from(ticketRelations)
         .where(eq(ticketRelations.sourceTicketId, ticketA.id))
         .all();
-      expect(after).toHaveLength(0);
+      expect(after).toHaveLength(1);
     });
 
     it("entfernt ticket_tags-Einträge (Tag bleibt erhalten)", async () => {
-      const project = await createProject(app);
-      const ticket = await createTicket(app, project.id);
+      const ticket = await createTicket(app, null);
       const tag = await createTag(app);
       await setTicketTags(app, ticket.id, [tag.id]);
 
@@ -960,7 +970,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
       const notesAfter = testDb.db.select().from(notes).all();
-      expect(notesAfter).toHaveLength(0);
+      expect(notesAfter).toHaveLength(1);
     });
 
     it("keine verwaisten comments-Einträge nach Löschen verschiedener Entity-Typen", async () => {

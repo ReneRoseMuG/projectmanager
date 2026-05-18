@@ -10,21 +10,82 @@ import type {
 } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { projects, ticketRelations, tickets } from "../db/schema.js";
-import { badRequest, notFound } from "../utils/errors.js";
+import { featureTickets, features, projectTickets, projects, taskTickets, tasks, ticketRelations, tickets, useCases, useCaseTickets } from "../db/schema.js";
+import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
 import { deleteCommentsForEntities, listEntityComments } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 import { deleteTicketNotesForIds, listTicketNotes } from "./notes.service.js";
 import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
 
+export type TicketOwner = { type: "project" | "task" | "feature" | "useCase"; id: number };
+
 type TicketRecord = typeof tickets.$inferSelect;
+type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number };
+
+const ticketSelect = {
+  id: tickets.id,
+  seedRunId: tickets.seedRunId,
+  parentId: tickets.parentId,
+  type: tickets.type,
+  title: tickets.title,
+  description: tickets.description,
+  status: tickets.status,
+  priority: tickets.priority,
+  resolution: tickets.resolution,
+  reporter: tickets.reporter,
+  assignee: tickets.assignee,
+  environment: tickets.environment,
+  affectedVersion: tickets.affectedVersion,
+  dueDate: tickets.dueDate,
+  resolvedAt: tickets.resolvedAt,
+  position: tickets.position,
+  createdAt: tickets.createdAt,
+  updatedAt: tickets.updatedAt
+};
 
 function ensureProjectExists(database: DbClient, projectId: number): void {
   const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
+}
+
+function ensureTaskExists(database: DbClient, taskId: number): void {
+  const task = database.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)).get();
+  if (!task) {
+    throw notFound(`Task with id ${taskId} not found`);
+  }
+}
+
+function ensureFeatureExists(database: DbClient, featureId: number): void {
+  const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
+  if (!feature) {
+    throw notFound(`Feature with id ${featureId} not found`);
+  }
+}
+
+function ensureUseCaseExists(database: DbClient, useCaseId: number): void {
+  const useCase = database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, useCaseId)).get();
+  if (!useCase) {
+    throw notFound(`Use case with id ${useCaseId} not found`);
+  }
+}
+
+function ensureOwnerExists(database: DbClient, owner: TicketOwner): void {
+  if (owner.type === "project") {
+    ensureProjectExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "task") {
+    ensureTaskExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "feature") {
+    ensureFeatureExists(database, owner.id);
+    return;
+  }
+  ensureUseCaseExists(database, owner.id);
 }
 
 function getTicketRecord(database: DbClient, id: number): TicketRecord {
@@ -52,8 +113,8 @@ function getSubTicketCounts(database: DbClient, ticketIds: number[]): Map<number
 }
 
 function collectTicketSubtreeIds(database: DbClient, ticketId: number): number[] {
-  const root = getTicketRecord(database, ticketId);
-  const rows = database.select({ id: tickets.id, parentId: tickets.parentId }).from(tickets).where(eq(tickets.projectId, root.projectId)).all();
+  getTicketRecord(database, ticketId);
+  const rows = database.select({ id: tickets.id, parentId: tickets.parentId }).from(tickets).all();
   const childrenByParent = new Map<number, number[]>();
 
   for (const row of rows) {
@@ -77,15 +138,87 @@ function collectTicketSubtreeIds(database: DbClient, ticketId: number): number[]
   return ids;
 }
 
-function nextPosition(database: DbClient, projectId: number, status: TicketRecord["status"], parentId: number | null): number {
-  const where =
-    parentId === null
-      ? and(eq(tickets.projectId, projectId), eq(tickets.status, status), isNull(tickets.parentId))
-      : and(eq(tickets.projectId, projectId), eq(tickets.status, status), eq(tickets.parentId, parentId));
-
+function nextPosition(database: DbClient, status: TicketRecord["status"], parentId: number | null): number {
+  const where = parentId === null ? and(eq(tickets.status, status), isNull(tickets.parentId)) : and(eq(tickets.status, status), eq(tickets.parentId, parentId));
   const positions = database.select({ position: tickets.position }).from(tickets).where(where).all();
   const max = positions.reduce((current, row) => Math.max(current, row.position), 0);
   return max + 1024;
+}
+
+function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRecordWithBoardPosition[] {
+  if (owner.type === "project") {
+    return database
+      .select({ ...ticketSelect, boardPosition: projectTickets.position })
+      .from(projectTickets)
+      .innerJoin(tickets, eq(projectTickets.ticketId, tickets.id))
+      .where(and(eq(projectTickets.ownerId, owner.id), isNull(tickets.parentId)))
+      .orderBy(tickets.status, projectTickets.position)
+      .all();
+  }
+  if (owner.type === "task") {
+    return database
+      .select({ ...ticketSelect, boardPosition: taskTickets.position })
+      .from(taskTickets)
+      .innerJoin(tickets, eq(taskTickets.ticketId, tickets.id))
+      .where(and(eq(taskTickets.ownerId, owner.id), isNull(tickets.parentId)))
+      .orderBy(tickets.status, taskTickets.position)
+      .all();
+  }
+  if (owner.type === "feature") {
+    return database
+      .select({ ...ticketSelect, boardPosition: featureTickets.position })
+      .from(featureTickets)
+      .innerJoin(tickets, eq(featureTickets.ticketId, tickets.id))
+      .where(and(eq(featureTickets.ownerId, owner.id), isNull(tickets.parentId)))
+      .orderBy(tickets.status, featureTickets.position)
+      .all();
+  }
+
+  return database
+    .select({ ...ticketSelect, boardPosition: useCaseTickets.position })
+    .from(useCaseTickets)
+    .innerJoin(tickets, eq(useCaseTickets.ticketId, tickets.id))
+    .where(and(eq(useCaseTickets.ownerId, owner.id), isNull(tickets.parentId)))
+    .orderBy(tickets.status, useCaseTickets.position)
+    .all();
+}
+
+function getOwnerTicketRow(database: DbClient, owner: TicketOwner, ticketId: number): TicketRecordWithBoardPosition | undefined {
+  return selectOwnerTicketRows(database, owner).find((ticket) => ticket.id === ticketId);
+}
+
+function nextOwnerPosition(database: DbClient, owner: TicketOwner, status: TicketRecord["status"]): number {
+  const rows = selectOwnerTicketRows(database, owner).filter((ticket) => ticket.status === status);
+  return rows.reduce((current, row) => Math.max(current, row.boardPosition), 0) + 1024;
+}
+
+function insertOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number, position: number): void {
+  if (owner.type === "project") {
+    database.insert(projectTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+    return;
+  }
+  if (owner.type === "task") {
+    database.insert(taskTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+    return;
+  }
+  if (owner.type === "feature") {
+    database.insert(featureTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+    return;
+  }
+  database.insert(useCaseTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+}
+
+function deleteOwnerTicketLink(database: DbClient, owner: TicketOwner, ticketId: number): number {
+  if (owner.type === "project") {
+    return database.delete(projectTickets).where(and(eq(projectTickets.ownerId, owner.id), eq(projectTickets.ticketId, ticketId))).run().changes;
+  }
+  if (owner.type === "task") {
+    return database.delete(taskTickets).where(and(eq(taskTickets.ownerId, owner.id), eq(taskTickets.ticketId, ticketId))).run().changes;
+  }
+  if (owner.type === "feature") {
+    return database.delete(featureTickets).where(and(eq(featureTickets.ownerId, owner.id), eq(featureTickets.ticketId, ticketId))).run().changes;
+  }
+  return database.delete(useCaseTickets).where(and(eq(useCaseTickets.ownerId, owner.id), eq(useCaseTickets.ticketId, ticketId))).run().changes;
 }
 
 function relationEntryId(sourceTicketId: number, targetTicketId: number, relationType: TicketRelationType, direction: "outgoing" | "incoming"): number {
@@ -94,22 +227,80 @@ function relationEntryId(sourceTicketId: number, targetTicketId: number, relatio
   return sourceTicketId * 1_000_000 + targetTicketId * 10 + relationOffset + directionOffset;
 }
 
+function insertTicketRecord(database: DbClient, input: TicketInput, parentId: number | null = null): TicketRecord {
+  const title = requireNonEmpty(input.title, "title");
+  const status = input.status ?? "open";
+  const now = nowIso();
+  return database
+    .insert(tickets)
+    .values({
+      parentId,
+      type: input.type ?? "bug",
+      title,
+      description: cleanNullable(input.description) ?? null,
+      status,
+      priority: input.priority ?? "medium",
+      resolution: null,
+      reporter: cleanNullable(input.reporter) ?? null,
+      assignee: cleanNullable(input.assignee) ?? null,
+      environment: cleanNullable(input.environment) ?? null,
+      affectedVersion: cleanNullable(input.affectedVersion) ?? null,
+      dueDate: cleanNullable(input.dueDate) ?? null,
+      resolvedAt: null,
+      position: nextPosition(database, status, parentId),
+      createdAt: now,
+      updatedAt: now
+    })
+    .returning()
+    .get();
+}
+
+function ticketDeleteBlockers(database: DbClient, ticketId: number): string[] {
+  const blockers: string[] = [];
+
+  if (database.select({ ownerId: projectTickets.ownerId }).from(projectTickets).where(eq(projectTickets.ticketId, ticketId)).get()) {
+    blockers.push("Projekt-Verknüpfungen");
+  }
+  if (database.select({ ownerId: taskTickets.ownerId }).from(taskTickets).where(eq(taskTickets.ticketId, ticketId)).get()) {
+    blockers.push("Aufgaben-Verknüpfungen");
+  }
+  if (database.select({ ownerId: featureTickets.ownerId }).from(featureTickets).where(eq(featureTickets.ticketId, ticketId)).get()) {
+    blockers.push("Feature-Verknüpfungen");
+  }
+  if (database.select({ ownerId: useCaseTickets.ownerId }).from(useCaseTickets).where(eq(useCaseTickets.ticketId, ticketId)).get()) {
+    blockers.push("Use-Case-Verknüpfungen");
+  }
+  if (database.select({ id: tickets.id }).from(tickets).where(eq(tickets.parentId, ticketId)).get()) {
+    blockers.push("Sub-Tickets");
+  }
+  if (
+    database
+      .select({ sourceTicketId: ticketRelations.sourceTicketId })
+      .from(ticketRelations)
+      .where(or(eq(ticketRelations.sourceTicketId, ticketId), eq(ticketRelations.targetTicketId, ticketId)))
+      .get()
+  ) {
+    blockers.push("Ticket-Relationen");
+  }
+
+  return blockers;
+}
+
 export function mapTicket(
   database: DbClient,
   record: TicketRecord,
   tags = getTicketTags(database, record.id),
-  subTicketCount = getSubTicketCounts(database, [record.id]).get(record.id) ?? 0
+  subTicketCount = getSubTicketCounts(database, [record.id]).get(record.id) ?? 0,
+  position = record.position
 ): Ticket {
   return {
     id: record.id,
-    projectId: record.projectId,
     parentId: record.parentId,
     type: record.type,
     title: record.title,
     description: record.description,
     status: record.status,
     priority: record.priority,
-    severity: record.severity,
     resolution: record.resolution,
     reporter: record.reporter,
     assignee: record.assignee,
@@ -117,7 +308,7 @@ export function mapTicket(
     affectedVersion: record.affectedVersion,
     dueDate: record.dueDate,
     resolvedAt: record.resolvedAt,
-    position: record.position,
+    position,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     tags,
@@ -126,39 +317,36 @@ export function mapTicket(
 }
 
 export function listTickets(database: DbClient): Ticket[] {
-  const rows = database.select().from(tickets).where(isNull(tickets.parentId)).orderBy(tickets.projectId, tickets.status, tickets.position).all();
+  const rows = database.select().from(tickets).where(isNull(tickets.parentId)).orderBy(tickets.status, tickets.position).all();
   const ids = rows.map((ticket) => ticket.id);
   const tagsByTicket = getTicketTagsMap(database, ids);
   const subTicketCounts = getSubTicketCounts(database, ids);
 
   return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0));
+}
+
+export function listOwnerTickets(database: DbClient, owner: TicketOwner): Ticket[] {
+  ensureOwnerExists(database, owner);
+  const rows = selectOwnerTicketRows(database, owner);
+  const ids = rows.map((ticket) => ticket.id);
+  const tagsByTicket = getTicketTagsMap(database, ids);
+  const subTicketCounts = getSubTicketCounts(database, ids);
+
+  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0, ticket.boardPosition));
 }
 
 export function listProjectTickets(database: DbClient, projectId: number): Ticket[] {
-  ensureProjectExists(database, projectId);
-  const rows = database
-    .select()
-    .from(tickets)
-    .where(and(eq(tickets.projectId, projectId), isNull(tickets.parentId)))
-    .orderBy(tickets.status, tickets.position)
-    .all();
-  const ids = rows.map((ticket) => ticket.id);
-  const tagsByTicket = getTicketTagsMap(database, ids);
-  const subTicketCounts = getSubTicketCounts(database, ids);
-
-  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0));
+  return listOwnerTickets(database, { type: "project", id: projectId });
 }
 
 export function listSubTickets(database: DbClient, parentId: number): Ticket[] {
-  const parent = getTicketRecord(database, parentId);
+  getTicketRecord(database, parentId);
   const rows = database.select().from(tickets).where(eq(tickets.parentId, parentId)).orderBy(tickets.status, tickets.position).all();
   const ids = rows.map((ticket) => ticket.id);
   const tagsByTicket = getTicketTagsMap(database, ids);
   const subTicketCounts = getSubTicketCounts(database, ids);
 
-  return rows
-    .filter((ticket) => ticket.projectId === parent.projectId)
-    .map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0));
+  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0));
 }
 
 export function getTicketDetail(database: DbClient, id: number): TicketDetail {
@@ -175,69 +363,52 @@ export function getTicketDetail(database: DbClient, id: number): TicketDetail {
   };
 }
 
-export function createTicket(database: DbClient, projectId: number, input: TicketInput): Ticket {
-  ensureProjectExists(database, projectId);
-  const title = requireNonEmpty(input.title, "title");
-  const status = input.status ?? "open";
-  const now = nowIso();
-  const created = database
-    .insert(tickets)
-    .values({
-      projectId,
-      parentId: null,
-      type: input.type ?? "bug",
-      title,
-      description: cleanNullable(input.description) ?? null,
-      status,
-      priority: input.priority ?? "medium",
-      severity: input.severity ?? null,
-      resolution: null,
-      reporter: cleanNullable(input.reporter) ?? null,
-      assignee: cleanNullable(input.assignee) ?? null,
-      environment: cleanNullable(input.environment) ?? null,
-      affectedVersion: cleanNullable(input.affectedVersion) ?? null,
-      dueDate: cleanNullable(input.dueDate) ?? null,
-      resolvedAt: null,
-      position: nextPosition(database, projectId, status, null),
-      createdAt: now,
-      updatedAt: now
-    })
-    .returning()
-    .get();
+export function createTicket(database: DbClient, input: TicketInput): Ticket {
+  return mapTicket(database, insertTicketRecord(database, input), [], 0);
+}
 
-  return mapTicket(database, created, [], 0);
+export function createOwnerTicket(database: DbClient, owner: TicketOwner, input: TicketInput): Ticket {
+  ensureOwnerExists(database, owner);
+  const status = input.status ?? "open";
+  const position = nextOwnerPosition(database, owner, status);
+  const created = database.transaction((tx) => {
+    const ticket = insertTicketRecord(tx as unknown as DbClient, input);
+    insertOwnerTicket(tx as unknown as DbClient, owner, ticket.id, position);
+    return ticket;
+  });
+
+  return mapTicket(database, created, [], 0, position);
+}
+
+export function linkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number): Ticket {
+  ensureOwnerExists(database, owner);
+  const ticket = getTicketRecord(database, ticketId);
+  if (ticket.parentId !== null) {
+    throw badRequest("Sub-tickets cannot be linked to owners");
+  }
+
+  const existing = getOwnerTicketRow(database, owner, ticketId);
+  if (existing) {
+    return mapTicket(database, existing, undefined, undefined, existing.boardPosition);
+  }
+
+  const position = nextOwnerPosition(database, owner, ticket.status);
+  insertOwnerTicket(database, owner, ticketId, position);
+  return mapTicket(database, ticket, undefined, undefined, position);
+}
+
+export function unlinkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number): void {
+  ensureOwnerExists(database, owner);
+  getTicketRecord(database, ticketId);
+  const changes = deleteOwnerTicketLink(database, owner, ticketId);
+  if (changes === 0) {
+    throw notFound(`Ticket ${ticketId} is not linked to ${owner.type} ${owner.id}`);
+  }
 }
 
 export function createSubTicket(database: DbClient, parentId: number, input: TicketInput): Ticket {
   const parent = getTicketRecord(database, parentId);
-  const title = requireNonEmpty(input.title, "title");
-  const status = input.status ?? "open";
-  const now = nowIso();
-  const created = database
-    .insert(tickets)
-    .values({
-      projectId: parent.projectId,
-      parentId,
-      type: input.type ?? parent.type,
-      title,
-      description: cleanNullable(input.description) ?? null,
-      status,
-      priority: input.priority ?? parent.priority,
-      severity: input.severity ?? null,
-      resolution: null,
-      reporter: cleanNullable(input.reporter) ?? null,
-      assignee: cleanNullable(input.assignee) ?? null,
-      environment: cleanNullable(input.environment) ?? null,
-      affectedVersion: cleanNullable(input.affectedVersion) ?? null,
-      dueDate: cleanNullable(input.dueDate) ?? null,
-      resolvedAt: null,
-      position: nextPosition(database, parent.projectId, status, parentId),
-      createdAt: now,
-      updatedAt: now
-    })
-    .returning()
-    .get();
-
+  const created = insertTicketRecord(database, { ...input, type: input.type ?? parent.type, priority: input.priority ?? parent.priority }, parentId);
   return mapTicket(database, created, [], 0);
 }
 
@@ -262,9 +433,6 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
   }
   if (input.priority !== undefined) {
     values.priority = input.priority;
-  }
-  if (input.severity !== undefined) {
-    values.severity = input.severity;
   }
   if (input.resolution !== undefined) {
     values.resolution = input.resolution;
@@ -323,6 +491,12 @@ export function updateTicketPosition(database: DbClient, id: number, input: Tick
 }
 
 export async function deleteTicket(database: DbClient, id: number): Promise<void> {
+  getTicketRecord(database, id);
+  const blockers = ticketDeleteBlockers(database, id);
+  if (blockers.length > 0) {
+    throw conflict(`Ticket kann nicht gelöscht werden, solange Beziehungen bestehen: ${blockers.join(", ")}.`);
+  }
+
   const ticketIds = collectTicketSubtreeIds(database, id);
 
   await deleteTicketAttachmentsForIds(database, ticketIds);

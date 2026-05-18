@@ -4,8 +4,8 @@ import { getProjectAttachments } from "../api/attachments";
 import { getFeatures } from "../api/features";
 import { getProjectNotes } from "../api/notes";
 import { getProjects } from "../api/projects";
-import { getProjectTasks } from "../api/tasks";
-import { getProjectTickets } from "../api/tickets";
+import { getTasks } from "../api/tasks";
+import { getTickets } from "../api/tickets";
 import { getRootWikiPages } from "../api/wiki";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
@@ -21,11 +21,9 @@ export interface GlobalSearchData {
 }
 
 async function loadGlobalSearchData(): Promise<GlobalSearchData> {
-  const [projects, features, wikiPages] = await Promise.all([getProjects(), getFeatures(), getRootWikiPages()]);
+  const [projects, features, wikiPages, tasks, tickets] = await Promise.all([getProjects(), getFeatures(), getRootWikiPages(), getTasks(), getTickets()]);
   const projectIds = projects.map((project) => project.id);
-  const [taskLists, ticketLists, noteLists, attachmentLists] = await Promise.all([
-    Promise.all(projectIds.map((projectId) => getProjectTasks(projectId))),
-    Promise.all(projectIds.map((projectId) => getProjectTickets(projectId))),
+  const [noteLists, attachmentLists] = await Promise.all([
     Promise.all(projectIds.map((projectId) => getProjectNotes(projectId))),
     Promise.all(projectIds.map((projectId) => getProjectAttachments(projectId)))
   ]);
@@ -34,8 +32,8 @@ async function loadGlobalSearchData(): Promise<GlobalSearchData> {
     projects,
     features,
     wikiPages,
-    tasks: taskLists.flat(),
-    tickets: ticketLists.flat(),
+    tasks,
+    tickets,
     notes: noteLists.flat(),
     attachments: attachmentLists.flat()
   };

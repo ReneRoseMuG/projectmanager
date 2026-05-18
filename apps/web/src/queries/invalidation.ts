@@ -1,6 +1,6 @@
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import type { CommentEntityType } from "@taskmanager/shared-types";
-import type { NoteOwnerType, QueryOwnerType } from "./queryKeys";
+import type { NoteOwnerType, QueryOwnerType, TicketOwnerType } from "./queryKeys";
 import { queryKeys } from "./queryKeys";
 
 async function invalidateMany(queryClient: QueryClient, keys: QueryKey[]): Promise<void> {
@@ -22,13 +22,12 @@ export async function invalidateProjectScope(queryClient: QueryClient, projectId
   ]);
 }
 
-export async function invalidateTaskScope(queryClient: QueryClient, projectId?: number, taskId?: number): Promise<void> {
+export async function invalidateTaskScope(queryClient: QueryClient, taskId?: number): Promise<void> {
   await invalidateMany(queryClient, [
     queryKeys.projects.root,
     queryKeys.tasks.root,
     queryKeys.calendarTasks.root,
     queryKeys.globalSearch.root,
-    ...(projectId !== undefined ? [queryKeys.projects.tasks(projectId), queryKeys.projects.detail(projectId)] : []),
     ...(taskId !== undefined ? [queryKeys.tasks.detail(taskId)] : [])
   ]);
 }
@@ -58,11 +57,33 @@ export async function invalidateBacklogScope(queryClient: QueryClient, projectId
   await invalidateMany(queryClient, [queryKeys.projects.backlog(projectId), queryKeys.projects.detail(projectId), queryKeys.globalSearch.root]);
 }
 
-export async function invalidateTicketScope(queryClient: QueryClient, projectId?: number, ticketId?: number): Promise<void> {
+export interface TicketOwnerScope {
+  type: TicketOwnerType;
+  id: number;
+}
+
+function ticketOwnerKeys(owner: TicketOwnerScope): QueryKey[] {
+  if (owner.type === "project") {
+    return [queryKeys.projects.detail(owner.id), queryKeys.projects.tickets(owner.id), queryKeys.tickets.byOwner(owner.type, owner.id)];
+  }
+  if (owner.type === "task") {
+    return [queryKeys.tasks.detail(owner.id), queryKeys.tasks.tickets(owner.id), queryKeys.tickets.byOwner(owner.type, owner.id)];
+  }
+  if (owner.type === "feature") {
+    return [queryKeys.features.detail(owner.id), queryKeys.features.tickets(owner.id), queryKeys.tickets.byOwner(owner.type, owner.id)];
+  }
+  return [queryKeys.useCases.detail(owner.id), queryKeys.useCases.tickets(owner.id), queryKeys.tickets.byOwner(owner.type, owner.id)];
+}
+
+export async function invalidateTicketScope(queryClient: QueryClient, owner?: TicketOwnerScope, ticketId?: number): Promise<void> {
   await invalidateMany(queryClient, [
     queryKeys.tickets.root,
+    queryKeys.projects.root,
+    queryKeys.tasks.root,
+    queryKeys.features.root,
+    queryKeys.useCases.root,
     queryKeys.globalSearch.root,
-    ...(projectId !== undefined ? [queryKeys.tickets.byProject(projectId), queryKeys.projects.detail(projectId)] : []),
+    ...(owner !== undefined ? ticketOwnerKeys(owner) : []),
     ...(ticketId !== undefined ? [queryKeys.tickets.detail(ticketId), queryKeys.tickets.relations(ticketId), queryKeys.tickets.subTickets(ticketId)] : [])
   ]);
 }

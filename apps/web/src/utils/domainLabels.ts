@@ -6,7 +6,6 @@ import type {
   TaskStatus,
   TicketRelationType,
   TicketResolution,
-  TicketSeverity,
   TicketStatus,
   TicketType
 } from "@taskmanager/shared-types";
@@ -116,20 +115,6 @@ export const ticketTypeTones: Record<TicketType, BadgeTone> = {
   improvement: "teal",
   question: "violet",
   task: "steel"
-};
-
-export const ticketSeverityLabels: Record<TicketSeverity, string> = {
-  critical: "Kritisch",
-  major: "Schwer",
-  minor: "Mittel",
-  trivial: "Trivial"
-};
-
-export const ticketSeverityTones: Record<TicketSeverity, BadgeTone> = {
-  critical: "crimson",
-  major: "tangerine",
-  minor: "mustard",
-  trivial: "steel"
 };
 
 export const ticketResolutionLabels: Record<TicketResolution, string> = {

@@ -74,10 +74,6 @@ function featureCard(page: Page, title: string) {
   return page.locator("article:visible").filter({ hasText: title }).first();
 }
 
-function relationPanel(page: Page, title: string) {
-  return page.locator("section").filter({ has: page.getByRole("heading", { name: title }) }).first();
-}
-
 async function openFeatureList(page: Page) {
   await page.goto("/features");
   await expect(page.getByRole("heading", { name: "Features", exact: true })).toBeVisible();
@@ -158,22 +154,30 @@ test.describe("Feature CRUD", () => {
     await deleteFeature(request, feature.id);
   });
 
-  test("Projekt verknüpfen im Projekte-Tab → Speichern → bleibt verknüpft", async ({ page, request }) => {
+  test("Projekt im Projekte-Tab hinzufügen und entfernen", async ({ page, request }) => {
     const feature = await createFeature(request, "E2E Feature Project Link");
-      const project = await createProject(request, "E2E Linked Project");
+    const project = await createProject(request, "E2E Linked Project");
 
     try {
       await page.goto(`/features/${feature.id}`);
       await page.getByRole("tab", { name: /Projekte/ }).click();
-      await page.getByRole("checkbox", { name: new RegExp(project.name) }).check({ force: true });
+      await page.getByRole("button", { name: "Projekt hinzufügen" }).click();
+      await activeModal(page).getByRole("combobox").selectOption({ label: project.name });
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),
-        relationPanel(page, "Projekte").getByRole("button", { name: "Speichern" }).click()
+        activeModal(page).getByRole("button", { name: "Hinzufügen" }).click()
       ]);
+      await expect(featureCard(page, project.name)).toBeVisible();
 
       await page.reload();
       await page.getByRole("tab", { name: /Projekte/ }).click();
-      await expect(page.getByRole("checkbox", { name: new RegExp(project.name) })).toBeChecked();
+      await expect(featureCard(page, project.name)).toBeVisible();
+
+      await Promise.all([
+        page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),
+        featureCard(page, project.name).getByRole("button", { name: "Entfernen" }).click()
+      ]);
+      await expect(featureCard(page, project.name)).not.toBeVisible();
     } finally {
       await deleteFeature(request, feature.id);
       await deleteProject(request, project.id);

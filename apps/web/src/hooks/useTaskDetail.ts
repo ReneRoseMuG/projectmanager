@@ -33,7 +33,7 @@ export function useTaskDetail(taskId: number | null) {
       return updateTaskRequest(validTaskId, input);
     },
     onSuccess: async (updated) => {
-      await invalidateTaskScope(queryClient, updated?.projectId ?? taskQuery.data?.projectId, updated?.id ?? validTaskId);
+      await invalidateTaskScope(queryClient, updated?.id ?? validTaskId);
     }
   });
 
@@ -48,7 +48,7 @@ export function useTaskDetail(taskId: number | null) {
       );
     },
     onSuccess: async () => {
-      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, validTaskId);
+      await invalidateTaskScope(queryClient, validTaskId);
       await invalidateTags(queryClient);
     }
   });
@@ -61,24 +61,24 @@ export function useTaskDetail(taskId: number | null) {
       return createSubtaskRequest(validTaskId, input);
     },
     onSuccess: async (created) => {
-      await invalidateTaskScope(queryClient, created?.projectId ?? taskQuery.data?.projectId, created?.id);
-      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, validTaskId);
+      await invalidateTaskScope(queryClient, created?.id);
+      await invalidateTaskScope(queryClient, validTaskId);
     }
   });
 
   const updateSubtaskMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TaskUpdate }) => updateTaskRequest(id, input),
     onSuccess: async (updated) => {
-      await invalidateTaskScope(queryClient, updated.projectId, updated.id);
-      await invalidateTaskScope(queryClient, updated.projectId, validTaskId);
+      await invalidateTaskScope(queryClient, updated.id);
+      await invalidateTaskScope(queryClient, validTaskId);
     }
   });
 
   const removeSubtaskMutation = useMutation({
     mutationFn: deleteTask,
     onSuccess: async (_result, id) => {
-      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, id);
-      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, validTaskId);
+      await invalidateTaskScope(queryClient, id);
+      await invalidateTaskScope(queryClient, validTaskId);
     }
   });
 
@@ -93,7 +93,7 @@ export function useTaskDetail(taskId: number | null) {
       if (validTaskId !== undefined) {
         await invalidateComments(queryClient, "task", validTaskId);
       }
-      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, validTaskId);
+      await invalidateTaskScope(queryClient, validTaskId);
     }
   });
 
@@ -103,7 +103,7 @@ export function useTaskDetail(taskId: number | null) {
       if (validTaskId !== undefined) {
         await invalidateComments(queryClient, "task", validTaskId);
       }
-      await invalidateTaskScope(queryClient, taskQuery.data?.projectId, validTaskId);
+      await invalidateTaskScope(queryClient, validTaskId);
     }
   });
 

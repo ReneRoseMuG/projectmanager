@@ -12,7 +12,7 @@
  * Ziel:
  * Die aufgabenspezifische ListBoardView-Integration gegen Layout-, Control- und Statusregressionen absichern.
  */
-import type { Task } from "@taskmanager/shared-types";
+import type { Task, TaskBoardItem } from "@taskmanager/shared-types";
 import { fireEvent, screen, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import { useState } from "react";
@@ -36,7 +36,7 @@ function renderTaskList({
   onOpen = vi.fn(),
   onDelete = vi.fn()
 }: {
-  tasks?: Task[];
+  tasks?: TaskBoardItem[];
   viewMode?: ViewMode;
   onViewModeChange?: (viewMode: ViewMode) => void;
   onAdd?: () => void;
@@ -57,7 +57,7 @@ function renderTaskList({
   );
 }
 
-function TaskHarness({ tasks, onViewModeChange }: { tasks: Task[]; onViewModeChange: (viewMode: ViewMode) => void }) {
+function TaskHarness({ tasks, onViewModeChange }: { tasks: TaskBoardItem[]; onViewModeChange: (viewMode: ViewMode) => void }) {
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
 
   return (
@@ -119,7 +119,7 @@ describe("TaskListBoardView", () => {
     const { container } = renderTaskList({ tasks, onAddStatus, onOpen });
 
     expectToolbar();
-    expect(container.querySelector(".lg\\:grid-cols-3")).toBeInTheDocument();
+    expect(container.querySelector(".grid-flow-col")).toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns.length).toBe(statusColumns.length);
@@ -154,7 +154,7 @@ describe("TaskListBoardView", () => {
     const tasks = buildTaskSet();
     const { container } = renderTaskList({ tasks, viewMode: "list" });
 
-    expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
+    expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
     const rows = container.querySelectorAll("article.rounded-xl");
     expect(rows).toHaveLength(tasks.length);
     expectItemRowClasses(rows);
@@ -175,7 +175,7 @@ describe("TaskListBoardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
     expect(onViewModeChange).toHaveBeenCalledWith("list");
-    expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
+    expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
     expect(container.querySelectorAll("article.rounded-xl")).toHaveLength(tasks.length);
   });
 

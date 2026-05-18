@@ -89,7 +89,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose }: Bac
           <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
         </FormField>
         <FormField label="Beschreibung" className="mt-4">
-          <RichTextEditor content={description} placeholder="Was soll später umgesetzt werden?" toolbar="minimal" minHeight="8rem" onChange={setDescription} />
+          <RichTextEditor content={description} placeholder="Was soll später umgesetzt werden?" toolbar="full" minHeight="8rem" onChange={setDescription} />
         </FormField>
       </Section>
 

@@ -1,7 +1,7 @@
 import type { CalendarEvent, EventInput, Project, Task } from "@taskmanager/shared-types";
 import { CalendarClock, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { fromDateTimeLocalInput, toDateTimeLocalInput } from "../../utils/date";
 import { Button } from "../ui/Button";
 import { ColorPicker } from "../ui/ColorPicker";
@@ -65,13 +65,6 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
     setTaskId(event?.taskId ? String(event.taskId) : "");
   }, [event, initialDate, open]);
 
-  const filteredTasks = useMemo(() => {
-    if (!projectId) {
-      return tasks;
-    }
-    return tasks.filter((task) => task.projectId === Number(projectId));
-  }, [projectId, tasks]);
-
   const submit = async (submitEvent: FormEvent<HTMLFormElement>) => {
     submitEvent.preventDefault();
     setSaving(true);
@@ -113,7 +106,7 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
           <Input value={title} onChange={(inputEvent) => setTitle(inputEvent.target.value)} required />
         </FormField>
         <FormField label="Beschreibung" className="mt-4">
-          <RichTextEditor content={description} placeholder="Beschreibung" toolbar="minimal" minHeight="7rem" onChange={setDescription} />
+          <RichTextEditor content={description} placeholder="Beschreibung" toolbar="full" minHeight="7rem" onChange={setDescription} />
         </FormField>
       </Section>
 
@@ -130,10 +123,7 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
 
       <Section title="Zuordnung">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select label="Projekt" value={projectId} onChange={(inputEvent) => {
-            setProjectId(inputEvent.target.value);
-            setTaskId("");
-          }}>
+          <Select label="Projekt" value={projectId} onChange={(inputEvent) => setProjectId(inputEvent.target.value)}>
             <option value="">Keins</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
@@ -143,7 +133,7 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
           </Select>
           <Select label="Aufgabe" value={taskId} onChange={(inputEvent) => setTaskId(inputEvent.target.value)}>
             <option value="">Keine</option>
-            {filteredTasks.map((task) => (
+            {tasks.map((task) => (
               <option key={task.id} value={task.id}>
                 {task.title}
               </option>

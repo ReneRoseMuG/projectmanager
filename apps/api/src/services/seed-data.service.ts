@@ -18,7 +18,6 @@ import {
   PRIORITIES,
   PROJECT_STATUSES,
   TASK_STATUSES,
-  TICKET_SEVERITIES,
   TICKET_STATUSES,
   TICKET_TYPES,
   attachments,
@@ -30,20 +29,25 @@ import {
   projectFeatures,
   projectNotes,
   projectTags,
+  projectTasks,
+  projectTickets,
   projects,
   seedRunItems,
   seedRuns,
   tags,
-  taskFeatures,
+  featureTasks,
+  featureTickets,
   taskNotes,
   taskTags,
-  taskUseCases,
+  taskTickets,
   tasks,
   ticketNotes,
   ticketRelations,
   ticketTags,
   tickets,
   useCases,
+  useCaseTasks,
+  useCaseTickets,
   wikiPages
 } from "../db/schema.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
@@ -84,11 +88,16 @@ const VISUAL_SEED_TABLES = [
   "ticket_relations",
   "ticket_tags",
   "ticket_notes",
+  "project_tickets",
+  "task_tickets",
+  "feature_tickets",
+  "use_case_tickets",
   "project_notes",
   "task_notes",
   "project_features",
-  "task_features",
-  "task_use_cases",
+  "project_tasks",
+  "feature_tasks",
+  "use_case_tasks",
   "content_files",
   "upload_files"
 ] as const;
@@ -245,8 +254,12 @@ function tableCountsFromMap(counts: Map<string, number>): SeedRunTableCount[] {
 function externalCountForProjects(database: DbClient, seedRunId: string, projectIds: number[]): number {
   if (projectIds.length === 0) return 0;
   return (
-    database.select({ id: tasks.id }).from(tasks).where(and(inArray(tasks.projectId, projectIds), or(isNull(tasks.seedRunId), ne(tasks.seedRunId, seedRunId)))).all().length +
-    database.select({ id: tickets.id }).from(tickets).where(and(inArray(tickets.projectId, projectIds), or(isNull(tickets.seedRunId), ne(tickets.seedRunId, seedRunId)))).all().length +
+    database.select({ taskId: projectTasks.taskId }).from(projectTasks).where(and(inArray(projectTasks.ownerId, projectIds), or(isNull(projectTasks.seedRunId), ne(projectTasks.seedRunId, seedRunId)))).all().length +
+    database
+      .select({ ticketId: projectTickets.ticketId })
+      .from(projectTickets)
+      .where(and(inArray(projectTickets.ownerId, projectIds), or(isNull(projectTickets.seedRunId), ne(projectTickets.seedRunId, seedRunId))))
+      .all().length +
     database
       .select({ id: backlogItems.id })
       .from(backlogItems)
@@ -299,14 +312,24 @@ function externalCountForTasks(database: DbClient, seedRunId: string, taskIds: n
     database.select({ taskId: taskTags.taskId }).from(taskTags).where(and(inArray(taskTags.taskId, taskIds), or(isNull(taskTags.seedRunId), ne(taskTags.seedRunId, seedRunId)))).all().length +
     database.select({ taskId: taskNotes.taskId }).from(taskNotes).where(and(inArray(taskNotes.taskId, taskIds), or(isNull(taskNotes.seedRunId), ne(taskNotes.seedRunId, seedRunId)))).all().length +
     database
-      .select({ taskId: taskFeatures.taskId })
-      .from(taskFeatures)
-      .where(and(inArray(taskFeatures.taskId, taskIds), or(isNull(taskFeatures.seedRunId), ne(taskFeatures.seedRunId, seedRunId))))
+      .select({ taskId: projectTasks.taskId })
+      .from(projectTasks)
+      .where(and(inArray(projectTasks.taskId, taskIds), or(isNull(projectTasks.seedRunId), ne(projectTasks.seedRunId, seedRunId))))
       .all().length +
     database
-      .select({ taskId: taskUseCases.taskId })
-      .from(taskUseCases)
-      .where(and(inArray(taskUseCases.taskId, taskIds), or(isNull(taskUseCases.seedRunId), ne(taskUseCases.seedRunId, seedRunId))))
+      .select({ taskId: featureTasks.taskId })
+      .from(featureTasks)
+      .where(and(inArray(featureTasks.taskId, taskIds), or(isNull(featureTasks.seedRunId), ne(featureTasks.seedRunId, seedRunId))))
+      .all().length +
+    database
+      .select({ taskId: useCaseTasks.taskId })
+      .from(useCaseTasks)
+      .where(and(inArray(useCaseTasks.taskId, taskIds), or(isNull(useCaseTasks.seedRunId), ne(useCaseTasks.seedRunId, seedRunId))))
+      .all().length +
+    database
+      .select({ ticketId: taskTickets.ticketId })
+      .from(taskTickets)
+      .where(and(inArray(taskTickets.ownerId, taskIds), or(isNull(taskTickets.seedRunId), ne(taskTickets.seedRunId, seedRunId))))
       .all().length +
     database
       .select({ id: comments.id })
@@ -327,6 +350,10 @@ function externalCountForTickets(database: DbClient, seedRunId: string, ticketId
       .all().length +
     database.select({ ticketId: ticketTags.ticketId }).from(ticketTags).where(and(inArray(ticketTags.ticketId, ticketIds), or(isNull(ticketTags.seedRunId), ne(ticketTags.seedRunId, seedRunId)))).all().length +
     database.select({ ticketId: ticketNotes.ticketId }).from(ticketNotes).where(and(inArray(ticketNotes.ticketId, ticketIds), or(isNull(ticketNotes.seedRunId), ne(ticketNotes.seedRunId, seedRunId)))).all().length +
+    database.select({ ticketId: projectTickets.ticketId }).from(projectTickets).where(and(inArray(projectTickets.ticketId, ticketIds), or(isNull(projectTickets.seedRunId), ne(projectTickets.seedRunId, seedRunId)))).all().length +
+    database.select({ ticketId: taskTickets.ticketId }).from(taskTickets).where(and(inArray(taskTickets.ticketId, ticketIds), or(isNull(taskTickets.seedRunId), ne(taskTickets.seedRunId, seedRunId)))).all().length +
+    database.select({ ticketId: featureTickets.ticketId }).from(featureTickets).where(and(inArray(featureTickets.ticketId, ticketIds), or(isNull(featureTickets.seedRunId), ne(featureTickets.seedRunId, seedRunId)))).all().length +
+    database.select({ ticketId: useCaseTickets.ticketId }).from(useCaseTickets).where(and(inArray(useCaseTickets.ticketId, ticketIds), or(isNull(useCaseTickets.seedRunId), ne(useCaseTickets.seedRunId, seedRunId)))).all().length +
     database
       .select({ sourceTicketId: ticketRelations.sourceTicketId })
       .from(ticketRelations)
@@ -379,9 +406,14 @@ function externalCountForFeatures(database: DbClient, seedRunId: string, feature
       .where(and(inArray(projectFeatures.featureId, featureIds), or(isNull(projectFeatures.seedRunId), ne(projectFeatures.seedRunId, seedRunId))))
       .all().length +
     database
-      .select({ featureId: taskFeatures.featureId })
-      .from(taskFeatures)
-      .where(and(inArray(taskFeatures.featureId, featureIds), or(isNull(taskFeatures.seedRunId), ne(taskFeatures.seedRunId, seedRunId))))
+      .select({ featureId: featureTasks.ownerId })
+      .from(featureTasks)
+      .where(and(inArray(featureTasks.ownerId, featureIds), or(isNull(featureTasks.seedRunId), ne(featureTasks.seedRunId, seedRunId))))
+      .all().length +
+    database
+      .select({ ticketId: featureTickets.ticketId })
+      .from(featureTickets)
+      .where(and(inArray(featureTickets.ownerId, featureIds), or(isNull(featureTickets.seedRunId), ne(featureTickets.seedRunId, seedRunId))))
       .all().length +
     database
       .select({ id: comments.id })
@@ -400,9 +432,14 @@ function externalCountForUseCases(database: DbClient, seedRunId: string, useCase
       .where(and(inArray(backlogItems.useCaseId, useCaseIds), or(isNull(backlogItems.seedRunId), ne(backlogItems.seedRunId, seedRunId))))
       .all().length +
     database
-      .select({ useCaseId: taskUseCases.useCaseId })
-      .from(taskUseCases)
-      .where(and(inArray(taskUseCases.useCaseId, useCaseIds), or(isNull(taskUseCases.seedRunId), ne(taskUseCases.seedRunId, seedRunId))))
+      .select({ useCaseId: useCaseTasks.ownerId })
+      .from(useCaseTasks)
+      .where(and(inArray(useCaseTasks.ownerId, useCaseIds), or(isNull(useCaseTasks.seedRunId), ne(useCaseTasks.seedRunId, seedRunId))))
+      .all().length +
+    database
+      .select({ ticketId: useCaseTickets.ticketId })
+      .from(useCaseTickets)
+      .where(and(inArray(useCaseTickets.ownerId, useCaseIds), or(isNull(useCaseTickets.seedRunId), ne(useCaseTickets.seedRunId, seedRunId))))
       .all().length +
     database
       .select({ id: comments.id })
@@ -631,7 +668,6 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
             .insert(tasks)
             .values({
               seedRunId: runId,
-              projectId: project.id,
               parentId: null,
               title: `${prefix} Aufgabe ${projectIndex + 1}.${statusIndex + 1} ${status}`,
               description: `Aufgabe für Board-, Listen- und Detailtests mit Priorität ${priority}.`,
@@ -639,7 +675,6 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
               priority,
               assignee: requiredAt(TASK_ASSIGNEES, statusIndex, "task assignee"),
               dueDate: `2026-06-${String(12 + projectIndex + statusIndex).padStart(2, "0")}`,
-              position: (statusIndex + 1) * 1024,
               createdAt: now,
               updatedAt: now
             })
@@ -647,13 +682,14 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
             .get();
           createdTasks.push(task);
           recordItem("tasks", String(task.id));
+          tx.insert(projectTasks).values({ seedRunId: runId, ownerId: project.id, taskId: task.id, position: (statusIndex + 1) * 1024 }).run();
+          recordItem("project_tasks", `${project.id}:${task.id}`);
 
           if (status !== "done") {
             const subtask = tx
               .insert(tasks)
               .values({
                 seedRunId: runId,
-                projectId: project.id,
                 parentId: task.id,
                 title: `${prefix} Unteraufgabe ${projectIndex + 1}.${statusIndex + 1}`,
                 description: "Unteraufgabe zur visuellen Prüfung verschachtelter Aufgaben.",
@@ -661,7 +697,6 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
                 priority,
                 assignee: "Seed Team",
                 dueDate: null,
-                position: 512,
                 createdAt: now,
                 updatedAt: now
               })
@@ -681,25 +716,22 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
 
       const createdTickets: TicketRecord[] = [];
       for (const [projectIndex, project] of createdProjects.entries()) {
-        const projectTickets: TicketRecord[] = [];
+        const projectTicketRecords: TicketRecord[] = [];
         for (let ticketIndex = 0; ticketIndex < 5; ticketIndex += 1) {
           const type = ticketIndex < 2 ? "bug" : wrappedAt(TICKET_TYPES, ticketIndex, "ticket type");
           const status = wrappedAt(TICKET_STATUSES, projectIndex + ticketIndex, "ticket status");
           const priority = wrappedAt(PRIORITIES, projectIndex + ticketIndex + 1, "ticket priority");
-          const severity = type === "bug" ? wrappedAt(TICKET_SEVERITIES, ticketIndex, "ticket severity") : null;
           const resolvedAt = status === "resolved" || status === "closed" ? now : null;
           const ticket = tx
             .insert(tickets)
             .values({
               seedRunId: runId,
-              projectId: project.id,
               parentId: null,
               type,
               title: `${prefix} Ticket ${projectIndex + 1}.${ticketIndex + 1} ${type}`,
               description: `Ticket-Testdatensatz mit Status ${status} und Priorität ${priority}.`,
               status,
               priority,
-              severity,
               resolution: resolvedAt ? "fixed" : null,
               reporter: "Seed QA",
               assignee: wrappedAt(TASK_ASSIGNEES, ticketIndex, "ticket assignee"),
@@ -713,28 +745,29 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
             })
             .returning()
             .get();
-          projectTickets.push(ticket);
+          projectTicketRecords.push(ticket);
           createdTickets.push(ticket);
           recordItem("tickets", String(ticket.id));
+
+          tx.insert(projectTickets).values({ seedRunId: runId, ownerId: project.id, ticketId: ticket.id, position: (ticketIndex + 1) * 1024 }).run();
+          recordItem("project_tickets", `${project.id}:${ticket.id}`);
 
           const tag = wrappedAt(createdTags, ticketIndex, "ticket tag");
           tx.insert(ticketTags).values({ seedRunId: runId, ticketId: ticket.id, tagId: tag.id }).run();
           recordItem("ticket_tags", `${ticket.id}:${tag.id}`);
         }
 
-        const parentTicket = requiredAt(projectTickets, 0, "parent ticket");
+        const parentTicket = requiredAt(projectTicketRecords, 0, "parent ticket");
         const subTicket = tx
           .insert(tickets)
           .values({
             seedRunId: runId,
-            projectId: project.id,
             parentId: parentTicket.id,
             type: parentTicket.type,
             title: `${prefix} Sub-Ticket ${projectIndex + 1}.1`,
             description: "Sub-Ticket zur visuellen Prüfung verschachtelter Tickets.",
             status: "open",
             priority: parentTicket.priority,
-            severity: parentTicket.severity,
             resolution: null,
             reporter: "Seed QA",
             assignee: "Seed Team",
@@ -751,7 +784,7 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
         createdTickets.push(subTicket);
         recordItem("tickets", String(subTicket.id));
 
-        const blockedTicket = requiredAt(projectTickets, 1, "blocked ticket");
+        const blockedTicket = requiredAt(projectTicketRecords, 1, "blocked ticket");
         tx.insert(ticketRelations)
           .values({
             seedRunId: runId,
@@ -764,13 +797,26 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
         recordItem("ticket_relations", `${parentTicket.id}:${blockedTicket.id}:blocks`);
       }
 
-      for (const task of createdTasks.slice(0, 8)) {
+      for (const task of createdTasks.filter((createdTask) => createdTask.parentId === null).slice(0, 8)) {
         const feature = wrappedAt(createdFeatures, task.id, "feature");
         const useCase = wrappedAt(createdUseCases, task.id, "use case");
-        tx.insert(taskFeatures).values({ seedRunId: runId, taskId: task.id, featureId: feature.id }).run();
-        tx.insert(taskUseCases).values({ seedRunId: runId, taskId: task.id, useCaseId: useCase.id }).run();
-        recordItem("task_features", `${task.id}:${feature.id}`);
-        recordItem("task_use_cases", `${task.id}:${useCase.id}`);
+        tx.insert(featureTasks).values({ seedRunId: runId, ownerId: feature.id, taskId: task.id, position: task.id * 1024 }).run();
+        tx.insert(useCaseTasks).values({ seedRunId: runId, ownerId: useCase.id, taskId: task.id, position: task.id * 1024 }).run();
+        recordItem("feature_tasks", `${feature.id}:${task.id}`);
+        recordItem("use_case_tasks", `${useCase.id}:${task.id}`);
+      }
+
+      for (const [index, ticket] of createdTickets.filter((createdTicket) => createdTicket.parentId === null).slice(0, 8).entries()) {
+        const task = wrappedAt(createdTasks.filter((createdTask) => createdTask.parentId === null), index, "ticket task owner");
+        const feature = wrappedAt(createdFeatures, index, "ticket feature owner");
+        const useCase = wrappedAt(createdUseCases, index, "ticket use case owner");
+        const position = (index + 1) * 1024;
+        tx.insert(taskTickets).values({ seedRunId: runId, ownerId: task.id, ticketId: ticket.id, position }).run();
+        tx.insert(featureTickets).values({ seedRunId: runId, ownerId: feature.id, ticketId: ticket.id, position }).run();
+        tx.insert(useCaseTickets).values({ seedRunId: runId, ownerId: useCase.id, ticketId: ticket.id, position }).run();
+        recordItem("task_tickets", `${task.id}:${ticket.id}`);
+        recordItem("feature_tickets", `${feature.id}:${ticket.id}`);
+        recordItem("use_case_tickets", `${useCase.id}:${ticket.id}`);
       }
 
       const createdNotes: NoteRecord[] = [];
@@ -1034,8 +1080,13 @@ export function deleteSeedRun(database: DbClient, id: string, confirmationId: st
   database.transaction((tx) => {
     addDeleted("comments", tx.delete(comments).where(eq(comments.seedRunId, id)).run().changes);
     addDeleted("ticket_relations", tx.delete(ticketRelations).where(eq(ticketRelations.seedRunId, id)).run().changes);
-    addDeleted("task_use_cases", tx.delete(taskUseCases).where(eq(taskUseCases.seedRunId, id)).run().changes);
-    addDeleted("task_features", tx.delete(taskFeatures).where(eq(taskFeatures.seedRunId, id)).run().changes);
+    addDeleted("use_case_tickets", tx.delete(useCaseTickets).where(eq(useCaseTickets.seedRunId, id)).run().changes);
+    addDeleted("feature_tickets", tx.delete(featureTickets).where(eq(featureTickets.seedRunId, id)).run().changes);
+    addDeleted("task_tickets", tx.delete(taskTickets).where(eq(taskTickets.seedRunId, id)).run().changes);
+    addDeleted("project_tickets", tx.delete(projectTickets).where(eq(projectTickets.seedRunId, id)).run().changes);
+    addDeleted("use_case_tasks", tx.delete(useCaseTasks).where(eq(useCaseTasks.seedRunId, id)).run().changes);
+    addDeleted("feature_tasks", tx.delete(featureTasks).where(eq(featureTasks.seedRunId, id)).run().changes);
+    addDeleted("project_tasks", tx.delete(projectTasks).where(eq(projectTasks.seedRunId, id)).run().changes);
     addDeleted("project_features", tx.delete(projectFeatures).where(eq(projectFeatures.seedRunId, id)).run().changes);
     addDeleted("ticket_tags", tx.delete(ticketTags).where(eq(ticketTags.seedRunId, id)).run().changes);
     addDeleted("task_tags", tx.delete(taskTags).where(eq(taskTags.seedRunId, id)).run().changes);
@@ -1053,7 +1104,6 @@ export function deleteSeedRun(database: DbClient, id: string, confirmationId: st
       addDeleted("wiki_pages", tx.delete(wikiPages).where(eq(wikiPages.id, page.id)).run().changes);
     }
 
-    addDeleted("task_use_cases", tx.delete(taskUseCases).where(eq(taskUseCases.seedRunId, id)).run().changes);
     addDeleted("tasks", tx.delete(tasks).where(eq(tasks.seedRunId, id)).run().changes);
     addDeleted("tickets", tx.delete(tickets).where(eq(tickets.seedRunId, id)).run().changes);
     addDeleted("use_cases", tx.delete(useCases).where(eq(useCases.seedRunId, id)).run().changes);

@@ -125,11 +125,11 @@ export function ProjectInlineForm({ project, onSubmit }: ProjectInlineFormProps)
         <TagPicker selected={selectedTags} onChange={setSelectedTags} />
       </Section>
 
-      <div className="flex justify-end">
+      <footer className="sticky bottom-4 z-20 flex justify-end rounded-xl border border-line bg-white/95 p-4 shadow-panel backdrop-blur">
         <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
           Speichern
         </Button>
-      </div>
+      </footer>
     </form>
   );
 }

@@ -38,7 +38,7 @@ export function useTicketDetail(ticketId: number | null) {
       return updateTicketRequest(validTicketId, input);
     },
     onSuccess: async (updated) => {
-      await invalidateTicketScope(queryClient, updated?.projectId ?? ticketQuery.data?.projectId, updated?.id ?? validTicketId);
+      await invalidateTicketScope(queryClient, undefined, updated?.id ?? validTicketId);
     }
   });
 
@@ -53,7 +53,7 @@ export function useTicketDetail(ticketId: number | null) {
       );
     },
     onSuccess: async () => {
-      await invalidateTicketScope(queryClient, ticketQuery.data?.projectId, validTicketId);
+      await invalidateTicketScope(queryClient, undefined, validTicketId);
       await invalidateTags(queryClient);
     }
   });
@@ -66,24 +66,24 @@ export function useTicketDetail(ticketId: number | null) {
       return createSubTicketRequest(validTicketId, input);
     },
     onSuccess: async (created) => {
-      await invalidateTicketScope(queryClient, created?.projectId ?? ticketQuery.data?.projectId, created?.id);
-      await invalidateTicketScope(queryClient, ticketQuery.data?.projectId, validTicketId);
+      await invalidateTicketScope(queryClient, undefined, created?.id);
+      await invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
   const updateSubTicketMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TicketUpdate }) => updateTicketRequest(id, input),
     onSuccess: async (updated) => {
-      await invalidateTicketScope(queryClient, updated.projectId, updated.id);
-      await invalidateTicketScope(queryClient, updated.projectId, validTicketId);
+      await invalidateTicketScope(queryClient, undefined, updated.id);
+      await invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
   const removeSubTicketMutation = useMutation({
     mutationFn: deleteTicket,
     onSuccess: async (_result, id) => {
-      await invalidateTicketScope(queryClient, ticketQuery.data?.projectId, id);
-      await invalidateTicketScope(queryClient, ticketQuery.data?.projectId, validTicketId);
+      await invalidateTicketScope(queryClient, undefined, id);
+      await invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
@@ -95,7 +95,7 @@ export function useTicketDetail(ticketId: number | null) {
       await addTicketRelationRequest(validTicketId, input);
     },
     onSuccess: async () => {
-      await invalidateTicketScope(queryClient, ticketQuery.data?.projectId, validTicketId);
+      await invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
@@ -107,7 +107,7 @@ export function useTicketDetail(ticketId: number | null) {
       await removeTicketRelationRequest(validTicketId, input);
     },
     onSuccess: async () => {
-      await invalidateTicketScope(queryClient, ticketQuery.data?.projectId, validTicketId);
+      await invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 

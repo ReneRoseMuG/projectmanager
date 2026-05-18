@@ -2,6 +2,7 @@ import type { CalendarEvent } from "@taskmanager/shared-types";
 import { CalendarClock } from "lucide-react";
 import { useMemo } from "react";
 import { formatHumanDate } from "../../utils/date";
+import { richTextToPlainText } from "../../utils/richText";
 import { ItemRow } from "../ui/ItemRow";
 
 interface UpcomingEventsProps {
@@ -27,17 +28,21 @@ export function UpcomingEvents({ events, onOpen }: UpcomingEventsProps) {
 
       {upcoming.length > 0 ? (
         <div className="grid gap-2">
-          {upcoming.map((event) => (
-            <ItemRow
-              key={event.id}
-              accentColor={event.color ?? "var(--color-teal)"}
-              statusIndicator={<span className="flex h-9 w-9 items-center justify-center rounded-lg bg-fern/10 text-fern"><CalendarClock size={16} /></span>}
-              title={event.title}
-              description={event.description || "Keine Beschreibung"}
-              meta={<span className="text-xs font-semibold text-slate-600">{formatHumanDate(event.startTime)}</span>}
-              onOpen={() => onOpen(event)}
-            />
-          ))}
+          {upcoming.map((event) => {
+            const description = richTextToPlainText(event.description);
+
+            return (
+              <ItemRow
+                key={event.id}
+                accentColor={event.color ?? "var(--color-teal)"}
+                statusIndicator={<span className="flex h-9 w-9 items-center justify-center rounded-lg bg-fern/10 text-fern"><CalendarClock size={16} /></span>}
+                title={event.title}
+                description={description}
+                meta={<span className="text-xs font-semibold text-slate-600">{formatHumanDate(event.startTime)}</span>}
+                onOpen={() => onOpen(event)}
+              />
+            );
+          })}
         </div>
       ) : (
         <p className="text-sm text-slate-600">Keine anstehenden Termine</p>

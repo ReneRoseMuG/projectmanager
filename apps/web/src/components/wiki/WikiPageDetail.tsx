@@ -52,14 +52,6 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
           <Button variant="ghost" icon={<Edit3 size={16} />} onClick={onEditMetadata}>
             Metadaten
           </Button>
-          <Button variant="ghost" icon={<Trash2 size={16} />} onClick={() => onDelete(page)}>
-            Löschen
-          </Button>
-          {activeTab === "content" ? (
-            <Button type="submit" form="wiki-page-detail-form" variant="primary" icon={<Save size={16} />} disabled={saving}>
-              Speichern
-            </Button>
-          ) : null}
         </div>
       </div>
       <TabBar tabs={tabs} active={activeTab} onChange={setActiveTab} />
@@ -68,6 +60,14 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
           <form id="wiki-page-detail-form" className="grid gap-5" onSubmit={submit}>
             {/* TODO: migrate existing markdown content to HTML. */}
             <RichTextEditor content={content} placeholder="Wiki-Inhalt" toolbar="full" onChange={setContent} />
+            <footer className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white/95 p-4 shadow-panel backdrop-blur">
+              <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(page)}>
+                Löschen
+              </Button>
+              <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
+                Speichern
+              </Button>
+            </footer>
           </form>
         ) : null}
         {activeTab === "comments" ? (

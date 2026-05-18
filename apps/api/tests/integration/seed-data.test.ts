@@ -50,6 +50,7 @@ describe("Seed data admin API", () => {
     fs.rmSync(tmpUploadDir, { recursive: true, force: true });
     fs.mkdirSync(tmpContentDir, { recursive: true });
     fs.mkdirSync(tmpUploadDir, { recursive: true });
+    setContentBaseDir(tmpContentDir);
   });
 
   afterAll(async () => {

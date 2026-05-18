@@ -1,6 +1,7 @@
 import { Check, Save } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
+import { richTextToPlainText } from "../../utils/richText";
 import { Badge } from "./Badge";
 import { Button } from "./Button";
 import { Divider } from "./Divider";
@@ -35,7 +36,7 @@ function searchableValue(value: unknown) {
   if (value === null || value === undefined) {
     return "";
   }
-  return String(value).toLocaleLowerCase("de-DE");
+  return richTextToPlainText(String(value)).toLocaleLowerCase("de-DE");
 }
 
 function sortLinkedFirst<T extends RelationItem>(items: T[], selected: Set<number>) {

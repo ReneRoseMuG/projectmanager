@@ -33,8 +33,8 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
         </span>
       </button>
       <div className="flex gap-1">
-        <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-8 w-8" icon={<Edit3 size={15} />} variant="ghost" onClick={() => onEdit(note)} />
-        <Button aria-label="Löschen" title="Löschen" className="h-8 w-8" icon={<Trash2 size={15} />} variant="ghost" onClick={() => onDelete(note)} />
+        <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onEdit(note)} />
+        <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(note)} />
       </div>
     </article>
   );

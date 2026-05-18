@@ -43,6 +43,92 @@ textarea {
   gap: 0.5rem;
 }
 
+.rich-text-surface {
+  color: theme("colors.ink");
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.rich-text-surface > *:first-child {
+  margin-top: 0;
+}
+
+.rich-text-surface > *:last-child {
+  margin-bottom: 0;
+}
+
+.rich-text-surface h1,
+.rich-text-surface h2,
+.rich-text-surface h3 {
+  color: theme("colors.ink");
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.rich-text-surface h1 {
+  margin: 1.25rem 0 0.75rem;
+  border-bottom: 1px solid theme("colors.line");
+  padding-bottom: 0.45rem;
+  font-size: 1.5rem;
+}
+
+.rich-text-surface h2 {
+  margin: 1.1rem 0 0.6rem;
+  font-size: 1.2rem;
+}
+
+.rich-text-surface h3 {
+  margin: 1rem 0 0.45rem;
+  font-size: 1.05rem;
+}
+
+.rich-text-surface p {
+  margin: 0.65rem 0;
+}
+
+.rich-text-surface p:has(> strong:only-child) {
+  margin: 1rem 0 0.4rem;
+  color: theme("colors.ink");
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.rich-text-surface ul,
+.rich-text-surface ol {
+  margin: 0.65rem 0;
+  padding-left: 1.35rem;
+}
+
+.rich-text-surface ul {
+  list-style: disc;
+}
+
+.rich-text-surface ol {
+  list-style: decimal;
+}
+
+.rich-text-surface li {
+  margin: 0.25rem 0;
+  padding-left: 0.15rem;
+}
+
+.rich-text-surface code {
+  border-radius: 0.3rem;
+  background: theme("colors.steel.100");
+  padding: 0.1rem 0.3rem;
+  color: theme("colors.steel.800");
+  font-size: 0.86em;
+}
+
+.rich-text-surface blockquote {
+  margin: 0.8rem 0;
+  border-left: 3px solid theme("colors.steel.300");
+  padding-left: 0.9rem;
+  color: theme("colors.slate.600");
+}
+
 .fc {
   --fc-border-color: theme("colors.line");
   --fc-today-bg-color: rgba(46, 89, 132, 0.05);

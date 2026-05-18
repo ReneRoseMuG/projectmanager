@@ -21,6 +21,7 @@ interface ListBoardViewProps<T> {
   onAdd: () => void;
   onAddToColumn?: (status: string) => void;
   addLabel?: string;
+  secondaryAction?: ReactNode;
   statusKey?: keyof T;
   statusColumns?: StatusColumn[];
   renderCard: (item: T) => ReactNode;
@@ -48,6 +49,7 @@ export function ListBoardView<T>({
   onAdd,
   onAddToColumn,
   addLabel = "Neu",
+  secondaryAction,
   statusKey,
   statusColumns,
   renderCard,
@@ -66,6 +68,7 @@ export function ListBoardView<T>({
         {onSearchChange ? <SearchInput value={searchValue} onChange={onSearchChange} /> : <span />}
         <div className="flex flex-wrap items-center gap-2">
           {filters}
+          {secondaryAction}
           <ViewToggle value={toViewMode(mode)} onChange={(value) => onModeChange(toListBoardMode(value))} />
           <Button aria-label={addLabel} title={addLabel} variant="primary" icon={<Plus size={17} />} onClick={onAdd} />
         </div>
@@ -84,7 +87,7 @@ export function ListBoardView<T>({
         </CardGrid>
       ) : null}
       {!loading && items.length > 0 && boardByStatus ? (
-        <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+        <div className="grid min-w-0 grid-flow-col auto-cols-[minmax(17rem,1fr)] gap-4 overflow-x-auto pb-2">
           {statusColumns.map((column) => {
             const columnItems = items.filter((item) => String(item[statusKey]) === column.value);
 
@@ -99,9 +102,8 @@ export function ListBoardView<T>({
                         aria-label={`${column.label} hinzufügen`}
                         title={`${column.label} hinzufügen`}
                         variant="ghost"
-                        size="sm"
-                        className="border border-line bg-white text-steel-700 hover:bg-steel-50"
-                        icon={<Plus size={14} />}
+                        className="h-10 w-10 border border-line bg-white text-steel-700 hover:bg-steel-50"
+                        icon={<Plus size={18} />}
                         onClick={() => onAddToColumn(column.value)}
                       />
                     ) : null}
