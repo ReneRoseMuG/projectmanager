@@ -293,7 +293,6 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
       <FormModal
         open={open}
         title={milestone ? "Meilenstein bearbeiten" : "Meilenstein anlegen"}
-        subtitle={milestone ? `Zuletzt aktualisiert am ${formatHumanDate(milestone.updatedAt)}` : "Stammdaten, Projektbezug und Beziehungen festlegen."}
         icon={<Flag size={21} />}
         breadcrumb={["Meilensteine", milestone ? milestone.name : "Neuer Meilenstein"]}
         onSubmit={submit}

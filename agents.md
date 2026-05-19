@@ -545,25 +545,26 @@ Die App ist in drei fachliche Domänen gegliedert. Neue Features und Änderungen
 
 ### Domäne 1 — Projektmanagement
 
-Entitäten: `projects`, `tasks` (inkl. Subtasks via `parentId`), `backlogItems`
+Entitäten: `projects`, `milestones`, `tasks` (inkl. Subtasks via `parentId`), `backlogItems`
 
-- Tasks gehören immer einem Projekt (`projectId NOT NULL`)
+- Milestones gehören immer einem Projekt (`projectId NOT NULL`) und sind eine Projekt-Subdomäne
+- Tasks sind owner-unabhängige fachliche Objekte und werden über `projectTasks`, `milestoneTasks`, `featureTasks` oder `useCaseTasks` an Träger gebunden
 - Subtasks sind Tasks mit gesetztem `parentId`
 - Backlog ist ein **Ideenspeicher** — BacklogItems werden nicht zu Tasks oder Tickets konvertiert
-- Navigation: `/projects`, `/projects/:id`
+- Navigation: `/projects`, `/projects/:id`, `/milestones/:id`
 
 ### Domäne 2 — Dokumentation
 
 Entitäten: `features`, `useCases`, `wikiPages`, `featureRelations`
 
 - Use Cases gehören immer einem Feature (`featureId NOT NULL`)
-- Features können projektübergreifend referenziert werden (`projectFeatures`, `taskFeatures`)
+- Features können projekt- und milestoneübergreifend referenziert werden (`projectFeatures`, `milestoneFeatures`, `featureTasks`, `useCaseTasks`)
 - Wiki-Seiten sind hierarchisch via `parentId` (restrict on delete), optional einem Projekt zugeordnet
 - Navigation: `/features`, `/features/:id`, `/wiki`, `/wiki/:id`
 
 ### Domäne 3 — Tickets & Bug-Tracking
 
-Entitäten: `tickets`, `ticketRelations`, `ticketTags`, `ticketNotes`, `projectTickets`, `taskTickets`, `featureTickets`, `useCaseTickets`
+Entitäten: `tickets`, `ticketRelations`, `ticketTags`, `ticketNotes`, `projectTickets`, `milestoneTickets`, `taskTickets`, `featureTickets`, `useCaseTickets`
 
 - Tickets sind owner-unabhängige fachliche Objekte und können über Join-Tabellen mehreren Trägern zugeordnet werden
 - Sub-Tickets via `parentId` (cascade delete); Sub-Tickets werden nicht direkt an Owner verknüpft
@@ -579,11 +580,11 @@ Folgende Infrastruktur wird von mehreren Domänen gemeinsam genutzt:
 
 | Infrastruktur | Träger-Entitäten | Implementierung |
 |---|---|---|
-| **Tags** | projects, tasks, tickets | Join-Tabellen (`projectTags`, `taskTags`, `ticketTags`), `setXxxTags`-Service-Funktionen |
-| **Notes** | projects, tasks, tickets | Join-Tabellen (`projectNotes`, `taskNotes`, `ticketNotes`), `useNotes(owner)` Hook |
-| **Attachments** | projects, tasks, features, tickets | `attachments` plus Owner-Join-Tabellen (`projectAttachments`, `taskAttachments`, `featureAttachments`, `ticketAttachments`), DTO `owners: [...]`, `useAttachments(owner)` Hook |
-| **Comments** | tasks, features, projects, useCases, backlogItems, wikiPages, tickets | `comments` plus Owner-Join-Tabellen (`projectComments`, `taskComments`, `featureComments`, `useCaseComments`, `backlogItemComments`, `wikiPageComments`, `ticketComments`), DTO `owners: [...]` |
-| **Calendar** | projects, tasks | `events`-Tabelle plus `projectEvents`/`taskEvents`-Join-Tabellen |
+| **Tags** | projects, milestones, tasks, tickets | Join-Tabellen (`projectTags`, `milestoneTags`, `taskTags`, `ticketTags`), `setXxxTags`-Service-Funktionen |
+| **Notes** | projects, milestones, tasks, tickets | Join-Tabellen (`projectNotes`, `milestoneNotes`, `taskNotes`, `ticketNotes`), `useNotes(owner)` Hook |
+| **Attachments** | projects, milestones, tasks, features, tickets | `attachments` plus Owner-Join-Tabellen (`projectAttachments`, `milestoneAttachments`, `taskAttachments`, `featureAttachments`, `ticketAttachments`), DTO `owners: [...]`, `useAttachments(owner)` Hook |
+| **Comments** | tasks, features, projects, milestones, useCases, backlogItems, wikiPages, tickets | `comments` plus Owner-Join-Tabellen (`projectComments`, `milestoneComments`, `taskComments`, `featureComments`, `useCaseComments`, `backlogItemComments`, `wikiPageComments`, `ticketComments`), DTO `owners: [...]` |
+| **Calendar** | projects, milestones, tasks | `events`-Tabelle plus `projectEvents`/`milestoneEvents`/`taskEvents`-Join-Tabellen |
 
 **Beim Hinzufügen einer neuen Attachment-fähigen Entität:**
 1. Neue Owner-Join-Tabelle anlegen — direkte Owner-Spalten in `attachments` sind im Zielschema nicht zulässig.

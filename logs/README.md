@@ -2,6 +2,10 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 20.05.26 | Fix | E2E RichText Verifikation | ✅ |
+| 20.05.26 | Fix | Agents Milestone Gate | ⚠️ |
+| 20.05.26 | Fix | RichText-Auswahl-Toolbar | ✅ |
+| 20.05.26 | Fix | Formular-Hero-Unterzeilen | ✅ |
 | 19.05.26 | Fix | Startscript und Dev-Watch | ✅ |
 | 19.05.26 | Fix | Google Drive OAuth Client Env | ⚠️ |
 | 19.05.26 | Fix | RichText Beschreibungsfelder | ✅ |

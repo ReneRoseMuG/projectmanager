@@ -147,7 +147,6 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
     <FormModal
       open={open}
       title={ticket ? "Ticket bearbeiten" : title}
-      subtitle="Status, Priorität und Kontext für die Nachverfolgung."
       icon={<Bug size={20} />}
       breadcrumb={["Tickets", ticket ? `TICKET-${ticket.id}` : "Neu"]}
       submitLabel={ticket ? "Speichern" : "Ticket anlegen"}

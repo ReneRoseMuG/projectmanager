@@ -151,7 +151,6 @@ export function FeatureProjectPanel({ projects, availableProjects, viewMode, onV
       <FormModal
         open={addModalOpen}
         title="Projekt hinzufügen"
-        subtitle="Verknüpft das ausgewählte Projekt mit diesem Feature."
         icon={<FolderKanban size={20} />}
         breadcrumb={["Feature", "Projekte"]}
         onSubmit={submitAddProject}

@@ -7,7 +7,6 @@ interface FormModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
-  subtitle?: string;
   icon?: ReactNode;
   breadcrumb?: string[];
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
@@ -24,7 +23,6 @@ export function FormModal({
   open,
   onClose,
   title,
-  subtitle,
   icon,
   breadcrumb = [],
   onSubmit,
@@ -64,7 +62,6 @@ export function FormModal({
               {icon ? <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/12 text-white">{icon}</span> : null}
               <div>
                 <h2 className="text-2xl font-bold tracking-normal">{title}</h2>
-                {subtitle ? <p className="text-sm text-white/75">{subtitle}</p> : null}
                 {headerMeta ? <div className="mt-3 flex flex-wrap items-center gap-2">{headerMeta}</div> : null}
               </div>
             </div>

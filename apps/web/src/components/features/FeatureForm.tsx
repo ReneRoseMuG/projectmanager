@@ -260,7 +260,6 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
       <FormModal
         open={open}
         title={feature ? "Feature bearbeiten" : "Neues Feature"}
-        subtitle="Feature-Inhalt und Beziehungen in einem Formular pflegen."
         icon={<BookOpen size={20} />}
         breadcrumb={["Features", feature ? "Bearbeiten" : "Neu"]}
         submitLabel={saving ? savingLabel ?? "Speichern…" : feature ? "Speichern" : "Feature anlegen"}

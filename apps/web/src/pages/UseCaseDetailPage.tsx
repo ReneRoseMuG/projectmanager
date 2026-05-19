@@ -124,14 +124,11 @@ export function UseCaseDetailPage() {
     return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Use Case nicht gefunden</div>;
   }
 
-  const featureTitle = allFeatures.features.find((feature) => feature.id === (useCase?.featureId ?? validFeatureId))?.title;
-
   return (
     <div className="mx-auto max-w-7xl">
       <UseCaseForm
         open
         useCase={useCase}
-        featureTitle={featureTitle}
         currentFeatureId={useCase?.featureId ?? validFeatureId}
         features={allFeatures.features}
         variant="page"

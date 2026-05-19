@@ -2,7 +2,6 @@ import type { BacklogItem, BacklogItemInput, BacklogStatus, Feature, Priority } 
 import { Inbox, Send } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { formatHumanDate } from "../../utils/date";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
 import { FormField } from "../ui/FormField";
@@ -81,7 +80,6 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
     <FormModal
       open={open}
       title={item ? "Backlog-Item bearbeiten" : "Backlog-Item anlegen"}
-      subtitle={item ? `Zuletzt aktualisiert am ${formatHumanDate(item.updatedAt)}` : "Idee erfassen und für spätere Umsetzung vorbereiten."}
       icon={<Inbox size={21} />}
       breadcrumb={["Backlog", item ? `Item #${item.id}` : "Neues Item"]}
       onSubmit={submit}

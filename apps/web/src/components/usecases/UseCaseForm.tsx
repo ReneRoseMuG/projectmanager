@@ -48,7 +48,6 @@ import { TabBar, type Tab } from "../ui/TabBar";
 interface UseCaseFormProps {
   open: boolean;
   useCase?: UseCase | null;
-  featureTitle?: string;
   currentFeatureId?: number;
   features?: Feature[];
   onSubmit: (input: UseCaseInput) => Promise<UseCase | void>;
@@ -103,7 +102,7 @@ const tabs: Array<Tab<UseCaseFormTab>> = [
   { value: "comments", label: "Kommentare" }
 ];
 
-export function UseCaseForm({ open, useCase, featureTitle, currentFeatureId, features = [], onSubmit, onPostCreate, onDelete, onClose, variant = "modal", closeOnSubmit = true }: UseCaseFormProps) {
+export function UseCaseForm({ open, useCase, currentFeatureId, features = [], onSubmit, onPostCreate, onDelete, onClose, variant = "modal", closeOnSubmit = true }: UseCaseFormProps) {
   const comments = useEntityComments("useCase", useCase?.id);
   const [activeTab, setActiveTab] = useState<UseCaseFormTab>("details");
   const [title, setTitle] = useState("");
@@ -199,7 +198,6 @@ export function UseCaseForm({ open, useCase, featureTitle, currentFeatureId, fea
       <FormModal
         open={open}
         title={useCase ? "Use Case bearbeiten" : "Use Case anlegen"}
-        subtitle={featureTitle ? `Feature: ${featureTitle}` : undefined}
         icon={<BookOpen size={21} />}
         breadcrumb={["Use Cases", useCase ? useCase.title : "Neu"]}
         onSubmit={submit}

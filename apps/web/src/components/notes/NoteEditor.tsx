@@ -1,8 +1,7 @@
 import type { JsonObject, JsonValue, Note, NoteUpdate } from "@taskmanager/shared-types";
 import { Download, MoreHorizontal, Save, StickyNote, Trash2, X } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { formatHumanDate } from "../../utils/date";
+import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { Modal } from "../ui/Modal";
@@ -14,11 +13,6 @@ interface NoteEditorProps {
   open: boolean;
   onSave: (id: number, input: NoteUpdate) => Promise<unknown>;
   onClose: () => void;
-}
-
-function countJsonWords(value: JsonObject) {
-  const text = noteContentToHtml(value).replace(/<[^>]+>/g, " ");
-  return text.split(/\s+/).filter((word) => word.length > 1).length;
 }
 
 function isJsonRecord(value: JsonValue): value is Record<string, JsonValue> {
@@ -74,7 +68,6 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
   const [content, setContent] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const wordCount = useMemo(() => countJsonWords(htmlToNoteContent(content)), [content]);
 
   useEffect(() => {
     if (!open || !note) {
@@ -150,9 +143,6 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
                   </span>
                   <div>
                     <h2 className="text-2xl font-bold tracking-normal">{title || "Ohne Titel"}</h2>
-                    <p className="text-sm text-white/75">
-                      NOTE-{note.id} · erstellt {formatHumanDate(note.createdAt)} · {wordCount} Wörter · 1 Abschnitt
-                    </p>
                   </div>
                 </div>
               </div>

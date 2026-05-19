@@ -109,7 +109,6 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
     <FormModal
       open={open}
       title={event ? "Termin bearbeiten" : "Termin anlegen"}
-      subtitle={isAllDay ? "Ganztägig" : undefined}
       icon={<CalendarClock size={21} />}
       breadcrumb={["Kalender", event ? event.title : "Neuer Termin"]}
       onSubmit={submit}

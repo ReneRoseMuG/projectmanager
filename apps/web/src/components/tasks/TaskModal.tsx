@@ -213,7 +213,6 @@ export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClos
       <FormModal
         open={open}
         title={task ? "Aufgabe bearbeiten" : "Aufgabe anlegen"}
-        subtitle="Aufgabe, Relationen und Anhänge in einem Formular pflegen."
         icon={<ClipboardList size={20} />}
         breadcrumb={["Aufgaben", task ? task.title : "Neu"]}
         submitLabel={saving ? savingLabel ?? "Speichern…" : task ? "Speichern" : "Aufgabe anlegen"}

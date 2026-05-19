@@ -28,7 +28,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
 import TextStyle from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
-import { BubbleMenu, EditorContent, FloatingMenu, useEditor } from "@tiptap/react";
+import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
   AlignCenter,
@@ -269,33 +269,6 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
     <div className="rounded-md ring-1 ring-steel-600" data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
       {toolbar !== "none" ? <RichTextToolbar editor={editor} variant={toolbar} /> : null}
       <EditorContent editor={editor} />
-      <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
-        <div data-testid="bubble-menu" className="flex items-center gap-0.5 rounded-lg border border-line bg-white p-1 shadow-panel">
-          <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Fett" icon={<Bold />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Kursiv" icon={<Italic />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Unterstrichen" icon={<UnderlineIcon />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive("strike")} title="Durchgestrichen" icon={<Strikethrough />} />
-          <Separator />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="Überschrift 1" icon={<Heading1 />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="Überschrift 2" icon={<Heading2 />} />
-          <Separator />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Aufzählung" icon={<List />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Nummerierte Liste" icon={<ListOrdered />} />
-          <Separator />
-          <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Links" icon={<AlignLeft />} />
-          <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Mitte" icon={<AlignCenter />} />
-          <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Rechts" icon={<AlignRight />} />
-        </div>
-      </BubbleMenu>
-      <FloatingMenu editor={editor} tippyOptions={{ duration: 100 }}>
-        <div data-testid="floating-menu" className="flex items-center gap-0.5 rounded-lg border border-line bg-white p-1 shadow-panel">
-          <ToolbarButton onClick={() => editor.chain().focus().setParagraph().run()} active={editor.isActive("paragraph")} title="Absatz" icon={<Text />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="Überschrift 1" icon={<Heading1 />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="Überschrift 2" icon={<Heading2 />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Aufzählung" icon={<List />} />
-          <ToolbarButton onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive("orderedList")} title="Nummeriert" icon={<ListOrdered />} />
-        </div>
-      </FloatingMenu>
     </div>
   );
 }

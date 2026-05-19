@@ -93,7 +93,6 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose }: Wi
                 <span>Bearbeiten</span>
               </div>
               <h2 className="text-2xl font-bold tracking-normal">{title || (page ? "Wiki-Seite bearbeiten" : "Wiki-Seite anlegen")}</h2>
-              <p className="text-sm text-white/75">Inhalte strukturieren, Slug pflegen und veröffentlichen.</p>
             </div>
             <div className="flex items-center gap-2">
               <Button className="border-white/20 bg-white/10 text-white hover:bg-white/20" icon={<Eye size={16} />} onClick={() => setPreview((current) => !current)}>

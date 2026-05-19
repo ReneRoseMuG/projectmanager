@@ -30,7 +30,6 @@ import { useNotes } from "../../hooks/useNotes";
 import { useProjectFeatureLinks } from "../../hooks/useDocLinks";
 import { useTickets } from "../../hooks/useTickets";
 import { useWikiImport } from "../../hooks/useWikiImport";
-import { formatHumanDate } from "../../utils/date";
 import { priorityLabels, projectStatusLabels, taskStatusLabels, taskStatusTones, ticketStatusLabels, ticketStatusTones } from "../../utils/domainLabels";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
@@ -387,7 +386,6 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       <FormModal
         open={open}
         title={project ? "Projekt bearbeiten" : "Projekt anlegen"}
-        subtitle={project ? `Zuletzt aktualisiert am ${formatHumanDate(project.updatedAt)}` : "Stammdaten, Status und Beziehungen festlegen."}
         icon={<FolderKanban size={21} />}
         breadcrumb={["Projekte", project ? project.name : "Neues Projekt"]}
         onSubmit={submit}

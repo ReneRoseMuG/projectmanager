@@ -5,6 +5,7 @@
  *
  * Abgedeckte Regeln:
  * - RichTextInlineField rendert HTML-Leseansicht, Placeholder, readOnly und Edit-Zustand.
+ * - Im Edit-Zustand wird nur die feste Toolbar gerendert, keine zusätzliche Auswahl- oder Floating-Bar.
  * - TipTap wird im Test gemockt, die Leseansicht wird real gerendert.
  *
  * Fehlerfälle:
@@ -17,7 +18,6 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, screen } from "@testing-library/dom";
 import { act, cleanup, render } from "@testing-library/react";
-import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RichTextInlineField } from "../rich-text-inline-field";
 
@@ -124,9 +124,7 @@ vi.mock("@tiptap/react", () => ({
     tiptapMock.config = config;
     return editor;
   }),
-  EditorContent: ({ editor }: { editor: MockEditor }) => <div data-testid="tiptap-editor-content" tabIndex={0} onBlur={() => tiptapMock.config?.onBlur?.({ editor })} />,
-  BubbleMenu: ({ children }: { children: React.ReactNode }) => <div data-testid="bubble-menu-wrapper">{children}</div>,
-  FloatingMenu: ({ children }: { children: React.ReactNode }) => <div data-testid="floating-menu-wrapper">{children}</div>
+  EditorContent: ({ editor }: { editor: MockEditor }) => <div data-testid="tiptap-editor-content" tabIndex={0} onBlur={() => tiptapMock.config?.onBlur?.({ editor })} />
 }));
 
 afterEach(() => {
@@ -246,6 +244,8 @@ describe("RichTextInlineField", () => {
     fireEvent.click(screen.getByTestId("field-view"));
 
     expect(screen.getByTestId("rich-text-toolbar")).toBeInTheDocument();
+    expect(screen.queryByTestId("bubble-menu")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("floating-menu")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Zitat" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Formatierung entfernen" })).toBeInTheDocument();
   });
