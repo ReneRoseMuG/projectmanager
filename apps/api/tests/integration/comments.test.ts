@@ -37,7 +37,7 @@ describe("Comments API", () => {
       .expect(201);
 
     expect(res.body.body).toBe("Erster Kommentar");
-    expect(res.body.taskId).toBe(task.id);
+    expect(res.body.owners).toEqual([{ type: "task", id: task.id }]);
   });
 
   it("POST ohne body gibt 400 zurueck", async () => {

@@ -30,7 +30,11 @@ export function CalendarPage() {
   const submit = async (input: EventInput, eventId?: number) => {
     try {
       if (eventId) {
-        await events.updateEvent(eventId, input);
+        const expectedVersion = selectedEvent?.id === eventId ? selectedEvent.version : undefined;
+        if (!expectedVersion) {
+          throw new Error("Event version is missing");
+        }
+        await events.updateEvent(eventId, { ...input, expectedVersion });
         showToast({ tone: "success", title: "Termin aktualisiert" });
         return;
       }
@@ -69,7 +73,7 @@ export function CalendarPage() {
             }}
             onEventMove={async (event, startTime, endTime) => {
               try {
-                await events.updateEvent(event.id, { startTime, endTime });
+                await events.updateEvent(event.id, { startTime, endTime, expectedVersion: event.version });
                 showToast({ tone: "success", title: "Termin verschoben" });
               } catch (eventError) {
                 showToast({ tone: "error", title: "Termin konnte nicht verschoben werden", message: errorMessage(eventError) });

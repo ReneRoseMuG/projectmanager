@@ -12,7 +12,6 @@ export const TICKET_TYPES = ["bug", "improvement", "question", "task"] as const;
 export const TICKET_STATUSES = ["open", "in_progress", "in_review", "resolved", "closed"] as const;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
-export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "backlogItem", "wikiPage", "ticket"] as const;
 
 export const appSettings = sqliteTable("app_settings", {
   key: text("key").primaryKey(),
@@ -93,10 +92,6 @@ export const tasks = sqliteTable(
 export const comments = sqliteTable("comments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   seedRunId: text("seed_run_id").references(() => seedRuns.id),
-  taskId: integer("task_id")
-    .references(() => tasks.id, { onDelete: "cascade" }),
-  entityType: text("entity_type", { enum: COMMENT_ENTITY_TYPES }).notNull().default("task"),
-  entityId: integer("entity_id").notNull(),
   body: text("body").notNull(),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -270,10 +265,6 @@ export const attachments = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     seedRunId: text("seed_run_id").references(() => seedRuns.id),
-    projectId: integer("project_id").references(() => projects.id, { onDelete: "cascade" }),
-    taskId: integer("task_id").references(() => tasks.id, { onDelete: "cascade" }),
-    featureId: integer("feature_id").references(() => features.id, { onDelete: "cascade" }),
-    ticketId: integer("ticket_id").references(() => tickets.id, { onDelete: "cascade" }),
     originalName: text("original_name").notNull(),
     filename: text("filename").notNull(),
     mimetype: text("mimetype").notNull(),
@@ -283,16 +274,7 @@ export const attachments = sqliteTable(
     updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
     updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
-  },
-  (table) => ({
-    ownerCheck: check(
-      "attachments_exactly_one_owner",
-      sql`(${table.projectId} is not null and ${table.taskId} is null and ${table.featureId} is null and ${table.ticketId} is null)
-       or (${table.projectId} is null and ${table.taskId} is not null and ${table.featureId} is null and ${table.ticketId} is null)
-       or (${table.projectId} is null and ${table.taskId} is null and ${table.featureId} is not null and ${table.ticketId} is null)
-       or (${table.projectId} is null and ${table.taskId} is null and ${table.featureId} is null and ${table.ticketId} is not null)`
-    )
-  })
+  }
 );
 
 export const projectAttachments = sqliteTable(
@@ -368,11 +350,44 @@ export const events = sqliteTable("events", {
   endTime: text("end_time").notNull(),
   isAllDay: integer("is_all_day", { mode: "boolean" }).notNull().default(false),
   color: text("color").default("#6366f1"),
-  projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
-  taskId: integer("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  version: integer("version").notNull().default(1),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
+
+export const projectEvents = sqliteTable(
+  "project_events",
+  {
+    seedRunId: text("seed_run_id").references(() => seedRuns.id),
+    projectId: integer("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    projectEventUnique: uniqueIndex("project_events_parent_event_unique").on(table.projectId, table.eventId)
+  })
+);
+
+export const taskEvents = sqliteTable(
+  "task_events",
+  {
+    seedRunId: text("seed_run_id").references(() => seedRuns.id),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    taskEventUnique: uniqueIndex("task_events_parent_event_unique").on(table.taskId, table.eventId)
+  })
+);
 
 export const features = sqliteTable("features", {
   id: integer("id").primaryKey({ autoIncrement: true }),

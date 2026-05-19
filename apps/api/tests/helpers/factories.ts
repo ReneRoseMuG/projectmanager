@@ -72,13 +72,13 @@ export interface TestNote {
 
 export interface TestEvent {
   id: number;
+  owners: Array<{ type: "project" | "task"; id: number }>;
   title: string;
   startTime: string;
   endTime: string;
   isAllDay: boolean;
   color: string | null;
-  projectId: number | null;
-  taskId: number | null;
+  version: number;
 }
 
 export interface TestComment {
@@ -316,8 +316,7 @@ export async function createEvent(
     startTime: string;
     endTime: string;
     isAllDay: boolean;
-    projectId: number | null;
-    taskId: number | null;
+    owners: Array<{ type: "project" | "task"; id: number }>;
     color: string | null;
   }> = {}
 ): Promise<TestEvent> {

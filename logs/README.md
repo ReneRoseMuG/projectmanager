@@ -2,6 +2,10 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 19.05.26 | 12 | Events Owner-Junction-Modell | ✅ |
+| 19.05.26 | Fix | Events Owner-Junction Folgeauftrag | ✅ |
+| 19.05.26 | 9 | Legacy-Spalten Cleanup | ✅ |
+| 19.05.26 | Fix | Agents Architekturleitplanken | ✅ |
 | 19.05.26 | Fix | Dump-Registry Neue Tabellen | ✅ |
 | 19.05.26 | Fix | Test-Fixtures Expected Version | ✅ |
 | 19.05.26 | 10 | Test- und Abnahme-Gate | ⚠️ |

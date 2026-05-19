@@ -21,11 +21,17 @@ import {
   TICKET_STATUSES,
   TICKET_TYPES,
   attachments,
+  backlogItemComments,
   backlogItems,
   comments,
   events,
+  featureAttachments,
+  featureComments,
   features,
   notes,
+  projectAttachments,
+  projectComments,
+  projectEvents,
   projectFeatures,
   projectNotes,
   projectTags,
@@ -35,19 +41,26 @@ import {
   seedRunItems,
   seedRuns,
   tags,
+  taskAttachments,
+  taskComments,
+  taskEvents,
   featureTasks,
   featureTickets,
   taskNotes,
   taskTags,
   taskTickets,
   tasks,
+  ticketAttachments,
+  ticketComments,
   ticketNotes,
   ticketRelations,
   ticketTags,
   tickets,
+  useCaseComments,
   useCases,
   useCaseTasks,
   useCaseTickets,
+  wikiPageComments,
   wikiPages
 } from "../db/schema.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
@@ -80,8 +93,21 @@ const VISUAL_SEED_TABLES = [
   "wiki_pages",
   "notes",
   "comments",
+  "project_comments",
+  "task_comments",
+  "feature_comments",
+  "use_case_comments",
+  "backlog_item_comments",
+  "wiki_page_comments",
+  "ticket_comments",
   "events",
+  "project_events",
+  "task_events",
   "attachments",
+  "project_attachments",
+  "task_attachments",
+  "feature_attachments",
+  "ticket_attachments",
   "project_tags",
   "task_tags",
   "tickets",
@@ -270,11 +296,15 @@ function externalCountForProjects(database: DbClient, seedRunId: string, project
       .from(wikiPages)
       .where(and(inArray(wikiPages.projectId, projectIds), or(isNull(wikiPages.seedRunId), ne(wikiPages.seedRunId, seedRunId))))
       .all().length +
-    database.select({ id: events.id }).from(events).where(and(inArray(events.projectId, projectIds), or(isNull(events.seedRunId), ne(events.seedRunId, seedRunId)))).all().length +
     database
-      .select({ id: attachments.id })
-      .from(attachments)
-      .where(and(inArray(attachments.projectId, projectIds), or(isNull(attachments.seedRunId), ne(attachments.seedRunId, seedRunId))))
+      .select({ projectId: projectEvents.projectId })
+      .from(projectEvents)
+      .where(and(inArray(projectEvents.projectId, projectIds), or(isNull(projectEvents.seedRunId), ne(projectEvents.seedRunId, seedRunId))))
+      .all().length +
+    database
+      .select({ projectId: projectAttachments.projectId })
+      .from(projectAttachments)
+      .where(and(inArray(projectAttachments.projectId, projectIds), or(isNull(projectAttachments.seedRunId), ne(projectAttachments.seedRunId, seedRunId))))
       .all().length +
     database
       .select({ projectId: projectTags.projectId })
@@ -292,9 +322,9 @@ function externalCountForProjects(database: DbClient, seedRunId: string, project
       .where(and(inArray(projectFeatures.projectId, projectIds), or(isNull(projectFeatures.seedRunId), ne(projectFeatures.seedRunId, seedRunId))))
       .all().length +
     database
-      .select({ id: comments.id })
-      .from(comments)
-      .where(and(eq(comments.entityType, "project"), inArray(comments.entityId, projectIds), or(isNull(comments.seedRunId), ne(comments.seedRunId, seedRunId))))
+      .select({ projectId: projectComments.projectId })
+      .from(projectComments)
+      .where(and(inArray(projectComments.projectId, projectIds), or(isNull(projectComments.seedRunId), ne(projectComments.seedRunId, seedRunId))))
       .all().length
   );
 }
@@ -303,11 +333,15 @@ function externalCountForTasks(database: DbClient, seedRunId: string, taskIds: n
   if (taskIds.length === 0) return 0;
   return (
     database.select({ id: tasks.id }).from(tasks).where(and(inArray(tasks.parentId, taskIds), or(isNull(tasks.seedRunId), ne(tasks.seedRunId, seedRunId)))).all().length +
-    database.select({ id: events.id }).from(events).where(and(inArray(events.taskId, taskIds), or(isNull(events.seedRunId), ne(events.seedRunId, seedRunId)))).all().length +
     database
-      .select({ id: attachments.id })
-      .from(attachments)
-      .where(and(inArray(attachments.taskId, taskIds), or(isNull(attachments.seedRunId), ne(attachments.seedRunId, seedRunId))))
+      .select({ taskId: taskEvents.taskId })
+      .from(taskEvents)
+      .where(and(inArray(taskEvents.taskId, taskIds), or(isNull(taskEvents.seedRunId), ne(taskEvents.seedRunId, seedRunId))))
+      .all().length +
+    database
+      .select({ taskId: taskAttachments.taskId })
+      .from(taskAttachments)
+      .where(and(inArray(taskAttachments.taskId, taskIds), or(isNull(taskAttachments.seedRunId), ne(taskAttachments.seedRunId, seedRunId))))
       .all().length +
     database.select({ taskId: taskTags.taskId }).from(taskTags).where(and(inArray(taskTags.taskId, taskIds), or(isNull(taskTags.seedRunId), ne(taskTags.seedRunId, seedRunId)))).all().length +
     database.select({ taskId: taskNotes.taskId }).from(taskNotes).where(and(inArray(taskNotes.taskId, taskIds), or(isNull(taskNotes.seedRunId), ne(taskNotes.seedRunId, seedRunId)))).all().length +
@@ -332,9 +366,9 @@ function externalCountForTasks(database: DbClient, seedRunId: string, taskIds: n
       .where(and(inArray(taskTickets.ownerId, taskIds), or(isNull(taskTickets.seedRunId), ne(taskTickets.seedRunId, seedRunId))))
       .all().length +
     database
-      .select({ id: comments.id })
-      .from(comments)
-      .where(and(eq(comments.entityType, "task"), inArray(comments.entityId, taskIds), or(isNull(comments.seedRunId), ne(comments.seedRunId, seedRunId))))
+      .select({ taskId: taskComments.taskId })
+      .from(taskComments)
+      .where(and(inArray(taskComments.taskId, taskIds), or(isNull(taskComments.seedRunId), ne(taskComments.seedRunId, seedRunId))))
       .all().length
   );
 }
@@ -344,9 +378,9 @@ function externalCountForTickets(database: DbClient, seedRunId: string, ticketId
   return (
     database.select({ id: tickets.id }).from(tickets).where(and(inArray(tickets.parentId, ticketIds), or(isNull(tickets.seedRunId), ne(tickets.seedRunId, seedRunId)))).all().length +
     database
-      .select({ id: attachments.id })
-      .from(attachments)
-      .where(and(inArray(attachments.ticketId, ticketIds), or(isNull(attachments.seedRunId), ne(attachments.seedRunId, seedRunId))))
+      .select({ ticketId: ticketAttachments.ticketId })
+      .from(ticketAttachments)
+      .where(and(inArray(ticketAttachments.ticketId, ticketIds), or(isNull(ticketAttachments.seedRunId), ne(ticketAttachments.seedRunId, seedRunId))))
       .all().length +
     database.select({ ticketId: ticketTags.ticketId }).from(ticketTags).where(and(inArray(ticketTags.ticketId, ticketIds), or(isNull(ticketTags.seedRunId), ne(ticketTags.seedRunId, seedRunId)))).all().length +
     database.select({ ticketId: ticketNotes.ticketId }).from(ticketNotes).where(and(inArray(ticketNotes.ticketId, ticketIds), or(isNull(ticketNotes.seedRunId), ne(ticketNotes.seedRunId, seedRunId)))).all().length +
@@ -365,9 +399,9 @@ function externalCountForTickets(database: DbClient, seedRunId: string, ticketId
       .where(and(inArray(ticketRelations.targetTicketId, ticketIds), or(isNull(ticketRelations.seedRunId), ne(ticketRelations.seedRunId, seedRunId))))
       .all().length +
     database
-      .select({ id: comments.id })
-      .from(comments)
-      .where(and(eq(comments.entityType, "ticket"), inArray(comments.entityId, ticketIds), or(isNull(comments.seedRunId), ne(comments.seedRunId, seedRunId))))
+      .select({ ticketId: ticketComments.ticketId })
+      .from(ticketComments)
+      .where(and(inArray(ticketComments.ticketId, ticketIds), or(isNull(ticketComments.seedRunId), ne(ticketComments.seedRunId, seedRunId))))
       .all().length
   );
 }
@@ -396,9 +430,9 @@ function externalCountForFeatures(database: DbClient, seedRunId: string, feature
       .where(and(inArray(backlogItems.featureId, featureIds), or(isNull(backlogItems.seedRunId), ne(backlogItems.seedRunId, seedRunId))))
       .all().length +
     database
-      .select({ id: attachments.id })
-      .from(attachments)
-      .where(and(inArray(attachments.featureId, featureIds), or(isNull(attachments.seedRunId), ne(attachments.seedRunId, seedRunId))))
+      .select({ featureId: featureAttachments.featureId })
+      .from(featureAttachments)
+      .where(and(inArray(featureAttachments.featureId, featureIds), or(isNull(featureAttachments.seedRunId), ne(featureAttachments.seedRunId, seedRunId))))
       .all().length +
     database
       .select({ featureId: projectFeatures.featureId })
@@ -416,9 +450,9 @@ function externalCountForFeatures(database: DbClient, seedRunId: string, feature
       .where(and(inArray(featureTickets.ownerId, featureIds), or(isNull(featureTickets.seedRunId), ne(featureTickets.seedRunId, seedRunId))))
       .all().length +
     database
-      .select({ id: comments.id })
-      .from(comments)
-      .where(and(eq(comments.entityType, "feature"), inArray(comments.entityId, featureIds), or(isNull(comments.seedRunId), ne(comments.seedRunId, seedRunId))))
+      .select({ featureId: featureComments.featureId })
+      .from(featureComments)
+      .where(and(inArray(featureComments.featureId, featureIds), or(isNull(featureComments.seedRunId), ne(featureComments.seedRunId, seedRunId))))
       .all().length
   );
 }
@@ -442,9 +476,9 @@ function externalCountForUseCases(database: DbClient, seedRunId: string, useCase
       .where(and(inArray(useCaseTickets.ownerId, useCaseIds), or(isNull(useCaseTickets.seedRunId), ne(useCaseTickets.seedRunId, seedRunId))))
       .all().length +
     database
-      .select({ id: comments.id })
-      .from(comments)
-      .where(and(eq(comments.entityType, "useCase"), inArray(comments.entityId, useCaseIds), or(isNull(comments.seedRunId), ne(comments.seedRunId, seedRunId))))
+      .select({ useCaseId: useCaseComments.useCaseId })
+      .from(useCaseComments)
+      .where(and(inArray(useCaseComments.useCaseId, useCaseIds), or(isNull(useCaseComments.seedRunId), ne(useCaseComments.seedRunId, seedRunId))))
       .all().length
   );
 }
@@ -462,9 +496,9 @@ function externalCountForNotes(database: DbClient, seedRunId: string, noteIds: n
 function externalCountForBacklog(database: DbClient, seedRunId: string, backlogIds: number[]): number {
   if (backlogIds.length === 0) return 0;
   return database
-    .select({ id: comments.id })
-    .from(comments)
-    .where(and(eq(comments.entityType, "backlogItem"), inArray(comments.entityId, backlogIds), or(isNull(comments.seedRunId), ne(comments.seedRunId, seedRunId))))
+    .select({ backlogItemId: backlogItemComments.backlogItemId })
+    .from(backlogItemComments)
+    .where(and(inArray(backlogItemComments.backlogItemId, backlogIds), or(isNull(backlogItemComments.seedRunId), ne(backlogItemComments.seedRunId, seedRunId))))
     .all().length;
 }
 
@@ -477,9 +511,9 @@ function externalCountForWiki(database: DbClient, seedRunId: string, wikiIds: nu
       .where(and(inArray(wikiPages.parentId, wikiIds), or(isNull(wikiPages.seedRunId), ne(wikiPages.seedRunId, seedRunId))))
       .all().length +
     database
-      .select({ id: comments.id })
-      .from(comments)
-      .where(and(eq(comments.entityType, "wikiPage"), inArray(comments.entityId, wikiIds), or(isNull(comments.seedRunId), ne(comments.seedRunId, seedRunId))))
+      .select({ wikiPageId: wikiPageComments.wikiPageId })
+      .from(wikiPageComments)
+      .where(and(inArray(wikiPageComments.wikiPageId, wikiIds), or(isNull(wikiPageComments.seedRunId), ne(wikiPageComments.seedRunId, seedRunId))))
       .all().length
   );
 }
@@ -943,9 +977,24 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
       recordItem("content_files", wikiChildPath);
 
       const eventInputs = [
-        { title: `${prefix} Termin Projekt`, projectId: requiredAt(createdProjects, 0, "project").id, taskId: null, startTime: "2026-06-15T09:00:00", endTime: "2026-06-15T11:00:00", isAllDay: false },
-        { title: `${prefix} Termin Aufgabe`, projectId: requiredAt(createdProjects, 1, "project").id, taskId: requiredAt(createdTasks, 1, "task").id, startTime: "2026-06-16T13:00:00", endTime: "2026-06-16T14:30:00", isAllDay: false },
-        { title: `${prefix} Ganztagestermin`, projectId: null, taskId: null, startTime: "2026-06-17T00:00:00", endTime: "2026-06-17T23:59:59", isAllDay: true }
+        {
+          title: `${prefix} Termin Projekt`,
+          owners: [{ type: "project" as const, id: requiredAt(createdProjects, 0, "project").id }],
+          startTime: "2026-06-15T09:00:00",
+          endTime: "2026-06-15T11:00:00",
+          isAllDay: false
+        },
+        {
+          title: `${prefix} Termin Aufgabe`,
+          owners: [
+            { type: "project" as const, id: requiredAt(createdProjects, 1, "project").id },
+            { type: "task" as const, id: requiredAt(createdTasks, 1, "task").id }
+          ],
+          startTime: "2026-06-16T13:00:00",
+          endTime: "2026-06-16T14:30:00",
+          isAllDay: false
+        },
+        { title: `${prefix} Ganztagestermin`, owners: [], startTime: "2026-06-17T00:00:00", endTime: "2026-06-17T23:59:59", isAllDay: true }
       ];
       for (const [index, eventInput] of eventInputs.entries()) {
         const event = tx
@@ -958,58 +1007,80 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
             endTime: eventInput.endTime,
             isAllDay: eventInput.isAllDay,
             color: requiredAt(EVENT_COLORS, index, "event color"),
-            projectId: eventInput.projectId,
-            taskId: eventInput.taskId,
             createdAt: now,
             updatedAt: now
           })
           .returning()
           .get();
+        for (const owner of eventInput.owners) {
+          if (owner.type === "project") {
+            tx.insert(projectEvents).values({ seedRunId: runId, projectId: owner.id, eventId: event.id }).run();
+            recordItem("project_events", `${owner.id}:${event.id}`);
+          } else {
+            tx.insert(taskEvents).values({ seedRunId: runId, taskId: owner.id, eventId: event.id }).run();
+            recordItem("task_events", `${owner.id}:${event.id}`);
+          }
+        }
         recordItem("events", String(event.id));
       }
 
       const commentTargets = [
-        { entityType: "project" as const, entityId: requiredAt(createdProjects, 0, "project").id, taskId: null },
-        { entityType: "task" as const, entityId: requiredAt(createdTasks, 0, "task").id, taskId: requiredAt(createdTasks, 0, "task").id },
-        { entityType: "feature" as const, entityId: requiredAt(createdFeatures, 0, "feature").id, taskId: null },
-        { entityType: "useCase" as const, entityId: requiredAt(createdUseCases, 0, "use case").id, taskId: null },
-        { entityType: "backlogItem" as const, entityId: requiredAt(createdBacklog, 0, "backlog item").id, taskId: null },
-        { entityType: "wikiPage" as const, entityId: wikiRoot.id, taskId: null },
-        { entityType: "ticket" as const, entityId: requiredAt(createdTickets, 0, "ticket").id, taskId: null }
+        { type: "project" as const, id: requiredAt(createdProjects, 0, "project").id },
+        { type: "task" as const, id: requiredAt(createdTasks, 0, "task").id },
+        { type: "feature" as const, id: requiredAt(createdFeatures, 0, "feature").id },
+        { type: "useCase" as const, id: requiredAt(createdUseCases, 0, "use case").id },
+        { type: "backlogItem" as const, id: requiredAt(createdBacklog, 0, "backlog item").id },
+        { type: "wikiPage" as const, id: wikiRoot.id },
+        { type: "ticket" as const, id: requiredAt(createdTickets, 0, "ticket").id }
       ];
       for (const target of commentTargets) {
         const comment = tx
           .insert(comments)
           .values({
             seedRunId: runId,
-            taskId: target.taskId,
-            entityType: target.entityType,
-            entityId: target.entityId,
-            body: `${prefix} Kommentar für ${target.entityType}.`,
+            body: `${prefix} Kommentar für ${target.type}.`,
             createdAt: now
           })
           .returning()
           .get();
         recordItem("comments", String(comment.id));
+        if (target.type === "project") {
+          tx.insert(projectComments).values({ seedRunId: runId, projectId: target.id, commentId: comment.id }).run();
+          recordItem("project_comments", `${target.id}:${comment.id}`);
+        } else if (target.type === "task") {
+          tx.insert(taskComments).values({ seedRunId: runId, taskId: target.id, commentId: comment.id }).run();
+          recordItem("task_comments", `${target.id}:${comment.id}`);
+        } else if (target.type === "feature") {
+          tx.insert(featureComments).values({ seedRunId: runId, featureId: target.id, commentId: comment.id }).run();
+          recordItem("feature_comments", `${target.id}:${comment.id}`);
+        } else if (target.type === "useCase") {
+          tx.insert(useCaseComments).values({ seedRunId: runId, useCaseId: target.id, commentId: comment.id }).run();
+          recordItem("use_case_comments", `${target.id}:${comment.id}`);
+        } else if (target.type === "backlogItem") {
+          tx.insert(backlogItemComments).values({ seedRunId: runId, backlogItemId: target.id, commentId: comment.id }).run();
+          recordItem("backlog_item_comments", `${target.id}:${comment.id}`);
+        } else if (target.type === "wikiPage") {
+          tx.insert(wikiPageComments).values({ seedRunId: runId, wikiPageId: target.id, commentId: comment.id }).run();
+          recordItem("wiki_page_comments", `${target.id}:${comment.id}`);
+        } else {
+          tx.insert(ticketComments).values({ seedRunId: runId, ticketId: target.id, commentId: comment.id }).run();
+          recordItem("ticket_comments", `${target.id}:${comment.id}`);
+        }
       }
 
       const attachmentInputs = [
-        { kind: "project", projectId: requiredAt(createdProjects, 0, "project").id, taskId: null, featureId: null, ticketId: null },
-        { kind: "task", projectId: null, taskId: requiredAt(createdTasks, 0, "task").id, featureId: null, ticketId: null },
-        { kind: "feature", projectId: null, taskId: null, featureId: requiredAt(createdFeatures, 0, "feature").id, ticketId: null },
-        { kind: "ticket", projectId: null, taskId: null, featureId: null, ticketId: requiredAt(createdTickets, 0, "ticket").id }
+        { type: "project" as const, id: requiredAt(createdProjects, 0, "project").id },
+        { type: "task" as const, id: requiredAt(createdTasks, 0, "task").id },
+        { type: "feature" as const, id: requiredAt(createdFeatures, 0, "feature").id },
+        { type: "ticket" as const, id: requiredAt(createdTickets, 0, "ticket").id }
       ];
       for (const input of attachmentInputs) {
-        const file = writeSeedAttachment(runId, input.kind, `${prefix} Attachment für ${input.kind}.`);
+        const file = writeSeedAttachment(runId, input.type, `${prefix} Attachment für ${input.type}.`);
         createdUploadFilenames.push(file.filename);
         const attachment = tx
           .insert(attachments)
           .values({
             seedRunId: runId,
-            projectId: input.projectId,
-            taskId: input.taskId,
-            featureId: input.featureId,
-            ticketId: input.ticketId,
             originalName: file.originalName,
             filename: file.filename,
             mimetype: "text/plain",
@@ -1019,6 +1090,19 @@ export function createVisualSeedRun(database: DbClient, input: SeedRunCreateRequ
           .returning()
           .get();
         recordItem("attachments", String(attachment.id));
+        if (input.type === "project") {
+          tx.insert(projectAttachments).values({ seedRunId: runId, projectId: input.id, attachmentId: attachment.id }).run();
+          recordItem("project_attachments", `${input.id}:${attachment.id}`);
+        } else if (input.type === "task") {
+          tx.insert(taskAttachments).values({ seedRunId: runId, taskId: input.id, attachmentId: attachment.id }).run();
+          recordItem("task_attachments", `${input.id}:${attachment.id}`);
+        } else if (input.type === "feature") {
+          tx.insert(featureAttachments).values({ seedRunId: runId, featureId: input.id, attachmentId: attachment.id }).run();
+          recordItem("feature_attachments", `${input.id}:${attachment.id}`);
+        } else {
+          tx.insert(ticketAttachments).values({ seedRunId: runId, ticketId: input.id, attachmentId: attachment.id }).run();
+          recordItem("ticket_attachments", `${input.id}:${attachment.id}`);
+        }
         recordItem("upload_files", file.filename);
       }
 
@@ -1078,6 +1162,13 @@ export function deleteSeedRun(database: DbClient, id: string, confirmationId: st
   };
 
   database.transaction((tx) => {
+    addDeleted("ticket_comments", tx.delete(ticketComments).where(eq(ticketComments.seedRunId, id)).run().changes);
+    addDeleted("wiki_page_comments", tx.delete(wikiPageComments).where(eq(wikiPageComments.seedRunId, id)).run().changes);
+    addDeleted("backlog_item_comments", tx.delete(backlogItemComments).where(eq(backlogItemComments.seedRunId, id)).run().changes);
+    addDeleted("use_case_comments", tx.delete(useCaseComments).where(eq(useCaseComments.seedRunId, id)).run().changes);
+    addDeleted("feature_comments", tx.delete(featureComments).where(eq(featureComments.seedRunId, id)).run().changes);
+    addDeleted("task_comments", tx.delete(taskComments).where(eq(taskComments.seedRunId, id)).run().changes);
+    addDeleted("project_comments", tx.delete(projectComments).where(eq(projectComments.seedRunId, id)).run().changes);
     addDeleted("comments", tx.delete(comments).where(eq(comments.seedRunId, id)).run().changes);
     addDeleted("ticket_relations", tx.delete(ticketRelations).where(eq(ticketRelations.seedRunId, id)).run().changes);
     addDeleted("use_case_tickets", tx.delete(useCaseTickets).where(eq(useCaseTickets.seedRunId, id)).run().changes);
@@ -1094,7 +1185,13 @@ export function deleteSeedRun(database: DbClient, id: string, confirmationId: st
     addDeleted("ticket_notes", tx.delete(ticketNotes).where(eq(ticketNotes.seedRunId, id)).run().changes);
     addDeleted("task_notes", tx.delete(taskNotes).where(eq(taskNotes.seedRunId, id)).run().changes);
     addDeleted("project_notes", tx.delete(projectNotes).where(eq(projectNotes.seedRunId, id)).run().changes);
+    addDeleted("task_events", tx.delete(taskEvents).where(eq(taskEvents.seedRunId, id)).run().changes);
+    addDeleted("project_events", tx.delete(projectEvents).where(eq(projectEvents.seedRunId, id)).run().changes);
     addDeleted("events", tx.delete(events).where(eq(events.seedRunId, id)).run().changes);
+    addDeleted("ticket_attachments", tx.delete(ticketAttachments).where(eq(ticketAttachments.seedRunId, id)).run().changes);
+    addDeleted("feature_attachments", tx.delete(featureAttachments).where(eq(featureAttachments.seedRunId, id)).run().changes);
+    addDeleted("task_attachments", tx.delete(taskAttachments).where(eq(taskAttachments.seedRunId, id)).run().changes);
+    addDeleted("project_attachments", tx.delete(projectAttachments).where(eq(projectAttachments.seedRunId, id)).run().changes);
     addDeleted("attachments", tx.delete(attachments).where(eq(attachments.seedRunId, id)).run().changes);
     addDeleted("backlog_items", tx.delete(backlogItems).where(eq(backlogItems.seedRunId, id)).run().changes);
     addDeleted("notes", tx.delete(notes).where(eq(notes.seedRunId, id)).run().changes);

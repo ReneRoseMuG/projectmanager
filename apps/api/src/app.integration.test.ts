@@ -125,7 +125,7 @@ describe("Projekt Manager API integration", () => {
 
     await request(app.server).get(`/api/tasks/${createdTask.id}/comments`).expect(200, []);
     const comment = (await request(app.server).post(`/api/tasks/${createdTask.id}/comments`).send({ body: "Kommentar" }).expect(201)).body as Comment;
-    expect(comment.taskId).toBe(createdTask.id);
+    expect(comment.owners).toEqual([{ type: "task", id: createdTask.id }]);
     await request(app.server).delete(`/api/comments/${comment.id}`).expect(204);
 
     await request(app.server).get(`/api/projects/${createdProject.id}/notes`).expect(200, []);
@@ -163,8 +163,7 @@ describe("Projekt Manager API integration", () => {
         .attach("file", Buffer.from("project file"), "project.txt")
         .expect(201)
     ).body as Attachment;
-    expect(projectAttachment.projectId).toBe(createdProject.id);
-    expect(projectAttachment.taskId).toBeNull();
+    expect(projectAttachment.owners).toEqual([{ type: "project", id: createdProject.id }]);
     await request(app.server).get(projectAttachment.url).expect(200);
 
     const taskAttachment = (
@@ -173,7 +172,7 @@ describe("Projekt Manager API integration", () => {
         .attach("file", Buffer.from("task file"), "task.txt")
         .expect(201)
     ).body as Attachment;
-    expect(taskAttachment.taskId).toBe(createdTask.id);
+    expect(taskAttachment.owners).toEqual([{ type: "task", id: createdTask.id }]);
 
     const projectAttachments = (await request(app.server).get(`/api/projects/${createdProject.id}/attachments`).expect(200)).body as Attachment[];
     expect(projectAttachments.map((attachment) => attachment.id)).toContain(projectAttachment.id);
@@ -189,12 +188,18 @@ describe("Projekt Manager API integration", () => {
           title: "Review",
           startTime: "2026-05-20T09:00:00.000Z",
           endTime: "2026-05-20T10:00:00.000Z",
-          projectId: createdProject.id,
-          taskId: createdTask.id
+          owners: [
+            { type: "project", id: createdProject.id },
+            { type: "task", id: createdTask.id }
+          ]
         })
         .expect(201)
     ).body as Event;
     expect(createdEvent.color).toBe("#6366f1");
+    expect(createdEvent.owners).toEqual([
+      { type: "project", id: createdProject.id },
+      { type: "task", id: createdTask.id }
+    ]);
 
     const loadedEvent = (await request(app.server).get(`/api/events/${createdEvent.id}`).expect(200)).body as Event;
     expect(loadedEvent.id).toBe(createdEvent.id);
@@ -202,7 +207,12 @@ describe("Projekt Manager API integration", () => {
     const rangeEvents = (await request(app.server).get("/api/events").query({ from: "2026-05-20", to: "2026-05-21" }).expect(200)).body as Event[];
     expect(rangeEvents.map((event) => event.id)).toContain(createdEvent.id);
 
-    const patchedEvent = (await request(app.server).patch(`/api/events/${createdEvent.id}`).send({ title: "Review verschoben" }).expect(200)).body as Event;
+    const patchedEvent = (
+      await request(app.server)
+        .patch(`/api/events/${createdEvent.id}`)
+        .send({ title: "Review verschoben", expectedVersion: createdEvent.version })
+        .expect(200)
+    ).body as Event;
     expect(patchedEvent.title).toBe("Review verschoben");
     await request(app.server).delete(`/api/events/${createdEvent.id}`).expect(204);
 

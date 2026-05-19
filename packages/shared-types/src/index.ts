@@ -177,9 +177,6 @@ export interface TicketRelationInput {
 
 export interface Comment {
   id: number;
-  taskId: number | null;
-  entityType: CommentEntityType;
-  entityId: number;
   owners: CommentOwner[];
   body: string;
   createdAt: string;
@@ -214,10 +211,6 @@ export type NoteUpdate = WithExpectedVersion<NoteInput>;
 
 export interface Attachment {
   id: number;
-  projectId: number | null;
-  taskId: number | null;
-  featureId: number | null;
-  ticketId: number | null;
   owners: AttachmentOwner[];
   originalName: string;
   filename: string;
@@ -258,19 +251,21 @@ export interface AttachmentPreviewInfo {
 
 export interface Event {
   id: number;
+  owners: EventOwner[];
   title: string;
   description: string | null;
   startTime: string;
   endTime: string;
   isAllDay: boolean;
   color: string | null;
-  projectId: number | null;
-  taskId: number | null;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export type CalendarEvent = Event;
+
+export type EventOwner = { type: "project" | "task"; id: number };
 
 export interface EventInput {
   title: string;
@@ -279,11 +274,10 @@ export interface EventInput {
   endTime: string;
   isAllDay?: boolean;
   color?: string | null;
-  projectId?: number | null;
-  taskId?: number | null;
+  owners?: EventOwner[];
 }
 
-export type EventUpdate = Partial<EventInput>;
+export type EventUpdate = WithExpectedVersion<Partial<EventInput>>;
 
 export interface Feature {
   id: number;

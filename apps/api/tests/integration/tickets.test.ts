@@ -403,7 +403,7 @@ describe("Tickets API", () => {
 
     const res = await supertest(app.server).post(`/api/tickets/${ticket.id}/comments`).send({ body: "Ticket comment" }).expect(201);
 
-    expect(res.body).toMatchObject({ entityType: "ticket", entityId: ticket.id, body: "Ticket comment" });
+    expect(res.body).toMatchObject({ owners: [{ type: "ticket", id: ticket.id }], body: "Ticket comment" });
   });
 
   it("Ticket comments appear in detail", async () => {
@@ -423,7 +423,7 @@ describe("Tickets API", () => {
       .attach("file", Buffer.from("Ticket file"), { filename: "ticket.txt", contentType: "text/plain" })
       .expect(201);
 
-    expect(res.body).toMatchObject({ ticketId: ticket.id, projectId: null, taskId: null, featureId: null, originalName: "ticket.txt" });
+    expect(res.body).toMatchObject({ owners: [{ type: "ticket", id: ticket.id }], originalName: "ticket.txt" });
   });
 
   it("Ticket attachments appear in detail", async () => {

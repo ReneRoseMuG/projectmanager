@@ -30,6 +30,13 @@ export interface TicketFixture {
   title: string;
 }
 
+export interface EventFixture {
+  id: number;
+  title: string;
+  version: number;
+  owners: Array<{ type: "project" | "task"; id: number }>;
+}
+
 export interface BacklogItemFixture {
   id: number;
   title: string;
@@ -158,6 +165,26 @@ export async function createTicket(request: APIRequestContext, owner: TicketOwne
   return response.json() as Promise<TicketFixture>;
 }
 
+export async function createEvent(
+  request: APIRequestContext,
+  titlePrefix: string,
+  input: Partial<{ owners: Array<{ type: "project" | "task"; id: number }>; startTime: string; endTime: string; isAllDay: boolean; color: string | null }> = {}
+) {
+  const title = uniqueTitle(titlePrefix);
+  const response = await request.post(`${apiBaseUrl}/events`, {
+    data: {
+      title,
+      startTime: input.startTime ?? "2026-12-01T10:00:00",
+      endTime: input.endTime ?? "2026-12-01T11:00:00",
+      isAllDay: input.isAllDay ?? false,
+      color: input.color ?? "#4682B4",
+      owners: input.owners ?? []
+    }
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<EventFixture>;
+}
+
 export async function createBacklogItem(request: APIRequestContext, projectId: number, titlePrefix: string, input: Partial<{ description: string; status: string; priority: string; featureId: number }> = {}) {
   const title = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/projects/${projectId}/backlog`, {
@@ -188,6 +215,12 @@ export async function deleteFeature(request: APIRequestContext, featureId: numbe
 export async function deleteTicket(request: APIRequestContext, ticketId: number | null | undefined) {
   if (ticketId) {
     await request.delete(`${apiBaseUrl}/tickets/${ticketId}`);
+  }
+}
+
+export async function deleteEvent(request: APIRequestContext, eventId: number | null | undefined) {
+  if (eventId) {
+    await request.delete(`${apiBaseUrl}/events/${eventId}`);
   }
 }
 

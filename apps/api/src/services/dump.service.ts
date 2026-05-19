@@ -46,6 +46,8 @@ const DUMP_TABLES = [
   { key: "comments", tableName: "comments" },
   { key: "attachments", tableName: "attachments" },
   { key: "events", tableName: "events" },
+  { key: "projectEvents", tableName: "project_events" },
+  { key: "taskEvents", tableName: "task_events" },
   { key: "backlogItems", tableName: "backlog_items" },
   { key: "featureRelations", tableName: "feature_relations" },
   { key: "projectTags", tableName: "project_tags" },

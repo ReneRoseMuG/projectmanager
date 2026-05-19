@@ -25,9 +25,6 @@ import { requireNonEmpty } from "./helpers.js";
 const commentSelect = {
   id: comments.id,
   seedRunId: comments.seedRunId,
-  taskId: comments.taskId,
-  entityType: comments.entityType,
-  entityId: comments.entityId,
   body: comments.body,
   version: comments.version,
   createdBy: comments.createdBy,
@@ -39,9 +36,6 @@ const commentSelect = {
 function mapComment(database: DbClient, record: CommentRecord): Comment {
   return {
     id: record.id,
-    taskId: record.taskId,
-    entityType: record.entityType,
-    entityId: record.entityId,
     owners: listCommentOwners(database, record.id),
     body: record.body,
     createdAt: record.createdAt,
@@ -263,14 +257,6 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
     .all();
 }
 
-function legacyValuesForOwner(owner: CommentOwner): Pick<CommentRecord, "taskId" | "entityType" | "entityId"> {
-  return {
-    taskId: owner.type === "task" ? owner.id : null,
-    entityType: owner.type,
-    entityId: owner.id
-  };
-}
-
 export function listEntityComments(database: DbClient, entityType: CommentEntityType, entityId: number): Comment[] {
   const owner = { type: entityType, id: entityId };
   ensureOwnerExists(database, owner);
@@ -283,7 +269,6 @@ export function createEntityComment(database: DbClient, entityType: CommentEntit
   const body = requireNonEmpty(input.body, "body");
   const created = database.transaction((tx) => {
     const comment = commentRepository.create(tx as unknown as DbClient, {
-      ...legacyValuesForOwner(owner),
       body
     });
     insertCommentLink(tx, owner, comment.id, comment.seedRunId);

@@ -22,10 +22,6 @@ export interface AttachmentUpload {
 const attachmentSelect = {
   id: attachments.id,
   seedRunId: attachments.seedRunId,
-  projectId: attachments.projectId,
-  taskId: attachments.taskId,
-  featureId: attachments.featureId,
-  ticketId: attachments.ticketId,
   originalName: attachments.originalName,
   filename: attachments.filename,
   mimetype: attachments.mimetype,
@@ -40,10 +36,6 @@ const attachmentSelect = {
 function mapAttachment(database: DbClient, record: AttachmentRecord): Attachment {
   return {
     id: record.id,
-    projectId: record.projectId,
-    taskId: record.taskId,
-    featureId: record.featureId,
-    ticketId: record.ticketId,
     owners: listAttachmentOwners(database, record.id),
     originalName: record.originalName,
     filename: record.filename,
@@ -150,15 +142,6 @@ function insertAttachmentLink(database: DbClient, owner: AttachmentOwner, attach
   database.insert(ticketAttachments).values({ seedRunId, ticketId: owner.id, attachmentId }).onConflictDoNothing().run();
 }
 
-function legacyValuesForOwner(owner: AttachmentOwner): Pick<AttachmentRecord, "projectId" | "taskId" | "featureId" | "ticketId"> {
-  return {
-    projectId: owner.type === "project" ? owner.id : null,
-    taskId: owner.type === "task" ? owner.id : null,
-    featureId: owner.type === "feature" ? owner.id : null,
-    ticketId: owner.type === "ticket" ? owner.id : null
-  };
-}
-
 async function removeAttachmentFiles(records: AttachmentCleanupRecord[]): Promise<void> {
   assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
 
@@ -222,7 +205,6 @@ async function persistAttachment(values: {
 
   const created = values.database.transaction((tx) => {
     const attachment = attachmentRepository.create(tx as unknown as DbClient, {
-      ...legacyValuesForOwner(values.owner),
       originalName: values.upload.originalName,
       filename,
       mimetype: values.upload.mimetype,

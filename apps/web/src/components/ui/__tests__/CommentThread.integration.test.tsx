@@ -43,9 +43,6 @@ const apiMocks = vi.mocked({ getEntityComments, createEntityComment, deleteEntit
 
 const initialComment: Comment = {
   id: 1,
-  taskId: null,
-  entityType: "project",
-  entityId: 7,
   owners: [{ type: "project", id: 7 }],
   body: "<p>Bestehender Kommentar</p>",
   createdAt: "2026-05-17T08:00:00.000Z",
@@ -55,9 +52,6 @@ const initialComment: Comment = {
 
 const createdComment: Comment = {
   id: 2,
-  taskId: null,
-  entityType: "project",
-  entityId: 7,
   owners: [{ type: "project", id: 7 }],
   body: "<p>Neu</p>",
   createdAt: "2026-05-17T09:00:00.000Z",

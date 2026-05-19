@@ -125,9 +125,6 @@ const fixtures = vi.hoisted(() => {
   };
   const comment = {
     id: 60,
-    taskId: null,
-    entityType: "project",
-    entityId: project.id,
     owners: [{ type: "project", id: project.id }],
     body: "<p>Kommentar</p>",
     createdAt: "2026-05-18T08:00:00.000Z",
@@ -144,10 +141,6 @@ const fixtures = vi.hoisted(() => {
   };
   const attachment = {
     id: 80,
-    projectId: project.id,
-    taskId: null,
-    featureId: null,
-    ticketId: null,
     originalName: "datei.txt",
     filename: "datei.txt",
     mimetype: "text/plain",

@@ -35,7 +35,8 @@ const projectAccent: Record<number, string> = {
 };
 
 function getEventAccent(event: CalendarEvent) {
-  return event.color ?? (event.projectId ? projectAccent[event.projectId] : undefined) ?? theme.steel[700];
+  const projectOwner = event.owners.find((owner) => owner.type === "project");
+  return event.color ?? (projectOwner ? projectAccent[projectOwner.id] : undefined) ?? theme.steel[700];
 }
 
 export function CalendarView({ events, tasks, onDateClick, onEventClick, onEventMove }: CalendarViewProps) {
