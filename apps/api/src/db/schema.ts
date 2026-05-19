@@ -19,30 +19,6 @@ export const appSettings = sqliteTable("app_settings", {
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
 
-export const seedRuns = sqliteTable("seed_runs", {
-  id: text("id").primaryKey(),
-  label: text("label").notNull(),
-  scenario: text("scenario").notNull().default("visual"),
-  summaryJson: text("summary_json").notNull().default("{}"),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`)
-});
-
-export const seedRunItems = sqliteTable(
-  "seed_run_items",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    seedRunId: text("seed_run_id")
-      .notNull()
-      .references(() => seedRuns.id, { onDelete: "cascade" }),
-    tableName: text("table_name").notNull(),
-    recordKey: text("record_key").notNull(),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`)
-  },
-  (table) => ({
-    seedRunItemUnique: uniqueIndex("seed_run_items_run_table_record_unique").on(table.seedRunId, table.tableName, table.recordKey)
-  })
-);
-
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -54,7 +30,6 @@ export const users = sqliteTable("users", {
 
 export const projects = sqliteTable("projects", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   name: text("name").notNull(),
   description: text("description"),
   status: text("status", { enum: PROJECT_STATUSES }).notNull().default("active"),
@@ -72,7 +47,6 @@ export const tasks = sqliteTable(
   "tasks",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     parentId: integer("parent_id").references((): AnySQLiteColumn => tasks.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     description: text("description"),
@@ -91,7 +65,6 @@ export const tasks = sqliteTable(
 
 export const comments = sqliteTable("comments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   body: text("body").notNull(),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -103,7 +76,6 @@ export const comments = sqliteTable("comments", {
 export const projectComments = sqliteTable(
   "project_comments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     projectId: integer("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -119,7 +91,6 @@ export const projectComments = sqliteTable(
 export const taskComments = sqliteTable(
   "task_comments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     taskId: integer("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
@@ -135,7 +106,6 @@ export const taskComments = sqliteTable(
 export const featureComments = sqliteTable(
   "feature_comments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     featureId: integer("feature_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
@@ -151,7 +121,6 @@ export const featureComments = sqliteTable(
 export const useCaseComments = sqliteTable(
   "use_case_comments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     useCaseId: integer("use_case_id")
       .notNull()
       .references(() => useCases.id, { onDelete: "cascade" }),
@@ -167,7 +136,6 @@ export const useCaseComments = sqliteTable(
 export const backlogItemComments = sqliteTable(
   "backlog_item_comments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     backlogItemId: integer("backlog_item_id")
       .notNull()
       .references(() => backlogItems.id, { onDelete: "cascade" }),
@@ -183,7 +151,6 @@ export const backlogItemComments = sqliteTable(
 export const wikiPageComments = sqliteTable(
   "wiki_page_comments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     wikiPageId: integer("wiki_page_id")
       .notNull()
       .references(() => wikiPages.id, { onDelete: "cascade" }),
@@ -198,7 +165,6 @@ export const wikiPageComments = sqliteTable(
 
 export const tags = sqliteTable("tags", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   name: text("name").notNull().unique(),
   color: text("color").notNull().default("#94a3b8"),
   version: integer("version").notNull().default(1),
@@ -209,7 +175,6 @@ export const tags = sqliteTable("tags", {
 });
 
 export const projectTags = sqliteTable("project_tags", {
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   projectId: integer("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
@@ -219,7 +184,6 @@ export const projectTags = sqliteTable("project_tags", {
 });
 
 export const taskTags = sqliteTable("task_tags", {
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   taskId: integer("task_id")
     .notNull()
     .references(() => tasks.id, { onDelete: "cascade" }),
@@ -230,7 +194,6 @@ export const taskTags = sqliteTable("task_tags", {
 
 export const notes = sqliteTable("notes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   title: text("title").notNull().default("Ohne Titel"),
   contentJson: text("content_json").notNull().default("{}"),
   version: integer("version").notNull().default(1),
@@ -241,7 +204,6 @@ export const notes = sqliteTable("notes", {
 });
 
 export const projectNotes = sqliteTable("project_notes", {
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   projectId: integer("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
@@ -251,7 +213,6 @@ export const projectNotes = sqliteTable("project_notes", {
 });
 
 export const taskNotes = sqliteTable("task_notes", {
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   taskId: integer("task_id")
     .notNull()
     .references(() => tasks.id, { onDelete: "cascade" }),
@@ -264,7 +225,6 @@ export const attachments = sqliteTable(
   "attachments",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     originalName: text("original_name").notNull(),
     filename: text("filename").notNull(),
     mimetype: text("mimetype").notNull(),
@@ -280,7 +240,6 @@ export const attachments = sqliteTable(
 export const projectAttachments = sqliteTable(
   "project_attachments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     projectId: integer("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -296,7 +255,6 @@ export const projectAttachments = sqliteTable(
 export const taskAttachments = sqliteTable(
   "task_attachments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     taskId: integer("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
@@ -312,7 +270,6 @@ export const taskAttachments = sqliteTable(
 export const featureAttachments = sqliteTable(
   "feature_attachments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     featureId: integer("feature_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
@@ -328,7 +285,6 @@ export const featureAttachments = sqliteTable(
 export const ticketAttachments = sqliteTable(
   "ticket_attachments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     ticketId: integer("ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
@@ -343,7 +299,6 @@ export const ticketAttachments = sqliteTable(
 
 export const events = sqliteTable("events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   title: text("title").notNull(),
   description: text("description"),
   startTime: text("start_time").notNull(),
@@ -360,7 +315,6 @@ export const events = sqliteTable("events", {
 export const projectEvents = sqliteTable(
   "project_events",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     projectId: integer("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -376,7 +330,6 @@ export const projectEvents = sqliteTable(
 export const taskEvents = sqliteTable(
   "task_events",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     taskId: integer("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
@@ -391,7 +344,6 @@ export const taskEvents = sqliteTable(
 
 export const features = sqliteTable("features", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   title: text("title").notNull(),
   slug: text("slug").notNull().unique(),
   status: text("status", { enum: FEATURE_STATUSES }).notNull().default("draft"),
@@ -407,7 +359,6 @@ export const features = sqliteTable("features", {
 
 export const useCases = sqliteTable("use_cases", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   featureId: integer("feature_id")
     .notNull()
     .references(() => features.id, { onDelete: "cascade" }),
@@ -427,7 +378,6 @@ export const useCases = sqliteTable("use_cases", {
 export const featureRelations = sqliteTable(
   "feature_relations",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     sourceFeatureId: integer("source_feature_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
@@ -447,7 +397,6 @@ export const featureRelations = sqliteTable(
 
 export const wikiPages = sqliteTable("wiki_pages", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   parentId: integer("parent_id").references((): AnySQLiteColumn => wikiPages.id, { onDelete: "restrict" }),
   projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
   title: text("title").notNull(),
@@ -465,7 +414,6 @@ export const backlogItems = sqliteTable(
   "backlog_items",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     projectId: integer("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -489,7 +437,6 @@ export const backlogItems = sqliteTable(
 );
 
 export const projectFeatures = sqliteTable("project_features", {
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   projectId: integer("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
@@ -501,7 +448,6 @@ export const projectFeatures = sqliteTable("project_features", {
 export const projectTasks = sqliteTable(
   "project_tasks",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     ownerId: integer("owner_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -518,7 +464,6 @@ export const projectTasks = sqliteTable(
 export const featureTasks = sqliteTable(
   "feature_tasks",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     ownerId: integer("owner_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
@@ -535,7 +480,6 @@ export const featureTasks = sqliteTable(
 export const useCaseTasks = sqliteTable(
   "use_case_tasks",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     ownerId: integer("owner_id")
       .notNull()
       .references(() => useCases.id, { onDelete: "cascade" }),
@@ -551,7 +495,6 @@ export const useCaseTasks = sqliteTable(
 
 export const tickets = sqliteTable("tickets", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   parentId: integer("parent_id").references((): AnySQLiteColumn => tickets.id, { onDelete: "cascade" }),
   type: text("type", { enum: TICKET_TYPES }).notNull().default("bug"),
   title: text("title").notNull(),
@@ -576,7 +519,6 @@ export const tickets = sqliteTable("tickets", {
 export const projectTickets = sqliteTable(
   "project_tickets",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     ownerId: integer("owner_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -593,7 +535,6 @@ export const projectTickets = sqliteTable(
 export const taskTickets = sqliteTable(
   "task_tickets",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     ownerId: integer("owner_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
@@ -610,7 +551,6 @@ export const taskTickets = sqliteTable(
 export const featureTickets = sqliteTable(
   "feature_tickets",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     ownerId: integer("owner_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
@@ -627,7 +567,6 @@ export const featureTickets = sqliteTable(
 export const useCaseTickets = sqliteTable(
   "use_case_tickets",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     ownerId: integer("owner_id")
       .notNull()
       .references(() => useCases.id, { onDelete: "cascade" }),
@@ -644,7 +583,6 @@ export const useCaseTickets = sqliteTable(
 export const ticketRelations = sqliteTable(
   "ticket_relations",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     sourceTicketId: integer("source_ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
@@ -665,7 +603,6 @@ export const ticketRelations = sqliteTable(
 );
 
 export const ticketTags = sqliteTable("ticket_tags", {
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   ticketId: integer("ticket_id")
     .notNull()
     .references(() => tickets.id, { onDelete: "cascade" }),
@@ -675,7 +612,6 @@ export const ticketTags = sqliteTable("ticket_tags", {
 });
 
 export const ticketNotes = sqliteTable("ticket_notes", {
-  seedRunId: text("seed_run_id").references(() => seedRuns.id),
   ticketId: integer("ticket_id")
     .notNull()
     .references(() => tickets.id, { onDelete: "cascade" }),
@@ -687,7 +623,6 @@ export const ticketNotes = sqliteTable("ticket_notes", {
 export const ticketComments = sqliteTable(
   "ticket_comments",
   {
-    seedRunId: text("seed_run_id").references(() => seedRuns.id),
     ticketId: integer("ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),

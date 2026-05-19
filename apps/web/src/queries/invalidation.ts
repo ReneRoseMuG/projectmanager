@@ -112,9 +112,8 @@ export async function invalidateEvents(queryClient: QueryClient): Promise<void> 
   await invalidateMany(queryClient, [queryKeys.events.root]);
 }
 
-export async function invalidateSeedData(queryClient: QueryClient): Promise<void> {
+export async function invalidateWikiImportData(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [
-    queryKeys.seedRuns.root,
     queryKeys.projects.root,
     queryKeys.tasks.root,
     queryKeys.features.root,

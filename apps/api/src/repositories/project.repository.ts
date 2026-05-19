@@ -5,7 +5,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type ProjectRecord = typeof projects.$inferSelect;
 export type ProjectCreateData = Omit<typeof projects.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type ProjectUpdateData = Partial<Omit<ProjectCreateData, "seedRunId">>;
+export type ProjectUpdateData = Partial<ProjectCreateData>;
 
 function nowIso(): string {
   return new Date().toISOString();

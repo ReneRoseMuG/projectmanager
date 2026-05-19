@@ -25,7 +25,6 @@ type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number };
 
 const ticketSelect = {
   id: tickets.id,
-  seedRunId: tickets.seedRunId,
   parentId: tickets.parentId,
   type: tickets.type,
   title: tickets.title,

@@ -87,20 +87,20 @@ function ensureOwnersExist(database: DbClient, owners: EventOwner[]): void {
   }
 }
 
-function insertEventOwner(database: DbClient, seedRunId: string | null, eventId: number, owner: EventOwner): void {
+function insertEventOwner(database: DbClient, eventId: number, owner: EventOwner): void {
   if (owner.type === "project") {
-    database.insert(projectEvents).values({ seedRunId, projectId: owner.id, eventId }).onConflictDoNothing().run();
+    database.insert(projectEvents).values({ projectId: owner.id, eventId }).onConflictDoNothing().run();
     return;
   }
 
-  database.insert(taskEvents).values({ seedRunId, taskId: owner.id, eventId }).onConflictDoNothing().run();
+  database.insert(taskEvents).values({ taskId: owner.id, eventId }).onConflictDoNothing().run();
 }
 
 function replaceEventOwners(database: DbClient, event: EventRecord, owners: EventOwner[]): void {
   database.delete(projectEvents).where(eq(projectEvents.eventId, event.id)).run();
   database.delete(taskEvents).where(eq(taskEvents.eventId, event.id)).run();
   for (const owner of owners) {
-    insertEventOwner(database, event.seedRunId, event.id, owner);
+    insertEventOwner(database, event.id, owner);
   }
 }
 
@@ -148,7 +148,7 @@ export function createEvent(database: DbClient, input: EventInput): Event {
       .get();
 
     for (const owner of owners) {
-      insertEventOwner(txDb, event.seedRunId, event.id, owner);
+      insertEventOwner(txDb, event.id, owner);
     }
     return event;
   });

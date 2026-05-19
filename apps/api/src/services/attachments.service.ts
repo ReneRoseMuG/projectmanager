@@ -21,7 +21,6 @@ export interface AttachmentUpload {
 
 const attachmentSelect = {
   id: attachments.id,
-  seedRunId: attachments.seedRunId,
   originalName: attachments.originalName,
   filename: attachments.filename,
   mimetype: attachments.mimetype,
@@ -126,20 +125,20 @@ function listAttachmentOwners(database: DbClient, attachmentId: number): Attachm
   ];
 }
 
-function insertAttachmentLink(database: DbClient, owner: AttachmentOwner, attachmentId: number, seedRunId: string | null): void {
+function insertAttachmentLink(database: DbClient, owner: AttachmentOwner, attachmentId: number): void {
   if (owner.type === "project") {
-    database.insert(projectAttachments).values({ seedRunId, projectId: owner.id, attachmentId }).onConflictDoNothing().run();
+    database.insert(projectAttachments).values({ projectId: owner.id, attachmentId }).onConflictDoNothing().run();
     return;
   }
   if (owner.type === "task") {
-    database.insert(taskAttachments).values({ seedRunId, taskId: owner.id, attachmentId }).onConflictDoNothing().run();
+    database.insert(taskAttachments).values({ taskId: owner.id, attachmentId }).onConflictDoNothing().run();
     return;
   }
   if (owner.type === "feature") {
-    database.insert(featureAttachments).values({ seedRunId, featureId: owner.id, attachmentId }).onConflictDoNothing().run();
+    database.insert(featureAttachments).values({ featureId: owner.id, attachmentId }).onConflictDoNothing().run();
     return;
   }
-  database.insert(ticketAttachments).values({ seedRunId, ticketId: owner.id, attachmentId }).onConflictDoNothing().run();
+  database.insert(ticketAttachments).values({ ticketId: owner.id, attachmentId }).onConflictDoNothing().run();
 }
 
 async function removeAttachmentFiles(records: AttachmentCleanupRecord[]): Promise<void> {
@@ -210,7 +209,7 @@ async function persistAttachment(values: {
       mimetype: values.upload.mimetype,
       size: values.upload.buffer.byteLength
     });
-    insertAttachmentLink(tx, values.owner, attachment.id, attachment.seedRunId);
+    insertAttachmentLink(tx, values.owner, attachment.id);
     return attachment;
   });
 
@@ -321,7 +320,7 @@ export async function linkAttachment(database: DbClient, owner: AttachmentOwner,
   if (!attachment) {
     throw notFound(`Attachment with id ${attachmentId} not found`);
   }
-  insertAttachmentLink(database, owner, attachmentId, attachment.seedRunId);
+  insertAttachmentLink(database, owner, attachmentId);
   return mapAttachment(database, attachment);
 }
 

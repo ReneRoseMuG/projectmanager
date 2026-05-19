@@ -24,7 +24,6 @@ import { requireNonEmpty } from "./helpers.js";
 
 const commentSelect = {
   id: comments.id,
-  seedRunId: comments.seedRunId,
   body: comments.body,
   version: comments.version,
   createdBy: comments.createdBy,
@@ -143,32 +142,32 @@ function listCommentOwners(database: DbClient, commentId: number): CommentOwner[
   ];
 }
 
-function insertCommentLink(database: DbClient, owner: CommentOwner, commentId: number, seedRunId: string | null): void {
+function insertCommentLink(database: DbClient, owner: CommentOwner, commentId: number): void {
   if (owner.type === "project") {
-    database.insert(projectComments).values({ seedRunId, projectId: owner.id, commentId }).onConflictDoNothing().run();
+    database.insert(projectComments).values({ projectId: owner.id, commentId }).onConflictDoNothing().run();
     return;
   }
   if (owner.type === "task") {
-    database.insert(taskComments).values({ seedRunId, taskId: owner.id, commentId }).onConflictDoNothing().run();
+    database.insert(taskComments).values({ taskId: owner.id, commentId }).onConflictDoNothing().run();
     return;
   }
   if (owner.type === "feature") {
-    database.insert(featureComments).values({ seedRunId, featureId: owner.id, commentId }).onConflictDoNothing().run();
+    database.insert(featureComments).values({ featureId: owner.id, commentId }).onConflictDoNothing().run();
     return;
   }
   if (owner.type === "useCase") {
-    database.insert(useCaseComments).values({ seedRunId, useCaseId: owner.id, commentId }).onConflictDoNothing().run();
+    database.insert(useCaseComments).values({ useCaseId: owner.id, commentId }).onConflictDoNothing().run();
     return;
   }
   if (owner.type === "backlogItem") {
-    database.insert(backlogItemComments).values({ seedRunId, backlogItemId: owner.id, commentId }).onConflictDoNothing().run();
+    database.insert(backlogItemComments).values({ backlogItemId: owner.id, commentId }).onConflictDoNothing().run();
     return;
   }
   if (owner.type === "wikiPage") {
-    database.insert(wikiPageComments).values({ seedRunId, wikiPageId: owner.id, commentId }).onConflictDoNothing().run();
+    database.insert(wikiPageComments).values({ wikiPageId: owner.id, commentId }).onConflictDoNothing().run();
     return;
   }
-  database.insert(ticketComments).values({ seedRunId, ticketId: owner.id, commentId }).onConflictDoNothing().run();
+  database.insert(ticketComments).values({ ticketId: owner.id, commentId }).onConflictDoNothing().run();
 }
 
 function deleteCommentLink(database: DbClient, owner: CommentOwner, commentId: number): number {
@@ -271,7 +270,7 @@ export function createEntityComment(database: DbClient, entityType: CommentEntit
     const comment = commentRepository.create(tx as unknown as DbClient, {
       body
     });
-    insertCommentLink(tx, owner, comment.id, comment.seedRunId);
+    insertCommentLink(tx, owner, comment.id);
     return comment;
   });
 
@@ -285,7 +284,7 @@ export function linkEntityComment(database: DbClient, entityType: CommentEntityT
   if (!comment) {
     throw notFound(`Comment with id ${commentId} not found`);
   }
-  insertCommentLink(database, owner, commentId, comment.seedRunId);
+  insertCommentLink(database, owner, commentId);
   return mapComment(database, comment);
 }
 

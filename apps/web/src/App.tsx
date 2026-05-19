@@ -10,7 +10,6 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SettingsBackupPage } from "./pages/SettingsBackupPage";
-import { SettingsSeedDataPage } from "./pages/SettingsSeedDataPage";
 import { SettingsTagsPage } from "./pages/SettingsTagsPage";
 import { TicketsPage } from "./pages/TicketsPage";
 import { TicketDetailPage } from "./pages/TicketDetailPage";
@@ -47,7 +46,6 @@ export default function App() {
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/settings/tags" element={<SettingsTagsPage />} />
             <Route path="/settings/backup" element={<SettingsBackupPage />} />
-            <Route path="/settings/test-data" element={<SettingsSeedDataPage />} />
             <Route path="/forbidden" element={<ForbiddenPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

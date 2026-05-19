@@ -2,7 +2,7 @@ import type { WikiImportReport } from "@taskmanager/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { previewWikiImport, runWikiImport } from "../api/imports";
-import { invalidateSeedData } from "../queries/invalidation";
+import { invalidateWikiImportData } from "../queries/invalidation";
 import { errorMessage } from "./errors";
 
 export function useWikiImport(projectId?: number) {
@@ -47,7 +47,7 @@ export function useWikiImport(projectId?: number) {
         const report = await runWikiImport(projectId, { sourcePath });
         setResult(report);
         setPreview(report);
-        await invalidateSeedData(queryClient);
+        await invalidateWikiImportData(queryClient);
         return report;
       } catch (runError) {
         setError(errorMessage(runError));
