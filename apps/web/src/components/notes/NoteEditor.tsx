@@ -1,4 +1,4 @@
-import type { JsonObject, JsonValue, Note, NoteInput } from "@taskmanager/shared-types";
+import type { JsonObject, JsonValue, Note, NoteUpdate } from "@taskmanager/shared-types";
 import { Download, MoreHorizontal, Save, StickyNote, Trash2, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -12,7 +12,7 @@ import { Section } from "../ui/Section";
 interface NoteEditorProps {
   note: Note | null;
   open: boolean;
-  onSave: (id: number, input: NoteInput) => Promise<unknown>;
+  onSave: (id: number, input: NoteUpdate) => Promise<unknown>;
   onClose: () => void;
 }
 
@@ -103,7 +103,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
     }
     setSaving(true);
     try {
-      await onSave(note.id, { title, contentJson: htmlToNoteContent(content) });
+      await onSave(note.id, { title, contentJson: htmlToNoteContent(content), expectedVersion: note.version });
       setDirty(false);
     } finally {
       setSaving(false);

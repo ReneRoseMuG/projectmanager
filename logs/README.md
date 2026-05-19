@@ -2,6 +2,23 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 19.05.26 | Fix / Feature | Demo-Daten-Seed entfernt | ✅ |
+| 19.05.26 | 12 | Events Owner-Junction-Modell | ✅ |
+| 19.05.26 | Fix | Events Owner-Junction Folgeauftrag | ✅ |
+| 19.05.26 | 9 | Legacy-Spalten Cleanup | ✅ |
+| 19.05.26 | Fix | Agents Architekturleitplanken | ✅ |
+| 19.05.26 | Fix | Dump-Registry Neue Tabellen | ✅ |
+| 19.05.26 | Fix | Test-Fixtures Expected Version | ✅ |
+| 19.05.26 | 10 | Test- und Abnahme-Gate | ⚠️ |
+| 19.05.26 | 9 | Cleanup und Drop Legacy-Spalten | 🔴 |
+| 19.05.26 | 8 | Support- und Infrastruktur-Services | ⚠️ |
+| 19.05.26 | 7 | Dokumentation- und Backlog-Services | ⚠️ |
+| 19.05.26 | 6 | Project-, Task- und Ticket-Services | ⚠️ |
+| 19.05.26 | 5 | Repository Foundation und API-Kontrakte | ✅ |
+| 19.05.26 | 4 | Attachment-Junction-Modell | ⚠️ |
+| 19.05.26 | 3 | Comment-Junction-Modell | ⚠️ |
+| 19.05.26 | 2 | Schema Users, Version und Audit-Felder | ⚠️ |
+| 19.05.26 | 1 | Bestandsaufnahme Architektur-Delta | ✅ |
 | 19.05.26 | Fix | Aufgabendateien Architektur-Refactoring | ✅ |
 | 18.05.26 | Feature | Detailseiten und Formularnavigation | ✅ |
 | 18.05.26 | Fix | App-Name Projekt Manager | ✅ |

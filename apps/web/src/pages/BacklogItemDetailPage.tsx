@@ -41,7 +41,7 @@ export function BacklogItemDetailPage() {
   const submitBacklogItem = async (input: BacklogItemInput) => {
     try {
       if (item) {
-        const updated = await backlog.updateItem(item.id, input);
+        const updated = await backlog.updateItem(item.id, { ...input, expectedVersion: item.version });
         setItem(updated);
         showToast({ tone: "success", title: "Backlog-Item gespeichert" });
         return;

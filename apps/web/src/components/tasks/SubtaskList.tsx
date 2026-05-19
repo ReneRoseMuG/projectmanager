@@ -58,7 +58,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
                   done ? "border-fern bg-fern text-white" : "border-steel-300 bg-white text-transparent hover:border-fern"
                 }`}
                 aria-label={done ? "Als offen markieren" : "Als erledigt markieren"}
-                onClick={() => void onUpdate(subtask.id, { status: done ? "todo" : "done" }).catch(() => undefined)}
+                onClick={() => void onUpdate(subtask.id, { status: done ? "todo" : "done", expectedVersion: subtask.version }).catch(() => undefined)}
               >
                 <Check size={15} />
               </button>

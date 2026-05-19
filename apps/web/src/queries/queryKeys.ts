@@ -67,10 +67,6 @@ export const queryKeys = {
     root: ["calendarTasks"] as const,
     list: () => [...queryKeys.calendarTasks.root, "list"] as const
   },
-  seedRuns: {
-    root: ["seedRuns"] as const,
-    list: () => [...queryKeys.seedRuns.root, "list"] as const
-  },
   dumps: {
     root: ["dumps"] as const,
     driveConfig: () => [...queryKeys.dumps.root, "driveConfig"] as const

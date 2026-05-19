@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import type { CommentEntityType, CommentInput } from "@taskmanager/shared-types";
-import { createComment, createEntityComment, deleteComment, deleteEntityComment, listComments, listEntityComments } from "../services/comments.service.js";
+import { createComment, createEntityComment, deleteComment, deleteEntityComment, linkEntityComment, listComments, listEntityComments } from "../services/comments.service.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema, taskIdParamSchema } from "../utils/route-schemas.js";
 
 const commentBodySchema = {
@@ -40,6 +40,12 @@ function registerEntityCommentRoutes(app: FastifyInstance, path: string, entityT
     `${path}/:id/comments`,
     { schema: { params: entityCommentParamsSchema, body: commentBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => reply.status(201).send(createEntityComment(app.db, entityType, request.params.id, request.body))
+  );
+
+  app.post<{ Params: { id: number; commentId: number } }>(
+    `${path}/:id/comments/:commentId`,
+    { schema: { params: entityCommentDeleteParamsSchema, response: { 200: objectResponseSchema } } },
+    async (request) => linkEntityComment(app.db, entityType, request.params.id, request.params.commentId)
   );
 
   app.delete<{ Params: { id: number; commentId: number } }>(

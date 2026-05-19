@@ -21,7 +21,7 @@ import { getContentBaseDir } from "./content.service.js";
 import type { GoogleDriveBackupClient } from "./google-drive.service.js";
 
 const APP_ID = "taskmanager";
-const DUMP_FORMAT_VERSION = 5;
+const DUMP_FORMAT_VERSION = 6;
 const DUMP_FILENAME_PREFIX = "taskmanager_dump_";
 const ZipArchive = (archiverPackage as unknown as {
   ZipArchive: new (options: { zlib: { level: number } }) => Archiver;
@@ -33,36 +33,48 @@ function createArchive(): Archiver {
 
 const DUMP_TABLES = [
   { key: "appSettings", tableName: "app_settings" },
-  { key: "seedRuns", tableName: "seed_runs" },
+  { key: "users", tableName: "users" },
   { key: "projects", tableName: "projects" },
   { key: "tags", tableName: "tags" },
   { key: "notes", tableName: "notes" },
   { key: "features", tableName: "features" },
-  { key: "featureRelations", tableName: "feature_relations" },
   { key: "tasks", tableName: "tasks" },
   { key: "tickets", tableName: "tickets" },
   { key: "useCases", tableName: "use_cases" },
   { key: "wikiPages", tableName: "wiki_pages" },
   { key: "comments", tableName: "comments" },
+  { key: "attachments", tableName: "attachments" },
+  { key: "events", tableName: "events" },
+  { key: "projectEvents", tableName: "project_events" },
+  { key: "taskEvents", tableName: "task_events" },
+  { key: "backlogItems", tableName: "backlog_items" },
+  { key: "featureRelations", tableName: "feature_relations" },
   { key: "projectTags", tableName: "project_tags" },
   { key: "taskTags", tableName: "task_tags" },
   { key: "ticketTags", tableName: "ticket_tags" },
   { key: "projectNotes", tableName: "project_notes" },
   { key: "taskNotes", tableName: "task_notes" },
   { key: "ticketNotes", tableName: "ticket_notes" },
-  { key: "attachments", tableName: "attachments" },
-  { key: "events", tableName: "events" },
-  { key: "backlogItems", tableName: "backlog_items" },
   { key: "projectFeatures", tableName: "project_features" },
   { key: "projectTasks", tableName: "project_tasks" },
   { key: "featureTasks", tableName: "feature_tasks" },
+  { key: "useCaseTasks", tableName: "use_case_tasks" },
   { key: "projectTickets", tableName: "project_tickets" },
   { key: "taskTickets", tableName: "task_tickets" },
   { key: "featureTickets", tableName: "feature_tickets" },
   { key: "useCaseTickets", tableName: "use_case_tickets" },
   { key: "ticketRelations", tableName: "ticket_relations" },
-  { key: "useCaseTasks", tableName: "use_case_tasks" },
-  { key: "seedRunItems", tableName: "seed_run_items" }
+  { key: "projectComments", tableName: "project_comments" },
+  { key: "taskComments", tableName: "task_comments" },
+  { key: "featureComments", tableName: "feature_comments" },
+  { key: "useCaseComments", tableName: "use_case_comments" },
+  { key: "backlogItemComments", tableName: "backlog_item_comments" },
+  { key: "wikiPageComments", tableName: "wiki_page_comments" },
+  { key: "ticketComments", tableName: "ticket_comments" },
+  { key: "projectAttachments", tableName: "project_attachments" },
+  { key: "taskAttachments", tableName: "task_attachments" },
+  { key: "featureAttachments", tableName: "feature_attachments" },
+  { key: "ticketAttachments", tableName: "ticket_attachments" }
 ] as const;
 
 export const DUMP_TABLE_KEYS = DUMP_TABLES.map((entry) => entry.key);

@@ -54,7 +54,7 @@ export function TaskDetailPage() {
 
     if (!isCreateMode && detail.task) {
       try {
-        const updated = await taskController.updateTask(detail.task.id, taskInput);
+        const updated = await taskController.updateTask(detail.task.id, { ...taskInput, expectedVersion: detail.task.version });
         await setTaskTags(detail.task.id, tagIds);
         await invalidateTags(queryClient);
         await detail.reload();

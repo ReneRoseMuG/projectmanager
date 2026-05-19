@@ -34,7 +34,7 @@ export function FeatureDetailPage() {
   const saveFeature = async (input: FeatureInput) => {
     try {
       if (features.feature) {
-        const updated = await features.updateFeature(features.feature.id, input);
+        const updated = await features.updateFeature(features.feature.id, { ...input, expectedVersion: features.feature.version });
         await features.reload();
         showToast({ tone: "success", title: "Feature gespeichert" });
         return updated;

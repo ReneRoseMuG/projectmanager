@@ -1,7 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import type { EventInput, EventUpdate } from "@taskmanager/shared-types";
 import { createEvent, deleteEvent, getEvent, listEvents, updateEvent } from "../services/events.service.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+
+const eventOwnerSchema = {
+  type: "object",
+  required: ["type", "id"],
+  additionalProperties: false,
+  properties: {
+    type: { type: "string", enum: ["project", "task"] },
+    id: { type: "integer", minimum: 1 }
+  }
+} as const;
 
 const eventBodySchema = {
   type: "object",
@@ -14,15 +24,21 @@ const eventBodySchema = {
     endTime: { type: "string" },
     isAllDay: { type: "boolean" },
     color: { type: ["string", "null"] },
-    projectId: { type: ["integer", "null"], minimum: 1 },
-    taskId: { type: ["integer", "null"], minimum: 1 }
+    owners: {
+      type: "array",
+      items: eventOwnerSchema
+    }
   }
 } as const;
 
 const eventPatchSchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
-  properties: eventBodySchema.properties
+  properties: {
+    ...eventBodySchema.properties,
+    ...expectedVersionPropertySchema
+  }
 } as const;
 
 const eventQuerySchema = {

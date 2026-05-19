@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { FEATURE_STATUSES } from "../db/schema.js";
 import { createFeature, deleteFeature, getFeature, listFeatures, updateFeature, type FeatureInput } from "../services/features.service.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const featureBodySchema = {
   type: "object",
@@ -19,8 +19,12 @@ const featureBodySchema = {
 
 const featurePatchSchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
-  properties: featureBodySchema.properties
+  properties: {
+    ...featureBodySchema.properties,
+    ...expectedVersionPropertySchema
+  }
 } as const;
 
 export async function registerFeaturesRoutes(app: FastifyInstance): Promise<void> {

@@ -107,7 +107,7 @@ describe("Projects API", () => {
 
     const res = await supertest(app.server)
       .patch(`/api/projects/${project.id}`)
-      .send({ name: "Aktualisiert", status: "on_hold" })
+      .send({ name: "Aktualisiert", status: "on_hold", expectedVersion: project.version })
       .expect(200);
 
     expect(res.body.name).toBe("Aktualisiert");
@@ -115,7 +115,7 @@ describe("Projects API", () => {
   });
 
   it("PATCH /api/projects/:id mit unbekannter ID gibt 404 zurueck", async () => {
-    await supertest(app.server).patch("/api/projects/9999").send({ name: "Fehlt" }).expect(404);
+    await supertest(app.server).patch("/api/projects/9999").send({ name: "Fehlt", expectedVersion: 1 }).expect(404);
   });
 
   it("PATCH /api/projects/:id aktualisiert updatedAt", async () => {
@@ -124,7 +124,7 @@ describe("Projects API", () => {
 
     const res = await supertest(app.server)
       .patch(`/api/projects/${project.id}`)
-      .send({ name: "Neuer Name" })
+      .send({ name: "Neuer Name", expectedVersion: project.version })
       .expect(200);
 
     expect(new Date(res.body.updatedAt).getTime()).toBeGreaterThanOrEqual(new Date(project.updatedAt).getTime());

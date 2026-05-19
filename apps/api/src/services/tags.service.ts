@@ -2,17 +2,18 @@ import type { Tag } from "@taskmanager/shared-types";
 import { inArray, eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { projectTags, projects, tags, taskTags, tasks, ticketTags, tickets } from "../db/schema.js";
+import { tagRepository, type TagRecord, type TagUpdateData } from "../repositories/tag.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
 
-type TagRecord = typeof tags.$inferSelect;
-type MappableTagRecord = Pick<TagRecord, "id" | "name" | "color">;
+type MappableTagRecord = Pick<TagRecord, "id" | "name" | "color" | "version">;
 
 function mapTag(record: MappableTagRecord): Tag {
   return {
     id: record.id,
     name: record.name,
-    color: record.color
+    color: record.color,
+    version: record.version
   };
 }
 
@@ -43,14 +44,14 @@ function ensureTagsExist(database: DbClient, tagIds: number[]): void {
   }
 
   const uniqueIds = [...new Set(tagIds)];
-  const found = database.select({ id: tags.id }).from(tags).where(inArray(tags.id, uniqueIds)).all();
+  const found = tagRepository.findByIds(database, uniqueIds);
   if (found.length !== uniqueIds.length) {
     throw badRequest("One or more tagIds are invalid");
   }
 }
 
 export function listTags(database: DbClient): Tag[] {
-  return database.select().from(tags).all().map(mapTag);
+  return tagRepository.findAll(database).map(mapTag);
 }
 
 export function getProjectTags(database: DbClient, projectId: number): Tag[] {
@@ -58,7 +59,8 @@ export function getProjectTags(database: DbClient, projectId: number): Tag[] {
     .select({
       id: tags.id,
       name: tags.name,
-      color: tags.color
+      color: tags.color,
+      version: tags.version
     })
     .from(projectTags)
     .innerJoin(tags, eq(projectTags.tagId, tags.id))
@@ -73,7 +75,8 @@ export function getTaskTags(database: DbClient, taskId: number): Tag[] {
     .select({
       id: tags.id,
       name: tags.name,
-      color: tags.color
+      color: tags.color,
+      version: tags.version
     })
     .from(taskTags)
     .innerJoin(tags, eq(taskTags.tagId, tags.id))
@@ -88,7 +91,8 @@ export function getTicketTags(database: DbClient, ticketId: number): Tag[] {
     .select({
       id: tags.id,
       name: tags.name,
-      color: tags.color
+      color: tags.color,
+      version: tags.version
     })
     .from(ticketTags)
     .innerJoin(tags, eq(ticketTags.tagId, tags.id))
@@ -109,7 +113,8 @@ export function getProjectTagsMap(database: DbClient, projectIds: number[]): Map
       projectId: projectTags.projectId,
       id: tags.id,
       name: tags.name,
-      color: tags.color
+      color: tags.color,
+      version: tags.version
     })
     .from(projectTags)
     .innerJoin(tags, eq(projectTags.tagId, tags.id))
@@ -118,7 +123,7 @@ export function getProjectTagsMap(database: DbClient, projectIds: number[]): Map
 
   for (const row of rows) {
     const current = map.get(row.projectId) ?? [];
-    current.push({ id: row.id, name: row.name, color: row.color });
+    current.push({ id: row.id, name: row.name, color: row.color, version: row.version });
     map.set(row.projectId, current);
   }
 
@@ -136,7 +141,8 @@ export function getTaskTagsMap(database: DbClient, taskIds: number[]): Map<numbe
       taskId: taskTags.taskId,
       id: tags.id,
       name: tags.name,
-      color: tags.color
+      color: tags.color,
+      version: tags.version
     })
     .from(taskTags)
     .innerJoin(tags, eq(taskTags.tagId, tags.id))
@@ -145,7 +151,7 @@ export function getTaskTagsMap(database: DbClient, taskIds: number[]): Map<numbe
 
   for (const row of rows) {
     const current = map.get(row.taskId) ?? [];
-    current.push({ id: row.id, name: row.name, color: row.color });
+    current.push({ id: row.id, name: row.name, color: row.color, version: row.version });
     map.set(row.taskId, current);
   }
 
@@ -163,7 +169,8 @@ export function getTicketTagsMap(database: DbClient, ticketIds: number[]): Map<n
       ticketId: ticketTags.ticketId,
       id: tags.id,
       name: tags.name,
-      color: tags.color
+      color: tags.color,
+      version: tags.version
     })
     .from(ticketTags)
     .innerJoin(tags, eq(ticketTags.tagId, tags.id))
@@ -172,7 +179,7 @@ export function getTicketTagsMap(database: DbClient, ticketIds: number[]): Map<n
 
   for (const row of rows) {
     const current = map.get(row.ticketId) ?? [];
-    current.push({ id: row.id, name: row.name, color: row.color });
+    current.push({ id: row.id, name: row.name, color: row.color, version: row.version });
     map.set(row.ticketId, current);
   }
 
@@ -181,22 +188,18 @@ export function getTicketTagsMap(database: DbClient, ticketIds: number[]): Map<n
 
 export function createTag(database: DbClient, input: { name?: string; color?: string }): Tag {
   const name = requireNonEmpty(input.name, "name");
-  const existing = database.select({ id: tags.id }).from(tags).where(eq(tags.name, name)).get();
+  const existing = tagRepository.findByName(database, name);
   if (existing) {
     throw conflict(`Tag "${name}" already exists`);
   }
 
-  const created = database
-    .insert(tags)
-    .values({ name, color: input.color ?? "#94a3b8" })
-    .returning()
-    .get();
+  const created = tagRepository.create(database, { name, color: input.color ?? "#94a3b8" });
 
   return mapTag(created);
 }
 
-export function updateTag(database: DbClient, id: number, input: { name?: string; color?: string }): Tag {
-  const values: Partial<typeof tags.$inferInsert> = {};
+export function updateTag(database: DbClient, id: number, input: { name?: string; color?: string; expectedVersion: number }): Tag {
+  const values: TagUpdateData = {};
   if (input.name !== undefined) {
     values.name = requireNonEmpty(input.name, "name");
   }
@@ -208,7 +211,7 @@ export function updateTag(database: DbClient, id: number, input: { name?: string
     throw badRequest("No tag fields provided");
   }
 
-  const updated = database.update(tags).set(values).where(eq(tags.id, id)).returning().get();
+  const updated = tagRepository.update(database, id, input.expectedVersion, values);
   if (!updated) {
     throw notFound(`Tag with id ${id} not found`);
   }
@@ -217,8 +220,7 @@ export function updateTag(database: DbClient, id: number, input: { name?: string
 }
 
 export function deleteTag(database: DbClient, id: number): void {
-  const result = database.delete(tags).where(eq(tags.id, id)).run();
-  if (result.changes === 0) {
+  if (tagRepository.delete(database, id) === 0) {
     throw notFound(`Tag with id ${id} not found`);
   }
 }

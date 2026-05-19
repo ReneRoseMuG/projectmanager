@@ -46,7 +46,7 @@ export function UseCaseDetailPage() {
   const submitUseCase = async (input: UseCaseInput) => {
     try {
       if (useCase) {
-        const updated = await useCases.updateUseCase(useCase.id, input);
+        const updated = await useCases.updateUseCase(useCase.id, { ...input, expectedVersion: useCase.version });
         setUseCase(updated);
         showToast({ tone: "success", title: "Use Case gespeichert" });
         return updated;

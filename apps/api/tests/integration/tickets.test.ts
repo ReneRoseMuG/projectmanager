@@ -251,7 +251,7 @@ describe("Tickets API", () => {
 
     const res = await supertest(app.server)
       .patch(`/api/tickets/${ticket.id}`)
-      .send({ title: "Updated", status: "in_progress", priority: "urgent", assignee: "Erika", resolution: "fixed" })
+      .send({ title: "Updated", status: "in_progress", priority: "urgent", assignee: "Erika", resolution: "fixed", expectedVersion: ticket.version })
       .expect(200);
 
     expect(res.body).toMatchObject({ title: "Updated", status: "in_progress", priority: "urgent", assignee: "Erika", resolution: "fixed" });
@@ -261,8 +261,8 @@ describe("Tickets API", () => {
     const resolvedTicket = await createTicket(app, null);
     const closedTicket = await createTicket(app, null, { title: "Closed" });
 
-    const resolved = await supertest(app.server).patch(`/api/tickets/${resolvedTicket.id}`).send({ status: "resolved" }).expect(200);
-    const closed = await supertest(app.server).patch(`/api/tickets/${closedTicket.id}`).send({ status: "closed" }).expect(200);
+    const resolved = await supertest(app.server).patch(`/api/tickets/${resolvedTicket.id}`).send({ status: "resolved", expectedVersion: resolvedTicket.version }).expect(200);
+    const closed = await supertest(app.server).patch(`/api/tickets/${closedTicket.id}`).send({ status: "closed", expectedVersion: closedTicket.version }).expect(200);
 
     expect(resolved.body.resolvedAt).toEqual(expect.any(String));
     expect(closed.body.resolvedAt).toEqual(expect.any(String));
@@ -271,13 +271,13 @@ describe("Tickets API", () => {
   it("PATCH /api/tickets/:id with invalid resolution returns 400", async () => {
     const ticket = await createTicket(app, null);
 
-    await supertest(app.server).patch(`/api/tickets/${ticket.id}`).send({ resolution: "later" }).expect(400);
+    await supertest(app.server).patch(`/api/tickets/${ticket.id}`).send({ resolution: "later", expectedVersion: ticket.version }).expect(400);
   });
 
   it("PATCH /api/tickets/:id/position updates status and position", async () => {
     const ticket = await createTicket(app, null);
 
-    const res = await supertest(app.server).patch(`/api/tickets/${ticket.id}/position`).send({ status: "in_review", position: 42 }).expect(200);
+    const res = await supertest(app.server).patch(`/api/tickets/${ticket.id}/position`).send({ status: "in_review", position: 42, expectedVersion: ticket.version }).expect(200);
 
     expect(res.body.status).toBe("in_review");
     expect(res.body.position).toBe(42);
@@ -403,7 +403,7 @@ describe("Tickets API", () => {
 
     const res = await supertest(app.server).post(`/api/tickets/${ticket.id}/comments`).send({ body: "Ticket comment" }).expect(201);
 
-    expect(res.body).toMatchObject({ entityType: "ticket", entityId: ticket.id, body: "Ticket comment" });
+    expect(res.body).toMatchObject({ owners: [{ type: "ticket", id: ticket.id }], body: "Ticket comment" });
   });
 
   it("Ticket comments appear in detail", async () => {
@@ -423,7 +423,7 @@ describe("Tickets API", () => {
       .attach("file", Buffer.from("Ticket file"), { filename: "ticket.txt", contentType: "text/plain" })
       .expect(201);
 
-    expect(res.body).toMatchObject({ ticketId: ticket.id, projectId: null, taskId: null, featureId: null, originalName: "ticket.txt" });
+    expect(res.body).toMatchObject({ owners: [{ type: "ticket", id: ticket.id }], originalName: "ticket.txt" });
   });
 
   it("Ticket attachments appear in detail", async () => {

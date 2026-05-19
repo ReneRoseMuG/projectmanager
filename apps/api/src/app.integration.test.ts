@@ -67,7 +67,12 @@ describe("Projekt Manager API integration", () => {
     const createdProject = (await request(app.server).post("/api/projects").send({ name: "Integration" }).expect(201)).body as Project;
     expect(createdProject.color).toBe("#6366f1");
 
-    const updatedProject = (await request(app.server).patch(`/api/projects/${createdProject.id}`).send({ description: "Updated" }).expect(200)).body as Project;
+    const updatedProject = (
+      await request(app.server)
+        .patch(`/api/projects/${createdProject.id}`)
+        .send({ description: "Updated", expectedVersion: createdProject.version })
+        .expect(200)
+    ).body as Project;
     expect(updatedProject.description).toBe("Updated");
 
     const loadedProject = (await request(app.server).get(`/api/projects/${createdProject.id}`).expect(200)).body as Project;
@@ -76,7 +81,9 @@ describe("Projekt Manager API integration", () => {
     const createdTag = (await request(app.server).post("/api/tags").send({ name: "Backend" }).expect(201)).body as Tag;
     expect(createdTag.color).toBe("#94a3b8");
 
-    const updatedTag = (await request(app.server).patch(`/api/tags/${createdTag.id}`).send({ color: "#6366f1" }).expect(200)).body as Tag;
+    const updatedTag = (
+      await request(app.server).patch(`/api/tags/${createdTag.id}`).send({ color: "#6366f1", expectedVersion: createdTag.version }).expect(200)
+    ).body as Tag;
     expect(updatedTag.color).toBe("#6366f1");
 
     const throwawayTag = (await request(app.server).post("/api/tags").send({ name: "Delete me", color: "#94a3b8" }).expect(201)).body as Tag;
@@ -95,11 +102,16 @@ describe("Projekt Manager API integration", () => {
     expect(createdTask.status).toBe("todo");
     expect(createdTask.boardPosition).toBeGreaterThan(0);
 
-    const updatedTask = (await request(app.server).patch(`/api/tasks/${createdTask.id}`).send({ priority: "high" }).expect(200)).body as Task;
+    const updatedTask = (
+      await request(app.server).patch(`/api/tasks/${createdTask.id}`).send({ priority: "high", expectedVersion: createdTask.version }).expect(200)
+    ).body as Task;
     expect(updatedTask.priority).toBe("high");
 
     const movedTask = (
-      await request(app.server).patch(`/api/projects/${createdProject.id}/tasks/${createdTask.id}/board`).send({ status: "in_progress", position: 512 }).expect(200)
+      await request(app.server)
+        .patch(`/api/projects/${createdProject.id}/tasks/${createdTask.id}/board`)
+        .send({ status: "in_progress", position: 512, expectedVersion: updatedTask.version })
+        .expect(200)
     ).body as TaskBoardItem;
     expect(movedTask.status).toBe("in_progress");
     expect(movedTask.boardPosition).toBe(512);
@@ -113,7 +125,7 @@ describe("Projekt Manager API integration", () => {
 
     await request(app.server).get(`/api/tasks/${createdTask.id}/comments`).expect(200, []);
     const comment = (await request(app.server).post(`/api/tasks/${createdTask.id}/comments`).send({ body: "Kommentar" }).expect(201)).body as Comment;
-    expect(comment.taskId).toBe(createdTask.id);
+    expect(comment.owners).toEqual([{ type: "task", id: createdTask.id }]);
     await request(app.server).delete(`/api/comments/${comment.id}`).expect(204);
 
     await request(app.server).get(`/api/projects/${createdProject.id}/notes`).expect(200, []);
@@ -131,7 +143,7 @@ describe("Projekt Manager API integration", () => {
     const patchedNote = (
       await request(app.server)
         .patch(`/api/notes/${projectNote.id}`)
-        .send({ contentJson: { type: "doc", content: [{ type: "paragraph" }] } })
+        .send({ contentJson: { type: "doc", content: [{ type: "paragraph" }] }, expectedVersion: projectNote.version })
         .expect(200)
     ).body as Note;
     expect(patchedNote.contentJson).toEqual({ type: "doc", content: [{ type: "paragraph" }] });
@@ -151,8 +163,7 @@ describe("Projekt Manager API integration", () => {
         .attach("file", Buffer.from("project file"), "project.txt")
         .expect(201)
     ).body as Attachment;
-    expect(projectAttachment.projectId).toBe(createdProject.id);
-    expect(projectAttachment.taskId).toBeNull();
+    expect(projectAttachment.owners).toEqual([{ type: "project", id: createdProject.id }]);
     await request(app.server).get(projectAttachment.url).expect(200);
 
     const taskAttachment = (
@@ -161,7 +172,7 @@ describe("Projekt Manager API integration", () => {
         .attach("file", Buffer.from("task file"), "task.txt")
         .expect(201)
     ).body as Attachment;
-    expect(taskAttachment.taskId).toBe(createdTask.id);
+    expect(taskAttachment.owners).toEqual([{ type: "task", id: createdTask.id }]);
 
     const projectAttachments = (await request(app.server).get(`/api/projects/${createdProject.id}/attachments`).expect(200)).body as Attachment[];
     expect(projectAttachments.map((attachment) => attachment.id)).toContain(projectAttachment.id);
@@ -177,12 +188,18 @@ describe("Projekt Manager API integration", () => {
           title: "Review",
           startTime: "2026-05-20T09:00:00.000Z",
           endTime: "2026-05-20T10:00:00.000Z",
-          projectId: createdProject.id,
-          taskId: createdTask.id
+          owners: [
+            { type: "project", id: createdProject.id },
+            { type: "task", id: createdTask.id }
+          ]
         })
         .expect(201)
     ).body as Event;
     expect(createdEvent.color).toBe("#6366f1");
+    expect(createdEvent.owners).toEqual([
+      { type: "project", id: createdProject.id },
+      { type: "task", id: createdTask.id }
+    ]);
 
     const loadedEvent = (await request(app.server).get(`/api/events/${createdEvent.id}`).expect(200)).body as Event;
     expect(loadedEvent.id).toBe(createdEvent.id);
@@ -190,7 +207,12 @@ describe("Projekt Manager API integration", () => {
     const rangeEvents = (await request(app.server).get("/api/events").query({ from: "2026-05-20", to: "2026-05-21" }).expect(200)).body as Event[];
     expect(rangeEvents.map((event) => event.id)).toContain(createdEvent.id);
 
-    const patchedEvent = (await request(app.server).patch(`/api/events/${createdEvent.id}`).send({ title: "Review verschoben" }).expect(200)).body as Event;
+    const patchedEvent = (
+      await request(app.server)
+        .patch(`/api/events/${createdEvent.id}`)
+        .send({ title: "Review verschoben", expectedVersion: createdEvent.version })
+        .expect(200)
+    ).body as Event;
     expect(patchedEvent.title).toBe("Review verschoben");
     await request(app.server).delete(`/api/events/${createdEvent.id}`).expect(204);
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { createWikiPage, deleteWikiPage, getWikiBreadcrumb, getWikiPage, listRootWikiPages, listWikiChildren, updateWikiPage, type WikiPageInput } from "../services/wiki.service.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const wikiBodySchema = {
   type: "object",
@@ -18,8 +18,12 @@ const wikiBodySchema = {
 
 const wikiPatchSchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
-  properties: wikiBodySchema.properties
+  properties: {
+    ...wikiBodySchema.properties,
+    ...expectedVersionPropertySchema
+  }
 } as const;
 
 export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {

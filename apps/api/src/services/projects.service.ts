@@ -1,15 +1,14 @@
 import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { backlogItems, projects, projectTasks, tasks } from "../db/schema.js";
+import { projects, projectTasks, tasks } from "../db/schema.js";
+import { projectRepository, type ProjectRecord } from "../repositories/project.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
-import { deleteCommentsForEntities, deleteCommentsForEntity } from "./comments.service.js";
-import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
+import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import { deleteProjectNotesForIds } from "./notes.service.js";
 import { getProjectTags, getProjectTagsMap } from "./tags.service.js";
 
-type ProjectRecord = typeof projects.$inferSelect;
 interface ProjectTaskCounts {
   openTaskCount: number;
   doneTaskCount: number;
@@ -33,6 +32,7 @@ function mapProject(database: DbClient, record: ProjectRecord, counts: ProjectTa
     color: record.color,
     startDate: record.startDate,
     dueDate: record.dueDate,
+    version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     openTaskCount: counts.openTaskCount,
@@ -94,21 +94,14 @@ export function getProject(database: DbClient, id: number): Project {
 
 export function createProject(database: DbClient, input: ProjectInput): Project {
   const name = requireNonEmpty(input.name, "name");
-  const now = nowIso();
-  const created = database
-    .insert(projects)
-    .values({
-      name,
-      description: cleanNullable(input.description) ?? null,
-      status: input.status ?? "active",
-      color: input.color ?? "#6366f1",
-      startDate: cleanNullable(input.startDate) ?? null,
-      dueDate: cleanNullable(input.dueDate) ?? null,
-      createdAt: now,
-      updatedAt: now
-    })
-    .returning()
-    .get();
+  const created = projectRepository.create(database, {
+    name,
+    description: cleanNullable(input.description) ?? null,
+    status: input.status ?? "active",
+    color: input.color ?? "#6366f1",
+    startDate: cleanNullable(input.startDate) ?? null,
+    dueDate: cleanNullable(input.dueDate) ?? null
+  });
 
   return mapProject(database, created, emptyProjectTaskCounts(), []);
 }
@@ -139,9 +132,7 @@ export function updateProject(database: DbClient, id: number, input: ProjectUpda
     throw badRequest("No project fields provided");
   }
 
-  values.updatedAt = nowIso();
-
-  const updated = database.update(projects).set(values).where(eq(projects.id, id)).returning().get();
+  const updated = projectRepository.update(database, id, input.expectedVersion, values);
   if (!updated) {
     throw notFound(`Project with id ${id} not found`);
   }
@@ -156,12 +147,8 @@ export async function deleteProject(database: DbClient, id: number): Promise<voi
     throw notFound(`Project with id ${id} not found`);
   }
 
-  const backlogItemIds = database.select({ id: backlogItems.id }).from(backlogItems).where(eq(backlogItems.projectId, id)).all().map((item) => item.id);
-
   await deleteProjectAttachmentsForIds(database, [id]);
 
-  deleteCommentsForEntity(database, "project", id);
-  deleteCommentsForEntities(database, "backlogItem", backlogItemIds);
   deleteProjectNotesForIds(database, [id]);
 
   const result = database.delete(projects).where(eq(projects.id, id)).run();

@@ -11,7 +11,6 @@ import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
 import { RichTextEditor } from "../ui/RichTextEditor";
 import { Section } from "../ui/Section";
-import { Select } from "../ui/Select";
 
 interface EventFormProps {
   open: boolean;
@@ -39,6 +38,14 @@ function dateAtHour(date: string, hour: number): string {
   return `${date.slice(0, 10)}T${String(hour).padStart(2, "0")}:00`;
 }
 
+function ownerIds(event: CalendarEvent | null, type: "project" | "task"): number[] {
+  return event?.owners.filter((owner) => owner.type === type).map((owner) => owner.id) ?? [];
+}
+
+function toggleId(values: number[], id: number): number[] {
+  return values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
+}
+
 export function EventForm({ open, event, initialDate, projects, tasks, onSubmit, onDelete, onClose }: EventFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -46,8 +53,8 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
   const [endTime, setEndTime] = useState("");
   const [isAllDay, setIsAllDay] = useState(false);
   const [color, setColor] = useState(colors[0] ?? "var(--color-steel-700)");
-  const [projectId, setProjectId] = useState("");
-  const [taskId, setTaskId] = useState("");
+  const [projectIds, setProjectIds] = useState<number[]>([]);
+  const [taskIds, setTaskIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -61,8 +68,8 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
     setEndTime(event ? toDateTimeLocalInput(event.endTime) : dateAtHour(initialDate ?? new Date().toISOString(), 10));
     setIsAllDay(event?.isAllDay ?? false);
     setColor(event?.color ?? colors[0] ?? "var(--color-steel-700)");
-    setProjectId(event?.projectId ? String(event.projectId) : "");
-    setTaskId(event?.taskId ? String(event.taskId) : "");
+    setProjectIds(ownerIds(event, "project"));
+    setTaskIds(ownerIds(event, "task"));
   }, [event, initialDate, open]);
 
   const submit = async (submitEvent: FormEvent<HTMLFormElement>) => {
@@ -77,8 +84,10 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
           endTime: fromDateTimeLocalInput(endTime),
           isAllDay,
           color,
-          projectId: projectId ? Number(projectId) : null,
-          taskId: taskId ? Number(taskId) : null
+          owners: [
+            ...projectIds.map((id) => ({ type: "project" as const, id })),
+            ...taskIds.map((id) => ({ type: "task" as const, id }))
+          ]
         },
         event?.id
       );
@@ -123,22 +132,34 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
 
       <Section title="Zuordnung">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select label="Projekt" value={projectId} onChange={(inputEvent) => setProjectId(inputEvent.target.value)}>
-            <option value="">Keins</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </Select>
-          <Select label="Aufgabe" value={taskId} onChange={(inputEvent) => setTaskId(inputEvent.target.value)}>
-            <option value="">Keine</option>
-            {tasks.map((task) => (
-              <option key={task.id} value={task.id}>
-                {task.title}
-              </option>
-            ))}
-          </Select>
+          <FormField label="Projekte">
+            <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
+              {projects.length > 0 ? (
+                projects.map((project) => (
+                  <label key={project.id} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" checked={projectIds.includes(project.id)} onChange={() => setProjectIds((current) => toggleId(current, project.id))} />
+                    {project.name}
+                  </label>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Keine Projekte</p>
+              )}
+            </div>
+          </FormField>
+          <FormField label="Aufgaben">
+            <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
+              {tasks.length > 0 ? (
+                tasks.map((task) => (
+                  <label key={task.id} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" checked={taskIds.includes(task.id)} onChange={() => setTaskIds((current) => toggleId(current, task.id))} />
+                    {task.title}
+                  </label>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Keine Aufgaben</p>
+              )}
+            </div>
+          </FormField>
         </div>
       </Section>
 

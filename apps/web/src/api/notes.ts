@@ -1,4 +1,4 @@
-import type { Note, NoteInput } from "@taskmanager/shared-types";
+import type { Note, NoteInput, NoteUpdate } from "@taskmanager/shared-types";
 import { api } from "./client";
 
 export async function getProjectNotes(projectId: number): Promise<Note[]> {
@@ -17,7 +17,7 @@ export async function createTaskNote(taskId: number, input: NoteInput): Promise<
   return api.post(`tasks/${taskId}/notes`, { json: input }).json<Note>();
 }
 
-export async function updateNote(id: number, input: NoteInput): Promise<Note> {
+export async function updateNote(id: number, input: NoteUpdate): Promise<Note> {
   return api.patch(`notes/${id}`, { json: input }).json<Note>();
 }
 

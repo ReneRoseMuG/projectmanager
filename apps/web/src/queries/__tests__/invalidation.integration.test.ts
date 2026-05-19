@@ -23,11 +23,11 @@ import {
   invalidateNotes,
   invalidateProjectScope,
   invalidateProjects,
-  invalidateSeedData,
   invalidateTags,
   invalidateTaskScope,
   invalidateUseCaseScope,
-  invalidateWiki
+  invalidateWiki,
+  invalidateWikiImportData
 } from "../invalidation";
 import { queryKeys } from "../queryKeys";
 
@@ -67,7 +67,6 @@ const knownQueries = {
   wikiDetail: queryKeys.wiki.detail(wikiPageId),
   eventsList: queryKeys.events.list("2026-05"),
   calendarTasks: queryKeys.calendarTasks.list(),
-  seedRuns: queryKeys.seedRuns.list(),
   driveConfig: queryKeys.dumps.driveConfig(),
   globalSearch: queryKeys.globalSearch.data()
 } satisfies Record<string, QueryKey>;
@@ -255,7 +254,7 @@ describe("Query invalidation integration", () => {
     ]);
   });
 
-  it("invalidiert Wiki, Events, Projektlisten und Seed-Daten mit den passenden globalen Abhängigkeiten", async () => {
+  it("invalidiert Wiki, Events, Projektlisten und Wiki-Import-Folgen mit den passenden globalen Abhängigkeiten", async () => {
     queryClient = createQueryClient();
     seedKnownQueries(queryClient);
 
@@ -280,7 +279,7 @@ describe("Query invalidation integration", () => {
     queryClient.clear();
     seedKnownQueries(queryClient);
 
-    await invalidateSeedData(queryClient);
+    await invalidateWikiImportData(queryClient);
 
     expectInvalidated(queryClient, [
       "projectsList",
@@ -310,7 +309,6 @@ describe("Query invalidation integration", () => {
       "wikiTree",
       "wikiDetail",
       "calendarTasks",
-      "seedRuns",
       "globalSearch"
     ]);
   });

@@ -1,5 +1,6 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from "fastify";
 import type { ApiErrorPayload } from "@taskmanager/shared-types";
+import { VersionConflictError } from "../repositories/base.repository.js";
 
 export type ApiErrorCode = ApiErrorPayload["error"];
 
@@ -39,6 +40,13 @@ function validationMessage(error: FastifyError): string {
 }
 
 export function errorHandler(error: FastifyError, _request: FastifyRequest, reply: FastifyReply): void {
+  if (error instanceof VersionConflictError) {
+    void reply.status(409).send(
+      formatError(conflict(`Version conflict: expected ${error.expected}, actual ${error.actual}`))
+    );
+    return;
+  }
+
   if (error instanceof AppError) {
     void reply.status(error.statusCode).send(formatError(error));
     return;

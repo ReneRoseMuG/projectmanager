@@ -32,7 +32,7 @@ export function ProjectDetailPage() {
   const submitProject = async (input: ProjectInput, tagIds: number[]) => {
     try {
       if (project) {
-        const updated = await updateProject(project.id, input, tagIds);
+        const updated = await updateProject(project.id, { ...input, expectedVersion: project.version }, tagIds);
         showToast({ tone: "success", title: "Projekt gespeichert" });
         return updated;
       }

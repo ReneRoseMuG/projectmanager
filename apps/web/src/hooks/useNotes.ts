@@ -1,4 +1,4 @@
-import type { NoteInput } from "@taskmanager/shared-types";
+import type { NoteInput, NoteUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
@@ -63,7 +63,7 @@ export function useNotes(owner: NoteOwner | null) {
   });
 
   const updateNoteMutation = useMutation({
-    mutationFn: ({ id, input }: { id: number; input: NoteInput }) => updateNoteRequest(id, input),
+    mutationFn: ({ id, input }: { id: number; input: NoteUpdate }) => updateNoteRequest(id, input),
     onSuccess: async () => {
       if (hasOwner) {
         await invalidateNotes(queryClient, ownerType as NoteOwner["type"], ownerId as number);
@@ -88,7 +88,7 @@ export function useNotes(owner: NoteOwner | null) {
   );
 
   const updateNote = useCallback(
-    async (id: number, input: NoteInput) => {
+    async (id: number, input: NoteUpdate) => {
       return updateNoteMutation.mutateAsync({ id, input });
     },
     [updateNoteMutation]

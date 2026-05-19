@@ -25,7 +25,7 @@ import {
 } from "../services/tickets.service.js";
 import type { TicketOwner } from "../services/tickets.service.js";
 import { badRequest } from "../utils/errors.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema, projectIdParamSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, projectIdParamSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
 
 interface MultipartFileField {
   filename?: string;
@@ -57,21 +57,24 @@ const ticketBodySchema = {
 
 const ticketPatchSchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
   properties: {
     ...ticketBodySchema.properties,
     resolution: { type: ["string", "null"], enum: [...TICKET_RESOLUTIONS, null] },
-    resolvedAt: { type: ["string", "null"] }
+    resolvedAt: { type: ["string", "null"] },
+    ...expectedVersionPropertySchema
   }
 } as const;
 
 const ticketPositionSchema = {
   type: "object",
-  required: ["status", "position"],
+  required: ["status", "position", "expectedVersion"],
   additionalProperties: false,
   properties: {
     status: { type: "string", enum: TICKET_STATUSES },
-    position: { type: "number" }
+    position: { type: "number" },
+    ...expectedVersionPropertySchema
   }
 } as const;
 

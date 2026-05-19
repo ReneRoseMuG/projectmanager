@@ -32,10 +32,17 @@ export interface ApiErrorPayload {
   statusCode: number;
 }
 
+export interface VersionedUpdate {
+  expectedVersion: number;
+}
+
+export type WithExpectedVersion<T> = T & VersionedUpdate;
+
 export interface Tag {
   id: number;
   name: string;
   color: string;
+  version: number;
 }
 
 export interface Project {
@@ -46,6 +53,7 @@ export interface Project {
   color: string | null;
   startDate: string | null;
   dueDate: string | null;
+  version: number;
   createdAt: string;
   updatedAt: string;
   openTaskCount: number;
@@ -63,7 +71,7 @@ export interface ProjectInput {
   dueDate?: string | null;
 }
 
-export type ProjectUpdate = Partial<ProjectInput>;
+export type ProjectUpdate = WithExpectedVersion<Partial<ProjectInput>>;
 
 export interface Task {
   id: number;
@@ -74,6 +82,7 @@ export interface Task {
   priority: Priority;
   assignee: string | null;
   dueDate: string | null;
+  version: number;
   createdAt: string;
   updatedAt: string;
   tags: Tag[];
@@ -93,12 +102,12 @@ export interface TaskInput {
   dueDate?: string | null;
 }
 
-export type TaskUpdate = Partial<TaskInput>;
+export type TaskUpdate = WithExpectedVersion<Partial<TaskInput>>;
 
-export interface TaskBoardPositionInput {
+export type TaskBoardPositionInput = WithExpectedVersion<{
   status: TaskStatus;
   position: number;
-}
+}>;
 
 export interface Ticket {
   id: number;
@@ -116,6 +125,7 @@ export interface Ticket {
   dueDate: string | null;
   resolvedAt: string | null;
   position: number;
+  version: number;
   createdAt: string;
   updatedAt: string;
   tags: Tag[];
@@ -150,15 +160,15 @@ export interface TicketInput {
   dueDate?: string | null;
 }
 
-export type TicketUpdate = Partial<TicketInput> & {
+export type TicketUpdate = WithExpectedVersion<Partial<TicketInput> & {
   resolution?: TicketResolution | null;
   resolvedAt?: string | null;
-};
+}>;
 
-export interface TicketPositionInput {
+export type TicketPositionInput = WithExpectedVersion<{
   status: TicketStatus;
   position: number;
-}
+}>;
 
 export interface TicketRelationInput {
   targetTicketId: number;
@@ -167,12 +177,17 @@ export interface TicketRelationInput {
 
 export interface Comment {
   id: number;
-  taskId: number | null;
-  entityType: CommentEntityType;
-  entityId: number;
+  owners: CommentOwner[];
   body: string;
   createdAt: string;
+  updatedAt: string;
+  version: number;
 }
+
+export type CommentOwner = {
+  type: CommentEntityType;
+  id: number;
+};
 
 export interface CommentInput {
   body: string;
@@ -182,6 +197,7 @@ export interface Note {
   id: number;
   title: string;
   contentJson: JsonObject;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -191,19 +207,26 @@ export interface NoteInput {
   contentJson?: JsonObject;
 }
 
+export type NoteUpdate = WithExpectedVersion<NoteInput>;
+
 export interface Attachment {
   id: number;
-  projectId: number | null;
-  taskId: number | null;
-  featureId: number | null;
-  ticketId: number | null;
+  owners: AttachmentOwner[];
   originalName: string;
   filename: string;
   mimetype: string;
   size: number;
   url: string;
   createdAt: string;
+  updatedAt: string;
+  version: number;
 }
+
+export type AttachmentOwner =
+  | { type: "project"; id: number }
+  | { type: "task"; id: number }
+  | { type: "feature"; id: number }
+  | { type: "ticket"; id: number };
 
 export type AttachmentPreviewKind = "image" | "pdf" | "text" | "csv" | "audio" | "video" | "generatedPdf" | "unsupported";
 export type AttachmentPreviewStatus = "available" | "unsupported" | "failed";
@@ -228,19 +251,21 @@ export interface AttachmentPreviewInfo {
 
 export interface Event {
   id: number;
+  owners: EventOwner[];
   title: string;
   description: string | null;
   startTime: string;
   endTime: string;
   isAllDay: boolean;
   color: string | null;
-  projectId: number | null;
-  taskId: number | null;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export type CalendarEvent = Event;
+
+export type EventOwner = { type: "project" | "task"; id: number };
 
 export interface EventInput {
   title: string;
@@ -249,11 +274,10 @@ export interface EventInput {
   endTime: string;
   isAllDay?: boolean;
   color?: string | null;
-  projectId?: number | null;
-  taskId?: number | null;
+  owners?: EventOwner[];
 }
 
-export type EventUpdate = Partial<EventInput>;
+export type EventUpdate = WithExpectedVersion<Partial<EventInput>>;
 
 export interface Feature {
   id: number;
@@ -265,6 +289,7 @@ export interface Feature {
   contentPath: string | null;
   sortOrder: number;
   useCaseCount: number;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -278,7 +303,7 @@ export interface FeatureInput {
   sortOrder?: number;
 }
 
-export type FeatureUpdate = Partial<FeatureInput>;
+export type FeatureUpdate = WithExpectedVersion<Partial<FeatureInput>>;
 
 export interface FeatureRelation {
   sourceFeatureId: number;
@@ -306,6 +331,7 @@ export interface UseCase {
   content?: string;
   contentPath: string | null;
   sortOrder: number;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -320,7 +346,7 @@ export interface UseCaseInput {
   sortOrder?: number;
 }
 
-export type UseCaseUpdate = Partial<UseCaseInput>;
+export type UseCaseUpdate = WithExpectedVersion<Partial<UseCaseInput>>;
 
 export type DraftTask =
   | { kind: "new"; draft: Pick<TaskInput, "title" | "status" | "priority"> }
@@ -357,6 +383,7 @@ export interface WikiPage {
   contentPath: string | null;
   sortOrder: number;
   childCount: number;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -376,7 +403,7 @@ export interface WikiPageInput {
   sortOrder?: number;
 }
 
-export type WikiPageUpdate = Partial<WikiPageInput>;
+export type WikiPageUpdate = WithExpectedVersion<Partial<WikiPageInput>>;
 
 export interface BacklogItem {
   id: number;
@@ -389,6 +416,7 @@ export interface BacklogItem {
   priority: Priority;
   importKey: string | null;
   sortOrder: number;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -404,7 +432,7 @@ export interface BacklogItemInput {
   sortOrder?: number;
 }
 
-export type BacklogItemUpdate = Partial<BacklogItemInput>;
+export type BacklogItemUpdate = WithExpectedVersion<Partial<BacklogItemInput>>;
 
 export interface TaskDetail extends Task {
   subtasks: Task[];
@@ -525,46 +553,4 @@ export interface DumpDriveConfig {
 
 export interface DumpDriveConfigUpdateRequest {
   folderInput: string;
-}
-
-export type SeedRunScenario = "visual";
-
-export interface SeedRunTableCount {
-  tableName: string;
-  count: number;
-}
-
-export interface SeedRunSummary {
-  totalRecords: number;
-  tableCounts: SeedRunTableCount[];
-}
-
-export interface SeedRun {
-  id: string;
-  label: string;
-  scenario: SeedRunScenario;
-  createdAt: string;
-  summary: SeedRunSummary;
-}
-
-export interface SeedRunCreateRequest {
-  label?: string | null;
-}
-
-export interface SeedRunDeletePreview {
-  seedRun: SeedRun;
-  canDelete: boolean;
-  blockingIssues: string[];
-  tableCounts: SeedRunTableCount[];
-}
-
-export interface SeedRunDeleteRequest {
-  confirmationId: string;
-}
-
-export interface SeedRunDeleteResult {
-  seedRunId: string;
-  deletedAt: string;
-  deletedTables: SeedRunTableCount[];
-  deletedFiles: number;
 }

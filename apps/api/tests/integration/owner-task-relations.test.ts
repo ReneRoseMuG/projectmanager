@@ -60,7 +60,7 @@ async function createOwner(app: FastifyInstance, ownerCase: OwnerCase): Promise<
   return { ...ownerCase, id: useCase.id, path: `/api/use-cases/${useCase.id}/tasks` };
 }
 
-async function createUnlinkedTask(app: FastifyInstance, title = "Unverknüpfte Aufgabe"): Promise<Pick<Task, "id" | "title">> {
+async function createUnlinkedTask(app: FastifyInstance, title = "Unverknüpfte Aufgabe"): Promise<Pick<Task, "id" | "title" | "version">> {
   const project = await createProject(app, { name: "Temporärer Aufgaben-Owner" });
   const task = await createTask(app, project.id, { title });
   await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
@@ -146,7 +146,10 @@ describe("Owner task relation API", () => {
         await supertest(app.server).post(taskLinkPath(owner, 9999)).expect(404);
         await supertest(app.server).post(taskLinkPath(owner, subtask.id)).expect(400);
         await supertest(app.server).delete(taskLinkPath(owner, existingTask.id)).expect(404);
-        await supertest(app.server).patch(`${taskLinkPath(owner, existingTask.id)}/board`).send({ status: "done", position: 1 }).expect(404);
+        await supertest(app.server)
+          .patch(`${taskLinkPath(owner, existingTask.id)}/board`)
+          .send({ status: "done", position: 1, expectedVersion: existingTask.version })
+          .expect(404);
       });
 
       it("Direktes Löschen ist blockiert, bis der Owner-Join entfernt wurde", async () => {
@@ -171,7 +174,10 @@ describe("Owner task relation API", () => {
     const task = await supertest(app.server).post(projectOwner.path).send({ title: "Board Move", status: "todo" }).expect(201);
     await supertest(app.server).post(taskLinkPath(featureOwner, task.body.id)).expect(200);
 
-    await supertest(app.server).patch(`${taskLinkPath(projectOwner, task.body.id)}/board`).send({ status: "done", position: 4096 }).expect(200);
+    await supertest(app.server)
+      .patch(`${taskLinkPath(projectOwner, task.body.id)}/board`)
+      .send({ status: "done", position: 4096, expectedVersion: task.body.version })
+      .expect(200);
 
     const projectTasks = await supertest(app.server).get(projectOwner.path).expect(200);
     const featureTasks = await supertest(app.server).get(featureOwner.path).expect(200);

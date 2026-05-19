@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { PROJECT_STATUSES } from "../db/schema.js";
 import { createProject, deleteProject, getProject, listProjects, updateProject } from "../services/projects.service.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const projectBodySchema = {
   type: "object",
@@ -20,8 +20,12 @@ const projectBodySchema = {
 
 const projectPatchSchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
-  properties: projectBodySchema.properties
+  properties: {
+    ...projectBodySchema.properties,
+    ...expectedVersionPropertySchema
+  }
 } as const;
 
 export async function registerProjectsRoutes(app: FastifyInstance): Promise<void> {

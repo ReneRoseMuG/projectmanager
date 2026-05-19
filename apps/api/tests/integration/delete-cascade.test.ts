@@ -1,95 +1,31 @@
 /**
- * Test Suite: Vollständige Lösch-Kaskadierung
+ * Test Scope:
  *
- * Stellt sicher, dass beim Löschen einer Entität ALLE abhängigen Objekte
- * mitgelöscht werden – direkt via DB-Cascade, Join-Tabellen-Einträge
- * und polymorphe Referenzen ohne FK-Constraint (Kommentare, Notes).
+ * Abgedeckte Regeln:
+ * - Löschvorgänge entfernen abhängige Join-Tabellen-Einträge.
+ * - Owner-basierte Comments werden über ihre Owner-Join-Tabellen bereinigt.
+ * - Notes, Tags, Tickets, Tasks, Wiki-Seiten und Relationen behalten ihre jeweilige Löschregel.
  *
- * Test-Matrix – geprüfte Relationen:
+ * Fehlerfälle:
+ * - Owner-Unlink darf mehrfach verknüpfte Tickets oder Tasks nicht löschen.
+ * - Restrict-Regeln müssen weiterhin blockieren, wenn abhängige Objekte existieren.
  *
- * deleteProject
- *   ├─ tasks (cascade)                              ✅ DB-Cascade
- *   │   ├─ subtasks (parentId cascade)             ✅ DB-Cascade
- *   │   ├─ comments via task_id FK                 ✅ DB-Cascade
- *   │   ├─ task_tags (cascade)                     ✅ DB-Cascade
- *   │   ├─ task_notes join (cascade)               ✅ DB-Cascade
- *   │   └─ notes record selbst                     ❌ BUG – orphaned
- *   ├─ comments entityType="project"               ❌ BUG – orphaned
- *   ├─ project_tags (cascade)                      ✅ DB-Cascade
- *   ├─ project_notes join (cascade)                ✅ DB-Cascade
- *   │   └─ notes record selbst                     ❌ BUG – orphaned
- *   ├─ backlog_items (cascade)                     ✅ DB-Cascade
- *   │   └─ comments entityType="backlogItem"       ❌ BUG – orphaned
- *   ├─ tickets (cascade)                           ✅ DB-Cascade
- *   │   ├─ sub-tickets (parentId cascade)          ✅ DB-Cascade
- *   │   ├─ ticket_relations (cascade)              ✅ DB-Cascade
- *   │   ├─ ticket_tags (cascade)                   ✅ DB-Cascade
- *   │   ├─ ticket_notes join (cascade)             ✅ DB-Cascade
- *   │   │   └─ notes record selbst                 ❌ BUG – orphaned
- *   │   └─ comments entityType="ticket"            ❌ BUG – orphaned
- *   ├─ attachments DB-Records (cascade)            ✅ DB-Cascade
- *   │   └─ physische Dateien auf Disk              ❌ BUG – nicht gelöscht (separater Test erforderlich)
- *   ├─ events.projectId → set null                 ✅ DB-Cascade
- *   ├─ wiki_pages.projectId → set null             ✅ DB-Cascade
- *   └─ project_features join (cascade)             ✅ DB-Cascade (Feature selbst bleibt)
- *
- * deleteTask
- *   ├─ subtasks (parentId cascade)                 ✅ DB-Cascade
- *   ├─ comments via task_id FK                     ✅ DB-Cascade
- *   ├─ task_tags (cascade)                         ✅ DB-Cascade
- *   ├─ task_notes join (cascade)                   ✅ DB-Cascade
- *   │   └─ notes record selbst                     ❌ BUG – orphaned
- *   ├─ task_features (cascade)                     ✅ DB-Cascade
- *   └─ task_use_cases (cascade)                    ✅ DB-Cascade
- *
- * deleteFeature
- *   ├─ use_cases (featureId cascade)               ✅ DB-Cascade
- *   │   └─ task_use_cases (cascade)               ✅ DB-Cascade
- *   ├─ comments entityType="feature"               ❌ BUG – orphaned
- *   ├─ comments entityType="useCase"               ❌ BUG – orphaned
- *   ├─ feature_relations source+target (cascade)   ✅ DB-Cascade
- *   ├─ task_features (cascade)                     ✅ DB-Cascade
- *   ├─ project_features (cascade)                  ✅ DB-Cascade
- *   └─ backlog_items.featureId → set null          ✅ DB-Cascade
- *
- * deleteUseCase
- *   ├─ comments entityType="useCase"               ❌ BUG – orphaned
- *   ├─ task_use_cases (cascade)                    ✅ DB-Cascade
- *   └─ backlog_items.useCaseId → set null          ✅ DB-Cascade
- *
- * deleteTicket
- *   ├─ sub-tickets (parentId cascade)              ✅ DB-Cascade
- *   ├─ comments entityType="ticket"                ❌ BUG – orphaned
- *   ├─ ticket_notes join (cascade)                 ✅ DB-Cascade
- *   │   └─ notes record selbst                     ❌ BUG – orphaned
- *   ├─ ticket_relations (beide Seiten, cascade)    ✅ DB-Cascade
- *   └─ ticket_tags (cascade)                       ✅ DB-Cascade
- *
- * deleteBacklogItem
- *   └─ comments entityType="backlogItem"           ❌ BUG – orphaned
- *
- * deleteWikiPage
- *   ├─ verhindert Löschen bei vorhandenen Kindern  ✅ restrict
- *   └─ comments entityType="wikiPage"              ❌ BUG – orphaned
- *
- * deleteTag
- *   ├─ project_tags (cascade)                      ✅ DB-Cascade
- *   ├─ task_tags (cascade)                         ✅ DB-Cascade
- *   └─ ticket_tags (cascade)                       ✅ DB-Cascade
+ * Ziel:
+ * Die vollständige Lösch-Kaskadierung über das bereinigte Owner-/Join-Modell absichern.
  */
 
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   backlogItems,
   comments,
-  events,
   featureRelations,
   featureTasks,
   features,
   notes,
+  projectEvents,
   projectFeatures,
   projectNotes,
   projectTags,
@@ -234,46 +170,46 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).get(`/api/tasks/${sub.id}`).expect(200);
     });
 
-    it("löscht Task-Kommentare via task_id-FK (entityType=task)", async () => {
+    it("behält Task-Kommentare, solange der Task-Owner bestehen bleibt", async () => {
       const project = await createProject(app);
       const task = await createTask(app, project.id);
-      await postComment(app, "tasks", task.id);
+      const commentId = await postComment(app, "tasks", task.id);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "task"), eq(comments.entityId, task.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(1);
     });
 
-    it("löscht Kommentare mit entityType='project'", async () => {
+    it("löscht Kommentare über den Project-Owner-Join", async () => {
       const project = await createProject(app);
-      await postComment(app, "projects", project.id);
+      const commentId = await postComment(app, "projects", project.id);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "project"), eq(comments.entityId, project.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(0);
     });
 
-    it("löscht Kommentare der BacklogItems (entityType='backlogItem')", async () => {
+    it("löscht Kommentare der BacklogItems über den Owner-Join", async () => {
       const project = await createProject(app);
       const item = await createBacklogItem(app, project.id);
-      await postComment(app, "backlog", item.id);
+      const commentId = await postComment(app, "backlog", item.id);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "backlogItem"), eq(comments.entityId, item.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(0);
     });
@@ -281,14 +217,14 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
     it("behält Kommentare der Tickets beim Entfernen des Projekt-Links", async () => {
       const project = await createProject(app);
       const ticket = await createTicket(app, project.id);
-      await postComment(app, "tickets", ticket.id);
+      const commentId = await postComment(app, "tickets", ticket.id);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "ticket"), eq(comments.entityId, ticket.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(1);
     });
@@ -297,14 +233,14 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const project = await createProject(app);
       const ticket = await createTicket(app, project.id);
       const sub = await createSubTicket(app, ticket.id);
-      await postComment(app, "tickets", sub.id);
+      const commentId = await postComment(app, "tickets", sub.id);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "ticket"), eq(comments.entityId, sub.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(1);
     });
@@ -384,18 +320,25 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remainingSub).toHaveLength(1);
     });
 
-    it("setzt projectId bei Events auf null (Events bleiben erhalten)", async () => {
+    it("entfernt Project-Event-Junctions, Events bleiben erhalten", async () => {
       const project = await createProject(app);
       const res = await supertest(app.server)
         .post("/api/events")
-        .send({ title: "Termin", startTime: "2026-07-01T10:00:00", endTime: "2026-07-01T11:00:00", isAllDay: false, projectId: project.id })
+        .send({
+          title: "Termin",
+          startTime: "2026-07-01T10:00:00",
+          endTime: "2026-07-01T11:00:00",
+          isAllDay: false,
+          owners: [{ type: "project", id: project.id }]
+        })
         .expect(201);
       const eventId = (res.body as { id: number }).id;
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
       const event = await supertest(app.server).get(`/api/events/${eventId}`).expect(200);
-      expect(event.body.projectId).toBeNull();
+      expect(event.body.owners).toEqual([]);
+      expect(testDb.db.select().from(projectEvents).where(eq(projectEvents.eventId, eventId)).all()).toHaveLength(0);
     });
 
     it("setzt projectId bei WikiPages auf null (WikiPages bleiben erhalten)", async () => {
@@ -442,10 +385,10 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).get(`/api/tasks/${sub2.id}`).expect(404);
     });
 
-    it("löscht Kommentare der Aufgabe via task_id-FK", async () => {
+    it("löscht Kommentare der Aufgabe über den Owner-Join", async () => {
       const project = await createProject(app);
       const task = await createTask(app, project.id);
-      await postComment(app, "tasks", task.id);
+      const commentId = await postComment(app, "tasks", task.id);
 
       await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
@@ -453,7 +396,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "task"), eq(comments.entityId, task.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(0);
     });
@@ -548,31 +491,31 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).get(`/api/use-cases/${uc2.id}`).expect(404);
     });
 
-    it("löscht Kommentare mit entityType='feature'", async () => {
+    it("löscht Kommentare über den Feature-Owner-Join", async () => {
       const feature = await createFeature(app);
-      await postComment(app, "features", feature.id);
+      const commentId = await postComment(app, "features", feature.id);
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "feature"), eq(comments.entityId, feature.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(0);
     });
 
-    it("löscht Kommentare der zugehörigen UseCases (entityType='useCase')", async () => {
+    it("löscht Kommentare der zugehörigen UseCases über den Owner-Join", async () => {
       const feature = await createFeature(app);
       const uc = await createUseCase(app, feature.id);
-      await postComment(app, "use-cases", uc.id);
+      const commentId = await postComment(app, "use-cases", uc.id);
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "useCase"), eq(comments.entityId, uc.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(0);
     });
@@ -670,17 +613,17 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
   // =========================================================================
 
   describe("deleteUseCase – alle abhängigen Objekte werden entfernt", () => {
-    it("löscht Kommentare mit entityType='useCase'", async () => {
+    it("löscht Kommentare über den Use-Case-Owner-Join", async () => {
       const feature = await createFeature(app);
       const uc = await createUseCase(app, feature.id);
-      await postComment(app, "use-cases", uc.id);
+      const commentId = await postComment(app, "use-cases", uc.id);
 
       await supertest(app.server).delete(`/api/use-cases/${uc.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "useCase"), eq(comments.entityId, uc.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(0);
     });
@@ -726,31 +669,31 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).get(`/api/tickets/${sub.id}`).expect(200);
     });
 
-    it("löscht Kommentare mit entityType='ticket'", async () => {
+    it("löscht Kommentare über den Ticket-Owner-Join", async () => {
       const ticket = await createTicket(app, null);
-      await postComment(app, "tickets", ticket.id);
+      const commentId = await postComment(app, "tickets", ticket.id);
 
       await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "ticket"), eq(comments.entityId, ticket.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(0);
     });
 
-    it("löscht Kommentare von direkt gelöschten Sub-Tickets (entityType='ticket')", async () => {
+    it("löscht Kommentare von direkt gelöschten Sub-Tickets über den Owner-Join", async () => {
       const parent = await createTicket(app, null);
       const sub = await createSubTicket(app, parent.id);
-      await postComment(app, "tickets", sub.id);
+      const commentId = await postComment(app, "tickets", sub.id);
 
       await supertest(app.server).delete(`/api/tickets/${sub.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "ticket"), eq(comments.entityId, sub.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(0);
     });
@@ -819,17 +762,17 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
   // =========================================================================
 
   describe("deleteBacklogItem – alle abhängigen Objekte werden entfernt", () => {
-    it("löscht Kommentare mit entityType='backlogItem'", async () => {
+    it("löscht Kommentare über den Backlog-Owner-Join", async () => {
       const project = await createProject(app);
       const item = await createBacklogItem(app, project.id);
-      await postComment(app, "backlog", item.id);
+      const commentId = await postComment(app, "backlog", item.id);
 
       await supertest(app.server).delete(`/api/backlog/${item.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "backlogItem"), eq(comments.entityId, item.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(0);
     });
@@ -840,16 +783,16 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
   // =========================================================================
 
   describe("deleteWikiPage – alle abhängigen Objekte werden entfernt", () => {
-    it("löscht Kommentare mit entityType='wikiPage'", async () => {
+    it("löscht Kommentare über den Wiki-Owner-Join", async () => {
       const page = await createWikiPage(app);
-      await postComment(app, "wiki", page.id);
+      const commentId = await postComment(app, "wiki", page.id);
 
       await supertest(app.server).delete(`/api/wiki/${page.id}`).expect(204);
 
       const remaining = testDb.db
         .select()
         .from(comments)
-        .where(and(eq(comments.entityType, "wikiPage"), eq(comments.entityId, page.id)))
+        .where(eq(comments.id, commentId))
         .all();
       expect(remaining).toHaveLength(0);
     });

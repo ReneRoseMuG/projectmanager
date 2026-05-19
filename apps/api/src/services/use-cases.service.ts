@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { features, useCases } from "../db/schema.js";
+import { features } from "../db/schema.js";
+import { assertVersion } from "../repositories/base.repository.js";
+import { useCaseRepository, type UseCaseRecord, type UseCaseUpdateData } from "../repositories/use-case.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
-import { deleteCommentsForEntity } from "./comments.service.js";
 import {
   buildFilename,
   buildStoredContentPath,
@@ -13,9 +14,8 @@ import {
   resolveStoredContentPath,
   writeContent
 } from "./content.service.js";
-import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
+import { cleanNullable, requireNonEmpty } from "./helpers.js";
 
-type UseCaseRecord = typeof useCases.$inferSelect;
 type UseCaseStatus = UseCaseRecord["status"];
 
 export interface UseCaseInput {
@@ -26,6 +26,7 @@ export interface UseCaseInput {
   description?: string | null;
   content?: string;
   sortOrder?: number;
+  expectedVersion?: number;
 }
 
 export interface UseCaseDto {
@@ -38,6 +39,7 @@ export interface UseCaseDto {
   content?: string;
   contentPath: string | null;
   sortOrder: number;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +59,7 @@ function mapUseCase(record: UseCaseRecord, content?: string): UseCaseDto {
     content,
     contentPath: record.contentPath,
     sortOrder: record.sortOrder,
+    version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
   };
@@ -70,7 +73,7 @@ function ensureFeatureExists(database: DbClient, featureId: number): void {
 }
 
 function getUseCaseRecord(database: DbClient, id: number): UseCaseRecord {
-  const useCase = database.select().from(useCases).where(eq(useCases.id, id)).get();
+  const useCase = useCaseRepository.findById(database, id);
   if (!useCase) {
     throw notFound(`Use case with id ${id} not found`);
   }
@@ -78,7 +81,7 @@ function getUseCaseRecord(database: DbClient, id: number): UseCaseRecord {
 }
 
 function ensureSlugIsUnique(database: DbClient, slug: string, exceptId?: number): void {
-  const existing = database.select({ id: useCases.id }).from(useCases).where(eq(useCases.slug, slug)).all().find((row) => row.id !== exceptId);
+  const existing = useCaseRepository.findBySlug(database, slug).find((row) => row.id !== exceptId);
   if (existing) {
     throw conflict(`Use case slug "${slug}" already exists`);
   }
@@ -90,13 +93,7 @@ function readUseCaseContent(record: UseCaseRecord): string {
 
 export function listUseCases(database: DbClient, featureId: number): UseCaseDto[] {
   ensureFeatureExists(database, featureId);
-  return database
-    .select()
-    .from(useCases)
-    .where(eq(useCases.featureId, featureId))
-    .orderBy(useCases.sortOrder, useCases.title)
-    .all()
-    .map((useCase) => mapUseCase(useCase));
+  return useCaseRepository.findByFeatureId(database, featureId).map((useCase) => mapUseCase(useCase));
 }
 
 export function getUseCase(database: DbClient, id: number): UseCaseDto {
@@ -111,22 +108,15 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
   const slug = requireNonEmpty(input.slug, "slug");
   ensureSlugIsUnique(database, slug);
 
-  const now = nowIso();
-  const created = database
-    .insert(useCases)
-    .values({
-      featureId: targetFeatureId,
-      title,
-      slug,
-      status: input.status ?? "draft",
-      description: cleanNullable(input.description) ?? null,
-      contentPath: null,
-      sortOrder: input.sortOrder ?? 0,
-      createdAt: now,
-      updatedAt: now
-    })
-    .returning()
-    .get();
+  const created = useCaseRepository.create(database, {
+    featureId: targetFeatureId,
+    title,
+    slug,
+    status: input.status ?? "draft",
+    description: cleanNullable(input.description) ?? null,
+    contentPath: null,
+    sortOrder: input.sortOrder ?? 0
+  });
 
   const filename = contentFilename(created.id, slug);
   const absolutePath = resolveContentPath("usecases", filename);
@@ -134,16 +124,14 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
 
   try {
     writeContent(absolutePath, input.content ?? "");
-    const updated = database
-      .update(useCases)
-      .set({ contentPath: storedPath, updatedAt: nowIso() })
-      .where(eq(useCases.id, created.id))
-      .returning()
-      .get();
+    const updated = useCaseRepository.setContentPath(database, created.id, storedPath);
+    if (!updated) {
+      throw notFound(`Use case with id ${created.id} not found`);
+    }
 
     return mapUseCase(updated, input.content ?? "");
   } catch (error) {
-    database.delete(useCases).where(eq(useCases.id, created.id)).run();
+    useCaseRepository.delete(database, created.id);
     deleteContent(absolutePath);
     throw error;
   }
@@ -151,7 +139,8 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
 
 export function updateUseCase(database: DbClient, id: number, input: UseCaseInput): UseCaseDto {
   const current = getUseCaseRecord(database, id);
-  const values: Partial<typeof useCases.$inferInsert> = {};
+  assertVersion(current.version, input.expectedVersion ?? 0);
+  const values: UseCaseUpdateData = {};
   let contentPath = current.contentPath;
 
   if (input.title !== undefined) {
@@ -202,16 +191,16 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
     writeContent(resolveStoredContentPath(contentPath), input.content);
   }
 
-  values.updatedAt = nowIso();
-
-  const updated = database.update(useCases).set(values).where(eq(useCases.id, id)).returning().get();
+  const updated = useCaseRepository.update(database, id, input.expectedVersion ?? 0, values);
+  if (!updated) {
+    throw notFound(`Use case with id ${id} not found`);
+  }
   return mapUseCase(updated, input.content ?? readUseCaseContent(updated));
 }
 
 export function deleteUseCase(database: DbClient, id: number): void {
   const useCase = getUseCaseRecord(database, id);
-  deleteCommentsForEntity(database, "useCase", id);
-  database.delete(useCases).where(eq(useCases.id, id)).run();
+  useCaseRepository.delete(database, id);
 
   if (useCase.contentPath) {
     deleteContent(resolveStoredContentPath(useCase.contentPath));

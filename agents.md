@@ -269,6 +269,21 @@ Der neueste Eintrag steht **oben**. Der Index wird nach jedem neuen Log sofort a
 - Alle Schema-Änderungen gehen über neue Migrations-Dateien — kein `drizzle-kit push` in der regulären Arbeit
 - `db/client.ts` als einziger Einstiegspunkt für die Drizzle-Instanz
 
+### Repository- und Service-Schicht
+
+- Neue fachliche Entitäten und bearbeitbare Support-Objekte erhalten eine Repository-Datei unter `apps/api/src/repositories/`, sofern sie CRUD, Versionierung oder wiederverwendbare Persistenzlogik haben.
+- Repository-Funktionen kapseln einfache DB-Zugriffe, CRUD-Operationen und Version-Checks. Services orchestrieren Business-Regeln, Relationen, Dateioperationen und domänenübergreifende Abläufe.
+- Update-Operationen für versionierte Objekte verlangen strikt `expectedVersion`; fehlende Werte sind `BAD_REQUEST`, Versionskonflikte sind `CONFLICT`.
+- Route-Handler rufen Services auf und enthalten keine eigene Persistenz- oder Businesslogik.
+- Neue öffentliche DTOs geben `version` zurück, sobald das Objekt versioniert ist.
+
+### Versionierung und Audit
+
+- Neue fachliche Entitäten erhalten grundsätzlich `version`, `createdBy`, `updatedBy`, `createdAt` und `updatedAt`.
+- Neue bearbeitbare Support-Objekte erhalten ebenfalls `version`, `createdBy`, `updatedBy`, `createdAt` und `updatedAt`, sofern sie per API geändert werden können.
+- Infrastruktur- oder Admin-Tabellen ohne fachlichen Bearbeitungsworkflow dürfen davon abweichen, wenn der Plan die Abweichung ausdrücklich benennt.
+- Jede Update-Route eines versionierten Objekts muss `expectedVersion` im Fastify-Schema erzwingen und einen Integrationstest für den erfolgreichen Update-Fall mit aktueller Version enthalten.
+
 ### React / Frontend
 
 - Keine `useEffect`-Ketten für Datenabruf — Datenabruf in custom Hooks
@@ -286,7 +301,7 @@ Server-State wird ausschließlich über TanStack Query verwaltet. Kein `useState
 - **Hooks:** Zwei Ebenen pro Domäne:
   - `use<Domäne>(projectId?)` — Liste + Mutations (create, update, position, delete)
   - `use<Domäne>Detail(id)` — Einzelelement + alle Detail-Mutations (tags, comments, relations, sub-items)
-- **Owner-basierte Querschnitts-Hooks:** `useNotes(owner)` und `useAttachments(owner)` sind generisch und decken alle Domänen ab. `owner` ist eine Discriminated Union (`{ type: "project" | "task" | "feature" | "ticket"; id: number }`). Beim Hinzufügen einer neuen Entität als Attachment- oder Note-Träger müssen diese Union-Typen sowie `QueryOwnerType` und `NoteOwnerType` in `queryKeys.ts` erweitert werden.
+- **Owner-basierte Querschnitts-Hooks:** `useNotes(owner)` und `useAttachments(owner)` sind generisch und decken alle dafür freigegebenen Domänen ab. Owner sind Discriminated Unions; beim Hinzufügen neuer Träger müssen `QueryOwnerType`, `NoteOwnerType`, `AttachmentOwner`, `NoteOwner` und die zuständigen API-Funktionen konsistent erweitert werden.
 - **Fehlerbehandlung:** `toQueryError(query.error)` aus `src/queries/queryErrors.ts` — nie rohe `error`-Objekte an Komponenten weitergeben.
 
 ---
@@ -304,6 +319,7 @@ taskmanager/
 │   ├── api/
 │   │   └── src/
 │   │       ├── db/schema.ts           ← zentrales Drizzle-Schema (alle Tabellen)
+│   │       ├── repositories/          ← CRUD, Version-Checks und Persistenzzugriffe
 │   │       ├── routes/                ← Fastify-Routes (eine Datei pro Domäne)
 │   │       ├── services/              ← Business-Logik (eine Datei pro Domäne)
 │   │       └── db/migrations/        ← versionierte SQL-Migrationen
@@ -410,6 +426,8 @@ npm run test -w apps/api  # nur API-Tests
 - Alle Tests mit DB-Bezug verwenden ausschließlich In-Memory-, Temp- oder `.test-runtime`-Datenbanken; Testläufe dürfen nie `apps/api/data/` verwenden.
 - Alle Tests mit Dateisystembezug verwenden ausschließlich Temp- oder `.test-runtime`-Verzeichnisse; Testläufe dürfen nie `apps/api/uploads/`, `apps/api/content/` oder `apps/api/backups/` verwenden.
 - Integrationstests verwenden eine eigene Temp-DB, die vor/nach dem Test angelegt und gelöscht wird
+- Integrationstests für Update-Endpunkte versionierter Objekte verwenden die aktuelle `version` aus Create- oder GET-Antworten und senden `expectedVersion` explizit mit.
+- Neue Anwendungstabellen müssen in Test-Fixtures, `truncateAll` und Dump-Roundtrip-Tests berücksichtigt werden, sobald sie Teil des produktiven DB-Schemas sind.
 - Schlägt ein Test fehl, dokumentiert Codex den Fehler und nimmt keine eigenständigen Fixes vor
 
 ### Test-Dokumentation in Testdateien
@@ -545,10 +563,10 @@ Entitäten: `features`, `useCases`, `wikiPages`, `featureRelations`
 
 ### Domäne 3 — Tickets & Bug-Tracking
 
-Entitäten: `tickets`, `ticketRelations`, `ticketTags`, `ticketNotes`
+Entitäten: `tickets`, `ticketRelations`, `ticketTags`, `ticketNotes`, `projectTickets`, `taskTickets`, `featureTickets`, `useCaseTickets`
 
-- Tickets gehören immer einem Projekt (`projectId NOT NULL`, cascade delete)
-- Sub-Tickets via `parentId` (cascade delete); Sub-Tickets erben Projekt des Eltern-Tickets
+- Tickets sind owner-unabhängige fachliche Objekte und können über Join-Tabellen mehreren Trägern zugeordnet werden
+- Sub-Tickets via `parentId` (cascade delete); Sub-Tickets werden nicht direkt an Owner verknüpft
 - Ticket-Typen: `bug | improvement | question | task`
 - Ticket-Status: `open → in_progress → in_review → resolved → closed`
 - `resolvedAt` wird automatisch gesetzt beim Übergang in `resolved` oder `closed`
@@ -563,20 +581,69 @@ Folgende Infrastruktur wird von mehreren Domänen gemeinsam genutzt:
 |---|---|---|
 | **Tags** | projects, tasks, tickets | Join-Tabellen (`projectTags`, `taskTags`, `ticketTags`), `setXxxTags`-Service-Funktionen |
 | **Notes** | projects, tasks, tickets | Join-Tabellen (`projectNotes`, `taskNotes`, `ticketNotes`), `useNotes(owner)` Hook |
-| **Attachments** | projects, tasks, features, tickets | Spalten in `attachments`-Tabelle, gegenseitig exklusive CHECK-Constraint, `useAttachments(owner)` Hook |
-| **Comments** | tasks, features, projects, useCases, backlogItems, wikiPages, tickets | Generisch via `entityType` + `entityId` in `comments`-Tabelle |
-| **Calendar** | projects, tasks | `events`-Tabelle mit optionalen FK |
+| **Attachments** | projects, tasks, features, tickets | `attachments` plus Owner-Join-Tabellen (`projectAttachments`, `taskAttachments`, `featureAttachments`, `ticketAttachments`), DTO `owners: [...]`, `useAttachments(owner)` Hook |
+| **Comments** | tasks, features, projects, useCases, backlogItems, wikiPages, tickets | `comments` plus Owner-Join-Tabellen (`projectComments`, `taskComments`, `featureComments`, `useCaseComments`, `backlogItemComments`, `wikiPageComments`, `ticketComments`), DTO `owners: [...]` |
+| **Calendar** | projects, tasks | `events`-Tabelle plus `projectEvents`/`taskEvents`-Join-Tabellen |
 
-**Beim Hinzufügen einer neuen Attachment- oder Note-fähigen Entität** müssen stets aktualisiert werden:
-1. `attachments`-Tabelle (neue Spalte + CHECK-Constraint-Rebuild) oder Join-Tabelle für Notes
-2. `QueryOwnerType` und `NoteOwnerType` in `src/queries/queryKeys.ts`
-3. `AttachmentOwner` in `src/hooks/useAttachments.ts`
-4. `NoteOwner` in `src/hooks/useNotes.ts`
-5. Entsprechende API-Funktionen in `src/api/<domäne>.ts`
+**Beim Hinzufügen einer neuen Attachment-fähigen Entität:**
+1. Neue Owner-Join-Tabelle anlegen — direkte Owner-Spalten in `attachments` sind im Zielschema nicht zulässig.
+2. `AttachmentOwner`, `QueryOwnerType`, Query-Keys, Invalidierung und API-Funktionen ergänzen.
+3. Attachment-DTOs weiterhin mit `owners: [...]` ausgeben.
+4. Dump-Registry, Test-DB-Truncation und Roundtrip-Seed aktualisieren.
+
+**Beim Hinzufügen einer neuen Note-fähigen Entität:**
+1. Neue Note-Join-Tabelle oder vorhandenes Note-Owner-Modell erweitern.
+2. `NoteOwnerType`, `NoteOwner`, Query-Keys, Invalidierung und API-Funktionen ergänzen.
+3. Dump-Registry, Test-DB-Truncation und Roundtrip-Seed aktualisieren.
 
 **Beim Hinzufügen einer neuen comment-fähigen Entität:**
-1. `COMMENT_ENTITY_TYPES` in `apps/api/src/db/schema.ts` ergänzen
-2. `CommentEntityType` in `packages/shared-types` ergänzen (falls separater Type-Export)
+1. Neue Owner-Join-Tabelle anlegen — direkte Owner-Spalten oder polymorphe `entityType`/`entityId`-Spalten in `comments` sind nicht zulässig.
+2. `CommentOwner` und `CommentEntityType` in `packages/shared-types` ergänzen, falls ein separater Type-Export betroffen ist.
+3. Comment-DTOs weiterhin mit `owners: [...]` ausgeben.
+4. Dump-Registry, Test-DB-Truncation und Roundtrip-Seed aktualisieren.
+
+**Beim Hinzufügen einer neuen tag-fähigen Entität:**
+1. Neue Tag-Join-Tabelle anlegen.
+2. `setXxxTags`-Service-Funktion und passende API-Route ergänzen.
+3. Query-Invalidierung und betroffene Detail-Hooks erweitern.
+4. Dump-Registry, Test-DB-Truncation und Roundtrip-Seed aktualisieren.
+
+### Pflichtcheckliste für neue Domänen und Support-Objekte
+
+Vor der Umsetzung einer neuen Entität muss im Plan ausdrücklich eingeordnet werden:
+
+- Gehört die Entität zu Projektmanagement, Dokumentation, Tickets oder ist eine neue Domäne nötig?
+- Ist sie ein fachliches Objekt, ein bearbeitbares Support-Objekt oder reine Infrastruktur/Admin-Konfiguration?
+- Ist sie versioniert, owner-fähig, suchbar, tag-, note-, comment- oder attachment-fähig?
+- Welche Parent-Child- und Owner-Beziehungen gelten im Zielzustand?
+- Welche Löschregel gilt pro Beziehung: cascade, restrict, set null oder nur Join entfernen?
+
+Für neue fachliche Domänen gilt als Mindestumfang:
+
+1. `schema.ts` plus neue Migration und Migrationstestlauf.
+2. Shared Types in `packages/shared-types`.
+3. Repository unter `apps/api/src/repositories/` für CRUD und Version-Checks.
+4. Service unter `apps/api/src/services/` für Business-Regeln und Relationen.
+5. Route unter `apps/api/src/routes/` mit Fastify-Schema und einheitlichem Fehlerformat.
+6. Update-Routen mit strikt erforderlichem `expectedVersion`.
+7. API-Integrationstests inklusive erfolgreichem Update mit aktueller Version und mindestens einem fachlichen Fehlerfall.
+8. Web-API-Funktionen unter `apps/web/src/api/`.
+9. Query-Keys, Invalidierung und Hooks gemäß TanStack-Regeln.
+10. UI-Labels und Tone-Maps in `src/utils/domainLabels.ts`.
+11. Global Search nur dann erweitern, wenn die Entität fachlich suchbar sein soll.
+12. Dump-Registry, Test-DB-Truncation und Dump-Roundtrip-Seed für jede neue Anwendungstabelle.
+
+### Dump- und Backup-Registry
+
+Jede neue Anwendungstabelle muss in `apps/api/src/services/dump.service.ts` in `DUMP_TABLES` eingetragen werden. Die Reihenfolge muss Foreign Keys respektieren: Eltern-Tabellen stehen vor abhängigen Tabellen, damit der Restore in Einfüge-Reihenfolge funktioniert und das Löschen in umgekehrter Reihenfolge sicher ist.
+
+Zusätzlich müssen aktualisiert werden:
+
+1. `apps/api/tests/helpers/db.ts` — `truncateAll` um die Tabelle ergänzen.
+2. `apps/api/tests/integration/dumps-drive.test.ts` — Tabellenvertrag unverändert lassen und Roundtrip-Seed um repräsentative Daten ergänzen, wenn die Tabelle fachliche Daten hält.
+3. Bei strukturellen Dump-Formatänderungen bewusst entscheiden, ob `DUMP_FORMAT_VERSION` erhöht werden muss. Neue Tabellen allein erhöhen die Formatversion nicht automatisch, weil die Schema-Revision bereits geprüft wird.
+
+Der Tabellenvertrag im Dump-Test darf nicht abgeschwächt werden. Wenn er rot wird, fehlt in der Regel eine Registry-, Truncation- oder Seed-Ergänzung.
 
 **Beim Hinzufügen einer neuen suchbaren Entität:**
 

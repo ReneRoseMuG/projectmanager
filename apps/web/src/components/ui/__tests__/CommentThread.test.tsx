@@ -31,8 +31,22 @@ vi.mock("../RichTextEditor", () => ({
 }));
 
 const comments = [
-  { id: 1, taskId: 10, entityType: "task" as const, entityId: 10, body: "<p>Erster Kommentar</p>", createdAt: "2026-05-17T08:00:00.000Z" },
-  { id: 2, taskId: 10, entityType: "task" as const, entityId: 10, body: "<p>Zweiter Kommentar</p>", createdAt: "2026-05-17T09:00:00.000Z" }
+  {
+    id: 1,
+    owners: [{ type: "task" as const, id: 10 }],
+    body: "<p>Erster Kommentar</p>",
+    createdAt: "2026-05-17T08:00:00.000Z",
+    updatedAt: "2026-05-17T08:00:00.000Z",
+    version: 1
+  },
+  {
+    id: 2,
+    owners: [{ type: "task" as const, id: 10 }],
+    body: "<p>Zweiter Kommentar</p>",
+    createdAt: "2026-05-17T09:00:00.000Z",
+    updatedAt: "2026-05-17T09:00:00.000Z",
+    version: 1
+  }
 ];
 
 afterEach(() => {

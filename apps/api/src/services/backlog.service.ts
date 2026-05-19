@@ -1,13 +1,12 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { backlogItems, features, projects, useCases } from "../db/schema.js";
+import { features, projects, useCases } from "../db/schema.js";
+import { backlogItemRepository, type BacklogItemRecord, type BacklogItemUpdateData } from "../repositories/backlog-item.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import { deleteCommentsForEntity } from "./comments.service.js";
-import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
+import { cleanNullable, requireNonEmpty } from "./helpers.js";
 
-type BacklogRecord = typeof backlogItems.$inferSelect;
-type BacklogStatus = BacklogRecord["status"];
-type BacklogPriority = BacklogRecord["priority"];
+type BacklogStatus = BacklogItemRecord["status"];
+type BacklogPriority = BacklogItemRecord["priority"];
 
 export interface BacklogInput {
   title?: string;
@@ -18,6 +17,7 @@ export interface BacklogInput {
   featureId?: number | null;
   useCaseId?: number | null;
   sortOrder?: number;
+  expectedVersion?: number;
 }
 
 export interface BacklogFilters {
@@ -37,11 +37,12 @@ export interface BacklogDto {
   priority: BacklogPriority;
   importKey: string | null;
   sortOrder: number;
+  version: number;
   createdAt: string;
   updatedAt: string;
 }
 
-function mapBacklogItem(record: BacklogRecord): BacklogDto {
+function mapBacklogItem(record: BacklogItemRecord): BacklogDto {
   return {
     id: record.id,
     projectId: record.projectId,
@@ -53,6 +54,7 @@ function mapBacklogItem(record: BacklogRecord): BacklogDto {
     priority: record.priority,
     importKey: record.importKey,
     sortOrder: record.sortOrder,
+    version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
   };
@@ -87,8 +89,8 @@ function ensureUseCaseExists(database: DbClient, useCaseId: number | null | unde
   }
 }
 
-function getBacklogRecord(database: DbClient, id: number): BacklogRecord {
-  const item = database.select().from(backlogItems).where(eq(backlogItems.id, id)).get();
+function getBacklogRecord(database: DbClient, id: number): BacklogItemRecord {
+  const item = backlogItemRepository.findById(database, id);
   if (!item) {
     throw notFound(`Backlog item with id ${id} not found`);
   }
@@ -112,24 +114,7 @@ function ensureStatusTransition(current: BacklogStatus, next: BacklogStatus): vo
 export function listBacklogItems(database: DbClient, projectId: number, filters: BacklogFilters): BacklogDto[] {
   ensureProjectExists(database, projectId);
 
-  const conditions = [eq(backlogItems.projectId, projectId)];
-  if (filters.featureId !== undefined) {
-    conditions.push(eq(backlogItems.featureId, filters.featureId));
-  }
-  if (filters.useCaseId !== undefined) {
-    conditions.push(eq(backlogItems.useCaseId, filters.useCaseId));
-  }
-  if (filters.status !== undefined) {
-    conditions.push(eq(backlogItems.status, filters.status));
-  }
-
-  return database
-    .select()
-    .from(backlogItems)
-    .where(and(...conditions))
-    .orderBy(backlogItems.sortOrder, backlogItems.createdAt)
-    .all()
-    .map(mapBacklogItem);
+  return backlogItemRepository.findByProject(database, projectId, filters).map(mapBacklogItem);
 }
 
 export function createBacklogItem(database: DbClient, projectId: number, input: BacklogInput): BacklogDto {
@@ -137,24 +122,17 @@ export function createBacklogItem(database: DbClient, projectId: number, input: 
   ensureFeatureExists(database, input.featureId);
   ensureUseCaseExists(database, input.useCaseId);
 
-  const now = nowIso();
-  const created = database
-    .insert(backlogItems)
-    .values({
-      projectId,
-      featureId: input.featureId ?? null,
-      useCaseId: input.useCaseId ?? null,
-      title: requireNonEmpty(input.title, "title"),
-      description: cleanNullable(input.description) ?? null,
-      status: input.status ?? "open",
-      priority: input.priority ?? "medium",
-      importKey: cleanNullable(input.importKey) ?? null,
-      sortOrder: input.sortOrder ?? 0,
-      createdAt: now,
-      updatedAt: now
-    })
-    .returning()
-    .get();
+  const created = backlogItemRepository.create(database, {
+    projectId,
+    featureId: input.featureId ?? null,
+    useCaseId: input.useCaseId ?? null,
+    title: requireNonEmpty(input.title, "title"),
+    description: cleanNullable(input.description) ?? null,
+    status: input.status ?? "open",
+    priority: input.priority ?? "medium",
+    importKey: cleanNullable(input.importKey) ?? null,
+    sortOrder: input.sortOrder ?? 0
+  });
 
   return mapBacklogItem(created);
 }
@@ -165,7 +143,7 @@ export function getBacklogItem(database: DbClient, id: number): BacklogDto {
 
 export function updateBacklogItem(database: DbClient, id: number, input: BacklogInput): BacklogDto {
   const current = getBacklogRecord(database, id);
-  const values: Partial<typeof backlogItems.$inferInsert> = {};
+  const values: BacklogItemUpdateData = {};
 
   if (input.title !== undefined) {
     values.title = requireNonEmpty(input.title, "title");
@@ -199,17 +177,16 @@ export function updateBacklogItem(database: DbClient, id: number, input: Backlog
     throw badRequest("No backlog item fields provided");
   }
 
-  values.updatedAt = nowIso();
-
-  const updated = database.update(backlogItems).set(values).where(eq(backlogItems.id, id)).returning().get();
+  const updated = backlogItemRepository.update(database, id, input.expectedVersion ?? 0, values);
+  if (!updated) {
+    throw notFound(`Backlog item with id ${id} not found`);
+  }
   return mapBacklogItem(updated);
 }
 
 export function deleteBacklogItem(database: DbClient, id: number): void {
   getBacklogRecord(database, id);
-  deleteCommentsForEntity(database, "backlogItem", id);
-  const result = database.delete(backlogItems).where(eq(backlogItems.id, id)).run();
-  if (result.changes === 0) {
+  if (backlogItemRepository.delete(database, id) === 0) {
     throw notFound(`Backlog item with id ${id} not found`);
   }
 }

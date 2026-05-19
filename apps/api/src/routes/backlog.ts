@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { BACKLOG_STATUSES, PRIORITIES } from "../db/schema.js";
 import { createBacklogItem, deleteBacklogItem, getBacklogItem, listBacklogItems, updateBacklogItem, type BacklogFilters, type BacklogInput } from "../services/backlog.service.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const backlogQuerySchema = {
   type: "object",
@@ -31,8 +31,12 @@ const backlogBodySchema = {
 
 const backlogPatchSchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
-  properties: backlogBodySchema.properties
+  properties: {
+    ...backlogBodySchema.properties,
+    ...expectedVersionPropertySchema
+  }
 } as const;
 
 export async function registerBacklogRoutes(app: FastifyInstance): Promise<void> {

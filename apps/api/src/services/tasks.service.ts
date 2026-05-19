@@ -2,17 +2,17 @@ import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureTasks, features, projectTasks, projects, tasks, useCases, useCaseTasks } from "../db/schema.js";
+import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
-import { deleteCommentsForEntities, listComments } from "./comments.service.js";
-import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
+import { listComments } from "./comments.service.js";
+import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import { deleteTaskNotesForIds, listTaskNotes } from "./notes.service.js";
 import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 
 export type TaskOwner = { type: "project" | "feature" | "useCase"; id: number };
 
-type TaskRecord = typeof tasks.$inferSelect;
-type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "createdAt" | "updatedAt">;
+type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "version" | "createdAt" | "updatedAt">;
 
 const taskSelect = {
   id: tasks.id,
@@ -23,6 +23,7 @@ const taskSelect = {
   priority: tasks.priority,
   assignee: tasks.assignee,
   dueDate: tasks.dueDate,
+  version: tasks.version,
   createdAt: tasks.createdAt,
   updatedAt: tasks.updatedAt
 };
@@ -42,6 +43,7 @@ export function mapTask(
     priority: record.priority,
     assignee: record.assignee,
     dueDate: record.dueDate,
+    version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     tags,
@@ -90,7 +92,7 @@ function ensureOwnerExists(database: DbClient, owner: TaskOwner): void {
 }
 
 function getTaskRecord(database: DbClient, id: number): TaskRecord {
-  const task = database.select().from(tasks).where(eq(tasks.id, id)).get();
+  const task = taskRepository.findById(database, id);
   if (!task) {
     throw notFound(`Task with id ${id} not found`);
   }
@@ -115,7 +117,7 @@ function getSubtaskCounts(database: DbClient, taskIds: number[]): Map<number, nu
 
 function collectTaskSubtreeIds(database: DbClient, taskId: number): number[] {
   getTaskRecord(database, taskId);
-  const rows = database.select({ id: tasks.id, parentId: tasks.parentId }).from(tasks).all();
+  const rows = taskRepository.findAll(database);
   const childrenByParent = new Map<number, number[]>();
 
   for (const row of rows) {
@@ -229,23 +231,16 @@ function deleteOwnerTaskLink(database: DbClient, owner: TaskOwner, taskId: numbe
 
 function insertTask(database: DbClient, input: TaskInput, parentId: number | null = null): TaskRecord {
   const title = requireNonEmpty(input.title, "title");
-  const now = nowIso();
 
-  return database
-    .insert(tasks)
-    .values({
-      parentId,
-      title,
-      description: cleanNullable(input.description) ?? null,
-      status: input.status ?? "todo",
-      priority: input.priority ?? "medium",
-      assignee: cleanNullable(input.assignee) ?? null,
-      dueDate: input.dueDate ?? null,
-      createdAt: now,
-      updatedAt: now
-    })
-    .returning()
-    .get();
+  return taskRepository.create(database, {
+    parentId,
+    title,
+    description: cleanNullable(input.description) ?? null,
+    status: input.status ?? "todo",
+    priority: input.priority ?? "medium",
+    assignee: cleanNullable(input.assignee) ?? null,
+    dueDate: input.dueDate ?? null
+  });
 }
 
 export function listOwnerTasks(database: DbClient, owner: TaskOwner): TaskBoardItem[] {
@@ -259,7 +254,7 @@ export function listOwnerTasks(database: DbClient, owner: TaskOwner): TaskBoardI
 }
 
 export function listTasks(database: DbClient): Task[] {
-  const rows = database.select(taskSelect).from(tasks).where(isNull(tasks.parentId)).orderBy(tasks.status, tasks.updatedAt).all();
+  const rows = taskRepository.findRootTasks(database);
   const ids = rows.map((task) => task.id);
   const tagsByTask = getTaskTagsMap(database, ids);
   const subtaskCounts = getSubtaskCounts(database, ids);
@@ -269,7 +264,7 @@ export function listTasks(database: DbClient): Task[] {
 
 export function listSubtasks(database: DbClient, taskId: number): Task[] {
   getTaskRecord(database, taskId);
-  const rows = database.select(taskSelect).from(tasks).where(eq(tasks.parentId, taskId)).orderBy(tasks.createdAt, tasks.id).all();
+  const rows = taskRepository.findChildren(database, taskId);
   const ids = rows.map((task) => task.id);
   const tagsByTask = getTaskTagsMap(database, ids);
   const subtaskCounts = getSubtaskCounts(database, ids);
@@ -322,7 +317,7 @@ export function updateOwnerTaskBoard(database: DbClient, owner: TaskOwner, taskI
     throw notFound(`Task ${taskId} is not linked to ${owner.type} ${owner.id}`);
   }
 
-  const updated = database.update(tasks).set({ status: input.status, updatedAt: nowIso() }).where(eq(tasks.id, taskId)).returning().get();
+  const updated = taskRepository.update(database, taskId, input.expectedVersion, { status: input.status });
   if (!updated) {
     throw notFound(`Task with id ${taskId} not found`);
   }
@@ -356,7 +351,7 @@ export function getTaskDetail(database: DbClient, id: number): TaskDetail {
 }
 
 export function updateTask(database: DbClient, id: number, input: TaskUpdate): Task {
-  const values: Partial<typeof tasks.$inferInsert> = {};
+  const values: Partial<Pick<TaskRecord, "title" | "description" | "status" | "priority" | "assignee" | "dueDate">> = {};
 
   if (input.title !== undefined) {
     values.title = requireNonEmpty(input.title, "title");
@@ -381,9 +376,7 @@ export function updateTask(database: DbClient, id: number, input: TaskUpdate): T
     throw badRequest("No task fields provided");
   }
 
-  values.updatedAt = nowIso();
-
-  const updated = database.update(tasks).set(values).where(eq(tasks.id, id)).returning().get();
+  const updated = taskRepository.update(database, id, input.expectedVersion, values);
   if (!updated) {
     throw notFound(`Task with id ${id} not found`);
   }
@@ -399,11 +392,9 @@ export async function deleteTask(database: DbClient, id: number): Promise<void> 
   }
 
   await deleteTaskAttachmentsForIds(database, taskIds);
-  deleteCommentsForEntities(database, "task", taskIds);
   deleteTaskNotesForIds(database, taskIds);
 
-  const result = database.delete(tasks).where(eq(tasks.id, id)).run();
-  if (result.changes === 0) {
+  if (taskRepository.delete(database, id) === 0) {
     throw notFound(`Task with id ${id} not found`);
   }
 }

@@ -42,11 +42,21 @@ export function createFileTestDb(databasePath: string) {
 
 export function truncateAll(sqlite: Database.Database): void {
   const tables = [
-    "seed_run_items",
     "app_settings",
     "use_case_tasks",
     "feature_tasks",
     "project_tasks",
+    "ticket_comments",
+    "wiki_page_comments",
+    "backlog_item_comments",
+    "use_case_comments",
+    "feature_comments",
+    "task_comments",
+    "project_comments",
+    "ticket_attachments",
+    "feature_attachments",
+    "task_attachments",
+    "project_attachments",
     "use_case_tickets",
     "feature_tickets",
     "task_tickets",
@@ -66,13 +76,14 @@ export function truncateAll(sqlite: Database.Database): void {
     "task_notes",
     "project_notes",
     "attachments",
+    "task_events",
+    "project_events",
     "events",
     "tickets",
     "tasks",
     "notes",
     "tags",
-    "projects",
-    "seed_runs"
+    "projects"
   ] as const;
 
   sqlite.pragma("foreign_keys = OFF");

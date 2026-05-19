@@ -9,7 +9,7 @@ export async function createTag(input: { name: string; color: string }): Promise
   return api.post("tags", { json: input }).json<Tag>();
 }
 
-export async function updateTag(id: number, input: { name?: string; color?: string }): Promise<Tag> {
+export async function updateTag(id: number, input: { name?: string; color?: string; expectedVersion: number }): Promise<Tag> {
   return api.patch(`tags/${id}`, { json: input }).json<Tag>();
 }
 

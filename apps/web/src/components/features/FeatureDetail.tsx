@@ -43,7 +43,7 @@ export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps)
     event.preventDefault();
     setSaving(true);
     try {
-      await onSave(feature.id, { title, slug, status, description, sortOrder, content });
+      await onSave(feature.id, { title, slug, status, description, sortOrder, content, expectedVersion: feature.version });
     } finally {
       setSaving(false);
     }

@@ -24,7 +24,6 @@ import { config } from "./config.js";
 import { createGoogleDriveBackupClient, type GoogleDriveBackupClient } from "./services/google-drive.service.js";
 import { getEffectiveGoogleDriveBackupFolderId } from "./services/drive-config.service.js";
 import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
-import { registerAdminSeedRunRoutes } from "./routes/admin-seed-runs.js";
 import { errorHandler } from "./utils/errors.js";
 import type Database from "better-sqlite3";
 
@@ -66,7 +65,6 @@ export async function buildApp(
   await app.register(registerDocLinksRoutes, { prefix: "/api" });
   await app.register(registerImportsRoutes, { prefix: "/api" });
   await app.register(registerDumpRoutes, { prefix: "/api" });
-  await app.register(registerAdminSeedRunRoutes, { prefix: "/api" });
 
   return app;
 }

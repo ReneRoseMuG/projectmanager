@@ -50,8 +50,7 @@ describe("Attachments API", () => {
       .attach("file", Buffer.from("Projekt-Datei"), { filename: "projekt.txt", contentType: "text/plain" })
       .expect(201);
 
-    expect(res.body.projectId).toBe(project.id);
-    expect(res.body.taskId).toBeNull();
+    expect(res.body.owners).toEqual([{ type: "project", id: project.id }]);
     expect(res.body.originalName).toBe("projekt.txt");
     expect(res.body.mimetype).toBe("text/plain");
     expect(res.body.size).toBeGreaterThan(0);
@@ -78,8 +77,7 @@ describe("Attachments API", () => {
       .attach("file", Buffer.from("Task-Datei"), { filename: "aufgabe.pdf", contentType: "application/pdf" })
       .expect(201);
 
-    expect(res.body.taskId).toBe(task.id);
-    expect(res.body.projectId).toBeNull();
+    expect(res.body.owners).toEqual([{ type: "task", id: task.id }]);
     expect(res.body.mimetype).toBe("application/pdf");
   });
 
