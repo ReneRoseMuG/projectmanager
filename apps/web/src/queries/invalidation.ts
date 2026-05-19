@@ -11,22 +11,45 @@ export async function invalidateProjects(queryClient: QueryClient): Promise<void
   await invalidateMany(queryClient, [queryKeys.projects.root, queryKeys.globalSearch.root]);
 }
 
+export async function invalidateMilestones(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.milestones.root, queryKeys.projects.root, queryKeys.globalSearch.root]);
+}
+
 export async function invalidateProjectScope(queryClient: QueryClient, projectId?: number): Promise<void> {
   await invalidateMany(queryClient, [
     queryKeys.projects.root,
+    queryKeys.milestones.root,
     queryKeys.tasks.root,
     queryKeys.tickets.root,
     queryKeys.calendarTasks.root,
+    queryKeys.events.root,
     queryKeys.globalSearch.root,
     ...(projectId !== undefined ? [queryKeys.projects.detail(projectId)] : [])
+  ]);
+}
+
+export async function invalidateMilestoneScope(queryClient: QueryClient, milestoneId?: number, projectId?: number): Promise<void> {
+  await invalidateMany(queryClient, [
+    queryKeys.milestones.root,
+    queryKeys.projects.root,
+    queryKeys.tasks.root,
+    queryKeys.tickets.root,
+    queryKeys.features.root,
+    queryKeys.calendarTasks.root,
+    queryKeys.events.root,
+    queryKeys.globalSearch.root,
+    ...(milestoneId !== undefined ? [queryKeys.milestones.detail(milestoneId)] : []),
+    ...(projectId !== undefined ? [queryKeys.projects.detail(projectId), queryKeys.milestones.byProject(projectId)] : [])
   ]);
 }
 
 export async function invalidateTaskScope(queryClient: QueryClient, taskId?: number): Promise<void> {
   await invalidateMany(queryClient, [
     queryKeys.projects.root,
+    queryKeys.milestones.root,
     queryKeys.tasks.root,
     queryKeys.calendarTasks.root,
+    queryKeys.events.root,
     queryKeys.globalSearch.root,
     ...(taskId !== undefined ? [queryKeys.tasks.detail(taskId)] : [])
   ]);
@@ -36,6 +59,7 @@ export async function invalidateFeatureScope(queryClient: QueryClient, featureId
   await invalidateMany(queryClient, [
     queryKeys.features.root,
     queryKeys.projects.root,
+    queryKeys.milestones.root,
     queryKeys.tasks.root,
     queryKeys.globalSearch.root,
     ...(featureId !== undefined ? [queryKeys.features.detail(featureId)] : [])
@@ -66,6 +90,9 @@ function ticketOwnerKeys(owner: TicketOwnerScope): QueryKey[] {
   if (owner.type === "project") {
     return [queryKeys.projects.detail(owner.id), queryKeys.projects.tickets(owner.id), queryKeys.tickets.byOwner(owner.type, owner.id)];
   }
+  if (owner.type === "milestone") {
+    return [queryKeys.milestones.detail(owner.id), queryKeys.milestones.tickets(owner.id), queryKeys.tickets.byOwner(owner.type, owner.id)];
+  }
   if (owner.type === "task") {
     return [queryKeys.tasks.detail(owner.id), queryKeys.tasks.tickets(owner.id), queryKeys.tickets.byOwner(owner.type, owner.id)];
   }
@@ -79,6 +106,7 @@ export async function invalidateTicketScope(queryClient: QueryClient, owner?: Ti
   await invalidateMany(queryClient, [
     queryKeys.tickets.root,
     queryKeys.projects.root,
+    queryKeys.milestones.root,
     queryKeys.tasks.root,
     queryKeys.features.root,
     queryKeys.useCases.root,
@@ -101,7 +129,7 @@ export async function invalidateAttachments(queryClient: QueryClient, ownerType:
 }
 
 export async function invalidateTags(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.tags.root, queryKeys.projects.root, queryKeys.tasks.root, queryKeys.tickets.root, queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.tags.root, queryKeys.projects.root, queryKeys.milestones.root, queryKeys.tasks.root, queryKeys.tickets.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateWiki(queryClient: QueryClient): Promise<void> {
@@ -115,6 +143,7 @@ export async function invalidateEvents(queryClient: QueryClient): Promise<void> 
 export async function invalidateWikiImportData(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [
     queryKeys.projects.root,
+    queryKeys.milestones.root,
     queryKeys.tasks.root,
     queryKeys.features.root,
     queryKeys.useCases.root,

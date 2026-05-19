@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { getProjectFeatures, setProjectFeatures as setProjectFeaturesRequest } from "../api/doc-links";
+import { getMilestoneFeatures, getProjectFeatures, setMilestoneFeatures as setMilestoneFeaturesRequest, setProjectFeatures as setProjectFeaturesRequest } from "../api/doc-links";
 import { getProjects } from "../api/projects";
-import { invalidateFeatureScope, invalidateProjectScope } from "../queries/invalidation";
+import { invalidateFeatureScope, invalidateMilestoneScope, invalidateProjectScope } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
@@ -50,6 +50,53 @@ export function useProjectFeatureLinks(projectId?: number) {
     error: toQueryError(featuresQuery.error),
     reload,
     setFeaturesForProject
+  };
+}
+
+export function useMilestoneFeatureLinks(milestoneId?: number) {
+  const queryClient = useQueryClient();
+  const validMilestoneId = milestoneId !== undefined && Number.isFinite(milestoneId) ? milestoneId : undefined;
+
+  const featuresQuery = useQuery({
+    queryKey: queryKeys.milestones.features(validMilestoneId ?? 0),
+    queryFn: () => getMilestoneFeatures(validMilestoneId as number),
+    enabled: validMilestoneId !== undefined
+  });
+
+  const reload = useCallback(async () => {
+    if (validMilestoneId !== undefined) {
+      await featuresQuery.refetch();
+    }
+  }, [featuresQuery, validMilestoneId]);
+
+  const setFeaturesMutation = useMutation({
+    mutationFn: (featureIds: number[]) => {
+      if (validMilestoneId === undefined) {
+        throw new Error("Milestone id is required");
+      }
+      return setMilestoneFeaturesRequest(validMilestoneId, featureIds);
+    },
+    onSuccess: async () => {
+      if (validMilestoneId !== undefined) {
+        await invalidateMilestoneScope(queryClient, validMilestoneId);
+      }
+      await invalidateFeatureScope(queryClient);
+    }
+  });
+
+  const setFeaturesForMilestone = useCallback(
+    async (featureIds: number[]) => {
+      return setFeaturesMutation.mutateAsync(featureIds);
+    },
+    [setFeaturesMutation]
+  );
+
+  return {
+    features: featuresQuery.data ?? [],
+    loading: featuresQuery.isLoading,
+    error: toQueryError(featuresQuery.error),
+    reload,
+    setFeaturesForMilestone
   };
 }
 

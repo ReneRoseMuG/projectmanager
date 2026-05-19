@@ -26,6 +26,10 @@ export const projectStatusTones: Record<ProjectStatus, PillTone> = {
   archived: "steel"
 };
 
+export const milestoneStatusLabels: Record<ProjectStatus, string> = projectStatusLabels;
+
+export const milestoneStatusTones: Record<ProjectStatus, PillTone> = projectStatusTones;
+
 export const featureStatusLabels: Record<FeatureStatus, string> = {
   draft: "Entwurf",
   active: "Aktiv",

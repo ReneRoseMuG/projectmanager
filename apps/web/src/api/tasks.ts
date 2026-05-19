@@ -1,11 +1,14 @@
 import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
 import { api } from "./client";
 
-export type TaskOwner = { type: "project" | "feature" | "useCase"; id: number };
+export type TaskOwner = { type: "project" | "milestone" | "feature" | "useCase"; id: number };
 
 function ownerPath(owner: TaskOwner): string {
   if (owner.type === "project") {
     return `projects/${owner.id}`;
+  }
+  if (owner.type === "milestone") {
+    return `milestones/${owner.id}`;
   }
   if (owner.type === "feature") {
     return `features/${owner.id}`;

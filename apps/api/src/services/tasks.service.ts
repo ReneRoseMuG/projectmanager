@@ -1,7 +1,7 @@
 import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { featureTasks, features, projectTasks, projects, tasks, useCases, useCaseTasks } from "../db/schema.js";
+import { featureTasks, features, milestoneTasks, milestones, projectTasks, projects, tasks, useCases, useCaseTasks } from "../db/schema.js";
 import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
@@ -10,7 +10,7 @@ import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import { deleteTaskNotesForIds, listTaskNotes } from "./notes.service.js";
 import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 
-export type TaskOwner = { type: "project" | "feature" | "useCase"; id: number };
+export type TaskOwner = { type: "project" | "milestone" | "feature" | "useCase"; id: number };
 
 type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "version" | "createdAt" | "updatedAt">;
 
@@ -72,6 +72,13 @@ function ensureFeatureExists(database: DbClient, featureId: number): void {
   }
 }
 
+function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
+  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+  if (!milestone) {
+    throw notFound(`Milestone with id ${milestoneId} not found`);
+  }
+}
+
 function ensureUseCaseExists(database: DbClient, useCaseId: number): void {
   const useCase = database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, useCaseId)).get();
   if (!useCase) {
@@ -86,6 +93,10 @@ function ensureOwnerExists(database: DbClient, owner: TaskOwner): void {
   }
   if (owner.type === "feature") {
     ensureFeatureExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "milestone") {
+    ensureMilestoneExists(database, owner.id);
     return;
   }
   ensureUseCaseExists(database, owner.id);
@@ -150,6 +161,9 @@ function taskDeleteBlockers(database: DbClient, taskIds: number[]): string[] {
   if (database.select({ taskId: featureTasks.taskId }).from(featureTasks).where(inArray(featureTasks.taskId, taskIds)).get()) {
     blockers.push("Feature-Verknüpfungen");
   }
+  if (database.select({ taskId: milestoneTasks.taskId }).from(milestoneTasks).where(inArray(milestoneTasks.taskId, taskIds)).get()) {
+    blockers.push("Meilenstein-Verknüpfungen");
+  }
   if (database.select({ taskId: useCaseTasks.taskId }).from(useCaseTasks).where(inArray(useCaseTasks.taskId, taskIds)).get()) {
     blockers.push("Use-Case-Verknüpfungen");
   }
@@ -181,6 +195,15 @@ function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Array<Mappab
       .orderBy(tasks.status, featureTasks.position)
       .all();
   }
+  if (owner.type === "milestone") {
+    return database
+      .select({ ...taskSelect, boardPosition: milestoneTasks.position })
+      .from(milestoneTasks)
+      .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
+      .where(and(eq(milestoneTasks.ownerId, owner.id), isNull(tasks.parentId)))
+      .orderBy(tasks.status, milestoneTasks.position)
+      .all();
+  }
 
   return database
     .select({ ...taskSelect, boardPosition: useCaseTasks.position })
@@ -204,6 +227,10 @@ function insertOwnerTask(database: DbClient, owner: TaskOwner, taskId: number, p
     database.insert(featureTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
     return;
   }
+  if (owner.type === "milestone") {
+    database.insert(milestoneTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
+    return;
+  }
   database.insert(useCaseTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
 }
 
@@ -216,6 +243,10 @@ function updateOwnerTaskPosition(database: DbClient, owner: TaskOwner, taskId: n
     database.update(featureTasks).set({ position }).where(and(eq(featureTasks.ownerId, owner.id), eq(featureTasks.taskId, taskId))).run();
     return;
   }
+  if (owner.type === "milestone") {
+    database.update(milestoneTasks).set({ position }).where(and(eq(milestoneTasks.ownerId, owner.id), eq(milestoneTasks.taskId, taskId))).run();
+    return;
+  }
   database.update(useCaseTasks).set({ position }).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId))).run();
 }
 
@@ -225,6 +256,9 @@ function deleteOwnerTaskLink(database: DbClient, owner: TaskOwner, taskId: numbe
   }
   if (owner.type === "feature") {
     return database.delete(featureTasks).where(and(eq(featureTasks.ownerId, owner.id), eq(featureTasks.taskId, taskId))).run().changes;
+  }
+  if (owner.type === "milestone") {
+    return database.delete(milestoneTasks).where(and(eq(milestoneTasks.ownerId, owner.id), eq(milestoneTasks.taskId, taskId))).run().changes;
   }
   return database.delete(useCaseTasks).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId))).run().changes;
 }

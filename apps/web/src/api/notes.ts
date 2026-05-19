@@ -9,12 +9,20 @@ export async function getTaskNotes(taskId: number): Promise<Note[]> {
   return api.get(`tasks/${taskId}/notes`).json<Note[]>();
 }
 
+export async function getMilestoneNotes(milestoneId: number): Promise<Note[]> {
+  return api.get(`milestones/${milestoneId}/notes`).json<Note[]>();
+}
+
 export async function createProjectNote(projectId: number, input: NoteInput): Promise<Note> {
   return api.post(`projects/${projectId}/notes`, { json: input }).json<Note>();
 }
 
 export async function createTaskNote(taskId: number, input: NoteInput): Promise<Note> {
   return api.post(`tasks/${taskId}/notes`, { json: input }).json<Note>();
+}
+
+export async function createMilestoneNote(milestoneId: number, input: NoteInput): Promise<Note> {
+  return api.post(`milestones/${milestoneId}/notes`, { json: input }).json<Note>();
 }
 
 export async function updateNote(id: number, input: NoteUpdate): Promise<Note> {

@@ -1,7 +1,7 @@
 import type { Event, EventInput, EventOwner, EventUpdate } from "@taskmanager/shared-types";
 import { and, eq, gte, lte } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { events, projectEvents, projects, taskEvents, tasks } from "../db/schema.js";
+import { events, milestoneEvents, milestones, projectEvents, projects, taskEvents, tasks } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
@@ -23,7 +23,14 @@ function listEventOwners(database: DbClient, eventId: number): EventOwner[] {
     .all()
     .map((row) => ({ type: "task" as const, id: row.id }));
 
-  return [...projectOwners, ...taskOwners];
+  const milestoneOwners = database
+    .select({ id: milestoneEvents.milestoneId })
+    .from(milestoneEvents)
+    .where(eq(milestoneEvents.eventId, eventId))
+    .all()
+    .map((row) => ({ type: "milestone" as const, id: row.id }));
+
+  return [...projectOwners, ...taskOwners, ...milestoneOwners];
 }
 
 function mapEvent(database: DbClient, record: EventRecord): Event {
@@ -50,7 +57,7 @@ function normalizeOwners(owners: EventOwner[] | undefined): EventOwner[] {
   const result: EventOwner[] = [];
   const seen = new Set<string>();
   for (const owner of owners) {
-    if ((owner.type !== "project" && owner.type !== "task") || !Number.isInteger(owner.id) || owner.id < 1) {
+    if ((owner.type !== "project" && owner.type !== "task" && owner.type !== "milestone") || !Number.isInteger(owner.id) || owner.id < 1) {
       throw badRequest("Invalid event owner");
     }
 
@@ -77,12 +84,21 @@ function ensureTaskExists(database: DbClient, taskId: number): void {
   }
 }
 
+function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
+  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+  if (!milestone) {
+    throw notFound(`Milestone with id ${milestoneId} not found`);
+  }
+}
+
 function ensureOwnersExist(database: DbClient, owners: EventOwner[]): void {
   for (const owner of owners) {
     if (owner.type === "project") {
       ensureProjectExists(database, owner.id);
-    } else {
+    } else if (owner.type === "task") {
       ensureTaskExists(database, owner.id);
+    } else {
+      ensureMilestoneExists(database, owner.id);
     }
   }
 }
@@ -93,12 +109,18 @@ function insertEventOwner(database: DbClient, eventId: number, owner: EventOwner
     return;
   }
 
+  if (owner.type === "milestone") {
+    database.insert(milestoneEvents).values({ milestoneId: owner.id, eventId }).onConflictDoNothing().run();
+    return;
+  }
+
   database.insert(taskEvents).values({ taskId: owner.id, eventId }).onConflictDoNothing().run();
 }
 
 function replaceEventOwners(database: DbClient, event: EventRecord, owners: EventOwner[]): void {
   database.delete(projectEvents).where(eq(projectEvents.eventId, event.id)).run();
   database.delete(taskEvents).where(eq(taskEvents.eventId, event.id)).run();
+  database.delete(milestoneEvents).where(eq(milestoneEvents.eventId, event.id)).run();
   for (const owner of owners) {
     insertEventOwner(database, event.id, owner);
   }

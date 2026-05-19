@@ -163,6 +163,7 @@ function seedCompleteDataset(): void {
   fs.mkdirSync(path.join(contentDir, "usecases"), { recursive: true });
   fs.mkdirSync(path.join(contentDir, "wiki"), { recursive: true });
   fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "Projektdatei", "utf8");
+  fs.writeFileSync(path.join(uploadDir, "milestone-file.txt"), "Meilensteindatei", "utf8");
   fs.writeFileSync(path.join(uploadDir, "docs", "task-file.pdf"), "Taskdatei", "utf8");
   fs.writeFileSync(path.join(uploadDir, "feature-file.txt"), "Featuredatei", "utf8");
   fs.writeFileSync(path.join(uploadDir, "ticket-file.txt"), "Ticketdatei", "utf8");
@@ -177,9 +178,13 @@ function seedCompleteDataset(): void {
       VALUES (1, 'Ada Lovelace', 'ada@example.test', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO projects (id, name, description, status, color, start_date, due_date, created_at, updated_at)
       VALUES (1, 'Projekt Alpha', 'Beschreibung', 'active', '#123456', '2026-05-01', '2026-05-31', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO milestones (id, project_id, name, description, status, color, start_date, due_date, created_at, updated_at)
+      VALUES (1, 1, 'Meilenstein Alpha', 'Meilenstein Beschreibung', 'active', '#654321', '2026-05-10', '2026-05-15', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO tags (id, name, color) VALUES (1, 'Wichtig', '#ff0000');
     INSERT INTO notes (id, title, content_json, created_at, updated_at)
       VALUES (1, 'Notiz', '{"type":"doc"}', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO notes (id, title, content_json, created_at, updated_at)
+      VALUES (2, 'Meilenstein-Notiz', '{"type":"doc","content":[]}', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO features (id, title, slug, status, description, content_path, sort_order, created_at, updated_at)
       VALUES (1, 'Feature Alpha', 'feature-alpha', 'active', 'Feature Beschreibung', 'content/features/feature-1-alpha.md', 10, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO tasks (id, parent_id, title, description, status, priority, assignee, due_date, import_key, created_at, updated_at)
@@ -206,9 +211,13 @@ function seedCompleteDataset(): void {
       VALUES (6, 'Wiki Kommentar', '2026-05-17T08:00:00');
     INSERT INTO comments (id, body, created_at)
       VALUES (7, 'Ticket Kommentar', '2026-05-17T08:00:00');
+    INSERT INTO comments (id, body, created_at)
+      VALUES (8, 'Meilenstein Kommentar', '2026-05-17T08:00:00');
     INSERT INTO project_tags (project_id, tag_id) VALUES (1, 1);
+    INSERT INTO milestone_tags (milestone_id, tag_id) VALUES (1, 1);
     INSERT INTO task_tags (task_id, tag_id) VALUES (1, 1);
     INSERT INTO project_notes (project_id, note_id) VALUES (1, 1);
+    INSERT INTO milestone_notes (milestone_id, note_id) VALUES (1, 2);
     INSERT INTO task_notes (task_id, note_id) VALUES (1, 1);
     INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at)
       VALUES (1, 'projekt.txt', 'project-file.txt', 'text/plain', 11, '2026-05-17T08:00:00');
@@ -218,17 +227,25 @@ function seedCompleteDataset(): void {
       VALUES (3, 'feature.txt', 'feature-file.txt', 'text/plain', 12, '2026-05-17T08:00:00');
     INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at)
       VALUES (4, 'ticket.txt', 'ticket-file.txt', 'text/plain', 11, '2026-05-17T08:00:00');
+    INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at)
+      VALUES (5, 'milestone.txt', 'milestone-file.txt', 'text/plain', 16, '2026-05-17T08:00:00');
     INSERT INTO events (id, title, description, start_time, end_time, is_all_day, color, created_at, updated_at)
       VALUES (1, 'Termin', NULL, '2026-05-20T08:00:00', '2026-05-20T09:00:00', 0, '#123456', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO backlog_items (id, project_id, feature_id, use_case_id, title, description, status, priority, sort_order, created_at, updated_at)
       VALUES (1, 1, 1, 1, 'Backlog Alpha', 'Backlog Beschreibung', 'open', 'urgent', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO project_features (project_id, feature_id) VALUES (1, 1);
+    INSERT INTO milestone_features (milestone_id, feature_id) VALUES (1, 1);
     INSERT INTO project_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
+    INSERT INTO milestone_tasks (owner_id, task_id, position) VALUES (1, 1, 2);
     INSERT INTO feature_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
     INSERT INTO use_case_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
+    INSERT INTO project_tickets (owner_id, ticket_id, position) VALUES (1, 1, 1);
+    INSERT INTO milestone_tickets (owner_id, ticket_id, position) VALUES (1, 1, 2);
     INSERT INTO project_events (project_id, event_id) VALUES (1, 1);
+    INSERT INTO milestone_events (milestone_id, event_id) VALUES (1, 1);
     INSERT INTO task_events (task_id, event_id) VALUES (1, 1);
     INSERT INTO project_comments (project_id, comment_id) VALUES (1, 3);
+    INSERT INTO milestone_comments (milestone_id, comment_id) VALUES (1, 8);
     INSERT INTO task_comments (task_id, comment_id) VALUES (1, 1);
     INSERT INTO feature_comments (feature_id, comment_id) VALUES (1, 2);
     INSERT INTO use_case_comments (use_case_id, comment_id) VALUES (1, 4);
@@ -236,6 +253,7 @@ function seedCompleteDataset(): void {
     INSERT INTO wiki_page_comments (wiki_page_id, comment_id) VALUES (1, 6);
     INSERT INTO ticket_comments (ticket_id, comment_id) VALUES (1, 7);
     INSERT INTO project_attachments (project_id, attachment_id) VALUES (1, 1);
+    INSERT INTO milestone_attachments (milestone_id, attachment_id) VALUES (1, 5);
     INSERT INTO task_attachments (task_id, attachment_id) VALUES (1, 2);
     INSERT INTO feature_attachments (feature_id, attachment_id) VALUES (1, 3);
     INSERT INTO ticket_attachments (ticket_id, attachment_id) VALUES (1, 4);

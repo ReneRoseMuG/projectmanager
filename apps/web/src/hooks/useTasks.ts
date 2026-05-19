@@ -12,7 +12,7 @@ import {
   updateOwnerTaskBoard as updateOwnerTaskBoardRequest,
   updateTask as updateTaskRequest
 } from "../api/tasks";
-import { invalidateFeatureScope, invalidateProjectScope, invalidateTaskScope, invalidateUseCaseScope } from "../queries/invalidation";
+import { invalidateFeatureScope, invalidateMilestoneScope, invalidateProjectScope, invalidateTaskScope, invalidateUseCaseScope } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
@@ -23,6 +23,9 @@ function ownerTaskKey(owner?: TaskOwner) {
   if (owner.type === "project") {
     return queryKeys.projects.tasks(owner.id);
   }
+  if (owner.type === "milestone") {
+    return queryKeys.milestones.tasks(owner.id);
+  }
   if (owner.type === "feature") {
     return queryKeys.features.tasks(owner.id);
   }
@@ -32,6 +35,8 @@ function ownerTaskKey(owner?: TaskOwner) {
 async function invalidateOwner(queryClient: QueryClient, owner?: TaskOwner, taskId?: number): Promise<void> {
   if (owner?.type === "project") {
     await invalidateProjectScope(queryClient, owner.id);
+  } else if (owner?.type === "milestone") {
+    await invalidateMilestoneScope(queryClient, owner.id);
   } else if (owner?.type === "feature") {
     await invalidateFeatureScope(queryClient, owner.id);
   } else if (owner?.type === "useCase") {

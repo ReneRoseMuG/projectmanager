@@ -141,6 +141,13 @@
       "when": 1779196851908,
       "tag": "0019_common_bloodscream",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1779200970800,
+      "tag": "0020_fuzzy_deathbird",
+      "breakpoints": true
     }
   ]
 }

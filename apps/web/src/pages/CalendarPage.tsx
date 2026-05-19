@@ -10,11 +10,13 @@ import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useCalendarTasks } from "../hooks/useCalendarTasks";
 import { useEvents } from "../hooks/useEvents";
+import { useMilestones } from "../hooks/useMilestones";
 import { useProjects } from "../hooks/useProjects";
 
 export function CalendarPage() {
   const { showToast } = useToast();
   const { projects, loading: projectsLoading } = useProjects();
+  const { milestones, loading: milestonesLoading } = useMilestones();
   const calendarTasks = useCalendarTasks();
   const events = useEvents();
   const [formOpen, setFormOpen] = useState(false);
@@ -59,7 +61,7 @@ export function CalendarPage() {
       </header>
 
       {events.error || calendarTasks.error ? <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">{events.error ?? calendarTasks.error}</div> : null}
-      {events.loading || calendarTasks.loading || projectsLoading ? (
+      {events.loading || calendarTasks.loading || projectsLoading || milestonesLoading ? (
         <CalendarSkeleton />
       ) : (
         <>
@@ -95,6 +97,7 @@ export function CalendarPage() {
         event={selectedEvent}
         initialDate={initialDate}
         projects={projects}
+        milestones={milestones}
         tasks={calendarTasks.tasks}
         onSubmit={submit}
         onDelete={async (event) => {

@@ -1,7 +1,8 @@
-import type { Attachment, Feature, Note, Project, Task, Ticket, WikiPage } from "@taskmanager/shared-types";
+import type { Attachment, Feature, Milestone, Note, Project, Task, Ticket, WikiPage } from "@taskmanager/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import { getProjectAttachments } from "../api/attachments";
 import { getFeatures } from "../api/features";
+import { getMilestones } from "../api/milestones";
 import { getProjectNotes } from "../api/notes";
 import { getProjects } from "../api/projects";
 import { getTasks } from "../api/tasks";
@@ -12,6 +13,7 @@ import { queryKeys } from "../queries/queryKeys";
 
 export interface GlobalSearchData {
   projects: Project[];
+  milestones: Milestone[];
   features: Feature[];
   wikiPages: WikiPage[];
   tasks: Task[];
@@ -21,7 +23,7 @@ export interface GlobalSearchData {
 }
 
 async function loadGlobalSearchData(): Promise<GlobalSearchData> {
-  const [projects, features, wikiPages, tasks, tickets] = await Promise.all([getProjects(), getFeatures(), getRootWikiPages(), getTasks(), getTickets()]);
+  const [projects, milestones, features, wikiPages, tasks, tickets] = await Promise.all([getProjects(), getMilestones(), getFeatures(), getRootWikiPages(), getTasks(), getTickets()]);
   const projectIds = projects.map((project) => project.id);
   const [noteLists, attachmentLists] = await Promise.all([
     Promise.all(projectIds.map((projectId) => getProjectNotes(projectId))),
@@ -30,6 +32,7 @@ async function loadGlobalSearchData(): Promise<GlobalSearchData> {
 
   return {
     projects,
+    milestones,
     features,
     wikiPages,
     tasks,
@@ -49,6 +52,7 @@ export function useGlobalSearchData(open: boolean) {
   return {
     data: searchQuery.data ?? {
       projects: [],
+      milestones: [],
       features: [],
       wikiPages: [],
       tasks: [],

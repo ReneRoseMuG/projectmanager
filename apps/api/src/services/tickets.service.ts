@@ -10,7 +10,7 @@ import type {
 } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { featureTickets, features, projectTickets, projects, taskTickets, tasks, ticketRelations, tickets, useCases, useCaseTickets } from "../db/schema.js";
+import { featureTickets, features, milestoneTickets, milestones, projectTickets, projects, taskTickets, tasks, ticketRelations, tickets, useCases, useCaseTickets } from "../db/schema.js";
 import { ticketRepository, type TicketRecord } from "../repositories/ticket.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
@@ -19,7 +19,7 @@ import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 import { deleteTicketNotesForIds, listTicketNotes } from "./notes.service.js";
 import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
 
-export type TicketOwner = { type: "project" | "task" | "feature" | "useCase"; id: number };
+export type TicketOwner = { type: "project" | "milestone" | "task" | "feature" | "useCase"; id: number };
 
 type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number };
 
@@ -60,6 +60,13 @@ function ensureTaskExists(database: DbClient, taskId: number): void {
   }
 }
 
+function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
+  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+  if (!milestone) {
+    throw notFound(`Milestone with id ${milestoneId} not found`);
+  }
+}
+
 function ensureFeatureExists(database: DbClient, featureId: number): void {
   const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
   if (!feature) {
@@ -81,6 +88,10 @@ function ensureOwnerExists(database: DbClient, owner: TicketOwner): void {
   }
   if (owner.type === "task") {
     ensureTaskExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "milestone") {
+    ensureMilestoneExists(database, owner.id);
     return;
   }
   if (owner.type === "feature") {
@@ -165,6 +176,15 @@ function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRe
       .orderBy(tickets.status, taskTickets.position)
       .all();
   }
+  if (owner.type === "milestone") {
+    return database
+      .select({ ...ticketSelect, boardPosition: milestoneTickets.position })
+      .from(milestoneTickets)
+      .innerJoin(tickets, eq(milestoneTickets.ticketId, tickets.id))
+      .where(and(eq(milestoneTickets.ownerId, owner.id), isNull(tickets.parentId)))
+      .orderBy(tickets.status, milestoneTickets.position)
+      .all();
+  }
   if (owner.type === "feature") {
     return database
       .select({ ...ticketSelect, boardPosition: featureTickets.position })
@@ -202,6 +222,10 @@ function insertOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: num
     database.insert(taskTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
     return;
   }
+  if (owner.type === "milestone") {
+    database.insert(milestoneTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+    return;
+  }
   if (owner.type === "feature") {
     database.insert(featureTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
     return;
@@ -215,6 +239,9 @@ function deleteOwnerTicketLink(database: DbClient, owner: TicketOwner, ticketId:
   }
   if (owner.type === "task") {
     return database.delete(taskTickets).where(and(eq(taskTickets.ownerId, owner.id), eq(taskTickets.ticketId, ticketId))).run().changes;
+  }
+  if (owner.type === "milestone") {
+    return database.delete(milestoneTickets).where(and(eq(milestoneTickets.ownerId, owner.id), eq(milestoneTickets.ticketId, ticketId))).run().changes;
   }
   if (owner.type === "feature") {
     return database.delete(featureTickets).where(and(eq(featureTickets.ownerId, owner.id), eq(featureTickets.ticketId, ticketId))).run().changes;
@@ -257,6 +284,9 @@ function ticketDeleteBlockers(database: DbClient, ticketId: number): string[] {
   }
   if (database.select({ ownerId: taskTickets.ownerId }).from(taskTickets).where(eq(taskTickets.ticketId, ticketId)).get()) {
     blockers.push("Aufgaben-Verknüpfungen");
+  }
+  if (database.select({ ownerId: milestoneTickets.ownerId }).from(milestoneTickets).where(eq(milestoneTickets.ticketId, ticketId)).get()) {
+    blockers.push("Meilenstein-Verknüpfungen");
   }
   if (database.select({ ownerId: featureTickets.ownerId }).from(featureTickets).where(eq(featureTickets.ticketId, ticketId)).get()) {
     blockers.push("Feature-Verknüpfungen");

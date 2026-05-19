@@ -3,8 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
   createProjectNote,
+  createMilestoneNote,
   createTaskNote,
   deleteNote as deleteNoteRequest,
+  getMilestoneNotes,
   getProjectNotes,
   getTaskNotes,
   updateNote as updateNoteRequest
@@ -14,7 +16,7 @@ import { invalidateNotes } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
-export type NoteOwner = { type: "project"; id: number } | { type: "task"; id: number } | { type: "ticket"; id: number };
+export type NoteOwner = { type: "project"; id: number } | { type: "milestone"; id: number } | { type: "task"; id: number } | { type: "ticket"; id: number };
 
 export function useNotes(owner: NoteOwner | null) {
   const queryClient = useQueryClient();
@@ -27,6 +29,9 @@ export function useNotes(owner: NoteOwner | null) {
     queryFn: () => {
       if (ownerType === "project") {
         return getProjectNotes(ownerId as number);
+      }
+      if (ownerType === "milestone") {
+        return getMilestoneNotes(ownerId as number);
       }
       if (ownerType === "ticket") {
         return getTicketNotes(ownerId as number);
@@ -49,6 +54,9 @@ export function useNotes(owner: NoteOwner | null) {
       }
       if (ownerType === "project") {
         return createProjectNote(ownerId as number, input);
+      }
+      if (ownerType === "milestone") {
+        return createMilestoneNote(ownerId as number, input);
       }
       if (ownerType === "ticket") {
         return createTicketNote(ownerId as number, input);

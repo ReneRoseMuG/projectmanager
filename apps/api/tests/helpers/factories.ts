@@ -14,6 +14,24 @@ export interface TestProject {
   tags: TestTag[];
 }
 
+export interface TestMilestone {
+  id: number;
+  projectId: number;
+  version: number;
+  name: string;
+  status: string;
+  color: string | null;
+  description: string | null;
+  startDate: string | null;
+  dueDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  taskCount: number;
+  ticketCount: number;
+  featureCount: number;
+  tags: TestTag[];
+}
+
 export interface TestTask {
   id: number;
   version: number;
@@ -72,7 +90,7 @@ export interface TestNote {
 
 export interface TestEvent {
   id: number;
-  owners: Array<{ type: "project" | "task"; id: number }>;
+  owners: Array<{ type: "project" | "milestone" | "task"; id: number }>;
   title: string;
   startTime: string;
   endTime: string;
@@ -163,6 +181,30 @@ export async function createProject(
   return res.body as TestProject;
 }
 
+export async function createMilestone(
+  app: FastifyInstance,
+  projectId: number,
+  overrides: Partial<{
+    name: string;
+    status: string;
+    color: string | null;
+    description: string | null;
+    startDate: string | null;
+    dueDate: string | null;
+  }> = {}
+): Promise<TestMilestone> {
+  const body = {
+    projectId,
+    name: "Testmeilenstein",
+    status: "active",
+    color: "#14b8a6",
+    ...overrides
+  };
+
+  const res = await supertest(app.server).post("/api/milestones").send(body).expect(201);
+  return res.body as TestMilestone;
+}
+
 export async function createTask(
   app: FastifyInstance,
   projectId: number,
@@ -203,7 +245,7 @@ export async function createSubtask(
 
 export async function createTicket(
   app: FastifyInstance,
-  owner: number | { type: "project" | "task" | "feature" | "useCase"; id: number } | null,
+  owner: number | { type: "project" | "milestone" | "task" | "feature" | "useCase"; id: number } | null,
   overrides: Partial<{
     title: string;
     type: string;
@@ -227,7 +269,9 @@ export async function createTicket(
       : typeof owner === "number"
         ? `/api/projects/${owner}/tickets`
         : owner.type === "project"
-          ? `/api/projects/${owner.id}/tickets`
+        ? `/api/projects/${owner.id}/tickets`
+        : owner.type === "milestone"
+          ? `/api/milestones/${owner.id}/tickets`
           : owner.type === "task"
             ? `/api/tasks/${owner.id}/tickets`
             : owner.type === "feature"
@@ -316,7 +360,7 @@ export async function createEvent(
     startTime: string;
     endTime: string;
     isAllDay: boolean;
-    owners: Array<{ type: "project" | "task"; id: number }>;
+    owners: Array<{ type: "project" | "milestone" | "task"; id: number }>;
     color: string | null;
   }> = {}
 ): Promise<TestEvent> {

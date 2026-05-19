@@ -3,8 +3,10 @@ import type { FastifyInstance } from "fastify";
 import { FEATURE_RELATION_TYPES } from "../db/schema.js";
 import {
   listFeatureRelations,
+  listMilestoneFeatures,
   listProjectFeatures,
   setFeatureRelations,
+  setMilestoneFeatures,
   setProjectFeatures
 } from "../services/doc-links.service.js";
 import { arrayResponseSchema, idParamSchema } from "../utils/route-schemas.js";
@@ -53,6 +55,18 @@ export async function registerDocLinksRoutes(app: FastifyInstance): Promise<void
     "/projects/:id/features",
     { schema: { params: idParamSchema, body: featureIdsBodySchema, response: { 200: arrayResponseSchema } } },
     async (request) => setProjectFeatures(app.db, request.params.id, request.body.featureIds)
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/milestones/:id/features",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listMilestoneFeatures(app.db, request.params.id)
+  );
+
+  app.put<{ Params: { id: number }; Body: { featureIds: number[] } }>(
+    "/milestones/:id/features",
+    { schema: { params: idParamSchema, body: featureIdsBodySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => setMilestoneFeatures(app.db, request.params.id, request.body.featureIds)
   );
 
   app.get<{ Params: { id: number } }>(

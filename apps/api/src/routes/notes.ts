@@ -2,9 +2,11 @@ import type { FastifyInstance } from "fastify";
 import type { NoteInput, NoteUpdate } from "@taskmanager/shared-types";
 import {
   createProjectNote,
+  createMilestoneNote,
   createTaskNote,
   deleteNote,
   getNote,
+  listMilestoneNotes,
   listProjectNotes,
   listTaskNotes,
   updateNote
@@ -43,6 +45,12 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     async (request) => listTaskNotes(app.db, request.params.id)
   );
 
+  app.get<{ Params: { id: number } }>(
+    "/milestones/:id/notes",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listMilestoneNotes(app.db, request.params.id)
+  );
+
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/projects/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
@@ -53,6 +61,12 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     "/tasks/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => reply.status(201).send(createTaskNote(app.db, request.params.id, request.body))
+  );
+
+  app.post<{ Params: { id: number }; Body: NoteInput }>(
+    "/milestones/:id/notes",
+    { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
+    async (request, reply) => reply.status(201).send(createMilestoneNote(app.db, request.params.id, request.body))
   );
 
   app.get<{ Params: { id: number } }>(

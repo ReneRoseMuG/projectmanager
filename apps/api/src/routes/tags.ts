@@ -3,6 +3,7 @@ import {
   createTag,
   deleteTag,
   listTags,
+  setMilestoneTags,
   setProjectTags,
   setTaskTags,
   updateTag
@@ -63,5 +64,11 @@ export async function registerTagsRoutes(app: FastifyInstance): Promise<void> {
     "/tasks/:id/tags",
     { schema: { params: idParamSchema, body: tagIdsBodySchema, response: { 200: arrayResponseSchema } } },
     async (request) => setTaskTags(app.db, request.params.id, request.body.tagIds)
+  );
+
+  app.put<{ Params: { id: number }; Body: { tagIds: number[] } }>(
+    "/milestones/:id/tags",
+    { schema: { params: idParamSchema, body: tagIdsBodySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => setMilestoneTags(app.db, request.params.id, request.body.tagIds)
   );
 }

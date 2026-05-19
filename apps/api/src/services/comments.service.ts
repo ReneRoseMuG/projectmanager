@@ -7,6 +7,8 @@ import {
   comments,
   featureComments,
   features,
+  milestoneComments,
+  milestones,
   projectComments,
   projects,
   taskComments,
@@ -57,6 +59,13 @@ function ensureTaskExists(database: DbClient, taskId: number): void {
   }
 }
 
+function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
+  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+  if (!milestone) {
+    throw notFound(`Milestone with id ${milestoneId} not found`);
+  }
+}
+
 function ensureFeatureExists(database: DbClient, featureId: number): void {
   const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
   if (!feature) {
@@ -101,6 +110,10 @@ function ensureOwnerExists(database: DbClient, owner: CommentOwner): void {
     ensureTaskExists(database, owner.id);
     return;
   }
+  if (owner.type === "milestone") {
+    ensureMilestoneExists(database, owner.id);
+    return;
+  }
   if (owner.type === "feature") {
     ensureFeatureExists(database, owner.id);
     return;
@@ -124,6 +137,7 @@ function listCommentOwners(database: DbClient, commentId: number): CommentOwner[
   return [
     ...database.select({ id: projectComments.projectId }).from(projectComments).where(eq(projectComments.commentId, commentId)).all().map((row) => ({ type: "project" as const, id: row.id })),
     ...database.select({ id: taskComments.taskId }).from(taskComments).where(eq(taskComments.commentId, commentId)).all().map((row) => ({ type: "task" as const, id: row.id })),
+    ...database.select({ id: milestoneComments.milestoneId }).from(milestoneComments).where(eq(milestoneComments.commentId, commentId)).all().map((row) => ({ type: "milestone" as const, id: row.id })),
     ...database.select({ id: featureComments.featureId }).from(featureComments).where(eq(featureComments.commentId, commentId)).all().map((row) => ({ type: "feature" as const, id: row.id })),
     ...database.select({ id: useCaseComments.useCaseId }).from(useCaseComments).where(eq(useCaseComments.commentId, commentId)).all().map((row) => ({ type: "useCase" as const, id: row.id })),
     ...database
@@ -151,6 +165,10 @@ function insertCommentLink(database: DbClient, owner: CommentOwner, commentId: n
     database.insert(taskComments).values({ taskId: owner.id, commentId }).onConflictDoNothing().run();
     return;
   }
+  if (owner.type === "milestone") {
+    database.insert(milestoneComments).values({ milestoneId: owner.id, commentId }).onConflictDoNothing().run();
+    return;
+  }
   if (owner.type === "feature") {
     database.insert(featureComments).values({ featureId: owner.id, commentId }).onConflictDoNothing().run();
     return;
@@ -176,6 +194,9 @@ function deleteCommentLink(database: DbClient, owner: CommentOwner, commentId: n
   }
   if (owner.type === "task") {
     return database.delete(taskComments).where(and(eq(taskComments.taskId, owner.id), eq(taskComments.commentId, commentId))).run().changes;
+  }
+  if (owner.type === "milestone") {
+    return database.delete(milestoneComments).where(and(eq(milestoneComments.milestoneId, owner.id), eq(milestoneComments.commentId, commentId))).run().changes;
   }
   if (owner.type === "feature") {
     return database.delete(featureComments).where(and(eq(featureComments.featureId, owner.id), eq(featureComments.commentId, commentId))).run().changes;
@@ -208,6 +229,15 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
       .from(taskComments)
       .innerJoin(comments, eq(taskComments.commentId, comments.id))
       .where(eq(taskComments.taskId, owner.id))
+      .orderBy(comments.createdAt, comments.id)
+      .all();
+  }
+  if (owner.type === "milestone") {
+    return database
+      .select(commentSelect)
+      .from(milestoneComments)
+      .innerJoin(comments, eq(milestoneComments.commentId, comments.id))
+      .where(eq(milestoneComments.milestoneId, owner.id))
       .orderBy(comments.createdAt, comments.id)
       .all();
   }

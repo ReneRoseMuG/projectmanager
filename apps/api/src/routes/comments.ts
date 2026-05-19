@@ -85,6 +85,7 @@ export async function registerCommentsRoutes(app: FastifyInstance): Promise<void
 
   registerEntityCommentRoutes(app, "/features", "feature");
   registerEntityCommentRoutes(app, "/projects", "project");
+  registerEntityCommentRoutes(app, "/milestones", "milestone");
   registerEntityCommentRoutes(app, "/use-cases", "useCase");
   registerEntityCommentRoutes(app, "/backlog", "backlogItem");
   registerEntityCommentRoutes(app, "/wiki", "wikiPage");
