@@ -149,7 +149,7 @@ function TicketRow({ ticket, description, onOpen, onDelete }: { ticket: Ticket; 
         }
         actions={
           <>
-            <Button aria-label="Öffnen" title="Öffnen" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(ticket)} />
+            <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(ticket)} />
             {onDelete ? <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(ticket)} /> : null}
           </>
         }

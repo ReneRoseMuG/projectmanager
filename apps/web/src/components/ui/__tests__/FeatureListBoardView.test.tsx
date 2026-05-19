@@ -35,15 +35,17 @@ function LocationProbe() {
 function renderFeatureList({
   features = buildFeatureSet(),
   onCreate = vi.fn(),
+  onOpen = vi.fn(),
   onDelete = vi.fn()
 }: {
   features?: Feature[];
   onCreate?: () => void;
+  onOpen?: (feature: Feature) => void;
   onDelete?: (feature: Feature) => void;
 } = {}) {
   return render(
     <MemoryRouter initialEntries={["/"]}>
-      <FeatureListBoardView features={features} onCreate={onCreate} onDelete={onDelete} />
+      <FeatureListBoardView features={features} onCreate={onCreate} onOpen={onOpen} onDelete={onDelete} />
       <LocationProbe />
     </MemoryRouter>
   );
@@ -108,13 +110,15 @@ describe("FeatureListBoardView", () => {
   });
 
   it("öffnet die Feature-Route per Doppelklick auf eine Karte", () => {
-    renderFeatureList();
+    const features = buildFeatureSet();
+    const onOpen = vi.fn();
+    renderFeatureList({ features, onOpen });
 
     const card = screen.getByText("Feature Aktiv").closest("article");
     expect(card).toBeInTheDocument();
     fireEvent.doubleClick(card as HTMLElement);
 
-    expect(screen.getByTestId("location")).toHaveTextContent("/features/2");
+    expect(onOpen).toHaveBeenCalledWith(features[1]);
   });
 
   it("wechselt von Board- in Listen-Modus und rendert weiterhin ItemCards", () => {

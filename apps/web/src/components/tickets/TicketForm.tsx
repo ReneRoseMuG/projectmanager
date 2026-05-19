@@ -30,6 +30,8 @@ interface TicketFormProps {
   title?: string;
   onSubmit: (input: TicketFormInput) => Promise<void>;
   onClose: () => void;
+  variant?: "modal" | "page";
+  closeOnSubmit?: boolean;
 }
 
 type RadioColor = "fern" | "tangerine" | "crimson" | "violet";
@@ -80,7 +82,7 @@ const resolutionOptions = (["fixed", "wont_fix", "duplicate", "cant_reproduce", 
   activeColor: "fern" as RadioColor
 }));
 
-export function TicketForm({ open, ticket, initialStatus = "open", title = "Ticket", onSubmit, onClose }: TicketFormProps) {
+export function TicketForm({ open, ticket, initialStatus = "open", title = "Ticket", onSubmit, onClose, variant = "modal", closeOnSubmit = true }: TicketFormProps) {
   const [ticketTitle, setTicketTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<TicketType>("bug");
@@ -131,7 +133,9 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
         dueDate: dueDate || null,
         tagIds: selectedTags.map((tag) => tag.id)
       });
-      onClose();
+      if (closeOnSubmit) {
+        onClose();
+      }
     } catch {
       // Error feedback is handled by the caller.
     } finally {
@@ -150,6 +154,7 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
       saving={saving}
       onSubmit={submit}
       onClose={onClose}
+      variant={variant}
     >
       <Section title="Basisdaten">
         <div className="grid gap-4">

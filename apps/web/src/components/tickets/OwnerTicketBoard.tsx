@@ -1,15 +1,12 @@
 import type { Ticket, TicketStatus } from "@taskmanager/shared-types";
-import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { setTicketTags, type TicketOwner } from "../../api/tickets";
+import { useLocation, useNavigate } from "react-router-dom";
+import type { TicketOwner } from "../../api/tickets";
 import { errorMessageAsync } from "../../hooks/errors";
 import { useTickets } from "../../hooks/useTickets";
 import { useViewMode } from "../../hooks/useViewMode";
-import { invalidateTags } from "../../queries/invalidation";
 import { OwnerRelationBoard } from "../ui/OwnerRelationBoard";
 import { useToast } from "../ui/ToastProvider";
-import { TicketDetail } from "./TicketDetail";
-import { TicketForm } from "./TicketForm";
 import { TicketLinkDialog } from "./TicketLinkDialog";
 import { TicketListBoardView } from "./TicketListBoardView";
 
@@ -18,18 +15,16 @@ interface OwnerTicketBoardProps {
 }
 
 export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
-  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
   const ticketController = useTickets(owner);
   const { viewMode, setViewMode } = useViewMode("kanban");
-  const [ticketFormOpen, setTicketFormOpen] = useState(false);
-  const [newTicketStatus, setNewTicketStatus] = useState<TicketStatus>("open");
-  const [detailTicketId, setDetailTicketId] = useState<number | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const returnTo = `${location.pathname}${location.search}`;
 
   const openTicketForm = (status: TicketStatus = "open") => {
-    setNewTicketStatus(status);
-    setTicketFormOpen(true);
+    navigate(`/tickets/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${status}&returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   return (
@@ -40,7 +35,7 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
         onCreateItem={(status) => openTicketForm(toTicketStatus(status))}
         onLinkItem={() => setLinkDialogOpen(true)}
         onUnlinkItem={(ticket) => ticketController.unlinkTicket(ticket.id)}
-        onOpenItem={(ticket) => setDetailTicketId(ticket.id)}
+        onOpenItem={(ticket) => navigate(`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`)}
         confirmUnlinkTitle={() => "Ticket-Zuordnung entfernen?"}
         confirmUnlinkBody={(ticket) => `Das Ticket "${ticket.title}" wird nur aus diesem Bereich entfernt.`}
         renderListBoardView={(props) => (
@@ -58,28 +53,6 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
         )}
       />
 
-      <TicketForm
-        open={ticketFormOpen}
-        title="Neues Ticket"
-        initialStatus={newTicketStatus}
-        onSubmit={async (input) => {
-          try {
-            const { tagIds, ...ticketInput } = input;
-            const created = await ticketController.createTicket(ticketInput);
-            if (created && tagIds.length > 0) {
-              await setTicketTags(created.id, tagIds);
-              await invalidateTags(queryClient);
-            }
-            await ticketController.reload();
-            showToast({ tone: "success", title: "Ticket erstellt" });
-          } catch (ticketError) {
-            showToast({ tone: "error", title: "Ticket konnte nicht erstellt werden", message: await errorMessageAsync(ticketError) });
-            throw ticketError;
-          }
-        }}
-        onClose={() => setTicketFormOpen(false)}
-      />
-
       <TicketLinkDialog
         open={linkDialogOpen}
         currentTickets={ticketController.tickets}
@@ -93,15 +66,6 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
           }
         }}
         onClose={() => setLinkDialogOpen(false)}
-      />
-
-      <TicketDetail
-        open={Boolean(detailTicketId)}
-        ticketId={detailTicketId}
-        onClose={() => setDetailTicketId(null)}
-        onChanged={async () => {
-          await ticketController.reload();
-        }}
       />
     </>
   );

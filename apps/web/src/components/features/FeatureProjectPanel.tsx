@@ -1,5 +1,5 @@
 import { PROJECT_STATUSES, type Project, type ProjectStatus } from "@taskmanager/shared-types";
-import { FolderKanban, FolderOpen, Trash2 } from "lucide-react";
+import { Edit3, FolderKanban, FolderOpen, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { ViewMode } from "../../types";
 import { formatHumanDate } from "../../utils/date";
@@ -196,9 +196,14 @@ function FeatureProjectCard({ project, removing, onOpen, onRemove }: { project: 
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
           <span className="text-xs font-semibold text-slate-500">Aktualisiert {formatHumanDate(project.updatedAt)}</span>
-          <Button variant="ghost" icon={<Trash2 size={16} />} loading={removing} onClick={onRemove}>
-            Entfernen
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="ghost" icon={<Edit3 size={16} />} onClick={onOpen}>
+              Bearbeiten
+            </Button>
+            <Button variant="ghost" icon={<Trash2 size={16} />} loading={removing} onClick={onRemove}>
+              Entfernen
+            </Button>
+          </div>
         </div>
       }
       className="min-w-0 max-w-full overflow-hidden"
@@ -224,9 +229,12 @@ function FeatureProjectRow({ project, removing, onOpen, onRemove }: { project: P
       }
       meta={<span className="text-xs font-semibold text-slate-500">Aktualisiert {formatHumanDate(project.updatedAt)}</span>}
       actions={
-        <Button variant="ghost" icon={<Trash2 size={16} />} loading={removing} onClick={onRemove}>
-          Entfernen
-        </Button>
+        <>
+          <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={onOpen} />
+          <Button variant="ghost" icon={<Trash2 size={16} />} loading={removing} onClick={onRemove}>
+            Entfernen
+          </Button>
+        </>
       }
       onOpen={onOpen}
     />

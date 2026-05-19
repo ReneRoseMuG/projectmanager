@@ -94,6 +94,7 @@ function BacklogItemCard({ item, featureName, onEdit, onDelete }: { item: Backlo
       }
       body={description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null}
       footer={featureName ? <Badge tone="teal">Feature: {featureName}</Badge> : <Badge tone="mute">Ohne Feature</Badge>}
+      onOpen={() => onEdit(item)}
       onEdit={() => onEdit(item)}
       onDelete={() => onDelete(item)}
       className={item.status === "rejected" ? "opacity-65" : ""}
@@ -118,6 +119,7 @@ function BacklogItemRow({ item, featureName, onEdit, onDelete }: { item: Backlog
           <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(item)} />
         </>
       }
+      onOpen={() => onEdit(item)}
       className={item.status === "rejected" ? "opacity-65" : ""}
     />
   );

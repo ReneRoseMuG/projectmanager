@@ -1,40 +1,95 @@
-import type { Project, ProjectInput } from "@taskmanager/shared-types";
-import { ChevronRight, Edit3 } from "lucide-react";
-import { useState, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import type { DraftComment, DraftNote, DraftTask, DraftTicket, Project, ProjectInput } from "@taskmanager/shared-types";
+import { useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { uploadProjectAttachment } from "../api/attachments";
+import { createEntityComment } from "../api/comments";
+import { setProjectFeatures } from "../api/doc-links";
+import { createProjectNote } from "../api/notes";
+import { createOwnerTask, linkOwnerTask } from "../api/tasks";
+import { createOwnerTicket, linkOwnerTicket } from "../api/tickets";
 import { ProjectForm } from "../components/projects/ProjectForm";
-import { Button } from "../components/ui/Button";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
-import { useBacklog } from "../hooks/useBacklog";
 import { useProjects } from "../hooks/useProjects";
-import { formatHumanDate } from "../utils/date";
-import { richTextToPlainText } from "../utils/richText";
+import type { DraftFile } from "../types";
 
 export function ProjectDetailPage() {
   const params = useParams();
-  const projectId = Number(params.id);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
-  const { project, loading: projectLoading, updateProject, removeProject } = useProjects(projectId);
-  const backlog = useBacklog(Number.isFinite(projectId) ? projectId : undefined);
-  const [formOpen, setFormOpen] = useState(false);
+  const isCreateMode = params.id === undefined;
+  const projectId = isCreateMode ? undefined : Number(params.id);
+  const { project, loading, createProject, updateProject, removeProject } = useProjects(projectId);
+  const [savingLabel, setSavingLabel] = useState<string | undefined>();
 
-  const submitProjectDetails = async (input: ProjectInput, tagIds: number[]) => {
-    if (!project) {
-      return;
-    }
+  const returnTo = searchParams.get("returnTo") ?? "/projects";
+  const closePage = () => navigate(returnTo);
 
+  const submitProject = async (input: ProjectInput, tagIds: number[]) => {
     try {
-      const updated = await updateProject(project.id, input, tagIds);
-      showToast({ tone: "success", title: "Projekt gespeichert" });
-      return updated;
+      if (project) {
+        const updated = await updateProject(project.id, input, tagIds);
+        showToast({ tone: "success", title: "Projekt gespeichert" });
+        return updated;
+      }
+
+      const created = await createProject(input, tagIds);
+      showToast({ tone: "success", title: "Projekt erstellt" });
+      return created;
     } catch (projectError) {
       showToast({ tone: "error", title: "Projekt konnte nicht gespeichert werden", message: errorMessage(projectError) });
       throw projectError;
+    }
+  };
+
+  const postCreateProject = async (
+    projectId: number,
+    pending: { tasks: DraftTask[]; tickets: DraftTicket[]; featureIds: number[]; comments: DraftComment[]; notes: DraftNote[]; files: DraftFile[] }
+  ) => {
+    const owner = { type: "project" as const, id: projectId };
+    try {
+      if (pending.featureIds.length > 0) {
+        await setProjectFeatures(projectId, pending.featureIds);
+      }
+      for (const task of pending.tasks) {
+        if (task.kind === "existing") {
+          await linkOwnerTask(owner, task.task.id);
+        } else {
+          await createOwnerTask(owner, task.draft);
+        }
+      }
+      for (const ticket of pending.tickets) {
+        if (ticket.kind === "existing") {
+          await linkOwnerTicket(owner, ticket.ticket.id);
+        } else {
+          await createOwnerTicket(owner, ticket.draft);
+        }
+      }
+      for (const comment of pending.comments) {
+        await createEntityComment("project", projectId, { body: comment.text });
+      }
+      for (const note of pending.notes) {
+        await createProjectNote(projectId, note);
+      }
+      for (let index = 0; index < pending.files.length; index += 1) {
+        const file = pending.files[index];
+        if (!file) {
+          continue;
+        }
+        setSavingLabel(`Speichern… (Datei ${index + 1} von ${pending.files.length})`);
+        await uploadProjectAttachment(projectId, file.file);
+      }
+      showToast({ tone: "success", title: "Projekt-Zuordnungen gespeichert" });
+      navigate(`/projects/${projectId}`);
+    } catch (postCreateError) {
+      showToast({ tone: "error", title: "Projekt wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
+      throw postCreateError;
+    } finally {
+      setSavingLabel(undefined);
     }
   };
 
@@ -59,61 +114,31 @@ export function ProjectDetailPage() {
     }
   };
 
-  if (projectLoading) {
-    return <DetailPageSkeleton />;
-  }
-
-  if (!project) {
+  if (!isCreateMode && !Number.isFinite(projectId)) {
     return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Projekt nicht gefunden</div>;
   }
 
-  const projectDescription = richTextToPlainText(project.description);
-  const progress = project.totalTaskCount > 0 ? Math.round((project.doneTaskCount / project.totalTaskCount) * 100) : 0;
+  if (!isCreateMode && loading) {
+    return <DetailPageSkeleton />;
+  }
+
+  if (!isCreateMode && !project) {
+    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Projekt nicht gefunden</div>;
+  }
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-6">
-      <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-steel-700 via-steel-600 to-violet p-6 text-white shadow-steel">
-        <div className="pointer-events-none absolute -right-20 -top-48 h-[480px] w-[480px] rounded-full bg-white/10 blur-sm" />
-        <div className="relative grid gap-5">
-          <div className="flex flex-wrap items-start justify-between gap-5">
-            <div className="min-w-0">
-              <nav className="flex flex-wrap items-center gap-2 text-sm text-white/70">
-                <Link className="hover:text-white" to="/projects">
-                  Projekte
-                </Link>
-                <ChevronRight size={16} />
-                <span className="text-white">{project.name}</span>
-              </nav>
-              <h1 className="mt-3 text-[30px] font-bold leading-tight tracking-normal text-white">{project.name}</h1>
-              {projectDescription ? <p className="mt-1 max-w-[720px] text-[15px] leading-6 text-white/85">{projectDescription}</p> : null}
-            </div>
-            <Button className="border-white/20 bg-white/10 text-white hover:bg-white/20" icon={<Edit3 size={17} />} variant="ghost" onClick={() => setFormOpen(true)}>
-              Bearbeiten
-            </Button>
-          </div>
-
-          <div className="grid gap-4 border-t border-white/18 pt-5 sm:grid-cols-2 lg:grid-cols-5">
-            <HeroStat label="Fortschritt">{progress} %</HeroStat>
-            <HeroStat label="Aufgaben">
-              {project.doneTaskCount} / {project.totalTaskCount}
-            </HeroStat>
-            <HeroStat label="Offen">{project.openTaskCount}</HeroStat>
-            <HeroStat label="Backlog">{backlog.items.length}</HeroStat>
-            <HeroStat label="Aktualisiert">{formatHumanDate(project.updatedAt)}</HeroStat>
-          </div>
-        </div>
-      </header>
-
-      <ProjectForm open={formOpen} project={project} onSubmit={submitProjectDetails} onDelete={deleteProject} onClose={() => setFormOpen(false)} />
-    </div>
-  );
-}
-
-function HeroStat({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <span className="block text-[11px] font-semibold uppercase tracking-widest text-white/60">{label}</span>
-      <span className="mt-1 block text-2xl font-bold text-white">{children}</span>
+    <div className="mx-auto max-w-7xl">
+      <ProjectForm
+        open
+        project={project}
+        variant="page"
+        closeOnSubmit={false}
+        onSubmit={submitProject}
+        onDelete={deleteProject}
+        savingLabel={savingLabel}
+        onPostCreate={postCreateProject}
+        onClose={closePage}
+      />
     </div>
   );
 }

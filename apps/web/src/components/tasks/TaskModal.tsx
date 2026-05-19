@@ -45,6 +45,8 @@ interface TaskModalProps {
   onClose: () => void;
   onChanged?: () => Promise<void>;
   savingLabel?: string;
+  variant?: "modal" | "page";
+  closeOnSubmit?: boolean;
 }
 
 export interface TaskModalInput extends TaskInput {
@@ -80,7 +82,7 @@ const priorities: Array<{ value: Priority; label: string; activeColor: "fern" | 
   { value: "urgent", label: priorityLabels.urgent, activeColor: "crimson" }
 ];
 
-export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClose, onChanged, savingLabel }: TaskModalProps) {
+export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClose, onChanged, savingLabel, variant = "modal", closeOnSubmit = true }: TaskModalProps) {
   const taskId = task?.id ?? null;
   const detail = useTaskDetail(open && taskId ? taskId : null);
   const ticketOwner = taskId && open ? { type: "task" as const, id: taskId } : null;
@@ -153,7 +155,9 @@ export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClos
         pendingNotes,
         pendingFiles
       });
-      onClose();
+      if (closeOnSubmit) {
+        onClose();
+      }
     } catch {
       // Error feedback is handled by the caller.
     } finally {
@@ -216,6 +220,7 @@ export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClos
         saving={saving}
         onSubmit={submit}
         onClose={onClose}
+        variant={variant}
         headerMeta={
           <div className="flex flex-wrap gap-2">
             <Pill tone={taskStatusTones[status]}>{taskStatusLabels[status]}</Pill>

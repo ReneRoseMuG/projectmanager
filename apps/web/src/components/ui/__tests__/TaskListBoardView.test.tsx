@@ -161,7 +161,7 @@ describe("TaskListBoardView", () => {
     tasks.forEach((task, index) => {
       const row = rows[index] as HTMLElement;
       expect(within(row).getByText(task.title)).toBeInTheDocument();
-      expect(within(row).getByRole("button", { name: "Öffnen" })).toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
       expect(within(row).getByRole("button", { name: "Löschen" })).toBeInTheDocument();
     });
   });

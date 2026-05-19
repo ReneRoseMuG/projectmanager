@@ -1,230 +1,203 @@
-import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import {
+  createFeature,
+  createProject,
+  createUseCase,
+  deleteFeature,
+  deleteProject,
+  expectRichText,
+  formPage,
+  itemCard,
+  linkProjectFeature,
+  slugify,
+  uniqueTitle
+} from "./domain-test-utils";
 
 /**
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Feature-CRUD läuft als echter Browser-Flow über ListBoardView, FormModal und FeatureDetailPage.
- * - Feature-Relationen zu Projekten und Use Cases bleiben nach dem Speichern sichtbar.
+ * - Feature-Create und Feature-Edit laufen über `/features/new` und `/features/:id`.
+ * - Doppelklick und Bearbeiten-Button in Feature-Übersicht und Feature-Tab-Views navigieren korrekt.
+ * - Feature-, Projekt- und Use-Case-Detailseiten zeigen ihre vollständigen Formulardaten.
  *
  * Fehlerfälle:
- * - Leere oder geskipte Platzhaltertests zählen nicht als E2E-Abdeckung.
+ * - Tab-Views dürfen keine leere Detailseite und kein altes Overlay-Formular öffnen.
  *
  * Ziel:
- * Die im Design-System-Auftrag geforderten Feature-CRUD-Flows mit ausführbaren Playwright-Tests absichern.
+ * Die dokumentationsbezogenen Domänenobjekte über echte Browsernavigation und echte API-Daten absichern.
  */
-
-const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL ?? "http://127.0.0.1:3101/api";
-
-interface FeatureFixture {
-  id: number;
-  title: string;
-  slug: string;
-}
-
-interface ProjectFixture {
-  id: number;
-  name: string;
-}
-
-function uniqueTitle(prefix: string) {
-  return `${prefix} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function slugify(value: string) {
-  return value.toLocaleLowerCase("de-DE").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-
-async function createFeature(request: APIRequestContext, titlePrefix: string): Promise<FeatureFixture> {
-  const title = uniqueTitle(titlePrefix);
-  const slug = slugify(title);
-  const response = await request.post(`${apiBaseUrl}/features`, {
-    data: { title, slug, status: "active", description: "E2E Feature", content: "E2E Inhalt", sortOrder: 0 }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function createProject(request: APIRequestContext, titlePrefix: string): Promise<ProjectFixture> {
-  const name = uniqueTitle(titlePrefix);
-  const response = await request.post(`${apiBaseUrl}/projects`, {
-    data: { name, description: "E2E Projekt", status: "active", color: "#4682B4" }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function deleteFeature(request: APIRequestContext, featureId: number | null) {
-  if (featureId) {
-    await request.delete(`${apiBaseUrl}/features/${featureId}`);
-  }
-}
-
-async function deleteProject(request: APIRequestContext, projectId: number | null) {
-  if (projectId) {
-    await request.delete(`${apiBaseUrl}/projects/${projectId}`);
-  }
-}
-
-function activeModal(page: Page) {
-  return page.locator(".fixed.inset-0").last();
-}
-
-function featureForm(page: Page) {
-  return page.locator(".fixed.inset-0").filter({ has: page.getByRole("heading", { name: "Feature bearbeiten" }) }).last();
-}
-
-function featureCard(scope: Page | Locator, title: string) {
-  return scope.locator("article:visible").filter({ hasText: title }).first();
-}
 
 async function openFeatureList(page: Page) {
   await page.goto("/features");
   await expect(page.getByRole("heading", { name: "Features", exact: true })).toBeVisible();
 }
 
-async function fillFeatureForm(page: Page, title: string, slug: string, description = "E2E Beschreibung", content = "E2E Inhalt") {
-  const modal = activeModal(page);
-  await modal.locator("input[required]").nth(0).fill(title);
-  await modal.locator("input[required]").nth(1).fill(slug);
-  await modal.locator('[contenteditable="true"]').nth(0).fill(description);
-  await modal.locator('[contenteditable="true"]').nth(1).fill(content);
+async function expectFeatureFormData(page: Page, feature: { title: string; slug: string }, descriptionText = "E2E Feature-Kurzbeschreibung vollständig", contentText = "E2E Feature-Inhalt vollständig") {
+  const form = formPage(page, "Feature bearbeiten");
+  await expect(form).toBeVisible();
+  await expect(form.locator("input[required]").nth(0)).toHaveValue(feature.title);
+  await expect(form.locator("input[required]").nth(1)).toHaveValue(feature.slug);
+  await expect(form.locator('input[type="number"]').first()).toHaveValue("7");
+  await expectRichText(form, descriptionText, 0);
+  await expectRichText(form, contentText, 1);
 }
 
-async function openFeatureDetailFromList(page: Page, title: string) {
-  await featureCard(page, title).dblclick();
-  await expect(page).toHaveURL(/\/features\/\d+$/);
-}
-
-test.describe("Feature CRUD", () => {
-  test("Feature erstellen: + Button → Form → Speichern → erscheint in Liste", async ({ page, request }) => {
+test.describe("Feature-Routen und Detailformular", () => {
+  test("Feature erstellen: Plus-Button navigiert auf Create-Detailseite und speichert als Detailroute", async ({ page, request }) => {
     let featureId: number | null = null;
-    const title = uniqueTitle("E2E Feature Create");
+    const title = uniqueTitle("E2E Feature Create Route");
     const slug = slugify(title);
 
     try {
       await openFeatureList(page);
       await page.getByRole("button", { name: "Neues Feature" }).click();
-      await fillFeatureForm(page, title, slug);
-      await page.getByRole("button", { name: "Feature anlegen" }).click();
+
+      await expect(page).toHaveURL(/\/features\/new$/);
+      const form = formPage(page, "Neues Feature");
+      await form.locator("input[required]").nth(0).fill(title);
+      await form.locator("input[required]").nth(1).fill(slug);
+      await form.locator('input[type="number"]').first().fill("7");
+      await form.locator('[contenteditable="true"]').nth(0).fill("E2E Feature-Neuanlage Beschreibung vollständig");
+      await form.locator('[contenteditable="true"]').nth(1).fill("E2E Feature-Neuanlage Inhalt vollständig");
+      await form.getByRole("button", { name: "Feature anlegen" }).click();
+
       await expect(page).toHaveURL(/\/features\/\d+$/);
       featureId = Number(page.url().split("/").pop());
+      await expectFeatureFormData(page, { title, slug }, "E2E Feature-Neuanlage Beschreibung vollständig", "E2E Feature-Neuanlage Inhalt vollständig");
 
       await openFeatureList(page);
-      await expect(featureCard(page, title)).toBeVisible();
+      await expect(itemCard(page, title)).toBeVisible();
     } finally {
       await deleteFeature(request, featureId);
     }
   });
 
-  test("Feature öffnen: Doppelklick → navigiert zu /features/:id", async ({ page, request }) => {
-    const feature = await createFeature(request, "E2E Feature Open");
+  test("Feature öffnen: Doppelklick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({ page, request }) => {
+    const feature = await createFeature(request, "E2E Feature Open Route");
+
     try {
       await openFeatureList(page);
-      await openFeatureDetailFromList(page, feature.title);
+      await itemCard(page, feature.title).dblclick();
+      await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
+      await expectFeatureFormData(page, feature);
 
-      await expect(page.getByRole("heading", { name: feature.title })).toBeVisible();
+      await openFeatureList(page);
+      await itemCard(page, feature.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
+      await expectFeatureFormData(page, feature);
+
+      await openFeatureList(page);
+      await page.getByRole("button", { name: "Liste", exact: true }).click();
+      await itemCard(page, feature.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
+      await expectFeatureFormData(page, feature);
     } finally {
       await deleteFeature(request, feature.id);
     }
   });
 
-  test("Feature bearbeiten: Titel + Kurzbeschreibung → Speichern → Änderung sichtbar", async ({ page, request }) => {
-    const feature = await createFeature(request, "E2E Feature Edit");
-    const updatedTitle = uniqueTitle("E2E Feature Updated");
-    const updatedDescription = "E2E aktualisierte Beschreibung";
+  test("Feature bearbeiten: Speichern hält die kanonische Detailformular-Seite aktuell", async ({ page, request }) => {
+    const feature = await createFeature(request, "E2E Feature Edit Route");
+    const updatedTitle = uniqueTitle("E2E Feature Updated Route");
 
     try {
       await page.goto(`/features/${feature.id}`);
-      await expect(page.getByRole("heading", { name: feature.title })).toBeVisible();
-      await page.getByRole("button", { name: "Bearbeiten" }).click();
-      await featureForm(page).locator("input[required]").nth(0).fill(updatedTitle);
-      await featureForm(page).locator('[contenteditable="true"]').nth(0).fill(updatedDescription);
+      const form = formPage(page, "Feature bearbeiten");
+      await expectFeatureFormData(page, feature);
+
+      await form.locator("input[required]").nth(0).fill(updatedTitle);
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/features/${feature.id}`) && response.request().method() === "PATCH"),
-        featureForm(page).getByRole("button", { name: "Speichern" }).click()
+        form.getByRole("button", { name: "Speichern" }).click()
       ]);
 
-      await expect(page.getByRole("heading", { name: updatedTitle })).toBeVisible();
-      await expect(page.getByText(updatedDescription)).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
+      await expect(form.locator("input[required]").nth(0)).toHaveValue(updatedTitle);
     } finally {
       await deleteFeature(request, feature.id);
     }
   });
 
-  test("Feature löschen: Delete → Confirm → verschwindet", async ({ page, request }) => {
-    const feature = await createFeature(request, "E2E Feature Delete");
-
-    await openFeatureList(page);
-    await featureCard(page, feature.title).getByRole("button", { name: "Löschen" }).click();
-    await page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click();
-
-    await expect(featureCard(page, feature.title)).not.toBeVisible();
-    await deleteFeature(request, feature.id);
-  });
-
-  test("Projekt im Projekte-Tab hinzufügen und entfernen", async ({ page, request }) => {
-    const feature = await createFeature(request, "E2E Feature Project Link");
-    const project = await createProject(request, "E2E Linked Project");
+  test("Feature-Projekte-Tab: Doppelklick und Bearbeiten öffnen das Projekt-Detailformular per Route", async ({ page, request }) => {
+    const feature = await createFeature(request, "E2E Feature Project Tab");
+    const project = await createProject(request, "E2E Feature Tab Project");
 
     try {
+      await linkProjectFeature(request, project.id, feature.id);
+
       await page.goto(`/features/${feature.id}`);
-      await page.getByRole("button", { name: "Bearbeiten" }).click();
-      await featureForm(page).getByRole("button", { name: /Projekte/ }).click();
-      await featureForm(page).getByRole("button", { name: "Projekt hinzufügen" }).click();
-      await activeModal(page).getByRole("combobox").selectOption({ label: project.name });
-      await Promise.all([
-        page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),
-        activeModal(page).getByRole("button", { name: "Hinzufügen" }).click()
-      ]);
-      await expect(featureCard(featureForm(page), project.name)).toBeVisible();
+      const featureForm = formPage(page, "Feature bearbeiten");
+      await featureForm.getByRole("button", { name: /Projekte/ }).click();
+      await expect(itemCard(featureForm, project.name)).toBeVisible();
 
-      await page.reload();
-      await page.getByRole("button", { name: "Bearbeiten" }).click();
-      await featureForm(page).getByRole("button", { name: /Projekte/ }).click();
-      await expect(featureCard(featureForm(page), project.name)).toBeVisible();
+      await itemCard(featureForm, project.name).dblclick();
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}`));
+      const projectForm = formPage(page, "Projekt bearbeiten");
+      await expect(projectForm.locator("input[required]").first()).toHaveValue(project.name);
+      await expectRichText(projectForm, "E2E Projektbeschreibung vollständig");
 
-      await Promise.all([
-        page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),
-        featureCard(featureForm(page), project.name).getByRole("button", { name: "Entfernen" }).click()
-      ]);
-      await expect(featureCard(featureForm(page), project.name)).not.toBeVisible();
+      await page.goto(`/features/${feature.id}`);
+      await formPage(page, "Feature bearbeiten").getByRole("button", { name: /Projekte/ }).click();
+      await itemCard(formPage(page, "Feature bearbeiten"), project.name).getByRole("button", { name: "Bearbeiten" }).click();
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}`));
+      await expect(formPage(page, "Projekt bearbeiten").locator("input[required]").first()).toHaveValue(project.name);
     } finally {
       await deleteFeature(request, feature.id);
       await deleteProject(request, project.id);
     }
   });
 
-  test("Use Case erstellen im UC-Tab → erscheint in UC-Liste", async ({ page, request }) => {
-    const feature = await createFeature(request, "E2E Feature Use Case");
-    const useCaseTitle = uniqueTitle("E2E Use Case Create");
+  test("Feature-Use-Cases-Tab: Doppelklick und Bearbeiten öffnen das Use-Case-Detailformular per Route", async ({ page, request }) => {
+    const feature = await createFeature(request, "E2E Feature UseCase Tab");
+    const useCase = await createUseCase(request, feature.id, "E2E Feature Tab UseCase");
 
     try {
       await page.goto(`/features/${feature.id}`);
-      await page.getByRole("button", { name: "Bearbeiten" }).click();
-      await featureForm(page).getByRole("button", { name: /Use Cases/ }).click();
-      await featureForm(page).getByRole("button", { name: "Neuer Use Case" }).click();
-      await activeModal(page).locator("input[required]").nth(0).fill(useCaseTitle);
-      await activeModal(page).locator("input[required]").nth(1).fill(slugify(useCaseTitle));
-      await activeModal(page).getByRole("button", { name: "Speichern" }).click();
+      const featureForm = formPage(page, "Feature bearbeiten");
+      await featureForm.getByRole("button", { name: /Use Cases/ }).click();
+      await expect(itemCard(featureForm, useCase.title)).toBeVisible();
 
-      await featureForm(page).getByRole("button", { name: /Use Cases/ }).click();
-      await expect(featureForm(page).getByText(useCaseTitle)).toBeVisible();
+      await itemCard(featureForm, useCase.title).dblclick();
+      await expect(page).toHaveURL(new RegExp(`/use-cases/${useCase.id}`));
+      const useCaseForm = formPage(page, "Use Case bearbeiten");
+      await expect(useCaseForm.locator("input[required]").nth(0)).toHaveValue(useCase.title);
+      await expect(useCaseForm.locator("input[required]").nth(1)).toHaveValue(useCase.slug);
+      await expectRichText(useCaseForm, "E2E Use-Case-Beschreibung vollständig", 0);
+      await expectRichText(useCaseForm, "E2E Use-Case-Inhalt vollständig", 1);
+
+      await page.goto(`/features/${feature.id}`);
+      await formPage(page, "Feature bearbeiten").getByRole("button", { name: /Use Cases/ }).click();
+      await itemCard(formPage(page, "Feature bearbeiten"), useCase.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await expect(page).toHaveURL(new RegExp(`/use-cases/${useCase.id}`));
+      await expect(formPage(page, "Use Case bearbeiten").locator("input[required]").nth(0)).toHaveValue(useCase.title);
     } finally {
       await deleteFeature(request, feature.id);
     }
   });
 
-  test("Board / Listen Toggle in Feature-Übersicht", async ({ page, request }) => {
-    const feature = await createFeature(request, "E2E Feature Toggle");
+  test("Feature löschen: Delete und Confirm entfernen die Karte aus der Übersicht", async ({ page, request }) => {
+    const feature = await createFeature(request, "E2E Feature Delete Route");
+
+    await openFeatureList(page);
+    await itemCard(page, feature.title).getByRole("button", { name: "Löschen" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click();
+
+    await expect(itemCard(page, feature.title)).not.toBeVisible();
+    await deleteFeature(request, feature.id);
+  });
+
+  test("Board- und Listenansicht zeigen echte Feature-Daten", async ({ page, request }) => {
+    const feature = await createFeature(request, "E2E Feature Toggle Route");
+
     try {
       await openFeatureList(page);
       await page.getByRole("button", { name: "Liste", exact: true }).click();
-      await expect(featureCard(page, feature.title)).toBeVisible();
+      await expect(itemCard(page, feature.title)).toBeVisible();
 
       await page.getByRole("button", { name: "Kanban" }).click();
       await expect(page.getByRole("heading", { name: "Aktiv" })).toBeVisible();
-      await expect(featureCard(page, feature.title)).toBeVisible();
+      await expect(itemCard(page, feature.title)).toBeVisible();
     } finally {
       await deleteFeature(request, feature.id);
     }

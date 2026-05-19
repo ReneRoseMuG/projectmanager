@@ -9,6 +9,7 @@ import { FeatureCard } from "./FeatureCard";
 interface FeatureListBoardViewProps {
   features: Feature[];
   onCreate: () => void;
+  onOpen: (feature: Feature) => void;
   onDelete: (feature: Feature) => void;
   filters?: React.ReactNode;
 }
@@ -29,7 +30,7 @@ function matchesSearch(feature: Feature, searchValue: string) {
 }
 
 /** Feature-specific ListBoardView adapter with status board columns. */
-export function FeatureListBoardView({ features, onCreate, onDelete, filters }: FeatureListBoardViewProps) {
+export function FeatureListBoardView({ features, onCreate, onOpen, onDelete, filters }: FeatureListBoardViewProps) {
   const [mode, setMode] = useState<ListBoardMode>("board");
   const [searchValue, setSearchValue] = useState("");
   const visibleFeatures = useMemo(() => features.filter((feature) => matchesSearch(feature, searchValue)), [features, searchValue]);
@@ -48,8 +49,8 @@ export function FeatureListBoardView({ features, onCreate, onDelete, filters }: 
       onSearchChange={setSearchValue}
       filters={filters}
       emptyState={<EmptyState icon={<BookOpen size={22} />} title="Keine Features" body="Lege ein Feature an, um Use Cases und Aufgaben fachlich zu gruppieren." tone="violet" variant="tinted" />}
-      renderCard={(feature) => <FeatureCard feature={feature} onDelete={onDelete} />}
-      renderRow={(feature) => <FeatureCard feature={feature} onDelete={onDelete} />}
+      renderCard={(feature) => <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} />}
+      renderRow={(feature) => <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} />}
     />
   );
 }

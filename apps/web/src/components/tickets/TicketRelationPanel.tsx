@@ -14,11 +14,12 @@ interface TicketRelationPanelProps {
   relations: TicketRelationEntry[];
   onAdd: (input: TicketRelationInput) => Promise<void>;
   onRemove: (input: TicketRelationInput) => Promise<void>;
+  onOpen: (ticket: Ticket) => void;
 }
 
 const relationTypes = ["blocks", "related", "duplicate"] as TicketRelationType[];
 
-export function TicketRelationPanel({ currentTicketId, tickets, relations, onAdd, onRemove }: TicketRelationPanelProps) {
+export function TicketRelationPanel({ currentTicketId, tickets, relations, onAdd, onRemove, onOpen }: TicketRelationPanelProps) {
   const [targetTicketId, setTargetTicketId] = useState("");
   const [relationType, setRelationType] = useState<TicketRelationType>("related");
   const [saving, setSaving] = useState(false);
@@ -80,9 +81,9 @@ export function TicketRelationPanel({ currentTicketId, tickets, relations, onAdd
         </div>
       </Section>
 
-      <RelationSection title="Blockiert" emptyTitle="Keine blockierten Tickets" relations={outgoingBlocks} onRemove={onRemove} />
-      <RelationSection title="Blockiert von" emptyTitle="Keine Blocker" relations={incomingBlocks} onRemove={onRemove} />
-      <RelationSection title="Verwandt / Duplikat" emptyTitle="Keine weiteren Relationen" relations={related} onRemove={onRemove} />
+      <RelationSection title="Blockiert" emptyTitle="Keine blockierten Tickets" relations={outgoingBlocks} onOpen={onOpen} onRemove={onRemove} />
+      <RelationSection title="Blockiert von" emptyTitle="Keine Blocker" relations={incomingBlocks} onOpen={onOpen} onRemove={onRemove} />
+      <RelationSection title="Verwandt / Duplikat" emptyTitle="Keine weiteren Relationen" relations={related} onOpen={onOpen} onRemove={onRemove} />
     </div>
   );
 }
@@ -91,11 +92,13 @@ function RelationSection({
   title,
   emptyTitle,
   relations,
+  onOpen,
   onRemove
 }: {
   title: string;
   emptyTitle: string;
   relations: TicketRelationEntry[];
+  onOpen: (ticket: Ticket) => void;
   onRemove: (input: TicketRelationInput) => Promise<void>;
 }) {
   return (
@@ -105,7 +108,7 @@ function RelationSection({
         <div className="grid gap-3">
           {relations.map((relation) => (
             <div key={relation.id} className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-              <TicketCard ticket={relation.ticket} variant="row" onOpen={() => undefined} />
+              <TicketCard ticket={relation.ticket} variant="row" onOpen={onOpen} />
               <Button
                 aria-label="Relation entfernen"
                 title="Relation entfernen"

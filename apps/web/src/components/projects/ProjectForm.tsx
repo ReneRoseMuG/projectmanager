@@ -5,7 +5,6 @@ import type {
   DraftTask,
   DraftTicket,
   Feature,
-  FeatureInput,
   Note,
   Priority,
   Project,
@@ -18,6 +17,7 @@ import type {
 import { FolderKanban, Inbox, ListTodo, Paperclip, StickyNote, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
@@ -32,9 +32,7 @@ import { formatHumanDate } from "../../utils/date";
 import { priorityLabels, projectStatusLabels, taskStatusLabels, taskStatusTones, ticketStatusLabels, ticketStatusTones } from "../../utils/domainLabels";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
-import { BacklogItemForm } from "../backlog/BacklogItemForm";
 import { BacklogListBoardView } from "../backlog/BacklogListBoardView";
-import { FeatureForm } from "../features/FeatureForm";
 import { ProjectFeaturePanel } from "../features/ProjectFeaturePanel";
 import { WikiImportPanel } from "../imports/WikiImportPanel";
 import { NoteEditor } from "../notes/NoteEditor";
@@ -75,6 +73,8 @@ interface ProjectFormProps {
   onClose: () => void;
   onDelete?: (project: Project) => Promise<boolean>;
   savingLabel?: string;
+  variant?: "modal" | "page";
+  closeOnSubmit?: boolean;
   onPostCreate?: (
     projectId: number,
     pending: {
@@ -152,7 +152,9 @@ function projectCode(name: string) {
     .toUpperCase();
 }
 
-export function ProjectForm({ open, project, onSubmit, onClose, onDelete, savingLabel, onPostCreate }: ProjectFormProps) {
+export function ProjectForm({ open, project, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onPostCreate }: ProjectFormProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const projectId = project?.id;
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -175,10 +177,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
-  const [backlogFormOpen, setBacklogFormOpen] = useState(false);
-  const [editingBacklogItem, setEditingBacklogItem] = useState<BacklogItem | null>(null);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const [featureFormOpen, setFeatureFormOpen] = useState(false);
   const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
   const [pendingFeatures, setPendingFeatures] = useState<Feature[]>([]);
   const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
@@ -244,7 +243,9 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
           files: pendingFiles
         });
       }
-      onClose();
+      if (closeOnSubmit) {
+        onClose();
+      }
     } catch {
       // Error feedback is handled by the page-level toast.
     } finally {
@@ -287,38 +288,6 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
     } catch (attachmentError) {
       showToast({ tone: "error", title: "Datei konnte nicht hochgeladen werden", message: errorMessage(attachmentError) });
       throw attachmentError;
-    }
-  };
-
-  const submitFeatureForm = async (input: FeatureInput) => {
-    if (!project) {
-      return;
-    }
-    try {
-      const created = await allFeatures.createFeature(input);
-      await featureLinks.setFeaturesForProject([...new Set([...featureLinks.features.map((feature) => feature.id), created.id])]);
-      await allFeatures.reload();
-      await featureLinks.reload();
-      showToast({ tone: "success", title: "Feature erstellt und verknüpft" });
-      return created;
-    } catch (featureError) {
-      showToast({ tone: "error", title: "Feature konnte nicht gespeichert werden", message: errorMessage(featureError) });
-      throw featureError;
-    }
-  };
-
-  const submitBacklogItem = async (input: Parameters<typeof backlog.createItem>[0]) => {
-    try {
-      if (editingBacklogItem) {
-        await backlog.updateItem(editingBacklogItem.id, input);
-        showToast({ tone: "success", title: "Backlog-Item gespeichert" });
-      } else {
-        await backlog.createItem(input);
-        showToast({ tone: "success", title: "Backlog-Item erstellt" });
-      }
-    } catch (backlogError) {
-      showToast({ tone: "error", title: "Backlog-Item konnte nicht gespeichert werden", message: errorMessage(backlogError) });
-      throw backlogError;
     }
   };
 
@@ -406,6 +375,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
           ) : undefined
         }
         onClose={onClose}
+        variant={variant}
       >
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
 
@@ -456,8 +426,8 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
                   features={featureLinks.features}
                   viewMode={featureViewMode}
                   onViewModeChange={setFeatureViewMode}
-                  onCreate={() => setFeatureFormOpen(true)}
-                  onOpen={() => undefined}
+                  onCreate={() => navigate(`/features/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                  onOpen={(feature) => navigate(`/features/${feature.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
                 />
               )
             ) : (
@@ -574,14 +544,8 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
                   features={allFeatures.features}
                   statusFilter={backlog.statusFilter}
                   onStatusFilterChange={backlog.setStatusFilter}
-                  onCreate={() => {
-                    setEditingBacklogItem(null);
-                    setBacklogFormOpen(true);
-                  }}
-                  onEdit={(item) => {
-                    setEditingBacklogItem(item);
-                    setBacklogFormOpen(true);
-                  }}
+                  onCreate={() => navigate(`/backlog/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                  onEdit={(item) => navigate(`/backlog/${item.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
                   onDelete={(item) => void deleteBacklogItem(item)}
                 />
               )
@@ -604,17 +568,6 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         ) : null}
       </FormModal>
 
-      <FeatureForm open={featureFormOpen} onSubmit={submitFeatureForm} onClose={() => setFeatureFormOpen(false)} />
-      <BacklogItemForm
-        open={backlogFormOpen}
-        item={editingBacklogItem}
-        features={allFeatures.features}
-        onSubmit={submitBacklogItem}
-        onClose={() => {
-          setBacklogFormOpen(false);
-          setEditingBacklogItem(null);
-        }}
-      />
       <FeatureLinkDialog
         open={featureLinkOpen}
         features={allFeatures.features}

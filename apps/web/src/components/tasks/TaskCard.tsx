@@ -129,7 +129,7 @@ function TaskRow({ task, description, onOpen, onDelete }: { task: Task; descript
         }
         actions={
           <>
-            <Button aria-label="Öffnen" title="Öffnen" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(task)} />
+            <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(task)} />
             {onDelete ? <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(task)} /> : null}
           </>
         }

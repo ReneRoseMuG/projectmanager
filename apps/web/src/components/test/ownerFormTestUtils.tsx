@@ -14,6 +14,7 @@ import { fireEvent, screen } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, expect, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { ConfirmDialogProvider } from "../ui/ConfirmDialogProvider";
 import { ToastProvider } from "../ui/ToastProvider";
 
@@ -469,9 +470,11 @@ afterEach(() => {
 
 export function renderWithProviders(ui: ReactElement) {
   const withProviders = (content: ReactElement) => (
-    <ToastProvider>
-      <ConfirmDialogProvider>{content}</ConfirmDialogProvider>
-    </ToastProvider>
+    <MemoryRouter>
+      <ToastProvider>
+        <ConfirmDialogProvider>{content}</ConfirmDialogProvider>
+      </ToastProvider>
+    </MemoryRouter>
   );
   const result = render(withProviders(ui));
 

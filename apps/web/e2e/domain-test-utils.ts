@@ -1,0 +1,232 @@
+import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+
+export const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL ?? "http://127.0.0.1:3101/api";
+
+export interface ProjectFixture {
+  id: number;
+  name: string;
+}
+
+export interface FeatureFixture {
+  id: number;
+  title: string;
+  slug: string;
+}
+
+export interface UseCaseFixture {
+  id: number;
+  title: string;
+  slug: string;
+  featureId: number;
+}
+
+export interface TaskFixture {
+  id: number;
+  title: string;
+}
+
+export interface TicketFixture {
+  id: number;
+  title: string;
+}
+
+export interface BacklogItemFixture {
+  id: number;
+  title: string;
+  projectId: number;
+}
+
+export type TaskOwner = { type: "project" | "feature" | "useCase"; id: number };
+export type TicketOwner = { type: "project" | "task" | "feature" | "useCase"; id: number };
+
+export function uniqueTitle(prefix: string) {
+  return `${prefix} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
+}
+
+export function slugify(value: string) {
+  return value.toLocaleLowerCase("de-DE").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function taskOwnerPath(owner: TaskOwner) {
+  if (owner.type === "project") {
+    return `projects/${owner.id}`;
+  }
+  if (owner.type === "feature") {
+    return `features/${owner.id}`;
+  }
+  return `use-cases/${owner.id}`;
+}
+
+function ticketOwnerPath(owner: TicketOwner) {
+  if (owner.type === "project") {
+    return `projects/${owner.id}`;
+  }
+  if (owner.type === "task") {
+    return `tasks/${owner.id}`;
+  }
+  if (owner.type === "feature") {
+    return `features/${owner.id}`;
+  }
+  return `use-cases/${owner.id}`;
+}
+
+export async function createProject(request: APIRequestContext, titlePrefix: string, input: Partial<{ description: string; status: string; color: string; startDate: string; dueDate: string }> = {}) {
+  const name = uniqueTitle(titlePrefix);
+  const response = await request.post(`${apiBaseUrl}/projects`, {
+    data: {
+      name,
+      description: input.description ?? "<p>E2E Projektbeschreibung vollständig</p>",
+      status: input.status ?? "active",
+      color: input.color ?? "#4682B4",
+      startDate: input.startDate ?? "2026-05-01",
+      dueDate: input.dueDate ?? "2026-05-31"
+    }
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<ProjectFixture>;
+}
+
+export async function createFeature(request: APIRequestContext, titlePrefix: string, input: Partial<{ description: string; content: string; status: string; sortOrder: number }> = {}) {
+  const title = uniqueTitle(titlePrefix);
+  const response = await request.post(`${apiBaseUrl}/features`, {
+    data: {
+      title,
+      slug: slugify(title),
+      status: input.status ?? "active",
+      description: input.description ?? "<p>E2E Feature-Kurzbeschreibung vollständig</p>",
+      content: input.content ?? "<p>E2E Feature-Inhalt vollständig</p>",
+      sortOrder: input.sortOrder ?? 7
+    }
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<FeatureFixture>;
+}
+
+export async function linkProjectFeature(request: APIRequestContext, projectId: number, featureId: number) {
+  const response = await request.put(`${apiBaseUrl}/projects/${projectId}/features`, { data: { featureIds: [featureId] } });
+  expect(response.ok()).toBeTruthy();
+}
+
+export async function createUseCase(request: APIRequestContext, featureId: number, titlePrefix: string, input: Partial<{ description: string; content: string; status: string; sortOrder: number }> = {}) {
+  const title = uniqueTitle(titlePrefix);
+  const response = await request.post(`${apiBaseUrl}/features/${featureId}/use-cases`, {
+    data: {
+      title,
+      slug: slugify(title),
+      status: input.status ?? "active",
+      description: input.description ?? "<p>E2E Use-Case-Beschreibung vollständig</p>",
+      content: input.content ?? "<p>E2E Use-Case-Inhalt vollständig</p>",
+      sortOrder: input.sortOrder ?? 3
+    }
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<UseCaseFixture>;
+}
+
+export async function createTask(request: APIRequestContext, owner: TaskOwner, titlePrefix: string, input: Partial<{ description: string; status: string; priority: string; dueDate: string }> = {}) {
+  const title = uniqueTitle(titlePrefix);
+  const response = await request.post(`${apiBaseUrl}/${taskOwnerPath(owner)}/tasks`, {
+    data: {
+      title,
+      description: input.description ?? "<p>E2E Aufgabenbeschreibung vollständig</p>",
+      status: input.status ?? "todo",
+      priority: input.priority ?? "high",
+      dueDate: input.dueDate ?? "2026-05-29"
+    }
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<TaskFixture>;
+}
+
+export async function createTicket(request: APIRequestContext, owner: TicketOwner | null, titlePrefix: string, input: Partial<{ description: string; type: string; status: string; priority: string; assignee: string; reporter: string; dueDate: string; environment: string; affectedVersion: string }> = {}) {
+  const title = uniqueTitle(titlePrefix);
+  const response = await request.post(`${apiBaseUrl}/${owner ? `${ticketOwnerPath(owner)}/tickets` : "tickets"}`, {
+    data: {
+      title,
+      description: input.description ?? "<p>E2E Ticketbeschreibung vollständig</p>",
+      type: input.type ?? "bug",
+      status: input.status ?? "open",
+      priority: input.priority ?? "urgent",
+      assignee: input.assignee ?? "Ada Lovelace",
+      reporter: input.reporter ?? "Grace Hopper",
+      dueDate: input.dueDate ?? "2026-05-30",
+      environment: input.environment ?? "E2E Umgebung",
+      affectedVersion: input.affectedVersion ?? "v1.2.3"
+    }
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<TicketFixture>;
+}
+
+export async function createBacklogItem(request: APIRequestContext, projectId: number, titlePrefix: string, input: Partial<{ description: string; status: string; priority: string; featureId: number }> = {}) {
+  const title = uniqueTitle(titlePrefix);
+  const response = await request.post(`${apiBaseUrl}/projects/${projectId}/backlog`, {
+    data: {
+      title,
+      description: input.description ?? "<p>E2E Backlog-Beschreibung vollständig</p>",
+      status: input.status ?? "open",
+      priority: input.priority ?? "medium",
+      featureId: input.featureId ?? null
+    }
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<BacklogItemFixture>;
+}
+
+export async function deleteProject(request: APIRequestContext, projectId: number | null | undefined) {
+  if (projectId) {
+    await request.delete(`${apiBaseUrl}/projects/${projectId}`);
+  }
+}
+
+export async function deleteFeature(request: APIRequestContext, featureId: number | null | undefined) {
+  if (featureId) {
+    await request.delete(`${apiBaseUrl}/features/${featureId}`);
+  }
+}
+
+export async function deleteTicket(request: APIRequestContext, ticketId: number | null | undefined) {
+  if (ticketId) {
+    await request.delete(`${apiBaseUrl}/tickets/${ticketId}`);
+  }
+}
+
+export async function deleteTask(request: APIRequestContext, taskId: number | null | undefined) {
+  if (taskId) {
+    await request.delete(`${apiBaseUrl}/tasks/${taskId}`);
+  }
+}
+
+export async function cleanupTasksByTitle(request: APIRequestContext, titles: string[]) {
+  const response = await request.get(`${apiBaseUrl}/tasks`);
+  if (!response.ok()) {
+    return;
+  }
+  const tasks = (await response.json()) as TaskFixture[];
+  for (const task of tasks.filter((item) => titles.includes(item.title))) {
+    await deleteTask(request, task.id);
+  }
+}
+
+export async function cleanupTicketsByTitle(request: APIRequestContext, titles: string[]) {
+  const response = await request.get(`${apiBaseUrl}/tickets`);
+  if (!response.ok()) {
+    return;
+  }
+  const tickets = (await response.json()) as TicketFixture[];
+  for (const ticket of tickets.filter((item) => titles.includes(item.title))) {
+    await deleteTicket(request, ticket.id);
+  }
+}
+
+export function formPage(page: Page, heading: string | RegExp) {
+  return page.locator("form").filter({ has: page.getByRole("heading", { name: heading }) }).last();
+}
+
+export function itemCard(scope: Page | Locator, title: string) {
+  return scope.locator("article:visible").filter({ hasText: title }).first();
+}
+
+export async function expectRichText(form: Locator, text: string, index = 0) {
+  await expect(form.locator('[contenteditable="true"]').nth(index)).toContainText(text);
+}

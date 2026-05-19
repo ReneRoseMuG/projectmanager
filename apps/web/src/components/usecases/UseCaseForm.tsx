@@ -62,6 +62,8 @@ interface UseCaseFormProps {
   ) => Promise<void>;
   onDelete?: (useCase: UseCase) => Promise<boolean> | boolean;
   onClose: () => void;
+  variant?: "modal" | "page";
+  closeOnSubmit?: boolean;
 }
 
 const statuses: Array<{ value: FeatureStatus; label: string; activeClassName: string }> = [
@@ -101,7 +103,7 @@ const tabs: Array<Tab<UseCaseFormTab>> = [
   { value: "comments", label: "Kommentare" }
 ];
 
-export function UseCaseForm({ open, useCase, featureTitle, currentFeatureId, features = [], onSubmit, onPostCreate, onDelete, onClose }: UseCaseFormProps) {
+export function UseCaseForm({ open, useCase, featureTitle, currentFeatureId, features = [], onSubmit, onPostCreate, onDelete, onClose, variant = "modal", closeOnSubmit = true }: UseCaseFormProps) {
   const comments = useEntityComments("useCase", useCase?.id);
   const [activeTab, setActiveTab] = useState<UseCaseFormTab>("details");
   const [title, setTitle] = useState("");
@@ -151,7 +153,9 @@ export function UseCaseForm({ open, useCase, featureTitle, currentFeatureId, fea
       if (!useCase && created && onPostCreate) {
         await onPostCreate(created.id, { tasks: pendingTasks, tickets: pendingTickets, comments: pendingComments });
       }
-      onClose();
+      if (closeOnSubmit) {
+        onClose();
+      }
     } catch {
       // Error feedback is handled by the page-level toast.
     } finally {
@@ -209,6 +213,7 @@ export function UseCaseForm({ open, useCase, featureTitle, currentFeatureId, fea
           ) : undefined
         }
         onClose={onClose}
+        variant={variant}
       >
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
 

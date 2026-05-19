@@ -1,6 +1,7 @@
 import type { Note, Ticket } from "@taskmanager/shared-types";
 import { CalendarDays, Edit3, Paperclip, Plus, StickyNote, UserRound } from "lucide-react";
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { setTicketTags } from "../../api/tickets";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useEntityComments } from "../../hooks/useEntityComments";
@@ -41,6 +42,7 @@ interface TicketDetailProps {
   open: boolean;
   onClose: () => void;
   onChanged: () => Promise<void>;
+  variant?: "modal" | "page";
 }
 
 type DetailTab = "details" | "subTickets" | "relations" | "comments" | "notes" | "attachments";
@@ -54,7 +56,9 @@ const tabs: Array<{ value: DetailTab; label: string }> = [
   { value: "attachments", label: "Dateien" }
 ];
 
-export function TicketDetail({ ticketId, open, onClose, onChanged }: TicketDetailProps) {
+export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "modal" }: TicketDetailProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const detail = useTicketDetail(open ? ticketId : null);
@@ -66,6 +70,8 @@ export function TicketDetail({ ticketId, open, onClose, onChanged }: TicketDetai
   const [formOpen, setFormOpen] = useState(false);
   const [subTicketFormOpen, setSubTicketFormOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const returnTo = `${location.pathname}${location.search}`;
+  const openTicketPage = (targetTicket: Ticket) => navigate(`/tickets/${targetTicket.id}?returnTo=${encodeURIComponent(returnTo)}`);
 
   if (!open) {
     return null;
@@ -147,6 +153,7 @@ export function TicketDetail({ ticketId, open, onClose, onChanged }: TicketDetai
       activeTab={activeTab}
       onTabChange={setActiveTab}
       onClose={onClose}
+      variant={variant}
       metaPills={
         ticket ? (
           <>
@@ -193,7 +200,7 @@ export function TicketDetail({ ticketId, open, onClose, onChanged }: TicketDetai
               </div>
               <div className="grid gap-3">
                 {ticket.subTickets.map((subTicket) => (
-                  <TicketCard key={subTicket.id} ticket={subTicket} variant="row" onOpen={() => undefined} onDelete={(item) => void detail.removeSubTicket(item.id)} />
+                  <TicketCard key={subTicket.id} ticket={subTicket} variant="row" onOpen={openTicketPage} onDelete={(item) => void detail.removeSubTicket(item.id)} />
                 ))}
               </div>
             </Section>
@@ -212,6 +219,7 @@ export function TicketDetail({ ticketId, open, onClose, onChanged }: TicketDetai
                 await detail.removeRelation(input);
                 showToast({ tone: "success", title: "Relation entfernt" });
               }}
+              onOpen={openTicketPage}
             />
           ) : null}
 

@@ -1,10 +1,11 @@
 import type { UseCase } from "@taskmanager/shared-types";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Edit3 } from "lucide-react";
 import { featureStatusLabels, featureStatusTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
 import { Pill } from "../ui/Pill";
+import { Button } from "../ui/Button";
 
 interface UseCaseCardProps {
   useCase: UseCase;
@@ -36,6 +37,7 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
             description={description}
             pills={<Pill tone={featureStatusTones[useCase.status]}>{featureStatusLabels[useCase.status]}</Pill>}
             meta={<span className="font-mono text-xs font-semibold text-slate-500">/uc/{useCase.slug}</span>}
+            actions={<Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(useCase)} />}
             onOpen={() => onOpen(useCase)}
           />
         </div>
@@ -66,6 +68,7 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
         </div>
       }
       onOpen={() => onOpen(useCase)}
+      onEdit={() => onOpen(useCase)}
     />
   );
 }

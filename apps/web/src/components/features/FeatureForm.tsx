@@ -10,14 +10,12 @@ import type {
   Project,
   TaskStatus,
   TicketStatus,
-  TicketType,
-  UseCase,
-  UseCaseInput,
-  UseCaseUpdate
+  TicketType
 } from "@taskmanager/shared-types";
 import { BookOpen, Bug, FileText, FolderKanban, LinkIcon, ListTodo, Paperclip, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
@@ -40,7 +38,6 @@ import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
-import { UseCaseForm } from "../usecases/UseCaseForm";
 import { UseCaseListBoardView } from "../usecases/UseCaseListBoardView";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
@@ -70,6 +67,8 @@ interface FeatureFormProps {
   onClose: () => void;
   onDelete?: (feature: Feature) => Promise<boolean>;
   savingLabel?: string;
+  variant?: "modal" | "page";
+  closeOnSubmit?: boolean;
   onPostCreate?: (
     featureId: number,
     pending: {
@@ -123,7 +122,9 @@ const priorities: Array<{ value: Priority; label: string; activeColor: "fern" | 
   { value: "urgent", label: priorityLabels.urgent, activeColor: "crimson" }
 ];
 
-export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, savingLabel, onPostCreate }: FeatureFormProps) {
+export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onPostCreate }: FeatureFormProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const featureId = feature?.id;
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -143,8 +144,6 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
   const [deleting, setDeleting] = useState(false);
   const [useCaseViewMode, setUseCaseViewMode] = useState<ViewMode>("kanban");
   const [projectViewMode, setProjectViewMode] = useState<ViewMode>("kanban");
-  const [useCaseFormOpen, setUseCaseFormOpen] = useState(false);
-  const [editingUseCase, setEditingUseCase] = useState<UseCase | null>(null);
   const [pendingUseCases, setPendingUseCases] = useState<DraftUseCase[]>([]);
   const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
   const [pendingTickets, setPendingTickets] = useState<DraftTicket[]>([]);
@@ -198,7 +197,9 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
           files: pendingFiles
         });
       }
-      onClose();
+      if (closeOnSubmit) {
+        onClose();
+      }
     } catch {
       // Error feedback is handled by the page-level toast.
     } finally {
@@ -219,36 +220,6 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
     } finally {
       setDeleting(false);
     }
-  };
-
-  const saveUseCase = async (id: number, input: UseCaseUpdate) => {
-    try {
-      await useCases.updateUseCase(id, input);
-      showToast({ tone: "success", title: "Use Case gespeichert" });
-    } catch (useCaseError) {
-      showToast({ tone: "error", title: "Use Case konnte nicht gespeichert werden", message: errorMessage(useCaseError) });
-      throw useCaseError;
-    }
-  };
-
-  const createUseCase = async (input: UseCaseInput) => {
-    try {
-      const created = await useCases.createUseCase(input);
-      showToast({ tone: "success", title: "Use Case erstellt" });
-      return created;
-    } catch (useCaseError) {
-      showToast({ tone: "error", title: "Use Case konnte nicht erstellt werden", message: errorMessage(useCaseError) });
-      throw useCaseError;
-    }
-  };
-
-  const submitUseCaseForm = async (input: UseCaseInput) => {
-    if (editingUseCase) {
-      await saveUseCase(editingUseCase.id, input);
-      setEditingUseCase(null);
-      return;
-    }
-    return createUseCase(input);
   };
 
   const uploadAttachment = async (file: File) => {
@@ -303,6 +274,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         }
         onSubmit={submit}
         onClose={onClose}
+        variant={variant}
       >
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
 
@@ -343,14 +315,8 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                   useCases={useCases.useCases}
                   viewMode={useCaseViewMode}
                   onViewModeChange={setUseCaseViewMode}
-                  onCreate={() => {
-                    setEditingUseCase(null);
-                    setUseCaseFormOpen(true);
-                  }}
-                  onOpen={(useCase) => {
-                    setEditingUseCase(useCase);
-                    setUseCaseFormOpen(true);
-                  }}
+                  onCreate={() => navigate(`/use-cases/new?featureId=${feature.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                  onOpen={(useCase) => navigate(`/use-cases/${useCase.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
                 />
               )
             ) : (
@@ -422,7 +388,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                 onViewModeChange={setProjectViewMode}
                 onAddProject={(project) => projectLinks.addProjectToFeature(project.id)}
                 onRemoveProject={(project) => projectLinks.removeProjectFromFeature(project.id)}
-                onOpen={() => undefined}
+                onOpen={(project) => navigate(`/projects/${project.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
               />
             ) : (
               <PendingRelationList
@@ -484,18 +450,6 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         ) : null}
       </FormModal>
 
-      <UseCaseForm
-        open={useCaseFormOpen}
-        useCase={editingUseCase}
-        featureTitle={feature?.title}
-        currentFeatureId={feature?.id}
-        features={feature ? [feature] : []}
-        onSubmit={submitUseCaseForm}
-        onClose={() => {
-          setUseCaseFormOpen(false);
-          setEditingUseCase(null);
-        }}
-      />
       <TaskLinkDialog
         open={taskLinkOpen}
         currentTasks={pendingTasks.flatMap((item) => (item.kind === "existing" ? [item.task] : []))}

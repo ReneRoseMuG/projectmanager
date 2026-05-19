@@ -122,14 +122,16 @@ describe("ProjectListBoardView", () => {
     expect(activeHeader).toHaveTextContent("1");
   });
 
-  it("öffnet die Projekt-Route per Doppelklick auf eine Karte", () => {
-    renderProjectList();
+  it("ruft onEdit per Doppelklick auf eine Karte auf", () => {
+    const projects = buildProjectSet();
+    const onEdit = vi.fn();
+    renderProjectList({ projects, onEdit });
 
     const card = screen.getByText("Projekt Aktiv").closest("article");
     expect(card).toBeInTheDocument();
     fireEvent.doubleClick(card as HTMLElement);
 
-    expect(screen.getByTestId("location")).toHaveTextContent("/projects/1");
+    expect(onEdit).toHaveBeenCalledWith(projects[0]);
   });
 
   it("wechselt von Board- in Listen-Modus und rendert Rows", () => {
@@ -146,7 +148,7 @@ describe("ProjectListBoardView", () => {
     projects.forEach((project, index) => {
       const row = rows[index] as HTMLElement;
       expect(within(row).getByText(project.name)).toBeInTheDocument();
-      expect(within(row).getByRole("button", { name: "Öffnen" })).toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
       expect(within(row).getByRole("button", { name: "Löschen" })).toBeInTheDocument();
     });
   });

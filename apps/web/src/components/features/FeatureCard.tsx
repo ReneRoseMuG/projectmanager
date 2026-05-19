@@ -1,6 +1,5 @@
 import type { Feature } from "@taskmanager/shared-types";
 import { ArrowRight, BookOpen, FileText } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { featureStatusLabels, featureStatusTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { ItemCard } from "../ui/ItemCard";
@@ -8,13 +7,13 @@ import { Pill } from "../ui/Pill";
 
 interface FeatureCardProps {
   feature: Feature;
+  onOpen: (feature: Feature) => void;
   onDelete: (feature: Feature) => void;
 }
 
 /** Feature card based on the shared ItemCard surface. */
-export function FeatureCard({ feature, onDelete }: FeatureCardProps) {
-  const navigate = useNavigate();
-  const open = () => navigate(`/features/${feature.id}`);
+export function FeatureCard({ feature, onOpen, onDelete }: FeatureCardProps) {
+  const open = () => onOpen(feature);
   const description = richTextToPlainText(feature.description);
 
   return (

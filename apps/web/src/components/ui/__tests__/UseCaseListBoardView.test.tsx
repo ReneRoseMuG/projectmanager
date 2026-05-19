@@ -3,7 +3,7 @@
  *
  * Abgedeckte Regeln:
  * - UseCaseListBoardView rendert Board-Modus ohne Statusspalten als CardGrid und Listenmodus als ItemRows.
- * - UseCase-Karten und -Zeilen zeigen erwartete Dimensionen, Toolbar und Doppelklick-Öffnen ohne Edit/Delete-Controls.
+ * - UseCase-Karten und -Zeilen zeigen erwartete Dimensionen, Toolbar, Doppelklick-Öffnen und Bearbeiten-Controls.
  *
  * Fehlerfälle:
  * - Leere Use-Case-Listen müssen den EmptyState ohne Karten oder Zeilen anzeigen.
@@ -116,7 +116,9 @@ describe("UseCaseListBoardView", () => {
     const cards = container.querySelectorAll("article.rounded-2xl");
     expect(cards).toHaveLength(useCases.length);
     expectItemCardClasses(cards);
-    expect(screen.queryByRole("button", { name: "Bearbeiten" })).not.toBeInTheDocument();
+    cards.forEach((card) => {
+      expect(within(card as HTMLElement).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
+    });
     expect(screen.queryByRole("button", { name: "Löschen" })).not.toBeInTheDocument();
   });
 
@@ -132,7 +134,7 @@ describe("UseCaseListBoardView", () => {
     expect(onOpen).toHaveBeenCalledWith(useCases[0]);
   });
 
-  it("rendert Listen-Modus mit ItemRows ohne Edit/Delete-Controls", () => {
+  it("rendert Listen-Modus mit ItemRows und Bearbeiten-Controls ohne Delete", () => {
     const useCases = buildUseCases();
     const { container } = renderUseCaseList({ useCases, viewMode: "list" });
 
@@ -142,8 +144,8 @@ describe("UseCaseListBoardView", () => {
     expectItemRowClasses(rows);
     useCases.forEach((useCase, index) => {
       expect(within(rows[index] as HTMLElement).getByText(useCase.title)).toBeInTheDocument();
+      expect(within(rows[index] as HTMLElement).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
     });
-    expect(screen.queryByRole("button", { name: "Bearbeiten" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Löschen" })).not.toBeInTheDocument();
   });
 

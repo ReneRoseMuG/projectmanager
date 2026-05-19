@@ -1,12 +1,13 @@
-import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
+import { apiBaseUrl, createFeature, createProject, deleteFeature, deleteProject, formPage, itemCard, slugify, uniqueTitle } from "./domain-test-utils";
 
 /**
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Projekt-Detail-Counter aktualisieren sich nach Collection-, Relations- und Dateiänderungen ohne Seitenwechsel-Zwang.
- * - Listen- und Board-Ansichten zeigen nach Mutationen denselben aktuellen Datenstand.
+ * - Projekt-Detail-Tabs aktualisieren sich nach Collection-, Relations- und Dateiänderungen mit echten API-Daten.
+ * - Child-Objekte nutzen ihre eigenen Detailrouten; Parent-Tabs zeigen danach wieder den aktuellen Datenstand.
  * - Backlog-Filter zählen die vollständige Collection, auch wenn ein Filter aktiv ist.
  *
  * Fehlerfälle:
@@ -16,18 +17,6 @@ import { Buffer } from "node:buffer";
  * Die globale Query-Synchronisierung aus Nutzersicht gegen Aktualitätsprobleme in Projekt-Detail-Flows absichern.
  */
 
-const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL ?? "http://127.0.0.1:3101/api";
-
-interface ProjectFixture {
-  id: number;
-  name: string;
-}
-
-interface FeatureFixture {
-  id: number;
-  title: string;
-}
-
 interface IdFixture {
   id: number;
 }
@@ -36,46 +25,8 @@ interface NoteFixture extends IdFixture {
   title: string;
 }
 
-function uniqueTitle(prefix: string) {
-  return `${prefix} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function slugify(value: string) {
-  return value.toLocaleLowerCase("de-DE").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-async function createProject(request: APIRequestContext, titlePrefix: string): Promise<ProjectFixture> {
-  const name = uniqueTitle(titlePrefix);
-  const response = await request.post(`${apiBaseUrl}/projects`, {
-    data: { name, description: "E2E Aktualität", status: "active", color: "#4682B4" }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function createFeature(request: APIRequestContext, titlePrefix: string): Promise<FeatureFixture> {
-  const title = uniqueTitle(titlePrefix);
-  const response = await request.post(`${apiBaseUrl}/features`, {
-    data: { title, slug: slugify(title), status: "active", description: "E2E Feature", content: "", sortOrder: 0 }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function deleteProject(request: APIRequestContext, projectId: number | null) {
-  if (projectId !== null) {
-    await request.delete(`${apiBaseUrl}/projects/${projectId}`);
-  }
-}
-
-async function deleteFeature(request: APIRequestContext, featureId: number | null) {
-  if (featureId !== null) {
-    await request.delete(`${apiBaseUrl}/features/${featureId}`);
-  }
 }
 
 function activeModal(page: Page) {
@@ -83,15 +34,15 @@ function activeModal(page: Page) {
 }
 
 function projectForm(page: Page) {
-  return page.locator(".fixed.inset-0").filter({ has: page.getByRole("heading", { name: "Projekt bearbeiten" }) }).last();
+  return formPage(page, "Projekt bearbeiten");
 }
 
 function featureForm(page: Page) {
-  return page.locator(".fixed.inset-0").filter({ has: page.getByRole("heading", { name: "Feature bearbeiten" }) }).last();
+  return formPage(page, "Feature bearbeiten");
 }
 
 function visibleArticle(scope: Page | Locator, text: string) {
-  return scope.locator("article:visible").filter({ hasText: text }).first();
+  return itemCard(scope, text);
 }
 
 function tabWithCount(scope: Page | Locator, label: string, count: number) {
@@ -110,10 +61,8 @@ async function openTab(scope: Page | Locator, label: string) {
   await tabByLabel(scope, label).click();
 }
 
-async function openProjectDetail(page: Page, project: ProjectFixture) {
-  await page.goto(`/projects/${project.id}`);
-  await expect(page.getByRole("heading", { name: project.name })).toBeVisible();
-  await page.getByRole("button", { name: "Bearbeiten" }).click();
+async function openProjectDetail(page: Page, projectId: number) {
+  await page.goto(`/projects/${projectId}`);
   await expect(projectForm(page)).toBeVisible();
 }
 
@@ -127,23 +76,26 @@ async function discardUnsavedNoteChangesIfNeeded(page: Page) {
 }
 
 test.describe("Globale UI-Aktualität", () => {
-  test("Task-Collection: Create/Delete aktualisiert Tab-Counter, Liste und Board", async ({ page, request }) => {
+  test("Task-Collection: Create/Delete aktualisiert Liste und Board im Projekt-Tab", async ({ page, request }) => {
     const project = await createProject(request, "E2E Fresh Tasks");
     const taskTitle = uniqueTitle("E2E Fresh Task");
 
     try {
-      await openProjectDetail(page, project);
+      await openProjectDetail(page, project.id);
       await openTab(projectForm(page), "Aufgaben");
       await expect(projectForm(page).getByRole("heading", { name: "Keine Aufgaben" })).toBeVisible();
 
       await projectForm(page).getByRole("button", { name: "Neue Aufgabe" }).click();
-      await activeModal(page).locator("input[required]").first().fill(taskTitle);
+      await expect(page).toHaveURL(/\/tasks\/new\?/);
+      const taskForm = formPage(page, "Aufgabe anlegen");
+      await taskForm.locator("input[required]").first().fill(taskTitle);
       const createResponsePromise = page.waitForResponse(
         (response) => response.url().includes(`/api/projects/${project.id}/tasks`) && response.request().method() === "POST"
       );
-      await activeModal(page).getByRole("button", { name: "Aufgabe anlegen" }).click();
+      await taskForm.getByRole("button", { name: "Aufgabe anlegen" }).click();
       const createdTask = (await (await createResponsePromise).json()) as IdFixture;
 
+      await openProjectDetail(page, project.id);
       await openTab(projectForm(page), "Aufgaben");
       await expect(visibleArticle(projectForm(page), taskTitle)).toBeVisible();
       await projectForm(page).getByRole("button", { name: "Kanban" }).click();
@@ -169,11 +121,10 @@ test.describe("Globale UI-Aktualität", () => {
     const feature = await createFeature(request, "E2E Fresh Relation Feature");
 
     try {
-      await openProjectDetail(page, project);
+      await openProjectDetail(page, project.id);
       await expectTabCount(projectForm(page), "Features", 0);
 
       await page.goto(`/features/${feature.id}`);
-      await page.getByRole("button", { name: "Bearbeiten" }).click();
       await featureForm(page).getByRole("button", { name: /Projekte/ }).click();
       await featureForm(page).getByRole("button", { name: "Projekt hinzufügen" }).click();
       await activeModal(page).getByRole("combobox").selectOption({ label: project.name });
@@ -182,7 +133,7 @@ test.describe("Globale UI-Aktualität", () => {
         activeModal(page).getByRole("button", { name: "Hinzufügen" }).click()
       ]);
 
-      await openProjectDetail(page, project);
+      await openProjectDetail(page, project.id);
       await expectTabCount(projectForm(page), "Features", 1);
       await tabWithCount(projectForm(page), "Features", 1).click();
       await expect(projectForm(page).getByText(feature.title)).toBeVisible();
@@ -190,14 +141,13 @@ test.describe("Globale UI-Aktualität", () => {
       await expect(visibleArticle(projectForm(page), feature.title)).toBeVisible();
 
       await page.goto(`/features/${feature.id}`);
-      await page.getByRole("button", { name: "Bearbeiten" }).click();
       await featureForm(page).getByRole("button", { name: /Projekte/ }).click();
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),
         visibleArticle(featureForm(page), project.name).getByRole("button", { name: "Entfernen" }).click()
       ]);
 
-      await openProjectDetail(page, project);
+      await openProjectDetail(page, project.id);
       await expectTabCount(projectForm(page), "Features", 0);
       await tabWithCount(projectForm(page), "Features", 0).click();
       await expect(projectForm(page).getByText(feature.title)).toHaveCount(0);
@@ -212,20 +162,24 @@ test.describe("Globale UI-Aktualität", () => {
     const backlogTitle = uniqueTitle("E2E Fresh Backlog Item");
 
     try {
-      await openProjectDetail(page, project);
+      await openProjectDetail(page, project.id);
       await expectTabCount(projectForm(page), "Backlog", 0);
       await tabWithCount(projectForm(page), "Backlog", 0).click();
       await expect(projectForm(page).getByRole("heading", { name: "Keine Backlog-Items" })).toBeVisible();
 
       await projectForm(page).getByRole("button", { name: "Neues Backlog-Item" }).click();
-      await activeModal(page).locator("input[required]").first().fill(backlogTitle);
+      await expect(page).toHaveURL(/\/backlog\/new\?/);
+      const createForm = formPage(page, "Backlog-Item anlegen");
+      await createForm.locator("input[required]").first().fill(backlogTitle);
       const createResponsePromise = page.waitForResponse(
         (response) => response.url().includes(`/api/projects/${project.id}/backlog`) && response.request().method() === "POST"
       );
-      await activeModal(page).getByRole("button", { name: "Speichern" }).click();
+      await createForm.getByRole("button", { name: "Speichern" }).click();
       const createdBacklogItem = (await (await createResponsePromise).json()) as IdFixture;
 
+      await openProjectDetail(page, project.id);
       await expectTabCount(projectForm(page), "Backlog", 1);
+      await tabWithCount(projectForm(page), "Backlog", 1).click();
       await expect(projectForm(page).getByRole("button", { name: /^Alle\s+1$/ })).toBeVisible();
       await expect(projectForm(page).getByRole("button", { name: /^Offen\s+1$/ })).toBeVisible();
       await expect(visibleArticle(projectForm(page), backlogTitle)).toBeVisible();
@@ -235,12 +189,15 @@ test.describe("Globale UI-Aktualität", () => {
       await projectForm(page).getByRole("button", { name: "Liste", exact: true }).click();
 
       await visibleArticle(projectForm(page), backlogTitle).getByRole("button", { name: "Bearbeiten" }).click();
-      await activeModal(page).getByRole("button", { name: "In Arbeit" }).click();
+      const editForm = formPage(page, "Backlog-Item bearbeiten");
+      await editForm.getByRole("button", { name: "In Arbeit" }).click();
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/backlog/${createdBacklogItem.id}`) && response.request().method() === "PATCH"),
-        activeModal(page).getByRole("button", { name: "Speichern" }).click()
+        editForm.getByRole("button", { name: "Speichern" }).click()
       ]);
 
+      await openProjectDetail(page, project.id);
+      await tabWithCount(projectForm(page), "Backlog", 1).click();
       await expect(projectForm(page).getByRole("button", { name: /^Alle\s+1$/ })).toBeVisible();
       await expect(projectForm(page).getByRole("button", { name: /^Offen\s+0$/ })).toBeVisible();
       await expect(projectForm(page).getByRole("button", { name: /^In Arbeit\s+1$/ })).toBeVisible();
@@ -270,7 +227,7 @@ test.describe("Globale UI-Aktualität", () => {
     const attachmentName = `${slugify(uniqueTitle("fresh attachment"))}.txt`;
 
     try {
-      await openProjectDetail(page, project);
+      await openProjectDetail(page, project.id);
 
       await expectTabCount(projectForm(page), "Kommentare", 0);
       await tabWithCount(projectForm(page), "Kommentare", 0).click();

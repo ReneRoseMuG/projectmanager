@@ -1,283 +1,254 @@
-import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import {
+  apiBaseUrl,
+  createFeature,
+  createProject,
+  createTask,
+  createTicket,
+  createUseCase,
+  cleanupTicketsByTitle,
+  deleteFeature,
+  deleteProject,
+  deleteTicket,
+  expectRichText,
+  formPage,
+  itemCard,
+  uniqueTitle
+} from "./domain-test-utils";
 
 /**
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Ticket-Boards in Projekt-, Aufgaben-, Feature- und Use-Case-Details unterstützen Create, Link und Remove als Browser-Flow.
- * - Bestehende Tickets können verknüpft und Ticket-Zuordnungen über den Item-Delete-Button entfernt werden.
- * - Direktes Löschen eines noch verknüpften Tickets wird mit sichtbarer Fehlermeldung blockiert.
+ * - Tickets werden global und aus Owner-Tabs über `/tickets/new` erstellt und über `/tickets/:id` bearbeitet.
+ * - Doppelklick und Bearbeiten-Button in Ticket-Boards und Listen navigieren auf dieselbe Detailformular-Seite.
+ * - Projekt-, Aufgaben-, Feature- und Use-Case-Ticket-Tabs öffnen echte Ticketdaten per Route.
  *
  * Fehlerfälle:
- * - Verknüpfte Tickets dürfen nicht stillschweigend gelöscht werden.
- * - Entfernen einer Owner-Relation darf das Ticket selbst nicht löschen.
+ * - Ticket-Detail darf weder leer bleiben noch in einem alten Detail-/Formular-Overlay landen.
  *
  * Ziel:
- * Die owner-basierten Ticket-Flows inklusive Benachrichtigungen über Playwright absichern.
+ * Ticket-Detailnavigation und Owner-Ticket-Boards mit echten Daten im Browser absichern.
  */
 
-const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL ?? "http://127.0.0.1:3101/api";
-
-interface ProjectFixture {
-  id: number;
-  name: string;
+async function openTicketList(page: Page) {
+  await page.goto("/tickets");
+  await expect(page.getByRole("heading", { name: "Tickets", exact: true })).toBeVisible();
 }
 
-interface TaskFixture {
-  id: number;
-  title: string;
-}
-
-interface FeatureFixture {
-  id: number;
-  title: string;
-}
-
-interface UseCaseFixture {
-  id: number;
-  title: string;
-}
-
-interface TicketFixture {
-  id: number;
-  title: string;
-}
-
-function uniqueTitle(prefix: string) {
-  return `${prefix} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function slugify(value: string) {
-  return value.toLocaleLowerCase("de-DE").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-
-async function createProject(request: APIRequestContext, titlePrefix: string): Promise<ProjectFixture> {
-  const name = uniqueTitle(titlePrefix);
-  const response = await request.post(`${apiBaseUrl}/projects`, {
-    data: { name, description: "E2E Projekt", status: "active", color: "#4682B4" }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function createTask(request: APIRequestContext, projectId: number, titlePrefix: string): Promise<TaskFixture> {
-  const title = uniqueTitle(titlePrefix);
-  const response = await request.post(`${apiBaseUrl}/projects/${projectId}/tasks`, {
-    data: { title, status: "todo", priority: "medium" }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function createFeature(request: APIRequestContext, titlePrefix: string): Promise<FeatureFixture> {
-  const title = uniqueTitle(titlePrefix);
-  const response = await request.post(`${apiBaseUrl}/features`, {
-    data: { title, slug: slugify(title), status: "active", description: "E2E Feature", content: "", sortOrder: 0 }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function createUseCase(request: APIRequestContext, featureId: number, titlePrefix: string): Promise<UseCaseFixture> {
-  const title = uniqueTitle(titlePrefix);
-  const response = await request.post(`${apiBaseUrl}/features/${featureId}/use-cases`, {
-    data: { title, slug: slugify(title), status: "active", description: "E2E Use Case", content: "", sortOrder: 0 }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function createTicket(request: APIRequestContext, titlePrefix: string): Promise<TicketFixture> {
-  const title = uniqueTitle(titlePrefix);
-  const response = await request.post(`${apiBaseUrl}/tickets`, {
-    data: { title, type: "bug", status: "open", priority: "medium" }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function createProjectTicket(request: APIRequestContext, projectId: number, titlePrefix: string): Promise<TicketFixture> {
-  const title = uniqueTitle(titlePrefix);
-  const response = await request.post(`${apiBaseUrl}/projects/${projectId}/tickets`, {
-    data: { title, type: "bug", status: "open", priority: "medium" }
-  });
-  expect(response.ok()).toBeTruthy();
-  return response.json();
-}
-
-async function cleanupTicket(request: APIRequestContext, ticketId: number | null | undefined) {
-  if (ticketId) {
-    await request.delete(`${apiBaseUrl}/tickets/${ticketId}`);
-  }
-}
-
-async function cleanupProject(request: APIRequestContext, projectId: number | null | undefined) {
-  if (projectId) {
-    await request.delete(`${apiBaseUrl}/projects/${projectId}`);
-  }
-}
-
-async function cleanupFeature(request: APIRequestContext, featureId: number | null | undefined) {
-  if (featureId) {
-    await request.delete(`${apiBaseUrl}/features/${featureId}`);
-  }
-}
-
-async function cleanupTicketsByTitle(request: APIRequestContext, titles: string[]) {
-  const response = await request.get(`${apiBaseUrl}/tickets`);
-  const tickets = (await response.json()) as TicketFixture[];
-  for (const ticket of tickets.filter((item) => titles.includes(item.title))) {
-    await cleanupTicket(request, ticket.id);
-  }
-}
-
-function activeModal(page: Page) {
-  return page.locator(".fixed.inset-0").last();
-}
-
-function ticketCard(scope: Page | Locator, title: string) {
-  return scope.locator("article:visible").filter({ hasText: title }).first();
-}
-
-async function createTicketInBoard(page: Page, scope: Page | Locator, title: string) {
-  await scope.getByRole("button", { name: "Neues Ticket" }).first().click();
-  await activeModal(page).locator("input[required]").first().fill(title);
-  await activeModal(page).getByRole("button", { name: "Ticket anlegen" }).click();
-  await expect(page.getByRole("status")).toContainText("Ticket erstellt");
-  await expect(ticketCard(scope, title)).toBeVisible();
-}
-
-async function linkTicketInBoard(page: Page, scope: Page | Locator, title: string) {
-  await scope.getByRole("button", { name: "Verknüpfen" }).first().click();
-  await activeModal(page).getByPlaceholder("Tickets suchen").fill(title);
-  await expect(activeModal(page).getByText(title)).toBeVisible();
-  await activeModal(page).getByRole("button", { name: "Verknüpfen" }).last().click();
-  await expect(page.getByRole("status")).toContainText("Ticket verknüpft");
-  await activeModal(page).getByRole("button", { name: "Schließen" }).click();
-  await expect(ticketCard(scope, title)).toBeVisible();
-}
-
-async function removeTicketRelationInBoard(page: Page, scope: Page | Locator, title: string) {
-  await ticketCard(scope, title).getByRole("button", { name: "Löschen", exact: true }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "Entfernen" }).click();
-  await expect(page.getByRole("status")).toContainText("Zuordnung entfernt");
-  await expect(ticketCard(scope, title)).toHaveCount(0);
+async function expectTicketFormData(page: Page, ticket: { title: string }, descriptionText = "E2E Ticketbeschreibung vollständig") {
+  const form = formPage(page, "Ticket bearbeiten");
+  await expect(form).toBeVisible();
+  await expect(form.locator("input[required]").first()).toHaveValue(ticket.title);
+  await expectRichText(form, descriptionText);
+  await expect(form.locator("input").nth(1)).toHaveValue("Ada Lovelace");
+  await expect(form.locator("input").nth(2)).toHaveValue("Grace Hopper");
+  await expect(form.locator('input[type="date"]').first()).toHaveValue("2026-05-30");
+  await expect(form.locator("input").nth(4)).toHaveValue("E2E Umgebung");
+  await expect(form.locator("input").nth(5)).toHaveValue("v1.2.3");
 }
 
 async function openProjectTickets(page: Page, projectId: number) {
   await page.goto(`/projects/${projectId}`);
-  await page.getByRole("button", { name: "Bearbeiten" }).click();
-  await activeModal(page).getByRole("button", { name: /Tickets/ }).click();
-  await expect(activeModal(page).getByRole("button", { name: "Neues Ticket" })).toBeVisible();
+  const form = formPage(page, "Projekt bearbeiten");
+  await form.getByRole("button", { name: /Tickets/ }).click();
+  await expect(form.getByRole("button", { name: "Neues Ticket" })).toBeVisible();
+  return form;
+}
+
+async function openTaskTickets(page: Page, taskId: number, projectId: number) {
+  await page.goto(`/tasks/${taskId}?returnTo=${encodeURIComponent(`/projects/${projectId}`)}`);
+  const form = formPage(page, "Aufgabe bearbeiten");
+  await form.getByRole("button", { name: /Tickets/ }).click();
+  await expect(form.getByRole("button", { name: "Neues Ticket" })).toBeVisible();
+  return form;
 }
 
 async function openFeatureTickets(page: Page, featureId: number) {
   await page.goto(`/features/${featureId}`);
-  await page.getByRole("button", { name: "Bearbeiten" }).click();
-  await activeModal(page).getByRole("button", { name: /Tickets/ }).click();
-  await expect(activeModal(page).getByRole("button", { name: "Neues Ticket" })).toBeVisible();
+  const form = formPage(page, "Feature bearbeiten");
+  await form.getByRole("button", { name: /Tickets/ }).click();
+  await expect(form.getByRole("button", { name: "Neues Ticket" })).toBeVisible();
+  return form;
 }
 
-async function openTaskTickets(page: Page, projectId: number, taskTitle: string) {
-  await page.goto(`/projects/${projectId}`);
-  await page.getByRole("button", { name: "Bearbeiten" }).click();
-  await activeModal(page).getByRole("button", { name: /Aufgaben/ }).click();
-  await ticketCard(activeModal(page), taskTitle).dblclick();
-  await activeModal(page).getByRole("button", { name: /Tickets/ }).click();
-  await expect(activeModal(page).getByRole("button", { name: "Neues Ticket" })).toBeVisible();
+async function openUseCaseTickets(page: Page, useCaseId: number, featureId: number) {
+  await page.goto(`/use-cases/${useCaseId}?returnTo=${encodeURIComponent(`/features/${featureId}`)}`);
+  const form = formPage(page, "Use Case bearbeiten");
+  await form.getByRole("button", { name: /Tickets/ }).click();
+  await expect(form.getByRole("button", { name: "Neues Ticket" })).toBeVisible();
+  return form;
 }
 
-async function openUseCaseTickets(page: Page, featureId: number, useCaseTitle: string) {
-  await page.goto(`/features/${featureId}`);
-  await page.getByRole("button", { name: "Bearbeiten" }).click();
-  await activeModal(page).getByRole("button", { name: /Use Cases/ }).click();
-  await ticketCard(activeModal(page), useCaseTitle).dblclick();
-  await activeModal(page).getByRole("button", { name: /Tickets/ }).click();
-  await expect(activeModal(page).getByRole("button", { name: "Neues Ticket" })).toBeVisible();
+async function expectTicketNavigationFromScope(page: Page, scope: Locator, title: string, ticketId: number) {
+  await itemCard(scope, title).dblclick();
+  await expect(page).toHaveURL(new RegExp(`/tickets/${ticketId}`));
+  await expectTicketFormData(page, { title });
 }
 
-test.describe("Owner-Ticket-Flows", () => {
-  test("Projekt-Tickets: Add, Link, Remove und Toasts", async ({ page, request }) => {
-    const project = await createProject(request, "E2E Ticket Project");
-    const existingTicket = await createTicket(request, "E2E Ticket Project Link");
-    const createdTitle = uniqueTitle("E2E Ticket Project Create");
+test.describe("Ticket-Routen und Detailformular", () => {
+  test("Ticket erstellen: Plus-Button navigiert auf Create-Detailseite und speichert als Detailroute", async ({ page, request }) => {
+    const ticketTitle = uniqueTitle("E2E Ticket Create Route");
+    let ticketId: number | null = null;
 
     try {
-      await openProjectTickets(page, project.id);
-      await createTicketInBoard(page, activeModal(page), createdTitle);
-      await linkTicketInBoard(page, activeModal(page), existingTicket.title);
-      await removeTicketRelationInBoard(page, activeModal(page), existingTicket.title);
+      await openTicketList(page);
+      await page.getByRole("button", { name: "Neues Ticket" }).click();
+
+      await expect(page).toHaveURL(/\/tickets\/new$/);
+      const form = formPage(page, "Ticket");
+      await form.locator("input[required]").first().fill(ticketTitle);
+      await form.locator('[contenteditable="true"]').first().fill("E2E neues Ticket vollständig");
+      await form.locator("input").nth(1).fill("Ada Lovelace");
+      await form.locator("input").nth(2).fill("Grace Hopper");
+      await form.locator('input[type="date"]').first().fill("2026-05-30");
+      await form.locator("input").nth(4).fill("E2E Umgebung");
+      await form.locator("input").nth(5).fill("v1.2.3");
+      await form.getByRole("button", { name: "Ticket anlegen" }).click();
+
+      await expect(page).toHaveURL(/\/tickets\/\d+\?/);
+      ticketId = Number(new URL(page.url()).pathname.split("/").pop());
+      await expectTicketFormData(page, { title: ticketTitle }, "E2E neues Ticket vollständig");
     } finally {
-      await cleanupProject(request, project.id);
-      await cleanupTicketsByTitle(request, [createdTitle, existingTicket.title]);
+      await deleteTicket(request, ticketId);
     }
   });
 
-  test("Aufgaben-Tickets: Add, Link, Remove im Tickets-Tab", async ({ page, request }) => {
-    const project = await createProject(request, "E2E Ticket Task Project");
-    const task = await createTask(request, project.id, "E2E Ticket Task");
-    const existingTicket = await createTicket(request, "E2E Ticket Task Link");
-    const createdTitle = uniqueTitle("E2E Ticket Task Create");
+  test("Ticket öffnen: Doppelklick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({ page, request }) => {
+    const ticket = await createTicket(request, null, "E2E Ticket Open Route");
 
     try {
-      await openTaskTickets(page, project.id, task.title);
-      await createTicketInBoard(page, activeModal(page), createdTitle);
-      await linkTicketInBoard(page, activeModal(page), existingTicket.title);
-      await removeTicketRelationInBoard(page, activeModal(page), existingTicket.title);
+      await openTicketList(page);
+      await itemCard(page, ticket.title).dblclick();
+      await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
+      await expectTicketFormData(page, ticket);
+
+      await openTicketList(page);
+      await itemCard(page, ticket.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
+      await expectTicketFormData(page, ticket);
+
+      await openTicketList(page);
+      await page.getByRole("button", { name: "Liste", exact: true }).click();
+      await itemCard(page, ticket.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
+      await expectTicketFormData(page, ticket);
     } finally {
-      await cleanupProject(request, project.id);
-      await cleanupTicketsByTitle(request, [createdTitle, existingTicket.title]);
+      await deleteTicket(request, ticket.id);
     }
   });
 
-  test("Feature-Tickets: Add, Link, Remove im Tickets-Tab", async ({ page, request }) => {
-    const feature = await createFeature(request, "E2E Ticket Feature");
-    const existingTicket = await createTicket(request, "E2E Ticket Feature Link");
-    const createdTitle = uniqueTitle("E2E Ticket Feature Create");
+  test("Ticket bearbeiten: Speichern hält die kanonische Detailformular-Seite aktuell", async ({ page, request }) => {
+    const ticket = await createTicket(request, null, "E2E Ticket Edit Route");
+    const updatedTitle = uniqueTitle("E2E Ticket Updated Route");
 
     try {
-      await openFeatureTickets(page, feature.id);
-      await createTicketInBoard(page, activeModal(page), createdTitle);
-      await linkTicketInBoard(page, activeModal(page), existingTicket.title);
-      await removeTicketRelationInBoard(page, activeModal(page), existingTicket.title);
+      await page.goto(`/tickets/${ticket.id}`);
+      const form = formPage(page, "Ticket bearbeiten");
+      await expectTicketFormData(page, ticket);
+
+      await form.locator("input[required]").first().fill(updatedTitle);
+      await Promise.all([
+        page.waitForResponse((response) => response.url().includes(`/api/tickets/${ticket.id}`) && response.request().method() === "PATCH"),
+        form.getByRole("button", { name: "Speichern" }).click()
+      ]);
+
+      await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
+      await expect(form.locator("input[required]").first()).toHaveValue(updatedTitle);
     } finally {
-      await cleanupFeature(request, feature.id);
-      await cleanupTicketsByTitle(request, [createdTitle, existingTicket.title]);
+      await deleteTicket(request, ticket.id);
     }
   });
 
-  test("Use-Case-Tickets: Add, Link, Remove im Tickets-Tab", async ({ page, request }) => {
-    const feature = await createFeature(request, "E2E Ticket UseCase Feature");
-    const useCase = await createUseCase(request, feature.id, "E2E Ticket UseCase");
-    const existingTicket = await createTicket(request, "E2E Ticket UseCase Link");
-    const createdTitle = uniqueTitle("E2E Ticket UseCase Create");
+  test("Projekt-Tickets-Tab: Neu, Doppelklick und Bearbeiten navigieren auf Ticket-Detailformular", async ({ page, request }) => {
+    const project = await createProject(request, "E2E Ticket Project Owner");
+    const existingTicket = await createTicket(request, { type: "project", id: project.id }, "E2E Ticket Project Existing");
+    const createdTitle = uniqueTitle("E2E Ticket Project Created");
+    let createdTicketId: number | null = null;
 
     try {
-      await openUseCaseTickets(page, feature.id, useCase.title);
-      await createTicketInBoard(page, activeModal(page), createdTitle);
-      await linkTicketInBoard(page, activeModal(page), existingTicket.title);
-      await removeTicketRelationInBoard(page, activeModal(page), existingTicket.title);
+      let scope = await openProjectTickets(page, project.id);
+      await scope.getByRole("button", { name: "Neues Ticket" }).first().click();
+      await expect(page).toHaveURL(/\/tickets\/new\?/);
+      const createForm = formPage(page, "Ticket");
+      await createForm.locator("input[required]").first().fill(createdTitle);
+      await createForm.getByRole("button", { name: "Ticket anlegen" }).click();
+      await expect(page).toHaveURL(/\/tickets\/\d+\?/);
+      createdTicketId = Number(new URL(page.url()).pathname.split("/").pop());
+      await expect(formPage(page, "Ticket bearbeiten").locator("input[required]").first()).toHaveValue(createdTitle);
+
+      scope = await openProjectTickets(page, project.id);
+      await expectTicketNavigationFromScope(page, scope, existingTicket.title, existingTicket.id);
+
+      scope = await openProjectTickets(page, project.id);
+      await itemCard(scope, existingTicket.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await expect(page).toHaveURL(new RegExp(`/tickets/${existingTicket.id}`));
+      await expectTicketFormData(page, existingTicket);
     } finally {
-      await cleanupFeature(request, feature.id);
+      await deleteProject(request, project.id);
       await cleanupTicketsByTitle(request, [createdTitle, existingTicket.title]);
+      await deleteTicket(request, createdTicketId);
+    }
+  });
+
+  test("Aufgaben-, Feature- und Use-Case-Ticket-Tabs öffnen verknüpfte Tickets per Doppelklick", async ({ page, request }) => {
+    const project = await createProject(request, "E2E Ticket Mixed Project");
+    const task = await createTask(request, { type: "project", id: project.id }, "E2E Ticket Mixed Task");
+    const feature = await createFeature(request, "E2E Ticket Mixed Feature");
+    const useCase = await createUseCase(request, feature.id, "E2E Ticket Mixed UseCase");
+    const taskTicket = await createTicket(request, { type: "task", id: task.id }, "E2E Ticket Task Tab");
+    const featureTicket = await createTicket(request, { type: "feature", id: feature.id }, "E2E Ticket Feature Tab");
+    const useCaseTicket = await createTicket(request, { type: "useCase", id: useCase.id }, "E2E Ticket UseCase Tab");
+
+    try {
+      let scope = await openTaskTickets(page, task.id, project.id);
+      await expectTicketNavigationFromScope(page, scope, taskTicket.title, taskTicket.id);
+
+      scope = await openFeatureTickets(page, feature.id);
+      await expectTicketNavigationFromScope(page, scope, featureTicket.title, featureTicket.id);
+
+      scope = await openUseCaseTickets(page, useCase.id, feature.id);
+      await expectTicketNavigationFromScope(page, scope, useCaseTicket.title, useCaseTicket.id);
+    } finally {
+      await deleteProject(request, project.id);
+      await deleteFeature(request, feature.id);
+      await cleanupTicketsByTitle(request, [taskTicket.title, featureTicket.title, useCaseTicket.title]);
+    }
+  });
+
+  test("Ticket-Zuordnung entfernen: Entfernen löscht nur die Owner-Relation", async ({ page, request }) => {
+    const project = await createProject(request, "E2E Ticket Remove Project");
+    const ticket = await createTicket(request, { type: "project", id: project.id }, "E2E Ticket Remove Route");
+
+    try {
+      const scope = await openProjectTickets(page, project.id);
+      await itemCard(scope, ticket.title).getByRole("button", { name: "Löschen", exact: true }).click();
+      await page.getByRole("alertdialog").getByRole("button", { name: "Entfernen" }).click();
+
+      await expect(itemCard(scope, ticket.title)).toHaveCount(0);
+      const detail = await request.get(`${apiBaseUrl}/tickets/${ticket.id}`);
+      expect(detail.ok()).toBeTruthy();
+    } finally {
+      await deleteProject(request, project.id);
+      await deleteTicket(request, ticket.id);
     }
   });
 
   test("Globales Ticket-Löschen zeigt Meldung, wenn noch Owner-Beziehungen bestehen", async ({ page, request }) => {
     const project = await createProject(request, "E2E Ticket Delete Block");
-    const ticket = await createProjectTicket(request, project.id, "E2E Ticket Blocked Delete");
+    const ticket = await createTicket(request, { type: "project", id: project.id }, "E2E Ticket Blocked Delete");
 
     try {
-      await page.goto("/tickets");
-      await ticketCard(page, ticket.title).getByRole("button", { name: "Löschen", exact: true }).click();
+      await openTicketList(page);
+      await itemCard(page, ticket.title).getByRole("button", { name: "Löschen", exact: true }).click();
       await page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click();
 
       await expect(page.getByRole("status")).toContainText("Ticket konnte nicht gelöscht werden");
       await expect(page.getByRole("status")).toContainText("Beziehungen");
-      await expect(ticketCard(page, ticket.title)).toBeVisible();
+      await expect(itemCard(page, ticket.title)).toBeVisible();
     } finally {
-      await cleanupProject(request, project.id);
-      await cleanupTicket(request, ticket.id);
+      await deleteProject(request, project.id);
+      await deleteTicket(request, ticket.id);
     }
   });
 });

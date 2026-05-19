@@ -20,6 +20,8 @@ interface BacklogItemFormProps {
   features: Feature[];
   onSubmit: (input: BacklogItemInput) => Promise<void>;
   onClose: () => void;
+  variant?: "modal" | "page";
+  closeOnSubmit?: boolean;
 }
 
 const statuses: Array<{ value: BacklogStatus; label: string; activeClassName: string }> = [
@@ -36,7 +38,7 @@ const priorities: Array<{ value: Priority; label: string; activeClassName: strin
   { value: "urgent", label: "Dringend", activeClassName: "data-[active=true]:bg-crimson data-[active=true]:text-white" }
 ];
 
-export function BacklogItemForm({ open, item, features, onSubmit, onClose }: BacklogItemFormProps) {
+export function BacklogItemForm({ open, item, features, onSubmit, onClose, variant = "modal", closeOnSubmit = true }: BacklogItemFormProps) {
   const comments = useEntityComments("backlogItem", item?.id);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -65,7 +67,9 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose }: Bac
     setSaving(true);
     try {
       await onSubmit({ title, description, status, priority, featureId, sortOrder });
-      onClose();
+      if (closeOnSubmit) {
+        onClose();
+      }
     } catch {
       // Error feedback is handled by the page-level toast.
     } finally {
@@ -83,6 +87,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose }: Bac
       onSubmit={submit}
       saving={saving}
       onClose={onClose}
+      variant={variant}
     >
       <Section title="Stammdaten">
         <FormField label="Titel" required>

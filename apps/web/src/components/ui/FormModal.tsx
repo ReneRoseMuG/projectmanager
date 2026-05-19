@@ -15,60 +15,87 @@ interface FormModalProps {
   submitLabel?: string;
   footerStart?: ReactNode;
   headerMeta?: ReactNode;
+  variant?: "modal" | "page";
   children: ReactNode;
 }
 
-/** Form modal template with shared gradient header, scroll body and fixed footer. */
-export function FormModal({ open, onClose, title, subtitle, icon, breadcrumb = [], onSubmit, saving = false, submitLabel = "Speichern", footerStart, headerMeta, children }: FormModalProps) {
+/** Shared form template; renders either as modal chrome or as full page content. */
+export function FormModal({
+  open,
+  onClose,
+  title,
+  subtitle,
+  icon,
+  breadcrumb = [],
+  onSubmit,
+  saving = false,
+  submitLabel = "Speichern",
+  footerStart,
+  headerMeta,
+  variant = "modal",
+  children
+}: FormModalProps) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
     return onSubmit(event);
   };
 
-  return (
-    <Modal open={open} title={title} size="xl" showHeader={false} bodyClassName="p-0" onClose={onClose}>
-      <form className="flex max-h-[calc(100vh-64px)] flex-col bg-shell" onSubmit={submit}>
-        <header className="relative shrink-0 overflow-hidden bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
-          <div className="pointer-events-none absolute -right-8 -top-32 h-80 w-80 rounded-full bg-white/12 blur-sm" />
-          <div className="relative flex items-start justify-between gap-4">
-            <div className="grid gap-2">
-              {breadcrumb.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-white/75">
-                  {breadcrumb.map((item, index) => (
-                    <span key={`${item}-${index}`} className="inline-flex items-center gap-2">
-                      {index > 0 ? <span>›</span> : null}
-                      <span>{item}</span>
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              <div className="flex flex-wrap items-center gap-3">
-                {icon ? <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/12 text-white">{icon}</span> : null}
-                <div>
-                  <h2 className="text-2xl font-bold tracking-normal">{title}</h2>
-                  {subtitle ? <p className="text-sm text-white/75">{subtitle}</p> : null}
-                  {headerMeta ? <div className="mt-3 flex flex-wrap items-center gap-2">{headerMeta}</div> : null}
-                </div>
+  if (!open) {
+    return null;
+  }
+
+  const form = (
+    <form className={variant === "page" ? "flex min-h-[calc(100vh-120px)] flex-col overflow-hidden rounded-2xl bg-shell shadow-panel" : "flex max-h-[calc(100vh-64px)] flex-col bg-shell"} onSubmit={submit}>
+      <header className="relative shrink-0 overflow-hidden bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
+        <div className="pointer-events-none absolute -right-8 -top-32 h-80 w-80 rounded-full bg-white/12 blur-sm" />
+        <div className="relative flex items-start justify-between gap-4">
+          <div className="grid gap-2">
+            {breadcrumb.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-white/75">
+                {breadcrumb.map((item, index) => (
+                  <span key={`${item}-${index}`} className="inline-flex items-center gap-2">
+                    {index > 0 ? <span>›</span> : null}
+                    <span>{item}</span>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-3">
+              {icon ? <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/12 text-white">{icon}</span> : null}
+              <div>
+                <h2 className="text-2xl font-bold tracking-normal">{title}</h2>
+                {subtitle ? <p className="text-sm text-white/75">{subtitle}</p> : null}
+                {headerMeta ? <div className="mt-3 flex flex-wrap items-center gap-2">{headerMeta}</div> : null}
               </div>
             </div>
-            <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Schließen" title="Schließen" onClick={onClose}>
-              <X size={18} />
-            </button>
           </div>
-        </header>
+          <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Schließen" title="Schließen" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+      </header>
 
-        <div className="grid min-h-0 flex-1 gap-4 overflow-auto p-4 md:p-5">{children}</div>
+      <div className="grid min-h-0 flex-1 gap-4 overflow-auto p-4 md:p-5">{children}</div>
 
-        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
-          <div className="flex flex-wrap items-center gap-2">{footerStart}</div>
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <Button onClick={onClose}>Abbrechen</Button>
-            <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
-              {submitLabel}
-            </Button>
-          </div>
-        </footer>
-      </form>
+      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
+        <div className="flex flex-wrap items-center gap-2">{footerStart}</div>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <Button onClick={onClose}>Abbrechen</Button>
+          <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
+            {submitLabel}
+          </Button>
+        </div>
+      </footer>
+    </form>
+  );
+
+  if (variant === "page") {
+    return form;
+  }
+
+  return (
+    <Modal open={open} title={title} size="xl" showHeader={false} bodyClassName="p-0" onClose={onClose}>
+      {form}
     </Modal>
   );
 }
