@@ -135,6 +135,7 @@ describe("Query invalidation integration", () => {
       "taskFeatures",
       "taskUseCases",
       "calendarTasks",
+      "eventsList",
       "globalSearch"
     ]);
   });
@@ -156,6 +157,7 @@ describe("Query invalidation integration", () => {
       "taskFeatures",
       "taskUseCases",
       "calendarTasks",
+      "eventsList",
       "globalSearch"
     ]);
   });
