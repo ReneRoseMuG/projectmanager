@@ -297,7 +297,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
               <SegmentedControl value={status} options={statuses} onChange={setStatus} />
             </Section>
             <Section title="Kurzbeschreibung">
-              <RichTextInlineField value={description} placeholder="Kurzbeschreibung" testIdPrefix="feature-form-description" onChange={setDescription} />
+              <RichTextInlineField value={description} placeholder="Kurzbeschreibung" minRows={12} testIdPrefix="feature-form-description" onChange={setDescription} />
             </Section>
             <Section title="Inhalt">
               <RichTextInlineField value={content} placeholder="Feature-Inhalt" testIdPrefix="feature-form-content" onChange={setContent} />

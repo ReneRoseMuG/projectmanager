@@ -417,7 +417,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
                 </FormField>
               </div>
               <FormField label="Beschreibung" className="mt-4">
-                <RichTextInlineField value={description} onChange={setDescription} placeholder="Worum geht es in diesem Projekt?" testIdPrefix="project-description" />
+                <RichTextInlineField value={description} onChange={setDescription} placeholder="Worum geht es in diesem Projekt?" minRows={12} testIdPrefix="project-description" />
               </FormField>
             </Section>
             <Section title="Identität">

@@ -328,7 +328,7 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
                 </Select>
               </div>
               <FormField label="Beschreibung" className="mt-4">
-                <RichTextInlineField value={description} onChange={setDescription} placeholder="Wofür steht dieser Meilenstein?" testIdPrefix="milestone-description" />
+                <RichTextInlineField value={description} onChange={setDescription} placeholder="Wofür steht dieser Meilenstein?" minRows={12} testIdPrefix="milestone-description" />
               </FormField>
             </Section>
             <Section title="Identität">

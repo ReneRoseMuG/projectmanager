@@ -55,11 +55,12 @@ if errorlevel 1 (
   exit /b 1
 )
 
-start "Projekt Manager API" /D "%APP_DIR%" cmd /k "npm run start -w apps/api"
-start "Projekt Manager Web" /D "%APP_DIR%" cmd /k "npm run preview -w apps/web -- --host 0.0.0.0 --port 5173"
-timeout /t 5 /nobreak > nul
-start "" "http://localhost:5173"
+echo Starte API und Web im selben Terminal...
+start "" /B powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 5; Start-Process 'http://localhost:5173'"
 
 echo Projekt Manager läuft unter http://localhost:5173
-echo Dieses Fenster kann geschlossen werden; API und Web laufen in eigenen Fenstern.
+echo Dieses Fenster offen lassen; Strg+C beendet API und Web.
+call npx concurrently --names API,WEB --prefix "[{name}]" --kill-others-on-fail "npm run start -w apps/api" "npm run preview -w apps/web -- --host 0.0.0.0 --port 5173"
+
+echo Projekt Manager wurde beendet.
 pause

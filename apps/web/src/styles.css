@@ -33,6 +33,10 @@ textarea {
   padding: 0.5rem 0.75rem;
 }
 
+.rich-text-inline-min-rows {
+  min-height: calc(var(--rich-text-field-min-rows, 0) * 1.7em + 1rem);
+}
+
 .ProseMirror:focus {
   outline: none;
 }

@@ -94,7 +94,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
           <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
         </FormField>
         <FormField label="Beschreibung" className="mt-4">
-          <RichTextInlineField value={description} placeholder="Was soll später umgesetzt werden?" testIdPrefix="backlog-item-description" onChange={setDescription} />
+          <RichTextInlineField value={description} placeholder="Was soll später umgesetzt werden?" minRows={12} testIdPrefix="backlog-item-description" onChange={setDescription} />
         </FormField>
       </Section>
 

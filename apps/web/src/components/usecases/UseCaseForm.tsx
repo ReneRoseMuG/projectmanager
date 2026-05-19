@@ -254,7 +254,7 @@ export function UseCaseForm({ open, useCase, featureTitle, currentFeatureId, fea
 
             <Section title="Kurzbeschreibung">
               <FormField label="Kurzbeschreibung">
-                <RichTextInlineField value={description} placeholder="Kurze fachliche Zusammenfassung" testIdPrefix="use-case-description" onChange={setDescription} />
+                <RichTextInlineField value={description} placeholder="Kurze fachliche Zusammenfassung" minRows={12} testIdPrefix="use-case-description" onChange={setDescription} />
               </FormField>
             </Section>
 

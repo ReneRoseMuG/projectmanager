@@ -162,7 +162,7 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
             <Input value={ticketTitle} onChange={(event) => setTicketTitle(event.target.value)} required autoFocus={!ticket} />
           </FormField>
           <FormField label="Beschreibung">
-            <RichTextInlineField value={description} placeholder="Beschreibung" testIdPrefix="ticket-description" onChange={setDescription} />
+            <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="ticket-description" onChange={setDescription} />
           </FormField>
         </div>
       </Section>

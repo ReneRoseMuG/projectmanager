@@ -23,13 +23,14 @@ import { RichTextInlineField } from "../rich-text-inline-field";
 
 interface MockEditor {
   getHTML: ReturnType<typeof vi.fn<[], string>>;
+  getAttributes: ReturnType<typeof vi.fn<[string], Record<string, string | undefined>>>;
   commands: {
     setContent: ReturnType<typeof vi.fn<[string], void>>;
     blur: ReturnType<typeof vi.fn<[], void>>;
     focus: ReturnType<typeof vi.fn<[string?], void>>;
     setTextSelection: ReturnType<typeof vi.fn<[number], void>>;
   };
-  isActive: ReturnType<typeof vi.fn<[], boolean>>;
+  isActive: ReturnType<typeof vi.fn<[(string | Record<string, string>)?, Record<string, unknown>?], boolean>>;
   chain: ReturnType<typeof vi.fn<[], MockCommandChain>>;
   view: {
     posAtCoords: ReturnType<typeof vi.fn<[{ left: number; top: number }], { pos: number } | null>>;
@@ -41,15 +42,28 @@ interface MockCommandChain {
   toggleBold: () => MockCommandChain;
   toggleItalic: () => MockCommandChain;
   toggleUnderline: () => MockCommandChain;
+  toggleStrike: () => MockCommandChain;
+  toggleHighlight: () => MockCommandChain;
   toggleHeading: () => MockCommandChain;
   toggleBulletList: () => MockCommandChain;
   toggleOrderedList: () => MockCommandChain;
+  toggleBlockquote: () => MockCommandChain;
+  toggleCodeBlock: () => MockCommandChain;
+  extendMarkRange: () => MockCommandChain;
+  unsetLink: () => MockCommandChain;
+  setLink: () => MockCommandChain;
+  setImage: () => MockCommandChain;
   setTextAlign: () => MockCommandChain;
   setParagraph: () => MockCommandChain;
+  unsetAllMarks: () => MockCommandChain;
+  clearNodes: () => MockCommandChain;
   run: () => boolean;
 }
 
 interface MockEditorConfig {
+  editorProps?: {
+    attributes?: Record<string, string>;
+  };
   onBlur?: (input: { editor: MockEditor }) => void;
 }
 
@@ -65,11 +79,21 @@ function createCommandChain(): MockCommandChain {
     toggleBold: () => chain,
     toggleItalic: () => chain,
     toggleUnderline: () => chain,
+    toggleStrike: () => chain,
+    toggleHighlight: () => chain,
     toggleHeading: () => chain,
     toggleBulletList: () => chain,
     toggleOrderedList: () => chain,
+    toggleBlockquote: () => chain,
+    toggleCodeBlock: () => chain,
+    extendMarkRange: () => chain,
+    unsetLink: () => chain,
+    setLink: () => chain,
+    setImage: () => chain,
     setTextAlign: () => chain,
     setParagraph: () => chain,
+    unsetAllMarks: () => chain,
+    clearNodes: () => chain,
     run: () => true
   };
 
@@ -80,6 +104,7 @@ vi.mock("@tiptap/react", () => ({
   useEditor: vi.fn((config: MockEditorConfig) => {
     const editor: MockEditor = {
       getHTML: vi.fn(() => tiptapMock.html),
+      getAttributes: vi.fn<[string], Record<string, string | undefined>>(() => ({})),
       commands: {
         setContent: vi.fn(),
         blur: vi.fn(() => {
@@ -88,7 +113,7 @@ vi.mock("@tiptap/react", () => ({
         focus: vi.fn(),
         setTextSelection: vi.fn()
       },
-      isActive: vi.fn(() => false),
+      isActive: vi.fn<[(string | Record<string, string>)?, Record<string, unknown>?], boolean>(() => false),
       chain: vi.fn(() => createCommandChain()),
       view: {
         posAtCoords: vi.fn((_coords: { left: number; top: number }): { pos: number } | null => ({ pos: 1 }))
@@ -212,5 +237,28 @@ describe("RichTextInlineField", () => {
     const { container } = render(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} />);
 
     expect(container.querySelectorAll("[data-testid]")).toHaveLength(0);
+  });
+
+  it("T-14 zeigt die Toolbar erst im Editierzustand", () => {
+    render(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    expect(screen.queryByTestId("rich-text-toolbar")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("field-view"));
+
+    expect(screen.getByTestId("rich-text-toolbar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zitat" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Formatierung entfernen" })).toBeInTheDocument();
+  });
+
+  it("T-15 setzt die MindesthÃ¶he fÃ¼r Leseansicht und Editor", () => {
+    render(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} minRows={12} testIdPrefix="field" />);
+
+    expect(screen.getByTestId("field-view")).toHaveClass("rich-text-inline-min-rows");
+    expect(screen.getByTestId("field-view")).toHaveStyle("--rich-text-field-min-rows: 12");
+
+    fireEvent.click(screen.getByTestId("field-view"));
+
+    expect(tiptapMock.config?.editorProps?.attributes?.class).toContain("rich-text-inline-min-rows");
+    expect(tiptapMock.config?.editorProps?.attributes?.style).toBe("--rich-text-field-min-rows: 12;");
   });
 });

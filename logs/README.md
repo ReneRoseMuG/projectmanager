@@ -2,6 +2,8 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 19.05.26 | Fix | RichText Beschreibungsfelder | ✅ |
+| 19.05.26 | Fix | Startdatei Ein Terminal | ✅ |
 | 19.05.26 | Feature | RichTextInlineField | ✅ |
 | 19.05.26 | Fix | Milestone-Web-Tests | ✅ |
 | 19.05.26 | Feature | Meilensteine als Projekt-Subdomäne | ⚠️ |

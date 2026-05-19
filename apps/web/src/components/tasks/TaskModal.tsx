@@ -241,7 +241,7 @@ export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClos
                   <Input value={title} onChange={(event) => setTitle(event.target.value)} required autoFocus={!task} />
                 </FormField>
                 <FormField label="Beschreibung">
-                  <RichTextInlineField value={description} placeholder="Beschreibung" testIdPrefix="task-description" onChange={setDescription} />
+                  <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="task-description" onChange={setDescription} />
                 </FormField>
               </div>
             </Section>
