@@ -6,7 +6,7 @@ import { formatHumanDate } from "../../utils/date";
 import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { Modal } from "../ui/Modal";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 
 interface NoteEditorProps {
@@ -196,9 +196,9 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
             </Section>
 
             <Section>
-              {/* TODO: migrate existing note JSON content to HTML. */}
-              <RichTextEditor
-                content={content}
+              <RichTextInlineField
+                value={content}
+                testIdPrefix="note-editor-content"
                 onChange={(value) => {
                   setContent(value);
                   setDirty(true);

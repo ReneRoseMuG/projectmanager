@@ -35,7 +35,7 @@ import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
 import { ItemRow } from "../ui/ItemRow";
 import { Pill } from "../ui/Pill";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SectionHeader } from "../ui/SectionHeader";
 import { SegmentedControl } from "../ui/SegmentedControl";
@@ -328,7 +328,7 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
                 </Select>
               </div>
               <FormField label="Beschreibung" className="mt-4">
-                <RichTextEditor content={description} onChange={setDescription} placeholder="Wofür steht dieser Meilenstein?" minHeight="9rem" toolbar="full" />
+                <RichTextInlineField value={description} onChange={setDescription} placeholder="Wofür steht dieser Meilenstein?" testIdPrefix="milestone-description" />
               </FormField>
             </Section>
             <Section title="Identität">

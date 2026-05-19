@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useEntityComments } from "../../hooks/useEntityComments";
@@ -58,8 +58,7 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
       <div className="p-5">
         {activeTab === "content" ? (
           <form id="wiki-page-detail-form" className="grid gap-5" onSubmit={submit}>
-            {/* TODO: migrate existing markdown content to HTML. */}
-            <RichTextEditor content={content} placeholder="Wiki-Inhalt" toolbar="full" onChange={setContent} />
+            <RichTextInlineField value={content} placeholder="Wiki-Inhalt" testIdPrefix="wiki-page-detail-content" onChange={setContent} />
             <footer className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white/95 p-4 shadow-panel backdrop-blur">
               <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(page)}>
                 Löschen

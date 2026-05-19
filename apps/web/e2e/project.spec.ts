@@ -8,6 +8,7 @@ import {
   deleteFeature,
   deleteProject,
   expectRichText,
+  fillRichText,
   formPage,
   itemCard,
   linkProjectFeature,
@@ -57,7 +58,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       const form = formPage(page, "Projekt anlegen");
       await expect(form).toBeVisible();
       await form.locator("input[required]").first().fill(name);
-      await form.locator('[contenteditable="true"]').first().fill("E2E neu angelegte Projektbeschreibung vollständig");
+      await fillRichText(form, "project-description", "E2E neu angelegte Projektbeschreibung vollständig");
       await form.locator('input[type="date"]').nth(0).fill("2026-05-01");
       await form.locator('input[type="date"]').nth(1).fill("2026-05-31");
       await form.getByRole("button", { name: "Projekt anlegen" }).click();
@@ -229,8 +230,8 @@ test.describe("Projekt-Routen und Detailformular", () => {
       const featureForm = formPage(page, "Neues Feature");
       await featureForm.locator("input[required]").nth(0).fill(featureTitle);
       await featureForm.locator("input[required]").nth(1).fill(featureSlug);
-      await featureForm.locator('[contenteditable="true"]').nth(0).fill("E2E verknüpfte Kurzbeschreibung vollständig");
-      await featureForm.locator('[contenteditable="true"]').nth(1).fill("E2E verknüpfter Inhalt vollständig");
+      await fillRichText(featureForm, "feature-form-description", "E2E verknüpfte Kurzbeschreibung vollständig");
+      await fillRichText(featureForm, "feature-form-content", "E2E verknüpfter Inhalt vollständig");
       await featureForm.getByRole("button", { name: "Feature anlegen" }).click();
 
       await expect(page).toHaveURL(/\/features\/\d+$/);

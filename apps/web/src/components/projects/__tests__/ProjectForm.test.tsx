@@ -25,6 +25,17 @@ import { addPendingComment, changeInput, clickTab, feature, getFileInput, projec
 import { ProjectForm } from "../ProjectForm";
 
 describe("ProjectForm", () => {
+  it("bindet das RichTextInlineField an die Projektbeschreibung", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(project);
+    renderWithProviders(<ProjectForm open project={project} onSubmit={onSubmit} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("project-description-view")).toHaveValue(project.description);
+    fireEvent.change(screen.getByTestId("project-description-view"), { target: { value: "<p>Projekt aktualisiert</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Projekt aktualisiert</p>" }), []));
+  });
+
   it("zeigt im Create-Modus alle erwarteten Verwaltungs-Tabs ohne Import", () => {
     renderWithProviders(<ProjectForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 

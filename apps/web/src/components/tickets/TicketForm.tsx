@@ -15,7 +15,7 @@ import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
 import { RadioList } from "../ui/RadioList";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 
 export interface TicketFormInput extends TicketInput {
@@ -162,7 +162,7 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
             <Input value={ticketTitle} onChange={(event) => setTicketTitle(event.target.value)} required autoFocus={!ticket} />
           </FormField>
           <FormField label="Beschreibung">
-            <RichTextEditor content={description} placeholder="Beschreibung" toolbar="full" minHeight="8rem" onChange={setDescription} />
+            <RichTextInlineField value={description} placeholder="Beschreibung" testIdPrefix="ticket-description" onChange={setDescription} />
           </FormField>
         </div>
       </Section>

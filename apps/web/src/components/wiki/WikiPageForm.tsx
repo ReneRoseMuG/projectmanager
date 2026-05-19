@@ -6,7 +6,7 @@ import type { WikiTreeNode } from "../../hooks/useWiki";
 import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { Modal } from "../ui/Modal";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 
 interface WikiPageFormProps {
@@ -158,8 +158,7 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose }: Wi
               <div className="prose max-w-none rounded-lg border border-line bg-shell/40 p-4" dangerouslySetInnerHTML={{ __html: content || "<p>Noch kein Inhalt.</p>" }} />
             ) : (
               <>
-                {/* TODO: migrate existing markdown content to HTML. */}
-                <RichTextEditor content={content} placeholder="Wiki-Inhalt" toolbar="full" onChange={(value) => { setContent(value); setDirty(true); }} />
+                <RichTextInlineField value={content} placeholder="Wiki-Inhalt" testIdPrefix="wiki-page-form-content" onChange={(value) => { setContent(value); setDirty(true); }} />
               </>
             )}
           </Section>

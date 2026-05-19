@@ -29,8 +29,21 @@ textarea {
 }
 
 .ProseMirror {
-  min-height: 260px;
+  min-height: 80px;
+  padding: 0.5rem 0.75rem;
+}
+
+.ProseMirror:focus {
   outline: none;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: theme("colors.slate.500");
+  float: left;
+  height: 0;
+  font-style: italic;
+  pointer-events: none;
 }
 
 .ProseMirror ul[data-type="taskList"] {

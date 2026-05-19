@@ -21,9 +21,9 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventForm } from "../EventForm";
 
-vi.mock("../../ui/RichTextEditor", () => ({
-  RichTextEditor({ content, onChange, placeholder }: { content: string; onChange: (value: string) => void; placeholder?: string }) {
-    return <textarea aria-label={placeholder ?? "Editor"} value={content} onChange={(event) => onChange(event.currentTarget.value)} />;
+vi.mock("../../ui/rich-text-inline-field", () => ({
+  RichTextInlineField({ value, onChange, placeholder, testIdPrefix }: { value: string | null | undefined; onChange: (value: string) => void; placeholder?: string; testIdPrefix?: string }) {
+    return <textarea aria-label={placeholder ?? "Editor"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
   }
 }));
 
@@ -118,6 +118,17 @@ afterEach(() => {
 });
 
 describe("EventForm", () => {
+  it("bindet das RichTextInlineField an die Eventbeschreibung", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<EventForm open event={event} projects={projects} tasks={tasks} onSubmit={onSubmit} onDelete={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("event-description-view")).toHaveValue("");
+    fireEvent.change(screen.getByTestId("event-description-view"), { target: { value: "<p>Termin aktualisiert</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Termin aktualisiert</p>" }), event.id));
+  });
+
   it("sendet owners statt direkter Owner-Felder", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(

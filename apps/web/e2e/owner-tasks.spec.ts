@@ -10,6 +10,7 @@ import {
   deleteProject,
   deleteTask,
   expectRichText,
+  fillRichText,
   formPage,
   itemCard,
   uniqueTitle
@@ -83,7 +84,7 @@ async function createTaskInBoard(page: Page, reopenScope: ScopeFactory, title: s
 
   const taskForm = formPage(page, "Aufgabe anlegen");
   await taskForm.locator("input[required]").first().fill(title);
-  await taskForm.locator('[contenteditable="true"]').first().fill("E2E Owner-Aufgabe vollständig");
+  await fillRichText(taskForm, "task-description", "E2E Owner-Aufgabe vollständig");
   await taskForm.getByRole("button", { name: "Aufgabe anlegen" }).click();
 
   await expect(page).toHaveURL(/\/tasks\/\d+\?/);

@@ -5,7 +5,7 @@ import { formatHumanDate } from "../../utils/date";
 import { Avatar } from "./Avatar";
 import { Button } from "./Button";
 import { EmptyState } from "./EmptyState";
-import { RichTextEditor } from "./RichTextEditor";
+import { RichTextInlineField } from "./rich-text-inline-field";
 import { Section } from "./Section";
 
 interface CommentThreadProps {
@@ -36,7 +36,7 @@ function CommentItem({ comment, index, onDelete }: { comment: Comment; index: nu
         </div>
         <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={18} />} variant="ghost" className="h-10 w-10" onClick={() => void onDelete(comment.id).catch(() => undefined)} />
       </div>
-      <RichTextEditor content={toHtmlContent(comment.body)} readOnly toolbar="minimal" minHeight="0" onChange={() => undefined} />
+      <RichTextInlineField value={toHtmlContent(comment.body)} readOnly testIdPrefix={`comment-thread-comment-${comment.id}-body`} onChange={() => undefined} />
       <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3 text-xs font-semibold text-slate-500">
         <span className="rounded-full bg-shell px-2 py-1">0 Reaktionen</span>
         <span className="rounded-full bg-shell px-2 py-1">Antworten</span>
@@ -66,7 +66,7 @@ function CommentComposer({ onCreate }: { onCreate: (input: { body: string }) => 
   return (
     <Section>
       <div className="grid gap-3">
-        <RichTextEditor content={body} placeholder="Kommentar schreiben" toolbar="minimal" minHeight="7rem" onChange={setBody} />
+        <RichTextInlineField value={body} placeholder="Kommentar schreiben" testIdPrefix="comment-thread-body" onChange={setBody} />
         <div className="flex justify-end">
           <Button variant="primary" icon={<Send size={16} />} loading={submitting} onClick={() => void submit()}>
             Kommentar

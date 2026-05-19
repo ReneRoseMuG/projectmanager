@@ -11,6 +11,7 @@ import {
   deleteProject,
   deleteTicket,
   expectRichText,
+  fillRichText,
   formPage,
   itemCard,
   uniqueTitle
@@ -98,7 +99,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
       await expect(page).toHaveURL(/\/tickets\/new$/);
       const form = formPage(page, "Ticket");
       await form.locator("input[required]").first().fill(ticketTitle);
-      await form.locator('[contenteditable="true"]').first().fill("E2E neues Ticket vollständig");
+      await fillRichText(form, "ticket-description", "E2E neues Ticket vollständig");
       await form.locator("input").nth(1).fill("Ada Lovelace");
       await form.locator("input").nth(2).fill("Grace Hopper");
       await form.locator('input[type="date"]').first().fill("2026-05-30");

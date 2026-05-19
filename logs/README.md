@@ -2,6 +2,7 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 19.05.26 | Feature | RichTextInlineField | ✅ |
 | 19.05.26 | Fix | Milestone-Web-Tests | ✅ |
 | 19.05.26 | Feature | Meilensteine als Projekt-Subdomäne | ⚠️ |
 | 19.05.26 | Fix / Feature | Demo-Daten-Seed entfernt | ✅ |

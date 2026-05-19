@@ -28,7 +28,7 @@ import { PendingNoteList } from "../ui/PendingNoteList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { Pill } from "../ui/Pill";
 import { RadioList } from "../ui/RadioList";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SectionHeader } from "../ui/SectionHeader";
 import { Select } from "../ui/Select";
@@ -241,7 +241,7 @@ export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClos
                   <Input value={title} onChange={(event) => setTitle(event.target.value)} required autoFocus={!task} />
                 </FormField>
                 <FormField label="Beschreibung">
-                  <RichTextEditor content={description} placeholder="Beschreibung" toolbar="full" minHeight="8rem" onChange={setDescription} />
+                  <RichTextInlineField value={description} placeholder="Beschreibung" testIdPrefix="task-description" onChange={setDescription} />
                 </FormField>
               </div>
             </Section>

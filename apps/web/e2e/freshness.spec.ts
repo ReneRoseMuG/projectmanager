@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
-import { apiBaseUrl, createFeature, createProject, deleteFeature, deleteProject, formPage, itemCard, slugify, uniqueTitle } from "./domain-test-utils";
+import { apiBaseUrl, createFeature, createProject, deleteFeature, deleteProject, fillRichText, formPage, itemCard, slugify, uniqueTitle } from "./domain-test-utils";
 
 /**
  * Test Scope:
@@ -232,9 +232,8 @@ test.describe("Globale UI-Aktualität", () => {
       await expectTabCount(projectForm(page), "Kommentare", 0);
       await tabWithCount(projectForm(page), "Kommentare", 0).click();
       await expect(projectForm(page).getByRole("heading", { name: "Noch keine Kommentare" })).toBeVisible();
-      const commentEditor = projectForm(page).locator('[contenteditable="true"]').last();
-      await commentEditor.fill(commentText);
-      await expect(commentEditor).toContainText(commentText);
+      await fillRichText(projectForm(page), "comment-thread-body", commentText);
+      await expect(projectForm(page).locator('[data-testid="comment-thread-body-view"]')).toContainText(commentText);
       const createCommentResponsePromise = page.waitForResponse(
         (response) => response.url().includes(`/api/projects/${project.id}/comments`) && response.request().method() === "POST"
       );

@@ -25,6 +25,19 @@ import { addPendingComment, changeInput, clickTab, feature, renderWithProviders,
 import { UseCaseForm } from "../UseCaseForm";
 
 describe("UseCaseForm", () => {
+  it("bindet RichTextInlineField an Kurzbeschreibung und Inhalt", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(useCase);
+    renderWithProviders(<UseCaseForm open useCase={useCase} currentFeatureId={feature.id} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("use-case-description-view")).toHaveValue(useCase.description);
+    expect(screen.getByTestId("use-case-content-view")).toHaveValue(useCase.content);
+    fireEvent.change(screen.getByTestId("use-case-description-view"), { target: { value: "<p>Neue Use-Case-Beschreibung</p>" } });
+    fireEvent.change(screen.getByTestId("use-case-content-view"), { target: { value: "<p>Neuer Use-Case-Inhalt</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Neue Use-Case-Beschreibung</p>", content: "<p>Neuer Use-Case-Inhalt</p>" })));
+  });
+
   it("zeigt im Create-Modus die Relation-Tabs und keinen Dateien-Tab", () => {
     renderWithProviders(<UseCaseForm open currentFeatureId={feature.id} features={[feature]} onSubmit={vi.fn()} onClose={vi.fn()} />);
 

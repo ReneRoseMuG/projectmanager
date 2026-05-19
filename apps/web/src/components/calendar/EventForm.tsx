@@ -9,7 +9,7 @@ import { DatePicker } from "../ui/DatePicker";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 
 interface EventFormProps {
@@ -121,7 +121,7 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
           <Input value={title} onChange={(inputEvent) => setTitle(inputEvent.target.value)} required />
         </FormField>
         <FormField label="Beschreibung" className="mt-4">
-          <RichTextEditor content={description} placeholder="Beschreibung" toolbar="full" minHeight="7rem" onChange={setDescription} />
+          <RichTextInlineField value={description} placeholder="Beschreibung" testIdPrefix="event-description" onChange={setDescription} />
         </FormField>
       </Section>
 

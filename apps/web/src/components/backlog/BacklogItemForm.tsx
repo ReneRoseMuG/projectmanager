@@ -8,7 +8,7 @@ import { CommentThread } from "../ui/CommentThread";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { Select } from "../ui/Select";
@@ -94,7 +94,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
           <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
         </FormField>
         <FormField label="Beschreibung" className="mt-4">
-          <RichTextEditor content={description} placeholder="Was soll später umgesetzt werden?" toolbar="full" minHeight="8rem" onChange={setDescription} />
+          <RichTextInlineField value={description} placeholder="Was soll später umgesetzt werden?" testIdPrefix="backlog-item-description" onChange={setDescription} />
         </FormField>
       </Section>
 

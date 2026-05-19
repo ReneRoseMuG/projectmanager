@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { apiBaseUrl, createProject, createTask, cleanupTasksByTitle, deleteProject, deleteTask, expectRichText, formPage, itemCard, uniqueTitle } from "./domain-test-utils";
+import { apiBaseUrl, createProject, createTask, cleanupTasksByTitle, deleteProject, deleteTask, expectRichText, fillRichText, formPage, itemCard, uniqueTitle } from "./domain-test-utils";
 
 /**
  * Test Scope:
@@ -46,7 +46,7 @@ test.describe("Task-Routen und Detailformular", () => {
       await expect(page).toHaveURL(/\/tasks\/new\?/);
       const taskForm = formPage(page, "Aufgabe anlegen");
       await taskForm.locator("input[required]").first().fill(taskTitle);
-      await taskForm.locator('[contenteditable="true"]').first().fill("E2E neue Aufgabenbeschreibung vollständig");
+      await fillRichText(taskForm, "task-description", "E2E neue Aufgabenbeschreibung vollständig");
       await taskForm.locator('input[type="date"]').first().fill("2026-05-29");
       await taskForm.getByRole("button", { name: "Aufgabe anlegen" }).click();
 
@@ -142,7 +142,7 @@ test.describe("Task-Routen und Detailformular", () => {
       await page.goto(`/tasks/${task.id}?returnTo=${encodeURIComponent(`/projects/${project.id}`)}`);
       const taskForm = formPage(page, "Aufgabe bearbeiten");
       await taskForm.getByRole("button", { name: /Kommentare/ }).click();
-      await taskForm.locator('[contenteditable="true"]').last().fill("E2E Kommentar Route");
+      await fillRichText(taskForm, "comment-thread-body", "E2E Kommentar Route");
       await taskForm.getByRole("button", { name: "Kommentar", exact: true }).click();
 
       await expect(taskForm.getByText("E2E Kommentar Route", { exact: true })).toBeVisible();

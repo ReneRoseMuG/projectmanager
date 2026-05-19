@@ -25,6 +25,19 @@ import { addPendingComment, changeInput, clickTab, feature, getFileInput, projec
 import { FeatureForm } from "../FeatureForm";
 
 describe("FeatureForm", () => {
+  it("bindet RichTextInlineField an Kurzbeschreibung und Inhalt", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(feature);
+    renderWithProviders(<FeatureForm open feature={feature} onSubmit={onSubmit} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("feature-form-description-view")).toHaveValue(feature.description);
+    expect(screen.getByTestId("feature-form-content-view")).toHaveValue(feature.content);
+    fireEvent.change(screen.getByTestId("feature-form-description-view"), { target: { value: "<p>Neue Kurzbeschreibung</p>" } });
+    fireEvent.change(screen.getByTestId("feature-form-content-view"), { target: { value: "<p>Neuer Inhalt</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Neue Kurzbeschreibung</p>", content: "<p>Neuer Inhalt</p>" })));
+  });
+
   it("zeigt im Create-Modus alle erwarteten Verwaltungs-Tabs", () => {
     renderWithProviders(<FeatureForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 

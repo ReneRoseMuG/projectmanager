@@ -20,13 +20,13 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommentThread } from "../CommentThread";
 
-vi.mock("../RichTextEditor", () => ({
-  RichTextEditor({ content, onChange, placeholder, readOnly }: { content: string; onChange: (value: string) => void; placeholder?: string; readOnly?: boolean }) {
+vi.mock("../rich-text-inline-field", () => ({
+  RichTextInlineField({ value, onChange, placeholder, readOnly, testIdPrefix }: { value: string | null | undefined; onChange: (value: string) => void; placeholder?: string; readOnly?: boolean; testIdPrefix?: string }) {
     if (readOnly) {
-      return <div data-testid="readonly-comment" dangerouslySetInnerHTML={{ __html: content }} />;
+      return <div data-testid={testIdPrefix ?? "readonly-comment"} dangerouslySetInnerHTML={{ __html: value ?? "" }} />;
     }
 
-    return <textarea aria-label={placeholder ?? "Editor"} value={content} onChange={(event) => onChange(event.currentTarget.value)} />;
+    return <textarea aria-label={placeholder ?? "Editor"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
   }
 }));
 

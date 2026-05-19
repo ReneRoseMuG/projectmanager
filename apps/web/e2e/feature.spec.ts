@@ -6,6 +6,7 @@ import {
   deleteFeature,
   deleteProject,
   expectRichText,
+  fillRichText,
   formPage,
   itemCard,
   linkProjectFeature,
@@ -58,8 +59,8 @@ test.describe("Feature-Routen und Detailformular", () => {
       await form.locator("input[required]").nth(0).fill(title);
       await form.locator("input[required]").nth(1).fill(slug);
       await form.locator('input[type="number"]').first().fill("7");
-      await form.locator('[contenteditable="true"]').nth(0).fill("E2E Feature-Neuanlage Beschreibung vollständig");
-      await form.locator('[contenteditable="true"]').nth(1).fill("E2E Feature-Neuanlage Inhalt vollständig");
+      await fillRichText(form, "feature-form-description", "E2E Feature-Neuanlage Beschreibung vollständig");
+      await fillRichText(form, "feature-form-content", "E2E Feature-Neuanlage Inhalt vollständig");
       await form.getByRole("button", { name: "Feature anlegen" }).click();
 
       await expect(page).toHaveURL(/\/features\/\d+$/);

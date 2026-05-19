@@ -188,17 +188,19 @@ export const milestone = fixtures.milestone as Milestone;
 export const task = fixtures.task as Task;
 export const ticket = fixtures.ticket as Ticket;
 
-vi.mock("../ui/RichTextEditor", () => ({
-  RichTextEditor({
-    content,
+vi.mock("../ui/rich-text-inline-field", () => ({
+  RichTextInlineField({
+    value,
     onChange,
-    placeholder
+    placeholder,
+    testIdPrefix
   }: {
-    content: string;
+    value: string | null | undefined;
     onChange: (value: string) => void;
     placeholder?: string;
+    testIdPrefix?: string;
   }) {
-    return <textarea aria-label={placeholder ?? "Rich Text"} value={content} onChange={(event) => onChange(event.currentTarget.value)} />;
+    return <textarea aria-label={placeholder ?? "Rich Text"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
   }
 }));
 

@@ -60,7 +60,7 @@ import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { RadioList } from "../ui/RadioList";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SectionHeader } from "../ui/SectionHeader";
 import { SegmentedControl } from "../ui/SegmentedControl";
@@ -417,7 +417,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
                 </FormField>
               </div>
               <FormField label="Beschreibung" className="mt-4">
-                <RichTextEditor content={description} onChange={setDescription} placeholder="Worum geht es in diesem Projekt?" minHeight="9rem" toolbar="full" />
+                <RichTextInlineField value={description} onChange={setDescription} placeholder="Worum geht es in diesem Projekt?" testIdPrefix="project-description" />
               </FormField>
             </Section>
             <Section title="Identität">

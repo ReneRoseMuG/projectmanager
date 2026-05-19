@@ -301,6 +301,15 @@ export function itemCard(scope: Page | Locator, title: string) {
   return scope.locator("article:visible").filter({ hasText: title }).first();
 }
 
-export async function expectRichText(form: Locator, text: string, index = 0) {
-  await expect(form.locator('[contenteditable="true"]').nth(index)).toContainText(text);
+export async function expectRichText(form: Locator, text: string, indexOrPrefix: number | string = 0) {
+  const view = typeof indexOrPrefix === "string" ? form.locator(`[data-testid="${indexOrPrefix}-view"]`) : form.locator('[data-testid$="-view"]').nth(indexOrPrefix);
+  await expect(view).toContainText(text);
+}
+
+export async function fillRichText(form: Locator, testIdPrefix: string, text: string) {
+  await form.locator(`[data-testid="${testIdPrefix}-view"]`).click();
+  const editor = form.locator(`[data-testid="${testIdPrefix}-editor"] [contenteditable="true"]`);
+  await expect(editor).toBeVisible();
+  await editor.fill(text);
+  await editor.blur();
 }

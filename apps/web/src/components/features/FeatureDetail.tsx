@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
 import { FormField } from "../ui/FormField";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SegmentedControl } from "../ui/SegmentedControl";
 
@@ -87,15 +87,13 @@ export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps)
 
       <Section title="Kurzbeschreibung">
       <div className="grid gap-1 text-sm font-medium">
-        {/* TODO: migrate existing markdown content to HTML. */}
-        <RichTextEditor content={description} placeholder="Kurzbeschreibung" toolbar="full" minHeight="6rem" onChange={setDescription} />
+        <RichTextInlineField value={description} placeholder="Kurzbeschreibung" testIdPrefix="feature-detail-description" onChange={setDescription} />
       </div>
       </Section>
 
       <Section title="Inhalt">
       <div className="grid gap-2 text-sm font-medium">
-        {/* TODO: migrate existing markdown content to HTML. */}
-        <RichTextEditor content={content} placeholder="Feature-Inhalt" onChange={setContent} />
+        <RichTextInlineField value={content} placeholder="Feature-Inhalt" testIdPrefix="feature-detail-content" onChange={setContent} />
       </div>
       </Section>
 

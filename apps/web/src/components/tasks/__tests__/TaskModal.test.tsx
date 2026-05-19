@@ -25,6 +25,17 @@ import { addPendingComment, changeInput, clickTab, getFileInput, renderWithProvi
 import { TaskModal } from "../TaskModal";
 
 describe("TaskModal", () => {
+  it("bindet das RichTextInlineField an die Aufgabenbeschreibung", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<TaskModal open task={task} onSubmit={onSubmit} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("task-description-view")).toHaveValue(task.description);
+    fireEvent.change(screen.getByTestId("task-description-view"), { target: { value: "<p>Aufgabe aktualisiert</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Aufgabe aktualisiert</p>" })));
+  });
+
   it("zeigt im Create-Modus alle erwarteten Verwaltungs-Tabs", () => {
     renderWithProviders(<TaskModal open onSubmit={vi.fn()} onClose={vi.fn()} />);
 

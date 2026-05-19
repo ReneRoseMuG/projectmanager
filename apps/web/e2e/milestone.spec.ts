@@ -13,6 +13,7 @@ import {
   deleteTask,
   deleteTicket,
   expectRichText,
+  fillRichText,
   formPage,
   itemCard,
   uniqueTitle
@@ -56,7 +57,7 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       const milestoneForm = formPage(page, "Meilenstein anlegen");
       await expect(milestoneForm.locator("select[required]")).toHaveValue(String(project.id));
       await milestoneForm.locator("input[required]").first().fill(milestoneName);
-      await milestoneForm.locator('[contenteditable="true"]').first().fill("E2E Meilensteinbeschreibung vollständig");
+      await fillRichText(milestoneForm, "milestone-description", "E2E Meilensteinbeschreibung vollständig");
       await milestoneForm.locator('input[type="date"]').nth(0).fill("2026-06-01");
       await milestoneForm.locator('input[type="date"]').nth(1).fill("2026-06-30");
       await milestoneForm.getByRole("button", { name: "Meilenstein anlegen" }).click();
@@ -131,10 +132,10 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       await expect(itemCard(milestoneForm, event.title)).toBeVisible();
 
       await milestoneForm.getByRole("button", { name: /Kommentare/ }).click();
-      await milestoneForm.locator('[contenteditable="true"]').first().fill("E2E Live Kommentar");
+      await fillRichText(milestoneForm, "comment-thread-body", "E2E Live Kommentar");
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/milestones/${milestone.id}/comments`) && response.request().method() === "POST"),
-        milestoneForm.getByRole("button", { name: "Kommentar" }).click()
+        milestoneForm.getByRole("button", { name: "Kommentar", exact: true }).click()
       ]);
       await expect(milestoneForm.getByRole("button", { name: /Kommentare\s+2/ })).toBeVisible();
       await expect(milestoneForm).toContainText("E2E Live Kommentar");

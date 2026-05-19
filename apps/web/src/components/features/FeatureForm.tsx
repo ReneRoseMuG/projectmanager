@@ -50,7 +50,7 @@ import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { RadioList } from "../ui/RadioList";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SectionHeader } from "../ui/SectionHeader";
 import { SegmentedControl } from "../ui/SegmentedControl";
@@ -297,10 +297,10 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
               <SegmentedControl value={status} options={statuses} onChange={setStatus} />
             </Section>
             <Section title="Kurzbeschreibung">
-              <RichTextEditor content={description} placeholder="Kurzbeschreibung" toolbar="full" minHeight="8rem" onChange={setDescription} />
+              <RichTextInlineField value={description} placeholder="Kurzbeschreibung" testIdPrefix="feature-form-description" onChange={setDescription} />
             </Section>
             <Section title="Inhalt">
-              <RichTextEditor content={content} placeholder="Feature-Inhalt" toolbar="full" onChange={setContent} />
+              <RichTextInlineField value={content} placeholder="Feature-Inhalt" testIdPrefix="feature-form-content" onChange={setContent} />
             </Section>
           </>
         ) : null}

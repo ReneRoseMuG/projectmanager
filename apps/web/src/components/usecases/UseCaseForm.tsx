@@ -39,7 +39,7 @@ import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { Pill } from "../ui/Pill";
 import { RadioList } from "../ui/RadioList";
-import { RichTextEditor } from "../ui/RichTextEditor";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { Select } from "../ui/Select";
@@ -254,12 +254,12 @@ export function UseCaseForm({ open, useCase, featureTitle, currentFeatureId, fea
 
             <Section title="Kurzbeschreibung">
               <FormField label="Kurzbeschreibung">
-                <RichTextEditor content={description} placeholder="Kurze fachliche Zusammenfassung" toolbar="full" minHeight="7rem" onChange={setDescription} />
+                <RichTextInlineField value={description} placeholder="Kurze fachliche Zusammenfassung" testIdPrefix="use-case-description" onChange={setDescription} />
               </FormField>
             </Section>
 
             <Section title="Inhalt" actions={<span className="text-xs font-semibold text-slate-500">HTML</span>}>
-              <RichTextEditor content={content} placeholder="Use-Case-Inhalt" toolbar="full" onChange={setContent} />
+              <RichTextInlineField value={content} placeholder="Use-Case-Inhalt" testIdPrefix="use-case-content" onChange={setContent} />
             </Section>
           </>
         ) : null}
