@@ -12,6 +12,7 @@ import { registerEventsRoutes } from "./routes/events.js";
 import { registerFeaturesRoutes } from "./routes/features.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerImportsRoutes } from "./routes/imports.js";
+import { registerMilestoneRoutes } from "./routes/milestones.js";
 import { registerNotesRoutes } from "./routes/notes.js";
 import { registerProjectsRoutes } from "./routes/projects.js";
 import { registerSubtasksRoutes } from "./routes/subtasks.js";
@@ -49,6 +50,7 @@ export async function buildApp(
   app.get("/health", async () => ({ ok: true }));
 
   await app.register(registerProjectsRoutes, { prefix: "/api" });
+  await app.register(registerMilestoneRoutes, { prefix: "/api" });
   await app.register(registerTasksRoutes, { prefix: "/api" });
   await app.register(registerSubtasksRoutes, { prefix: "/api" });
   await app.register(registerTicketsRoutes, { prefix: "/api" });

@@ -4,6 +4,7 @@ import { api } from "./client";
 const entityPaths: Record<CommentEntityType, string> = {
   task: "tasks",
   feature: "features",
+  milestone: "milestones",
   project: "projects",
   useCase: "use-cases",
   backlogItem: "backlog",

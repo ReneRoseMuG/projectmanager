@@ -3,8 +3,10 @@ import { useCallback } from "react";
 import {
   deleteAttachment as deleteAttachmentRequest,
   getFeatureAttachments,
+  getMilestoneAttachments,
   getProjectAttachments,
   getTaskAttachments,
+  uploadMilestoneAttachment,
   uploadFeatureAttachment,
   uploadProjectAttachment,
   uploadTaskAttachment
@@ -16,6 +18,7 @@ import { queryKeys } from "../queries/queryKeys";
 
 export type AttachmentOwner =
   | { type: "project"; id: number }
+  | { type: "milestone"; id: number }
   | { type: "task"; id: number }
   | { type: "feature"; id: number }
   | { type: "ticket"; id: number };
@@ -34,6 +37,9 @@ export function useAttachments(owner: AttachmentOwner | null) {
       }
       if (ownerType === "task") {
         return getTaskAttachments(ownerId as number);
+      }
+      if (ownerType === "milestone") {
+        return getMilestoneAttachments(ownerId as number);
       }
       if (ownerType === "ticket") {
         return getTicketAttachments(ownerId as number);
@@ -59,6 +65,9 @@ export function useAttachments(owner: AttachmentOwner | null) {
       }
       if (ownerType === "task") {
         return uploadTaskAttachment(ownerId as number, file);
+      }
+      if (ownerType === "milestone") {
+        return uploadMilestoneAttachment(ownerId as number, file);
       }
       if (ownerType === "ticket") {
         return uploadTicketAttachment(ownerId as number, file);

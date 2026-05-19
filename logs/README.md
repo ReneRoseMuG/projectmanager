@@ -2,6 +2,8 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 19.05.26 | Fix | Milestone-Web-Tests | ✅ |
+| 19.05.26 | Feature | Meilensteine als Projekt-Subdomäne | ⚠️ |
 | 19.05.26 | Fix / Feature | Demo-Daten-Seed entfernt | ✅ |
 | 19.05.26 | 12 | Events Owner-Junction-Modell | ✅ |
 | 19.05.26 | Fix | Events Owner-Junction Folgeauftrag | ✅ |

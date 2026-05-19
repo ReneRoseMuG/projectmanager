@@ -1,7 +1,7 @@
 import type { Note, NoteInput, NoteUpdate } from "@taskmanager/shared-types";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { notes, projectNotes, projects, taskNotes, tasks, ticketNotes, tickets } from "../db/schema.js";
+import { milestoneNotes, milestones, notes, projectNotes, projects, taskNotes, tasks, ticketNotes, tickets } from "../db/schema.js";
 import { noteRepository, type NoteRecord, type NoteUpdateData } from "../repositories/note.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { parseJsonObject, stringifyJsonObject } from "./helpers.js";
@@ -35,6 +35,13 @@ function ensureTaskExists(database: DbClient, taskId: number): void {
   const task = database.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)).get();
   if (!task) {
     throw notFound(`Task with id ${taskId} not found`);
+  }
+}
+
+function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
+  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+  if (!milestone) {
+    throw notFound(`Milestone with id ${milestoneId} not found`);
   }
 }
 
@@ -85,6 +92,26 @@ export function listTaskNotes(database: DbClient, taskId: number): Note[] {
   return rows.map(mapNote);
 }
 
+export function listMilestoneNotes(database: DbClient, milestoneId: number): Note[] {
+  ensureMilestoneExists(database, milestoneId);
+  const rows = database
+    .select({
+      id: notes.id,
+      title: notes.title,
+      contentJson: notes.contentJson,
+      version: notes.version,
+      createdAt: notes.createdAt,
+      updatedAt: notes.updatedAt
+    })
+    .from(milestoneNotes)
+    .innerJoin(notes, eq(milestoneNotes.noteId, notes.id))
+    .where(eq(milestoneNotes.milestoneId, milestoneId))
+    .orderBy(notes.createdAt, notes.id)
+    .all();
+
+  return rows.map(mapNote);
+}
+
 export function listTicketNotes(database: DbClient, ticketId: number): Note[] {
   ensureTicketExists(database, ticketId);
   const rows = database
@@ -127,6 +154,20 @@ export function createTaskNote(database: DbClient, taskId: number, input: NoteIn
       contentJson: stringifyJsonObject(input.contentJson)
     });
     tx.insert(taskNotes).values({ taskId, noteId: note.id }).run();
+    return note;
+  });
+
+  return mapNote(created);
+}
+
+export function createMilestoneNote(database: DbClient, milestoneId: number, input: NoteInput): Note {
+  ensureMilestoneExists(database, milestoneId);
+  const created = database.transaction((tx) => {
+    const note = noteRepository.create(tx as unknown as DbClient, {
+      title: cleanTitle(input.title),
+      contentJson: stringifyJsonObject(input.contentJson)
+    });
+    tx.insert(milestoneNotes).values({ milestoneId, noteId: note.id }).run();
     return note;
   });
 
@@ -209,6 +250,16 @@ export function deleteTaskNotesForIds(database: DbClient, taskIds: number[]): vo
   }
 
   const rows = database.select({ noteId: taskNotes.noteId }).from(taskNotes).where(inArray(taskNotes.taskId, uniqueIds)).all();
+  deleteNotesByIds(database, rows.map((row) => row.noteId));
+}
+
+export function deleteMilestoneNotesForIds(database: DbClient, milestoneIds: number[]): void {
+  const uniqueIds = [...new Set(milestoneIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const rows = database.select({ noteId: milestoneNotes.noteId }).from(milestoneNotes).where(inArray(milestoneNotes.milestoneId, uniqueIds)).all();
   deleteNotesByIds(database, rows.map((row) => row.noteId));
 }
 

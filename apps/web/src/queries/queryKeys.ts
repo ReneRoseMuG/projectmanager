@@ -1,8 +1,8 @@
 import type { CommentEntityType } from "@taskmanager/shared-types";
 
-export type NoteOwnerType = "project" | "task" | "ticket";
-export type QueryOwnerType = "project" | "task" | "feature" | "ticket";
-export type TicketOwnerType = "project" | "task" | "feature" | "useCase";
+export type NoteOwnerType = "project" | "milestone" | "task" | "ticket";
+export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket";
+export type TicketOwnerType = "project" | "milestone" | "task" | "feature" | "useCase";
 
 export const queryKeys = {
   projects: {
@@ -13,6 +13,15 @@ export const queryKeys = {
     tickets: (projectId: number) => [...queryKeys.projects.detail(projectId), "tickets"] as const,
     backlog: (projectId: number) => [...queryKeys.projects.detail(projectId), "backlog"] as const,
     features: (projectId: number) => [...queryKeys.projects.detail(projectId), "features"] as const
+  },
+  milestones: {
+    root: ["milestones"] as const,
+    list: () => [...queryKeys.milestones.root, "list"] as const,
+    byProject: (projectId: number) => [...queryKeys.projects.detail(projectId), "milestones"] as const,
+    detail: (milestoneId: number) => [...queryKeys.milestones.root, "detail", milestoneId] as const,
+    tasks: (milestoneId: number) => [...queryKeys.milestones.detail(milestoneId), "tasks"] as const,
+    tickets: (milestoneId: number) => [...queryKeys.milestones.detail(milestoneId), "tickets"] as const,
+    features: (milestoneId: number) => [...queryKeys.milestones.detail(milestoneId), "features"] as const
   },
   tasks: {
     root: ["tasks"] as const,

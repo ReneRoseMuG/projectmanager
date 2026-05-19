@@ -38,6 +38,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { errorHandler } = await import("../../src/utils/errors.js");
   const { registerCors } = await import("../../src/plugins/cors.js");
   const { registerProjectsRoutes } = await import("../../src/routes/projects.js");
+  const { registerMilestoneRoutes } = await import("../../src/routes/milestones.js");
   const { registerTasksRoutes } = await import("../../src/routes/tasks.js");
   const { registerSubtasksRoutes } = await import("../../src/routes/subtasks.js");
   const { registerCommentsRoutes } = await import("../../src/routes/comments.js");
@@ -68,6 +69,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   }
 
   await app.register(registerProjectsRoutes, { prefix: "/api" });
+  await app.register(registerMilestoneRoutes, { prefix: "/api" });
   await app.register(registerTasksRoutes, { prefix: "/api" });
   await app.register(registerSubtasksRoutes, { prefix: "/api" });
   await app.register(registerCommentsRoutes, { prefix: "/api" });

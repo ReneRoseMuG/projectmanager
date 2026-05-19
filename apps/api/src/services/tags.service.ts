@@ -1,7 +1,7 @@
 import type { Tag } from "@taskmanager/shared-types";
 import { inArray, eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { projectTags, projects, tags, taskTags, tasks, ticketTags, tickets } from "../db/schema.js";
+import { milestoneTags, milestones, projectTags, projects, tags, taskTags, tasks, ticketTags, tickets } from "../db/schema.js";
 import { tagRepository, type TagRecord, type TagUpdateData } from "../repositories/tag.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
@@ -28,6 +28,13 @@ function ensureTaskExists(database: DbClient, taskId: number): void {
   const task = database.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)).get();
   if (!task) {
     throw notFound(`Task with id ${taskId} not found`);
+  }
+}
+
+function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
+  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+  if (!milestone) {
+    throw notFound(`Milestone with id ${milestoneId} not found`);
   }
 }
 
@@ -81,6 +88,22 @@ export function getTaskTags(database: DbClient, taskId: number): Tag[] {
     .from(taskTags)
     .innerJoin(tags, eq(taskTags.tagId, tags.id))
     .where(eq(taskTags.taskId, taskId))
+    .all();
+
+  return rows.map(mapTag);
+}
+
+export function getMilestoneTags(database: DbClient, milestoneId: number): Tag[] {
+  const rows = database
+    .select({
+      id: tags.id,
+      name: tags.name,
+      color: tags.color,
+      version: tags.version
+    })
+    .from(milestoneTags)
+    .innerJoin(tags, eq(milestoneTags.tagId, tags.id))
+    .where(eq(milestoneTags.milestoneId, milestoneId))
     .all();
 
   return rows.map(mapTag);
@@ -153,6 +176,34 @@ export function getTaskTagsMap(database: DbClient, taskIds: number[]): Map<numbe
     const current = map.get(row.taskId) ?? [];
     current.push({ id: row.id, name: row.name, color: row.color, version: row.version });
     map.set(row.taskId, current);
+  }
+
+  return map;
+}
+
+export function getMilestoneTagsMap(database: DbClient, milestoneIds: number[]): Map<number, Tag[]> {
+  const map = new Map<number, Tag[]>();
+  if (milestoneIds.length === 0) {
+    return map;
+  }
+
+  const rows = database
+    .select({
+      milestoneId: milestoneTags.milestoneId,
+      id: tags.id,
+      name: tags.name,
+      color: tags.color,
+      version: tags.version
+    })
+    .from(milestoneTags)
+    .innerJoin(tags, eq(milestoneTags.tagId, tags.id))
+    .where(inArray(milestoneTags.milestoneId, milestoneIds))
+    .all();
+
+  for (const row of rows) {
+    const current = map.get(row.milestoneId) ?? [];
+    current.push({ id: row.id, name: row.name, color: row.color, version: row.version });
+    map.set(row.milestoneId, current);
   }
 
   return map;
@@ -257,6 +308,23 @@ export function setTaskTags(database: DbClient, taskId: number, tagIds: number[]
   });
 
   return getTaskTags(database, taskId);
+}
+
+export function setMilestoneTags(database: DbClient, milestoneId: number, tagIds: number[]): Tag[] {
+  ensureMilestoneExists(database, milestoneId);
+  ensureTagsExist(database, tagIds);
+
+  database.transaction((tx) => {
+    tx.delete(milestoneTags).where(eq(milestoneTags.milestoneId, milestoneId)).run();
+    const uniqueIds = [...new Set(tagIds)];
+    if (uniqueIds.length > 0) {
+      tx.insert(milestoneTags)
+        .values(uniqueIds.map((tagId) => ({ milestoneId, tagId })))
+        .run();
+    }
+  });
+
+  return getMilestoneTags(database, milestoneId);
 }
 
 export function setTicketTags(database: DbClient, ticketId: number, tagIds: number[]): Tag[] {

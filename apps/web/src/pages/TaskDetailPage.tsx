@@ -20,7 +20,7 @@ function parseTaskOwner(searchParams: URLSearchParams): TaskOwner | undefined {
   const ownerType = searchParams.get("ownerType");
   const ownerIdParam = searchParams.get("ownerId");
   const ownerId = ownerIdParam ? Number(ownerIdParam) : NaN;
-  if ((ownerType === "project" || ownerType === "feature" || ownerType === "useCase") && Number.isFinite(ownerId)) {
+  if ((ownerType === "project" || ownerType === "milestone" || ownerType === "feature" || ownerType === "useCase") && Number.isFinite(ownerId)) {
     return { type: ownerType, id: ownerId };
   }
   return undefined;

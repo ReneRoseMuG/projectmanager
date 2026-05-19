@@ -8,7 +8,7 @@ const eventOwnerSchema = {
   required: ["type", "id"],
   additionalProperties: false,
   properties: {
-    type: { type: "string", enum: ["project", "task"] },
+    type: { type: "string", enum: ["project", "milestone", "task"] },
     id: { type: "integer", minimum: 1 }
   }
 } as const;

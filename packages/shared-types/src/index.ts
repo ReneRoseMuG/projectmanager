@@ -8,7 +8,7 @@ export const TICKET_TYPES = ["bug", "improvement", "question", "task"] as const;
 export const TICKET_STATUSES = ["open", "in_progress", "in_review", "resolved", "closed"] as const;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
-export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "useCase", "backlogItem", "wikiPage", "ticket"] as const;
+export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "milestone", "useCase", "backlogItem", "wikiPage", "ticket"] as const;
 
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export type TaskStatus = (typeof TASK_STATUSES)[number];
@@ -72,6 +72,36 @@ export interface ProjectInput {
 }
 
 export type ProjectUpdate = WithExpectedVersion<Partial<ProjectInput>>;
+
+export interface Milestone {
+  id: number;
+  projectId: number;
+  name: string;
+  description: string | null;
+  status: ProjectStatus;
+  color: string | null;
+  startDate: string | null;
+  dueDate: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  taskCount: number;
+  ticketCount: number;
+  featureCount: number;
+  tags: Tag[];
+}
+
+export interface MilestoneInput {
+  projectId: number;
+  name: string;
+  description?: string | null;
+  status?: ProjectStatus;
+  color?: string | null;
+  startDate?: string | null;
+  dueDate?: string | null;
+}
+
+export type MilestoneUpdate = WithExpectedVersion<Partial<MilestoneInput>>;
 
 export interface Task {
   id: number;
@@ -224,6 +254,7 @@ export interface Attachment {
 
 export type AttachmentOwner =
   | { type: "project"; id: number }
+  | { type: "milestone"; id: number }
   | { type: "task"; id: number }
   | { type: "feature"; id: number }
   | { type: "ticket"; id: number };
@@ -265,7 +296,7 @@ export interface Event {
 
 export type CalendarEvent = Event;
 
-export type EventOwner = { type: "project" | "task"; id: number };
+export type EventOwner = { type: "project" | "milestone" | "task"; id: number };
 
 export interface EventInput {
   title: string;

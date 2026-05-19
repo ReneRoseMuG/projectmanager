@@ -12,7 +12,7 @@ function parseTicketOwner(searchParams: URLSearchParams): TicketOwner | undefine
   const ownerType = searchParams.get("ownerType");
   const ownerIdParam = searchParams.get("ownerId");
   const ownerId = ownerIdParam ? Number(ownerIdParam) : NaN;
-  if ((ownerType === "project" || ownerType === "task" || ownerType === "feature" || ownerType === "useCase") && Number.isFinite(ownerId)) {
+  if ((ownerType === "project" || ownerType === "milestone" || ownerType === "task" || ownerType === "feature" || ownerType === "useCase") && Number.isFinite(ownerId)) {
     return { type: ownerType, id: ownerId };
   }
   return undefined;

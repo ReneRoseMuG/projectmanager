@@ -6,6 +6,7 @@ import { BacklogItemDetailPage } from "./pages/BacklogItemDetailPage";
 import { FeatureDetailPage } from "./pages/FeatureDetailPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
+import { MilestoneDetailPage } from "./pages/MilestoneDetailPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
@@ -29,6 +30,8 @@ export default function App() {
             <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/projects/new" element={<ProjectDetailPage />} />
             <Route path="/projects/:id" element={<ProjectDetailPage />} />
+            <Route path="/milestones/new" element={<MilestoneDetailPage />} />
+            <Route path="/milestones/:id" element={<MilestoneDetailPage />} />
             <Route path="/tickets" element={<TicketsPage />} />
             <Route path="/tickets/new" element={<TicketDetailPage />} />
             <Route path="/tickets/:id" element={<TicketDetailPage />} />

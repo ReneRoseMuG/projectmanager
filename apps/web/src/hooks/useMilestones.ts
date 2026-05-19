@@ -1,0 +1,115 @@
+import type { MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+import {
+  createMilestone as createMilestoneRequest,
+  createProjectMilestone as createProjectMilestoneRequest,
+  deleteMilestone as deleteMilestoneRequest,
+  getMilestone,
+  getMilestones,
+  getProjectMilestones,
+  setMilestoneTags,
+  updateMilestone as updateMilestoneRequest
+} from "../api/milestones";
+import { invalidateMilestoneScope, invalidateMilestones } from "../queries/invalidation";
+import { toQueryError } from "../queries/queryErrors";
+import { queryKeys } from "../queries/queryKeys";
+
+export function useMilestones(milestoneId?: number | null, projectId?: number | null) {
+  const queryClient = useQueryClient();
+  const validMilestoneId = milestoneId !== null && milestoneId !== undefined && Number.isFinite(milestoneId) ? milestoneId : undefined;
+  const validProjectId = projectId !== null && projectId !== undefined && Number.isFinite(projectId) ? projectId : undefined;
+
+  const milestonesQuery = useQuery({
+    queryKey: validProjectId !== undefined ? queryKeys.milestones.byProject(validProjectId) : queryKeys.milestones.list(),
+    queryFn: () => (validProjectId !== undefined ? getProjectMilestones(validProjectId) : getMilestones())
+  });
+
+  const milestoneQuery = useQuery({
+    queryKey: queryKeys.milestones.detail(validMilestoneId ?? 0),
+    queryFn: () => getMilestone(validMilestoneId as number),
+    enabled: validMilestoneId !== undefined
+  });
+
+  const reload = useCallback(async () => {
+    await milestonesQuery.refetch();
+    if (validMilestoneId !== undefined) {
+      await milestoneQuery.refetch();
+    }
+  }, [milestoneQuery, milestonesQuery, validMilestoneId]);
+
+  const createMilestoneMutation = useMutation({
+    mutationFn: async ({ input, tagIds }: { input: MilestoneInput; tagIds: number[] }) => {
+      const created =
+        validProjectId !== undefined && input.projectId === validProjectId
+          ? await createProjectMilestoneRequest(validProjectId, {
+              name: input.name,
+              description: input.description,
+              status: input.status,
+              color: input.color,
+              startDate: input.startDate,
+              dueDate: input.dueDate
+            })
+          : await createMilestoneRequest(input);
+      if (tagIds.length > 0) {
+        await setMilestoneTags(created.id, tagIds);
+      }
+      return created;
+    },
+    onSuccess: async (created) => {
+      await invalidateMilestoneScope(queryClient, created.id, created.projectId);
+    }
+  });
+
+  const updateMilestoneMutation = useMutation({
+    mutationFn: async ({ id, input, tagIds }: { id: number; input: MilestoneUpdate; tagIds?: number[] }) => {
+      const updated = await updateMilestoneRequest(id, input);
+      if (tagIds) {
+        await setMilestoneTags(id, tagIds);
+      }
+      return updated;
+    },
+    onSuccess: async (updated) => {
+      await invalidateMilestoneScope(queryClient, updated.id, updated.projectId);
+    }
+  });
+
+  const removeMilestoneMutation = useMutation({
+    mutationFn: deleteMilestoneRequest,
+    onSuccess: async () => {
+      await invalidateMilestones(queryClient);
+    }
+  });
+
+  const createMilestone = useCallback(
+    async (input: MilestoneInput, tagIds: number[] = []) => {
+      return createMilestoneMutation.mutateAsync({ input, tagIds });
+    },
+    [createMilestoneMutation]
+  );
+
+  const updateMilestone = useCallback(
+    async (id: number, input: MilestoneUpdate, tagIds?: number[]) => {
+      return updateMilestoneMutation.mutateAsync({ id, input, tagIds });
+    },
+    [updateMilestoneMutation]
+  );
+
+  const removeMilestone = useCallback(
+    async (id: number) => {
+      await removeMilestoneMutation.mutateAsync(id);
+    },
+    [removeMilestoneMutation]
+  );
+
+  return {
+    milestones: milestonesQuery.data ?? [],
+    milestone: milestoneQuery.data ?? null,
+    loading: milestonesQuery.isLoading || milestoneQuery.isLoading,
+    error: toQueryError(milestonesQuery.error ?? milestoneQuery.error),
+    reload,
+    createMilestone,
+    updateMilestone,
+    removeMilestone
+  };
+}

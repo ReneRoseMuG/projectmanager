@@ -24,6 +24,9 @@ function ownerTicketKey(owner?: TicketOwner | null) {
   if (owner.type === "project") {
     return queryKeys.projects.tickets(owner.id);
   }
+  if (owner.type === "milestone") {
+    return queryKeys.milestones.tickets(owner.id);
+  }
   if (owner.type === "task") {
     return queryKeys.tasks.tickets(owner.id);
   }

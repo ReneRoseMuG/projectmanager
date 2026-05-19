@@ -1,7 +1,7 @@
 import type { FeatureRelation, FeatureRelationInput } from "@taskmanager/shared-types";
 import { eq, inArray, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { featureRelations, features, projectFeatures, projects, useCases } from "../db/schema.js";
+import { featureRelations, features, milestoneFeatures, milestones, projectFeatures, projects, useCases } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import type { FeatureDto } from "./features.service.js";
 
@@ -30,6 +30,13 @@ function ensureProjectExists(database: DbClient, projectId: number): void {
   const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
+  }
+}
+
+function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
+  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+  if (!milestone) {
+    throw notFound(`Milestone with id ${milestoneId} not found`);
   }
 }
 
@@ -126,6 +133,44 @@ export function setProjectFeatures(database: DbClient, projectId: number, featur
   });
 
   return listProjectFeatures(database, projectId);
+}
+
+export function listMilestoneFeatures(database: DbClient, milestoneId: number): FeatureDto[] {
+  ensureMilestoneExists(database, milestoneId);
+  const rows = database
+    .select({
+      id: features.id,
+      title: features.title,
+      slug: features.slug,
+      status: features.status,
+      description: features.description,
+      contentPath: features.contentPath,
+      sortOrder: features.sortOrder,
+      version: features.version,
+      createdAt: features.createdAt,
+      updatedAt: features.updatedAt
+    })
+    .from(milestoneFeatures)
+    .innerJoin(features, eq(milestoneFeatures.featureId, features.id))
+    .where(eq(milestoneFeatures.milestoneId, milestoneId))
+    .all();
+  const counts = getUseCaseCountMap(database, rows.map((row) => row.id));
+
+  return rows.map((row) => mapFeature(row, counts.get(row.id) ?? 0));
+}
+
+export function setMilestoneFeatures(database: DbClient, milestoneId: number, featureIds: number[]): FeatureDto[] {
+  ensureMilestoneExists(database, milestoneId);
+  const uniqueIds = ensureFeaturesExist(database, featureIds);
+
+  database.transaction((tx) => {
+    tx.delete(milestoneFeatures).where(eq(milestoneFeatures.milestoneId, milestoneId)).run();
+    if (uniqueIds.length > 0) {
+      tx.insert(milestoneFeatures).values(uniqueIds.map((featureId) => ({ milestoneId, featureId }))).run();
+    }
+  });
+
+  return listMilestoneFeatures(database, milestoneId);
 }
 
 export function listFeatureRelations(database: DbClient, featureId: number): FeatureRelation[] {

@@ -1,4 +1,4 @@
-import { BookOpen, Bug, CircleHelp, ClipboardList, FileText, FolderKanban, ListTodo, Paperclip, Plus, Search, Sparkles, StickyNote, X } from "lucide-react";
+import { BookOpen, Bug, CircleHelp, ClipboardList, FileText, Flag, FolderKanban, ListTodo, Paperclip, Plus, Search, Sparkles, StickyNote, X } from "lucide-react";
 import type { Ticket } from "@taskmanager/shared-types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +11,7 @@ interface GlobalSearchProps {
   onClose: () => void;
 }
 
-type Scope = "all" | "projects" | "tasks" | "tickets" | "features" | "notes" | "wiki" | "files";
+type Scope = "all" | "projects" | "milestones" | "tasks" | "tickets" | "features" | "notes" | "wiki" | "files";
 
 function ticketIcon(ticket: Ticket) {
   if (ticket.type === "bug") {
@@ -31,13 +31,16 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   const searchData = useGlobalSearchData(open);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("all");
-  const { projects, features, wikiPages, tasks, tickets, notes, attachments } = searchData.data;
+  const { projects, milestones, features, wikiPages, tasks, tickets, notes, attachments } = searchData.data;
 
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const projectResults = projects
       .filter((project) => !normalized || project.name.toLowerCase().includes(normalized) || richTextToPlainText(project.description).toLowerCase().includes(normalized))
       .map((project) => ({ id: `project-${project.id}`, type: "Projekte", title: project.name, meta: `PROJECT-${project.id}`, to: `/projects/${project.id}`, icon: <FolderKanban size={17} /> }));
+    const milestoneResults = milestones
+      .filter((milestone) => !normalized || milestone.name.toLowerCase().includes(normalized) || richTextToPlainText(milestone.description).toLowerCase().includes(normalized))
+      .map((milestone) => ({ id: `milestone-${milestone.id}`, type: "Meilensteine", title: milestone.name, meta: `MILESTONE-${milestone.id}`, to: `/milestones/${milestone.id}`, icon: <Flag size={17} /> }));
     const featureResults = features
       .filter((feature) => !normalized || feature.title.toLowerCase().includes(normalized) || feature.slug.toLowerCase().includes(normalized))
       .map((feature) => ({ id: `feature-${feature.id}`, type: "Features", title: feature.title, meta: feature.slug, to: `/features/${feature.id}`, icon: <BookOpen size={17} /> }));
@@ -58,6 +61,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
       .map((attachment) => ({ id: `file-${attachment.id}`, type: "Dateien", title: attachment.originalName, meta: attachment.mimetype, to: "/projects", icon: <Paperclip size={17} /> }));
     return [
       ...(scope === "all" || scope === "projects" ? projectResults : []),
+      ...(scope === "all" || scope === "milestones" ? milestoneResults : []),
       ...(scope === "all" || scope === "tasks" ? taskResults : []),
       ...(scope === "all" || scope === "tickets" ? ticketResults : []),
       ...(scope === "all" || scope === "features" ? featureResults : []),
@@ -65,7 +69,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
       ...(scope === "all" || scope === "wiki" ? wikiResults : []),
       ...(scope === "all" || scope === "files" ? fileResults : [])
     ];
-  }, [attachments, features, notes, projects, query, scope, tasks, tickets, wikiPages]);
+  }, [attachments, features, milestones, notes, projects, query, scope, tasks, tickets, wikiPages]);
 
   const go = (to: string) => {
     navigate(to);
@@ -77,8 +81,9 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   }
 
   const scopes: Array<{ value: Scope; label: string; count: number }> = [
-    { value: "all", label: "Alle", count: projects.length + tasks.length + tickets.length + features.length + notes.length + wikiPages.length + attachments.length },
+    { value: "all", label: "Alle", count: projects.length + milestones.length + tasks.length + tickets.length + features.length + notes.length + wikiPages.length + attachments.length },
     { value: "projects", label: "Projekte", count: projects.length },
+    { value: "milestones", label: "Meilensteine", count: milestones.length },
     { value: "tasks", label: "Aufgaben", count: tasks.length },
     { value: "tickets", label: "Tickets", count: tickets.length },
     { value: "features", label: "Features", count: features.length },
@@ -122,7 +127,7 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
               </button>
             </div>
           ) : results.length === 0 ? (
-            <EmptyState icon={<Search size={22} />} title="Keine Treffer" body={`Für "${query}" wurde nichts in den geladenen Projekten oder Features gefunden.`} tone="neutral" variant="default" actions={[{ label: "Neue Aufgabe mit diesem Titel", onClick: () => go("/projects"), icon: <Plus size={16} /> }]} />
+            <EmptyState icon={<Search size={22} />} title="Keine Treffer" body={`Für "${query}" wurde nichts in den geladenen Daten gefunden.`} tone="neutral" variant="default" actions={[{ label: "Neue Aufgabe mit diesem Titel", onClick: () => go("/projects"), icon: <Plus size={16} /> }]} />
           ) : (
             <div className="grid gap-1">
               {results.map((result) => (

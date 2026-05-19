@@ -13,6 +13,13 @@ export interface FeatureFixture {
   slug: string;
 }
 
+export interface MilestoneFixture {
+  id: number;
+  projectId: number;
+  name: string;
+  version: number;
+}
+
 export interface UseCaseFixture {
   id: number;
   title: string;
@@ -34,7 +41,7 @@ export interface EventFixture {
   id: number;
   title: string;
   version: number;
-  owners: Array<{ type: "project" | "task"; id: number }>;
+  owners: Array<{ type: "project" | "milestone" | "task"; id: number }>;
 }
 
 export interface BacklogItemFixture {
@@ -43,8 +50,8 @@ export interface BacklogItemFixture {
   projectId: number;
 }
 
-export type TaskOwner = { type: "project" | "feature" | "useCase"; id: number };
-export type TicketOwner = { type: "project" | "task" | "feature" | "useCase"; id: number };
+export type TaskOwner = { type: "project" | "milestone" | "feature" | "useCase"; id: number };
+export type TicketOwner = { type: "project" | "milestone" | "task" | "feature" | "useCase"; id: number };
 
 export function uniqueTitle(prefix: string) {
   return `${prefix} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
@@ -58,6 +65,9 @@ function taskOwnerPath(owner: TaskOwner) {
   if (owner.type === "project") {
     return `projects/${owner.id}`;
   }
+  if (owner.type === "milestone") {
+    return `milestones/${owner.id}`;
+  }
   if (owner.type === "feature") {
     return `features/${owner.id}`;
   }
@@ -67,6 +77,9 @@ function taskOwnerPath(owner: TaskOwner) {
 function ticketOwnerPath(owner: TicketOwner) {
   if (owner.type === "project") {
     return `projects/${owner.id}`;
+  }
+  if (owner.type === "milestone") {
+    return `milestones/${owner.id}`;
   }
   if (owner.type === "task") {
     return `tasks/${owner.id}`;
@@ -91,6 +104,28 @@ export async function createProject(request: APIRequestContext, titlePrefix: str
   });
   expect(response.ok()).toBeTruthy();
   return response.json() as Promise<ProjectFixture>;
+}
+
+export async function createMilestone(
+  request: APIRequestContext,
+  projectId: number,
+  titlePrefix: string,
+  input: Partial<{ description: string; status: string; color: string; startDate: string; dueDate: string }> = {}
+) {
+  const name = uniqueTitle(titlePrefix);
+  const response = await request.post(`${apiBaseUrl}/milestones`, {
+    data: {
+      projectId,
+      name,
+      description: input.description ?? "<p>E2E Meilensteinbeschreibung vollständig</p>",
+      status: input.status ?? "active",
+      color: input.color ?? "#14B8A6",
+      startDate: input.startDate ?? "2026-06-01",
+      dueDate: input.dueDate ?? "2026-06-30"
+    }
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<MilestoneFixture>;
 }
 
 export async function createFeature(request: APIRequestContext, titlePrefix: string, input: Partial<{ description: string; content: string; status: string; sortOrder: number }> = {}) {
@@ -168,7 +203,7 @@ export async function createTicket(request: APIRequestContext, owner: TicketOwne
 export async function createEvent(
   request: APIRequestContext,
   titlePrefix: string,
-  input: Partial<{ owners: Array<{ type: "project" | "task"; id: number }>; startTime: string; endTime: string; isAllDay: boolean; color: string | null }> = {}
+  input: Partial<{ owners: Array<{ type: "project" | "milestone" | "task"; id: number }>; startTime: string; endTime: string; isAllDay: boolean; color: string | null }> = {}
 ) {
   const title = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/events`, {
@@ -203,6 +238,12 @@ export async function createBacklogItem(request: APIRequestContext, projectId: n
 export async function deleteProject(request: APIRequestContext, projectId: number | null | undefined) {
   if (projectId) {
     await request.delete(`${apiBaseUrl}/projects/${projectId}`);
+  }
+}
+
+export async function deleteMilestone(request: APIRequestContext, milestoneId: number | null | undefined) {
+  if (milestoneId) {
+    await request.delete(`${apiBaseUrl}/milestones/${milestoneId}`);
   }
 }
 

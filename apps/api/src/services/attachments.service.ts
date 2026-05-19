@@ -5,7 +5,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { config } from "../config.js";
 import type { DbClient } from "../db/client.js";
-import { attachments, featureAttachments, features, projectAttachments, projects, taskAttachments, tasks, ticketAttachments, tickets } from "../db/schema.js";
+import { attachments, featureAttachments, features, milestoneAttachments, milestones, projectAttachments, projects, taskAttachments, tasks, ticketAttachments, tickets } from "../db/schema.js";
 import { attachmentRepository, type AttachmentRecord } from "../repositories/attachment.repository.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { notFound } from "../utils/errors.js";
@@ -61,6 +61,13 @@ function ensureTaskExists(database: DbClient, taskId: number): void {
   }
 }
 
+function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
+  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+  if (!milestone) {
+    throw notFound(`Milestone with id ${milestoneId} not found`);
+  }
+}
+
 function ensureFeatureExists(database: DbClient, featureId: number): void {
   const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
   if (!feature) {
@@ -82,6 +89,10 @@ function ensureOwnerExists(database: DbClient, owner: AttachmentOwner): void {
   }
   if (owner.type === "task") {
     ensureTaskExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "milestone") {
+    ensureMilestoneExists(database, owner.id);
     return;
   }
   if (owner.type === "feature") {
@@ -111,6 +122,12 @@ function listAttachmentOwners(database: DbClient, attachmentId: number): Attachm
       .all()
       .map((row) => ({ type: "task" as const, id: row.id })),
     ...database
+      .select({ id: milestoneAttachments.milestoneId })
+      .from(milestoneAttachments)
+      .where(eq(milestoneAttachments.attachmentId, attachmentId))
+      .all()
+      .map((row) => ({ type: "milestone" as const, id: row.id })),
+    ...database
       .select({ id: featureAttachments.featureId })
       .from(featureAttachments)
       .where(eq(featureAttachments.attachmentId, attachmentId))
@@ -132,6 +149,10 @@ function insertAttachmentLink(database: DbClient, owner: AttachmentOwner, attach
   }
   if (owner.type === "task") {
     database.insert(taskAttachments).values({ taskId: owner.id, attachmentId }).onConflictDoNothing().run();
+    return;
+  }
+  if (owner.type === "milestone") {
+    database.insert(milestoneAttachments).values({ milestoneId: owner.id, attachmentId }).onConflictDoNothing().run();
     return;
   }
   if (owner.type === "feature") {
@@ -177,9 +198,11 @@ async function deleteAttachmentsOwnedOnlyBy(database: DbClient, ownerType: Attac
       ? database.select({ id: projectAttachments.attachmentId }).from(projectAttachments).where(inArray(projectAttachments.projectId, uniqueIds)).all()
       : ownerType === "task"
         ? database.select({ id: taskAttachments.attachmentId }).from(taskAttachments).where(inArray(taskAttachments.taskId, uniqueIds)).all()
-        : ownerType === "feature"
-          ? database.select({ id: featureAttachments.attachmentId }).from(featureAttachments).where(inArray(featureAttachments.featureId, uniqueIds)).all()
-          : database.select({ id: ticketAttachments.attachmentId }).from(ticketAttachments).where(inArray(ticketAttachments.ticketId, uniqueIds)).all();
+        : ownerType === "milestone"
+          ? database.select({ id: milestoneAttachments.attachmentId }).from(milestoneAttachments).where(inArray(milestoneAttachments.milestoneId, uniqueIds)).all()
+          : ownerType === "feature"
+            ? database.select({ id: featureAttachments.attachmentId }).from(featureAttachments).where(inArray(featureAttachments.featureId, uniqueIds)).all()
+            : database.select({ id: ticketAttachments.attachmentId }).from(ticketAttachments).where(inArray(ticketAttachments.ticketId, uniqueIds)).all();
 
   const attachmentIds = [...new Set(candidateRows.map((row) => row.id))].filter((attachmentId) => attachmentOnlyOwnedBy(database, attachmentId, ownerType, idSet));
   if (attachmentIds.length === 0) {
@@ -235,6 +258,15 @@ function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Att
       .orderBy(desc(attachments.createdAt))
       .all();
   }
+  if (owner.type === "milestone") {
+    return database
+      .select(attachmentSelect)
+      .from(milestoneAttachments)
+      .innerJoin(attachments, eq(milestoneAttachments.attachmentId, attachments.id))
+      .where(eq(milestoneAttachments.milestoneId, owner.id))
+      .orderBy(desc(attachments.createdAt))
+      .all();
+  }
   if (owner.type === "feature") {
     return database
       .select(attachmentSelect)
@@ -266,6 +298,10 @@ export function listTaskAttachments(database: DbClient, taskId: number): Attachm
   return listOwnerAttachments(database, { type: "task", id: taskId });
 }
 
+export function listMilestoneAttachments(database: DbClient, milestoneId: number): Attachment[] {
+  return listOwnerAttachments(database, { type: "milestone", id: milestoneId });
+}
+
 export function listFeatureAttachments(database: DbClient, featureId: number): Attachment[] {
   return listOwnerAttachments(database, { type: "feature", id: featureId });
 }
@@ -280,6 +316,10 @@ export async function deleteProjectAttachmentsForIds(database: DbClient, project
 
 export async function deleteTaskAttachmentsForIds(database: DbClient, taskIds: number[]): Promise<void> {
   await deleteAttachmentsOwnedOnlyBy(database, "task", taskIds);
+}
+
+export async function deleteMilestoneAttachmentsForIds(database: DbClient, milestoneIds: number[]): Promise<void> {
+  await deleteAttachmentsOwnedOnlyBy(database, "milestone", milestoneIds);
 }
 
 export async function deleteFeatureAttachmentsForIds(database: DbClient, featureIds: number[]): Promise<void> {
@@ -298,6 +338,12 @@ export async function createProjectAttachment(database: DbClient, projectId: num
 
 export async function createTaskAttachment(database: DbClient, taskId: number, upload: AttachmentUpload): Promise<Attachment> {
   const owner = { type: "task" as const, id: taskId };
+  ensureOwnerExists(database, owner);
+  return persistAttachment({ database, owner, upload });
+}
+
+export async function createMilestoneAttachment(database: DbClient, milestoneId: number, upload: AttachmentUpload): Promise<Attachment> {
+  const owner = { type: "milestone" as const, id: milestoneId };
   ensureOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload });
 }

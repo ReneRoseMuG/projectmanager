@@ -43,6 +43,24 @@ export const projects = sqliteTable("projects", {
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
 
+export const milestones = sqliteTable("milestones", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status", { enum: PROJECT_STATUSES }).notNull().default("active"),
+  color: text("color").default("#6366f1"),
+  startDate: text("start_date"),
+  dueDate: text("due_date"),
+  version: integer("version").notNull().default(1),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+});
+
 export const tasks = sqliteTable(
   "tasks",
   {
@@ -85,6 +103,21 @@ export const projectComments = sqliteTable(
   },
   (table) => ({
     projectCommentUnique: uniqueIndex("project_comments_parent_comment_unique").on(table.projectId, table.commentId)
+  })
+);
+
+export const milestoneComments = sqliteTable(
+  "milestone_comments",
+  {
+    milestoneId: integer("milestone_id")
+      .notNull()
+      .references(() => milestones.id, { onDelete: "cascade" }),
+    commentId: integer("comment_id")
+      .notNull()
+      .references(() => comments.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    milestoneCommentUnique: uniqueIndex("milestone_comments_parent_comment_unique").on(table.milestoneId, table.commentId)
   })
 );
 
@@ -183,6 +216,15 @@ export const projectTags = sqliteTable("project_tags", {
     .references(() => tags.id, { onDelete: "cascade" })
 });
 
+export const milestoneTags = sqliteTable("milestone_tags", {
+  milestoneId: integer("milestone_id")
+    .notNull()
+    .references(() => milestones.id, { onDelete: "cascade" }),
+  tagId: integer("tag_id")
+    .notNull()
+    .references(() => tags.id, { onDelete: "cascade" })
+});
+
 export const taskTags = sqliteTable("task_tags", {
   taskId: integer("task_id")
     .notNull()
@@ -207,6 +249,15 @@ export const projectNotes = sqliteTable("project_notes", {
   projectId: integer("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
+  noteId: integer("note_id")
+    .notNull()
+    .references(() => notes.id, { onDelete: "cascade" })
+});
+
+export const milestoneNotes = sqliteTable("milestone_notes", {
+  milestoneId: integer("milestone_id")
+    .notNull()
+    .references(() => milestones.id, { onDelete: "cascade" }),
   noteId: integer("note_id")
     .notNull()
     .references(() => notes.id, { onDelete: "cascade" })
@@ -249,6 +300,21 @@ export const projectAttachments = sqliteTable(
   },
   (table) => ({
     projectAttachmentUnique: uniqueIndex("project_attachments_parent_attachment_unique").on(table.projectId, table.attachmentId)
+  })
+);
+
+export const milestoneAttachments = sqliteTable(
+  "milestone_attachments",
+  {
+    milestoneId: integer("milestone_id")
+      .notNull()
+      .references(() => milestones.id, { onDelete: "cascade" }),
+    attachmentId: integer("attachment_id")
+      .notNull()
+      .references(() => attachments.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    milestoneAttachmentUnique: uniqueIndex("milestone_attachments_parent_attachment_unique").on(table.milestoneId, table.attachmentId)
   })
 );
 
@@ -339,6 +405,21 @@ export const taskEvents = sqliteTable(
   },
   (table) => ({
     taskEventUnique: uniqueIndex("task_events_parent_event_unique").on(table.taskId, table.eventId)
+  })
+);
+
+export const milestoneEvents = sqliteTable(
+  "milestone_events",
+  {
+    milestoneId: integer("milestone_id")
+      .notNull()
+      .references(() => milestones.id, { onDelete: "cascade" }),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    milestoneEventUnique: uniqueIndex("milestone_events_parent_event_unique").on(table.milestoneId, table.eventId)
   })
 );
 
@@ -445,6 +526,15 @@ export const projectFeatures = sqliteTable("project_features", {
     .references(() => features.id, { onDelete: "cascade" })
 });
 
+export const milestoneFeatures = sqliteTable("milestone_features", {
+  milestoneId: integer("milestone_id")
+    .notNull()
+    .references(() => milestones.id, { onDelete: "cascade" }),
+  featureId: integer("feature_id")
+    .notNull()
+    .references(() => features.id, { onDelete: "cascade" })
+});
+
 export const projectTasks = sqliteTable(
   "project_tasks",
   {
@@ -458,6 +548,22 @@ export const projectTasks = sqliteTable(
   },
   (table) => ({
     projectTaskUnique: uniqueIndex("project_tasks_owner_task_unique").on(table.ownerId, table.taskId)
+  })
+);
+
+export const milestoneTasks = sqliteTable(
+  "milestone_tasks",
+  {
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => milestones.id, { onDelete: "cascade" }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    milestoneTaskUnique: uniqueIndex("milestone_tasks_owner_task_unique").on(table.ownerId, table.taskId)
   })
 );
 
@@ -529,6 +635,22 @@ export const projectTickets = sqliteTable(
   },
   (table) => ({
     projectTicketUnique: uniqueIndex("project_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
+  })
+);
+
+export const milestoneTickets = sqliteTable(
+  "milestone_tickets",
+  {
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => milestones.id, { onDelete: "cascade" }),
+    ticketId: integer("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    milestoneTicketUnique: uniqueIndex("milestone_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
   })
 );
 

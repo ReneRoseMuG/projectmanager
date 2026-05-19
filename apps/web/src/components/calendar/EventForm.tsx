@@ -1,4 +1,4 @@
-import type { CalendarEvent, EventInput, Project, Task } from "@taskmanager/shared-types";
+import type { CalendarEvent, EventInput, EventOwner, Milestone, Project, Task } from "@taskmanager/shared-types";
 import { CalendarClock, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
@@ -16,7 +16,9 @@ interface EventFormProps {
   open: boolean;
   event: CalendarEvent | null;
   initialDate?: string | null;
+  initialOwners?: EventOwner[];
   projects: Project[];
+  milestones?: Milestone[];
   tasks: Task[];
   onSubmit: (input: EventInput, eventId?: number) => Promise<void>;
   onDelete: (event: CalendarEvent) => Promise<void>;
@@ -38,15 +40,16 @@ function dateAtHour(date: string, hour: number): string {
   return `${date.slice(0, 10)}T${String(hour).padStart(2, "0")}:00`;
 }
 
-function ownerIds(event: CalendarEvent | null, type: "project" | "task"): number[] {
-  return event?.owners.filter((owner) => owner.type === type).map((owner) => owner.id) ?? [];
+function ownerIds(event: CalendarEvent | null, initialOwners: EventOwner[] | undefined, type: EventOwner["type"]): number[] {
+  const owners = event?.owners ?? initialOwners ?? [];
+  return owners.filter((owner) => owner.type === type).map((owner) => owner.id);
 }
 
 function toggleId(values: number[], id: number): number[] {
   return values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
 }
 
-export function EventForm({ open, event, initialDate, projects, tasks, onSubmit, onDelete, onClose }: EventFormProps) {
+export function EventForm({ open, event, initialDate, initialOwners, projects, milestones = [], tasks, onSubmit, onDelete, onClose }: EventFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -54,6 +57,7 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
   const [isAllDay, setIsAllDay] = useState(false);
   const [color, setColor] = useState(colors[0] ?? "var(--color-steel-700)");
   const [projectIds, setProjectIds] = useState<number[]>([]);
+  const [milestoneIds, setMilestoneIds] = useState<number[]>([]);
   const [taskIds, setTaskIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -68,9 +72,10 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
     setEndTime(event ? toDateTimeLocalInput(event.endTime) : dateAtHour(initialDate ?? new Date().toISOString(), 10));
     setIsAllDay(event?.isAllDay ?? false);
     setColor(event?.color ?? colors[0] ?? "var(--color-steel-700)");
-    setProjectIds(ownerIds(event, "project"));
-    setTaskIds(ownerIds(event, "task"));
-  }, [event, initialDate, open]);
+    setProjectIds(ownerIds(event, initialOwners, "project"));
+    setMilestoneIds(ownerIds(event, initialOwners, "milestone"));
+    setTaskIds(ownerIds(event, initialOwners, "task"));
+  }, [event, initialDate, initialOwners, open]);
 
   const submit = async (submitEvent: FormEvent<HTMLFormElement>) => {
     submitEvent.preventDefault();
@@ -86,6 +91,7 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
           color,
           owners: [
             ...projectIds.map((id) => ({ type: "project" as const, id })),
+            ...milestoneIds.map((id) => ({ type: "milestone" as const, id })),
             ...taskIds.map((id) => ({ type: "task" as const, id }))
           ]
         },
@@ -124,7 +130,7 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
           <input type="checkbox" checked={isAllDay} onChange={(inputEvent) => setIsAllDay(inputEvent.target.checked)} />
           Ganztägig
         </label>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-3">
           <DatePicker label="Start" mode="datetime-local" value={startTime} onChange={(inputEvent) => setStartTime(inputEvent.target.value)} />
           <DatePicker label="Ende" mode="datetime-local" value={endTime} onChange={(inputEvent) => setEndTime(inputEvent.target.value)} />
         </div>
@@ -143,6 +149,20 @@ export function EventForm({ open, event, initialDate, projects, tasks, onSubmit,
                 ))
               ) : (
                 <p className="text-sm text-slate-500">Keine Projekte</p>
+              )}
+            </div>
+          </FormField>
+          <FormField label="Meilensteine">
+            <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
+              {milestones.length > 0 ? (
+                milestones.map((milestone) => (
+                  <label key={milestone.id} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" checked={milestoneIds.includes(milestone.id)} onChange={() => setMilestoneIds((current) => toggleId(current, milestone.id))} />
+                    {milestone.name}
+                  </label>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Keine Meilensteine</p>
               )}
             </div>
           </FormField>

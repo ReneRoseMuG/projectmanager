@@ -4,6 +4,7 @@ import type {
   BacklogItem,
   Comment,
   Feature,
+  Milestone,
   Note,
   Project,
   Task,
@@ -32,6 +33,7 @@ const ownerFormMocks = vi.hoisted(() => ({
   removeProjectFromFeature: vi.fn(),
   createComment: vi.fn(),
   removeComment: vi.fn(),
+  removeMilestone: vi.fn(),
   createBacklogItem: vi.fn(),
   updateBacklogItem: vi.fn(),
   removeBacklogItem: vi.fn(),
@@ -82,6 +84,23 @@ const fixtures = vi.hoisted(() => {
     openTaskCount: 1,
     doneTaskCount: 0,
     totalTaskCount: 1,
+    tags: []
+  };
+  const milestone = {
+    id: 35,
+    projectId: project.id,
+    name: "Meilenstein Alpha",
+    description: "<p>Meilenstein</p>",
+    status: "active",
+    color: "var(--color-teal)",
+    startDate: null,
+    dueDate: null,
+    version: 1,
+    createdAt: "2026-05-18T08:00:00.000Z",
+    updatedAt: "2026-05-18T09:00:00.000Z",
+    taskCount: 0,
+    ticketCount: 0,
+    featureCount: 0,
     tags: []
   };
   const task = {
@@ -159,12 +178,13 @@ const fixtures = vi.hoisted(() => {
     attachments: [attachment]
   };
 
-  return { attachment, comment, feature, note, project, task, taskDetail, ticket, useCase };
+  return { attachment, comment, feature, milestone, note, project, task, taskDetail, ticket, useCase };
 });
 
 export const feature = fixtures.feature as Feature;
 export const useCase = fixtures.useCase as UseCase;
 export const project = fixtures.project as Project;
+export const milestone = fixtures.milestone as Milestone;
 export const task = fixtures.task as Task;
 export const ticket = fixtures.ticket as Ticket;
 
@@ -364,6 +384,17 @@ vi.mock("../../hooks/useProjects", () => ({
   }
 }));
 
+vi.mock("../../hooks/useMilestones", () => ({
+  useMilestones() {
+    return {
+      milestones: [fixtures.milestone],
+      loading: false,
+      removeMilestone: ownerFormMocks.removeMilestone,
+      reload: vi.fn().mockResolvedValue(undefined)
+    };
+  }
+}));
+
 vi.mock("../../hooks/useUseCases", () => ({
   useUseCases() {
     return {
@@ -461,6 +492,7 @@ beforeEach(() => {
   ownerFormMocks.removeProjectFromFeature.mockResolvedValue(undefined);
   ownerFormMocks.createComment.mockResolvedValue(fixtures.comment);
   ownerFormMocks.removeComment.mockResolvedValue(undefined);
+  ownerFormMocks.removeMilestone.mockResolvedValue(undefined);
   ownerFormMocks.createBacklogItem.mockResolvedValue(undefined);
   ownerFormMocks.updateBacklogItem.mockResolvedValue(undefined);
   ownerFormMocks.removeBacklogItem.mockResolvedValue(undefined);

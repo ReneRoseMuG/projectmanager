@@ -5,6 +5,7 @@ import type {
   DraftTask,
   DraftTicket,
   Feature,
+  Milestone,
   Note,
   Priority,
   Project,
@@ -14,7 +15,7 @@ import type {
   TaskStatus,
   TicketStatus
 } from "@taskmanager/shared-types";
-import { FolderKanban, Inbox, ListTodo, Paperclip, StickyNote, Trash2 } from "lucide-react";
+import { Flag, FolderKanban, Inbox, ListTodo, Paperclip, StickyNote, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -24,6 +25,7 @@ import { useAttachments } from "../../hooks/useAttachments";
 import { useBacklog } from "../../hooks/useBacklog";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useFeatures } from "../../hooks/useFeatures";
+import { useMilestones } from "../../hooks/useMilestones";
 import { useNotes } from "../../hooks/useNotes";
 import { useProjectFeatureLinks } from "../../hooks/useDocLinks";
 import { useTickets } from "../../hooks/useTickets";
@@ -35,6 +37,7 @@ import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { BacklogListBoardView } from "../backlog/BacklogListBoardView";
 import { ProjectFeaturePanel } from "../features/ProjectFeaturePanel";
 import { WikiImportPanel } from "../imports/WikiImportPanel";
+import { MilestoneListBoardView } from "../milestones/MilestoneListBoardView";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { TagPicker } from "../tags/TagPicker";
@@ -88,10 +91,11 @@ interface ProjectFormProps {
   ) => Promise<void>;
 }
 
-type ProjectFormTab = "details" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "backlog" | "import";
+type ProjectFormTab = "details" | "milestones" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "backlog" | "import";
 
 const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "details", label: "Details" },
+  { value: "milestones", label: "Meilensteine" },
   { value: "features", label: "Features" },
   { value: "tasks", label: "Aufgaben" },
   { value: "tickets", label: "Tickets" },
@@ -159,6 +163,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const allFeatures = useFeatures();
+  const milestones = useMilestones(null, projectId);
   const featureLinks = useProjectFeatureLinks(projectId);
   const tickets = useTickets(projectId ? { type: "project", id: projectId } : null);
   const backlog = useBacklog(projectId);
@@ -309,6 +314,24 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
     }
   };
 
+  const deleteMilestone = async (milestone: Milestone) => {
+    const approved = await confirm({
+      title: "Meilenstein löschen?",
+      body: `Der Meilenstein "${milestone.name}" wird entfernt.`,
+      severity: "danger",
+      confirmLabel: "Löschen"
+    });
+    if (!approved) {
+      return;
+    }
+    try {
+      await milestones.removeMilestone(milestone.id);
+      showToast({ tone: "success", title: "Meilenstein gelöscht" });
+    } catch (milestoneError) {
+      showToast({ tone: "error", title: "Meilenstein konnte nicht gelöscht werden", message: errorMessage(milestoneError) });
+    }
+  };
+
   const previewWikiImport = async () => {
     try {
       const report = await wikiImport.previewImport(wikiImportSourcePath);
@@ -335,6 +358,9 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
 
   const visibleTabs = project ? baseTabs : baseTabs.filter((tab) => tab.value !== "import");
   const tabItems = visibleTabs.map((tab) => {
+    if (tab.value === "milestones") {
+      return { ...tab, count: project ? milestones.milestones.length : undefined };
+    }
     if (tab.value === "features") {
       return { ...tab, count: project ? featureLinks.features.length : pendingFeatures.length };
     }
@@ -414,6 +440,22 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
               <TagPicker selected={selectedTags} onChange={setSelectedTags} />
             </Section>
           </>
+        ) : null}
+
+        {activeTab === "milestones" ? (
+          <Section title="Meilensteine">
+            {project ? (
+              <MilestoneListBoardView
+                milestones={milestones.milestones}
+                loading={milestones.loading}
+                onCreate={() => navigate(`/milestones/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                onEdit={(milestone) => navigate(`/milestones/${milestone.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                onDelete={(milestone) => void deleteMilestone(milestone)}
+              />
+            ) : (
+              <EmptyState icon={<Flag size={22} />} title="Meilensteine sind nach dem Speichern verfügbar." tone="teal" variant="tinted" />
+            )}
+          </Section>
         ) : null}
 
         {activeTab === "features" ? (

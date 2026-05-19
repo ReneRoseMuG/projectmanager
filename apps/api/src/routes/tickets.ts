@@ -172,6 +172,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
 
   const ownerRoutes: Array<{ path: string; ownerType: TicketOwner["type"] }> = [
     { path: "/projects/:id/tickets", ownerType: "project" },
+    { path: "/milestones/:id/tickets", ownerType: "milestone" },
     { path: "/tasks/:id/tickets", ownerType: "task" },
     { path: "/features/:id/tickets", ownerType: "feature" },
     { path: "/use-cases/:id/tickets", ownerType: "useCase" }

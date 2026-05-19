@@ -6,6 +6,7 @@ import { projectRepository, type ProjectRecord } from "../repositories/project.r
 import { badRequest, notFound } from "../utils/errors.js";
 import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
+import { deleteMilestoneOwnedSupportForProjectIds } from "./milestones.service.js";
 import { deleteProjectNotesForIds } from "./notes.service.js";
 import { getProjectTags, getProjectTagsMap } from "./tags.service.js";
 
@@ -148,6 +149,7 @@ export async function deleteProject(database: DbClient, id: number): Promise<voi
   }
 
   await deleteProjectAttachmentsForIds(database, [id]);
+  await deleteMilestoneOwnedSupportForProjectIds(database, [id]);
 
   deleteProjectNotesForIds(database, [id]);
 

@@ -13,11 +13,14 @@ import type {
 } from "@taskmanager/shared-types";
 import { api } from "./client";
 
-export type TicketOwner = { type: "project" | "task" | "feature" | "useCase"; id: number };
+export type TicketOwner = { type: "project" | "milestone" | "task" | "feature" | "useCase"; id: number };
 
 function ownerPath(owner: TicketOwner): string {
   if (owner.type === "project") {
     return `projects/${owner.id}`;
+  }
+  if (owner.type === "milestone") {
+    return `milestones/${owner.id}`;
   }
   if (owner.type === "task") {
     return `tasks/${owner.id}`;
