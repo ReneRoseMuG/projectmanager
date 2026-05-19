@@ -2,6 +2,7 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 19.05.26 | Fix | Aufgabendateien Architektur-Refactoring | ✅ |
 | 18.05.26 | Feature | Detailseiten und Formularnavigation | ✅ |
 | 18.05.26 | Fix | App-Name Projekt Manager | ✅ |
 | 18.05.26 | Fix | Responsive-Density-Auftrag | ✅ |
