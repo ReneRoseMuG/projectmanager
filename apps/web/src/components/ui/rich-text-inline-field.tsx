@@ -212,7 +212,7 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
     editorProps: {
       attributes: editorAttributes
     },
-    onBlur: ({ editor: activeEditor }) => {
+    onBlur: ({ editor: activeEditor }: { editor: Editor }) => {
       if (cancellingRef.current) {
         cancellingRef.current = false;
         onCancel();

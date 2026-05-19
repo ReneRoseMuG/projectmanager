@@ -2,6 +2,7 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 19.05.26 | Fix | Startscript und Dev-Watch | ✅ |
 | 19.05.26 | Fix | Google Drive OAuth Client Env | ⚠️ |
 | 19.05.26 | Fix | RichText Beschreibungsfelder | ✅ |
 | 19.05.26 | Fix | Startdatei Ein Terminal | ✅ |
