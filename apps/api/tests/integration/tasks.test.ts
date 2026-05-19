@@ -117,7 +117,8 @@ describe("Tasks API", () => {
         status: "in_progress",
         priority: "urgent",
         assignee: "Erika",
-        dueDate: "2026-07-01"
+        dueDate: "2026-07-01",
+        expectedVersion: task.version
       })
       .expect(200);
 
@@ -136,7 +137,7 @@ describe("Tasks API", () => {
 
     const res = await supertest(app.server)
       .patch(`/api/projects/${project.id}/tasks/${task.id}/board`)
-      .send({ status: "done", position: 42 })
+      .send({ status: "done", position: 42, expectedVersion: task.version })
       .expect(200);
 
     expect(res.body.status).toBe("done");
@@ -147,7 +148,7 @@ describe("Tasks API", () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
 
-    await supertest(app.server).patch(`/api/projects/${project.id}/tasks/${task.id}/board`).send({ position: 42 }).expect(400);
+    await supertest(app.server).patch(`/api/projects/${project.id}/tasks/${task.id}/board`).send({ position: 42, expectedVersion: task.version }).expect(400);
   });
 
   it("POST /api/projects/:id/tasks/:taskId verknüpft eine vorhandene Aufgabe", async () => {
@@ -198,9 +199,9 @@ describe("Tasks API", () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id, { status: "todo" });
 
-    await supertest(app.server).patch(`/api/tasks/${task.id}`).send({ status: "in_progress" }).expect(200);
+    const inProgress = await supertest(app.server).patch(`/api/tasks/${task.id}`).send({ status: "in_progress", expectedVersion: task.version }).expect(200);
 
-    const res = await supertest(app.server).patch(`/api/tasks/${task.id}`).send({ status: "done" }).expect(200);
+    const res = await supertest(app.server).patch(`/api/tasks/${task.id}`).send({ status: "done", expectedVersion: inProgress.body.version }).expect(200);
     expect(res.body.status).toBe("done");
   });
 });

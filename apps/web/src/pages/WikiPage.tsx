@@ -40,7 +40,8 @@ export function WikiPage() {
 
   const savePage = async (id: number, input: WikiPageUpdate) => {
     try {
-      await wiki.updateWikiPage(id, input);
+      const expectedVersion = wiki.page?.id === id ? wiki.page.version : input.expectedVersion;
+      await wiki.updateWikiPage(id, { ...input, expectedVersion });
       showToast({ tone: "success", title: "Wiki-Seite gespeichert" });
     } catch (wikiError) {
       showToast({ tone: "error", title: "Wiki-Seite konnte nicht gespeichert werden", message: errorMessage(wikiError) });
@@ -51,7 +52,7 @@ export function WikiPage() {
   const submitForm = async (input: WikiPageInput) => {
     try {
       if (editingPage) {
-        await wiki.updateWikiPage(editingPage.id, input);
+        await wiki.updateWikiPage(editingPage.id, { ...input, expectedVersion: editingPage.version });
         showToast({ tone: "success", title: "Wiki-Seite gespeichert" });
       } else {
         const created = await wiki.createWikiPage(input);

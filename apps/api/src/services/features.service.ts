@@ -1,9 +1,11 @@
 import { eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { features, useCases } from "../db/schema.js";
+import { useCases } from "../db/schema.js";
+import { assertVersion } from "../repositories/base.repository.js";
+import { featureRepository, type FeatureRecord, type FeatureUpdateData } from "../repositories/feature.repository.js";
+import { useCaseRepository } from "../repositories/use-case.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteFeatureAttachmentsForIds } from "./attachments.service.js";
-import { deleteCommentsForEntities, deleteCommentsForEntity } from "./comments.service.js";
 import {
   buildFilename,
   buildStoredContentPath,
@@ -14,9 +16,8 @@ import {
   resolveStoredContentPath,
   writeContent
 } from "./content.service.js";
-import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
+import { cleanNullable, requireNonEmpty } from "./helpers.js";
 
-type FeatureRecord = typeof features.$inferSelect;
 type FeatureStatus = FeatureRecord["status"];
 
 export interface FeatureInput {
@@ -26,6 +27,7 @@ export interface FeatureInput {
   description?: string | null;
   content?: string;
   sortOrder?: number;
+  expectedVersion?: number;
 }
 
 export interface FeatureDto {
@@ -37,6 +39,7 @@ export interface FeatureDto {
   content?: string;
   contentPath: string | null;
   sortOrder: number;
+  version: number;
   useCaseCount: number;
   createdAt: string;
   updatedAt: string;
@@ -56,6 +59,7 @@ function mapFeature(record: FeatureRecord, useCaseCount: number, content?: strin
     content,
     contentPath: record.contentPath,
     sortOrder: record.sortOrder,
+    version: record.version,
     useCaseCount,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
@@ -78,7 +82,7 @@ function getUseCaseCounts(database: DbClient): Map<number, number> {
 }
 
 function getFeatureRecord(database: DbClient, id: number): FeatureRecord {
-  const feature = database.select().from(features).where(eq(features.id, id)).get();
+  const feature = featureRepository.findById(database, id);
   if (!feature) {
     throw notFound(`Feature with id ${id} not found`);
   }
@@ -86,9 +90,7 @@ function getFeatureRecord(database: DbClient, id: number): FeatureRecord {
 }
 
 function ensureSlugIsUnique(database: DbClient, slug: string, exceptId?: number): void {
-  const existing = exceptId
-    ? database.select({ id: features.id }).from(features).where(eq(features.slug, slug)).all().find((row) => row.id !== exceptId)
-    : database.select({ id: features.id }).from(features).where(eq(features.slug, slug)).get();
+  const existing = featureRepository.findBySlug(database, slug).find((row) => row.id !== exceptId);
 
   if (existing) {
     throw conflict(`Feature slug "${slug}" already exists`);
@@ -100,7 +102,7 @@ function readFeatureContent(record: FeatureRecord): string {
 }
 
 export function listFeatures(database: DbClient): FeatureDto[] {
-  const rows = database.select().from(features).orderBy(features.sortOrder, features.title).all();
+  const rows = featureRepository.findAll(database);
   const counts = getUseCaseCounts(database);
 
   return rows.map((feature) => mapFeature(feature, counts.get(feature.id) ?? 0));
@@ -116,21 +118,14 @@ export function createFeature(database: DbClient, input: FeatureInput): FeatureD
   const slug = requireNonEmpty(input.slug, "slug");
   ensureSlugIsUnique(database, slug);
 
-  const now = nowIso();
-  const created = database
-    .insert(features)
-    .values({
-      title,
-      slug,
-      status: input.status ?? "draft",
-      description: cleanNullable(input.description) ?? null,
-      contentPath: null,
-      sortOrder: input.sortOrder ?? 0,
-      createdAt: now,
-      updatedAt: now
-    })
-    .returning()
-    .get();
+  const created = featureRepository.create(database, {
+    title,
+    slug,
+    status: input.status ?? "draft",
+    description: cleanNullable(input.description) ?? null,
+    contentPath: null,
+    sortOrder: input.sortOrder ?? 0
+  });
 
   const filename = contentFilename(created.id, slug);
   const absolutePath = resolveContentPath("features", filename);
@@ -138,16 +133,14 @@ export function createFeature(database: DbClient, input: FeatureInput): FeatureD
 
   try {
     writeContent(absolutePath, input.content ?? "");
-    const updated = database
-      .update(features)
-      .set({ contentPath: storedPath, updatedAt: nowIso() })
-      .where(eq(features.id, created.id))
-      .returning()
-      .get();
+    const updated = featureRepository.setContentPath(database, created.id, storedPath);
+    if (!updated) {
+      throw notFound(`Feature with id ${created.id} not found`);
+    }
 
     return mapFeature(updated, 0, input.content ?? "");
   } catch (error) {
-    database.delete(features).where(eq(features.id, created.id)).run();
+    featureRepository.delete(database, created.id);
     deleteContent(absolutePath);
     throw error;
   }
@@ -155,7 +148,8 @@ export function createFeature(database: DbClient, input: FeatureInput): FeatureD
 
 export function updateFeature(database: DbClient, id: number, input: FeatureInput): FeatureDto {
   const current = getFeatureRecord(database, id);
-  const values: Partial<typeof features.$inferInsert> = {};
+  assertVersion(current.version, input.expectedVersion ?? 0);
+  const values: FeatureUpdateData = {};
   let contentPath = current.contentPath;
 
   if (input.title !== undefined) {
@@ -206,21 +200,19 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
     writeContent(resolveStoredContentPath(contentPath), input.content);
   }
 
-  values.updatedAt = nowIso();
-
-  const updated = database.update(features).set(values).where(eq(features.id, id)).returning().get();
+  const updated = featureRepository.update(database, id, input.expectedVersion ?? 0, values);
+  if (!updated) {
+    throw notFound(`Feature with id ${id} not found`);
+  }
   return mapFeature(updated, countUseCases(database, id), input.content ?? readFeatureContent(updated));
 }
 
 export async function deleteFeature(database: DbClient, id: number): Promise<void> {
   const feature = getFeatureRecord(database, id);
-  const linkedUseCases = database.select({ id: useCases.id, contentPath: useCases.contentPath }).from(useCases).where(eq(useCases.featureId, id)).all();
-  const linkedUseCaseIds = linkedUseCases.map((useCase) => useCase.id);
+  const linkedUseCases = useCaseRepository.findByFeatureId(database, id);
 
   await deleteFeatureAttachmentsForIds(database, [id]);
-  deleteCommentsForEntity(database, "feature", id);
-  deleteCommentsForEntities(database, "useCase", linkedUseCaseIds);
-  database.delete(features).where(eq(features.id, id)).run();
+  featureRepository.delete(database, id);
 
   if (feature.contentPath) {
     deleteContent(resolveStoredContentPath(feature.contentPath));

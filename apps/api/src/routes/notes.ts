@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import type { NoteInput } from "@taskmanager/shared-types";
+import type { NoteInput, NoteUpdate } from "@taskmanager/shared-types";
 import {
   createProjectNote,
   createTaskNote,
@@ -9,7 +9,7 @@ import {
   listTaskNotes,
   updateNote
 } from "../services/notes.service.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const noteBodySchema = {
   type: "object",
@@ -17,6 +17,16 @@ const noteBodySchema = {
   properties: {
     title: { type: "string" },
     contentJson: { type: "object", additionalProperties: true }
+  }
+} as const;
+
+const notePatchSchema = {
+  type: "object",
+  required: ["expectedVersion"],
+  additionalProperties: false,
+  properties: {
+    ...noteBodySchema.properties,
+    ...expectedVersionPropertySchema
   }
 } as const;
 
@@ -51,9 +61,9 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     async (request) => getNote(app.db, request.params.id)
   );
 
-  app.patch<{ Params: { id: number }; Body: NoteInput }>(
+  app.patch<{ Params: { id: number }; Body: NoteUpdate }>(
     "/notes/:id",
-    { schema: { params: idParamSchema, body: noteBodySchema, response: { 200: objectResponseSchema } } },
+    { schema: { params: idParamSchema, body: notePatchSchema, response: { 200: objectResponseSchema } } },
     async (request) => updateNote(app.db, request.params.id, request.body)
   );
 

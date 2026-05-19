@@ -11,16 +11,16 @@ import type {
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureTickets, features, projectTickets, projects, taskTickets, tasks, ticketRelations, tickets, useCases, useCaseTickets } from "../db/schema.js";
+import { ticketRepository, type TicketRecord } from "../repositories/ticket.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
-import { deleteCommentsForEntities, listEntityComments } from "./comments.service.js";
+import { listEntityComments } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 import { deleteTicketNotesForIds, listTicketNotes } from "./notes.service.js";
 import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
 
 export type TicketOwner = { type: "project" | "task" | "feature" | "useCase"; id: number };
 
-type TicketRecord = typeof tickets.$inferSelect;
 type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number };
 
 const ticketSelect = {
@@ -40,6 +40,9 @@ const ticketSelect = {
   dueDate: tickets.dueDate,
   resolvedAt: tickets.resolvedAt,
   position: tickets.position,
+  version: tickets.version,
+  createdBy: tickets.createdBy,
+  updatedBy: tickets.updatedBy,
   createdAt: tickets.createdAt,
   updatedAt: tickets.updatedAt
 };
@@ -89,7 +92,7 @@ function ensureOwnerExists(database: DbClient, owner: TicketOwner): void {
 }
 
 function getTicketRecord(database: DbClient, id: number): TicketRecord {
-  const ticket = database.select().from(tickets).where(eq(tickets.id, id)).get();
+  const ticket = ticketRepository.findById(database, id);
   if (!ticket) {
     throw notFound(`Ticket with id ${id} not found`);
   }
@@ -114,7 +117,7 @@ function getSubTicketCounts(database: DbClient, ticketIds: number[]): Map<number
 
 function collectTicketSubtreeIds(database: DbClient, ticketId: number): number[] {
   getTicketRecord(database, ticketId);
-  const rows = database.select({ id: tickets.id, parentId: tickets.parentId }).from(tickets).all();
+  const rows = ticketRepository.findAll(database);
   const childrenByParent = new Map<number, number[]>();
 
   for (const row of rows) {
@@ -139,8 +142,7 @@ function collectTicketSubtreeIds(database: DbClient, ticketId: number): number[]
 }
 
 function nextPosition(database: DbClient, status: TicketRecord["status"], parentId: number | null): number {
-  const where = parentId === null ? and(eq(tickets.status, status), isNull(tickets.parentId)) : and(eq(tickets.status, status), eq(tickets.parentId, parentId));
-  const positions = database.select({ position: tickets.position }).from(tickets).where(where).all();
+  const positions = ticketRepository.findPositions(database, status, parentId);
   const max = positions.reduce((current, row) => Math.max(current, row.position), 0);
   return max + 1024;
 }
@@ -230,29 +232,22 @@ function relationEntryId(sourceTicketId: number, targetTicketId: number, relatio
 function insertTicketRecord(database: DbClient, input: TicketInput, parentId: number | null = null): TicketRecord {
   const title = requireNonEmpty(input.title, "title");
   const status = input.status ?? "open";
-  const now = nowIso();
-  return database
-    .insert(tickets)
-    .values({
-      parentId,
-      type: input.type ?? "bug",
-      title,
-      description: cleanNullable(input.description) ?? null,
-      status,
-      priority: input.priority ?? "medium",
-      resolution: null,
-      reporter: cleanNullable(input.reporter) ?? null,
-      assignee: cleanNullable(input.assignee) ?? null,
-      environment: cleanNullable(input.environment) ?? null,
-      affectedVersion: cleanNullable(input.affectedVersion) ?? null,
-      dueDate: cleanNullable(input.dueDate) ?? null,
-      resolvedAt: null,
-      position: nextPosition(database, status, parentId),
-      createdAt: now,
-      updatedAt: now
-    })
-    .returning()
-    .get();
+  return ticketRepository.create(database, {
+    parentId,
+    type: input.type ?? "bug",
+    title,
+    description: cleanNullable(input.description) ?? null,
+    status,
+    priority: input.priority ?? "medium",
+    resolution: null,
+    reporter: cleanNullable(input.reporter) ?? null,
+    assignee: cleanNullable(input.assignee) ?? null,
+    environment: cleanNullable(input.environment) ?? null,
+    affectedVersion: cleanNullable(input.affectedVersion) ?? null,
+    dueDate: cleanNullable(input.dueDate) ?? null,
+    resolvedAt: null,
+    position: nextPosition(database, status, parentId)
+  });
 }
 
 function ticketDeleteBlockers(database: DbClient, ticketId: number): string[] {
@@ -309,6 +304,7 @@ export function mapTicket(
     dueDate: record.dueDate,
     resolvedAt: record.resolvedAt,
     position,
+    version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     tags,
@@ -317,7 +313,7 @@ export function mapTicket(
 }
 
 export function listTickets(database: DbClient): Ticket[] {
-  const rows = database.select().from(tickets).where(isNull(tickets.parentId)).orderBy(tickets.status, tickets.position).all();
+  const rows = ticketRepository.findRootTickets(database);
   const ids = rows.map((ticket) => ticket.id);
   const tagsByTicket = getTicketTagsMap(database, ids);
   const subTicketCounts = getSubTicketCounts(database, ids);
@@ -341,7 +337,7 @@ export function listProjectTickets(database: DbClient, projectId: number): Ticke
 
 export function listSubTickets(database: DbClient, parentId: number): Ticket[] {
   getTicketRecord(database, parentId);
-  const rows = database.select().from(tickets).where(eq(tickets.parentId, parentId)).orderBy(tickets.status, tickets.position).all();
+  const rows = ticketRepository.findChildren(database, parentId);
   const ids = rows.map((ticket) => ticket.id);
   const tagsByTicket = getTicketTagsMap(database, ids);
   const subTicketCounts = getSubTicketCounts(database, ids);
@@ -414,7 +410,23 @@ export function createSubTicket(database: DbClient, parentId: number, input: Tic
 
 export function updateTicket(database: DbClient, id: number, input: TicketUpdate): Ticket {
   const existing = getTicketRecord(database, id);
-  const values: Partial<typeof tickets.$inferInsert> = {};
+  const values: Partial<
+    Pick<
+      TicketRecord,
+      | "type"
+      | "title"
+      | "description"
+      | "status"
+      | "priority"
+      | "resolution"
+      | "reporter"
+      | "assignee"
+      | "environment"
+      | "affectedVersion"
+      | "dueDate"
+      | "resolvedAt"
+    >
+  > = {};
 
   if (input.title !== undefined) {
     values.title = requireNonEmpty(input.title, "title");
@@ -460,9 +472,7 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
     throw badRequest("No ticket fields provided");
   }
 
-  values.updatedAt = nowIso();
-
-  const updated = database.update(tickets).set(values).where(eq(tickets.id, id)).returning().get();
+  const updated = ticketRepository.update(database, id, input.expectedVersion, values);
   if (!updated) {
     throw notFound(`Ticket with id ${id} not found`);
   }
@@ -472,17 +482,16 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
 
 export function updateTicketPosition(database: DbClient, id: number, input: TicketPositionInput): Ticket {
   const existing = getTicketRecord(database, id);
-  const values: Partial<typeof tickets.$inferInsert> = {
+  const values: Partial<Pick<TicketRecord, "status" | "position" | "resolvedAt">> = {
     status: input.status,
-    position: input.position,
-    updatedAt: nowIso()
+    position: input.position
   };
 
   if ((input.status === "resolved" || input.status === "closed") && existing.resolvedAt === null) {
     values.resolvedAt = nowIso();
   }
 
-  const updated = database.update(tickets).set(values).where(eq(tickets.id, id)).returning().get();
+  const updated = ticketRepository.update(database, id, input.expectedVersion, values);
   if (!updated) {
     throw notFound(`Ticket with id ${id} not found`);
   }
@@ -500,11 +509,9 @@ export async function deleteTicket(database: DbClient, id: number): Promise<void
   const ticketIds = collectTicketSubtreeIds(database, id);
 
   await deleteTicketAttachmentsForIds(database, ticketIds);
-  deleteCommentsForEntities(database, "ticket", ticketIds);
   deleteTicketNotesForIds(database, ticketIds);
 
-  const result = database.delete(tickets).where(eq(tickets.id, id)).run();
-  if (result.changes === 0) {
+  if (ticketRepository.delete(database, id) === 0) {
     throw notFound(`Ticket with id ${id} not found`);
   }
 }

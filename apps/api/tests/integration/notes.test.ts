@@ -112,7 +112,7 @@ describe("Notes API", () => {
     const contentJson = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Neu" }] }] };
     const res = await supertest(app.server)
       .patch(`/api/notes/${note.id}`)
-      .send({ title: "Aktualisiert", contentJson })
+      .send({ title: "Aktualisiert", contentJson, expectedVersion: note.version })
       .expect(200);
 
     expect(res.body.title).toBe("Aktualisiert");

@@ -12,7 +12,7 @@ import {
   updateOwnerTaskBoard,
   updateTask
 } from "../services/tasks.service.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const taskBodySchema = {
   type: "object",
@@ -30,17 +30,22 @@ const taskBodySchema = {
 
 const taskPatchSchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
-  properties: taskBodySchema.properties
+  properties: {
+    ...taskBodySchema.properties,
+    ...expectedVersionPropertySchema
+  }
 } as const;
 
 const taskBoardPositionSchema = {
   type: "object",
-  required: ["status", "position"],
+  required: ["status", "position", "expectedVersion"],
   additionalProperties: false,
   properties: {
     status: { type: "string", enum: TASK_STATUSES },
-    position: { type: "number" }
+    position: { type: "number" },
+    ...expectedVersionPropertySchema
   }
 } as const;
 

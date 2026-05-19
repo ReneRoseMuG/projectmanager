@@ -50,6 +50,7 @@ const fixtures = vi.hoisted(() => {
     contentPath: null,
     sortOrder: 1,
     useCaseCount: 1,
+    version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z"
   };
@@ -63,6 +64,7 @@ const fixtures = vi.hoisted(() => {
     content: "<p>Inhalt</p>",
     contentPath: null,
     sortOrder: 1,
+    version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z"
   };
@@ -74,6 +76,7 @@ const fixtures = vi.hoisted(() => {
     color: "var(--color-steel-700)",
     startDate: null,
     dueDate: null,
+    version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z",
     openTaskCount: 1,
@@ -91,6 +94,7 @@ const fixtures = vi.hoisted(() => {
     priority: "medium",
     assignee: null,
     dueDate: null,
+    version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z",
     tags: [],
@@ -113,6 +117,7 @@ const fixtures = vi.hoisted(() => {
     dueDate: null,
     resolvedAt: null,
     position: 1024,
+    version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z",
     tags: [],
@@ -123,13 +128,17 @@ const fixtures = vi.hoisted(() => {
     taskId: null,
     entityType: "project",
     entityId: project.id,
+    owners: [{ type: "project", id: project.id }],
     body: "<p>Kommentar</p>",
-    createdAt: "2026-05-18T08:00:00.000Z"
+    createdAt: "2026-05-18T08:00:00.000Z",
+    updatedAt: "2026-05-18T09:00:00.000Z",
+    version: 1
   };
   const note = {
     id: 70,
     title: "Notiz Alpha",
     contentJson: {},
+    version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z"
   };
@@ -144,7 +153,10 @@ const fixtures = vi.hoisted(() => {
     mimetype: "text/plain",
     size: 12,
     url: "/uploads/datei.txt",
-    createdAt: "2026-05-18T08:00:00.000Z"
+    owners: [{ type: "project", id: project.id }],
+    createdAt: "2026-05-18T08:00:00.000Z",
+    updatedAt: "2026-05-18T09:00:00.000Z",
+    version: 1
   };
   const taskDetail = {
     ...task,

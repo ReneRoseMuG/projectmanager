@@ -7,7 +7,7 @@ import {
   setTaskTags,
   updateTag
 } from "../services/tags.service.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
 
 const tagBodySchema = {
   type: "object",
@@ -21,8 +21,12 @@ const tagBodySchema = {
 
 const tagPatchSchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
-  properties: tagBodySchema.properties
+  properties: {
+    ...tagBodySchema.properties,
+    ...expectedVersionPropertySchema
+  }
 } as const;
 
 export async function registerTagsRoutes(app: FastifyInstance): Promise<void> {
@@ -34,7 +38,7 @@ export async function registerTagsRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => reply.status(201).send(createTag(app.db, request.body))
   );
 
-  app.patch<{ Params: { id: number }; Body: { name?: string; color?: string } }>(
+  app.patch<{ Params: { id: number }; Body: { name?: string; color?: string; expectedVersion: number } }>(
     "/tags/:id",
     { schema: { params: idParamSchema, body: tagPatchSchema, response: { 200: objectResponseSchema } } },
     async (request) => updateTag(app.db, request.params.id, request.body)

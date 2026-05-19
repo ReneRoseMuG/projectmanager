@@ -48,7 +48,7 @@ describe("Tags API", () => {
 
     const res = await supertest(app.server)
       .patch(`/api/tags/${tag.id}`)
-      .send({ name: "neu", color: "#ffffff" })
+      .send({ name: "neu", color: "#ffffff", expectedVersion: tag.version })
       .expect(200);
 
     expect(res.body.name).toBe("neu");

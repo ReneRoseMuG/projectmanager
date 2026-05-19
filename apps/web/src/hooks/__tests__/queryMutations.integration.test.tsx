@@ -59,6 +59,7 @@ function taskFixture(overrides: Partial<TaskBoardItem> = {}): TaskBoardItem {
     assignee: null,
     dueDate: null,
     boardPosition: 0,
+    version: 1,
     createdAt: now,
     updatedAt: now,
     tags: [],
@@ -77,6 +78,7 @@ function featureFixture(overrides: Partial<Feature> = {}): Feature {
     contentPath: null,
     sortOrder: 0,
     useCaseCount: 0,
+    version: 1,
     createdAt: now,
     updatedAt: now,
     ...overrides

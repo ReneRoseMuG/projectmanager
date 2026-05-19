@@ -3,6 +3,7 @@ import supertest from "supertest";
 
 export interface TestProject {
   id: number;
+  version: number;
   name: string;
   status: string;
   color: string | null;
@@ -15,6 +16,7 @@ export interface TestProject {
 
 export interface TestTask {
   id: number;
+  version: number;
   parentId: number | null;
   title: string;
   description: string | null;
@@ -31,6 +33,7 @@ export interface TestTask {
 
 export interface TestTicket {
   id: number;
+  version: number;
   parentId: number | null;
   type: string;
   title: string;
@@ -53,12 +56,14 @@ export interface TestTicket {
 
 export interface TestTag {
   id: number;
+  version: number;
   name: string;
   color: string;
 }
 
 export interface TestNote {
   id: number;
+  version: number;
   title: string;
   contentJson: object;
   createdAt: string;
@@ -85,6 +90,7 @@ export interface TestComment {
 
 export interface TestFeature {
   id: number;
+  version: number;
   title: string;
   slug: string;
   status: string;
@@ -99,6 +105,7 @@ export interface TestFeature {
 
 export interface TestUseCase {
   id: number;
+  version: number;
   featureId: number;
   title: string;
   slug: string;
@@ -113,6 +120,7 @@ export interface TestUseCase {
 
 export interface TestWikiPage {
   id: number;
+  version: number;
   parentId: number | null;
   projectId: number | null;
   title: string;
@@ -127,6 +135,7 @@ export interface TestWikiPage {
 
 export interface TestBacklogItem {
   id: number;
+  version: number;
   projectId: number;
   featureId: number | null;
   useCaseId: number | null;

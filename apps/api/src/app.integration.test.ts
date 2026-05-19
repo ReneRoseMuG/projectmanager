@@ -67,7 +67,12 @@ describe("Projekt Manager API integration", () => {
     const createdProject = (await request(app.server).post("/api/projects").send({ name: "Integration" }).expect(201)).body as Project;
     expect(createdProject.color).toBe("#6366f1");
 
-    const updatedProject = (await request(app.server).patch(`/api/projects/${createdProject.id}`).send({ description: "Updated" }).expect(200)).body as Project;
+    const updatedProject = (
+      await request(app.server)
+        .patch(`/api/projects/${createdProject.id}`)
+        .send({ description: "Updated", expectedVersion: createdProject.version })
+        .expect(200)
+    ).body as Project;
     expect(updatedProject.description).toBe("Updated");
 
     const loadedProject = (await request(app.server).get(`/api/projects/${createdProject.id}`).expect(200)).body as Project;
@@ -76,7 +81,9 @@ describe("Projekt Manager API integration", () => {
     const createdTag = (await request(app.server).post("/api/tags").send({ name: "Backend" }).expect(201)).body as Tag;
     expect(createdTag.color).toBe("#94a3b8");
 
-    const updatedTag = (await request(app.server).patch(`/api/tags/${createdTag.id}`).send({ color: "#6366f1" }).expect(200)).body as Tag;
+    const updatedTag = (
+      await request(app.server).patch(`/api/tags/${createdTag.id}`).send({ color: "#6366f1", expectedVersion: createdTag.version }).expect(200)
+    ).body as Tag;
     expect(updatedTag.color).toBe("#6366f1");
 
     const throwawayTag = (await request(app.server).post("/api/tags").send({ name: "Delete me", color: "#94a3b8" }).expect(201)).body as Tag;
@@ -95,11 +102,16 @@ describe("Projekt Manager API integration", () => {
     expect(createdTask.status).toBe("todo");
     expect(createdTask.boardPosition).toBeGreaterThan(0);
 
-    const updatedTask = (await request(app.server).patch(`/api/tasks/${createdTask.id}`).send({ priority: "high" }).expect(200)).body as Task;
+    const updatedTask = (
+      await request(app.server).patch(`/api/tasks/${createdTask.id}`).send({ priority: "high", expectedVersion: createdTask.version }).expect(200)
+    ).body as Task;
     expect(updatedTask.priority).toBe("high");
 
     const movedTask = (
-      await request(app.server).patch(`/api/projects/${createdProject.id}/tasks/${createdTask.id}/board`).send({ status: "in_progress", position: 512 }).expect(200)
+      await request(app.server)
+        .patch(`/api/projects/${createdProject.id}/tasks/${createdTask.id}/board`)
+        .send({ status: "in_progress", position: 512, expectedVersion: updatedTask.version })
+        .expect(200)
     ).body as TaskBoardItem;
     expect(movedTask.status).toBe("in_progress");
     expect(movedTask.boardPosition).toBe(512);
@@ -131,7 +143,7 @@ describe("Projekt Manager API integration", () => {
     const patchedNote = (
       await request(app.server)
         .patch(`/api/notes/${projectNote.id}`)
-        .send({ contentJson: { type: "doc", content: [{ type: "paragraph" }] } })
+        .send({ contentJson: { type: "doc", content: [{ type: "paragraph" }] }, expectedVersion: projectNote.version })
         .expect(200)
     ).body as Note;
     expect(patchedNote.contentJson).toEqual({ type: "doc", content: [{ type: "paragraph" }] });

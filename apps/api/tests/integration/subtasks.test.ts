@@ -71,7 +71,7 @@ describe("Subtasks API", () => {
     const parent = await createTask(app, project.id);
     const subtask = await createSubtask(app, parent.id, { status: "todo" });
 
-    const res = await supertest(app.server).patch(`/api/tasks/${subtask.id}`).send({ status: "done" }).expect(200);
+    const res = await supertest(app.server).patch(`/api/tasks/${subtask.id}`).send({ status: "done", expectedVersion: subtask.version }).expect(200);
     expect(res.body.status).toBe("done");
   });
 

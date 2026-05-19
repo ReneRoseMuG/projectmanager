@@ -92,7 +92,7 @@ describe("Backlog API", () => {
     const project = await createProject(app);
     const item = await createBacklogItem(app, project.id);
 
-    const res = await supertest(app.server).patch(`/api/backlog/${item.id}`).send({ status: "in_progress" }).expect(200);
+    const res = await supertest(app.server).patch(`/api/backlog/${item.id}`).send({ status: "in_progress", expectedVersion: item.version }).expect(200);
 
     expect(res.body.status).toBe("in_progress");
   });
@@ -101,7 +101,7 @@ describe("Backlog API", () => {
     const project = await createProject(app);
     const item = await createBacklogItem(app, project.id);
 
-    const res = await supertest(app.server).patch(`/api/backlog/${item.id}`).send({ title: "Neu", priority: "urgent" }).expect(200);
+    const res = await supertest(app.server).patch(`/api/backlog/${item.id}`).send({ title: "Neu", priority: "urgent", expectedVersion: item.version }).expect(200);
 
     expect(res.body).toMatchObject({ title: "Neu", priority: "urgent" });
   });
@@ -110,7 +110,7 @@ describe("Backlog API", () => {
     const project = await createProject(app);
     const item = await createBacklogItem(app, project.id);
 
-    await supertest(app.server).patch(`/api/backlog/${item.id}`).send({ status: "done" }).expect(400);
+    await supertest(app.server).patch(`/api/backlog/${item.id}`).send({ status: "done", expectedVersion: item.version }).expect(400);
   });
 
   it("Projekt-DELETE löscht Backlog-Items per Cascade", async () => {

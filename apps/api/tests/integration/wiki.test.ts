@@ -115,7 +115,7 @@ describe("Wiki API", () => {
   it("PATCH aktualisiert Content und Datei", async () => {
     const page = await createWikiPage(app, { slug: "wiki-patch", content: "# Alt" });
 
-    const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ content: "# Neu" }).expect(200);
+    const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ content: "# Neu", expectedVersion: page.version }).expect(200);
 
     expect(res.body.content).toBe("# Neu");
     expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# Neu");
@@ -125,7 +125,7 @@ describe("Wiki API", () => {
     const page = await createWikiPage(app, { slug: "wiki-old" });
     const oldPath = resolveStoredContentPath(page.contentPath ?? "");
 
-    const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ slug: "wiki-new" }).expect(200);
+    const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ slug: "wiki-new", expectedVersion: page.version }).expect(200);
 
     expect(res.body.contentPath).toBe("content/wiki/wiki-new.md");
     expect(fs.existsSync(oldPath)).toBe(false);

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { FEATURE_STATUSES } from "../db/schema.js";
 import { createUseCase, deleteUseCase, getUseCase, listUseCases, updateUseCase, type UseCaseInput } from "../services/use-cases.service.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const featureIdParamSchema = {
   type: "object",
@@ -28,8 +28,12 @@ const useCaseBodySchema = {
 
 const useCasePatchSchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
-  properties: useCaseBodySchema.properties
+  properties: {
+    ...useCaseBodySchema.properties,
+    ...expectedVersionPropertySchema
+  }
 } as const;
 
 export async function registerUseCasesRoutes(app: FastifyInstance): Promise<void> {

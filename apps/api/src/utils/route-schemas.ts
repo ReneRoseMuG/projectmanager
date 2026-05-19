@@ -43,6 +43,17 @@ export const tagIdsBodySchema = {
   }
 } as const;
 
+export const expectedVersionPropertySchema = {
+  expectedVersion: { type: "integer", minimum: 1 }
+} as const;
+
+export const expectedVersionBodySchema = {
+  type: "object",
+  required: ["expectedVersion"],
+  additionalProperties: true,
+  properties: expectedVersionPropertySchema
+} as const;
+
 export const emptyResponseSchema = {
   type: "object",
   additionalProperties: false,

@@ -1,8 +1,9 @@
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { projects, wikiPages } from "../db/schema.js";
+import { projects } from "../db/schema.js";
+import { assertVersion } from "../repositories/base.repository.js";
+import { wikiPageRepository, type WikiPageRecord, type WikiPageUpdateData } from "../repositories/wiki-page.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
-import { deleteCommentsForEntity } from "./comments.service.js";
 import {
   buildStoredContentPath,
   deleteContent,
@@ -12,9 +13,7 @@ import {
   resolveStoredContentPath,
   writeContent
 } from "./content.service.js";
-import { nowIso, requireNonEmpty } from "./helpers.js";
-
-type WikiPageRecord = typeof wikiPages.$inferSelect;
+import { requireNonEmpty } from "./helpers.js";
 
 export interface WikiPageInput {
   parentId?: number | null;
@@ -23,6 +22,7 @@ export interface WikiPageInput {
   slug?: string;
   content?: string;
   sortOrder?: number;
+  expectedVersion?: number;
 }
 
 export interface WikiPageDto {
@@ -34,6 +34,7 @@ export interface WikiPageDto {
   content?: string;
   contentPath: string | null;
   sortOrder: number;
+  version: number;
   childCount: number;
   createdAt: string;
   updatedAt: string;
@@ -55,6 +56,7 @@ function mapWikiPage(record: WikiPageRecord, childCount: number, content?: strin
     content,
     contentPath: record.contentPath,
     sortOrder: record.sortOrder,
+    version: record.version,
     childCount,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
@@ -68,7 +70,7 @@ function wikiFilename(slug: string): string {
 }
 
 function getWikiPageRecord(database: DbClient, id: number): WikiPageRecord {
-  const page = database.select().from(wikiPages).where(eq(wikiPages.id, id)).get();
+  const page = wikiPageRepository.findById(database, id);
   if (!page) {
     throw notFound(`Wiki page with id ${id} not found`);
   }
@@ -76,11 +78,11 @@ function getWikiPageRecord(database: DbClient, id: number): WikiPageRecord {
 }
 
 function childCount(database: DbClient, id: number): number {
-  return database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.parentId, id)).all().length;
+  return wikiPageRepository.findChildren(database, id).length;
 }
 
 function ensureSlugIsUnique(database: DbClient, slug: string, exceptId?: number): void {
-  const existing = database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.slug, slug)).all().find((row) => row.id !== exceptId);
+  const existing = wikiPageRepository.findBySlug(database, slug).find((row) => row.id !== exceptId);
   if (existing) {
     throw conflict(`Wiki slug "${slug}" already exists`);
   }
@@ -112,24 +114,12 @@ function readWikiContent(record: WikiPageRecord): string {
 }
 
 export function listRootWikiPages(database: DbClient): WikiPageDto[] {
-  return database
-    .select()
-    .from(wikiPages)
-    .where(isNull(wikiPages.parentId))
-    .orderBy(wikiPages.sortOrder, wikiPages.title)
-    .all()
-    .map((page) => mapWikiPage(page, childCount(database, page.id)));
+  return wikiPageRepository.findRootPages(database).map((page) => mapWikiPage(page, childCount(database, page.id)));
 }
 
 export function listWikiChildren(database: DbClient, id: number): WikiPageDto[] {
   getWikiPageRecord(database, id);
-  return database
-    .select()
-    .from(wikiPages)
-    .where(eq(wikiPages.parentId, id))
-    .orderBy(wikiPages.sortOrder, wikiPages.title)
-    .all()
-    .map((page) => mapWikiPage(page, childCount(database, page.id)));
+  return wikiPageRepository.findChildren(database, id).map((page) => mapWikiPage(page, childCount(database, page.id)));
 }
 
 export function getWikiPage(database: DbClient, id: number): WikiPageDto {
@@ -144,31 +134,24 @@ export function createWikiPage(database: DbClient, input: WikiPageInput): WikiPa
   ensureParentExists(database, input.parentId);
   ensureProjectExists(database, input.projectId);
 
-  const now = nowIso();
   const filename = wikiFilename(slug);
   const absolutePath = resolveContentPath("wiki", filename);
   const storedPath = buildStoredContentPath("wiki", filename);
 
-  const created = database
-    .insert(wikiPages)
-    .values({
-      parentId: input.parentId ?? null,
-      projectId: input.projectId ?? null,
-      title,
-      slug,
-      contentPath: storedPath,
-      sortOrder: input.sortOrder ?? 0,
-      createdAt: now,
-      updatedAt: now
-    })
-    .returning()
-    .get();
+  const created = wikiPageRepository.create(database, {
+    parentId: input.parentId ?? null,
+    projectId: input.projectId ?? null,
+    title,
+    slug,
+    contentPath: storedPath,
+    sortOrder: input.sortOrder ?? 0
+  });
 
   try {
     writeContent(absolutePath, input.content ?? "");
     return mapWikiPage(created, 0, input.content ?? "");
   } catch (error) {
-    database.delete(wikiPages).where(eq(wikiPages.id, created.id)).run();
+    wikiPageRepository.delete(database, created.id);
     deleteContent(absolutePath);
     throw error;
   }
@@ -176,7 +159,8 @@ export function createWikiPage(database: DbClient, input: WikiPageInput): WikiPa
 
 export function updateWikiPage(database: DbClient, id: number, input: WikiPageInput): WikiPageDto {
   const current = getWikiPageRecord(database, id);
-  const values: Partial<typeof wikiPages.$inferInsert> = {};
+  assertVersion(current.version, input.expectedVersion ?? 0);
+  const values: WikiPageUpdateData = {};
   let contentPath = current.contentPath;
 
   if (input.title !== undefined) {
@@ -225,9 +209,10 @@ export function updateWikiPage(database: DbClient, id: number, input: WikiPageIn
     writeContent(resolveStoredContentPath(contentPath), input.content);
   }
 
-  values.updatedAt = nowIso();
-
-  const updated = database.update(wikiPages).set(values).where(eq(wikiPages.id, id)).returning().get();
+  const updated = wikiPageRepository.update(database, id, input.expectedVersion ?? 0, values);
+  if (!updated) {
+    throw notFound(`Wiki page with id ${id} not found`);
+  }
   return mapWikiPage(updated, childCount(database, id), input.content ?? readWikiContent(updated));
 }
 
@@ -237,8 +222,7 @@ export function deleteWikiPage(database: DbClient, id: number): void {
     throw conflict("Wiki page has child pages");
   }
 
-  deleteCommentsForEntity(database, "wikiPage", id);
-  database.delete(wikiPages).where(eq(wikiPages.id, id)).run();
+  wikiPageRepository.delete(database, id);
 
   if (page.contentPath) {
     deleteContent(resolveStoredContentPath(page.contentPath));

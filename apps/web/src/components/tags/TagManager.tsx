@@ -32,7 +32,7 @@ function TagRow({ tag, onReload }: { tag: Tag; onReload: () => Promise<void> }) 
 
   const save = async () => {
     try {
-      await updateTag(tag.id, { name, color });
+      await updateTag(tag.id, { name, color, expectedVersion: tag.version });
       await onReload();
       setEditing(false);
       showToast({ tone: "success", title: "Tag gespeichert" });

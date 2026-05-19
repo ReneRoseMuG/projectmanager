@@ -91,7 +91,7 @@ describe("Features API", () => {
   it("PATCH aktualisiert Content und Datei", async () => {
     const feature = await createFeature(app, { slug: "ft-patch", content: "# Alt" });
 
-    const res = await supertest(app.server).patch(`/api/features/${feature.id}`).send({ content: "# Neu" }).expect(200);
+    const res = await supertest(app.server).patch(`/api/features/${feature.id}`).send({ content: "# Neu", expectedVersion: feature.version }).expect(200);
 
     expect(res.body.content).toBe("# Neu");
     expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# Neu");
@@ -102,7 +102,7 @@ describe("Features API", () => {
 
     const res = await supertest(app.server)
       .patch(`/api/features/${feature.id}`)
-      .send({ title: "Meta neu", status: "active", description: "Kurz", sortOrder: 5 })
+      .send({ title: "Meta neu", status: "active", description: "Kurz", sortOrder: 5, expectedVersion: feature.version })
       .expect(200);
 
     expect(res.body).toMatchObject({ title: "Meta neu", status: "active", description: "Kurz", sortOrder: 5 });
@@ -112,7 +112,7 @@ describe("Features API", () => {
     const feature = await createFeature(app, { slug: "ft-old", content: "# Inhalt" });
     const oldPath = resolveStoredContentPath(feature.contentPath ?? "");
 
-    const res = await supertest(app.server).patch(`/api/features/${feature.id}`).send({ slug: "ft-new" }).expect(200);
+    const res = await supertest(app.server).patch(`/api/features/${feature.id}`).send({ slug: "ft-new", expectedVersion: feature.version }).expect(200);
 
     expect(res.body.contentPath).toContain("ft-new");
     expect(fs.existsSync(oldPath)).toBe(false);

@@ -7,7 +7,7 @@ import type { FeatureDto } from "./features.service.js";
 
 type MappableFeatureRecord = Pick<
   typeof features.$inferSelect,
-  "id" | "title" | "slug" | "status" | "description" | "contentPath" | "sortOrder" | "createdAt" | "updatedAt"
+  "id" | "title" | "slug" | "status" | "description" | "contentPath" | "sortOrder" | "version" | "createdAt" | "updatedAt"
 >;
 
 function mapFeature(row: MappableFeatureRecord, useCaseCount = 0): FeatureDto {
@@ -19,6 +19,7 @@ function mapFeature(row: MappableFeatureRecord, useCaseCount = 0): FeatureDto {
     description: row.description,
     contentPath: row.contentPath,
     sortOrder: row.sortOrder,
+    version: row.version,
     useCaseCount,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
@@ -100,6 +101,7 @@ export function listProjectFeatures(database: DbClient, projectId: number): Feat
       description: features.description,
       contentPath: features.contentPath,
       sortOrder: features.sortOrder,
+      version: features.version,
       createdAt: features.createdAt,
       updatedAt: features.updatedAt
     })
@@ -143,6 +145,7 @@ export function listFeatureRelations(database: DbClient, featureId: number): Fea
       targetDescription: features.description,
       targetContentPath: features.contentPath,
       targetSortOrder: features.sortOrder,
+      targetVersion: features.version,
       targetCreatedAt: features.createdAt,
       targetUpdatedAt: features.updatedAt
     })
@@ -171,6 +174,7 @@ export function listFeatureRelations(database: DbClient, featureId: number): Fea
         description: row.targetDescription,
         contentPath: row.targetContentPath,
         sortOrder: row.targetSortOrder,
+        version: row.targetVersion,
         createdAt: row.targetCreatedAt,
         updatedAt: row.targetUpdatedAt
       },

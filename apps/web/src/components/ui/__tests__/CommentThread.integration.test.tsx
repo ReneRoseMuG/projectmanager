@@ -46,8 +46,11 @@ const initialComment: Comment = {
   taskId: null,
   entityType: "project",
   entityId: 7,
+  owners: [{ type: "project", id: 7 }],
   body: "<p>Bestehender Kommentar</p>",
-  createdAt: "2026-05-17T08:00:00.000Z"
+  createdAt: "2026-05-17T08:00:00.000Z",
+  updatedAt: "2026-05-17T08:00:00.000Z",
+  version: 1
 };
 
 const createdComment: Comment = {
@@ -55,8 +58,11 @@ const createdComment: Comment = {
   taskId: null,
   entityType: "project",
   entityId: 7,
+  owners: [{ type: "project", id: 7 }],
   body: "<p>Neu</p>",
-  createdAt: "2026-05-17T09:00:00.000Z"
+  createdAt: "2026-05-17T09:00:00.000Z",
+  updatedAt: "2026-05-17T09:00:00.000Z",
+  version: 1
 };
 
 function Harness() {

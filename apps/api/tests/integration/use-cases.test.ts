@@ -101,7 +101,7 @@ describe("Use Cases API", () => {
     const useCase = await createUseCase(app, feature.id, { slug: "uc-old" });
     const oldPath = resolveStoredContentPath(useCase.contentPath ?? "");
 
-    const res = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ slug: "uc-new" }).expect(200);
+    const res = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ slug: "uc-new", expectedVersion: useCase.version }).expect(200);
 
     expect(res.body.contentPath).toContain("uc-new");
     expect(fs.existsSync(oldPath)).toBe(false);
@@ -114,7 +114,7 @@ describe("Use Cases API", () => {
 
     const res = await supertest(app.server)
       .patch(`/api/use-cases/${useCase.id}`)
-      .send({ title: "UC neu", status: "active", description: "Kurz", sortOrder: 3 })
+      .send({ title: "UC neu", status: "active", description: "Kurz", sortOrder: 3, expectedVersion: useCase.version })
       .expect(200);
 
     expect(res.body).toMatchObject({ title: "UC neu", status: "active", description: "Kurz", sortOrder: 3 });
@@ -138,7 +138,7 @@ describe("Use Cases API", () => {
     const detail = await supertest(app.server).get(`/api/use-cases/${useCase.id}`).expect(200);
     expect(detail.body.content).toBe("# Alt");
 
-    const updated = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ content: "# Neu" }).expect(200);
+    const updated = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ content: "# Neu", expectedVersion: useCase.version }).expect(200);
     expect(updated.body.content).toBe("# Neu");
     expect(fs.readFileSync(resolveStoredContentPath(updated.body.contentPath), "utf8")).toBe("# Neu");
   });

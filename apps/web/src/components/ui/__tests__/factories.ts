@@ -40,6 +40,7 @@ export function buildTag(overrides: Partial<Tag> = {}): Tag {
     id: 1,
     name: "Qualität",
     color: "#0f766e",
+    version: 1,
     ...overrides
   };
 }
@@ -53,6 +54,7 @@ export function buildProject(overrides: Partial<Project> = {}): Project {
     color: "#4f46e5",
     startDate: "2026-01-01",
     dueDate: "2026-12-31",
+    version: 1,
     createdAt,
     updatedAt,
     openTaskCount: 3,
@@ -74,6 +76,7 @@ export function buildTask(overrides: Partial<TaskBoardItem> = {}): TaskBoardItem
     assignee: "Max Mustermann",
     dueDate: "2026-12-31",
     boardPosition: 1,
+    version: 1,
     createdAt,
     updatedAt,
     tags: [buildTag()],
@@ -93,6 +96,7 @@ export function buildFeature(overrides: Partial<Feature> = {}): Feature {
     contentPath: "content/features/feature-login.md",
     sortOrder: 1,
     useCaseCount: 3,
+    version: 1,
     createdAt,
     updatedAt,
     ...overrides
@@ -110,6 +114,7 @@ export function buildUseCase(overrides: Partial<UseCase> = {}): UseCase {
     content: "Der Nutzer meldet sich mit gültigen Zugangsdaten an.",
     contentPath: "content/use-cases/uc-login-success.md",
     sortOrder: 1,
+    version: 1,
     createdAt,
     updatedAt,
     ...overrides
@@ -128,6 +133,7 @@ export function buildBacklogItem(overrides: Partial<BacklogItem> = {}): BacklogI
     priority: "medium",
     importKey: null,
     sortOrder: 1,
+    version: 1,
     createdAt,
     updatedAt,
     ...overrides

@@ -30,7 +30,7 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
     event.preventDefault();
     setSaving(true);
     try {
-      await onSave(page.id, { content });
+      await onSave(page.id, { content, expectedVersion: page.version });
     } finally {
       setSaving(false);
     }

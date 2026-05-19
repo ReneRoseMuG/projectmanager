@@ -64,7 +64,7 @@ export function TicketDetailPage() {
     }
     const { tagIds, ...ticketInput } = input;
     try {
-      await detail.updateTicket(ticketInput);
+      await detail.updateTicket({ ...ticketInput, expectedVersion: ticket.version });
       await setTicketTags(ticket.id, tagIds);
       await detail.reload();
       await tickets.reload();

@@ -1,18 +1,19 @@
-import type { Note, NoteInput } from "@taskmanager/shared-types";
+import type { Note, NoteInput, NoteUpdate } from "@taskmanager/shared-types";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { notes, projectNotes, projects, taskNotes, tasks, ticketNotes, tickets } from "../db/schema.js";
+import { noteRepository, type NoteRecord, type NoteUpdateData } from "../repositories/note.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import { nowIso, parseJsonObject, stringifyJsonObject } from "./helpers.js";
+import { parseJsonObject, stringifyJsonObject } from "./helpers.js";
 
-type NoteRecord = typeof notes.$inferSelect;
-type MappableNoteRecord = Pick<NoteRecord, "id" | "title" | "contentJson" | "createdAt" | "updatedAt">;
+type MappableNoteRecord = Pick<NoteRecord, "id" | "title" | "contentJson" | "version" | "createdAt" | "updatedAt">;
 
 function mapNote(record: MappableNoteRecord): Note {
   return {
     id: record.id,
     title: record.title,
     contentJson: parseJsonObject(record.contentJson),
+    version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
   };
@@ -51,6 +52,7 @@ export function listProjectNotes(database: DbClient, projectId: number): Note[] 
       id: notes.id,
       title: notes.title,
       contentJson: notes.contentJson,
+      version: notes.version,
       createdAt: notes.createdAt,
       updatedAt: notes.updatedAt
     })
@@ -70,6 +72,7 @@ export function listTaskNotes(database: DbClient, taskId: number): Note[] {
       id: notes.id,
       title: notes.title,
       contentJson: notes.contentJson,
+      version: notes.version,
       createdAt: notes.createdAt,
       updatedAt: notes.updatedAt
     })
@@ -89,6 +92,7 @@ export function listTicketNotes(database: DbClient, ticketId: number): Note[] {
       id: notes.id,
       title: notes.title,
       contentJson: notes.contentJson,
+      version: notes.version,
       createdAt: notes.createdAt,
       updatedAt: notes.updatedAt
     })
@@ -103,18 +107,11 @@ export function listTicketNotes(database: DbClient, ticketId: number): Note[] {
 
 export function createProjectNote(database: DbClient, projectId: number, input: NoteInput): Note {
   ensureProjectExists(database, projectId);
-  const now = nowIso();
   const created = database.transaction((tx) => {
-    const note = tx
-      .insert(notes)
-      .values({
-        title: cleanTitle(input.title),
-        contentJson: stringifyJsonObject(input.contentJson),
-        createdAt: now,
-        updatedAt: now
-      })
-      .returning()
-      .get();
+    const note = noteRepository.create(tx as unknown as DbClient, {
+      title: cleanTitle(input.title),
+      contentJson: stringifyJsonObject(input.contentJson)
+    });
     tx.insert(projectNotes).values({ projectId, noteId: note.id }).run();
     return note;
   });
@@ -124,18 +121,11 @@ export function createProjectNote(database: DbClient, projectId: number, input: 
 
 export function createTaskNote(database: DbClient, taskId: number, input: NoteInput): Note {
   ensureTaskExists(database, taskId);
-  const now = nowIso();
   const created = database.transaction((tx) => {
-    const note = tx
-      .insert(notes)
-      .values({
-        title: cleanTitle(input.title),
-        contentJson: stringifyJsonObject(input.contentJson),
-        createdAt: now,
-        updatedAt: now
-      })
-      .returning()
-      .get();
+    const note = noteRepository.create(tx as unknown as DbClient, {
+      title: cleanTitle(input.title),
+      contentJson: stringifyJsonObject(input.contentJson)
+    });
     tx.insert(taskNotes).values({ taskId, noteId: note.id }).run();
     return note;
   });
@@ -145,18 +135,11 @@ export function createTaskNote(database: DbClient, taskId: number, input: NoteIn
 
 export function createTicketNote(database: DbClient, ticketId: number, input: NoteInput): Note {
   ensureTicketExists(database, ticketId);
-  const now = nowIso();
   const created = database.transaction((tx) => {
-    const note = tx
-      .insert(notes)
-      .values({
-        title: cleanTitle(input.title),
-        contentJson: stringifyJsonObject(input.contentJson),
-        createdAt: now,
-        updatedAt: now
-      })
-      .returning()
-      .get();
+    const note = noteRepository.create(tx as unknown as DbClient, {
+      title: cleanTitle(input.title),
+      contentJson: stringifyJsonObject(input.contentJson)
+    });
     tx.insert(ticketNotes).values({ ticketId, noteId: note.id }).run();
     return note;
   });
@@ -165,7 +148,7 @@ export function createTicketNote(database: DbClient, ticketId: number, input: No
 }
 
 export function getNote(database: DbClient, id: number): Note {
-  const note = database.select().from(notes).where(eq(notes.id, id)).get();
+  const note = noteRepository.findById(database, id);
   if (!note) {
     throw notFound(`Note with id ${id} not found`);
   }
@@ -173,8 +156,8 @@ export function getNote(database: DbClient, id: number): Note {
   return mapNote(note);
 }
 
-export function updateNote(database: DbClient, id: number, input: NoteInput): Note {
-  const values: Partial<typeof notes.$inferInsert> = {};
+export function updateNote(database: DbClient, id: number, input: NoteUpdate): Note {
+  const values: NoteUpdateData = {};
 
   if (input.title !== undefined) {
     values.title = cleanTitle(input.title);
@@ -186,9 +169,7 @@ export function updateNote(database: DbClient, id: number, input: NoteInput): No
     throw badRequest("No note fields provided");
   }
 
-  values.updatedAt = nowIso();
-
-  const updated = database.update(notes).set(values).where(eq(notes.id, id)).returning().get();
+  const updated = noteRepository.update(database, id, input.expectedVersion, values);
   if (!updated) {
     throw notFound(`Note with id ${id} not found`);
   }
@@ -197,8 +178,7 @@ export function updateNote(database: DbClient, id: number, input: NoteInput): No
 }
 
 export function deleteNote(database: DbClient, id: number): void {
-  const result = database.delete(notes).where(eq(notes.id, id)).run();
-  if (result.changes === 0) {
+  if (noteRepository.delete(database, id) === 0) {
     throw notFound(`Note with id ${id} not found`);
   }
 }
@@ -209,7 +189,7 @@ function deleteNotesByIds(database: DbClient, noteIds: number[]): void {
     return;
   }
 
-  database.delete(notes).where(inArray(notes.id, uniqueIds)).run();
+  noteRepository.deleteByIds(database, uniqueIds);
 }
 
 export function deleteProjectNotesForIds(database: DbClient, projectIds: number[]): void {
