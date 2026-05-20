@@ -38,7 +38,7 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
   const showAdmin = canAdministerUsers(currentUser);
 
   return (
-    <aside className="hidden w-64 shrink-0 bg-gradient-to-b from-steel-700 to-steel-800 p-4 text-white md:block">
+    <aside className="hidden w-64 shrink-0 overflow-y-auto bg-gradient-to-b from-steel-700 to-steel-800 p-4 text-white md:block">
       <div className="mb-8 flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-steel-700 shadow-lg">PM</span>
         <div>

@@ -68,6 +68,8 @@ describe("Sidebar", () => {
   it("rendert für alle 5 Hauptnavigationseinträge je einen In-neuem-Tab-Button", () => {
     renderSidebar();
 
+    expect(screen.getByText("Projekt Manager").closest("aside")).toHaveClass("overflow-y-auto");
+
     for (const label of ["Projekte", "Tickets", "Features", "Wiki", "Kalender"]) {
       expect(screen.getByTitle(`${label} in neuem Tab öffnen`)).toBeInTheDocument();
     }

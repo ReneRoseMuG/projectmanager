@@ -313,9 +313,8 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
         }
         onClose={onClose}
         variant={variant}
+        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
       >
-        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
-
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">

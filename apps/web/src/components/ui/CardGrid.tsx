@@ -13,5 +13,5 @@ const columnClasses: Record<NonNullable<CardGridProps["columns"]>, string> = {
 
 /** Responsive card grid used for statusless board layouts. */
 export function CardGrid({ children, columns = 3 }: CardGridProps) {
-  return <div className={`grid min-w-0 gap-4 ${columnClasses[columns]}`}>{children}</div>;
+  return <div className={`grid min-h-full min-w-0 content-start gap-4 ${columnClasses[columns]}`}>{children}</div>;
 }

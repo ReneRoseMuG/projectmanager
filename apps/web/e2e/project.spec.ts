@@ -99,6 +99,50 @@ test.describe("Projekt-Routen und Detailformular", () => {
     }
   });
 
+  test("Projektformular hält Tab Bar und Footer im Content-Scrollcontainer sichtbar", async ({ page, request }) => {
+    const project = await createProject(request, "E2E Project Sticky Shell");
+
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await authenticatedGoto(page, `/projects/${project.id}`);
+
+      const main = page.locator("main").first();
+      const form = formPage(page, "Projekt bearbeiten");
+      const header = form.locator(":scope > header");
+      const tabBar = form.locator(":scope > div").first();
+      const footer = form.locator(":scope > footer");
+      const mainBox = await main.boundingBox();
+
+      if (!mainBox) {
+        throw new Error("Main scroll container is not visible.");
+      }
+
+      await expect(tabBar).toBeVisible();
+      await expect(footer).toBeVisible();
+
+      await main.evaluate((element) => {
+        element.scrollTop = 360;
+      });
+
+      await expect.poll(async () => (await header.boundingBox())?.bottom ?? Number.NEGATIVE_INFINITY).toBeLessThan(mainBox.y + 8);
+      await expect.poll(async () => (await tabBar.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(mainBox.y + 28);
+      await expect.poll(async () => {
+        const box = await footer.boundingBox();
+        return box ? box.y + box.height : 0;
+      }).toBeGreaterThan(mainBox.y + mainBox.height - 32);
+      await expect.poll(async () => {
+        const box = await footer.boundingBox();
+        return box ? box.y + box.height : Number.POSITIVE_INFINITY;
+      }).toBeLessThan(mainBox.y + mainBox.height + 2);
+
+      const featuresTab = form.getByRole("button", { name: /Features/ });
+      await featuresTab.click();
+      await expect(featuresTab).toHaveClass(/text-steel-700/);
+    } finally {
+      await deleteProject(request, project.id);
+    }
+  });
+
   test("Projekt bearbeiten: Speichern schließt auf die Rücksprung-Route und aktualisiert die Übersicht", async ({ page, request }) => {
     const project = await createProject(request, "E2E Project Edit Route");
     const updatedName = uniqueTitle("E2E Project Updated Route");

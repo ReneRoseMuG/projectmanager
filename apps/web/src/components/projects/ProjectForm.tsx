@@ -389,9 +389,8 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
       >
-        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
-
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">

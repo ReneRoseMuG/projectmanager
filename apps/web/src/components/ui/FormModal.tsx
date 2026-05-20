@@ -16,6 +16,7 @@ interface FormModalProps {
   headerMeta?: ReactNode;
   variant?: "modal" | "page";
   onOpenInTab?: () => void;
+  tabBar?: ReactNode;
   children: ReactNode;
 }
 
@@ -33,6 +34,7 @@ export function FormModal({
   headerMeta,
   variant = "modal",
   onOpenInTab,
+  tabBar,
   children
 }: FormModalProps) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -44,9 +46,11 @@ export function FormModal({
     return null;
   }
 
+  const isPage = variant === "page";
+
   const form = (
-    <form className={variant === "page" ? "flex min-h-[calc(100vh-120px)] flex-col overflow-hidden rounded-2xl bg-shell shadow-panel" : "flex max-h-[calc(100vh-64px)] flex-col bg-shell"} onSubmit={submit}>
-      <header className="relative shrink-0 overflow-hidden bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
+    <form className={isPage ? "flex min-h-full flex-col rounded-2xl bg-shell shadow-panel" : "flex max-h-[calc(100vh-64px)] flex-col bg-shell"} onSubmit={submit}>
+      <header className={`relative overflow-hidden bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6 ${isPage ? "rounded-t-2xl" : "shrink-0"}`}>
         <div className="pointer-events-none absolute -right-8 -top-32 h-80 w-80 rounded-full bg-white/12 blur-sm" />
         <div className="relative flex items-start justify-between gap-4">
           <div className="grid gap-2">
@@ -81,9 +85,11 @@ export function FormModal({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 content-start gap-4 overflow-auto p-4 md:p-5">{children}</div>
+      {tabBar ? <div className={isPage ? "sticky top-0 z-20 shadow-sm" : "shrink-0"}>{tabBar}</div> : null}
 
-      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
+      <div className={isPage ? "grid flex-1 content-start gap-4 p-4 pb-24 md:p-5 md:pb-24" : "grid min-h-0 flex-1 content-start gap-4 overflow-auto p-4 md:p-5"}>{children}</div>
+
+      <footer className={`flex flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4 ${isPage ? "sticky bottom-0 z-10 rounded-b-2xl" : "shrink-0"}`}>
         <div className="flex flex-wrap items-center gap-2">{footerStart}</div>
         <div className="flex flex-wrap items-center justify-end gap-3">
           <Button onClick={onClose}>Abbrechen</Button>

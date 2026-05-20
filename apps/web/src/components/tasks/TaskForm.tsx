@@ -220,6 +220,7 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
         headerMeta={
           <div className="flex flex-wrap gap-2">
             <StatusPill kind="workStatus" value={status} />
@@ -227,8 +228,6 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
           </div>
         }
       >
-        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
-
         {task && detail.loading ? <TaskListSkeleton /> : null}
         {task && detail.error ? <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{detail.error}</div> : null}
 

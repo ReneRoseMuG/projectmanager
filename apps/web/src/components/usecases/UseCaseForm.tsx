@@ -189,9 +189,8 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
         }
         onClose={onClose}
         variant={variant}
+        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
       >
-        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
-
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">

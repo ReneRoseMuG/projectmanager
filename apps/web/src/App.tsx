@@ -69,16 +69,16 @@ export default function App() {
   const adminAccess = hasAdminAccess(auth.user);
 
   return (
-    <div className="flex min-h-screen bg-shell text-ink">
+    <div className="flex h-screen overflow-hidden bg-shell text-ink">
       <Sidebar
         currentUser={auth.user}
         onLogout={() => {
           void auth.logout().then(() => navigate("/login", { replace: true }));
         }}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar />
-        <main className="min-w-0 flex-1 p-4 md:p-6">
+        <main className="min-h-0 min-w-0 flex-1 overflow-auto p-4 md:p-6">
           <Routes>
             <Route path="/" element={<Navigate to="/projects" replace />} />
             <Route path="/projects" element={<ProjectsPage />} />
