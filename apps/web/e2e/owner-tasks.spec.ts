@@ -10,7 +10,6 @@ import {
   deleteFeature,
   deleteProject,
   deleteTask,
-  expectRichText,
   fillRichText,
   formPage,
   itemCard,
@@ -22,7 +21,7 @@ import {
  *
  * Abgedeckte Regeln:
  * - Projekt-, Feature- und Use-Case-Detailseiten besitzen einen Aufgaben-Tab.
- * - Neue Aufgaben aus Owner-Tabs navigieren auf `/tasks/new` und speichern als `/tasks/:id`.
+ * - Neue Aufgaben aus Owner-Tabs navigieren auf `/tasks/new` und schließen nach Speichern zurück zum Owner.
  * - Doppelklick und Bearbeiten-Button öffnen verknüpfte Aufgaben als vollständige Detailformular-Seite.
  * - `Verknüpfen` und `Entfernen` bleiben relationale Aktionen und löschen Aufgaben nicht global.
  *
@@ -86,17 +85,15 @@ async function createTaskInBoard(page: Page, reopenScope: ScopeFactory, title: s
   const taskForm = formPage(page, "Aufgabe anlegen");
   await taskForm.locator("input[required]").first().fill(title);
   await fillRichText(taskForm, "task-description", "E2E Owner-Aufgabe vollständig");
+  const taskResponsePromise = page.waitForResponse((response) => response.url().includes("/tasks") && response.request().method() === "POST");
   await taskForm.getByRole("button", { name: "Aufgabe anlegen" }).click();
+  const createdTask = (await (await taskResponsePromise).json()) as { id: number };
 
-  await expect(page).toHaveURL(/\/tasks\/\d+\?/);
-  const createdTaskId = Number(new URL(page.url()).pathname.split("/").pop());
-  const detailForm = formPage(page, "Aufgabe bearbeiten");
-  await expect(detailForm.locator("input[required]").first()).toHaveValue(title);
-  await expectRichText(detailForm, "E2E Owner-Aufgabe vollständig");
+  await expect(formPage(page, "Aufgabe anlegen")).toHaveCount(0);
 
   const reopened = await reopenScope();
   await expect(itemCard(reopened, title)).toBeVisible();
-  return createdTaskId;
+  return createdTask.id;
 }
 
 async function linkTaskInBoard(page: Page, reopenScope: ScopeFactory, title: string) {

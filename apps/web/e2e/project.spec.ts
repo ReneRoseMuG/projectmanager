@@ -21,7 +21,8 @@ import {
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Projekt-Create und Projekt-Edit laufen über die kanonischen Routen `/projects/new` und `/projects/:id`.
+ * - Projekt-Create läuft über `/projects/new` und schließt nach Speichern zurück zur Übersicht.
+ * - Projekt-Edit läuft über die kanonische Route `/projects/:id`.
  * - Doppelklick und Bearbeiten-Button in Board- und Listenansicht navigieren auf dieselbe Detailformular-Seite.
  * - Projekt-Tab-Views öffnen verknüpfte Domänenobjekte per Route statt per Overlay.
  *
@@ -47,7 +48,7 @@ async function expectProjectFormData(page: Page, project: { name: string }, desc
 }
 
 test.describe("Projekt-Routen und Detailformular", () => {
-  test("Projekt erstellen: Plus-Button navigiert auf Create-Detailseite und speichert als Detailroute", async ({ page, request }) => {
+  test("Projekt erstellen: Plus-Button navigiert auf Create-Detailseite und Speichern schließt", async ({ page, request }) => {
     let projectId: number | null = null;
     const name = uniqueTitle("E2E Project Create Route");
 
@@ -62,13 +63,12 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await fillRichText(form, "project-description", "E2E neu angelegte Projektbeschreibung vollständig");
       await form.locator('input[type="date"]').nth(0).fill("2026-05-01");
       await form.locator('input[type="date"]').nth(1).fill("2026-05-31");
+      const projectResponsePromise = page.waitForResponse((response) => response.url().includes("/api/projects") && response.request().method() === "POST");
       await form.getByRole("button", { name: "Projekt anlegen" }).click();
+      const createdProject = (await (await projectResponsePromise).json()) as { id: number };
+      projectId = createdProject.id;
 
-      await expect(page).toHaveURL(/\/projects\/\d+$/);
-      projectId = Number(page.url().split("/").pop());
-      await expectProjectFormData(page, { name }, "E2E neu angelegte Projektbeschreibung vollständig");
-
-      await openProjectList(page);
+      await expect(page).toHaveURL(/\/projects$/);
       await expect(itemCard(page, name)).toBeVisible();
     } finally {
       await deleteProject(request, projectId);
@@ -267,7 +267,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
     }
   });
 
-  test("Feature erstellen aus Projekt-Tab nutzt die Feature-Create-Detailroute und verknüpft echte Daten", async ({ page, request }) => {
+  test("Feature erstellen aus Projekt-Tab nutzt die Feature-Create-Route, schließt und verknüpft echte Daten", async ({ page, request }) => {
     const project = await createProject(request, "E2E Project Feature Create Route");
     let featureId: number | null = null;
     const featureTitle = uniqueTitle("E2E Project Created Feature Route");
@@ -285,11 +285,15 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await featureForm.locator("input[required]").nth(1).fill(featureSlug);
       await fillRichText(featureForm, "feature-form-description", "E2E verknüpfte Kurzbeschreibung vollständig");
       await fillRichText(featureForm, "feature-form-content", "E2E verknüpfter Inhalt vollständig");
+      const featureResponsePromise = page.waitForResponse((response) => response.url().includes("/api/features") && response.request().method() === "POST");
       await featureForm.getByRole("button", { name: "Feature anlegen" }).click();
+      const createdFeature = (await (await featureResponsePromise).json()) as { id: number };
+      featureId = createdFeature.id;
 
-      await expect(page).toHaveURL(/\/features\/\d+$/);
-      featureId = Number(page.url().split("/").pop());
-      await expect(formPage(page, "Feature bearbeiten").locator("input[required]").nth(0)).toHaveValue(featureTitle);
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
+      const refreshedProjectForm = formPage(page, "Projekt bearbeiten");
+      await refreshedProjectForm.getByRole("button", { name: /Features/ }).click();
+      await expect(itemCard(refreshedProjectForm, featureTitle)).toBeVisible();
 
       const linkedResponse = await request.get(`${apiBaseUrl}/projects/${project.id}/features`);
       const linked = (await linkedResponse.json()) as Array<{ id: number }>;

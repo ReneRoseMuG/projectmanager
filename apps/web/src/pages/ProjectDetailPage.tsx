@@ -91,7 +91,6 @@ export function ProjectDetailPage() {
         await uploadProjectAttachment(projectId, file.file);
       }
       showToast({ tone: "success", title: "Projekt-Zuordnungen gespeichert" });
-      navigate(`/projects/${projectId}`);
     } catch (postCreateError) {
       showToast({ tone: "error", title: "Projekt wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
       throw postCreateError;
@@ -143,7 +142,6 @@ export function ProjectDetailPage() {
         onDelete={deleteProject}
         savingLabel={savingLabel}
         onPostCreate={postCreateProject}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

@@ -19,7 +19,8 @@ import {
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Feature-Create und Feature-Edit laufen über `/features/new` und `/features/:id`.
+ * - Feature-Create läuft über `/features/new` und schließt nach Speichern zurück zur Übersicht.
+ * - Feature-Edit läuft über `/features/:id`.
  * - Doppelklick und Bearbeiten-Button in Feature-Übersicht und Feature-Tab-Views navigieren korrekt.
  * - Feature-, Projekt- und Use-Case-Detailseiten zeigen ihre vollständigen Formulardaten.
  *
@@ -46,7 +47,7 @@ async function expectFeatureFormData(page: Page, feature: { title: string; slug:
 }
 
 test.describe("Feature-Routen und Detailformular", () => {
-  test("Feature erstellen: Plus-Button navigiert auf Create-Detailseite und speichert als Detailroute", async ({ page, request }) => {
+  test("Feature erstellen: Plus-Button navigiert auf Create-Detailseite und Speichern schließt", async ({ page, request }) => {
     let featureId: number | null = null;
     const title = uniqueTitle("E2E Feature Create Route");
     const slug = slugify(title);
@@ -62,13 +63,12 @@ test.describe("Feature-Routen und Detailformular", () => {
       await form.locator('input[type="number"]').first().fill("7");
       await fillRichText(form, "feature-form-description", "E2E Feature-Neuanlage Beschreibung vollständig");
       await fillRichText(form, "feature-form-content", "E2E Feature-Neuanlage Inhalt vollständig");
+      const featureResponsePromise = page.waitForResponse((response) => response.url().includes("/api/features") && response.request().method() === "POST");
       await form.getByRole("button", { name: "Feature anlegen" }).click();
+      const createdFeature = (await (await featureResponsePromise).json()) as { id: number };
+      featureId = createdFeature.id;
 
-      await expect(page).toHaveURL(/\/features\/\d+$/);
-      featureId = Number(page.url().split("/").pop());
-      await expectFeatureFormData(page, { title, slug }, "E2E Feature-Neuanlage Beschreibung vollständig", "E2E Feature-Neuanlage Inhalt vollständig");
-
-      await openFeatureList(page);
+      await expect(page).toHaveURL(/\/features$/);
       await expect(itemCard(page, title)).toBeVisible();
     } finally {
       await deleteFeature(request, featureId);
@@ -99,7 +99,7 @@ test.describe("Feature-Routen und Detailformular", () => {
     }
   });
 
-  test("Feature bearbeiten: Speichern hält die kanonische Detailformular-Seite aktuell", async ({ page, request }) => {
+  test("Feature bearbeiten: Speichern schließt auf die Rücksprung-Route und aktualisiert die Übersicht", async ({ page, request }) => {
     const feature = await createFeature(request, "E2E Feature Edit Route");
     const updatedTitle = uniqueTitle("E2E Feature Updated Route");
 
@@ -114,8 +114,8 @@ test.describe("Feature-Routen und Detailformular", () => {
         form.getByRole("button", { name: "Speichern" }).click()
       ]);
 
-      await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
-      await expect(form.locator("input[required]").nth(0)).toHaveValue(updatedTitle);
+      await expect(page).toHaveURL(/\/features$/);
+      await expect(itemCard(page, updatedTitle)).toBeVisible();
     } finally {
       await deleteFeature(request, feature.id);
     }

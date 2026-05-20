@@ -42,7 +42,6 @@ export function MilestoneDetailPage() {
 
       const created = await createMilestone(input, tagIds);
       showToast({ tone: "success", title: "Meilenstein erstellt" });
-      navigate(`/milestones/${created.id}?returnTo=${encodeURIComponent(returnTo)}`);
       return created;
     } catch (milestoneError) {
       showToast({ tone: "error", title: "Meilenstein konnte nicht gespeichert werden", message: errorMessage(milestoneError) });
@@ -93,7 +92,6 @@ export function MilestoneDetailPage() {
         variant="page"
         onSubmit={submitMilestone}
         onDelete={deleteMilestone}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

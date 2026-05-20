@@ -22,7 +22,7 @@ import {
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Tickets werden global und aus Owner-Tabs über `/tickets/new` erstellt und über `/tickets/:id` bearbeitet.
+ * - Tickets werden global und aus Owner-Tabs über `/tickets/new` erstellt, schließen nach Speichern zurück und werden über `/tickets/:id` bearbeitet.
  * - Doppelklick und Bearbeiten-Button in Ticket-Boards und Listen navigieren auf dieselbe Detailformular-Seite.
  * - Projekt-, Aufgaben-, Feature- und Use-Case-Ticket-Tabs öffnen echte Ticketdaten per Route.
  *
@@ -89,7 +89,7 @@ async function expectTicketNavigationFromScope(page: Page, scope: Locator, title
 }
 
 test.describe("Ticket-Routen und Detailformular", () => {
-  test("Ticket erstellen: Plus-Button navigiert auf Create-Detailseite und speichert als Detailroute", async ({ page, request }) => {
+  test("Ticket erstellen: Plus-Button navigiert auf Create-Detailseite und Speichern schließt", async ({ page, request }) => {
     const ticketTitle = uniqueTitle("E2E Ticket Create Route");
     let ticketId: number | null = null;
 
@@ -106,11 +106,13 @@ test.describe("Ticket-Routen und Detailformular", () => {
       await form.locator('input[type="date"]').first().fill("2026-05-30");
       await form.locator("input").nth(4).fill("E2E Umgebung");
       await form.locator("input").nth(5).fill("v1.2.3");
+      const ticketResponsePromise = page.waitForResponse((response) => response.url().includes("/api/tickets") && response.request().method() === "POST");
       await form.getByRole("button", { name: "Ticket anlegen" }).click();
+      const createdTicket = (await (await ticketResponsePromise).json()) as { id: number };
+      ticketId = createdTicket.id;
 
-      await expect(page).toHaveURL(/\/tickets\/\d+\?/);
-      ticketId = Number(new URL(page.url()).pathname.split("/").pop());
-      await expectTicketFormData(page, { title: ticketTitle }, "E2E neues Ticket vollständig");
+      await expect(page).toHaveURL(/\/tickets$/);
+      await expect(itemCard(page, ticketTitle)).toBeVisible();
     } finally {
       await deleteTicket(request, ticketId);
     }
@@ -140,7 +142,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
     }
   });
 
-  test("Ticket bearbeiten: Speichern hält die kanonische Detailformular-Seite aktuell", async ({ page, request }) => {
+  test("Ticket bearbeiten: Speichern schließt auf die Rücksprung-Route und aktualisiert die Übersicht", async ({ page, request }) => {
     const ticket = await createTicket(request, null, "E2E Ticket Edit Route");
     const updatedTitle = uniqueTitle("E2E Ticket Updated Route");
 
@@ -155,8 +157,8 @@ test.describe("Ticket-Routen und Detailformular", () => {
         form.getByRole("button", { name: "Speichern" }).click()
       ]);
 
-      await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
-      await expect(form.locator("input[required]").first()).toHaveValue(updatedTitle);
+      await expect(page).toHaveURL(/\/tickets$/);
+      await expect(itemCard(page, updatedTitle)).toBeVisible();
     } finally {
       await deleteTicket(request, ticket.id);
     }
@@ -174,10 +176,13 @@ test.describe("Ticket-Routen und Detailformular", () => {
       await expect(page).toHaveURL(/\/tickets\/new\?/);
       const createForm = formPage(page, "Ticket");
       await createForm.locator("input[required]").first().fill(createdTitle);
+      const createdTicketResponsePromise = page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/tickets`) && response.request().method() === "POST");
       await createForm.getByRole("button", { name: "Ticket anlegen" }).click();
-      await expect(page).toHaveURL(/\/tickets\/\d+\?/);
-      createdTicketId = Number(new URL(page.url()).pathname.split("/").pop());
-      await expect(formPage(page, "Ticket bearbeiten").locator("input[required]").first()).toHaveValue(createdTitle);
+      const createdTicket = (await (await createdTicketResponsePromise).json()) as { id: number };
+      createdTicketId = createdTicket.id;
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
+      scope = await openProjectTickets(page, project.id);
+      await expect(itemCard(scope, createdTitle)).toBeVisible();
 
       scope = await openProjectTickets(page, project.id);
       await expectTicketNavigationFromScope(page, scope, existingTicket.title, existingTicket.id);

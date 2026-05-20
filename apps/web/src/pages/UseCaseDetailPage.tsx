@@ -87,7 +87,6 @@ export function UseCaseDetailPage() {
       for (const comment of pending.comments) {
         await createEntityComment("useCase", useCaseId, { body: comment.text });
       }
-      navigate(`/use-cases/${useCaseId}?returnTo=${encodeURIComponent(returnTo)}`);
     } catch (postCreateError) {
       showToast({ tone: "error", title: "Use Case wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
       throw postCreateError;
@@ -142,7 +141,6 @@ export function UseCaseDetailPage() {
         onSubmit={submitUseCase}
         onPostCreate={postCreateUseCase}
         onDelete={deleteUseCase}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

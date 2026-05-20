@@ -2,6 +2,8 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 20.05.26 | Fix | Formular Save-Close Create | ✅ |
+| 20.05.26 | Fix | Backup Pfad Root | ✅ |
 | 20.05.26 | Feature | Lokale Backups | ✅ |
 | 20.05.26 | Fix | Formular-Board-Tabs füllen | ⚠️ |
 | 20.05.26 | Fix | Katalogsichere Create-Flows | ✅ |

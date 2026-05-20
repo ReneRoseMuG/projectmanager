@@ -117,7 +117,6 @@ export function TaskDetailPage() {
       }
 
       showToast({ tone: "success", title: "Aufgabe erstellt" });
-      navigate(`/tasks/${created.id}?returnTo=${encodeURIComponent(returnTo)}`);
       return created;
     } catch (taskError) {
       showToast({ tone: "error", title: created ? "Aufgabe wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden" : "Aufgabe konnte nicht erstellt werden", message: errorMessage(taskError) });
@@ -152,7 +151,6 @@ export function TaskDetailPage() {
         variant="page"
         savingLabel={savingLabel}
         onSubmit={submitTask}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onChanged={detail.reload}
         onOpenInTab={openInTab}

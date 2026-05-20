@@ -99,7 +99,6 @@ export function FeatureDetailPage() {
       }
       await features.reload();
       showToast({ tone: "success", title: "Feature-Zuordnungen gespeichert" });
-      navigate(`/features/${featureId}`);
     } catch (postCreateError) {
       showToast({ tone: "error", title: "Feature wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
       throw postCreateError;
@@ -151,7 +150,6 @@ export function FeatureDetailPage() {
         onDelete={deleteFeature}
         savingLabel={savingLabel}
         onPostCreate={postCreateFeature}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

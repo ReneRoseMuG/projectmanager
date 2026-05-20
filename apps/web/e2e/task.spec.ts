@@ -5,7 +5,7 @@ import { authenticatedGoto, apiBaseUrl, createProject, createTask, cleanupTasksB
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Aufgaben werden aus Owner-Tabs heraus über `/tasks/new` erstellt und über `/tasks/:id` bearbeitet.
+ * - Aufgaben werden aus Owner-Tabs heraus über `/tasks/new` erstellt, schließen nach Speichern zurück und werden über `/tasks/:id` bearbeitet.
  * - Doppelklick und Bearbeiten-Button im Aufgaben-Board und in der Liste navigieren auf dieselbe Detailformular-Seite.
  * - Das Aufgabenformular zeigt echte geladene Daten inklusive Beschreibung und Fälligkeitsdatum vollständig an.
  *
@@ -34,7 +34,7 @@ async function expectTaskFormData(page: Page, task: { title: string }, descripti
 }
 
 test.describe("Task-Routen und Detailformular", () => {
-  test("Task erstellen: Neue Aufgabe im Projekt-Tab navigiert über Create-Route und speichert als Detailseite", async ({ page, request }) => {
+  test("Task erstellen: Neue Aufgabe im Projekt-Tab navigiert über Create-Route und Speichern schließt", async ({ page, request }) => {
     const project = await createProject(request, "E2E Task Create Project");
     const taskTitle = uniqueTitle("E2E Task Create Route");
     let taskId: number | null = null;
@@ -48,14 +48,17 @@ test.describe("Task-Routen und Detailformular", () => {
       await taskForm.locator("input[required]").first().fill(taskTitle);
       await fillRichText(taskForm, "task-description", "E2E neue Aufgabenbeschreibung vollständig");
       await taskForm.locator('input[type="date"]').first().fill("2026-05-29");
+      const taskResponsePromise = page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/tasks`) && response.request().method() === "POST");
       await taskForm.getByRole("button", { name: "Aufgabe anlegen" }).click();
+      const createdTask = (await (await taskResponsePromise).json()) as { id: number };
+      taskId = createdTask.id;
 
-      await expect(page).toHaveURL(/\/tasks\/\d+\?/);
-      taskId = Number(new URL(page.url()).pathname.split("/").pop());
-      await expectTaskFormData(page, { title: taskTitle }, "E2E neue Aufgabenbeschreibung vollständig");
-
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
       const reopenedProjectForm = await openProjectTasks(page, project.id);
       await expect(itemCard(reopenedProjectForm, taskTitle)).toBeVisible();
+      await itemCard(reopenedProjectForm, taskTitle).dblclick();
+      await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}`));
+      await expectTaskFormData(page, { title: taskTitle }, "E2E neue Aufgabenbeschreibung vollständig");
     } finally {
       await deleteProject(request, project.id);
       await deleteTask(request, taskId);
@@ -87,7 +90,7 @@ test.describe("Task-Routen und Detailformular", () => {
     }
   });
 
-  test("Task bearbeiten: Speichern aktualisiert die Detailformular-Seite und die Owner-Karte", async ({ page, request }) => {
+  test("Task bearbeiten: Speichern schließt auf die Rücksprung-Route und aktualisiert die Owner-Karte", async ({ page, request }) => {
     const project = await createProject(request, "E2E Task Edit Project");
     const task = await createTask(request, { type: "project", id: project.id }, "E2E Task Edit Route");
     const updatedTitle = uniqueTitle("E2E Task Updated Route");
@@ -103,9 +106,7 @@ test.describe("Task-Routen und Detailformular", () => {
         taskForm.getByRole("button", { name: "Speichern" }).click()
       ]);
 
-      await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}`));
-      await expect(taskForm.locator("input[required]").first()).toHaveValue(updatedTitle);
-
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
       const projectForm = await openProjectTasks(page, project.id);
       await expect(itemCard(projectForm, updatedTitle)).toBeVisible();
     } finally {
