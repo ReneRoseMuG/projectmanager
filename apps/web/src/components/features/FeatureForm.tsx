@@ -65,6 +65,7 @@ interface FeatureFormProps {
   savingLabel?: string;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
+  onOpenInTab?: () => void;
   onPostCreate?: (
     featureId: number,
     pending: {
@@ -90,7 +91,7 @@ const tabs: Array<Tab<FeatureFormTab>> = [
   { value: "attachments", label: "Dateien" }
 ];
 
-export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onPostCreate }: FeatureFormProps) {
+export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab, onPostCreate }: FeatureFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const featureId = feature?.id;
@@ -248,6 +249,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         onSubmit={submit}
         onClose={onClose}
         variant={variant}
+        onOpenInTab={onOpenInTab}
       >
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
 

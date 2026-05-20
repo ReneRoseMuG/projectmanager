@@ -59,6 +59,7 @@ interface MilestoneFormProps {
   savingLabel?: string;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
+  onOpenInTab?: () => void;
 }
 
 type MilestoneFormTab = "details" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "events";
@@ -86,7 +87,7 @@ const swatches = [
   "var(--color-ink)"
 ];
 
-export function MilestoneForm({ open, milestone, projects, initialProjectId, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true }: MilestoneFormProps) {
+export function MilestoneForm({ open, milestone, projects, initialProjectId, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab }: MilestoneFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
@@ -299,6 +300,7 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
         onSubmit={submit}
         saving={saving}
         submitLabel={saving ? savingLabel ?? "Speichern..." : milestone ? "Speichern" : "Meilenstein anlegen"}
+        onOpenInTab={onOpenInTab}
         footerStart={
           milestone && onDelete ? (
             <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" disabled={deleting} onClick={() => void deleteCurrentMilestone()}>

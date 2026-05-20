@@ -31,6 +31,29 @@ vi.mock("../../tags/TagPicker", () => ({
   }
 }));
 
+vi.mock("../../../hooks/useCatalogs", () => ({
+  useCatalogs() {
+    const entries = [
+      { id: 1, kind: "workStatus", key: "open", label: "Offen", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
+      { id: 2, kind: "workStatus", key: "in_progress", label: "In Arbeit", sortOrder: 200, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
+      { id: 3, kind: "workStatus", key: "closed", label: "Geschlossen", sortOrder: 300, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
+      { id: 4, kind: "priority", key: "medium", label: "Mittel", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" }
+    ];
+    return {
+      entries,
+      workStatuses: entries.filter((entry) => entry.kind === "workStatus"),
+      featureStatuses: [],
+      priorities: entries.filter((entry) => entry.kind === "priority"),
+      loading: false,
+      error: null,
+      createEntry: vi.fn(),
+      updateEntry: vi.fn(),
+      deleteEntry: vi.fn(),
+      reload: vi.fn()
+    };
+  }
+}));
+
 const ticket: Ticket = {
   id: 50,
   parentId: null,
@@ -69,5 +92,17 @@ describe("TicketForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Ticket aktualisiert</p>" })));
+  });
+
+  it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {
+    render(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} variant="page" />);
+
+    expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
+  });
+
+  it("zeigt im Edit-Modus keinen 'In neuem Tab öffnen'-Button, wenn onOpenInTab fehlt", () => {
+    render(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
   });
 });

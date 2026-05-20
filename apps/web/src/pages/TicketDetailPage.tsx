@@ -38,6 +38,13 @@ export function TicketDetailPage() {
   const returnTo = searchParams.get("returnTo") ?? "/tickets";
 
   const closePage = () => navigate(returnTo);
+  const openInTab =
+    !isCreateMode && ticketId !== null && Number.isFinite(ticketId)
+      ? () => {
+          window.open(`/tickets/${ticketId}`, "_blank");
+          navigate(returnTo);
+        }
+      : undefined;
 
   const createTicket = async (input: TicketFormInput) => {
     const { tagIds, ...ticketInput } = input;
@@ -97,7 +104,7 @@ export function TicketDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <TicketForm open ticket={detail.ticket} variant="page" onSubmit={saveTicket} onClose={closePage} />
+      <TicketForm open ticket={detail.ticket} variant="page" onSubmit={saveTicket} onClose={closePage} onOpenInTab={openInTab} />
     </div>
   );
 }

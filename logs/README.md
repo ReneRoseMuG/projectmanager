@@ -2,6 +2,7 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 20.05.26 | 1 | Browser-Tabs | ⚠️ |
 | 20.05.26 | Fix | Büroumgebung KI Runtime | ✅ |
 | 20.05.26 | Feature | Status-Board-Gruppierung | ✅ |
 | 20.05.26 | Feature | Status- und Prioritätskataloge | ✅ |

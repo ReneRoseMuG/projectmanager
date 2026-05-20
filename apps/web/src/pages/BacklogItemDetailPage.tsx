@@ -24,6 +24,13 @@ export function BacklogItemDetailPage() {
   const backlog = useBacklog(projectId);
   const features = useFeatures();
   const returnTo = searchParams.get("returnTo") ?? (projectId ? `/projects/${projectId}` : "/projects");
+  const openInTab =
+    !isCreateMode && itemId !== null && Number.isFinite(itemId)
+      ? () => {
+          window.open(`/backlog/${itemId}`, "_blank");
+          navigate(returnTo);
+        }
+      : undefined;
 
   useEffect(() => {
     const id = itemId;
@@ -73,7 +80,7 @@ export function BacklogItemDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <BacklogItemForm open item={item} features={features.features} variant="page" onSubmit={submitBacklogItem} onClose={closePage} />
+      <BacklogItemForm open item={item} features={features.features} variant="page" onSubmit={submitBacklogItem} onClose={closePage} onOpenInTab={openInTab} />
     </div>
   );
 }

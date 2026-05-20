@@ -38,6 +38,16 @@ export function WikiPage() {
     setFormOpen(true);
   };
 
+  const openInTab = editingPage
+    ? () => {
+        window.open(`/wiki/${editingPage.id}`, "_blank");
+        navigate("/wiki");
+        setFormOpen(false);
+        setFormParent(null);
+        setEditingPage(null);
+      }
+    : undefined;
+
   const savePage = async (id: number, input: WikiPageUpdate) => {
     try {
       const expectedVersion = wiki.page?.id === id ? wiki.page.version : input.expectedVersion;
@@ -119,6 +129,7 @@ export function WikiPage() {
         parent={formParent}
         tree={wiki.tree}
         onSubmit={submitForm}
+        onOpenInTab={openInTab}
         onClose={() => {
           setFormOpen(false);
           setFormParent(null);

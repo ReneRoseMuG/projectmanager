@@ -1,4 +1,4 @@
-import { BookOpen, Bug, CalendarDays, DatabaseBackup, FolderKanban, Library, ListChecks, Tags } from "lucide-react";
+import { BookOpen, Bug, CalendarDays, DatabaseBackup, ExternalLink, FolderKanban, Library, ListChecks, Tags } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
@@ -38,11 +38,24 @@ export function Sidebar() {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-md" : "text-white/75 hover:bg-white/5 hover:text-white"}`
+                `group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-md" : "text-white/75 hover:bg-white/5 hover:text-white"}`
               }
             >
               <Icon size={17} />
               {item.label}
+              <button
+                type="button"
+                className="ml-auto flex h-6 w-6 items-center justify-center rounded opacity-0 transition hover:bg-white/20 group-hover:opacity-100"
+                aria-label={`${item.label} in neuem Tab öffnen`}
+                title={`${item.label} in neuem Tab öffnen`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  window.open(item.to, "_blank");
+                }}
+              >
+                <ExternalLink size={13} />
+              </button>
             </NavLink>
           );
         })}

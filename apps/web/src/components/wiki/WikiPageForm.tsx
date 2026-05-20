@@ -1,5 +1,5 @@
 import type { WikiPage, WikiPageInput } from "@taskmanager/shared-types";
-import { Eye, History, Save, X } from "lucide-react";
+import { ExternalLink, Eye, History, Save, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import type { WikiTreeNode } from "../../hooks/useWiki";
@@ -16,13 +16,14 @@ interface WikiPageFormProps {
   tree: WikiTreeNode[];
   onSubmit: (input: WikiPageInput) => Promise<void>;
   onClose: () => void;
+  onOpenInTab?: () => void;
 }
 
 function flattenTree(nodes: WikiTreeNode[]): WikiPage[] {
   return nodes.flatMap((node) => [node, ...flattenTree(node.children)]);
 }
 
-export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose }: WikiPageFormProps) {
+export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOpenInTab }: WikiPageFormProps) {
   const { confirm } = useConfirm();
   const pages = useMemo(() => flattenTree(tree).filter((item) => item.id !== page?.id), [page?.id, tree]);
   const [title, setTitle] = useState("");
@@ -101,6 +102,11 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose }: Wi
               <Button className="border-white/20 bg-white/10 text-white hover:bg-white/20" icon={<History size={16} />} onClick={() => setVersionsOpen((current) => !current)}>
                 Versionen
               </Button>
+              {onOpenInTab ? (
+                <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="In neuem Tab öffnen" title="In neuem Tab öffnen" onClick={onOpenInTab}>
+                  <ExternalLink size={18} />
+                </button>
+              ) : null}
               <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Schließen" title="Schließen" onClick={() => void requestClose()}>
                 <X size={18} />
               </button>

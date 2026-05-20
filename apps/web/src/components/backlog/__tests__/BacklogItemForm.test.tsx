@@ -36,6 +36,28 @@ vi.mock("../../../hooks/useEntityComments", () => ({
   }
 }));
 
+vi.mock("../../../hooks/useCatalogs", () => ({
+  useCatalogs() {
+    const entries = [
+      { id: 1, kind: "workStatus", key: "open", label: "Offen", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
+      { id: 2, kind: "workStatus", key: "done", label: "Erledigt", sortOrder: 200, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
+      { id: 3, kind: "priority", key: "medium", label: "Mittel", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" }
+    ];
+    return {
+      entries,
+      workStatuses: entries.filter((entry) => entry.kind === "workStatus"),
+      featureStatuses: [],
+      priorities: entries.filter((entry) => entry.kind === "priority"),
+      loading: false,
+      error: null,
+      createEntry: vi.fn(),
+      updateEntry: vi.fn(),
+      deleteEntry: vi.fn(),
+      reload: vi.fn()
+    };
+  }
+}));
+
 const backlogItem: BacklogItem = {
   id: 1,
   projectId: 10,
@@ -66,5 +88,17 @@ describe("BacklogItemForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Backlog aktualisiert</p>" })));
+  });
+
+  it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {
+    render(<BacklogItemForm open item={backlogItem} features={[]} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} variant="page" />);
+
+    expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
+  });
+
+  it("zeigt im Edit-Modus keinen 'In neuem Tab öffnen'-Button, wenn onOpenInTab fehlt", () => {
+    render(<BacklogItemForm open item={backlogItem} features={[]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
   });
 });

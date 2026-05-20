@@ -24,6 +24,13 @@ export function MilestoneDetailPage() {
 
   const returnTo = searchParams.get("returnTo") ?? (initialProjectId && Number.isFinite(initialProjectId) ? `/projects/${initialProjectId}` : "/projects");
   const closePage = () => navigate(returnTo);
+  const openInTab =
+    !isCreateMode && milestoneId !== undefined && Number.isFinite(milestoneId)
+      ? () => {
+          window.open(`/milestones/${milestoneId}`, "_blank");
+          navigate(returnTo);
+        }
+      : undefined;
 
   const submitMilestone = async (input: MilestoneInput, tagIds: number[]) => {
     try {
@@ -87,6 +94,7 @@ export function MilestoneDetailPage() {
         onSubmit={submitMilestone}
         onDelete={deleteMilestone}
         onClose={closePage}
+        onOpenInTab={openInTab}
       />
     </div>
   );

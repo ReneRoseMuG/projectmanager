@@ -82,6 +82,50 @@ vi.mock("../../../hooks/useMilestones", () => ({
   }
 }));
 
+vi.mock("../../../hooks/useTasks", () => ({
+  useTasks() {
+    return {
+      tasks: [],
+      loading: false,
+      error: null,
+      reload: vi.fn().mockResolvedValue(undefined)
+    };
+  }
+}));
+
+vi.mock("../../../hooks/useTickets", () => ({
+  useTickets() {
+    return {
+      tickets: [],
+      loading: false,
+      reload: vi.fn().mockResolvedValue(undefined)
+    };
+  }
+}));
+
+vi.mock("../../../hooks/useCatalogs", () => ({
+  useCatalogs() {
+    const entries = [
+      { id: 1, kind: "workStatus", key: "active", label: "Aktiv", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
+      { id: 2, kind: "workStatus", key: "done", label: "Erledigt", sortOrder: 200, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
+      { id: 3, kind: "featureStatus", key: "active", label: "Aktiv", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
+      { id: 4, kind: "priority", key: "medium", label: "Mittel", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" }
+    ];
+    return {
+      entries,
+      workStatuses: entries.filter((entry) => entry.kind === "workStatus"),
+      featureStatuses: entries.filter((entry) => entry.kind === "featureStatus"),
+      priorities: entries.filter((entry) => entry.kind === "priority"),
+      loading: false,
+      error: null,
+      createEntry: vi.fn(),
+      updateEntry: vi.fn(),
+      deleteEntry: vi.fn(),
+      reload: vi.fn()
+    };
+  }
+}));
+
 vi.mock("../../../hooks/useDocLinks", () => ({
   useMilestoneFeatureLinks() {
     return {
@@ -202,5 +246,17 @@ describe("MilestoneForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Meilenstein aktualisiert</p>" }), []));
+  });
+
+  it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {
+    renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} variant="page" />);
+
+    expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
+  });
+
+  it("zeigt im Edit-Modus keinen 'In neuem Tab öffnen'-Button, wenn onOpenInTab fehlt", () => {
+    renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
   });
 });

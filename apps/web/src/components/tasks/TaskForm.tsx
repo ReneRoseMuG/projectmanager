@@ -52,6 +52,7 @@ interface TaskFormProps {
   savingLabel?: string;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
+  onOpenInTab?: () => void;
 }
 
 export interface TaskFormInput extends TaskInput {
@@ -74,7 +75,7 @@ const tabs: Array<Tab<TaskFormTab>> = [
   { value: "attachments", label: "Dateien" }
 ];
 
-export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose, onChanged, savingLabel, variant = "modal", closeOnSubmit = true }: TaskFormProps) {
+export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose, onChanged, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab }: TaskFormProps) {
   const taskId = task?.id ?? null;
   const detail = useTaskDetail(open && taskId ? taskId : null);
   const ticketOwner = taskId && open ? { type: "task" as const, id: taskId } : null;
@@ -215,6 +216,7 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
         onSubmit={submit}
         onClose={onClose}
         variant={variant}
+        onOpenInTab={onOpenInTab}
         headerMeta={
           <div className="flex flex-wrap gap-2">
             <StatusPill kind="workStatus" value={status} />

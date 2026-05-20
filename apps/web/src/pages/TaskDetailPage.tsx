@@ -48,6 +48,13 @@ export function TaskDetailPage() {
   const returnTo = searchParams.get("returnTo") ?? (owner ? `/${owner.type === "useCase" ? "use-cases" : `${owner.type}s`}/${owner.id}` : "/projects");
 
   const closePage = () => navigate(returnTo);
+  const openInTab =
+    !isCreateMode && taskId !== null && Number.isFinite(taskId)
+      ? () => {
+          window.open(`/tasks/${taskId}`, "_blank");
+          navigate(returnTo);
+        }
+      : undefined;
 
   const submitTask = async (input: TaskFormInput): Promise<Task | void> => {
     const { tagIds, pendingSubtasks, pendingTickets, pendingComments, pendingNotes, pendingFiles, ...taskInput } = input;
@@ -150,6 +157,7 @@ export function TaskDetailPage() {
         onSubmit={submitTask}
         onClose={closePage}
         onChanged={detail.reload}
+        onOpenInTab={openInTab}
       />
     </div>
   );

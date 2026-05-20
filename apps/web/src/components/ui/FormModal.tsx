@@ -1,4 +1,4 @@
-import { Save, X } from "lucide-react";
+import { ExternalLink, Save, X } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
@@ -15,6 +15,7 @@ interface FormModalProps {
   footerStart?: ReactNode;
   headerMeta?: ReactNode;
   variant?: "modal" | "page";
+  onOpenInTab?: () => void;
   children: ReactNode;
 }
 
@@ -31,6 +32,7 @@ export function FormModal({
   footerStart,
   headerMeta,
   variant = "modal",
+  onOpenInTab,
   children
 }: FormModalProps) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -66,9 +68,16 @@ export function FormModal({
               </div>
             </div>
           </div>
-          <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Schließen" title="Schließen" onClick={onClose}>
-            <X size={18} />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            {onOpenInTab ? (
+              <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="In neuem Tab öffnen" title="In neuem Tab öffnen" onClick={onOpenInTab}>
+                <ExternalLink size={18} />
+              </button>
+            ) : null}
+            <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Schließen" title="Schließen" onClick={onClose}>
+              <X size={18} />
+            </button>
+          </div>
         </div>
       </header>
 

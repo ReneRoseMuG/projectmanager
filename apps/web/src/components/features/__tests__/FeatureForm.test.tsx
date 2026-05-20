@@ -213,4 +213,16 @@ describe("FeatureForm", () => {
     expect(screen.getByTestId("attachment-uploader")).toBeInTheDocument();
     expect(screen.getByTestId("attachment-list")).toHaveTextContent("1");
   });
+
+  it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {
+    renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
+  });
+
+  it("zeigt im Edit-Modus keinen 'In neuem Tab öffnen'-Button, wenn onOpenInTab fehlt", () => {
+    renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
+  });
 });

@@ -825,6 +825,12 @@ Vor dem Commit einer neuen Domain-View oder eines Formulars prüfen:
 - [ ] Keine neuen Tailwind-Klassen, die es in der App noch nicht gibt
 - [ ] Kein `any` in Props
 
+### 15.8 Browser-Tab-Konvention für Views und Detailformulare
+
+Hauptansichten der Sidebar (`/projects`, `/tickets`, `/features`, `/wiki`, `/calendar`) erhalten einen `ExternalLink`-Icon-Button, der die Route per `window.open(path, "_blank")` in einem neuen Browser-Tab öffnet. Der Button verhindert die normale Link-Navigation mit `preventDefault()` und `stopPropagation()`.
+
+Detailformulare erhalten ein optionales Prop `onOpenInTab?: () => void`. Dieses Prop wird nur im Edit-Modus mit gültiger Entity-ID gesetzt. Create-Modi setzen das Prop nicht, damit keine URL ohne ID geöffnet werden kann. Die neue Tab-URL ist immer die saubere Entity-Route ohne `returnTo`; danach navigiert der aktuelle Tab zur bestehenden Rücksprungroute.
+
 ---
 
 ## Plan-Aktualisierung im Plan-Modus

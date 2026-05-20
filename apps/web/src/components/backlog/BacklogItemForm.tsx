@@ -21,9 +21,10 @@ interface BacklogItemFormProps {
   onClose: () => void;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
+  onOpenInTab?: () => void;
 }
 
-export function BacklogItemForm({ open, item, features, onSubmit, onClose, variant = "modal", closeOnSubmit = true }: BacklogItemFormProps) {
+export function BacklogItemForm({ open, item, features, onSubmit, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: BacklogItemFormProps) {
   const comments = useEntityComments("backlogItem", item?.id);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -70,6 +71,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
       saving={saving}
       onClose={onClose}
       variant={variant}
+      onOpenInTab={onOpenInTab}
     >
       <Section title="Stammdaten">
         <FormField label="Titel" required>

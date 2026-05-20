@@ -58,6 +58,7 @@ interface UseCaseFormProps {
   onClose: () => void;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
+  onOpenInTab?: () => void;
 }
 
 type UseCaseFormTab = "details" | "tasks" | "tickets" | "comments";
@@ -69,7 +70,7 @@ const tabs: Array<Tab<UseCaseFormTab>> = [
   { value: "comments", label: "Kommentare" }
 ];
 
-export function UseCaseForm({ open, useCase, currentFeatureId, features = [], onSubmit, onPostCreate, onDelete, onClose, variant = "modal", closeOnSubmit = true }: UseCaseFormProps) {
+export function UseCaseForm({ open, useCase, currentFeatureId, features = [], onSubmit, onPostCreate, onDelete, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: UseCaseFormProps) {
   const comments = useEntityComments("useCase", useCase?.id);
   const catalogs = useCatalogs();
   const tasks = useTasks(useCase ? { type: "useCase", id: useCase.id } : undefined);
@@ -174,6 +175,7 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
         breadcrumb={["Use Cases", useCase ? useCase.title : "Neu"]}
         onSubmit={submit}
         saving={saving}
+        onOpenInTab={onOpenInTab}
         headerMeta={<StatusPill kind="featureStatus" value={status} />}
         footerStart={
           useCase && onDelete ? (

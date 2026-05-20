@@ -80,6 +80,7 @@ interface ProjectFormProps {
   savingLabel?: string;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
+  onOpenInTab?: () => void;
   onPostCreate?: (
     projectId: number,
     pending: {
@@ -130,7 +131,7 @@ function projectCode(name: string) {
     .toUpperCase();
 }
 
-export function ProjectForm({ open, project, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onPostCreate }: ProjectFormProps) {
+export function ProjectForm({ open, project, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab, onPostCreate }: ProjectFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const projectId = project?.id;
@@ -384,6 +385,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         }
         onClose={onClose}
         variant={variant}
+        onOpenInTab={onOpenInTab}
       >
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
 

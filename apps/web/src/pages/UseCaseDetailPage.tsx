@@ -29,6 +29,13 @@ export function UseCaseDetailPage() {
   const [useCase, setUseCase] = useState<UseCase | null>(null);
   const [loading, setLoading] = useState(false);
   const returnTo = searchParams.get("returnTo") ?? (useCase ? `/features/${useCase.featureId}` : "/features");
+  const openInTab =
+    !isCreateMode && useCaseId !== null && Number.isFinite(useCaseId)
+      ? () => {
+          window.open(`/use-cases/${useCaseId}`, "_blank");
+          navigate(returnTo);
+        }
+      : undefined;
 
   useEffect(() => {
     const id = useCaseId;
@@ -136,6 +143,7 @@ export function UseCaseDetailPage() {
         onPostCreate={postCreateUseCase}
         onDelete={deleteUseCase}
         onClose={closePage}
+        onOpenInTab={openInTab}
       />
     </div>
   );

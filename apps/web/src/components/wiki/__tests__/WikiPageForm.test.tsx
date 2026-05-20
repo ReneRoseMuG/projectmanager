@@ -62,4 +62,16 @@ describe("WikiPageForm", () => {
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Wiki aktualisiert</p>" })));
   });
+
+  it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {
+    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
+  });
+
+  it("zeigt im Edit-Modus keinen 'In neuem Tab öffnen'-Button, wenn onOpenInTab fehlt", () => {
+    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
+  });
 });

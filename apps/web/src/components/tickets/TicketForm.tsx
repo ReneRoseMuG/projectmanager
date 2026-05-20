@@ -29,6 +29,7 @@ interface TicketFormProps {
   onClose: () => void;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
+  onOpenInTab?: () => void;
 }
 
 type RadioColor = "fern" | "tangerine" | "crimson" | "violet";
@@ -52,7 +53,7 @@ const resolutionOptions = (["fixed", "wont_fix", "duplicate", "cant_reproduce", 
   activeColor: "fern" as RadioColor
 }));
 
-export function TicketForm({ open, ticket, initialStatus = "open", title = "Ticket", onSubmit, onClose, variant = "modal", closeOnSubmit = true }: TicketFormProps) {
+export function TicketForm({ open, ticket, initialStatus = "open", title = "Ticket", onSubmit, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: TicketFormProps) {
   const [ticketTitle, setTicketTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<TicketType>("bug");
@@ -124,6 +125,7 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
       onSubmit={submit}
       onClose={onClose}
       variant={variant}
+      onOpenInTab={onOpenInTab}
     >
       <Section title="Basisdaten">
         <div className="grid gap-4">

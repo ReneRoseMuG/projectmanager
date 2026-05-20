@@ -358,6 +358,17 @@ vi.mock("../../hooks/useTaskDetail", () => ({
   }
 }));
 
+vi.mock("../../hooks/useTasks", () => ({
+  useTasks() {
+    return {
+      tasks: [fixtures.task],
+      loading: false,
+      error: null,
+      reload: vi.fn().mockResolvedValue(undefined)
+    };
+  }
+}));
+
 vi.mock("../../hooks/useNotes", () => ({
   useNotes() {
     return {

@@ -28,6 +28,13 @@ export function ProjectDetailPage() {
 
   const returnTo = searchParams.get("returnTo") ?? "/projects";
   const closePage = () => navigate(returnTo);
+  const openInTab =
+    !isCreateMode && projectId !== undefined && Number.isFinite(projectId)
+      ? () => {
+          window.open(`/projects/${projectId}`, "_blank");
+          navigate(returnTo);
+        }
+      : undefined;
 
   const submitProject = async (input: ProjectInput, tagIds: number[]) => {
     try {
@@ -137,6 +144,7 @@ export function ProjectDetailPage() {
         savingLabel={savingLabel}
         onPostCreate={postCreateProject}
         onClose={closePage}
+        onOpenInTab={openInTab}
       />
     </div>
   );

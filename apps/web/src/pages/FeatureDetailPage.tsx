@@ -30,6 +30,13 @@ export function FeatureDetailPage() {
 
   const returnTo = searchParams.get("returnTo") ?? "/features";
   const closePage = () => navigate(returnTo);
+  const openInTab =
+    !isCreateMode && featureId !== undefined && Number.isFinite(featureId)
+      ? () => {
+          window.open(`/features/${featureId}`, "_blank");
+          navigate(returnTo);
+        }
+      : undefined;
 
   const saveFeature = async (input: FeatureInput) => {
     try {
@@ -145,6 +152,7 @@ export function FeatureDetailPage() {
         savingLabel={savingLabel}
         onPostCreate={postCreateFeature}
         onClose={closePage}
+        onOpenInTab={openInTab}
       />
     </div>
   );
