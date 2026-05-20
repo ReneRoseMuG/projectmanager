@@ -1,7 +1,7 @@
-import { PROJECT_STATUSES, type Milestone } from "@taskmanager/shared-types";
+import type { Milestone } from "@taskmanager/shared-types";
 import { Flag } from "lucide-react";
 import { useMemo, useState } from "react";
-import { milestoneStatusLabels } from "../../utils/domainLabels";
+import type { ViewMode } from "../../types";
 import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
@@ -10,12 +10,20 @@ import { MilestoneCard } from "./MilestoneCard";
 interface MilestoneListBoardViewProps {
   milestones: Milestone[];
   loading?: boolean;
+  viewMode?: ViewMode;
+  onViewModeChange?: (viewMode: ViewMode) => void;
   onCreate: () => void;
   onEdit: (milestone: Milestone) => void;
   onDelete: (milestone: Milestone) => void;
 }
 
-const statusColumns = PROJECT_STATUSES.map((status) => ({ value: status, label: milestoneStatusLabels[status] }));
+function toListBoardMode(viewMode: ViewMode): ListBoardMode {
+  return viewMode === "kanban" ? "board" : "list";
+}
+
+function toViewMode(mode: ListBoardMode): ViewMode {
+  return mode === "board" ? "kanban" : "list";
+}
 
 function matchesSearch(milestone: Milestone, searchValue: string) {
   const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
@@ -27,21 +35,30 @@ function matchesSearch(milestone: Milestone, searchValue: string) {
   return values.some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
 }
 
-export function MilestoneListBoardView({ milestones, loading = false, onCreate, onEdit, onDelete }: MilestoneListBoardViewProps) {
-  const [mode, setMode] = useState<ListBoardMode>("board");
+export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onDelete }: MilestoneListBoardViewProps) {
+  const [internalViewMode, setInternalViewMode] = useState<ViewMode>("kanban");
   const [searchValue, setSearchValue] = useState("");
+  const currentViewMode = viewMode ?? internalViewMode;
   const visibleMilestones = useMemo(() => milestones.filter((milestone) => matchesSearch(milestone, searchValue)), [milestones, searchValue]);
+
+  const changeMode = (mode: ListBoardMode) => {
+    const nextViewMode = toViewMode(mode);
+    if (viewMode === undefined) {
+      setInternalViewMode(nextViewMode);
+    }
+    onViewModeChange?.(nextViewMode);
+  };
 
   return (
     <ListBoardView
       items={visibleMilestones}
-      mode={mode}
-      onModeChange={setMode}
+      mode={toListBoardMode(currentViewMode)}
+      onModeChange={changeMode}
       onAdd={onCreate}
       onAddToColumn={onCreate}
       addLabel="Neuer Meilenstein"
       statusKey="status"
-      statusColumns={statusColumns}
+      statusCatalogKind="workStatus"
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       loading={loading}

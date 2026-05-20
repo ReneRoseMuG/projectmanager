@@ -27,6 +27,9 @@ export interface TestMilestone {
   createdAt: string;
   updatedAt: string;
   taskCount: number;
+  openTaskCount: number;
+  doneTaskCount: number;
+  totalTaskCount: number;
   ticketCount: number;
   featureCount: number;
   tags: TestTag[];
@@ -160,7 +163,6 @@ export interface TestBacklogItem {
   title: string;
   description: string | null;
   status: string;
-  priority: string;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -428,12 +430,11 @@ export async function createWikiPage(
 export async function createBacklogItem(
   app: FastifyInstance,
   projectId: number,
-  overrides: Partial<{ title: string; description: string | null; featureId: number | null; useCaseId: number | null; status: string; priority: string }> = {}
+  overrides: Partial<{ title: string; description: string | null; featureId: number | null; useCaseId: number | null; status: string }> = {}
 ): Promise<TestBacklogItem> {
   const body = {
     title: "Test Backlog",
     status: "open",
-    priority: "medium",
     ...overrides
   };
 

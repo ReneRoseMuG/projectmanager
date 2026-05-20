@@ -84,7 +84,6 @@ export function MilestoneDetailPage() {
         projects={projects}
         initialProjectId={initialProjectId}
         variant="page"
-        closeOnSubmit={false}
         onSubmit={submitMilestone}
         onDelete={deleteMilestone}
         onClose={closePage}

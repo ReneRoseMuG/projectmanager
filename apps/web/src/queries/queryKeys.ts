@@ -67,6 +67,10 @@ export const queryKeys = {
     root: ["tags"] as const,
     list: () => [...queryKeys.tags.root, "list"] as const
   },
+  catalogs: {
+    root: ["catalogs"] as const,
+    list: () => [...queryKeys.catalogs.root, "list"] as const
+  },
   wiki: {
     root: ["wiki"] as const,
     tree: () => [...queryKeys.wiki.root, "tree"] as const,

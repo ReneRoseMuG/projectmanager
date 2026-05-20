@@ -1,16 +1,20 @@
 import type { Milestone, MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { milestoneFeatures, milestones, milestoneTasks, milestoneTickets, projects } from "../db/schema.js";
+import { milestoneFeatures, milestones, milestoneTasks, milestoneTickets, projects, tasks } from "../db/schema.js";
 import { milestoneRepository, type MilestoneRecord } from "../repositories/milestone.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import { deleteMilestoneAttachmentsForIds } from "./attachments.service.js";
+import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { deleteMilestoneNotesForIds } from "./notes.service.js";
 import { getMilestoneTags, getMilestoneTagsMap } from "./tags.service.js";
 
 interface MilestoneCounts {
   taskCount: number;
+  openTaskCount: number;
+  doneTaskCount: number;
+  totalTaskCount: number;
   ticketCount: number;
   featureCount: number;
 }
@@ -18,6 +22,9 @@ interface MilestoneCounts {
 function emptyMilestoneCounts(): MilestoneCounts {
   return {
     taskCount: 0,
+    openTaskCount: 0,
+    doneTaskCount: 0,
+    totalTaskCount: 0,
     ticketCount: 0,
     featureCount: 0
   };
@@ -37,6 +44,9 @@ function mapMilestone(database: DbClient, record: MilestoneRecord, counts: Miles
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     taskCount: counts.taskCount,
+    openTaskCount: counts.openTaskCount,
+    doneTaskCount: counts.doneTaskCount,
+    totalTaskCount: counts.totalTaskCount,
     ticketCount: counts.ticketCount,
     featureCount: counts.featureCount,
     tags
@@ -60,10 +70,21 @@ function getMilestoneCounts(database: DbClient, milestoneIds: number[]): Map<num
     counts.set(milestoneId, emptyMilestoneCounts());
   }
 
-  const taskRows = database.select({ ownerId: milestoneTasks.ownerId }).from(milestoneTasks).where(inArray(milestoneTasks.ownerId, milestoneIds)).all();
+  const taskRows = database
+    .select({ ownerId: milestoneTasks.ownerId, status: tasks.status })
+    .from(milestoneTasks)
+    .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
+    .where(inArray(milestoneTasks.ownerId, milestoneIds))
+    .all();
   for (const row of taskRows) {
     const current = counts.get(row.ownerId) ?? emptyMilestoneCounts();
     current.taskCount += 1;
+    current.totalTaskCount += 1;
+    if (row.status === "done") {
+      current.doneTaskCount += 1;
+    } else {
+      current.openTaskCount += 1;
+    }
     counts.set(row.ownerId, current);
   }
 
@@ -115,11 +136,13 @@ export function getMilestone(database: DbClient, id: number): Milestone {
 export function createMilestone(database: DbClient, input: MilestoneInput): Milestone {
   ensureProjectExists(database, input.projectId);
   const name = requireNonEmpty(input.name, "name");
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "active");
+  ensureCatalogEntryExists(database, "workStatus", status);
   const created = milestoneRepository.create(database, {
     projectId: input.projectId,
     name,
     description: cleanNullable(input.description) ?? null,
-    status: input.status ?? "active",
+    status,
     color: input.color ?? "#6366f1",
     startDate: cleanNullable(input.startDate) ?? null,
     dueDate: cleanNullable(input.dueDate) ?? null
@@ -142,6 +165,7 @@ export function updateMilestone(database: DbClient, id: number, input: Milestone
     values.description = cleanNullable(input.description) ?? null;
   }
   if (input.status !== undefined) {
+    ensureCatalogEntryExists(database, "workStatus", input.status);
     values.status = input.status;
   }
   if (input.color !== undefined) {

@@ -49,6 +49,8 @@ export function UseCaseListBoardView({ useCases, viewMode, onViewModeChange, onC
       onModeChange={(mode) => onViewModeChange(toViewMode(mode))}
       onAdd={onCreate}
       addLabel="Neuer Use Case"
+      statusKey="status"
+      statusCatalogKind="featureStatus"
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       emptyState={<EmptyState icon={<BookOpen size={22} />} title="Keine Use Cases" body="Lege Use Cases an, um fachliche Abläufe zu beschreiben." tone="violet" variant="tinted" />}

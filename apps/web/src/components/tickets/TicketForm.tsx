@@ -3,20 +3,17 @@ import { Bug, UserRound } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { toDateInput } from "../../utils/date";
-import {
-  priorityLabels,
-  ticketResolutionLabels,
-  ticketStatusLabels,
-  ticketTypeLabels
-} from "../../utils/domainLabels";
+import { ticketResolutionLabels, ticketTypeLabels } from "../../utils/domainLabels";
 import { TagPicker } from "../tags/TagPicker";
 import { DatePicker } from "../ui/DatePicker";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
+import { PrioritySelect } from "../ui/PrioritySelect";
 import { RadioList } from "../ui/RadioList";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
+import { StatusToggle } from "../ui/StatusToggle";
 
 export interface TicketFormInput extends TicketInput {
   resolution?: TicketResolution | null;
@@ -36,14 +33,6 @@ interface TicketFormProps {
 
 type RadioColor = "fern" | "tangerine" | "crimson" | "violet";
 
-const statusColors: Record<TicketStatus, RadioColor> = {
-  open: "violet",
-  in_progress: "tangerine",
-  in_review: "tangerine",
-  resolved: "fern",
-  closed: "violet"
-};
-
 const typeColors: Record<TicketType, RadioColor> = {
   bug: "crimson",
   improvement: "fern",
@@ -51,29 +40,10 @@ const typeColors: Record<TicketType, RadioColor> = {
   task: "tangerine"
 };
 
-const priorityColors: Record<Priority, RadioColor> = {
-  low: "fern",
-  medium: "violet",
-  high: "tangerine",
-  urgent: "crimson"
-};
-
-const statuses = (["open", "in_progress", "in_review", "resolved", "closed"] as TicketStatus[]).map((value) => ({
-  value,
-  label: ticketStatusLabels[value],
-  activeColor: statusColors[value]
-}));
-
 const types = (["bug", "improvement", "question", "task"] as TicketType[]).map((value) => ({
   value,
   label: ticketTypeLabels[value],
   activeColor: typeColors[value]
-}));
-
-const priorities = (["low", "medium", "high", "urgent"] as Priority[]).map((value) => ({
-  value,
-  label: priorityLabels[value],
-  activeColor: priorityColors[value]
 }));
 
 const resolutionOptions = (["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as TicketResolution[]).map((value) => ({
@@ -172,7 +142,7 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
             <RadioList value={type} options={types} onChange={setType} />
           </FormField>
           <FormField label="Priorität">
-            <RadioList value={priority} options={priorities} onChange={setPriority} />
+            <PrioritySelect value={priority} onChange={setPriority} />
           </FormField>
         </div>
       </Section>
@@ -180,7 +150,7 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
       <Section title="Status & Lösung">
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <RadioList value={status} options={statuses} onChange={setStatus} />
+            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
           </FormField>
           {status === "resolved" || status === "closed" ? (
             <FormField label="Lösung">

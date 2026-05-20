@@ -15,7 +15,7 @@
  * Die gemeinsame ListBoardView-Infrastruktur gegen Regressionsfehler bei Moduswechsel, Aktionen und Basis-Item-Komponenten absichern.
  */
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, screen } from "@testing-library/dom";
+import { fireEvent, screen, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ItemCard } from "../ItemCard";
@@ -90,6 +90,33 @@ describe("ListBoardView", () => {
     expect(screen.getByText("Row Alpha")).toBeInTheDocument();
     expect(screen.getByText("Row Beta")).toBeInTheDocument();
     expect(screen.queryByText("Card Alpha")).not.toBeInTheDocument();
+  });
+
+  it("gruppiert Listenmodus nach sortierten Statusspalten", () => {
+    const { container } = render(
+      <ListBoardView
+        items={items}
+        mode="list"
+        onModeChange={vi.fn()}
+        onAdd={vi.fn()}
+        statusKey="status"
+        statusColumns={[
+          { value: "done", label: "Erledigt", sortOrder: 200, isClosed: true },
+          { value: "todo", label: "Offen", sortOrder: 100 }
+        ]}
+        renderCard={(item) => <ItemCard header={<h3>Card {item.title}</h3>} body={<p>{item.description}</p>} />}
+        renderRow={(item) => <ItemRow title={`Row ${item.title}`} description={item.description} />}
+      />
+    );
+
+    const sections = container.querySelectorAll("section.rounded-lg");
+    expect(sections).toHaveLength(2);
+    expect(within(sections[0] as HTMLElement).getByRole("heading", { name: "Offen" })).toBeInTheDocument();
+    expect(within(sections[0] as HTMLElement).getByText("Row Alpha")).toBeInTheDocument();
+    expect(sections[0]).toHaveClass("bg-shell/70");
+    expect(within(sections[1] as HTMLElement).getByRole("heading", { name: "Erledigt" })).toBeInTheDocument();
+    expect(within(sections[1] as HTMLElement).getByText("Row Beta")).toBeInTheDocument();
+    expect(sections[1]).toHaveClass("bg-steel-50/80");
   });
 
   it("ViewToggle wechselt Modus", () => {

@@ -44,7 +44,6 @@ const backlogItem: BacklogItem = {
   title: "Backlog Alpha",
   description: "<p>Backlog Beschreibung</p>",
   status: "open",
-  priority: "medium",
   importKey: null,
   sortOrder: 0,
   version: 2,

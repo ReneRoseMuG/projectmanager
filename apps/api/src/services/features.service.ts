@@ -6,6 +6,7 @@ import { featureRepository, type FeatureRecord, type FeatureUpdateData } from ".
 import { useCaseRepository } from "../repositories/use-case.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteFeatureAttachmentsForIds } from "./attachments.service.js";
+import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import {
   buildFilename,
   buildStoredContentPath,
@@ -117,11 +118,13 @@ export function createFeature(database: DbClient, input: FeatureInput): FeatureD
   const title = requireNonEmpty(input.title, "title");
   const slug = requireNonEmpty(input.slug, "slug");
   ensureSlugIsUnique(database, slug);
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
+  ensureCatalogEntryExists(database, "featureStatus", status);
 
   const created = featureRepository.create(database, {
     title,
     slug,
-    status: input.status ?? "draft",
+    status,
     description: cleanNullable(input.description) ?? null,
     contentPath: null,
     sortOrder: input.sortOrder ?? 0
@@ -162,6 +165,7 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
   }
 
   if (input.status !== undefined) {
+    ensureCatalogEntryExists(database, "featureStatus", input.status);
     values.status = input.status;
   }
 

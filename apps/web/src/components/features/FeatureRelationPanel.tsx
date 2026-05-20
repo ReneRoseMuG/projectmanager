@@ -1,10 +1,9 @@
 import type { Feature } from "@taskmanager/shared-types";
 import { BookOpen } from "lucide-react";
 import type { ReactNode } from "react";
-import { featureStatusLabels, featureStatusTones } from "../../utils/domainLabels";
 import { EmptyState } from "../ui/EmptyState";
-import { Pill } from "../ui/Pill";
 import { RelationPanel } from "../ui/RelationPanel";
+import { StatusPill } from "../ui/StatusPill";
 
 interface FeatureRelationPanelProps {
   features: Feature[];
@@ -65,7 +64,7 @@ export function FeatureRelationPanel({
               <span className="block truncate font-mono text-[11px] text-slate-500">/features/{feature.slug}</span>
             </span>
             <span className="hidden md:inline-flex">
-              <Pill tone={featureStatusTones[feature.status]}>{featureStatusLabels[feature.status]}</Pill>
+              <StatusPill kind="featureStatus" value={feature.status} />
             </span>
             <span className="hidden rounded-md bg-steel-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 md:inline-flex">{feature.useCaseCount} UCs</span>
           </span>

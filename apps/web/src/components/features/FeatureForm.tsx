@@ -19,19 +19,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
+import { useCatalogs } from "../../hooks/useCatalogs";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useFeatureProjectLinks } from "../../hooks/useDocLinks";
 import { useProjects } from "../../hooks/useProjects";
+import { useTasks } from "../../hooks/useTasks";
+import { useTickets } from "../../hooks/useTickets";
 import { useUseCases } from "../../hooks/useUseCases";
-import {
-  featureStatusLabels,
-  priorityLabels,
-  taskStatusLabels,
-  taskStatusTones,
-  ticketStatusLabels,
-  ticketStatusTones,
-  ticketTypeLabels
-} from "../../utils/domainLabels";
+import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed } from "../../utils/catalogs";
+import { ticketTypeLabels } from "../../utils/domainLabels";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
@@ -49,13 +45,13 @@ import { Modal } from "../ui/Modal";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingRelationList } from "../ui/PendingRelationList";
-import { RadioList } from "../ui/RadioList";
+import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SectionHeader } from "../ui/SectionHeader";
-import { SegmentedControl } from "../ui/SegmentedControl";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
+import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 import { FeatureProjectPanel } from "./FeatureProjectPanel";
@@ -94,34 +90,6 @@ const tabs: Array<Tab<FeatureFormTab>> = [
   { value: "attachments", label: "Dateien" }
 ];
 
-const statuses: Array<{ value: FeatureStatus; label: string }> = [
-  { value: "draft", label: featureStatusLabels.draft },
-  { value: "active", label: featureStatusLabels.active },
-  { value: "done", label: featureStatusLabels.done },
-  { value: "archived", label: featureStatusLabels.archived }
-];
-
-const taskStatuses: Array<{ value: TaskStatus; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
-  { value: "todo", label: taskStatusLabels.todo, activeColor: "crimson" },
-  { value: "in_progress", label: taskStatusLabels.in_progress, activeColor: "tangerine" },
-  { value: "done", label: taskStatusLabels.done, activeColor: "fern" }
-];
-
-const ticketStatuses: Array<{ value: TicketStatus; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
-  { value: "open", label: ticketStatusLabels.open, activeColor: "crimson" },
-  { value: "in_progress", label: ticketStatusLabels.in_progress, activeColor: "tangerine" },
-  { value: "in_review", label: ticketStatusLabels.in_review, activeColor: "violet" },
-  { value: "resolved", label: ticketStatusLabels.resolved, activeColor: "fern" },
-  { value: "closed", label: ticketStatusLabels.closed, activeColor: "fern" }
-];
-
-const priorities: Array<{ value: Priority; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
-  { value: "low", label: priorityLabels.low, activeColor: "fern" },
-  { value: "medium", label: priorityLabels.medium, activeColor: "violet" },
-  { value: "high", label: priorityLabels.high, activeColor: "tangerine" },
-  { value: "urgent", label: priorityLabels.urgent, activeColor: "crimson" }
-];
-
 export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onPostCreate }: FeatureFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -130,6 +98,9 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
   const { confirm } = useConfirm();
   const projects = useProjects();
   const useCases = useUseCases(featureId);
+  const tasks = useTasks(featureId ? { type: "feature", id: featureId } : undefined);
+  const tickets = useTickets(featureId ? { type: "feature", id: featureId } : null);
+  const catalogs = useCatalogs();
   const projectLinks = useFeatureProjectLinks(featureId);
   const comments = useEntityComments("feature", featureId);
   const attachments = useAttachments(featureId ? { type: "feature", id: featureId } : null);
@@ -235,16 +206,19 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
 
   const tabItems = tabs.map((tab) => {
     if (tab.value === "useCases") {
-      return { ...tab, count: feature ? useCases.useCases.length : pendingUseCases.length };
+      const pending = pendingUseCases.map((item) => (item.kind === "existing" ? item.useCase : item.draft));
+      return { ...tab, count: feature ? countOpenStatusItems(useCases.useCases, catalogs.entries, "featureStatus") : countOpenStatusItems(pending, catalogs.entries, "featureStatus") };
     }
     if (tab.value === "tasks") {
-      return { ...tab, count: feature ? undefined : pendingTasks.length };
+      const pending = pendingTasks.map((item) => (item.kind === "existing" ? item.task : item.draft));
+      return { ...tab, count: feature ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
     }
     if (tab.value === "tickets") {
-      return { ...tab, count: feature ? undefined : pendingTickets.length };
+      const pending = pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft));
+      return { ...tab, count: feature ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
     }
     if (tab.value === "projects") {
-      return { ...tab, count: feature ? projectLinks.linkedProjects.length : pendingProjects.length };
+      return { ...tab, count: feature ? countOpenStatusItems(projectLinks.linkedProjects, catalogs.entries, "workStatus") : countOpenStatusItems(pendingProjects, catalogs.entries, "workStatus") };
     }
     if (tab.value === "comments") {
       return { ...tab, count: feature ? comments.comments.length : pendingComments.length };
@@ -252,7 +226,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
     if (tab.value === "attachments") {
       return { ...tab, count: feature ? attachments.attachments.length : pendingFiles.length };
     }
-    return tab;
+    return { ...tab, count: 0 };
   });
 
   return (
@@ -293,7 +267,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
               </div>
             </Section>
             <Section title="Status">
-              <SegmentedControl value={status} options={statuses} onChange={setStatus} />
+              <StatusToggle kind="featureStatus" value={status} onChange={setStatus} />
             </Section>
             <Section title="Kurzbeschreibung">
               <RichTextInlineField value={description} placeholder="Kurzbeschreibung" minRows={12} testIdPrefix="feature-form-description" onChange={setDescription} />
@@ -340,7 +314,16 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
             ) : (
               <PendingRelationList
                 existingItems={pendingTasks.flatMap((item) =>
-                  item.kind === "existing" ? [{ id: item.task.id, title: item.task.title, statusLabel: taskStatusLabels[item.task.status], statusTone: taskStatusTones[item.task.status] }] : []
+                  item.kind === "existing"
+                    ? [
+                        {
+                          id: item.task.id,
+                          title: item.task.title,
+                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.task.status),
+                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.task.status) ? "steel" : "fern"
+                        }
+                      ]
+                    : []
                 )}
                 draftItems={pendingTasks.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
                 emptyIcon={<ListTodo size={22} />}
@@ -362,7 +345,14 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
               <PendingRelationList
                 existingItems={pendingTickets.flatMap((item) =>
                   item.kind === "existing"
-                    ? [{ id: item.ticket.id, title: item.ticket.title, statusLabel: ticketStatusLabels[item.ticket.status], statusTone: ticketStatusTones[item.ticket.status] }]
+                    ? [
+                        {
+                          id: item.ticket.id,
+                          title: item.ticket.title,
+                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.ticket.status),
+                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.ticket.status) ? "steel" : "fern"
+                        }
+                      ]
                     : []
                 )}
                 draftItems={pendingTickets.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
@@ -577,7 +567,7 @@ function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
           <Input value={slug} onChange={(event) => setSlug(event.target.value)} required variant="mono" />
         </FormField>
         <FormField label="Status">
-          <SegmentedControl value={status} options={statuses} onChange={setStatus} />
+          <StatusToggle kind="featureStatus" value={status} onChange={setStatus} />
         </FormField>
         <footer className="flex justify-end gap-2">
           <Button onClick={onClose}>Abbrechen</Button>
@@ -617,10 +607,10 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <RadioList value={status} options={taskStatuses} onChange={setStatus} />
+            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
           </FormField>
           <FormField label="Priorität">
-            <RadioList value={priority} options={priorities} onChange={setPriority} />
+            <PrioritySelect value={priority} onChange={setPriority} />
           </FormField>
         </div>
         <footer className="flex justify-end gap-2">
@@ -669,10 +659,10 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
         </Select>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <RadioList value={status} options={ticketStatuses} onChange={setStatus} />
+            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
           </FormField>
           <FormField label="Priorität">
-            <RadioList value={priority} options={priorities} onChange={setPriority} />
+            <PrioritySelect value={priority} onChange={setPriority} />
           </FormField>
         </div>
         <footer className="flex justify-end gap-2">

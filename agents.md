@@ -152,9 +152,15 @@ Codex ändert nur, was im Auftrag oder im bestätigten Plan steht. Keine Refacto
 
 Schlägt ein Test fehl, dokumentiert Codex den Fehler. Eigenständige Fixes während eines laufenden Testlaufs sind unzulässig. Fixes erfolgen erst nach einem separaten Folgeauftrag.
 
-### 4.4 Blocker-Verhalten
+### 4.4 Blocker-Verhalten — Weitermachen ist Pflicht
 
-Bei Unklarheiten, Widersprüchen oder technischen Blockern bricht Codex die Umsetzung kontrolliert ab. Der Blocker wird konkret dokumentiert: was fehlt, warum die Umsetzung nicht sicher möglich ist, welche Informationen benötigt werden.
+Ein Blocker in einer Teilaufgabe unterbricht den Auftrag **nicht**. Codex dokumentiert den Blocker im Schritt-Log und setzt die Umsetzung mit dem nächsten Schritt fort.
+
+**Abbruch des gesamten Auftrags ist nur zulässig, wenn es faktisch unmöglich ist weiterzuarbeiten** — zum Beispiel wenn eine Datei fehlt, die für alle folgenden Schritte zwingend benötigt wird, oder wenn ein Kompilierfehler jeden weiteren Schritt blockiert.
+
+In jedem anderen Fall gilt: Blocker dokumentieren, Schritt als `⚠️ Teilweise abgeschlossen` loggen, nächsten Schritt beginnen. Der Nutzer entscheidet nach Abschluss des Auftrags, wie mit offenen Blockern umgegangen wird.
+
+Ein Blocker wird dokumentiert mit: was genau fehlt, welcher Schritt betroffen ist, welche Schritte davon abhängen, und ob die abhängigen Schritte trotzdem teilweise ausführbar sind.
 
 ---
 
@@ -313,8 +319,10 @@ taskmanager/
 ├── agents.md                          ← diese Datei
 ├── logs/                              ← Schritt-Logs (automatisch, Abschnitt 5)
 │   └── README.md
-├── docs/                              ← Architektur- und Implementierungsdokumentation
-├── codex-auftrag-ticket-system.md     ← Großauftrag: Ticket- & Bug-Tracking (ab 17.05.26)
+├── docs/
+│   ├── tasks/                         ← Aufgabendateien für Codex (Abschnitt 7.1)
+│   └── ...                            ← Architektur- und Implementierungsdokumentation
+├── codex-auftrag-ticket-system.md     ← Großauftrag (Legacy-Ablage, neue Aufträge → docs/tasks/)
 ├── apps/
 │   ├── api/
 │   │   └── src/
@@ -336,6 +344,26 @@ taskmanager/
 
 Aktuelle Großaufträge:
 - `codex-auftrag-ticket-system.md` — Ticket- & Bug-Tracking-System (Domäne 3, ab 17.05.26)
+- `docs/tasks/codex-auftrag-browser-tabs.md` — Views und Detailseiten in Browser-Tabs öffnen (ab 20.05.26)
+
+### 7.1 Aufgabendateien (verbindlich)
+
+Alle Codex-Aufgabendateien werden unter `docs/tasks/` abgelegt. Dateiname: `codex-auftrag-<thema-kebab-case>.md`.
+
+Die Vorlage liegt unter `docs/task-template.md`. Neue Aufgabendateien folgen dem Format des Skill `mugplan-codex-auftrag` (Abschnitte: Ziel, Kontext, Aufgabe, Regeln & Einschränkungen, Randfälle & Fehlerpfade, Seiteneffekte, Testhinweise, Abnahmekriterien, Implementierungsreihenfolge).
+
+Aufgabendateien im Repo-Root sind nicht zulässig. Bestehende Dateien im Root gelten als Legacy und werden bei Gelegenheit nach `docs/tasks/` verschoben.
+
+### 7.2 Testregime in Aufgabendateien (verbindlich)
+
+Jede Aufgabendatei enthält einen Abschnitt **Testhinweise** mit:
+
+- Dem verwendeten Test-Framework und Hilfsmitteln
+- Konkreten Testfällen pro neuer oder geänderter Komponente (nummeriert)
+- Dem Pflicht-Kommentar-Format für neue Testdateien (Test Scope, Abgedeckte Regeln, Fehlerfälle, Ziel)
+- Abnahmekriterium: alle aufgeführten Tests müssen vor Abnahme grün sein
+
+`test.skip`, `it.skip` und leere Testkörper sind ohne dokumentierten Blocker im Schritt-Log unzulässig und zählen nicht als implementierte Tests.
 
 ---
 

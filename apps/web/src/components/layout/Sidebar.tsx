@@ -1,4 +1,4 @@
-import { BookOpen, Bug, CalendarDays, DatabaseBackup, FolderKanban, Library, Tags } from "lucide-react";
+import { BookOpen, Bug, CalendarDays, DatabaseBackup, FolderKanban, Library, ListChecks, Tags } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
@@ -10,6 +10,7 @@ const items = [
 ];
 
 const settingsItems = [
+  { to: "/settings/catalogs", label: "Kataloge", icon: ListChecks },
   { to: "/settings/tags", label: "Tags", icon: Tags },
   { to: "/settings/backup", label: "Sicherung", icon: DatabaseBackup }
 ];

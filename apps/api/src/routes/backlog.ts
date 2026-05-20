@@ -1,5 +1,4 @@
 import type { FastifyInstance } from "fastify";
-import { BACKLOG_STATUSES, PRIORITIES } from "../db/schema.js";
 import { createBacklogItem, deleteBacklogItem, getBacklogItem, listBacklogItems, updateBacklogItem, type BacklogFilters, type BacklogInput } from "../services/backlog.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
@@ -9,7 +8,7 @@ const backlogQuerySchema = {
   properties: {
     featureId: { type: "integer", minimum: 1 },
     useCaseId: { type: "integer", minimum: 1 },
-    status: { type: "string", enum: BACKLOG_STATUSES }
+    status: { type: "string", minLength: 1 }
   }
 } as const;
 
@@ -20,8 +19,7 @@ const backlogBodySchema = {
   properties: {
     title: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
-    status: { type: "string", enum: BACKLOG_STATUSES },
-    priority: { type: "string", enum: PRIORITIES },
+    status: { type: "string", minLength: 1 },
     importKey: { type: ["string", "null"] },
     featureId: { type: ["integer", "null"], minimum: 1 },
     useCaseId: { type: ["integer", "null"], minimum: 1 },

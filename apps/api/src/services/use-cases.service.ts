@@ -14,6 +14,7 @@ import {
   resolveStoredContentPath,
   writeContent
 } from "./content.service.js";
+import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 
 type UseCaseStatus = UseCaseRecord["status"];
@@ -107,12 +108,14 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
   const title = requireNonEmpty(input.title, "title");
   const slug = requireNonEmpty(input.slug, "slug");
   ensureSlugIsUnique(database, slug);
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
+  ensureCatalogEntryExists(database, "featureStatus", status);
 
   const created = useCaseRepository.create(database, {
     featureId: targetFeatureId,
     title,
     slug,
-    status: input.status ?? "draft",
+    status,
     description: cleanNullable(input.description) ?? null,
     contentPath: null,
     sortOrder: input.sortOrder ?? 0
@@ -155,6 +158,7 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
     ensureSlugIsUnique(database, values.slug, id);
   }
   if (input.status !== undefined) {
+    ensureCatalogEntryExists(database, "featureStatus", input.status);
     values.status = input.status;
   }
   if (input.description !== undefined) {

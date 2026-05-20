@@ -6,20 +6,13 @@ import { Button } from "../ui/Button";
 import { FormField } from "../ui/FormField";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
-import { SegmentedControl } from "../ui/SegmentedControl";
+import { StatusToggle } from "../ui/StatusToggle";
 
 interface FeatureDetailProps {
   feature: Feature;
   onSave: (id: number, input: FeatureUpdate) => Promise<void>;
   onDelete: (feature: Feature) => void;
 }
-
-const statuses: Array<{ value: FeatureStatus; label: string; activeClassName: string }> = [
-  { value: "draft", label: "Entwurf", activeClassName: "data-[active=true]:bg-mustard data-[active=true]:text-mustard-dark" },
-  { value: "active", label: "Aktiv", activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" },
-  { value: "done", label: "Erledigt", activeClassName: "data-[active=true]:bg-violet data-[active=true]:text-white" },
-  { value: "archived", label: "Archiviert", activeClassName: "data-[active=true]:bg-steel-100 data-[active=true]:text-steel-700" }
-];
 
 export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps) {
   const [title, setTitle] = useState(feature.title);
@@ -77,7 +70,7 @@ export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps)
       <Section title="Status & Sortierung">
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
         <FormField label="Status" className="min-w-0">
-          <SegmentedControl value={status} options={statuses} onChange={setStatus} />
+          <StatusToggle kind="featureStatus" value={status} onChange={setStatus} />
         </FormField>
         <FormField label="Sortierung" className="min-w-0">
           <input className="h-11 w-full min-w-0 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />

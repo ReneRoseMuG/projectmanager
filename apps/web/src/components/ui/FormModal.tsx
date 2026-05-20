@@ -72,7 +72,7 @@ export function FormModal({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 gap-4 overflow-auto p-4 md:p-5">{children}</div>
+      <div className="grid min-h-0 flex-1 content-start gap-4 overflow-auto p-4 md:p-5">{children}</div>
 
       <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
         <div className="flex flex-wrap items-center gap-2">{footerStart}</div>

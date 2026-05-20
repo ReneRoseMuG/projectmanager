@@ -132,7 +132,6 @@ export function UseCaseDetailPage() {
         currentFeatureId={useCase?.featureId ?? validFeatureId}
         features={allFeatures.features}
         variant="page"
-        closeOnSubmit={false}
         onSubmit={submitUseCase}
         onPostCreate={postCreateUseCase}
         onDelete={deleteUseCase}

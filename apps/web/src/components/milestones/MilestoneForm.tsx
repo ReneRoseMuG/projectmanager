@@ -11,10 +11,13 @@ import { useEntityComments } from "../../hooks/useEntityComments";
 import { useEvents } from "../../hooks/useEvents";
 import { useFeatures } from "../../hooks/useFeatures";
 import { useMilestoneFeatureLinks } from "../../hooks/useDocLinks";
+import { useCatalogs } from "../../hooks/useCatalogs";
 import { useMilestones } from "../../hooks/useMilestones";
 import { useNotes } from "../../hooks/useNotes";
+import { useTasks } from "../../hooks/useTasks";
+import { useTickets } from "../../hooks/useTickets";
 import { formatHumanDate } from "../../utils/date";
-import { featureStatusLabels, featureStatusTones, milestoneStatusLabels } from "../../utils/domainLabels";
+import { countOpenStatusItems } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
@@ -34,13 +37,14 @@ import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
 import { ItemRow } from "../ui/ItemRow";
-import { Pill } from "../ui/Pill";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SectionHeader } from "../ui/SectionHeader";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
+import { StatusPill } from "../ui/StatusPill";
+import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 
@@ -70,13 +74,6 @@ const tabs: Array<Tab<MilestoneFormTab>> = [
   { value: "events", label: "Events" }
 ];
 
-const statusOptions: Array<{ value: ProjectStatus; label: string; activeClassName: string }> = [
-  { value: "active", label: milestoneStatusLabels.active, activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" },
-  { value: "on_hold", label: milestoneStatusLabels.on_hold, activeClassName: "data-[active=true]:bg-tangerine data-[active=true]:text-white" },
-  { value: "completed", label: milestoneStatusLabels.completed, activeClassName: "data-[active=true]:bg-violet data-[active=true]:text-white" },
-  { value: "archived", label: milestoneStatusLabels.archived, activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" }
-];
-
 const swatches = [
   "var(--color-teal)",
   "var(--color-steel-700)",
@@ -97,6 +94,10 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
   const allFeatures = useFeatures();
   const allMilestones = useMilestones();
   const featureLinks = useMilestoneFeatureLinks(milestoneId);
+  const taskOwner = milestoneId ? { type: "milestone" as const, id: milestoneId } : undefined;
+  const tasks = useTasks(taskOwner);
+  const tickets = useTickets(milestoneId ? { type: "milestone", id: milestoneId } : null);
+  const catalogs = useCatalogs();
   const notes = useNotes(milestoneId ? { type: "milestone", id: milestoneId } : null);
   const attachments = useAttachments(milestoneId ? { type: "milestone", id: milestoneId } : null);
   const comments = useEntityComments("milestone", milestoneId);
@@ -265,27 +266,27 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
 
   const tabItems = tabs.map((tab) => {
     if (tab.value === "features") {
-      return { ...tab, count: milestone ? featureLinks.features.length : undefined };
+      return { ...tab, count: milestone ? countOpenStatusItems(featureLinks.features, catalogs.entries, "featureStatus") : 0 };
     }
     if (tab.value === "tasks") {
-      return { ...tab, count: milestone?.taskCount };
+      return { ...tab, count: milestone ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : 0 };
     }
     if (tab.value === "tickets") {
-      return { ...tab, count: milestone?.ticketCount };
+      return { ...tab, count: milestone ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : 0 };
     }
     if (tab.value === "comments") {
-      return { ...tab, count: milestone ? comments.comments.length : undefined };
+      return { ...tab, count: milestone ? comments.comments.length : 0 };
     }
     if (tab.value === "notes") {
-      return { ...tab, count: milestone ? notes.notes.length : undefined };
+      return { ...tab, count: milestone ? notes.notes.length : 0 };
     }
     if (tab.value === "attachments") {
-      return { ...tab, count: milestone ? attachments.attachments.length : undefined };
+      return { ...tab, count: milestone ? attachments.attachments.length : 0 };
     }
     if (tab.value === "events") {
-      return { ...tab, count: milestone ? milestoneEvents.length : undefined };
+      return { ...tab, count: milestone ? milestoneEvents.length : 0 };
     }
-    return tab;
+    return { ...tab, count: 0 };
   });
 
   return (
@@ -336,7 +337,7 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
                   <ColorPicker value={color} onChange={setColor} swatches={swatches} />
                 </FormField>
                 <FormField label="Status">
-                  <SegmentedControl value={status} options={statusOptions} onChange={setStatus} />
+                  <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
                 </FormField>
               </div>
             </Section>
@@ -527,7 +528,7 @@ function MilestoneFeatureList({
             description={richTextToPlainText(feature.description)}
             pills={
               <>
-                <Pill tone={featureStatusTones[feature.status]}>{featureStatusLabels[feature.status]}</Pill>
+                <StatusPill kind="featureStatus" value={feature.status} />
                 <Badge tone="steel">{feature.useCaseCount} Use Cases</Badge>
               </>
             }

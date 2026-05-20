@@ -132,7 +132,6 @@ export function ProjectDetailPage() {
         open
         project={project}
         variant="page"
-        closeOnSubmit={false}
         onSubmit={submitProject}
         onDelete={deleteProject}
         savingLabel={savingLabel}

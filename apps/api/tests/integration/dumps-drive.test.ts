@@ -231,8 +231,8 @@ function seedCompleteDataset(): void {
       VALUES (5, 'milestone.txt', 'milestone-file.txt', 'text/plain', 16, '2026-05-17T08:00:00');
     INSERT INTO events (id, title, description, start_time, end_time, is_all_day, color, created_at, updated_at)
       VALUES (1, 'Termin', NULL, '2026-05-20T08:00:00', '2026-05-20T09:00:00', 0, '#123456', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO backlog_items (id, project_id, feature_id, use_case_id, title, description, status, priority, sort_order, created_at, updated_at)
-      VALUES (1, 1, 1, 1, 'Backlog Alpha', 'Backlog Beschreibung', 'open', 'urgent', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO backlog_items (id, project_id, feature_id, use_case_id, title, description, status, sort_order, created_at, updated_at)
+      VALUES (1, 1, 1, 1, 'Backlog Alpha', 'Backlog Beschreibung', 'open', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO project_features (project_id, feature_id) VALUES (1, 1);
     INSERT INTO milestone_features (milestone_id, feature_id) VALUES (1, 1);
     INSERT INTO project_tasks (owner_id, task_id, position) VALUES (1, 1, 1);

@@ -34,6 +34,7 @@ function createArchive(): Archiver {
 const DUMP_TABLES = [
   { key: "appSettings", tableName: "app_settings" },
   { key: "users", tableName: "users" },
+  { key: "catalogEntries", tableName: "catalog_entries" },
   { key: "projects", tableName: "projects" },
   { key: "milestones", tableName: "milestones" },
   { key: "tags", tableName: "tags" },

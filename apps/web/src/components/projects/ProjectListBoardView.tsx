@@ -1,7 +1,6 @@
-import { PROJECT_STATUSES, type Project } from "@taskmanager/shared-types";
+import type { Project } from "@taskmanager/shared-types";
 import { FolderKanban } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { projectStatusLabels } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
@@ -15,8 +14,6 @@ interface ProjectListBoardViewProps {
   onDelete: (project: Project) => void;
   filters?: ReactNode;
 }
-
-const statusColumns = PROJECT_STATUSES.map((status) => ({ value: status, label: projectStatusLabels[status] }));
 
 function matchesSearch(project: Project, searchValue: string) {
   const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
@@ -43,7 +40,7 @@ export function ProjectListBoardView({ projects, loading = false, onCreate, onEd
       onAddToColumn={onCreate}
       addLabel="Neues Projekt"
       statusKey="status"
-      statusColumns={statusColumns}
+      statusCatalogKind="workStatus"
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={filters}

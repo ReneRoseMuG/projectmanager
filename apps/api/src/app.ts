@@ -7,6 +7,7 @@ import { registerAttachmentsRoutes } from "./routes/attachments.js";
 import { registerAiRoutes } from "./routes/ai.js";
 import { registerBacklogRoutes } from "./routes/backlog.js";
 import { registerCommentsRoutes } from "./routes/comments.js";
+import { registerCatalogRoutes } from "./routes/catalogs.js";
 import { registerDocLinksRoutes } from "./routes/doc-links.js";
 import { registerDumpRoutes } from "./routes/dumps.js";
 import { registerEventsRoutes } from "./routes/events.js";
@@ -61,6 +62,7 @@ export async function buildApp(
   await app.register(registerSubtasksRoutes, { prefix: "/api" });
   await app.register(registerTicketsRoutes, { prefix: "/api" });
   await app.register(registerCommentsRoutes, { prefix: "/api" });
+  await app.register(registerCatalogRoutes, { prefix: "/api" });
   await app.register(registerTagsRoutes, { prefix: "/api" });
   await app.register(registerNotesRoutes, { prefix: "/api" });
   await app.register(registerAttachmentsRoutes, { prefix: "/api" });

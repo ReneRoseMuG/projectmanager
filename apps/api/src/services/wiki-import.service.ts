@@ -56,7 +56,6 @@ interface ParsedBacklogItem {
   title: string;
   description: string | null;
   status: BacklogStatus;
-  priority: Priority;
   sortOrder: number;
   importKey: string;
   sourcePath: string;
@@ -506,7 +505,6 @@ function parseBacklogItems(featureSlug: string, backlogDir: string, sourcePath: 
         title: section.title,
         description: description ? markdownToHtml(description) : null,
         status: parseBacklogStatus(section.body),
-        priority: parsePriority(section.body),
         sortOrder: numberFromSlug(featureSlug) + section.index,
         importKey: `wiki:${sourceRelativePath.toLowerCase()}#${normalizePathSegment(section.title)}`,
         sourcePath: sourceRelativePath
@@ -975,7 +973,6 @@ function upsertBacklogItem(
         title: backlogItem.title,
         description: backlogItem.description,
         status: backlogItem.status,
-        priority: backlogItem.priority,
         sortOrder: backlogItem.sortOrder,
         updatedAt: now
       })
@@ -993,7 +990,6 @@ function upsertBacklogItem(
       title: backlogItem.title,
       description: backlogItem.description,
       status: backlogItem.status,
-      priority: backlogItem.priority,
       importKey: backlogItem.importKey,
       sortOrder: backlogItem.sortOrder,
       createdAt: now,

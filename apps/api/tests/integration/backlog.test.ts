@@ -4,11 +4,11 @@
  * Abgedeckte Regeln:
  * - Backlog-Items gehören zu Projekten und können Features/Use Cases referenzieren.
  * - Filter nach Feature, Use Case und Status funktionieren.
- * - Status-Updates folgen den erlaubten Übergängen.
+ * - Status-Updates nutzen den gemeinsamen Statuskatalog.
  *
  * Fehlerfälle:
  * - Falsches Projekt liefert 404.
- * - Ungültiger Statusübergang liefert 400.
+ * - Ungültiger Status liefert 400.
  *
  * Ziel:
  * Backlog-API und Projekt-Cascade isoliert absichern.
@@ -51,9 +51,9 @@ describe("Backlog API", () => {
     const project = await createProject(app);
     const feature = await createFeature(app, { slug: "ft-backlog-create" });
 
-    const res = await supertest(app.server).post(`/api/projects/${project.id}/backlog`).send({ title: "Item 1", priority: "high", featureId: feature.id }).expect(201);
+    const res = await supertest(app.server).post(`/api/projects/${project.id}/backlog`).send({ title: "Item 1", featureId: feature.id }).expect(201);
 
-    expect(res.body).toMatchObject({ projectId: project.id, featureId: feature.id, status: "open", priority: "high" });
+    expect(res.body).toMatchObject({ projectId: project.id, featureId: feature.id, status: "open" });
   });
 
   it("Falsches Projekt liefert 404", async () => {
@@ -97,20 +97,20 @@ describe("Backlog API", () => {
     expect(res.body.status).toBe("in_progress");
   });
 
-  it("PATCH aktualisiert Titel und Priorität", async () => {
+  it("PATCH aktualisiert Titel", async () => {
     const project = await createProject(app);
     const item = await createBacklogItem(app, project.id);
 
-    const res = await supertest(app.server).patch(`/api/backlog/${item.id}`).send({ title: "Neu", priority: "urgent", expectedVersion: item.version }).expect(200);
+    const res = await supertest(app.server).patch(`/api/backlog/${item.id}`).send({ title: "Neu", expectedVersion: item.version }).expect(200);
 
-    expect(res.body).toMatchObject({ title: "Neu", priority: "urgent" });
+    expect(res.body).toMatchObject({ title: "Neu" });
   });
 
-  it("Ungültiger Statusübergang liefert 400", async () => {
+  it("Ungültiger Status liefert 400", async () => {
     const project = await createProject(app);
     const item = await createBacklogItem(app, project.id);
 
-    await supertest(app.server).patch(`/api/backlog/${item.id}`).send({ status: "done", expectedVersion: item.version }).expect(400);
+    await supertest(app.server).patch(`/api/backlog/${item.id}`).send({ status: "missing_status", expectedVersion: item.version }).expect(400);
   });
 
   it("Projekt-DELETE löscht Backlog-Items per Cascade", async () => {

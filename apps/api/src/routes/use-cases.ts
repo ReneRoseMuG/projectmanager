@@ -1,5 +1,4 @@
 import type { FastifyInstance } from "fastify";
-import { FEATURE_STATUSES } from "../db/schema.js";
 import { createUseCase, deleteUseCase, getUseCase, listUseCases, updateUseCase, type UseCaseInput } from "../services/use-cases.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
@@ -19,7 +18,7 @@ const useCaseBodySchema = {
     featureId: { type: "integer", minimum: 1 },
     title: { type: "string", minLength: 1 },
     slug: { type: "string", minLength: 1 },
-    status: { type: "string", enum: FEATURE_STATUSES },
+    status: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
     content: { type: "string" },
     sortOrder: { type: "integer" }

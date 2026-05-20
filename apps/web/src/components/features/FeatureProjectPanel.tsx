@@ -1,9 +1,10 @@
-import { PROJECT_STATUSES, type Project, type ProjectStatus } from "@taskmanager/shared-types";
+import type { Project } from "@taskmanager/shared-types";
 import { Edit3, FolderKanban, FolderOpen, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { ViewMode } from "../../types";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { catalogLabel } from "../../utils/catalogs";
 import { formatHumanDate } from "../../utils/date";
-import { projectStatusLabels, projectStatusTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { TagBadge } from "../tags/TagBadge";
 import { Button } from "../ui/Button";
@@ -12,9 +13,9 @@ import { FormModal } from "../ui/FormModal";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
-import { Pill } from "../ui/Pill";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
+import { StatusPill } from "../ui/StatusPill";
 
 interface FeatureProjectPanelProps {
   projects: Project[];
@@ -26,8 +27,6 @@ interface FeatureProjectPanelProps {
   onOpen: (project: Project) => void;
 }
 
-const statusColumns: Array<{ value: ProjectStatus; label: string }> = PROJECT_STATUSES.map((status) => ({ value: status, label: projectStatusLabels[status] }));
-
 function toListBoardMode(viewMode: ViewMode): ListBoardMode {
   return viewMode === "kanban" ? "board" : "list";
 }
@@ -36,13 +35,13 @@ function toViewMode(mode: ListBoardMode): ViewMode {
   return mode === "board" ? "kanban" : "list";
 }
 
-function matchesSearch(project: Project, searchValue: string) {
+function matchesSearch(project: Project, searchValue: string, statusLabel: string) {
   const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
   if (!normalized) {
     return true;
   }
 
-  const values = [project.name, richTextToPlainText(project.description), projectStatusLabels[project.status], ...project.tags.map((tag) => tag.name)];
+  const values = [project.name, richTextToPlainText(project.description), statusLabel, ...project.tags.map((tag) => tag.name)];
   return values.some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
 }
 
@@ -52,6 +51,7 @@ function sortProjects(projects: Project[]) {
 
 /** Feature project relation surface built on the shared list/board toolbar. */
 export function FeatureProjectPanel({ projects, availableProjects, viewMode, onViewModeChange, onAddProject, onRemoveProject, onOpen }: FeatureProjectPanelProps) {
+  const catalogs = useCatalogs();
   const [searchValue, setSearchValue] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
@@ -62,7 +62,7 @@ export function FeatureProjectPanel({ projects, availableProjects, viewMode, onV
     () => sortProjects(availableProjects.filter((project) => !linkedProjectIds.has(project.id))),
     [availableProjects, linkedProjectIds]
   );
-  const visibleProjects = useMemo(() => sortProjects(projects).filter((project) => matchesSearch(project, searchValue)), [projects, searchValue]);
+  const visibleProjects = useMemo(() => sortProjects(projects).filter((project) => matchesSearch(project, searchValue, catalogLabel(catalogs.entries, "workStatus", project.status))), [catalogs.entries, projects, searchValue]);
 
   useEffect(() => {
     if (!addModalOpen) {
@@ -118,7 +118,7 @@ export function FeatureProjectPanel({ projects, availableProjects, viewMode, onV
         onAdd={openAddModal}
         addLabel="Projekt hinzufügen"
         statusKey="status"
-        statusColumns={statusColumns}
+        statusCatalogKind="workStatus"
         searchValue={searchValue}
         onSearchChange={setSearchValue}
         emptyState={
@@ -222,7 +222,7 @@ function FeatureProjectRow({ project, removing, onOpen, onRemove }: { project: P
       description={description}
       pills={
         <>
-          <Pill tone={projectStatusTones[project.status]}>{projectStatusLabels[project.status]}</Pill>
+          <StatusPill kind="workStatus" value={project.status} />
           {project.tags[0] ? <TagBadge tag={project.tags[0]} /> : null}
         </>
       }
@@ -251,7 +251,7 @@ function FeatureProjectHeader({ project }: { project: Project }) {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Pill tone={projectStatusTones[project.status]}>{projectStatusLabels[project.status]}</Pill>
+        <StatusPill kind="workStatus" value={project.status} />
         {project.tags.map((tag) => (
           <TagBadge key={tag.id} tag={tag} />
         ))}

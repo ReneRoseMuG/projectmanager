@@ -1,11 +1,10 @@
 import type { UseCase } from "@taskmanager/shared-types";
 import { BookOpen, Edit3 } from "lucide-react";
-import { featureStatusLabels, featureStatusTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
+import { Button } from "../ui/Button";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
-import { Pill } from "../ui/Pill";
-import { Button } from "../ui/Button";
+import { StatusPill } from "../ui/StatusPill";
 
 interface UseCaseCardProps {
   useCase: UseCase;
@@ -13,7 +12,7 @@ interface UseCaseCardProps {
   onOpen: (useCase: UseCase) => void;
 }
 
-const statusAccent: Record<UseCase["status"], string> = {
+const statusAccent: Record<string, string> = {
   draft: "var(--color-mustard)",
   active: "var(--color-fern)",
   done: "var(--color-violet)",
@@ -31,11 +30,11 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
         </div>
         <div className="hidden md:block">
           <ItemRow
-            accentColor={statusAccent[useCase.status]}
+            accentColor={statusAccent[useCase.status] ?? "var(--color-steel-400)"}
             statusIndicator={<UseCaseBadge useCase={useCase} />}
             title={useCase.title}
             description={description}
-            pills={<Pill tone={featureStatusTones[useCase.status]}>{featureStatusLabels[useCase.status]}</Pill>}
+            pills={<StatusPill kind="featureStatus" value={useCase.status} />}
             meta={<span className="font-mono text-xs font-semibold text-slate-500">/uc/{useCase.slug}</span>}
             actions={<Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(useCase)} />}
             onOpen={() => onOpen(useCase)}
@@ -47,7 +46,7 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
 
   return (
     <ItemCard
-      accentColor={statusAccent[useCase.status]}
+      accentColor={statusAccent[useCase.status] ?? "var(--color-steel-400)"}
       header={
         <div className="grid gap-2">
           <div className="flex items-start gap-3">
@@ -57,7 +56,7 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
               <p className="mt-1 truncate font-mono text-[11px] text-slate-500">/uc/{useCase.slug}</p>
             </div>
           </div>
-          <Pill tone={featureStatusTones[useCase.status]}>{featureStatusLabels[useCase.status]}</Pill>
+          <StatusPill kind="featureStatus" value={useCase.status} />
         </div>
       }
       body={description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null}
@@ -75,7 +74,7 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
 
 function UseCaseBadge({ useCase }: { useCase: UseCase }) {
   return (
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: statusAccent[useCase.status] }}>
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: statusAccent[useCase.status] ?? "var(--color-steel-400)" }}>
       <BookOpen size={18} />
     </span>
   );

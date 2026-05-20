@@ -1,6 +1,5 @@
 import type { TaskBoardPositionInput, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
-import { PRIORITIES, TASK_STATUSES } from "../db/schema.js";
 import {
   createOwnerTask,
   deleteTask,
@@ -21,8 +20,8 @@ const taskBodySchema = {
   properties: {
     title: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
-    status: { type: "string", enum: TASK_STATUSES },
-    priority: { type: "string", enum: PRIORITIES },
+    status: { type: "string", minLength: 1 },
+    priority: { type: "string", minLength: 1 },
     assignee: { type: ["string", "null"] },
     dueDate: { type: ["string", "null"] }
   }
@@ -43,7 +42,7 @@ const taskBoardPositionSchema = {
   required: ["status", "position", "expectedVersion"],
   additionalProperties: false,
   properties: {
-    status: { type: "string", enum: TASK_STATUSES },
+    status: { type: "string", minLength: 1 },
     position: { type: "number" },
     ...expectedVersionPropertySchema
   }

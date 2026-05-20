@@ -1,7 +1,8 @@
 import type { BacklogItem, BacklogStatus, Feature } from "@taskmanager/shared-types";
 import { Edit3, Inbox, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { backlogStatusLabels, backlogStatusTones, priorityBadgeTones, priorityLabels } from "../../utils/domainLabels";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { catalogEntriesByKind, isCatalogStatusClosed } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
@@ -10,7 +11,7 @@ import { FilterChips } from "../ui/FilterChips";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
-import { Pill } from "../ui/Pill";
+import { StatusPill } from "../ui/StatusPill";
 
 interface BacklogListBoardViewProps {
   items: BacklogItem[];
@@ -22,43 +23,39 @@ interface BacklogListBoardViewProps {
   onDelete: (item: BacklogItem) => void;
 }
 
-const priorityAccent: Record<BacklogItem["priority"], string> = {
-  urgent: "var(--color-crimson)",
-  high: "var(--color-tangerine)",
-  medium: "var(--color-mustard)",
-  low: "var(--color-steel-400)"
-};
-
-const statusOptions: Array<{ value: BacklogStatus; label: string }> = [
-  { value: "open", label: backlogStatusLabels.open },
-  { value: "in_progress", label: backlogStatusLabels.in_progress },
-  { value: "done", label: backlogStatusLabels.done },
-  { value: "rejected", label: backlogStatusLabels.rejected }
-];
-
 function matchesSearch(item: BacklogItem, featureName: string, searchValue: string) {
   const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
   if (!normalized) {
     return true;
   }
 
-  const values = [item.title, richTextToPlainText(item.description), item.status, item.priority, featureName];
+  const values = [item.title, richTextToPlainText(item.description), item.status, featureName];
   return values.some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
 }
 
 export function BacklogListBoardView({ items, features, statusFilter, onStatusFilterChange, onCreate, onEdit, onDelete }: BacklogListBoardViewProps) {
   const [mode, setMode] = useState<ListBoardMode>("list");
   const [searchValue, setSearchValue] = useState("");
+  const catalogs = useCatalogs();
   const featureNames = useMemo(() => new Map(features.map((feature) => [feature.id, feature.title])), [features]);
   const filteredItems = useMemo(() => items.filter((item) => statusFilter === "all" || item.status === statusFilter), [items, statusFilter]);
   const visibleItems = useMemo(
     () => filteredItems.filter((item) => matchesSearch(item, item.featureId ? (featureNames.get(item.featureId) ?? String(item.featureId)) : "", searchValue)),
     [featureNames, filteredItems, searchValue]
   );
-  const filterOptions = statusOptions.map((option) => ({
-    ...option,
-    count: items.filter((item) => item.status === option.value).length
-  }));
+  const statusColumns = useMemo(
+    () => catalogEntriesByKind(catalogs.entries, "workStatus").map((option) => ({ value: option.key, label: option.label, sortOrder: option.sortOrder, isClosed: option.isClosed })),
+    [catalogs.entries]
+  );
+  const filterOptions = useMemo(
+    () =>
+      statusColumns.map((option) => ({
+        value: option.value,
+        label: option.label,
+        count: items.filter((item) => item.status === option.value).length
+      })),
+    [items, statusColumns]
+  );
 
   return (
     <ListBoardView
@@ -67,6 +64,9 @@ export function BacklogListBoardView({ items, features, statusFilter, onStatusFi
       onModeChange={setMode}
       onAdd={onCreate}
       addLabel="Neues Backlog-Item"
+      statusKey="status"
+      statusCatalogKind="workStatus"
+      statusColumns={statusColumns}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={<FilterChips value={statusFilter} onChange={onStatusFilterChange} options={filterOptions} allCount={items.length} />}
@@ -79,16 +79,17 @@ export function BacklogListBoardView({ items, features, statusFilter, onStatusFi
 
 function BacklogItemCard({ item, featureName, onEdit, onDelete }: { item: BacklogItem; featureName?: string; onEdit: (item: BacklogItem) => void; onDelete: (item: BacklogItem) => void }) {
   const description = richTextToPlainText(item.description);
+  const catalogs = useCatalogs();
+  const closed = isCatalogStatusClosed(catalogs.entries, "workStatus", item.status);
 
   return (
     <ItemCard
-      accentColor={priorityAccent[item.priority]}
+      accentColor={closed ? "var(--color-steel-400)" : "var(--color-fern)"}
       header={
         <div className="grid gap-2">
-          <h3 className={`line-clamp-2 text-sm font-semibold ${item.status === "rejected" ? "text-slate-500 line-through" : "text-ink"}`}>{item.title}</h3>
+          <h3 className={`line-clamp-2 text-sm font-semibold ${closed ? "text-slate-500 line-through" : "text-ink"}`}>{item.title}</h3>
           <div className="flex flex-wrap items-center gap-1.5">
-            <Pill tone={backlogStatusTones[item.status]}>{backlogStatusLabels[item.status]}</Pill>
-            <Badge tone={priorityBadgeTones[item.priority]}>{priorityLabels[item.priority]}</Badge>
+            <StatusPill kind="workStatus" value={item.status} />
           </div>
         </div>
       }
@@ -97,21 +98,23 @@ function BacklogItemCard({ item, featureName, onEdit, onDelete }: { item: Backlo
       onOpen={() => onEdit(item)}
       onEdit={() => onEdit(item)}
       onDelete={() => onDelete(item)}
-      className={item.status === "rejected" ? "opacity-65" : ""}
+      className={closed ? "opacity-65" : ""}
     />
   );
 }
 
 function BacklogItemRow({ item, featureName, onEdit, onDelete }: { item: BacklogItem; featureName?: string; onEdit: (item: BacklogItem) => void; onDelete: (item: BacklogItem) => void }) {
   const description = richTextToPlainText(item.description);
+  const catalogs = useCatalogs();
+  const closed = isCatalogStatusClosed(catalogs.entries, "workStatus", item.status);
 
   return (
     <ItemRow
-      accentColor={priorityAccent[item.priority]}
-      statusIndicator={<Pill tone={backlogStatusTones[item.status]}>{backlogStatusLabels[item.status]}</Pill>}
+      accentColor={closed ? "var(--color-steel-400)" : "var(--color-fern)"}
+      statusIndicator={<StatusPill kind="workStatus" value={item.status} />}
       title={item.title}
       description={description}
-      pills={<Badge tone={priorityBadgeTones[item.priority]}>{priorityLabels[item.priority]}</Badge>}
+      pills={null}
       meta={featureName ? <Badge tone="teal">{featureName}</Badge> : <Badge tone="mute">Ohne Feature</Badge>}
       actions={
         <>
@@ -120,7 +123,7 @@ function BacklogItemRow({ item, featureName, onEdit, onDelete }: { item: Backlog
         </>
       }
       onOpen={() => onEdit(item)}
-      className={item.status === "rejected" ? "opacity-65" : ""}
+      className={closed ? "opacity-65" : ""}
     />
   );
 }

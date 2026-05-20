@@ -1,9 +1,8 @@
 import type { Feature } from "@taskmanager/shared-types";
 import { ArrowRight, BookOpen, FileText } from "lucide-react";
-import { featureStatusLabels, featureStatusTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { ItemCard } from "../ui/ItemCard";
-import { Pill } from "../ui/Pill";
+import { StatusPill } from "../ui/StatusPill";
 
 interface FeatureCardProps {
   feature: Feature;
@@ -39,7 +38,7 @@ function FeatureCardHeader({ feature }: { feature: Feature }) {
         <span className="line-clamp-2 text-base font-semibold text-ink">{feature.title}</span>
         <span className="block truncate font-mono text-xs text-slate-500">/features/{feature.slug}</span>
         <span className="mt-2 inline-flex">
-          <Pill tone={featureStatusTones[feature.status]}>{featureStatusLabels[feature.status]}</Pill>
+          <StatusPill kind="featureStatus" value={feature.status} />
         </span>
       </span>
     </div>

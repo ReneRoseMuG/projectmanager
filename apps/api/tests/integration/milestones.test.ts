@@ -81,6 +81,9 @@ describe("Milestones API", () => {
       name: "Alpha",
       status: "active",
       taskCount: 0,
+      openTaskCount: 0,
+      doneTaskCount: 0,
+      totalTaskCount: 0,
       ticketCount: 0,
       featureCount: 0,
       tags: []
@@ -117,7 +120,7 @@ describe("Milestones API", () => {
   it("verwaltet alle Milestone-Relationen mit echten Daten", async () => {
     const project = await createProject(app);
     const milestone = await createMilestone(app, project.id);
-    const task = await createTask(app, project.id, { title: "Bestehende Aufgabe" });
+    const task = await createTask(app, project.id, { title: "Bestehende Aufgabe", status: "done" });
     const ticket = await createTicket(app, null, { title: "Bestehendes Ticket" });
     const feature = await createFeature(app, { title: "Feature A" });
     const tag = await createTag(app, { name: "release", color: "#14b8a6" });
@@ -173,13 +176,13 @@ describe("Milestones API", () => {
     expect(event.body.owners).toEqual([{ type: "milestone", id: milestone.id }]);
 
     const detail = await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(200);
-    expect(detail.body).toMatchObject({ taskCount: 2, ticketCount: 2, featureCount: 1 });
+    expect(detail.body).toMatchObject({ taskCount: 2, openTaskCount: 1, doneTaskCount: 1, totalTaskCount: 2, ticketCount: 2, featureCount: 1 });
 
     await supertest(app.server).delete(`/api/milestones/${milestone.id}/tasks/${task.id}`).expect(204);
     await supertest(app.server).delete(`/api/milestones/${milestone.id}/tickets/${ticket.id}`).expect(204);
 
     const reducedDetail = await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(200);
-    expect(reducedDetail.body).toMatchObject({ taskCount: 1, ticketCount: 1, featureCount: 1 });
+    expect(reducedDetail.body).toMatchObject({ taskCount: 1, openTaskCount: 1, doneTaskCount: 0, totalTaskCount: 1, ticketCount: 1, featureCount: 1 });
   });
 
   it("löscht Milestone-Supportobjekte, aber keine unabhängigen Fachobjekte", async () => {

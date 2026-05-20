@@ -1,21 +1,15 @@
 import type { Ticket } from "@taskmanager/shared-types";
 import { CalendarClock, Edit3, GitBranch, Trash2 } from "lucide-react";
 import { formatHumanDate, isOverdue } from "../../utils/date";
-import {
-  priorityBadgeTones,
-  priorityLabels,
-  ticketStatusLabels,
-  ticketStatusTones,
-  ticketTypeLabels,
-  ticketTypeTones
-} from "../../utils/domainLabels";
+import { ticketTypeLabels, ticketTypeTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
-import { Pill } from "../ui/Pill";
+import { PriorityBadge } from "../ui/PriorityBadge";
+import { StatusPill } from "../ui/StatusPill";
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -25,14 +19,14 @@ interface TicketCardProps {
   onDelete?: (ticket: Ticket) => void;
 }
 
-const priorityAccent: Record<Ticket["priority"], string> = {
+const priorityAccent: Record<string, string> = {
   urgent: "var(--color-crimson)",
   high: "var(--color-tangerine)",
   medium: "var(--color-mustard)",
   low: "var(--color-steel-400)"
 };
 
-const statusDot: Record<Ticket["status"], string> = {
+const statusDot: Record<string, string> = {
   open: "bg-steel-400",
   in_progress: "bg-tangerine",
   in_review: "bg-mustard",
@@ -58,7 +52,7 @@ export function TicketCard({ ticket, compact = false, variant = "card", onOpen, 
 
   return (
     <ItemCard
-      accentColor={priorityAccent[ticket.priority]}
+      accentColor={priorityAccent[ticket.priority] ?? "var(--color-steel-400)"}
       header={<TicketCardHeader ticket={ticket} />}
       body={<TicketCardBody description={description} />}
       footer={<TicketCardFooter ticket={ticket} />}
@@ -75,7 +69,7 @@ function TicketCardHeader({ ticket }: { ticket: Ticket }) {
     <div className="grid gap-2">
       <h3 className="line-clamp-2 text-sm font-semibold text-ink">{ticket.title}</h3>
       <div className="flex flex-wrap items-center gap-2">
-        <Pill tone={ticketStatusTones[ticket.status]}>{ticketStatusLabels[ticket.status]}</Pill>
+        <StatusPill kind="workStatus" value={ticket.status} />
         <Badge tone={ticketTypeTones[ticket.type]}>{ticketTypeLabels[ticket.type]}</Badge>
       </div>
     </div>
@@ -127,15 +121,15 @@ function TicketRow({ ticket, description, onOpen, onDelete }: { ticket: Ticket; 
   return (
     <div className="hidden md:block">
       <ItemRow
-        accentColor={priorityAccent[ticket.priority]}
-        statusIndicator={<span className={`block h-3 w-3 rounded-full ${statusDot[ticket.status]}`} aria-hidden="true" />}
+        accentColor={priorityAccent[ticket.priority] ?? "var(--color-steel-400)"}
+        statusIndicator={<span className={`block h-3 w-3 rounded-full ${statusDot[ticket.status] ?? "bg-steel-400"}`} aria-hidden="true" />}
         title={ticket.title}
         description={description}
         pills={
           <>
-            <Pill tone={ticketStatusTones[ticket.status]}>{ticketStatusLabels[ticket.status]}</Pill>
+            <StatusPill kind="workStatus" value={ticket.status} />
             <Badge tone={ticketTypeTones[ticket.type]}>{ticketTypeLabels[ticket.type]}</Badge>
-            <Badge tone={priorityBadgeTones[ticket.priority]}>{priorityLabels[ticket.priority]}</Badge>
+            <PriorityBadge value={ticket.priority} />
           </>
         }
         meta={

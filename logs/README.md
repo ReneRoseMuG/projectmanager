@@ -2,6 +2,14 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 20.05.26 | Feature | Status-Board-Gruppierung | ✅ |
+| 20.05.26 | Feature | Status- und Prioritätskataloge | ✅ |
+| 20.05.26 | Fix | TaskForm-Umbenennung | ✅ |
+| 20.05.26 | Fix | Planungskarten Aufgaben-Progress | ✅ |
+| 20.05.26 | Fix | Meilenstein View-State | ✅ |
+| 20.05.26 | Fix | Feature List Items | ✅ |
+| 20.05.26 | Fix | Formular Speichern schließt | ✅ |
+| 20.05.26 | Fix | Projekt-Tabs Leerfläche | ✅ |
 | 20.05.26 | Fix | Lokale KI Runtime Paket | ✅ |
 | 20.05.26 | Feature | TLDraw-Zeichenblock | ✅ |
 | 20.05.26 | Feature | Lokaler KI-Agent | ✅ |

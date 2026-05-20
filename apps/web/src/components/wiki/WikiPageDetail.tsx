@@ -37,8 +37,8 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
   };
 
   const tabs: Array<Tab<"content" | "comments">> = [
-    { value: "content", label: "Inhalt" },
-    { value: "comments", label: "Kommentare" }
+    { value: "content", label: "Inhalt", count: 0 },
+    { value: "comments", label: "Kommentare", count: comments.comments.length }
   ];
 
   return (

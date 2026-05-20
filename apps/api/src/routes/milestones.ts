@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
 import type { MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
-import { PROJECT_STATUSES } from "../db/schema.js";
 import { createMilestone, deleteMilestone, getMilestone, listMilestones, listProjectMilestones, updateMilestone } from "../services/milestones.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
@@ -12,7 +11,7 @@ const milestoneBodySchema = {
     projectId: { type: "integer", minimum: 1 },
     name: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
-    status: { type: "string", enum: PROJECT_STATUSES },
+    status: { type: "string", minLength: 1 },
     color: { type: ["string", "null"] },
     startDate: { type: ["string", "null"] },
     dueDate: { type: ["string", "null"] }
@@ -36,7 +35,7 @@ const projectMilestoneBodySchema = {
   properties: {
     name: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
-    status: { type: "string", enum: PROJECT_STATUSES },
+    status: { type: "string", minLength: 1 },
     color: { type: ["string", "null"] },
     startDate: { type: ["string", "null"] },
     dueDate: { type: ["string", "null"] }

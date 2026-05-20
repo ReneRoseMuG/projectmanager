@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { CommentInput, NoteInput, TicketInput, TicketPositionInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
-import { PRIORITIES, TICKET_RELATION_TYPES, TICKET_RESOLUTIONS, TICKET_STATUSES, TICKET_TYPES } from "../db/schema.js";
+import { TICKET_RELATION_TYPES, TICKET_RESOLUTIONS, TICKET_TYPES } from "../db/schema.js";
 import { createTicketAttachment, deleteAttachment, listTicketAttachments } from "../services/attachments.service.js";
 import { createEntityComment, deleteEntityComment, listEntityComments } from "../services/comments.service.js";
 import { createTicketNote, deleteTicketNote, listTicketNotes } from "../services/notes.service.js";
@@ -45,8 +45,8 @@ const ticketBodySchema = {
     title: { type: "string", minLength: 1 },
     type: { type: "string", enum: TICKET_TYPES },
     description: { type: ["string", "null"] },
-    status: { type: "string", enum: TICKET_STATUSES },
-    priority: { type: "string", enum: PRIORITIES },
+    status: { type: "string", minLength: 1 },
+    priority: { type: "string", minLength: 1 },
     reporter: { type: ["string", "null"] },
     assignee: { type: ["string", "null"] },
     environment: { type: ["string", "null"] },
@@ -72,7 +72,7 @@ const ticketPositionSchema = {
   required: ["status", "position", "expectedVersion"],
   additionalProperties: false,
   properties: {
-    status: { type: "string", enum: TICKET_STATUSES },
+    status: { type: "string", minLength: 1 },
     position: { type: "number" },
     ...expectedVersionPropertySchema
   }

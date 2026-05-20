@@ -1,10 +1,9 @@
 import type { UseCase } from "@taskmanager/shared-types";
 import { FileText } from "lucide-react";
 import type { ReactNode } from "react";
-import { featureStatusLabels, featureStatusTones } from "../../utils/domainLabels";
 import { EmptyState } from "../ui/EmptyState";
-import { Pill } from "../ui/Pill";
 import { RelationPanel } from "../ui/RelationPanel";
+import { StatusPill } from "../ui/StatusPill";
 
 interface UseCaseRelationPanelProps {
   useCases: UseCase[];
@@ -56,7 +55,7 @@ export function UseCaseRelationPanel({
             <span className="block truncate font-mono text-[11px] text-slate-500">/use-cases/{useCase.slug}</span>
           </span>
           <span className="hidden md:inline-flex">
-            <Pill tone={featureStatusTones[useCase.status]}>{featureStatusLabels[useCase.status]}</Pill>
+            <StatusPill kind="featureStatus" value={useCase.status} />
           </span>
         </span>
       )}

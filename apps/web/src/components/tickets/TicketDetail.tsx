@@ -4,18 +4,17 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { setTicketTags } from "../../api/tickets";
 import { useAttachments } from "../../hooks/useAttachments";
+import { useCatalogs } from "../../hooks/useCatalogs";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { errorMessage } from "../../hooks/errors";
 import { useNotes } from "../../hooks/useNotes";
 import { useTicketDetail } from "../../hooks/useTicketDetail";
 import { useTickets } from "../../hooks/useTickets";
+import { catalogLabel, countOpenStatusItems } from "../../utils/catalogs";
 import { formatHumanDate } from "../../utils/date";
 import {
-  priorityLabels,
   priorityPillTones,
   ticketResolutionLabels,
-  ticketStatusLabels,
-  ticketStatusTones,
   ticketTypeLabels
 } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
@@ -32,6 +31,7 @@ import { Pill } from "../ui/Pill";
 import { Section } from "../ui/Section";
 import { SectionHeader } from "../ui/SectionHeader";
 import { TaskListSkeleton } from "../ui/Skeleton";
+import { StatusPill } from "../ui/StatusPill";
 import { useToast } from "../ui/ToastProvider";
 import { TicketCard } from "./TicketCard";
 import { TicketForm, type TicketFormInput } from "./TicketForm";
@@ -63,6 +63,7 @@ export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "mo
   const { confirm } = useConfirm();
   const detail = useTicketDetail(open ? ticketId : null);
   const allTickets = useTickets(open ? undefined : null);
+  const catalogs = useCatalogs();
   const comments = useEntityComments("ticket", open ? ticketId : null);
   const notes = useNotes(ticketId && open ? { type: "ticket", id: ticketId } : null);
   const attachments = useAttachments(ticketId && open ? { type: "ticket", id: ticketId } : null);
@@ -79,7 +80,8 @@ export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "mo
 
   const ticket = detail.ticket;
   const counts: Partial<Record<DetailTab, number>> = {
-    subTickets: ticket?.subTickets.length ?? 0,
+    details: 0,
+    subTickets: countOpenStatusItems(ticket?.subTickets ?? [], catalogs.entries, "workStatus"),
     relations: ticket?.relations.length ?? 0,
     comments: comments.comments.length,
     notes: notes.notes.length,
@@ -157,8 +159,8 @@ export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "mo
       metaPills={
         ticket ? (
           <>
-            <Pill tone={ticketStatusTones[ticket.status]}>{ticketStatusLabels[ticket.status]}</Pill>
-            <Pill tone={priorityPillTones[ticket.priority]}>{priorityLabels[ticket.priority]}</Pill>
+            <StatusPill kind="workStatus" value={ticket.status} />
+            <Pill tone={priorityPillTones[ticket.priority] ?? "steel"}>{catalogLabel(catalogs.entries, "priority", ticket.priority)}</Pill>
           </>
         ) : null
       }
@@ -311,6 +313,7 @@ export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "mo
 }
 
 function TicketReadOnlyDetails({ ticket }: { ticket: Ticket }) {
+  const catalogs = useCatalogs();
   const description = richTextToPlainText(ticket.description);
 
   return (
@@ -319,7 +322,7 @@ function TicketReadOnlyDetails({ ticket }: { ticket: Ticket }) {
         <Section title="Basisdaten">
           <div className="grid gap-4 md:grid-cols-2">
             <ReadonlyField label="Typ" value={ticketTypeLabels[ticket.type]} />
-            <ReadonlyField label="Status" value={ticketStatusLabels[ticket.status]} />
+            <ReadonlyField label="Status" value={catalogLabel(catalogs.entries, "workStatus", ticket.status)} />
             {description ? <ReadonlyField label="Beschreibung" value={description} wide /> : null}
           </div>
         </Section>

@@ -132,6 +132,19 @@ export async function invalidateTags(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.tags.root, queryKeys.projects.root, queryKeys.milestones.root, queryKeys.tasks.root, queryKeys.tickets.root, queryKeys.globalSearch.root]);
 }
 
+export async function invalidateCatalogs(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [
+    queryKeys.catalogs.root,
+    queryKeys.projects.root,
+    queryKeys.milestones.root,
+    queryKeys.tasks.root,
+    queryKeys.features.root,
+    queryKeys.useCases.root,
+    queryKeys.tickets.root,
+    queryKeys.globalSearch.root
+  ]);
+}
+
 export async function invalidateWiki(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.wiki.root, queryKeys.globalSearch.root]);
 }
@@ -151,6 +164,7 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.attachments.root,
     queryKeys.comments.root,
     queryKeys.tags.root,
+    queryKeys.catalogs.root,
     queryKeys.wiki.root,
     queryKeys.calendarTasks.root,
     queryKeys.tickets.root,

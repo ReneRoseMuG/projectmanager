@@ -4,15 +4,14 @@ import { LinkIcon, ListTodo } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getTasks } from "../../api/tasks";
 import { queryKeys } from "../../queries/queryKeys";
-import { priorityBadgeTones, priorityLabels, taskStatusLabels, taskStatusTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
-import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { Modal } from "../ui/Modal";
-import { Pill } from "../ui/Pill";
+import { PriorityBadge } from "../ui/PriorityBadge";
 import { SearchInput } from "../ui/SearchInput";
 import { TaskListSkeleton } from "../ui/Skeleton";
+import { StatusPill } from "../ui/StatusPill";
 
 interface TaskLinkDialogProps {
   open: boolean;
@@ -70,8 +69,8 @@ export function TaskLinkDialog({ open, currentTasks, excludeIds = [], onLink, on
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="truncate text-sm font-semibold text-ink">{task.title}</span>
-                      <Pill tone={taskStatusTones[task.status]}>{taskStatusLabels[task.status]}</Pill>
-                      <Badge tone={priorityBadgeTones[task.priority]}>{priorityLabels[task.priority]}</Badge>
+                      <StatusPill kind="workStatus" value={task.status} />
+                      <PriorityBadge value={task.priority} />
                     </div>
                     {description ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{description}</p> : null}
                   </div>

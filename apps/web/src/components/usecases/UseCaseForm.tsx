@@ -14,17 +14,12 @@ import type {
 import { BookOpen, Bug, LinkIcon, ListTodo, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { useCatalogs } from "../../hooks/useCatalogs";
 import { useEntityComments } from "../../hooks/useEntityComments";
-import {
-  featureStatusLabels,
-  featureStatusTones,
-  priorityLabels,
-  taskStatusLabels,
-  taskStatusTones,
-  ticketStatusLabels,
-  ticketStatusTones,
-  ticketTypeLabels
-} from "../../utils/domainLabels";
+import { useTasks } from "../../hooks/useTasks";
+import { useTickets } from "../../hooks/useTickets";
+import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed } from "../../utils/catalogs";
+import { ticketTypeLabels } from "../../utils/domainLabels";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
@@ -37,12 +32,12 @@ import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingRelationList } from "../ui/PendingRelationList";
-import { Pill } from "../ui/Pill";
-import { RadioList } from "../ui/RadioList";
+import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
-import { SegmentedControl } from "../ui/SegmentedControl";
 import { Select } from "../ui/Select";
+import { StatusPill } from "../ui/StatusPill";
+import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 
 interface UseCaseFormProps {
@@ -65,34 +60,6 @@ interface UseCaseFormProps {
   closeOnSubmit?: boolean;
 }
 
-const statuses: Array<{ value: FeatureStatus; label: string; activeClassName: string }> = [
-  { value: "draft", label: "Entwurf", activeClassName: "data-[active=true]:bg-mustard data-[active=true]:text-mustard-dark" },
-  { value: "active", label: "Aktiv", activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" },
-  { value: "done", label: "Erledigt", activeClassName: "data-[active=true]:bg-violet data-[active=true]:text-white" },
-  { value: "archived", label: "Archiviert", activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" }
-];
-
-const taskStatuses: Array<{ value: TaskStatus; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
-  { value: "todo", label: taskStatusLabels.todo, activeColor: "crimson" },
-  { value: "in_progress", label: taskStatusLabels.in_progress, activeColor: "tangerine" },
-  { value: "done", label: taskStatusLabels.done, activeColor: "fern" }
-];
-
-const ticketStatuses: Array<{ value: TicketStatus; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
-  { value: "open", label: ticketStatusLabels.open, activeColor: "crimson" },
-  { value: "in_progress", label: ticketStatusLabels.in_progress, activeColor: "tangerine" },
-  { value: "in_review", label: ticketStatusLabels.in_review, activeColor: "violet" },
-  { value: "resolved", label: ticketStatusLabels.resolved, activeColor: "fern" },
-  { value: "closed", label: ticketStatusLabels.closed, activeColor: "fern" }
-];
-
-const priorityOptions: Array<{ value: Priority; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
-  { value: "low", label: priorityLabels.low, activeColor: "fern" },
-  { value: "medium", label: priorityLabels.medium, activeColor: "violet" },
-  { value: "high", label: priorityLabels.high, activeColor: "tangerine" },
-  { value: "urgent", label: priorityLabels.urgent, activeColor: "crimson" }
-];
-
 type UseCaseFormTab = "details" | "tasks" | "tickets" | "comments";
 
 const tabs: Array<Tab<UseCaseFormTab>> = [
@@ -104,6 +71,9 @@ const tabs: Array<Tab<UseCaseFormTab>> = [
 
 export function UseCaseForm({ open, useCase, currentFeatureId, features = [], onSubmit, onPostCreate, onDelete, onClose, variant = "modal", closeOnSubmit = true }: UseCaseFormProps) {
   const comments = useEntityComments("useCase", useCase?.id);
+  const catalogs = useCatalogs();
+  const tasks = useTasks(useCase ? { type: "useCase", id: useCase.id } : undefined);
+  const tickets = useTickets(useCase ? { type: "useCase", id: useCase.id } : null);
   const [activeTab, setActiveTab] = useState<UseCaseFormTab>("details");
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -182,15 +152,17 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
   const ticketOwner = useCase ? { type: "useCase" as const, id: useCase.id } : null;
   const tabItems = tabs.map((tab) => {
     if (tab.value === "tasks") {
-      return { ...tab, count: useCase ? undefined : pendingTasks.length };
+      const pending = pendingTasks.map((item) => (item.kind === "existing" ? item.task : item.draft));
+      return { ...tab, count: useCase ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
     }
     if (tab.value === "tickets") {
-      return { ...tab, count: useCase ? undefined : pendingTickets.length };
+      const pending = pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft));
+      return { ...tab, count: useCase ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
     }
     if (tab.value === "comments") {
       return { ...tab, count: useCase ? comments.comments.length : pendingComments.length };
     }
-    return tab;
+    return { ...tab, count: 0 };
   });
 
   return (
@@ -202,7 +174,7 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
         breadcrumb={["Use Cases", useCase ? useCase.title : "Neu"]}
         onSubmit={submit}
         saving={saving}
-        headerMeta={<Pill tone={featureStatusTones[status]}>{featureStatusLabels[status]}</Pill>}
+        headerMeta={<StatusPill kind="featureStatus" value={status} />}
         footerStart={
           useCase && onDelete ? (
             <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" disabled={deleting} onClick={() => void deleteCurrentUseCase()}>
@@ -242,7 +214,7 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
             <Section title="Status & Sortierung">
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
                 <FormField label="Status">
-                  <SegmentedControl value={status} options={statuses} onChange={setStatus} />
+                  <StatusToggle kind="featureStatus" value={status} onChange={setStatus} />
                 </FormField>
                 <FormField label="Sortierung">
                   <Input type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
@@ -269,7 +241,16 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
             ) : (
               <PendingRelationList
                 existingItems={pendingTasks.flatMap((item) =>
-                  item.kind === "existing" ? [{ id: item.task.id, title: item.task.title, statusLabel: taskStatusLabels[item.task.status], statusTone: taskStatusTones[item.task.status] }] : []
+                  item.kind === "existing"
+                    ? [
+                        {
+                          id: item.task.id,
+                          title: item.task.title,
+                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.task.status),
+                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.task.status) ? "steel" : "fern"
+                        }
+                      ]
+                    : []
                 )}
                 draftItems={pendingTasks.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
                 emptyIcon={<ListTodo size={22} />}
@@ -291,7 +272,14 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
               <PendingRelationList
                 existingItems={pendingTickets.flatMap((item) =>
                   item.kind === "existing"
-                    ? [{ id: item.ticket.id, title: item.ticket.title, statusLabel: ticketStatusLabels[item.ticket.status], statusTone: ticketStatusTones[item.ticket.status] }]
+                    ? [
+                        {
+                          id: item.ticket.id,
+                          title: item.ticket.title,
+                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.ticket.status),
+                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.ticket.status) ? "steel" : "fern"
+                        }
+                      ]
                     : []
                 )}
                 draftItems={pendingTickets.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
@@ -390,10 +378,10 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <RadioList value={status} options={taskStatuses} onChange={setStatus} />
+            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
           </FormField>
           <FormField label="Priorität">
-            <RadioList value={priority} options={priorityOptions} onChange={setPriority} />
+            <PrioritySelect value={priority} onChange={setPriority} />
           </FormField>
         </div>
         <footer className="flex justify-end gap-2">
@@ -442,10 +430,10 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
         </Select>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <RadioList value={status} options={ticketStatuses} onChange={setStatus} />
+            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
           </FormField>
           <FormField label="Priorität">
-            <RadioList value={priority} options={priorityOptions} onChange={setPriority} />
+            <PrioritySelect value={priority} onChange={setPriority} />
           </FormField>
         </div>
         <footer className="flex justify-end gap-2">

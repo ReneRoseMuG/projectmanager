@@ -5,6 +5,7 @@ import { projects, projectTasks, tasks } from "../db/schema.js";
 import { projectRepository, type ProjectRecord } from "../repositories/project.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
+import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import { deleteMilestoneOwnedSupportForProjectIds } from "./milestones.service.js";
 import { deleteProjectNotesForIds } from "./notes.service.js";
@@ -95,10 +96,12 @@ export function getProject(database: DbClient, id: number): Project {
 
 export function createProject(database: DbClient, input: ProjectInput): Project {
   const name = requireNonEmpty(input.name, "name");
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "active");
+  ensureCatalogEntryExists(database, "workStatus", status);
   const created = projectRepository.create(database, {
     name,
     description: cleanNullable(input.description) ?? null,
-    status: input.status ?? "active",
+    status,
     color: input.color ?? "#6366f1",
     startDate: cleanNullable(input.startDate) ?? null,
     dueDate: cleanNullable(input.dueDate) ?? null
@@ -117,6 +120,7 @@ export function updateProject(database: DbClient, id: number, input: ProjectUpda
     values.description = cleanNullable(input.description) ?? null;
   }
   if (input.status !== undefined) {
+    ensureCatalogEntryExists(database, "workStatus", input.status);
     values.status = input.status;
   }
   if (input.color !== undefined) {

@@ -3,7 +3,8 @@ import { ListTodo } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
-import { taskStatusLabels } from "../../utils/domainLabels";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { catalogEntriesByKind } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { FilterChips } from "../ui/FilterChips";
@@ -21,12 +22,6 @@ interface TaskListBoardViewProps {
   linkAction?: ReactNode;
   loading?: boolean;
 }
-
-const statusColumns = [
-  { value: "todo", label: "Offen" },
-  { value: "in_progress", label: "In Arbeit" },
-  { value: "done", label: "Erledigt" }
-];
 
 function toListBoardMode(viewMode: ViewMode): ListBoardMode {
   return viewMode === "kanban" ? "board" : "list";
@@ -48,13 +43,15 @@ function matchesSearch(task: Task, searchValue: string) {
 
 /** Task-specific ListBoardView adapter with status Kanban columns. */
 export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, linkAction, loading = false }: TaskListBoardViewProps) {
+  const catalogs = useCatalogs();
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState<Task["status"] | "all">("all");
+  const statusColumns = useMemo(() => catalogEntriesByKind(catalogs.entries, "workStatus").map((entry) => ({ value: entry.key, label: entry.label, sortOrder: entry.sortOrder, isClosed: entry.isClosed })), [catalogs.entries]);
   const filteredTasks = useMemo(() => tasks.filter((task) => statusFilter === "all" || task.status === statusFilter), [statusFilter, tasks]);
   const visibleTasks = useMemo(() => filteredTasks.filter((task) => matchesSearch(task, searchValue)), [filteredTasks, searchValue]);
   const filterOptions = statusColumns.map((column) => ({
     value: column.value as Task["status"],
-    label: taskStatusLabels[column.value as Task["status"]],
+    label: column.label,
     count: tasks.filter((task) => task.status === column.value).length
   }));
 
@@ -68,6 +65,7 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
       addLabel="Neue Aufgabe"
       secondaryAction={linkAction}
       statusKey="status"
+      statusCatalogKind="workStatus"
       statusColumns={statusColumns}
       searchValue={searchValue}
       onSearchChange={setSearchValue}

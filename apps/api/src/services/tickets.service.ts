@@ -14,6 +14,7 @@ import { featureTickets, features, milestoneTickets, milestones, projectTickets,
 import { ticketRepository, type TicketRecord } from "../repositories/ticket.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
+import { ensureCatalogEntryExists, isCatalogEntryClosed, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { listEntityComments } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 import { deleteTicketNotesForIds, listTicketNotes } from "./notes.service.js";
@@ -257,14 +258,17 @@ function relationEntryId(sourceTicketId: number, targetTicketId: number, relatio
 
 function insertTicketRecord(database: DbClient, input: TicketInput, parentId: number | null = null): TicketRecord {
   const title = requireNonEmpty(input.title, "title");
-  const status = input.status ?? "open";
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "open");
+  const priority = input.priority ?? resolveDefaultCatalogEntryKey(database, "priority", "medium");
+  ensureCatalogEntryExists(database, "workStatus", status);
+  ensureCatalogEntryExists(database, "priority", priority);
   return ticketRepository.create(database, {
     parentId,
     type: input.type ?? "bug",
     title,
     description: cleanNullable(input.description) ?? null,
     status,
-    priority: input.priority ?? "medium",
+    priority,
     resolution: null,
     reporter: cleanNullable(input.reporter) ?? null,
     assignee: cleanNullable(input.assignee) ?? null,
@@ -394,7 +398,7 @@ export function createTicket(database: DbClient, input: TicketInput): Ticket {
 
 export function createOwnerTicket(database: DbClient, owner: TicketOwner, input: TicketInput): Ticket {
   ensureOwnerExists(database, owner);
-  const status = input.status ?? "open";
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "open");
   const position = nextOwnerPosition(database, owner, status);
   const created = database.transaction((tx) => {
     const ticket = insertTicketRecord(tx as unknown as DbClient, input);
@@ -467,12 +471,14 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
     values.description = cleanNullable(input.description) ?? null;
   }
   if (input.status !== undefined) {
+    ensureCatalogEntryExists(database, "workStatus", input.status);
     values.status = input.status;
-    if ((input.status === "resolved" || input.status === "closed") && existing.resolvedAt === null && input.resolvedAt === undefined) {
+    if (isCatalogEntryClosed(database, "workStatus", input.status) && existing.resolvedAt === null && input.resolvedAt === undefined) {
       values.resolvedAt = nowIso();
     }
   }
   if (input.priority !== undefined) {
+    ensureCatalogEntryExists(database, "priority", input.priority);
     values.priority = input.priority;
   }
   if (input.resolution !== undefined) {
@@ -511,12 +517,13 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
 
 export function updateTicketPosition(database: DbClient, id: number, input: TicketPositionInput): Ticket {
   const existing = getTicketRecord(database, id);
+  ensureCatalogEntryExists(database, "workStatus", input.status);
   const values: Partial<Pick<TicketRecord, "status" | "position" | "resolvedAt">> = {
     status: input.status,
     position: input.position
   };
 
-  if ((input.status === "resolved" || input.status === "closed") && existing.resolvedAt === null) {
+  if (isCatalogEntryClosed(database, "workStatus", input.status) && existing.resolvedAt === null) {
     values.resolvedAt = nowIso();
   }
 

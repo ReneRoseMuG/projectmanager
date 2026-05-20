@@ -28,9 +28,12 @@ import { useFeatures } from "../../hooks/useFeatures";
 import { useMilestones } from "../../hooks/useMilestones";
 import { useNotes } from "../../hooks/useNotes";
 import { useProjectFeatureLinks } from "../../hooks/useDocLinks";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useWikiImport } from "../../hooks/useWikiImport";
-import { priorityLabels, projectStatusLabels, taskStatusLabels, taskStatusTones, ticketStatusLabels, ticketStatusTones } from "../../utils/domainLabels";
+import { taskStatusLabels, taskStatusTones, ticketStatusLabels, ticketStatusTones } from "../../utils/domainLabels";
+import { countOpenStatusItems } from "../../utils/catalogs";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { BacklogListBoardView } from "../backlog/BacklogListBoardView";
@@ -58,13 +61,13 @@ import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
 import { PendingRelationList } from "../ui/PendingRelationList";
-import { RadioList } from "../ui/RadioList";
+import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SectionHeader } from "../ui/SectionHeader";
-import { SegmentedControl } from "../ui/SegmentedControl";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
+import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 
@@ -105,34 +108,6 @@ const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "import", label: "Import" }
 ];
 
-const statusOptions: Array<{ value: ProjectStatus; label: string; activeClassName: string }> = [
-  { value: "active", label: projectStatusLabels.active, activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" },
-  { value: "on_hold", label: projectStatusLabels.on_hold, activeClassName: "data-[active=true]:bg-tangerine data-[active=true]:text-white" },
-  { value: "completed", label: projectStatusLabels.completed, activeClassName: "data-[active=true]:bg-violet data-[active=true]:text-white" },
-  { value: "archived", label: projectStatusLabels.archived, activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" }
-];
-
-const taskStatuses = [
-  { value: "todo" as const, label: taskStatusLabels.todo, activeColor: "crimson" as const },
-  { value: "in_progress" as const, label: taskStatusLabels.in_progress, activeColor: "tangerine" as const },
-  { value: "done" as const, label: taskStatusLabels.done, activeColor: "fern" as const }
-];
-
-const ticketStatuses = [
-  { value: "open" as const, label: ticketStatusLabels.open, activeColor: "crimson" as const },
-  { value: "in_progress" as const, label: ticketStatusLabels.in_progress, activeColor: "tangerine" as const },
-  { value: "in_review" as const, label: ticketStatusLabels.in_review, activeColor: "violet" as const },
-  { value: "resolved" as const, label: ticketStatusLabels.resolved, activeColor: "fern" as const },
-  { value: "closed" as const, label: ticketStatusLabels.closed, activeColor: "fern" as const }
-];
-
-const priorities = [
-  { value: "low" as const, label: priorityLabels.low, activeColor: "fern" as const },
-  { value: "medium" as const, label: priorityLabels.medium, activeColor: "violet" as const },
-  { value: "high" as const, label: priorityLabels.high, activeColor: "tangerine" as const },
-  { value: "urgent" as const, label: priorityLabels.urgent, activeColor: "crimson" as const }
-];
-
 const swatches = [
   "var(--color-steel-700)",
   "var(--color-crimson)",
@@ -164,8 +139,11 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
   const allFeatures = useFeatures();
   const milestones = useMilestones(null, projectId);
   const featureLinks = useProjectFeatureLinks(projectId);
+  const taskOwner = projectId ? { type: "project" as const, id: projectId } : undefined;
+  const tasks = useTasks(taskOwner);
   const tickets = useTickets(projectId ? { type: "project", id: projectId } : null);
   const backlog = useBacklog(projectId);
+  const catalogs = useCatalogs();
   const notes = useNotes(projectId ? { type: "project", id: projectId } : null);
   const attachments = useAttachments(projectId ? { type: "project", id: projectId } : null);
   const comments = useEntityComments("project", projectId);
@@ -180,6 +158,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
   const [deleting, setDeleting] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [milestoneViewMode, setMilestoneViewMode] = useState<ViewMode>("kanban");
   const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
@@ -358,13 +337,18 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
   const visibleTabs = project ? baseTabs : baseTabs.filter((tab) => tab.value !== "import");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "milestones") {
-      return { ...tab, count: project ? milestones.milestones.length : undefined };
+      return { ...tab, count: project ? countOpenStatusItems(milestones.milestones, catalogs.entries, "workStatus") : 0 };
     }
     if (tab.value === "features") {
-      return { ...tab, count: project ? featureLinks.features.length : pendingFeatures.length };
+      return { ...tab, count: project ? countOpenStatusItems(featureLinks.features, catalogs.entries, "featureStatus") : countOpenStatusItems(pendingFeatures, catalogs.entries, "featureStatus") };
+    }
+    if (tab.value === "tasks") {
+      const pending = pendingTasks.map((item) => (item.kind === "existing" ? item.task : item.draft));
+      return { ...tab, count: project ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
     }
     if (tab.value === "tickets") {
-      return { ...tab, count: project ? tickets.tickets.length : pendingTickets.length };
+      const pending = pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft));
+      return { ...tab, count: project ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
     }
     if (tab.value === "comments") {
       return { ...tab, count: project ? comments.comments.length : pendingComments.length };
@@ -376,9 +360,9 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       return { ...tab, count: project ? attachments.attachments.length : pendingFiles.length };
     }
     if (tab.value === "backlog") {
-      return { ...tab, count: project ? backlog.items.length : undefined };
+      return { ...tab, count: project ? countOpenStatusItems(backlog.items, catalogs.entries, "workStatus") : 0 };
     }
-    return tab;
+    return { ...tab, count: 0 };
   });
 
   return (
@@ -424,7 +408,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
                   <ColorPicker value={color} onChange={setColor} swatches={swatches} />
                 </FormField>
                 <FormField label="Status">
-                  <SegmentedControl value={status} options={statusOptions} onChange={setStatus} />
+                  <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
                 </FormField>
               </div>
             </Section>
@@ -446,6 +430,8 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
               <MilestoneListBoardView
                 milestones={milestones.milestones}
                 loading={milestones.loading}
+                viewMode={milestoneViewMode}
+                onViewModeChange={setMilestoneViewMode}
                 onCreate={() => navigate(`/milestones/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
                 onEdit={(milestone) => navigate(`/milestones/${milestone.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
                 onDelete={(milestone) => void deleteMilestone(milestone)}
@@ -728,10 +714,10 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <RadioList value={status} options={taskStatuses} onChange={setStatus} />
+            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
           </FormField>
           <FormField label="Priorität">
-            <RadioList value={priority} options={priorities} onChange={setPriority} />
+            <PrioritySelect value={priority} onChange={setPriority} />
           </FormField>
         </div>
         <footer className="flex justify-end gap-2">
@@ -772,10 +758,10 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <RadioList value={status} options={ticketStatuses} onChange={setStatus} />
+            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
           </FormField>
           <FormField label="Priorität">
-            <RadioList value={priority} options={priorities} onChange={setPriority} />
+            <PrioritySelect value={priority} onChange={setPriority} />
           </FormField>
         </div>
         <footer className="flex justify-end gap-2">

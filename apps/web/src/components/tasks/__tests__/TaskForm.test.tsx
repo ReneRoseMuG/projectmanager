@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * Test Scope: TaskModal
+ * Test Scope: TaskForm
  *
  * Create-Modus:
  *  1. Alle Relation-Tabs sichtbar (Aufgaben, Tickets, Kommentare, ...).
@@ -22,12 +22,12 @@
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
 import { addPendingComment, changeInput, clickTab, getFileInput, renderWithProviders, task, ticket } from "../../test/ownerFormTestUtils";
-import { TaskModal } from "../TaskModal";
+import { TaskForm } from "../TaskForm";
 
-describe("TaskModal", () => {
+describe("TaskForm", () => {
   it("bindet das RichTextInlineField an die Aufgabenbeschreibung", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(<TaskModal open task={task} onSubmit={onSubmit} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open task={task} onSubmit={onSubmit} onClose={vi.fn()} />);
 
     expect(screen.getByTestId("task-description-view")).toHaveValue(task.description);
     fireEvent.change(screen.getByTestId("task-description-view"), { target: { value: "<p>Aufgabe aktualisiert</p>" } });
@@ -37,7 +37,7 @@ describe("TaskModal", () => {
   });
 
   it("zeigt im Create-Modus alle erwarteten Verwaltungs-Tabs", () => {
-    renderWithProviders(<TaskModal open onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: /^Subtasks/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Tickets/ })).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe("TaskModal", () => {
   });
 
   it("zeigt im Subtask-Tab PendingRelationList nur mit Neu-erstellen-Aktion", () => {
-    renderWithProviders(<TaskModal open onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     clickTab("Subtasks");
 
@@ -57,7 +57,7 @@ describe("TaskModal", () => {
   });
 
   it("zeigt im Tickets-Tab PendingRelationList statt OwnerTicketBoard", () => {
-    renderWithProviders(<TaskModal open onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     clickTab("Tickets");
 
@@ -66,7 +66,7 @@ describe("TaskModal", () => {
   });
 
   it("zeigt im Kommentare-Tab PendingCommentList", () => {
-    renderWithProviders(<TaskModal open onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     clickTab("Kommentare");
 
@@ -74,7 +74,7 @@ describe("TaskModal", () => {
   });
 
   it("zeigt im Notizen-Tab PendingNoteList", () => {
-    renderWithProviders(<TaskModal open onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     clickTab("Notizen");
 
@@ -82,7 +82,7 @@ describe("TaskModal", () => {
   });
 
   it("zeigt im Dateien-Tab PendingFileList", () => {
-    renderWithProviders(<TaskModal open onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     clickTab("Dateien");
 
@@ -91,7 +91,7 @@ describe("TaskModal", () => {
 
   it("verknüpft ein bestehendes Ticket lokal ohne Submit", async () => {
     const onSubmit = vi.fn();
-    renderWithProviders(<TaskModal open onSubmit={onSubmit} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open onSubmit={onSubmit} onClose={vi.fn()} />);
 
     clickTab("Tickets");
     fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
@@ -102,7 +102,7 @@ describe("TaskModal", () => {
   });
 
   it("erstellt und entfernt einen Subtask-Draft lokal", () => {
-    renderWithProviders(<TaskModal open onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     clickTab("Subtasks");
     fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
@@ -119,7 +119,7 @@ describe("TaskModal", () => {
     const onSubmit = vi.fn().mockResolvedValue(createdTask);
     const onClose = vi.fn();
     const file = new File(["task"], "task.txt", { type: "text/plain" });
-    const { container } = renderWithProviders(<TaskModal open initialStatus="in_progress" onSubmit={onSubmit} onClose={onClose} />);
+    const { container } = renderWithProviders(<TaskForm open initialStatus="in_progress" onSubmit={onSubmit} onClose={onClose} />);
 
     changeInput(0, "Neue Aufgabe");
     clickTab("Subtasks");
@@ -156,7 +156,7 @@ describe("TaskModal", () => {
   });
 
   it("setzt Pending-Listen nach Schließen und erneutem Öffnen zurück", () => {
-    const { rerender } = renderWithProviders(<TaskModal open onSubmit={vi.fn()} onClose={vi.fn()} />);
+    const { rerender } = renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     clickTab("Subtasks");
     fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
@@ -164,8 +164,8 @@ describe("TaskModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Vormerken" }));
     expect(screen.getByText("Reset-Subtask")).toBeInTheDocument();
 
-    rerender(<TaskModal open={false} onSubmit={vi.fn()} onClose={vi.fn()} />);
-    rerender(<TaskModal open onSubmit={vi.fn()} onClose={vi.fn()} />);
+    rerender(<TaskForm open={false} onSubmit={vi.fn()} onClose={vi.fn()} />);
+    rerender(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
     clickTab("Subtasks");
 
     expect(screen.queryByText("Reset-Subtask")).not.toBeInTheDocument();
@@ -173,7 +173,7 @@ describe("TaskModal", () => {
   });
 
   it("zeigt im Edit-Modus OwnerTicketBoard im Tickets-Tab", () => {
-    renderWithProviders(<TaskModal open task={task} onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open task={task} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     clickTab("Tickets");
 
@@ -181,7 +181,7 @@ describe("TaskModal", () => {
   });
 
   it("zeigt im Edit-Modus CommentThread, NoteList und AttachmentList", () => {
-    renderWithProviders(<TaskModal open task={task} onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open task={task} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     clickTab("Kommentare");
     expect(screen.getByTestId("comment-thread")).toHaveTextContent("Aufgabe:1");

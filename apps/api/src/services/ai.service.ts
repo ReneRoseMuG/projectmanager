@@ -602,8 +602,7 @@ function backlogInput(payload: JsonObject): BacklogItemInput {
     description: nullableTextField(payload, "description"),
     featureId: numberField(payload, "featureId") ?? null,
     useCaseId: numberField(payload, "useCaseId") ?? null,
-    status: enumField(payload, "status", ["open", "in_progress", "done", "rejected"] as const),
-    priority: enumField(payload, "priority", PRIORITIES),
+    status: enumField(payload, "status", TASK_STATUSES),
     importKey: nullableTextField(payload, "importKey"),
     sortOrder: numberField(payload, "sortOrder")
   };

@@ -8,7 +8,7 @@ import { createTaskNote } from "../api/notes";
 import { createSubtask, type TaskOwner } from "../api/tasks";
 import { setTaskTags } from "../api/tags";
 import { createOwnerTicket, linkOwnerTicket } from "../api/tickets";
-import { TaskModal, type TaskModalInput } from "../components/tasks/TaskModal";
+import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
@@ -49,7 +49,7 @@ export function TaskDetailPage() {
 
   const closePage = () => navigate(returnTo);
 
-  const submitTask = async (input: TaskModalInput): Promise<Task | void> => {
+  const submitTask = async (input: TaskFormInput): Promise<Task | void> => {
     const { tagIds, pendingSubtasks, pendingTickets, pendingComments, pendingNotes, pendingFiles, ...taskInput } = input;
 
     if (!isCreateMode && detail.task) {
@@ -141,12 +141,11 @@ export function TaskDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <TaskModal
+      <TaskForm
         open
         task={detail.task}
         initialStatus={parseTaskStatus(searchParams.get("status"))}
         variant="page"
-        closeOnSubmit={false}
         savingLabel={savingLabel}
         onSubmit={submitTask}
         onClose={closePage}

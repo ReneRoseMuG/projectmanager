@@ -1,13 +1,13 @@
 import type { Task } from "@taskmanager/shared-types";
 import { CalendarClock, CheckCircle2, Edit3, Trash2 } from "lucide-react";
 import { formatHumanDate, isOverdue } from "../../utils/date";
-import { priorityBadgeTones, priorityLabels, taskStatusLabels, taskStatusTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
-import { Pill } from "../ui/Pill";
+import { PriorityBadge } from "../ui/PriorityBadge";
+import { StatusPill } from "../ui/StatusPill";
 
 interface TaskCardProps {
   task: Task;
@@ -17,7 +17,7 @@ interface TaskCardProps {
   onDelete?: (task: Task) => void;
 }
 
-const priorityAccent: Record<Task["priority"], string> = {
+const priorityAccent: Record<string, string> = {
   urgent: "var(--color-crimson)",
   high: "var(--color-tangerine)",
   medium: "var(--color-mustard)",
@@ -42,7 +42,7 @@ export function TaskCard({ task, compact = false, variant = "card", onOpen, onDe
 
   return (
     <ItemCard
-      accentColor={priorityAccent[task.priority]}
+      accentColor={priorityAccent[task.priority] ?? "var(--color-steel-400)"}
       header={<TaskCardHeader task={task} />}
       body={<TaskCardBody description={description} />}
       footer={<TaskCardFooter task={task} />}
@@ -59,8 +59,8 @@ function TaskCardHeader({ task }: { task: Task }) {
     <div className="grid gap-2">
       <h3 className="line-clamp-2 text-sm font-semibold text-ink">{task.title}</h3>
       <div className="flex flex-wrap items-center gap-2">
-        <Pill tone={taskStatusTones[task.status]}>{taskStatusLabels[task.status]}</Pill>
-        <Badge tone={priorityBadgeTones[task.priority]}>{priorityLabels[task.priority]}</Badge>
+        <StatusPill kind="workStatus" value={task.status} />
+        <PriorityBadge value={task.priority} />
       </div>
     </div>
   );
@@ -112,12 +112,12 @@ function TaskRow({ task, description, onOpen, onDelete }: { task: Task; descript
   return (
     <div className="hidden md:block">
       <ItemRow
-        accentColor={priorityAccent[task.priority]}
+        accentColor={priorityAccent[task.priority] ?? "var(--color-steel-400)"}
         title={task.title}
         description={description}
         pills={
           <>
-            <Pill tone={taskStatusTones[task.status]}>{taskStatusLabels[task.status]}</Pill>
+            <StatusPill kind="workStatus" value={task.status} />
             {primaryTag ? <Badge tone={tagTones[0]}>{primaryTag.name}</Badge> : <Badge tone="mute">Ohne Tag</Badge>}
           </>
         }

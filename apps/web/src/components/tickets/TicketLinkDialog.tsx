@@ -4,15 +4,16 @@ import { Bug, LinkIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getTickets } from "../../api/tickets";
 import { queryKeys } from "../../queries/queryKeys";
-import { priorityBadgeTones, priorityLabels, ticketStatusLabels, ticketStatusTones, ticketTypeLabels, ticketTypeTones } from "../../utils/domainLabels";
+import { ticketTypeLabels, ticketTypeTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { Modal } from "../ui/Modal";
-import { Pill } from "../ui/Pill";
+import { PriorityBadge } from "../ui/PriorityBadge";
 import { SearchInput } from "../ui/SearchInput";
 import { TaskListSkeleton } from "../ui/Skeleton";
+import { StatusPill } from "../ui/StatusPill";
 
 interface TicketLinkDialogProps {
   open: boolean;
@@ -70,9 +71,9 @@ export function TicketLinkDialog({ open, currentTickets, excludeIds = [], onLink
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="truncate text-sm font-semibold text-ink">{ticket.title}</span>
-                      <Pill tone={ticketStatusTones[ticket.status]}>{ticketStatusLabels[ticket.status]}</Pill>
+                      <StatusPill kind="workStatus" value={ticket.status} />
                       <Badge tone={ticketTypeTones[ticket.type]}>{ticketTypeLabels[ticket.type]}</Badge>
-                      <Badge tone={priorityBadgeTones[ticket.priority]}>{priorityLabels[ticket.priority]}</Badge>
+                      <PriorityBadge value={ticket.priority} />
                     </div>
                     {description ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{description}</p> : null}
                   </div>

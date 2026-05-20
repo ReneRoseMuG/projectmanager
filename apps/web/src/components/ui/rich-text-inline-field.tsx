@@ -10,7 +10,7 @@
 // components/milestones/MilestoneForm.tsx         | description              | milestone-description
 // components/notes/NoteEditor.tsx                 | content                  | note-editor-content
 // components/projects/ProjectForm.tsx             | description              | project-description
-// components/tasks/TaskModal.tsx                  | description              | task-description
+// components/tasks/TaskForm.tsx                   | description              | task-description
 // components/tickets/TicketForm.tsx               | description              | ticket-description
 // components/ui/CommentThread.tsx                 | comment.body readOnly    | comment-thread-comment-${comment.id}-body
 // components/ui/CommentThread.tsx                 | draft body               | comment-thread-body

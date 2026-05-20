@@ -18,14 +18,14 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ViewMode } from "../../../types";
 import { ProjectFeaturePanel } from "../../features/ProjectFeaturePanel";
-import { buildFeatureSet } from "./factories";
+import { buildFeature, buildFeatureSet } from "./factories";
 
 function renderProjectFeaturePanel({
   features = buildFeatureSet(),
   viewMode = "kanban",
   onViewModeChange = vi.fn(),
   onCreate = vi.fn(),
-  onOpen = vi.fn()
+  onOpen = vi.fn(),
 }: {
   features?: Feature[];
   viewMode?: ViewMode;
@@ -34,7 +34,13 @@ function renderProjectFeaturePanel({
   onOpen?: (feature: Feature) => void;
 } = {}) {
   return render(
-    <ProjectFeaturePanel features={features} viewMode={viewMode} onViewModeChange={onViewModeChange} onCreate={onCreate} onOpen={onOpen} />
+    <ProjectFeaturePanel
+      features={features}
+      viewMode={viewMode}
+      onViewModeChange={onViewModeChange}
+      onCreate={onCreate}
+      onOpen={onOpen}
+    />,
   );
 }
 
@@ -50,20 +56,34 @@ describe("ProjectFeaturePanel", () => {
     expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Neues Feature" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Neues Feature" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Neues Feature")).not.toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns).toHaveLength(4);
-    expect(screen.getByRole("heading", { name: "Entwurf" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Entwurf" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Aktiv" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Erledigt" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Archiviert" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Erledigt" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Archiviert" }),
+    ).toBeInTheDocument();
 
-    const activeColumn = screen.getByRole("heading", { name: "Aktiv" }).closest("section");
+    const activeColumn = screen
+      .getByRole("heading", { name: "Aktiv" })
+      .closest("section");
     expect(activeColumn).toContainElement(screen.getByText("Feature Aktiv"));
-    const archivedColumn = screen.getByRole("heading", { name: "Archiviert" }).closest("section");
-    expect(archivedColumn).toContainElement(screen.getByText("Feature Archiviert"));
+    const archivedColumn = screen
+      .getByRole("heading", { name: "Archiviert" })
+      .closest("section");
+    expect(archivedColumn).toContainElement(
+      screen.getByText("Feature Archiviert"),
+    );
   });
 
   it("begrenzt Board-Karten auf die Breite ihrer Statusspalten", () => {
@@ -86,15 +106,23 @@ describe("ProjectFeaturePanel", () => {
   it("bietet keine projektseitige Relation-Auswahl oder Speichern-Aktion an", () => {
     const { container } = renderProjectFeaturePanel();
 
-    expect(container.querySelector('input[type="checkbox"]')).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Speichern" })).not.toBeInTheDocument();
+    expect(
+      container.querySelector('input[type="checkbox"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Speichern" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/verknüpft/i)).not.toBeInTheDocument();
   });
 
   it("rendert den Listenmodus als Ergebniszeilen und öffnet Features", () => {
     const features = buildFeatureSet();
     const onOpen = vi.fn();
-    const { container } = renderProjectFeaturePanel({ features, viewMode: "list", onOpen });
+    const { container } = renderProjectFeaturePanel({
+      features,
+      viewMode: "list",
+      onOpen,
+    });
 
     expect(container.querySelector("table")).not.toBeInTheDocument();
     const rows = container.querySelectorAll("article.rounded-xl");
@@ -105,10 +133,34 @@ describe("ProjectFeaturePanel", () => {
 
     const activeRow = screen.getByText("Feature Aktiv").closest("article");
     expect(activeRow).toBeInTheDocument();
-    expect(within(activeRow as HTMLElement).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
+    expect(activeRow?.querySelector(".w-52")).toBeInTheDocument();
+    expect(activeRow?.querySelector(".w-72")).toBeInTheDocument();
+    expect(
+      within(activeRow as HTMLElement).getByRole("button", {
+        name: "Bearbeiten",
+      }),
+    ).toBeInTheDocument();
     fireEvent.doubleClick(activeRow as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledWith(features[1]);
+  });
+
+  it("rendert fehlende Feature-Metadaten ohne undefined-Ausgabe", () => {
+    const feature = buildFeature({
+      id: 99,
+      title: "Feature ohne Metadaten",
+      slug: undefined as unknown as string,
+      useCaseCount: undefined as unknown as number,
+    });
+
+    renderProjectFeaturePanel({ features: [feature], viewMode: "list" });
+
+    const row = screen.getByText("Feature ohne Metadaten").closest("article");
+    expect(row).toBeInTheDocument();
+    expect(
+      within(row as HTMLElement).getByText("0 Use Cases"),
+    ).toBeInTheDocument();
+    expect(row).not.toHaveTextContent("undefined");
   });
 
   it("meldet Moduswechsel über Callback", () => {
@@ -124,8 +176,12 @@ describe("ProjectFeaturePanel", () => {
     const { container } = renderProjectFeaturePanel({ features: [] });
 
     expect(screen.getByText("Keine Features")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Neues Feature" })).toHaveLength(1);
-    expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Neues Feature" }),
+    ).toHaveLength(1);
+    expect(
+      container.querySelector("article.rounded-xl"),
+    ).not.toBeInTheDocument();
     expect(container.querySelector("table")).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { PROJECT_STATUSES, type Project, type ProjectStatus } from "@taskmanager/shared-types";
+import type { Project, ProjectStatus } from "@taskmanager/shared-types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ProjectListBoardView } from "../components/projects/ProjectListBoardView";
@@ -6,24 +6,26 @@ import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
+import { useCatalogs } from "../hooks/useCatalogs";
 import { useProjects } from "../hooks/useProjects";
-import { projectStatusLabels } from "../utils/domainLabels";
+import { catalogEntriesByKind } from "../utils/catalogs";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
   const { projects, loading, error, removeProject } = useProjects();
+  const catalogs = useCatalogs();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
 
   const statusOptions = useMemo(
     () =>
-      PROJECT_STATUSES.map((status) => ({
-        value: status,
-        label: projectStatusLabels[status],
-        count: projects.filter((project) => project.status === status).length
+      catalogEntriesByKind(catalogs.entries, "workStatus").map((entry) => ({
+        value: entry.key,
+        label: entry.label,
+        count: projects.filter((project) => project.status === entry.key).length
       })),
-    [projects]
+    [catalogs.entries, projects]
   );
 
   const filteredProjects = useMemo(() => {

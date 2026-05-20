@@ -4,6 +4,7 @@ import {
   TASK_STATUSES,
   type BacklogItem,
   type Feature,
+  type Milestone,
   type Project,
   type ProjectStatus,
   type Tag,
@@ -60,6 +61,30 @@ export function buildProject(overrides: Partial<Project> = {}): Project {
     openTaskCount: 3,
     doneTaskCount: 2,
     totalTaskCount: 5,
+    tags: [buildTag()],
+    ...overrides
+  };
+}
+
+export function buildMilestone(overrides: Partial<Milestone> = {}): Milestone {
+  return {
+    id: 1,
+    projectId: 1,
+    name: "Meilenstein Aktiv",
+    description: "Meilenstein zur Bündelung der Projektarbeit",
+    status: "active",
+    color: "#0f766e",
+    startDate: "2026-02-01",
+    dueDate: "2026-03-01",
+    version: 1,
+    createdAt,
+    updatedAt,
+    taskCount: 5,
+    openTaskCount: 3,
+    doneTaskCount: 2,
+    totalTaskCount: 5,
+    ticketCount: 1,
+    featureCount: 2,
     tags: [buildTag()],
     ...overrides
   };
@@ -130,7 +155,6 @@ export function buildBacklogItem(overrides: Partial<BacklogItem> = {}): BacklogI
     title: "Passwort-Reset",
     description: "Passwort-Reset implementieren",
     status: "open",
-    priority: "medium",
     importKey: null,
     sortOrder: 1,
     version: 1,
@@ -147,6 +171,18 @@ export function buildProjectSet(): Project[] {
       name: `Projekt ${projectStatusLabels[status]}`,
       status,
       color: ["#4f46e5", "#b45309", "#15803d", "#475569"][index],
+      tags: [buildTag({ id: index + 1, name: `Tag ${projectStatusLabels[status]}` })]
+    })
+  );
+}
+
+export function buildMilestoneSet(): Milestone[] {
+  return PROJECT_STATUSES.map((status, index) =>
+    buildMilestone({
+      id: index + 1,
+      name: `Meilenstein ${projectStatusLabels[status]}`,
+      status,
+      color: ["#0f766e", "#b45309", "#7c3aed", "#475569"][index],
       tags: [buildTag({ id: index + 1, name: `Tag ${projectStatusLabels[status]}` })]
     })
   );

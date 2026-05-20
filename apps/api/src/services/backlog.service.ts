@@ -3,16 +3,15 @@ import type { DbClient } from "../db/client.js";
 import { features, projects, useCases } from "../db/schema.js";
 import { backlogItemRepository, type BacklogItemRecord, type BacklogItemUpdateData } from "../repositories/backlog-item.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
+import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 
 type BacklogStatus = BacklogItemRecord["status"];
-type BacklogPriority = BacklogItemRecord["priority"];
 
 export interface BacklogInput {
   title?: string;
   description?: string | null;
   status?: BacklogStatus;
-  priority?: BacklogPriority;
   importKey?: string | null;
   featureId?: number | null;
   useCaseId?: number | null;
@@ -34,7 +33,6 @@ export interface BacklogDto {
   title: string;
   description: string | null;
   status: BacklogStatus;
-  priority: BacklogPriority;
   importKey: string | null;
   sortOrder: number;
   version: number;
@@ -51,7 +49,6 @@ function mapBacklogItem(record: BacklogItemRecord): BacklogDto {
     title: record.title,
     description: record.description,
     status: record.status,
-    priority: record.priority,
     importKey: record.importKey,
     sortOrder: record.sortOrder,
     version: record.version,
@@ -97,20 +94,6 @@ function getBacklogRecord(database: DbClient, id: number): BacklogItemRecord {
   return item;
 }
 
-function ensureStatusTransition(current: BacklogStatus, next: BacklogStatus): void {
-  if (current === next) {
-    return;
-  }
-
-  const allowed =
-    (current === "open" && (next === "in_progress" || next === "rejected")) ||
-    (current === "in_progress" && next === "done");
-
-  if (!allowed) {
-    throw badRequest(`Invalid backlog status transition from ${current} to ${next}`);
-  }
-}
-
 export function listBacklogItems(database: DbClient, projectId: number, filters: BacklogFilters): BacklogDto[] {
   ensureProjectExists(database, projectId);
 
@@ -121,6 +104,8 @@ export function createBacklogItem(database: DbClient, projectId: number, input: 
   ensureProjectExists(database, projectId);
   ensureFeatureExists(database, input.featureId);
   ensureUseCaseExists(database, input.useCaseId);
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "open");
+  ensureCatalogEntryExists(database, "workStatus", status);
 
   const created = backlogItemRepository.create(database, {
     projectId,
@@ -128,8 +113,7 @@ export function createBacklogItem(database: DbClient, projectId: number, input: 
     useCaseId: input.useCaseId ?? null,
     title: requireNonEmpty(input.title, "title"),
     description: cleanNullable(input.description) ?? null,
-    status: input.status ?? "open",
-    priority: input.priority ?? "medium",
+    status,
     importKey: cleanNullable(input.importKey) ?? null,
     sortOrder: input.sortOrder ?? 0
   });
@@ -142,7 +126,7 @@ export function getBacklogItem(database: DbClient, id: number): BacklogDto {
 }
 
 export function updateBacklogItem(database: DbClient, id: number, input: BacklogInput): BacklogDto {
-  const current = getBacklogRecord(database, id);
+  getBacklogRecord(database, id);
   const values: BacklogItemUpdateData = {};
 
   if (input.title !== undefined) {
@@ -152,11 +136,8 @@ export function updateBacklogItem(database: DbClient, id: number, input: Backlog
     values.description = cleanNullable(input.description) ?? null;
   }
   if (input.status !== undefined) {
-    ensureStatusTransition(current.status, input.status);
+    ensureCatalogEntryExists(database, "workStatus", input.status);
     values.status = input.status;
-  }
-  if (input.priority !== undefined) {
-    values.priority = input.priority;
   }
   if (input.importKey !== undefined) {
     values.importKey = cleanNullable(input.importKey) ?? null;

@@ -3,8 +3,11 @@ import { ClipboardList, ListChecks, Paperclip, StickyNote } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import type { DraftFile } from "../../types";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { useTickets } from "../../hooks/useTickets";
+import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed } from "../../utils/catalogs";
 import { toDateInput } from "../../utils/date";
-import { priorityLabels, priorityPillTones, taskStatusLabels, taskStatusTones, ticketStatusLabels, ticketStatusTones, ticketTypeLabels } from "../../utils/domainLabels";
+import { priorityPillTones, ticketTypeLabels } from "../../utils/domainLabels";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useNotes } from "../../hooks/useNotes";
@@ -27,21 +30,23 @@ import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { Pill } from "../ui/Pill";
-import { RadioList } from "../ui/RadioList";
+import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SectionHeader } from "../ui/SectionHeader";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
+import { StatusPill } from "../ui/StatusPill";
+import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 import { SubtaskList } from "./SubtaskList";
 
-interface TaskModalProps {
+interface TaskFormProps {
   open: boolean;
   task?: Task | null;
   initialStatus?: TaskStatus;
-  onSubmit: (input: TaskModalInput) => Promise<Task | void>;
+  onSubmit: (input: TaskFormInput) => Promise<Task | void>;
   onClose: () => void;
   onChanged?: () => Promise<void>;
   savingLabel?: string;
@@ -49,7 +54,7 @@ interface TaskModalProps {
   closeOnSubmit?: boolean;
 }
 
-export interface TaskModalInput extends TaskInput {
+export interface TaskFormInput extends TaskInput {
   tagIds: number[];
   pendingSubtasks: DraftSubtask[];
   pendingTickets: DraftTicket[];
@@ -58,9 +63,9 @@ export interface TaskModalInput extends TaskInput {
   pendingFiles: DraftFile[];
 }
 
-type TaskModalTab = "details" | "subtasks" | "tickets" | "comments" | "notes" | "attachments";
+type TaskFormTab = "details" | "subtasks" | "tickets" | "comments" | "notes" | "attachments";
 
-const tabs: Array<Tab<TaskModalTab>> = [
+const tabs: Array<Tab<TaskFormTab>> = [
   { value: "details", label: "Details" },
   { value: "subtasks", label: "Subtasks" },
   { value: "tickets", label: "Tickets" },
@@ -69,28 +74,17 @@ const tabs: Array<Tab<TaskModalTab>> = [
   { value: "attachments", label: "Dateien" }
 ];
 
-const statuses: Array<{ value: TaskStatus; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
-  { value: "todo", label: taskStatusLabels.todo, activeColor: "crimson" },
-  { value: "in_progress", label: taskStatusLabels.in_progress, activeColor: "tangerine" },
-  { value: "done", label: taskStatusLabels.done, activeColor: "fern" }
-];
-
-const priorities: Array<{ value: Priority; label: string; activeColor: "fern" | "tangerine" | "crimson" | "violet" }> = [
-  { value: "low", label: priorityLabels.low, activeColor: "fern" },
-  { value: "medium", label: priorityLabels.medium, activeColor: "violet" },
-  { value: "high", label: priorityLabels.high, activeColor: "tangerine" },
-  { value: "urgent", label: priorityLabels.urgent, activeColor: "crimson" }
-];
-
-export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClose, onChanged, savingLabel, variant = "modal", closeOnSubmit = true }: TaskModalProps) {
+export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose, onChanged, savingLabel, variant = "modal", closeOnSubmit = true }: TaskFormProps) {
   const taskId = task?.id ?? null;
   const detail = useTaskDetail(open && taskId ? taskId : null);
   const ticketOwner = taskId && open ? { type: "task" as const, id: taskId } : null;
+  const tickets = useTickets(ticketOwner);
+  const catalogs = useCatalogs();
   const notes = useNotes(taskId && open ? { type: "task", id: taskId } : null);
   const attachments = useAttachments(taskId && open ? { type: "task", id: taskId } : null);
   const { showToast } = useToast();
   const { confirm } = useConfirm();
-  const [activeTab, setActiveTab] = useState<TaskModalTab>("details");
+  const [activeTab, setActiveTab] = useState<TaskFormTab>("details");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>("todo");
@@ -190,10 +184,11 @@ export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClos
 
   const tabItems = tabs.map((tab) => {
     if (tab.value === "subtasks") {
-      return { ...tab, count: task ? detail.task?.subtasks.length ?? 0 : pendingSubtasks.length };
+      return { ...tab, count: task ? countOpenStatusItems(detail.task?.subtasks ?? [], catalogs.entries, "workStatus") : countOpenStatusItems(pendingSubtasks, catalogs.entries, "workStatus") };
     }
     if (tab.value === "tickets") {
-      return { ...tab, count: task ? undefined : pendingTickets.length };
+      const pending = pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft));
+      return { ...tab, count: task ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
     }
     if (tab.value === "comments") {
       return { ...tab, count: task ? detail.task?.comments.length ?? 0 : pendingComments.length };
@@ -204,7 +199,7 @@ export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClos
     if (tab.value === "attachments") {
       return { ...tab, count: task ? attachments.attachments.length : pendingFiles.length };
     }
-    return tab;
+    return { ...tab, count: 0 };
   });
   const loadedTask = detail.task;
 
@@ -222,8 +217,8 @@ export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClos
         variant={variant}
         headerMeta={
           <div className="flex flex-wrap gap-2">
-            <Pill tone={taskStatusTones[status]}>{taskStatusLabels[status]}</Pill>
-            <Pill tone={priorityPillTones[priority]}>{priorityLabels[priority]}</Pill>
+            <StatusPill kind="workStatus" value={status} />
+            <Pill tone={priorityPillTones[priority] ?? "steel"}>{catalogLabel(catalogs.entries, "priority", priority)}</Pill>
           </div>
         }
       >
@@ -248,10 +243,10 @@ export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClos
             <Section title="Status & Priorität">
               <div className="grid items-start gap-4 md:grid-cols-2">
                 <FormField label="Status">
-                  <RadioList value={status} options={statuses} onChange={setStatus} />
+                  <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
                 </FormField>
                 <FormField label="Priorität">
-                  <RadioList value={priority} options={priorities} onChange={setPriority} />
+                  <PrioritySelect value={priority} onChange={setPriority} />
                 </FormField>
               </div>
             </Section>
@@ -328,7 +323,14 @@ export function TaskModal({ open, task, initialStatus = "todo", onSubmit, onClos
               <PendingRelationList
                 existingItems={pendingTickets.flatMap((item) =>
                   item.kind === "existing"
-                    ? [{ id: item.ticket.id, title: item.ticket.title, statusLabel: ticketStatusLabels[item.ticket.status], statusTone: ticketStatusTones[item.ticket.status] }]
+                    ? [
+                        {
+                          id: item.ticket.id,
+                          title: item.ticket.title,
+                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.ticket.status),
+                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.ticket.status) ? "steel" : "fern"
+                        }
+                      ]
                     : []
                 )}
                 draftItems={pendingTickets.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
@@ -522,10 +524,10 @@ function SubtaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
       <Section title="Status & Priorität">
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <RadioList value={status} options={statuses} onChange={setStatus} />
+            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
           </FormField>
           <FormField label="Priorität">
-            <RadioList value={priority} options={priorities} onChange={setPriority} />
+            <PrioritySelect value={priority} onChange={setPriority} />
           </FormField>
         </div>
       </Section>
@@ -572,10 +574,10 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
       <Section title="Status & Priorität">
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <RadioList value={status} options={ticketStatusOptions} onChange={setStatus} />
+            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
           </FormField>
           <FormField label="Priorität">
-            <RadioList value={priority} options={priorities} onChange={setPriority} />
+            <PrioritySelect value={priority} onChange={setPriority} />
           </FormField>
         </div>
       </Section>
@@ -583,10 +585,3 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
   );
 }
 
-const ticketStatusOptions = [
-  { value: "open" as const, label: ticketStatusLabels.open, activeColor: "crimson" as const },
-  { value: "in_progress" as const, label: ticketStatusLabels.in_progress, activeColor: "tangerine" as const },
-  { value: "in_review" as const, label: ticketStatusLabels.in_review, activeColor: "violet" as const },
-  { value: "resolved" as const, label: ticketStatusLabels.resolved, activeColor: "fern" as const },
-  { value: "closed" as const, label: ticketStatusLabels.closed, activeColor: "fern" as const }
-];

@@ -3,7 +3,6 @@ import { Bug } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
-import { ticketStatusLabels } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
@@ -21,14 +20,6 @@ interface TicketListBoardViewProps {
   filters?: ReactNode;
   loading?: boolean;
 }
-
-const statusColumns = [
-  { value: "open", label: ticketStatusLabels.open },
-  { value: "in_progress", label: ticketStatusLabels.in_progress },
-  { value: "in_review", label: ticketStatusLabels.in_review },
-  { value: "resolved", label: ticketStatusLabels.resolved },
-  { value: "closed", label: ticketStatusLabels.closed }
-];
 
 function toListBoardMode(viewMode: ViewMode): ListBoardMode {
   return viewMode === "kanban" ? "board" : "list";
@@ -70,7 +61,7 @@ export function TicketListBoardView({ tickets, viewMode, onViewModeChange, onAdd
       onAddToColumn={(columnStatus) => (onAddStatus ? onAddStatus(columnStatus as Ticket["status"]) : onAdd())}
       addLabel="Neues Ticket"
       statusKey="status"
-      statusColumns={statusColumns}
+      statusCatalogKind="workStatus"
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={filters}

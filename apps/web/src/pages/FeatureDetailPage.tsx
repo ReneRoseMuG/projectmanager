@@ -140,7 +140,6 @@ export function FeatureDetailPage() {
         open
         feature={features.feature}
         variant="page"
-        closeOnSubmit={false}
         onSubmit={saveFeature}
         onDelete={deleteFeature}
         savingLabel={savingLabel}

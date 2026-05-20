@@ -191,6 +191,19 @@ describe("ProjectForm", () => {
     expect(screen.getByTestId("owner-ticket-board")).toHaveTextContent(`project:${project.id}`);
   });
 
+  it("behält im Meilenstein-Tab die Listenansicht nach Tabwechsel", () => {
+    renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    clickTab("Meilensteine");
+    fireEvent.click(screen.getByRole("button", { name: "Liste" }));
+    expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("bg-steel-700");
+
+    clickTab("Features");
+    clickTab("Meilensteine");
+
+    expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("bg-steel-700");
+  });
+
   it("zeigt im Edit-Modus CommentThread, NoteList, AttachmentList, Backlog und Import", () => {
     renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
 

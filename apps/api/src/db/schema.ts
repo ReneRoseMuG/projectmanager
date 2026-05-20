@@ -2,16 +2,18 @@ import { sql } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { check, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-export const PROJECT_STATUSES = ["active", "on_hold", "completed", "archived"] as const;
-export const TASK_STATUSES = ["todo", "in_progress", "done"] as const;
+export const WORK_STATUSES = ["active", "on_hold", "completed", "archived", "todo", "open", "in_progress", "in_review", "done", "resolved", "closed", "rejected"] as const;
+export const PROJECT_STATUSES = WORK_STATUSES;
+export const TASK_STATUSES = WORK_STATUSES;
 export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export const FEATURE_STATUSES = ["draft", "active", "done", "archived"] as const;
 export const FEATURE_RELATION_TYPES = ["related", "depends_on", "consumed_by"] as const;
-export const BACKLOG_STATUSES = ["open", "in_progress", "done", "rejected"] as const;
+export const BACKLOG_STATUSES = WORK_STATUSES;
 export const TICKET_TYPES = ["bug", "improvement", "question", "task"] as const;
-export const TICKET_STATUSES = ["open", "in_progress", "in_review", "resolved", "closed"] as const;
+export const TICKET_STATUSES = WORK_STATUSES;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
+export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority"] as const;
 
 export const appSettings = sqliteTable("app_settings", {
   key: text("key").primaryKey(),
@@ -28,11 +30,31 @@ export const users = sqliteTable("users", {
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
 
+export const catalogEntries = sqliteTable(
+  "catalog_entries",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    kind: text("kind", { enum: CATALOG_KINDS }).notNull(),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    sortOrder: real("sort_order").notNull().default(0),
+    isClosed: integer("is_closed", { mode: "boolean" }).notNull().default(false),
+    version: integer("version").notNull().default(1),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    catalogEntryKindKeyUnique: uniqueIndex("catalog_entries_kind_key_unique").on(table.kind, table.key)
+  })
+);
+
 export const projects = sqliteTable("projects", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   description: text("description"),
-  status: text("status", { enum: PROJECT_STATUSES }).notNull().default("active"),
+  status: text("status").notNull().default("active"),
   color: text("color").default("#6366f1"),
   startDate: text("start_date"),
   dueDate: text("due_date"),
@@ -50,7 +72,7 @@ export const milestones = sqliteTable("milestones", {
     .references(() => projects.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
-  status: text("status", { enum: PROJECT_STATUSES }).notNull().default("active"),
+  status: text("status").notNull().default("active"),
   color: text("color").default("#6366f1"),
   startDate: text("start_date"),
   dueDate: text("due_date"),
@@ -68,8 +90,8 @@ export const tasks = sqliteTable(
     parentId: integer("parent_id").references((): AnySQLiteColumn => tasks.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     description: text("description"),
-    status: text("status", { enum: TASK_STATUSES }).notNull().default("todo"),
-    priority: text("priority", { enum: PRIORITIES }).notNull().default("medium"),
+    status: text("status").notNull().default("todo"),
+    priority: text("priority").notNull().default("medium"),
     assignee: text("assignee"),
     dueDate: text("due_date"),
     importKey: text("import_key"),
@@ -427,7 +449,7 @@ export const features = sqliteTable("features", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
   slug: text("slug").notNull().unique(),
-  status: text("status", { enum: FEATURE_STATUSES }).notNull().default("draft"),
+  status: text("status").notNull().default("draft"),
   description: text("description"),
   contentPath: text("content_path"),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -445,7 +467,7 @@ export const useCases = sqliteTable("use_cases", {
     .references(() => features.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   slug: text("slug").notNull().unique(),
-  status: text("status", { enum: FEATURE_STATUSES }).notNull().default("draft"),
+  status: text("status").notNull().default("draft"),
   description: text("description"),
   contentPath: text("content_path"),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -502,8 +524,7 @@ export const backlogItems = sqliteTable(
     useCaseId: integer("use_case_id").references(() => useCases.id, { onDelete: "set null" }),
     title: text("title").notNull(),
     description: text("description"),
-    status: text("status", { enum: BACKLOG_STATUSES }).notNull().default("open"),
-    priority: text("priority", { enum: PRIORITIES }).notNull().default("medium"),
+    status: text("status").notNull().default("open"),
     importKey: text("import_key"),
     sortOrder: integer("sort_order").notNull().default(0),
     version: integer("version").notNull().default(1),
@@ -605,8 +626,8 @@ export const tickets = sqliteTable("tickets", {
   type: text("type", { enum: TICKET_TYPES }).notNull().default("bug"),
   title: text("title").notNull(),
   description: text("description"),
-  status: text("status", { enum: TICKET_STATUSES }).notNull().default("open"),
-  priority: text("priority", { enum: PRIORITIES }).notNull().default("medium"),
+  status: text("status").notNull().default("open"),
+  priority: text("priority").notNull().default("medium"),
   resolution: text("resolution", { enum: TICKET_RESOLUTIONS }),
   reporter: text("reporter"),
   assignee: text("assignee"),

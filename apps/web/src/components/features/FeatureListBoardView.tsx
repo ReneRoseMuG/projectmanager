@@ -1,4 +1,4 @@
-import type { Feature, FeatureStatus } from "@taskmanager/shared-types";
+import type { Feature } from "@taskmanager/shared-types";
 import { BookOpen } from "lucide-react";
 import { useMemo, useState } from "react";
 import { richTextToPlainText } from "../../utils/richText";
@@ -13,13 +13,6 @@ interface FeatureListBoardViewProps {
   onDelete: (feature: Feature) => void;
   filters?: React.ReactNode;
 }
-
-const statusColumns: Array<{ value: FeatureStatus; label: string }> = [
-  { value: "draft", label: "Entwurf" },
-  { value: "active", label: "Aktiv" },
-  { value: "done", label: "Erledigt" },
-  { value: "archived", label: "Archiviert" }
-];
 
 function matchesSearch(feature: Feature, searchValue: string) {
   const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
@@ -44,7 +37,7 @@ export function FeatureListBoardView({ features, onCreate, onOpen, onDelete, fil
       onAddToColumn={onCreate}
       addLabel="Neues Feature"
       statusKey="status"
-      statusColumns={statusColumns}
+      statusCatalogKind="featureStatus"
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={filters}

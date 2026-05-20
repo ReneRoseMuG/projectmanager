@@ -10,6 +10,36 @@ import { assertSafeTestDatabasePath, vitestRuntimeRoot } from "../../src/runtime
 
 export type TestDb = ReturnType<typeof createTestDb>;
 
+const defaultCatalogEntries = [
+  ["workStatus", "active", "Aktiv", 100, 0],
+  ["workStatus", "on_hold", "Pausiert", 200, 0],
+  ["workStatus", "completed", "Abgeschlossen", 300, 1],
+  ["workStatus", "archived", "Archiviert", 400, 1],
+  ["workStatus", "todo", "Offen", 500, 0],
+  ["workStatus", "open", "Offen", 600, 0],
+  ["workStatus", "in_progress", "In Arbeit", 700, 0],
+  ["workStatus", "in_review", "In Prüfung", 800, 0],
+  ["workStatus", "done", "Erledigt", 900, 1],
+  ["workStatus", "resolved", "Gelöst", 1000, 1],
+  ["workStatus", "closed", "Geschlossen", 1100, 1],
+  ["workStatus", "rejected", "Verworfen", 1200, 1],
+  ["featureStatus", "draft", "Entwurf", 100, 0],
+  ["featureStatus", "active", "Aktiv", 200, 0],
+  ["featureStatus", "done", "Erledigt", 300, 1],
+  ["featureStatus", "archived", "Archiviert", 400, 1],
+  ["priority", "low", "Niedrig", 100, 0],
+  ["priority", "medium", "Mittel", 200, 0],
+  ["priority", "high", "Hoch", 300, 0],
+  ["priority", "urgent", "Dringend", 400, 0]
+] as const;
+
+function seedDefaultCatalogEntries(sqlite: Database.Database): void {
+  const insert = sqlite.prepare("INSERT INTO catalog_entries (kind, key, label, sort_order, is_closed, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))");
+  for (const entry of defaultCatalogEntries) {
+    insert.run(...entry);
+  }
+}
+
 function migrateTestDb(sqlite: Database.Database) {
   const db = drizzle(sqlite, { schema });
   const migrationsFolder = fileURLToPath(new URL("../../src/db/migrations", import.meta.url));
@@ -43,6 +73,7 @@ export function createFileTestDb(databasePath: string) {
 export function truncateAll(sqlite: Database.Database): void {
   const tables = [
     "app_settings",
+    "catalog_entries",
     "use_case_tasks",
     "feature_tasks",
     "milestone_tasks",
@@ -102,6 +133,7 @@ export function truncateAll(sqlite: Database.Database): void {
         sqlite.prepare(`DELETE FROM ${table}`).run();
         sqlite.prepare("DELETE FROM sqlite_sequence WHERE name = ?").run(table);
       }
+      seedDefaultCatalogEntries(sqlite);
     })();
   } finally {
     sqlite.pragma("foreign_keys = ON");

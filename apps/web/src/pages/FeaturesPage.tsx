@@ -1,4 +1,4 @@
-import { FEATURE_STATUSES, type Feature, type FeatureStatus } from "@taskmanager/shared-types";
+import type { Feature, FeatureStatus } from "@taskmanager/shared-types";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FeatureCardSkeleton } from "../components/features/FeatureCardSkeleton";
@@ -7,24 +7,26 @@ import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
+import { useCatalogs } from "../hooks/useCatalogs";
 import { useFeatures } from "../hooks/useFeatures";
-import { featureStatusLabels } from "../utils/domainLabels";
+import { catalogEntriesByKind } from "../utils/catalogs";
 
 export function FeaturesPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const features = useFeatures();
+  const catalogs = useCatalogs();
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | "all">("all");
 
   const statusOptions = useMemo(
     () =>
-      FEATURE_STATUSES.map((status) => ({
-        value: status,
-        label: featureStatusLabels[status],
-        count: features.features.filter((feature) => feature.status === status).length
+      catalogEntriesByKind(catalogs.entries, "featureStatus").map((entry) => ({
+        value: entry.key,
+        label: entry.label,
+        count: features.features.filter((feature) => feature.status === entry.key).length
       })),
-    [features.features]
+    [catalogs.entries, features.features]
   );
 
   const filteredFeatures = useMemo(() => features.features.filter((feature) => statusFilter === "all" || feature.status === statusFilter), [features.features, statusFilter]);

@@ -1,26 +1,32 @@
-export const PROJECT_STATUSES = ["active", "on_hold", "completed", "archived"] as const;
-export const TASK_STATUSES = ["todo", "in_progress", "done"] as const;
+export const WORK_STATUSES = ["active", "on_hold", "completed", "archived", "todo", "open", "in_progress", "in_review", "done", "resolved", "closed", "rejected"] as const;
+export const PROJECT_STATUSES = WORK_STATUSES;
+export const TASK_STATUSES = WORK_STATUSES;
 export const FEATURE_STATUSES = ["draft", "active", "done", "archived"] as const;
 export const FEATURE_RELATION_TYPES = ["related", "depends_on", "consumed_by"] as const;
-export const BACKLOG_STATUSES = ["open", "in_progress", "done", "rejected"] as const;
+export const BACKLOG_STATUSES = WORK_STATUSES;
 export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export const TICKET_TYPES = ["bug", "improvement", "question", "task"] as const;
-export const TICKET_STATUSES = ["open", "in_progress", "in_review", "resolved", "closed"] as const;
+export const TICKET_STATUSES = WORK_STATUSES;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
 export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "milestone", "useCase", "backlogItem", "wikiPage", "ticket"] as const;
+export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority"] as const;
+export const STATUS_CATALOG_KINDS = ["workStatus", "featureStatus"] as const;
 
-export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
-export type TaskStatus = (typeof TASK_STATUSES)[number];
-export type FeatureStatus = (typeof FEATURE_STATUSES)[number];
+export type WorkStatus = string;
+export type ProjectStatus = WorkStatus;
+export type TaskStatus = WorkStatus;
+export type FeatureStatus = string;
 export type FeatureRelationType = (typeof FEATURE_RELATION_TYPES)[number];
-export type BacklogStatus = (typeof BACKLOG_STATUSES)[number];
-export type Priority = (typeof PRIORITIES)[number];
+export type BacklogStatus = WorkStatus;
+export type Priority = string;
 export type TicketType = (typeof TICKET_TYPES)[number];
-export type TicketStatus = (typeof TICKET_STATUSES)[number];
+export type TicketStatus = WorkStatus;
 export type TicketResolution = (typeof TICKET_RESOLUTIONS)[number];
 export type TicketRelationType = (typeof TICKET_RELATION_TYPES)[number];
 export type CommentEntityType = (typeof COMMENT_ENTITY_TYPES)[number];
+export type CatalogKind = (typeof CATALOG_KINDS)[number];
+export type StatusCatalogKind = (typeof STATUS_CATALOG_KINDS)[number];
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonObject = { [key: string]: JsonValue };
@@ -37,6 +43,27 @@ export interface VersionedUpdate {
 }
 
 export type WithExpectedVersion<T> = T & VersionedUpdate;
+
+export interface CatalogEntry {
+  id: number;
+  kind: CatalogKind;
+  key: string;
+  label: string;
+  sortOrder: number;
+  isClosed: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CatalogEntryInput {
+  key: string;
+  label: string;
+  sortOrder?: number;
+  isClosed?: boolean;
+}
+
+export type CatalogEntryUpdate = WithExpectedVersion<Partial<Omit<CatalogEntryInput, "key">>>;
 
 export interface AiModelInfo {
   name: string;
@@ -185,6 +212,9 @@ export interface Milestone {
   createdAt: string;
   updatedAt: string;
   taskCount: number;
+  openTaskCount: number;
+  doneTaskCount: number;
+  totalTaskCount: number;
   ticketCount: number;
   featureCount: number;
   tags: Tag[];
@@ -543,7 +573,6 @@ export interface BacklogItem {
   title: string;
   description: string | null;
   status: BacklogStatus;
-  priority: Priority;
   importKey: string | null;
   sortOrder: number;
   version: number;
@@ -557,7 +586,6 @@ export interface BacklogItemInput {
   featureId?: number | null;
   useCaseId?: number | null;
   status?: BacklogStatus;
-  priority?: Priority;
   importKey?: string | null;
   sortOrder?: number;
 }

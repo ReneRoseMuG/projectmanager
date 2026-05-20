@@ -11,6 +11,7 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SettingsBackupPage } from "./pages/SettingsBackupPage";
+import { SettingsCatalogsPage } from "./pages/SettingsCatalogsPage";
 import { SettingsTagsPage } from "./pages/SettingsTagsPage";
 import { TicketsPage } from "./pages/TicketsPage";
 import { TicketDetailPage } from "./pages/TicketDetailPage";
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="/wiki" element={<WikiPage />} />
             <Route path="/wiki/:id" element={<WikiPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/settings/catalogs" element={<SettingsCatalogsPage />} />
             <Route path="/settings/tags" element={<SettingsTagsPage />} />
             <Route path="/settings/backup" element={<SettingsBackupPage />} />
             <Route path="/forbidden" element={<ForbiddenPage />} />

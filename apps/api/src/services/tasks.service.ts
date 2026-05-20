@@ -5,6 +5,7 @@ import { featureTasks, features, milestoneTasks, milestones, projectTasks, proje
 import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
+import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { listComments } from "./comments.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import { deleteTaskNotesForIds, listTaskNotes } from "./notes.service.js";
@@ -265,13 +266,17 @@ function deleteOwnerTaskLink(database: DbClient, owner: TaskOwner, taskId: numbe
 
 function insertTask(database: DbClient, input: TaskInput, parentId: number | null = null): TaskRecord {
   const title = requireNonEmpty(input.title, "title");
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "todo");
+  const priority = input.priority ?? resolveDefaultCatalogEntryKey(database, "priority", "medium");
+  ensureCatalogEntryExists(database, "workStatus", status);
+  ensureCatalogEntryExists(database, "priority", priority);
 
   return taskRepository.create(database, {
     parentId,
     title,
     description: cleanNullable(input.description) ?? null,
-    status: input.status ?? "todo",
-    priority: input.priority ?? "medium",
+    status,
+    priority,
     assignee: cleanNullable(input.assignee) ?? null,
     dueDate: input.dueDate ?? null
   });
@@ -308,7 +313,7 @@ export function listSubtasks(database: DbClient, taskId: number): Task[] {
 
 export function createOwnerTask(database: DbClient, owner: TaskOwner, input: TaskInput): TaskBoardItem {
   ensureOwnerExists(database, owner);
-  const status = input.status ?? "todo";
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "todo");
   const position = nextOwnerPosition(database, owner, status);
   const created = database.transaction((tx) => {
     const task = insertTask(tx as unknown as DbClient, input);
@@ -346,6 +351,7 @@ export function unlinkOwnerTask(database: DbClient, owner: TaskOwner, taskId: nu
 
 export function updateOwnerTaskBoard(database: DbClient, owner: TaskOwner, taskId: number, input: TaskBoardPositionInput): TaskBoardItem {
   ensureOwnerExists(database, owner);
+  ensureCatalogEntryExists(database, "workStatus", input.status);
   const linked = getOwnerTaskRow(database, owner, taskId);
   if (!linked) {
     throw notFound(`Task ${taskId} is not linked to ${owner.type} ${owner.id}`);
@@ -394,9 +400,11 @@ export function updateTask(database: DbClient, id: number, input: TaskUpdate): T
     values.description = cleanNullable(input.description) ?? null;
   }
   if (input.status !== undefined) {
+    ensureCatalogEntryExists(database, "workStatus", input.status);
     values.status = input.status;
   }
   if (input.priority !== undefined) {
+    ensureCatalogEntryExists(database, "priority", input.priority);
     values.priority = input.priority;
   }
   if (input.assignee !== undefined) {

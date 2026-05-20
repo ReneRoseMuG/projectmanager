@@ -110,6 +110,10 @@ describe("ProjectListBoardView", () => {
     expect(archivedColumn).toContainElement(screen.getByText("Projekt Archiviert"));
 
     expectItemCardClasses(container.querySelectorAll("article.rounded-2xl"));
+    expect(within(activeColumn as HTMLElement).getByText("Aufgaben")).toBeInTheDocument();
+    expect(within(activeColumn as HTMLElement).getByText("2 / 5 erledigt")).toBeInTheDocument();
+    expect(within(activeColumn as HTMLElement).getByText("3 offen")).toBeInTheDocument();
+    expect(within(activeColumn as HTMLElement).queryByText("PA")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(projects.length);
     expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(projects.length);
 
@@ -148,6 +152,7 @@ describe("ProjectListBoardView", () => {
     projects.forEach((project, index) => {
       const row = rows[index] as HTMLElement;
       expect(within(row).getByText(project.name)).toBeInTheDocument();
+      expect(within(row).getByText("Aufgaben")).toBeInTheDocument();
       expect(within(row).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
       expect(within(row).getByRole("button", { name: "Löschen" })).toBeInTheDocument();
     });

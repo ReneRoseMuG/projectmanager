@@ -1,4 +1,4 @@
-import type { BacklogItem, BacklogItemInput, BacklogStatus, Feature, Priority } from "@taskmanager/shared-types";
+import type { BacklogItem, BacklogItemInput, BacklogStatus, Feature } from "@taskmanager/shared-types";
 import { Inbox, Send } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -9,9 +9,9 @@ import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
-import { SegmentedControl } from "../ui/SegmentedControl";
 import { Select } from "../ui/Select";
 import { useEntityComments } from "../../hooks/useEntityComments";
+import { StatusToggle } from "../ui/StatusToggle";
 
 interface BacklogItemFormProps {
   open: boolean;
@@ -23,26 +23,11 @@ interface BacklogItemFormProps {
   closeOnSubmit?: boolean;
 }
 
-const statuses: Array<{ value: BacklogStatus; label: string; activeClassName: string }> = [
-  { value: "open", label: "Offen", activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" },
-  { value: "in_progress", label: "In Arbeit", activeClassName: "data-[active=true]:bg-tangerine data-[active=true]:text-white" },
-  { value: "done", label: "Erledigt", activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" },
-  { value: "rejected", label: "Verworfen", activeClassName: "data-[active=true]:bg-crimson data-[active=true]:text-white" }
-];
-
-const priorities: Array<{ value: Priority; label: string; activeClassName: string }> = [
-  { value: "low", label: "Niedrig", activeClassName: "data-[active=true]:bg-steel-500 data-[active=true]:text-white" },
-  { value: "medium", label: "Mittel", activeClassName: "data-[active=true]:bg-mustard data-[active=true]:text-mustard-dark" },
-  { value: "high", label: "Hoch", activeClassName: "data-[active=true]:bg-tangerine data-[active=true]:text-white" },
-  { value: "urgent", label: "Dringend", activeClassName: "data-[active=true]:bg-crimson data-[active=true]:text-white" }
-];
-
 export function BacklogItemForm({ open, item, features, onSubmit, onClose, variant = "modal", closeOnSubmit = true }: BacklogItemFormProps) {
   const comments = useEntityComments("backlogItem", item?.id);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<BacklogStatus>("open");
-  const [priority, setPriority] = useState<Priority>("medium");
   const [featureId, setFeatureId] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -56,7 +41,6 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
     setTitle(item?.title ?? "");
     setDescription(item?.description ?? "");
     setStatus(item?.status ?? "open");
-    setPriority(item?.priority ?? "medium");
     setFeatureId(item?.featureId ?? null);
     setSortOrder(item?.sortOrder ?? 0);
   }, [open, item]);
@@ -65,7 +49,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
     event.preventDefault();
     setSaving(true);
     try {
-      await onSubmit({ title, description, status, priority, featureId, sortOrder });
+      await onSubmit({ title, description, status, featureId, sortOrder });
       if (closeOnSubmit) {
         onClose();
       }
@@ -96,15 +80,10 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
         </FormField>
       </Section>
 
-      <Section title="Status & Priorität">
-        <div className="grid gap-4 md:grid-cols-2">
-          <FormField label="Status">
-            <SegmentedControl value={status} options={statuses} onChange={setStatus} />
-          </FormField>
-          <FormField label="Priorität">
-            <SegmentedControl value={priority} options={priorities} onChange={setPriority} />
-          </FormField>
-        </div>
+      <Section title="Status">
+        <FormField label="Status">
+          <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+        </FormField>
       </Section>
 
       <Section title="Zuordnung">

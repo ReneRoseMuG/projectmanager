@@ -220,14 +220,13 @@ export async function createEvent(
   return response.json() as Promise<EventFixture>;
 }
 
-export async function createBacklogItem(request: APIRequestContext, projectId: number, titlePrefix: string, input: Partial<{ description: string; status: string; priority: string; featureId: number }> = {}) {
+export async function createBacklogItem(request: APIRequestContext, projectId: number, titlePrefix: string, input: Partial<{ description: string; status: string; featureId: number }> = {}) {
   const title = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/projects/${projectId}/backlog`, {
     data: {
       title,
       description: input.description ?? "<p>E2E Backlog-Beschreibung vollständig</p>",
       status: input.status ?? "open",
-      priority: input.priority ?? "medium",
       featureId: input.featureId ?? null
     }
   });

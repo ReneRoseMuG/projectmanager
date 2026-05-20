@@ -78,7 +78,7 @@ export function TicketDetailPage() {
   if (isCreateMode) {
     return (
       <div className="mx-auto max-w-7xl">
-        <TicketForm open variant="page" closeOnSubmit={false} initialStatus={parseTicketStatus(searchParams.get("status"))} onSubmit={createTicket} onClose={closePage} />
+        <TicketForm open variant="page" initialStatus={parseTicketStatus(searchParams.get("status"))} onSubmit={createTicket} onClose={closePage} />
       </div>
     );
   }
@@ -97,7 +97,7 @@ export function TicketDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <TicketForm open ticket={detail.ticket} variant="page" closeOnSubmit={false} onSubmit={saveTicket} onClose={closePage} />
+      <TicketForm open ticket={detail.ticket} variant="page" onSubmit={saveTicket} onClose={closePage} />
     </div>
   );
 }

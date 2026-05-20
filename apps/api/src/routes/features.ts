@@ -1,5 +1,4 @@
 import type { FastifyInstance } from "fastify";
-import { FEATURE_STATUSES } from "../db/schema.js";
 import { createFeature, deleteFeature, getFeature, listFeatures, updateFeature, type FeatureInput } from "../services/features.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
@@ -10,7 +9,7 @@ const featureBodySchema = {
   properties: {
     title: { type: "string", minLength: 1 },
     slug: { type: "string", minLength: 1 },
-    status: { type: "string", enum: FEATURE_STATUSES },
+    status: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
     content: { type: "string" },
     sortOrder: { type: "integer" }
