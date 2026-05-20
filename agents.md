@@ -83,6 +83,12 @@ Neue Dateien, Routes, Services oder Strukturen werden nur angelegt, wenn der Auf
 
 ## 3. Planung
 
+### 3.0 Planungs-Skill (Pflicht)
+
+Vor jeder Planerstellung im Chat oder im Plan-Modus nutzt Codex den Repo-Skill `skills/projekt-manager-planungsleitplanken`.
+
+Der Skill ist ein Planungs-Gate und ersetzt diese Datei nicht. `agents.md` bleibt die maßgebliche Quelle; bei Widersprüchen gilt `agents.md`. Der Skill stellt sicher, dass Architekturentscheidungen, Rollen-/Permission-Regeln, Teststrategie, Branch-Hygiene, UI-Leitplanken und Abnahmekriterien bei jeder Planung geprüft werden.
+
 ### 3.1 Branch-Nutzung (nur bei explizitem Nutzerwunsch)
 
 Codex fragt nicht aktiv nach einem Branch. Ein Branch wird nur angelegt, wenn der Nutzer dies ausdrücklich verlangt oder das Kurzkommando `branch <name>` verwendet.
@@ -135,6 +141,20 @@ Der Plan muss ausreichend Kontext enthalten, damit der Nutzer die Tragweite der 
 | `test` / `Test` | Vollständigen Testlauf gemäß Abschnitt 12 seriell ausführen, inklusive Browser-/E2E-Tests; anschließend Testanzahlen und Fehlergruppierung berichten |
 | `log <kurztitel>` | Schritt-Log manuell auslösen (ergänzt automatisches Log) |
 | `save` | Alle offenen Änderungen stagen, eine sinnvolle Commit-Message wählen, alles committen und auf den aktuellen Branch pushen |
+| `savetowork` | Alle offenen Änderungen auf dem aktuellen Branch sichern, den aktuellen Branch in `work` mergen, prüfen, dass `work` alle Änderungen enthält, `work` pushen und den Arbeitsbranch nach ausdrücklicher Bestätigung löschen |
+
+#### `savetowork` Sicherheitsablauf
+
+`savetowork` ist eine Git-Operation ohne Codeänderung. Codex führt die Schritte ausschließlich seriell aus:
+
+1. Aktuellen Branch und Working Tree prüfen.
+2. Falls offene Änderungen vorhanden sind: alle Änderungen stagen, sinnvoll committen und den aktuellen Branch pushen.
+3. `work` von `origin/main` abzweigen, falls `work` noch nicht existiert; andernfalls auf `work` wechseln und `origin/work` aktualisieren.
+4. Den zuvor aktuellen Arbeitsbranch in `work` mergen.
+5. Absichern, dass die Änderungen wirklich in `work` liegen, mindestens durch `git status`, Branch-/Upstream-Prüfung und Vergleich der relevanten Commit-Spitzen.
+6. `work` pushen.
+7. Vor dem Löschen des Arbeitsbranches ausdrücklich beim Nutzer bestätigen lassen, welcher lokale und welcher Remote-Branch gelöscht werden sollen.
+8. Erst nach Bestätigung den Arbeitsbranch lokal und remote löschen.
 
 ---
 
@@ -269,6 +289,19 @@ Der neueste Eintrag steht **oben**. Der Index wird nach jedem neuen Log sofort a
 - Keine Business-Logik in Route-Handlern — Logik in separaten Service-Funktionen
 - Alle Endpunkte haben ein Fastify-Schema (Request-Validierung)
 
+### Authentifizierung und Rollen (verbindlich)
+
+Benutzer, Rollen und Berechtigungen sind Querschnittsinfrastruktur und müssen bei jeder neuen API-, Web- oder Domänenänderung mitgeplant werden.
+
+- Neue API-Routen sind grundsätzlich authentifizierungspflichtig. Öffentliche Ausnahmen müssen im Plan ausdrücklich benannt und begründet werden.
+- Aktuell öffentliche Ausnahmen sind nur `/health`, `/api/health` und `/api/auth/*`, sofern keine spätere Aufgabendatei etwas anderes festlegt.
+- Die API ist die verbindliche Sicherheitsgrenze. Frontend-Gating verbessert nur die Bedienbarkeit und ersetzt nie Backend-Berechtigungsprüfungen.
+- Jede neue Route erhält eine konkrete Berechtigungsentscheidung: `read` für lesende Endpunkte, `write` für erstellende oder ändernde Endpunkte, `delete` für Löschoperationen oder eine ausdrücklich benannte Admin-Berechtigung.
+- Admin-Routen verwenden domänenspezifische Admin-Rechte, zum Beispiel `users:admin` und `roles:admin`; neue Admin-Bereiche bekommen eigene klar benannte Admin-Permissions.
+- Neue fachliche Domänen oder größere Support-Objekte müssen im Permission-Katalog berücksichtigt werden, wenn sie per API gelesen, geändert oder administriert werden.
+- Services dürfen nicht davon ausgehen, dass ein Frontend eine Aktion bereits verborgen hat. Verbotene Zugriffe liefern `FORBIDDEN`, fehlende oder ungültige Sessions liefern `UNAUTHORIZED`.
+- Tests für neue geschützte Workflows müssen mindestens den erfolgreichen Zugriff mit berechtigtem User und den abgelehnten Zugriff ohne ausreichende Berechtigung abdecken. Bei Schreiboperationen wird zusätzlich ein Reader- oder Custom-Role-Negativfall geprüft.
+
 ### Drizzle ORM
 
 - Keine rohen SQL-Strings außer für unvermeidbare SQLite-spezifische Ausdrücke
@@ -296,6 +329,7 @@ Der neueste Eintrag steht **oben**. Der Index wird nach jedem neuen Log sofort a
 - Keine Business-Logik in Komponenten — Logik in Hooks oder `src/api/`
 - Keine direkte `fetch`-Nutzung in Komponenten — immer über `src/api/`-Funktionen
 - Kein `any` in Props-Definitionen
+- Neue Navigationseinträge, Aktionsbuttons und Seiten mit geschützten API-Aufrufen berücksichtigen die aktuelle Rolle und die Permissions aus `useAuth`. Versteckte UI ist nur Komfort; die zugehörige API-Berechtigung bleibt Pflicht.
 
 ### TanStack Query (verbindlich)
 
@@ -319,6 +353,8 @@ taskmanager/
 ├── agents.md                          ← diese Datei
 ├── logs/                              ← Schritt-Logs (automatisch, Abschnitt 5)
 │   └── README.md
+├── skills/                            ← versionierte Codex-Skills für dieses Repo
+│   └── projekt-manager-planungsleitplanken/
 ├── docs/
 │   ├── tasks/                         ← Aufgabendateien für Codex (Abschnitt 7.1)
 │   └── ...                            ← Architektur- und Implementierungsdokumentation
@@ -399,7 +435,7 @@ Alle Fastify-Endpunkte liefern Fehler in diesem Format:
 }
 ```
 
-Zulässige `error`-Werte: `NOT_FOUND`, `BAD_REQUEST`, `CONFLICT`, `INTERNAL_ERROR`.
+Zulässige `error`-Werte: `NOT_FOUND`, `BAD_REQUEST`, `CONFLICT`, `UNAUTHORIZED`, `FORBIDDEN`, `INTERNAL_ERROR`.
 
 ---
 
@@ -450,6 +486,7 @@ npm run test -w apps/api  # nur API-Tests
 - Jeder Test muss einen beobachtbaren Effekt prüfen — keine reinen Sichtbarkeitsprüfungen
 - Leere Tests, Platzhaltertests und Tests ohne fachliche Assertion sind unzulässig. `test.skip`, `it.skip`, `describe.skip` oder leere Testkörper dürfen nur verwendet werden, wenn der Nutzer dies ausdrücklich beauftragt oder ein konkreter Blocker im Log dokumentiert wird; sie zählen nie als implementierte Tests.
 - Wenn ein Test noch nicht sicher implementierbar ist, wird kein leeres Testgerüst committed. Stattdessen wird die fehlende Testabdeckung als offener Punkt im Log dokumentiert.
+- Neue oder geänderte geschützte Workflows müssen Rollen- und Berechtigungstests enthalten. Mindestens ein positiver Fall mit passender Permission und ein negativer Fall ohne passende Permission sind Pflicht; bei UI-Flows wird zusätzlich geprüft, dass unzulässige Aktionen nicht angeboten oder mit Forbidden behandelt werden.
 - Keine Direktzugriffe auf die Produktions-SQLite-Datei in Tests
 - Alle Tests mit DB-Bezug verwenden ausschließlich In-Memory-, Temp- oder `.test-runtime`-Datenbanken; Testläufe dürfen nie `apps/api/data/` verwenden.
 - Alle Tests mit Dateisystembezug verwenden ausschließlich Temp- oder `.test-runtime`-Verzeichnisse; Testläufe dürfen nie `apps/api/uploads/`, `apps/api/content/` oder `apps/api/backups/` verwenden.
@@ -613,6 +650,7 @@ Folgende Infrastruktur wird von mehreren Domänen gemeinsam genutzt:
 | **Attachments** | projects, milestones, tasks, features, tickets | `attachments` plus Owner-Join-Tabellen (`projectAttachments`, `milestoneAttachments`, `taskAttachments`, `featureAttachments`, `ticketAttachments`), DTO `owners: [...]`, `useAttachments(owner)` Hook |
 | **Comments** | tasks, features, projects, milestones, useCases, backlogItems, wikiPages, tickets | `comments` plus Owner-Join-Tabellen (`projectComments`, `milestoneComments`, `taskComments`, `featureComments`, `useCaseComments`, `backlogItemComments`, `wikiPageComments`, `ticketComments`), DTO `owners: [...]` |
 | **Calendar** | projects, milestones, tasks | `events`-Tabelle plus `projectEvents`/`milestoneEvents`/`taskEvents`-Join-Tabellen |
+| **Auth & Rollen** | alle API- und Web-Workflows | Session-Auth, Rollen, Permissions, Permission-Katalog, API-Guards und UI-Gating |
 
 **Beim Hinzufügen einer neuen Attachment-fähigen Entität:**
 1. Neue Owner-Join-Tabelle anlegen — direkte Owner-Spalten in `attachments` sind im Zielschema nicht zulässig.
@@ -644,6 +682,7 @@ Vor der Umsetzung einer neuen Entität muss im Plan ausdrücklich eingeordnet we
 - Gehört die Entität zu Projektmanagement, Dokumentation, Tickets oder ist eine neue Domäne nötig?
 - Ist sie ein fachliches Objekt, ein bearbeitbares Support-Objekt oder reine Infrastruktur/Admin-Konfiguration?
 - Ist sie versioniert, owner-fähig, suchbar, tag-, note-, comment- oder attachment-fähig?
+- Welche Rollen- und Permission-Regeln gelten für Lesen, Schreiben, Löschen und Administration?
 - Welche Parent-Child- und Owner-Beziehungen gelten im Zielzustand?
 - Welche Löschregel gilt pro Beziehung: cascade, restrict, set null oder nur Join entfernen?
 
@@ -654,13 +693,14 @@ Für neue fachliche Domänen gilt als Mindestumfang:
 3. Repository unter `apps/api/src/repositories/` für CRUD und Version-Checks.
 4. Service unter `apps/api/src/services/` für Business-Regeln und Relationen.
 5. Route unter `apps/api/src/routes/` mit Fastify-Schema und einheitlichem Fehlerformat.
-6. Update-Routen mit strikt erforderlichem `expectedVersion`.
-7. API-Integrationstests inklusive erfolgreichem Update mit aktueller Version und mindestens einem fachlichen Fehlerfall.
-8. Web-API-Funktionen unter `apps/web/src/api/`.
-9. Query-Keys, Invalidierung und Hooks gemäß TanStack-Regeln.
-10. UI-Labels und Tone-Maps in `src/utils/domainLabels.ts`.
-11. Global Search nur dann erweitern, wenn die Entität fachlich suchbar sein soll.
-12. Dump-Registry, Test-DB-Truncation und Dump-Roundtrip-Seed für jede neue Anwendungstabelle.
+6. Permission-Katalog, API-Guards und Auth-Testfälle für die neuen Routen.
+7. Update-Routen mit strikt erforderlichem `expectedVersion`.
+8. API-Integrationstests inklusive erfolgreichem Update mit aktueller Version und mindestens einem fachlichen Fehlerfall.
+9. Web-API-Funktionen unter `apps/web/src/api/`.
+10. Query-Keys, Invalidierung und Hooks gemäß TanStack-Regeln.
+11. UI-Labels und Tone-Maps in `src/utils/domainLabels.ts`.
+12. Global Search nur dann erweitern, wenn die Entität fachlich suchbar sein soll.
+13. Dump-Registry, Test-DB-Truncation und Dump-Roundtrip-Seed für jede neue Anwendungstabelle.
 
 ### Dump- und Backup-Registry
 

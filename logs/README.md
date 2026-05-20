@@ -2,6 +2,9 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 20.05.26 | 1 | Planungsleitplanken-Skill | ✅ |
+| 20.05.26 | Fix | Auth-Rollen-Architektur | ✅ |
+| 20.05.26 | Fix | Savetowork-Kommando | ✅ |
 | 20.05.26 | 5 | Auth-Tests und Verifikation | ✅ |
 | 20.05.26 | 4 | Auth-Frontend | ✅ |
 | 20.05.26 | 3 | Auth-API | ✅ |
