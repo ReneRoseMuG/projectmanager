@@ -2,6 +2,9 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 20.05.26 | Fix | Create Detailroute | ✅ |
+| 20.05.26 | Fix | Rote Tests Testhelper | ⚠️ |
+| 20.05.26 | Fix | Audit Coverage entfernt | ⚠️ |
 | 20.05.26 | 1 | Browser-Tabs | ⚠️ |
 | 20.05.26 | Fix | Büroumgebung KI Runtime | ✅ |
 | 20.05.26 | Feature | Status-Board-Gruppierung | ✅ |

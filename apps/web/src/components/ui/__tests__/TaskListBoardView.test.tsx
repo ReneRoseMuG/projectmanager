@@ -21,10 +21,36 @@ import type { ViewMode } from "../../../types";
 import { TaskListBoardView } from "../../tasks/TaskListBoardView";
 import { buildTask, buildTaskSet } from "./factories";
 
+vi.mock("../../../hooks/useCatalogs", () => ({
+  useCatalogs() {
+    return {
+      entries: [],
+      workStatuses: [],
+      featureStatuses: [],
+      priorities: [],
+      loading: false,
+      error: null,
+      reload: async () => undefined,
+      createEntry: async () => undefined,
+      updateEntry: async () => undefined,
+      deleteEntry: async () => undefined
+    };
+  }
+}));
+
 const statusColumns = [
+  { value: "active", label: "Aktiv" },
+  { value: "on_hold", label: "Pausiert" },
+  { value: "completed", label: "Abgeschlossen" },
+  { value: "archived", label: "Archiviert" },
   { value: "todo", label: "Offen" },
+  { value: "open", label: "Offen" },
   { value: "in_progress", label: "In Arbeit" },
-  { value: "done", label: "Erledigt" }
+  { value: "in_review", label: "In Prüfung" },
+  { value: "done", label: "Erledigt" },
+  { value: "resolved", label: "Gelöst" },
+  { value: "closed", label: "Geschlossen" },
+  { value: "rejected", label: "Verworfen" }
 ] as const;
 
 function renderTaskList({
@@ -126,11 +152,11 @@ describe("TaskListBoardView", () => {
     columns.forEach((column) => {
       expect(column).toHaveClass("min-w-0");
     });
-    statusColumns.forEach((column) => {
-      expect(screen.getByRole("heading", { name: column.label })).toBeInTheDocument();
+    statusColumns.forEach((column, index) => {
+      expect(within(columns[index] as HTMLElement).getByRole("heading", { name: column.label })).toBeInTheDocument();
     });
 
-    const todoColumn = screen.getByRole("heading", { name: "Offen" }).closest("section");
+    const todoColumn = columns[4] as HTMLElement;
     expect(todoColumn).toContainElement(screen.getByText("Aufgabe Offen"));
     const doneColumn = screen.getByRole("heading", { name: "Erledigt" }).closest("section");
     expect(doneColumn).toContainElement(screen.getByText("Aufgabe Erledigt"));
@@ -143,10 +169,10 @@ describe("TaskListBoardView", () => {
     fireEvent.click(editButtons[0]!);
     expect(onOpen).toHaveBeenCalledWith(tasks[0]);
 
-    fireEvent.click(screen.getByRole("button", { name: "Offen hinzufügen" }));
+    fireEvent.click(within(todoColumn).getByRole("button", { name: "Offen hinzufügen" }));
     expect(onAddStatus).toHaveBeenCalledWith("todo");
 
-    const todoHeader = screen.getByRole("heading", { name: "Offen" }).closest("header");
+    const todoHeader = within(todoColumn).getByRole("heading", { name: "Offen" }).closest("header");
     expect(todoHeader).toHaveTextContent("1");
   });
 

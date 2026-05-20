@@ -98,7 +98,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
     }
   });
 
-  test("Projekt bearbeiten: Speichern hält die kanonische Detailformular-Seite aktuell", async ({ page, request }) => {
+  test("Projekt bearbeiten: Speichern schließt auf die Rücksprung-Route und aktualisiert die Übersicht", async ({ page, request }) => {
     const project = await createProject(request, "E2E Project Edit Route");
     const updatedName = uniqueTitle("E2E Project Updated Route");
 
@@ -113,8 +113,8 @@ test.describe("Projekt-Routen und Detailformular", () => {
         form.getByRole("button", { name: "Speichern" }).click()
       ]);
 
-      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
-      await expect(form.locator("input[required]").first()).toHaveValue(updatedName);
+      await expect(page).toHaveURL(/\/projects$/);
+      await expect(itemCard(page, updatedName)).toBeVisible();
     } finally {
       await deleteProject(request, project.id);
     }

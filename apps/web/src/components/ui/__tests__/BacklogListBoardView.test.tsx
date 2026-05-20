@@ -2,8 +2,8 @@
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - BacklogListBoardView rendert Board-Modus ohne Statusspalten als CardGrid und Listenmodus als ItemRows.
- * - Backlog-Karten und -Zeilen zeigen erwartete Controls, Dimensionen, Toolbar und Feature-Badges.
+ * - BacklogListBoardView rendert Board-Modus mit katalogbasierten Statusspalten und Listenmodus als ItemRows.
+ * - Backlog-Karten und -Zeilen zeigen erwartete Controls, Dimensionen, Toolbar, Filter und Feature-Badges.
  *
  * Fehlerfälle:
  * - BacklogItems ohne Feature-Zuordnung müssen das Badge "Ohne Feature" anzeigen.
@@ -18,6 +18,25 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BacklogListBoardView } from "../../backlog/BacklogListBoardView";
 import { buildBacklogItem, buildFeature } from "./factories";
+
+const workStatusColumnCount = 12;
+
+vi.mock("../../../hooks/useCatalogs", () => ({
+  useCatalogs() {
+    return {
+      entries: [],
+      workStatuses: [],
+      featureStatuses: [],
+      priorities: [],
+      loading: false,
+      error: null,
+      reload: async () => undefined,
+      createEntry: async () => undefined,
+      updateEntry: async () => undefined,
+      deleteEntry: async () => undefined
+    };
+  }
+}));
 
 function buildBacklogItems(): BacklogItem[] {
   return [
@@ -92,7 +111,7 @@ afterEach(() => {
 });
 
 describe("BacklogListBoardView", () => {
-  it("rendert Board-Modus ohne Statusspalten als CardGrid", () => {
+  it("rendert Board-Modus mit katalogbasierten Statusspalten", () => {
     const items = buildBacklogItems();
     const { container } = renderBacklogList({ items });
 
@@ -100,8 +119,8 @@ describe("BacklogListBoardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
 
     expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
-    expect(container.querySelector("section.rounded-lg")).not.toBeInTheDocument();
-    expect(container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3")).toBeInTheDocument();
+    expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(workStatusColumnCount);
+    expect(container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3")).not.toBeInTheDocument();
 
     const cards = container.querySelectorAll("article.rounded-2xl");
     expect(cards).toHaveLength(items.length);

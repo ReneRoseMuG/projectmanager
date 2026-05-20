@@ -155,6 +155,7 @@ export function TaskDetailPage() {
         variant="page"
         savingLabel={savingLabel}
         onSubmit={submitTask}
+        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onChanged={detail.reload}
         onOpenInTab={openInTab}

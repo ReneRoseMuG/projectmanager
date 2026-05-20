@@ -20,11 +20,36 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProjectListBoardView } from "../../projects/ProjectListBoardView";
 import { buildProjectSet } from "./factories";
 
+vi.mock("../../../hooks/useCatalogs", () => ({
+  useCatalogs() {
+    return {
+      entries: [],
+      workStatuses: [],
+      featureStatuses: [],
+      priorities: [],
+      loading: false,
+      error: null,
+      reload: async () => undefined,
+      createEntry: async () => undefined,
+      updateEntry: async () => undefined,
+      deleteEntry: async () => undefined
+    };
+  }
+}));
+
 const statusColumns = [
   { value: "active", label: "Aktiv" },
   { value: "on_hold", label: "Pausiert" },
   { value: "completed", label: "Abgeschlossen" },
-  { value: "archived", label: "Archiviert" }
+  { value: "archived", label: "Archiviert" },
+  { value: "todo", label: "Offen" },
+  { value: "open", label: "Offen" },
+  { value: "in_progress", label: "In Arbeit" },
+  { value: "in_review", label: "In Prüfung" },
+  { value: "done", label: "Erledigt" },
+  { value: "resolved", label: "Gelöst" },
+  { value: "closed", label: "Geschlossen" },
+  { value: "rejected", label: "Verworfen" }
 ] as const;
 
 function LocationProbe() {
@@ -100,8 +125,8 @@ describe("ProjectListBoardView", () => {
     columns.forEach((column) => {
       expect(column).toHaveClass("min-w-0");
     });
-    statusColumns.forEach((column) => {
-      expect(screen.getByRole("heading", { name: column.label })).toBeInTheDocument();
+    statusColumns.forEach((column, index) => {
+      expect(within(columns[index] as HTMLElement).getByRole("heading", { name: column.label })).toBeInTheDocument();
     });
 
     const activeColumn = screen.getByRole("heading", { name: "Aktiv" }).closest("section");

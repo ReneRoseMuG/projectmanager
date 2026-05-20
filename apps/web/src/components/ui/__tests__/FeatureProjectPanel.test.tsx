@@ -21,6 +21,25 @@ import type { ViewMode } from "../../../types";
 import { FeatureProjectPanel } from "../../features/FeatureProjectPanel";
 import { buildProjectSet } from "./factories";
 
+const workStatusColumnCount = 12;
+
+vi.mock("../../../hooks/useCatalogs", () => ({
+  useCatalogs() {
+    return {
+      entries: [],
+      workStatuses: [],
+      featureStatuses: [],
+      priorities: [],
+      loading: false,
+      error: null,
+      reload: async () => undefined,
+      createEntry: async () => undefined,
+      updateEntry: async () => undefined,
+      deleteEntry: async () => undefined
+    };
+  }
+}));
+
 function renderFeatureProjectPanel({
   projects = buildProjectSet().filter((project) => project.status === "active" || project.status === "archived"),
   availableProjects = buildProjectSet(),
@@ -75,7 +94,7 @@ describe("FeatureProjectPanel", () => {
     expect(screen.queryByRole("button", { name: "Speichern" })).not.toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
-    expect(columns).toHaveLength(4);
+    expect(columns).toHaveLength(workStatusColumnCount);
     expect(screen.getByRole("heading", { name: "Aktiv" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Archiviert" })).toBeInTheDocument();
 

@@ -2,12 +2,12 @@
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - UseCaseListBoardView rendert Board-Modus ohne Statusspalten als CardGrid und Listenmodus als ItemRows.
+ * - UseCaseListBoardView rendert Board-Modus mit katalogbasierten Feature-Statusspalten und Listenmodus als ItemRows.
  * - UseCase-Karten und -Zeilen zeigen erwartete Dimensionen, Toolbar, Doppelklick-Öffnen und Bearbeiten-Controls.
  *
  * Fehlerfälle:
  * - Leere Use-Case-Listen müssen den EmptyState ohne Karten oder Zeilen anzeigen.
- * - Der statuslose Board-Modus darf keine Spalten-Sections rendern.
+ * - Der Board-Modus muss die Feature-Statusspalten aus dem Katalog nutzen.
  *
  * Ziel:
  * Die Use-Case-spezifische ListBoardView-Integration gegen Layout-, Control- und Callback-Regressionen absichern.
@@ -21,6 +21,25 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ViewMode } from "../../../types";
 import { UseCaseListBoardView } from "../../usecases/UseCaseListBoardView";
 import { buildUseCase } from "./factories";
+
+const featureStatusColumnCount = 4;
+
+vi.mock("../../../hooks/useCatalogs", () => ({
+  useCatalogs() {
+    return {
+      entries: [],
+      workStatuses: [],
+      featureStatuses: [],
+      priorities: [],
+      loading: false,
+      error: null,
+      reload: async () => undefined,
+      createEntry: async () => undefined,
+      updateEntry: async () => undefined,
+      deleteEntry: async () => undefined
+    };
+  }
+}));
 
 function buildUseCases(): UseCase[] {
   return [
@@ -104,14 +123,18 @@ afterEach(() => {
 });
 
 describe("UseCaseListBoardView", () => {
-  it("rendert Board-Modus ohne Statusspalten als CardGrid", () => {
+  it("rendert Board-Modus mit Feature-Statusspalten", () => {
     const useCases = buildUseCases();
     const { container } = renderUseCaseList({ useCases });
 
     expectToolbar();
     expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
-    expect(container.querySelector("section.rounded-lg")).not.toBeInTheDocument();
-    expect(container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3")).toBeInTheDocument();
+    expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(featureStatusColumnCount);
+    expect(screen.getByRole("heading", { name: "Entwurf" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Aktiv" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Erledigt" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Archiviert" })).toBeInTheDocument();
+    expect(container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3")).not.toBeInTheDocument();
 
     const cards = container.querySelectorAll("article.rounded-2xl");
     expect(cards).toHaveLength(useCases.length);

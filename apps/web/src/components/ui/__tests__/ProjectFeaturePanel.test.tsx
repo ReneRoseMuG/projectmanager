@@ -20,6 +20,23 @@ import type { ViewMode } from "../../../types";
 import { ProjectFeaturePanel } from "../../features/ProjectFeaturePanel";
 import { buildFeature, buildFeatureSet } from "./factories";
 
+vi.mock("../../../hooks/useCatalogs", () => ({
+  useCatalogs() {
+    return {
+      entries: [],
+      workStatuses: [],
+      featureStatuses: [],
+      priorities: [],
+      loading: false,
+      error: null,
+      reload: async () => undefined,
+      createEntry: async () => undefined,
+      updateEntry: async () => undefined,
+      deleteEntry: async () => undefined
+    };
+  }
+}));
+
 function renderProjectFeaturePanel({
   features = buildFeatureSet(),
   viewMode = "kanban",

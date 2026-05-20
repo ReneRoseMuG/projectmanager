@@ -99,7 +99,7 @@ test.describe("Globale UI-Aktualität", () => {
       await openTab(projectForm(page), "Aufgaben");
       await expect(visibleArticle(projectForm(page), taskTitle)).toBeVisible();
       await projectForm(page).getByRole("button", { name: "Kanban" }).click();
-      await expect(projectForm(page).getByRole("heading", { name: "Offen" })).toBeVisible();
+      await expect(projectForm(page).getByRole("heading", { name: "Offen" }).first()).toBeVisible();
       await expect(visibleArticle(projectForm(page), taskTitle)).toBeVisible();
 
       await visibleArticle(projectForm(page), taskTitle).getByRole("button", { name: "Löschen", exact: true }).click();
@@ -199,11 +199,11 @@ test.describe("Globale UI-Aktualität", () => {
       await openProjectDetail(page, project.id);
       await tabWithCount(projectForm(page), "Backlog", 1).click();
       await expect(projectForm(page).getByRole("button", { name: /^Alle\s+1$/ })).toBeVisible();
-      await expect(projectForm(page).getByRole("button", { name: /^Offen\s+0$/ })).toBeVisible();
+      await expect(projectForm(page).getByRole("button", { name: /^Offen\s+0$/ }).last()).toBeVisible();
       await expect(projectForm(page).getByRole("button", { name: /^In Arbeit\s+1$/ })).toBeVisible();
       await projectForm(page).getByRole("button", { name: /^In Arbeit\s+1$/ }).click();
       await expect(visibleArticle(projectForm(page), backlogTitle)).toBeVisible();
-      await projectForm(page).getByRole("button", { name: /^Offen\s+0$/ }).click();
+      await projectForm(page).getByRole("button", { name: /^Offen\s+0$/ }).last().click();
       await expect(projectForm(page).locator("article:visible").filter({ hasText: backlogTitle })).toHaveCount(0);
       await projectForm(page).getByRole("button", { name: /^Alle\s+1$/ }).click();
 

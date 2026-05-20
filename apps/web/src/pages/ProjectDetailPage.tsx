@@ -143,6 +143,7 @@ export function ProjectDetailPage() {
         onDelete={deleteProject}
         savingLabel={savingLabel}
         onPostCreate={postCreateProject}
+        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

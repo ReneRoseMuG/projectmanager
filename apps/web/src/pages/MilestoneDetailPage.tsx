@@ -93,6 +93,7 @@ export function MilestoneDetailPage() {
         variant="page"
         onSubmit={submitMilestone}
         onDelete={deleteMilestone}
+        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

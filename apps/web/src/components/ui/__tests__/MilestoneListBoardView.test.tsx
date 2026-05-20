@@ -19,6 +19,23 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MilestoneListBoardView } from "../../milestones/MilestoneListBoardView";
 import { buildMilestoneSet } from "./factories";
 
+vi.mock("../../../hooks/useCatalogs", () => ({
+  useCatalogs() {
+    return {
+      entries: [],
+      workStatuses: [],
+      featureStatuses: [],
+      priorities: [],
+      loading: false,
+      error: null,
+      reload: async () => undefined,
+      createEntry: async () => undefined,
+      updateEntry: async () => undefined,
+      deleteEntry: async () => undefined
+    };
+  }
+}));
+
 function renderMilestoneList({
   milestones = buildMilestoneSet(),
   onCreate = vi.fn(),

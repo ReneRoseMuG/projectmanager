@@ -151,6 +151,7 @@ export function FeatureDetailPage() {
         onDelete={deleteFeature}
         savingLabel={savingLabel}
         onPostCreate={postCreateFeature}
+        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

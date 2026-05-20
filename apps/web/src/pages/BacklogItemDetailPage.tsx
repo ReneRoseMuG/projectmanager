@@ -80,7 +80,7 @@ export function BacklogItemDetailPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <BacklogItemForm open item={item} features={features.features} variant="page" onSubmit={submitBacklogItem} onClose={closePage} onOpenInTab={openInTab} />
+      <BacklogItemForm open item={item} features={features.features} variant="page" onSubmit={submitBacklogItem} closeOnSubmit={!isCreateMode} onClose={closePage} onOpenInTab={openInTab} />
     </div>
   );
 }

@@ -142,6 +142,7 @@ export function UseCaseDetailPage() {
         onSubmit={submitUseCase}
         onPostCreate={postCreateUseCase}
         onDelete={deleteUseCase}
+        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

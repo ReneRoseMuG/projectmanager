@@ -14,7 +14,6 @@
     "db:migrate": "npm run build && node scripts/copy-migrations-to-dist.mjs && node dist/db/migrate.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run",
     "lint": "eslint src --ext .ts"
   },
@@ -38,7 +37,6 @@
     "@types/unzipper": "^0.10.11",
     "@typescript-eslint/eslint-plugin": "^7.16.0",
     "@typescript-eslint/parser": "^7.16.0",
-    "@vitest/coverage-v8": "^1.6.1",
     "drizzle-kit": "^0.20.18",
     "eslint": "^8.57.0",
     "supertest": "^7.2.2",
