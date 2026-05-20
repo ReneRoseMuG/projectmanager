@@ -91,7 +91,6 @@ export function ProjectDetailPage() {
         await uploadProjectAttachment(projectId, file.file);
       }
       showToast({ tone: "success", title: "Projekt-Zuordnungen gespeichert" });
-      navigate(`/projects/${projectId}`);
     } catch (postCreateError) {
       showToast({ tone: "error", title: "Projekt wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
       throw postCreateError;
@@ -134,7 +133,7 @@ export function ProjectDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto -my-4 min-h-[calc(100%+2rem)] max-w-7xl md:-my-6 md:min-h-[calc(100%+3rem)]">
       <ProjectForm
         open
         project={project}
@@ -143,7 +142,6 @@ export function ProjectDetailPage() {
         onDelete={deleteProject}
         savingLabel={savingLabel}
         onPostCreate={postCreateProject}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

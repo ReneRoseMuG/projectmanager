@@ -99,7 +99,6 @@ export function FeatureDetailPage() {
       }
       await features.reload();
       showToast({ tone: "success", title: "Feature-Zuordnungen gespeichert" });
-      navigate(`/features/${featureId}`);
     } catch (postCreateError) {
       showToast({ tone: "error", title: "Feature wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
       throw postCreateError;
@@ -142,7 +141,7 @@ export function FeatureDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto -my-4 min-h-[calc(100%+2rem)] max-w-7xl md:-my-6 md:min-h-[calc(100%+3rem)]">
       <FeatureForm
         open
         feature={features.feature}
@@ -151,7 +150,6 @@ export function FeatureDetailPage() {
         onDelete={deleteFeature}
         savingLabel={savingLabel}
         onPostCreate={postCreateFeature}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

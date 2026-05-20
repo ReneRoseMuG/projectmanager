@@ -99,10 +99,12 @@ test.describe("Globale UI-Aktualität", () => {
       await openTab(projectForm(page), "Aufgaben");
       await expect(visibleArticle(projectForm(page), taskTitle)).toBeVisible();
       await projectForm(page).getByRole("button", { name: "Kanban" }).click();
-      await expect(projectForm(page).getByRole("heading", { name: "Offen" }).first()).toBeVisible();
+      await expect(projectForm(page).getByRole("heading", { name: "Aktiv" }).first()).toBeVisible();
       await expect(visibleArticle(projectForm(page), taskTitle)).toBeVisible();
 
-      await visibleArticle(projectForm(page), taskTitle).getByRole("button", { name: "Löschen", exact: true }).click();
+      const taskArticle = visibleArticle(projectForm(page), taskTitle);
+      await taskArticle.scrollIntoViewIfNeeded();
+      await taskArticle.getByRole("button", { name: "Löschen", exact: true }).click();
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/tasks/${createdTask.id}`) && response.request().method() === "DELETE"),
         page.getByRole("alertdialog").getByRole("button", { name: "Entfernen" }).click()

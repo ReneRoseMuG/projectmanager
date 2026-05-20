@@ -2,20 +2,20 @@
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Google-Drive-Sicherung erzeugt ein vollständiges Dump-ZIP mit DB, uploads/ und content/.
- * - Aktualisieren findet die neueste valide Drive-Sicherung und stellt DB + Dateisystem wieder her.
+ * - Lokale Sicherung erzeugt ein vollständiges Dump-ZIP mit DB, uploads/ und content/.
+ * - Aktualisieren findet die neueste valide lokale Sicherung und stellt DB + Dateisystem wieder her.
  * - Der Tabellenvertrag deckt alle Anwendungstabellen der aktuellen SQLite-Migration ab.
  * - Fehlerfälle blockieren den Import oder rollen ihn zurück, ohne beschädigte Teildaten zu hinterlassen.
  *
  * Fehlerfälle:
  * - Korrupte ZIPs, fehlende data.json, falsche Sicherheitsphrase, Hash-Mismatch, Manifest-Mismatch.
- * - Ungültige Fremdschlüssel im Dump, Drive-Downloadfehler, Fehler nach Dateisystem-Swap.
+ * - Ungültige Fremdschlüssel im Dump, unsichere Dateinamen, Fehler nach Dateisystem-Swap.
  *
  * Ziel:
  * Nachweis eines echten Roundtrips gegen temporäre SQLite-Datei und temporäre Datei-Verzeichnisse
  * sowie Absicherung der fehlertoleranten, aber konsistenzerhaltenden Importlogik.
  */
-import type { DumpDriveApplyResult, DumpDriveConfig, DumpDriveFile, DumpDrivePreviewResult } from "@taskmanager/shared-types";
+import type { DumpBackupApplyResult, DumpBackupFile, DumpBackupPreviewResult } from "@taskmanager/shared-types";
 import * as archiverPackage from "archiver";
 import type { Archiver } from "archiver";
 import crypto from "node:crypto";
@@ -27,15 +27,15 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { vitestRuntimeRoot } from "../../src/runtime-safety.js";
 import { config } from "../../src/config.js";
 import {
-  applyDriveDump,
+  applyLocalDump,
   buildDumpArchive,
   DUMP_TABLE_KEYS,
   getRegisteredDumpTables,
+  getLocalBackupStatus,
   inspectDumpArchive,
-  previewLatestDriveDump
+  previewLatestLocalDump
 } from "../../src/services/dump.service.js";
 import { setContentBaseDir } from "../../src/services/content.service.js";
-import type { GoogleDriveBackupClient } from "../../src/services/google-drive.service.js";
 import { buildTestApp } from "../helpers/app.js";
 import { createFileTestDb, type TestDb } from "../helpers/db.js";
 
@@ -54,64 +54,12 @@ interface Snapshot {
   foreignKeyErrors: unknown[];
 }
 
-class FakeDriveClient implements GoogleDriveBackupClient {
-  private files: Array<{ meta: DumpDriveFile; buffer: Buffer }> = [];
-  private counter = 0;
-  public failDownloadFor = new Set<string>();
-
-  addFile(name: string, buffer: Buffer, createdTime = new Date(Date.now() + this.counter * 1000).toISOString()): DumpDriveFile {
-    this.counter += 1;
-    const meta: DumpDriveFile = {
-      id: `drive-file-${this.counter}`,
-      name,
-      createdTime,
-      modifiedTime: createdTime,
-      sizeBytes: buffer.byteLength
-    };
-    this.files.push({ meta, buffer });
-    return meta;
-  }
-
-  replaceFile(id: string, buffer: Buffer): void {
-    const item = this.files.find((file) => file.meta.id === id);
-    if (!item) throw new Error(`Unknown fake file ${id}`);
-    item.buffer = buffer;
-    item.meta.sizeBytes = buffer.byteLength;
-  }
-
-  async listDumpFiles(): Promise<DumpDriveFile[]> {
-    return this.files
-      .map((file) => file.meta)
-      .sort((a, b) => b.createdTime.localeCompare(a.createdTime));
-  }
-
-  async uploadDump(filename: string, content: Buffer): Promise<DumpDriveFile> {
-    return this.addFile(filename, Buffer.from(content));
-  }
-
-  async downloadFile(fileId: string): Promise<Buffer> {
-    if (this.failDownloadFor.has(fileId)) {
-      throw new Error("Fake Drive download failed");
-    }
-    const item = this.files.find((file) => file.meta.id === fileId);
-    if (!item) throw new Error(`Unknown fake file ${fileId}`);
-    return Buffer.from(item.buffer);
-  }
-}
-
 let tempRoot: string;
 let uploadDir: string;
 let contentDir: string;
 let backupDir: string;
 let previewDir: string;
 let testDb: TestDb;
-let driveClient: FakeDriveClient;
-const originalGoogleConfig = {
-  googleDriveBackupFolderId: config.googleDriveBackupFolderId,
-  googleDriveClientId: config.googleDriveClientId,
-  googleDriveClientSecret: config.googleDriveClientSecret,
-  googleDriveRefreshToken: config.googleDriveRefreshToken
-};
 
 function quoteIdentifier(value: string): string {
   return `"${value.replace(/"/g, "\"\"")}"`;
@@ -144,6 +92,21 @@ function listFileHashes(rootDir: string): Record<string, string> {
   return Object.fromEntries(Object.entries(result).sort(([a], [b]) => a.localeCompare(b, "en")));
 }
 
+function writeBackupFile(filename: string, buffer: Buffer, modifiedAt = new Date()): DumpBackupFile {
+  fs.mkdirSync(backupDir, { recursive: true });
+  const filePath = path.join(backupDir, filename);
+  fs.writeFileSync(filePath, buffer);
+  fs.utimesSync(filePath, modifiedAt, modifiedAt);
+  return {
+    id: filename,
+    name: filename,
+    path: filePath,
+    createdTime: modifiedAt.toISOString(),
+    modifiedTime: modifiedAt.toISOString(),
+    sizeBytes: buffer.byteLength
+  };
+}
+
 function collectSnapshot(): Snapshot {
   const tables: Snapshot["tables"] = {};
   for (const entry of getRegisteredDumpTables()) {
@@ -172,8 +135,6 @@ function seedCompleteDataset(): void {
   fs.writeFileSync(path.join(contentDir, "wiki", "root.md"), "# Wiki Root", "utf8");
 
   testDb.sqlite.exec(`
-    INSERT INTO app_settings (key, value, updated_at)
-      VALUES ('googleDriveBackupFolderId', 'drive-folder-seeded', '2026-05-17T08:00:00');
     INSERT INTO users (id, name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at)
       VALUES (1, '', 'Ada', 'Lovelace', 'ada@example.test', NULL, 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO projects (id, name, description, status, color, start_date, due_date, created_at, updated_at)
@@ -310,7 +271,7 @@ async function replaceDumpJson(original: Buffer, data: Record<string, unknown>, 
 }
 
 beforeEach(() => {
-  tempRoot = path.join(vitestRuntimeRoot, "dump-drive", crypto.randomUUID());
+  tempRoot = path.join(vitestRuntimeRoot, "dump-local", crypto.randomUUID());
   uploadDir = path.join(tempRoot, "uploads");
   contentDir = path.join(tempRoot, "content");
   backupDir = path.join(tempRoot, "backups");
@@ -323,23 +284,14 @@ beforeEach(() => {
   config.backupWorkDir = backupDir;
   config.previewCacheDir = previewDir;
   config.databasePath = path.join(tempRoot, "taskmanager.sqlite");
-  config.googleDriveBackupFolderId = null;
-  config.googleDriveClientId = "test-client-id";
-  config.googleDriveClientSecret = "test-client-secret";
-  config.googleDriveRefreshToken = "test-refresh-token";
   setContentBaseDir(contentDir);
   testDb = createFileTestDb(config.databasePath);
-  driveClient = new FakeDriveClient();
   seedCompleteDataset();
 });
 
 afterEach(() => {
   testDb.sqlite.close();
   fs.rmSync(tempRoot, { recursive: true, force: true });
-  config.googleDriveBackupFolderId = originalGoogleConfig.googleDriveBackupFolderId;
-  config.googleDriveClientId = originalGoogleConfig.googleDriveClientId;
-  config.googleDriveClientSecret = originalGoogleConfig.googleDriveClientSecret;
-  config.googleDriveRefreshToken = originalGoogleConfig.googleDriveRefreshToken;
 });
 
 describe("Dump table contract", () => {
@@ -354,78 +306,104 @@ describe("Dump table contract", () => {
   });
 });
 
-describe("Google Drive backup config", () => {
-  it("speichert eine kopierte Google-Drive-Ordner-URL als normalisierte Folder-ID", async () => {
-    const app = await buildTestApp(testDb, { driveClient });
+describe("Local backup status", () => {
+  it("legt den lokalen Backup-Ordner bei Bedarf an", async () => {
+    fs.rmSync(backupDir, { recursive: true, force: true });
+    expect(fs.existsSync(backupDir)).toBe(false);
 
-    const response = await supertest(app.server)
-      .put("/api/dumps/drive/config")
-      .send({ folderInput: "https://drive.google.com/drive/folders/drive-folder-123_ABC?usp=sharing" })
-      .expect(200);
-    const updated = response.body as DumpDriveConfig;
+    const status = getLocalBackupStatus();
 
-    expect(updated.folderId).toBe("drive-folder-123_ABC");
-    expect(updated.folderUrl).toBe("https://drive.google.com/drive/folders/drive-folder-123_ABC");
-    expect(updated.source).toBe("database");
-    expect(updated.ready).toBe(true);
-    expect(testDb.sqlite.prepare("SELECT value FROM app_settings WHERE key = ?").get("googleDriveBackupFolderId")).toEqual({
-      value: "drive-folder-123_ABC"
+    expect(status.backupDirectory).toBe(backupDir);
+    expect(status.ready).toBe(true);
+    expect(status.fileCount).toBe(0);
+    expect(status.latestFile).toBeNull();
+    expect(fs.existsSync(backupDir)).toBe(true);
+  });
+
+  it("liefert den Status auch über die API", async () => {
+    const app = await buildTestApp(testDb);
+
+    const response = await supertest(app.server).get("/api/dumps/local/status").expect(200);
+
+    expect(response.body).toMatchObject({
+      backupDirectory: backupDir,
+      ready: true,
+      fileCount: 0,
+      latestFile: null
     });
-
-    const loaded = (await supertest(app.server).get("/api/dumps/drive/config").expect(200)).body as DumpDriveConfig;
-    expect(loaded.folderId).toBe("drive-folder-123_ABC");
     await app.close();
   });
 
-  it("weist ungültige Ordner-Eingaben zurück und lässt die gespeicherte ID unverändert", async () => {
-    const app = await buildTestApp(testDb, { driveClient });
-    const before = testDb.sqlite.prepare("SELECT value FROM app_settings WHERE key = ?").get("googleDriveBackupFolderId");
+  it("schützt lokale Dump-Routen über Auth und Dumps-Berechtigungen", async () => {
+    const originalAdminInitialPassword = config.adminInitialPassword;
+    config.adminInitialPassword = "password123";
+    const app = await buildTestApp(testDb, { enableAuth: true });
 
-    await supertest(app.server).put("/api/dumps/drive/config").send({ folderInput: "C:\\Backup\\Google Drive" }).expect(400);
+    try {
+      await supertest(app.server).get("/api/dumps/local/status").expect(401);
 
-    expect(testDb.sqlite.prepare("SELECT value FROM app_settings WHERE key = ?").get("googleDriveBackupFolderId")).toEqual(before);
-    await app.close();
+      const admin = supertest.agent(app.server);
+      await admin.post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
+      await admin.post("/api/dumps/local/save").expect(200);
+
+      const roles = await admin.get("/api/admin/roles").expect(200);
+      const readerRole = roles.body.find((role: { key: string }) => role.key === "reader") as { id: number };
+      await admin
+        .post("/api/admin/users")
+        .send({ firstName: "Dump", lastName: "Reader", email: "dump-reader@example.test", roleId: readerRole.id, password: "password123", isActive: true })
+        .expect(201);
+
+      const reader = supertest.agent(app.server);
+      await reader.post("/api/auth/login").send({ email: "dump-reader@example.test", password: "password123" }).expect(200);
+      await reader.get("/api/dumps/local/status").expect(200);
+      await reader.get("/api/dumps/local/latest/preview").expect(200);
+      await reader.post("/api/dumps/local/save").expect(403);
+    } finally {
+      config.adminInitialPassword = originalAdminInitialPassword;
+      await app.close();
+    }
   });
 });
 
-describe("Google Drive dump roundtrip", () => {
+describe("Local dump roundtrip", () => {
   it("sichert und aktualisiert DB, uploads und content als echten Roundtrip", async () => {
     const before = collectSnapshot();
-    const app = await buildTestApp(testDb, { enableMultipart: true, driveClient });
+    const app = await buildTestApp(testDb, { enableMultipart: true });
     setContentBaseDir(contentDir);
 
-    const saveResponse = await supertest(app.server).post("/api/dumps/drive/save").expect(200);
+    const saveResponse = await supertest(app.server).post("/api/dumps/local/save").expect(200);
     expect(String((saveResponse.body as { filename: string }).filename)).toMatch(/^taskmanager_dump_/);
+    expect(fs.existsSync((saveResponse.body as { filePath: string }).filePath)).toBe(true);
     mutateLocalState();
     expect(collectSnapshot()).not.toEqual(before);
 
-    const previewResponse = await supertest(app.server).post("/api/dumps/drive/latest/preview").expect(200);
-    const preview = previewResponse.body as DumpDrivePreviewResult;
+    const previewResponse = await supertest(app.server).get("/api/dumps/local/latest/preview").expect(200);
+    const preview = previewResponse.body as DumpBackupPreviewResult;
     expect(preview.transferReadiness).toBe("ready");
 
     const applyResponse = await supertest(app.server)
-      .post("/api/dumps/drive/latest/apply")
+      .post("/api/dumps/local/latest/apply")
       .send({
-        fileId: preview.driveFile.id,
+        fileId: preview.backupFile.id,
         fileHash: preview.fileHash,
         confirmationPhrase: preview.confirmationPhrase
       })
       .expect(200);
-    const applyResult = applyResponse.body as DumpDriveApplyResult;
+    const applyResult = applyResponse.body as DumpBackupApplyResult;
 
     expect(applyResult.verificationPassed).toBe(true);
     expect(collectSnapshot()).toEqual(before);
     await app.close();
   });
 
-  it("überspringt neuere defekte Drive-Dateien und nutzt die neueste valide Sicherung", async () => {
+  it("überspringt neuere defekte lokale Dateien und nutzt die neueste valide Sicherung", async () => {
     const validArchive = await buildDumpArchive(testDb.sqlite);
-    const validFile = driveClient.addFile("taskmanager_dump_valid.zip", validArchive.buffer, "2026-05-17T08:00:00.000Z");
-    driveClient.addFile("taskmanager_dump_broken.zip", Buffer.from("broken"), "2026-05-17T09:00:00.000Z");
+    const validFile = writeBackupFile("taskmanager_dump_valid.zip", validArchive.buffer, new Date("2026-05-17T08:00:00.000Z"));
+    writeBackupFile("taskmanager_dump_broken.zip", Buffer.from("broken"), new Date("2026-05-17T09:00:00.000Z"));
 
-    const preview = await previewLatestDriveDump(driveClient);
+    const preview = await previewLatestLocalDump();
 
-    expect(preview.driveFile.id).toBe(validFile.id);
+    expect(preview.backupFile.id).toBe(validFile.id);
     expect(preview.warnings.some((warning) => warning.includes("broken"))).toBe(true);
   });
 });
@@ -433,12 +411,12 @@ describe("Google Drive dump roundtrip", () => {
 describe("Dump import failure safety", () => {
   it("blockiert Hash-Mismatch und falsche Sicherheitsphrase ohne lokale Änderung", async () => {
     const archive = await buildDumpArchive(testDb.sqlite);
-    const file = driveClient.addFile(archive.filename, archive.buffer);
+    const file = writeBackupFile(archive.filename, archive.buffer);
     const before = collectSnapshot();
     const preview = await inspectDumpArchive(archive.buffer, file);
 
     await expect(
-      applyDriveDump(testDb.sqlite, driveClient, {
+      applyLocalDump(testDb.sqlite, {
         fileId: file.id,
         fileHash: `${preview.fileHash}x`,
         confirmationPhrase: preview.confirmationPhrase
@@ -447,7 +425,7 @@ describe("Dump import failure safety", () => {
     expect(collectSnapshot()).toEqual(before);
 
     await expect(
-      applyDriveDump(testDb.sqlite, driveClient, {
+      applyLocalDump(testDb.sqlite, {
         fileId: file.id,
         fileHash: preview.fileHash,
         confirmationPhrase: "falsch"
@@ -463,13 +441,13 @@ describe("Dump import failure safety", () => {
     const manifestTables = manifest.tables as Record<string, { rowCount: number; sha256: string }>;
     manifestTables.projects = { ...manifestTables.projects, rowCount: manifestTables.projects.rowCount + 1 };
     const badArchive = await replaceDumpJson(archive.buffer, data, manifest);
-    const file = driveClient.addFile(archive.filename, badArchive);
+    const file = writeBackupFile(archive.filename, badArchive);
     const before = collectSnapshot();
 
     const preview = await inspectDumpArchive(badArchive, file);
     expect(preview.transferReadiness).toBe("blocked");
     await expect(
-      applyDriveDump(testDb.sqlite, driveClient, {
+      applyLocalDump(testDb.sqlite, {
         fileId: file.id,
         fileHash: preview.fileHash,
         confirmationPhrase: preview.confirmationPhrase
@@ -490,7 +468,7 @@ describe("Dump import failure safety", () => {
       sha256: sha256Json(tables.projectTasks)
     };
     const badArchive = await replaceDumpJson(archive.buffer, data, manifest);
-    const file = driveClient.addFile(archive.filename, badArchive);
+    const file = writeBackupFile(archive.filename, badArchive);
     const before = collectSnapshot();
     mutateLocalState();
     const mutated = collectSnapshot();
@@ -498,7 +476,7 @@ describe("Dump import failure safety", () => {
     const preview = await inspectDumpArchive(badArchive, file);
     expect(preview.transferReadiness).toBe("ready");
     await expect(
-      applyDriveDump(testDb.sqlite, driveClient, {
+      applyLocalDump(testDb.sqlite, {
         fileId: file.id,
         fileHash: preview.fileHash,
         confirmationPhrase: preview.confirmationPhrase
@@ -512,16 +490,15 @@ describe("Dump import failure safety", () => {
 
   it("stellt Dateisystem und DB nach Fehler während des Dateitauschs wieder her", async () => {
     const archive = await buildDumpArchive(testDb.sqlite);
-    const file = driveClient.addFile(archive.filename, archive.buffer);
+    const file = writeBackupFile(archive.filename, archive.buffer);
     const before = collectSnapshot();
     mutateLocalState();
     const mutated = collectSnapshot();
     const preview = await inspectDumpArchive(archive.buffer, file);
 
     await expect(
-      applyDriveDump(
+      applyLocalDump(
         testDb.sqlite,
-        driveClient,
         {
           fileId: file.id,
           fileHash: preview.fileHash,
@@ -539,18 +516,23 @@ describe("Dump import failure safety", () => {
     expect(collectSnapshot()).not.toEqual(before);
   });
 
-  it("verändert bei Drive-Downloadfehler und kaputten ZIPs keine lokalen Daten", async () => {
+  it("verändert bei unsicheren Dateinamen und kaputten ZIPs keine lokalen Daten", async () => {
     const archive = await buildDumpArchive(testDb.sqlite);
-    const file = driveClient.addFile(archive.filename, archive.buffer);
+    const file = writeBackupFile(archive.filename, archive.buffer);
     const before = collectSnapshot();
-    driveClient.failDownloadFor.add(file.id);
 
-    await expect(previewLatestDriveDump(driveClient)).rejects.toThrow();
+    await expect(
+      applyLocalDump(testDb.sqlite, {
+        fileId: `../${file.id}`,
+        fileHash: "irrelevant",
+        confirmationPhrase: "irrelevant"
+      })
+    ).rejects.toThrow();
     expect(collectSnapshot()).toEqual(before);
 
-    driveClient.failDownloadFor.clear();
-    driveClient.replaceFile(file.id, await zipFromEntries([{ name: "readme.txt", content: "missing data" }]));
-    await expect(previewLatestDriveDump(driveClient)).rejects.toThrow();
+    fs.rmSync(path.join(backupDir, file.id), { force: true });
+    writeBackupFile("taskmanager_dump_broken.zip", await zipFromEntries([{ name: "readme.txt", content: "missing data" }]));
+    await expect(previewLatestLocalDump()).rejects.toThrow();
     expect(collectSnapshot()).toEqual(before);
   });
 });

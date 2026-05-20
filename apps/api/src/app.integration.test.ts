@@ -1,4 +1,4 @@
-import type { Attachment, BacklogItem, Comment, Event, Feature, FeatureRelation, Note, Project, Tag, Task, TaskBoardItem, TaskDetail, UseCase, WikiImportReport } from "@taskmanager/shared-types";
+import type { Attachment, BacklogItem, CatalogEntry, Comment, Event, Feature, FeatureRelation, Milestone, Note, Project, Tag, Task, TaskBoardItem, TaskDetail, Ticket, UseCase, WikiImportReport } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import fs from "node:fs/promises";
@@ -67,6 +67,92 @@ describe("Projekt Manager API integration", () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
+  async function trimCatalog(kind: CatalogEntry["kind"], keepKeys: string[]): Promise<CatalogEntry[]> {
+    const entries = (await api.get(`/api/catalogs/${kind}`).expect(200)).body as CatalogEntry[];
+    const removed = entries.filter((entry) => !keepKeys.includes(entry.key));
+    for (const entry of removed) {
+      await api.delete(`/api/catalogs/${kind}/${entry.id}`).expect(204);
+    }
+    return removed;
+  }
+
+  async function restoreCatalogEntries(entries: CatalogEntry[]): Promise<void> {
+    for (const entry of entries.sort((left, right) => left.sortOrder - right.sortOrder)) {
+      const existing = (await api.get(`/api/catalogs/${entry.kind}`).expect(200)).body as CatalogEntry[];
+      if (existing.some((candidate) => candidate.key === entry.key)) {
+        continue;
+      }
+      await api
+        .post(`/api/catalogs/${entry.kind}`)
+        .send({ key: entry.key, label: entry.label, sortOrder: entry.sortOrder, isClosed: entry.isClosed })
+        .expect(201);
+    }
+  }
+
+  it("creates domain objects when editable catalogs no longer contain legacy defaults", async () => {
+    const removedEntries: CatalogEntry[] = [];
+    const createdIds: Partial<Record<"project" | "milestone" | "feature" | "useCase" | "task" | "ticket" | "backlog", number>> = {};
+
+    try {
+      removedEntries.push(...(await trimCatalog("workStatus", ["active"])));
+      removedEntries.push(...(await trimCatalog("featureStatus", ["active"])));
+      removedEntries.push(...(await trimCatalog("priority", ["low"])));
+
+      const project = (await api.post("/api/projects").send({ name: "Trimmed catalogs project" }).expect(201)).body as Project;
+      createdIds.project = project.id;
+      expect(project.status).toBe("active");
+
+      const milestone = (await api.post("/api/milestones").send({ projectId: project.id, name: "Trimmed catalogs milestone" }).expect(201)).body as Milestone;
+      createdIds.milestone = milestone.id;
+      expect(milestone.status).toBe("active");
+
+      const feature = (await api.post("/api/features").send({ title: "Trimmed catalogs feature", slug: "trimmed-catalogs-feature" }).expect(201)).body as Feature;
+      createdIds.feature = feature.id;
+      expect(feature.status).toBe("active");
+
+      const useCase = (await api.post(`/api/features/${feature.id}/use-cases`).send({ title: "Trimmed catalogs use case", slug: "trimmed-catalogs-use-case" }).expect(201)).body as UseCase;
+      createdIds.useCase = useCase.id;
+      expect(useCase.status).toBe("active");
+
+      const task = (await api.post(`/api/projects/${project.id}/tasks`).send({ title: "Trimmed catalogs task" }).expect(201)).body as TaskBoardItem;
+      createdIds.task = task.id;
+      expect(task.status).toBe("active");
+      expect(task.priority).toBe("low");
+
+      const ticket = (await api.post(`/api/projects/${project.id}/tickets`).send({ title: "Trimmed catalogs ticket" }).expect(201)).body as Ticket;
+      createdIds.ticket = ticket.id;
+      expect(ticket.status).toBe("active");
+      expect(ticket.priority).toBe("low");
+
+      const backlog = (await api.post(`/api/projects/${project.id}/backlog`).send({ title: "Trimmed catalogs backlog" }).expect(201)).body as BacklogItem;
+      createdIds.backlog = backlog.id;
+      expect(backlog.status).toBe("active");
+    } finally {
+      if (createdIds.backlog) {
+        await api.delete(`/api/backlog/${createdIds.backlog}`);
+      }
+      if (createdIds.useCase) {
+        await api.delete(`/api/use-cases/${createdIds.useCase}`);
+      }
+      if (createdIds.feature) {
+        await api.delete(`/api/features/${createdIds.feature}`);
+      }
+      if (createdIds.milestone) {
+        await api.delete(`/api/milestones/${createdIds.milestone}`);
+      }
+      if (createdIds.project) {
+        await api.delete(`/api/projects/${createdIds.project}`);
+      }
+      if (createdIds.ticket) {
+        await api.delete(`/api/tickets/${createdIds.ticket}`);
+      }
+      if (createdIds.task) {
+        await api.delete(`/api/tasks/${createdIds.task}`);
+      }
+      await restoreCatalogEntries(removedEntries);
+    }
+  });
+
   it("covers project, task, tag, note, attachment, comment and event endpoints", async () => {
     await api.get("/health").expect(200, { ok: true });
     await api.get("/api/projects").expect(200, []);
@@ -107,7 +193,7 @@ describe("Projekt Manager API integration", () => {
         .send({ title: "API testen", dueDate: "2026-05-20" })
         .expect(201)
     ).body as TaskBoardItem;
-    expect(createdTask.status).toBe("todo");
+    expect(createdTask.status).toBe("active");
     expect(createdTask.boardPosition).toBeGreaterThan(0);
 
     const updatedTask = (

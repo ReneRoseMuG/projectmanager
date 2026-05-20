@@ -195,7 +195,7 @@ function ListBoardViewContent<T>({
   const boardByStatus = mode === "board" && hasStatusGrouping;
 
   return (
-    <div className="grid gap-4">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4" data-testid="list-board-view">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {onSearchChange ? <SearchInput value={searchValue} onChange={onSearchChange} /> : <span />}
         <div className="flex flex-wrap items-center gap-2">
@@ -206,70 +206,72 @@ function ListBoardViewContent<T>({
         </div>
       </div>
 
-      {loading ? <TaskListSkeleton /> : null}
-      {!loading && items.length === 0 ? emptyState : null}
-      {!loading && items.length > 0 && mode === "list" && !hasStatusGrouping ? (
-        <div className="grid gap-3">
-          {items.map((item, index) => (
-            <div key={index}>{renderRow(item)}</div>
-          ))}
-        </div>
-      ) : null}
-      {!loading && items.length > 0 && mode === "list" && hasStatusGrouping ? (
-        <div className="grid gap-4">
-          {listStatusGroups.map((group) => (
-            <section key={group.column.value} className={`grid min-w-0 gap-3 rounded-lg border p-3 ${statusGroupClass(group.column)}`}>
-              <header className="flex min-w-0 items-center justify-between gap-3">
-                <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{group.column.label}</h2>
-                <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">{group.items.length}</span>
-              </header>
-              <div className="grid gap-3">
-                {group.items.map((item, index) => (
-                  <div key={index}>{renderRow(item)}</div>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-      ) : null}
-      {!loading && items.length > 0 && mode === "board" && !boardByStatus ? (
-        <CardGrid>
-          {items.map((item, index) => (
-            <div key={index} className="min-w-0 max-w-full">
-              {renderCard(item)}
-            </div>
-          ))}
-        </CardGrid>
-      ) : null}
-      {!loading && items.length > 0 && boardByStatus ? (
-        <div className="grid min-w-0 grid-flow-col auto-cols-[minmax(17rem,1fr)] gap-4 overflow-x-auto pb-2">
-          {boardStatusGroups.map((group) => (
-            <section key={group.column.value} className={`grid min-h-[240px] min-w-0 content-start gap-3 rounded-lg border p-3 ${statusGroupClass(group.column)}`}>
-              <header className="flex min-w-0 items-center justify-between gap-3">
-                <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{group.column.label}</h2>
-                <div className="flex items-center gap-2">
+      <div className="min-h-0 flex-1">
+        {loading ? <TaskListSkeleton /> : null}
+        {!loading && items.length === 0 ? <div className="grid min-h-full">{emptyState}</div> : null}
+        {!loading && items.length > 0 && mode === "list" && !hasStatusGrouping ? (
+          <div className="grid min-h-full content-start gap-3">
+            {items.map((item, index) => (
+              <div key={index}>{renderRow(item)}</div>
+            ))}
+          </div>
+        ) : null}
+        {!loading && items.length > 0 && mode === "list" && hasStatusGrouping ? (
+          <div className="grid min-h-full content-start gap-4">
+            {listStatusGroups.map((group) => (
+              <section key={group.column.value} className={`grid min-w-0 gap-3 rounded-lg border p-3 ${statusGroupClass(group.column)}`}>
+                <header className="flex min-w-0 items-center justify-between gap-3">
+                  <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{group.column.label}</h2>
                   <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">{group.items.length}</span>
-                  {onAddToColumn && isKnownColumn(orderedStatusColumns, group.column.value) ? (
-                    <Button
-                      aria-label={`${group.column.label} hinzufügen`}
-                      title={`${group.column.label} hinzufügen`}
-                      variant="ghost"
-                      className="h-10 w-10 border border-line bg-white text-steel-700 hover:bg-steel-50"
-                      icon={<Plus size={18} />}
-                      onClick={() => onAddToColumn(group.column.value)}
-                    />
-                  ) : null}
+                </header>
+                <div className="grid gap-3">
+                  {group.items.map((item, index) => (
+                    <div key={index}>{renderRow(item)}</div>
+                  ))}
                 </div>
-              </header>
-              {group.items.map((item, index) => (
-                <div key={index} className="min-w-0 max-w-full">
-                  {renderCard(item)}
-                </div>
-              ))}
-            </section>
-          ))}
-        </div>
-      ) : null}
+              </section>
+            ))}
+          </div>
+        ) : null}
+        {!loading && items.length > 0 && mode === "board" && !boardByStatus ? (
+          <CardGrid>
+            {items.map((item, index) => (
+              <div key={index} className="min-w-0 max-w-full">
+                {renderCard(item)}
+              </div>
+            ))}
+          </CardGrid>
+        ) : null}
+        {!loading && items.length > 0 && boardByStatus ? (
+          <div className="grid h-full min-h-full min-w-0 grid-flow-col auto-cols-[minmax(17rem,1fr)] gap-4 overflow-x-auto pb-2">
+            {boardStatusGroups.map((group) => (
+              <section key={group.column.value} className={`grid h-full min-h-[240px] min-w-0 content-start gap-3 rounded-lg border p-3 ${statusGroupClass(group.column)}`}>
+                <header className="flex min-w-0 items-center justify-between gap-3">
+                  <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{group.column.label}</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">{group.items.length}</span>
+                    {onAddToColumn && isKnownColumn(orderedStatusColumns, group.column.value) ? (
+                      <Button
+                        aria-label={`${group.column.label} hinzufügen`}
+                        title={`${group.column.label} hinzufügen`}
+                        variant="ghost"
+                        className="h-10 w-10 border border-line bg-white text-steel-700 hover:bg-steel-50"
+                        icon={<Plus size={18} />}
+                        onClick={() => onAddToColumn(group.column.value)}
+                      />
+                    ) : null}
+                  </div>
+                </header>
+                {group.items.map((item, index) => (
+                  <div key={index} className="min-w-0 max-w-full">
+                    {renderCard(item)}
+                  </div>
+                ))}
+              </section>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

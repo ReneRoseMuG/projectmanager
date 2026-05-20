@@ -27,10 +27,7 @@ function parseTaskOwner(searchParams: URLSearchParams): TaskOwner | undefined {
 }
 
 function parseTaskStatus(value: string | null): TaskStatus {
-  if (value === "in_progress" || value === "done") {
-    return value;
-  }
-  return "todo";
+  return value && value.trim().length > 0 ? value : "active";
 }
 
 export function TaskDetailPage() {
@@ -120,7 +117,6 @@ export function TaskDetailPage() {
       }
 
       showToast({ tone: "success", title: "Aufgabe erstellt" });
-      navigate(`/tasks/${created.id}?returnTo=${encodeURIComponent(returnTo)}`);
       return created;
     } catch (taskError) {
       showToast({ tone: "error", title: created ? "Aufgabe wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden" : "Aufgabe konnte nicht erstellt werden", message: errorMessage(taskError) });
@@ -147,7 +143,7 @@ export function TaskDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto -my-4 min-h-[calc(100%+2rem)] max-w-7xl md:-my-6 md:min-h-[calc(100%+3rem)]">
       <TaskForm
         open
         task={detail.task}
@@ -155,7 +151,6 @@ export function TaskDetailPage() {
         variant="page"
         savingLabel={savingLabel}
         onSubmit={submitTask}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onChanged={detail.reload}
         onOpenInTab={openInTab}

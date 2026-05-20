@@ -19,10 +19,7 @@ function parseTicketOwner(searchParams: URLSearchParams): TicketOwner | undefine
 }
 
 function parseTicketStatus(value: string | null): TicketStatus {
-  if (value === "in_progress" || value === "in_review" || value === "resolved" || value === "closed") {
-    return value;
-  }
-  return "open";
+  return value && value.trim().length > 0 ? value : "open";
 }
 
 export function TicketDetailPage() {
@@ -55,9 +52,6 @@ export function TicketDetailPage() {
       }
       await tickets.reload();
       showToast({ tone: "success", title: "Ticket erstellt" });
-      if (created) {
-        navigate(`/tickets/${created.id}?returnTo=${encodeURIComponent(returnTo)}`);
-      }
     } catch (ticketError) {
       showToast({ tone: "error", title: "Ticket konnte nicht erstellt werden", message: await errorMessageAsync(ticketError) });
       throw ticketError;
@@ -84,8 +78,8 @@ export function TicketDetailPage() {
 
   if (isCreateMode) {
     return (
-      <div className="mx-auto max-w-7xl">
-        <TicketForm open variant="page" initialStatus={parseTicketStatus(searchParams.get("status"))} onSubmit={createTicket} closeOnSubmit={false} onClose={closePage} />
+      <div className="mx-auto -my-4 min-h-[calc(100%+2rem)] max-w-7xl md:-my-6 md:min-h-[calc(100%+3rem)]">
+        <TicketForm open variant="page" initialStatus={parseTicketStatus(searchParams.get("status"))} onSubmit={createTicket} onClose={closePage} />
       </div>
     );
   }
@@ -103,7 +97,7 @@ export function TicketDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="mx-auto -my-4 min-h-[calc(100%+2rem)] max-w-7xl md:-my-6 md:min-h-[calc(100%+3rem)]">
       <TicketForm open ticket={detail.ticket} variant="page" onSubmit={saveTicket} onClose={closePage} onOpenInTab={openInTab} />
     </div>
   );

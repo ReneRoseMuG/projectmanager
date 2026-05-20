@@ -25,9 +25,11 @@ export function DetailModal<T extends string>({ open, onClose, title, subtitle, 
     return null;
   }
 
+  const isPage = variant === "page";
+
   const detail = (
-    <div className={variant === "page" ? "flex min-h-[calc(100vh-120px)] flex-col overflow-hidden rounded-2xl bg-shell shadow-panel" : "flex max-h-[calc(100vh-64px)] flex-col bg-shell"}>
-      <header className="relative shrink-0 overflow-hidden border-b border-steel-700 bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
+    <div className={isPage ? "flex min-h-full flex-col rounded-2xl bg-shell shadow-panel" : "flex max-h-[calc(100vh-64px)] flex-col bg-shell"}>
+      <header className={`relative overflow-hidden border-b border-steel-700 bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6 ${isPage ? "rounded-t-2xl" : "shrink-0"}`}>
         <div className="pointer-events-none absolute -right-8 -top-32 h-80 w-80 rounded-full bg-white/12 blur-sm" />
         <div className="relative grid gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -63,10 +65,12 @@ export function DetailModal<T extends string>({ open, onClose, title, subtitle, 
         </div>
       </header>
 
-      <TabBar tabs={tabs} active={activeTab} onChange={onTabChange} />
-      <main className="min-h-0 flex-1 overflow-auto p-4 md:p-5">{children}</main>
+      <div className={isPage ? "sticky top-[-1rem] z-20 shadow-sm md:top-[-1.5rem]" : "shrink-0"}>
+        <TabBar tabs={tabs} active={activeTab} onChange={onTabChange} />
+      </div>
+      <main className={isPage ? "flex flex-1 flex-col gap-4 px-4 pt-4 md:px-5 md:pt-5" : "min-h-0 flex-1 overflow-auto p-4 md:p-5"}>{children}</main>
       {footer ? (
-        <footer className="shrink-0 border-t border-line bg-white px-5 py-4">
+        <footer className={`${isPage ? "sticky bottom-[-1rem] z-10 rounded-b-2xl md:bottom-[-1.5rem]" : "shrink-0"} border-t border-line bg-white px-5 py-4`}>
           <div className="flex flex-wrap items-center justify-end gap-3">{footer}</div>
         </footer>
       ) : null}

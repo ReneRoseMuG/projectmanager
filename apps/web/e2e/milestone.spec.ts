@@ -25,6 +25,7 @@ import {
  *
  * Abgedeckte Regeln:
  * - Meilensteine sind als Tab im Projektformular sichtbar und öffnen die kanonischen Routen `/milestones/new` und `/milestones/:id`.
+ * - Neue Meilensteine schließen nach Speichern zurück zur Rücksprungroute.
  * - Das Meilensteinformular zeigt Stammdaten inklusive Projektzuordnung und alle Subviews mit echten API-Daten.
  * - Subviews reagieren auf Datenänderungen ohne Browser-Reload, insbesondere Kommentar-Counts nach Mutation.
  *
@@ -34,12 +35,6 @@ import {
  * Ziel:
  * Den Milestone-UI-Workflow im Browser gegen echte API-Daten absichern.
  */
-
-function milestoneIdFromUrl(url: string): number {
-  const id = Number(new URL(url).pathname.split("/").pop());
-  expect(Number.isFinite(id)).toBeTruthy();
-  return id;
-}
 
 test.describe("Meilenstein-Formular und Projekt-Tab", () => {
   test("Projektformular erstellt Meilensteine über den neuen Tab und aktualisiert die Menge", async ({ page, request }) => {
@@ -61,10 +56,12 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       await fillRichText(milestoneForm, "milestone-description", "E2E Meilensteinbeschreibung vollständig");
       await milestoneForm.locator('input[type="date"]').nth(0).fill("2026-06-01");
       await milestoneForm.locator('input[type="date"]').nth(1).fill("2026-06-30");
+      const milestoneResponsePromise = page.waitForResponse((response) => response.url().includes("/api/milestones") && response.request().method() === "POST");
       await milestoneForm.getByRole("button", { name: "Meilenstein anlegen" }).click();
+      const createdMilestone = (await (await milestoneResponsePromise).json()) as { id: number };
+      milestoneId = createdMilestone.id;
 
-      await expect(page).toHaveURL(/\/milestones\/\d+/);
-      milestoneId = milestoneIdFromUrl(page.url());
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
 
       await authenticatedGoto(page, `/projects/${project.id}`);
       const refreshedProjectForm = formPage(page, "Projekt bearbeiten");

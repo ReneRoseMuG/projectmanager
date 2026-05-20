@@ -18,7 +18,7 @@ import { useCatalogs } from "../../hooks/useCatalogs";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
-import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed } from "../../utils/catalogs";
+import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed, resolveCatalogEntryKey } from "../../utils/catalogs";
 import { ticketTypeLabels } from "../../utils/domainLabels";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
@@ -70,6 +70,18 @@ const tabs: Array<Tab<UseCaseFormTab>> = [
   { value: "comments", label: "Kommentare" }
 ];
 
+function featureStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "draft") {
+  return resolveCatalogEntryKey(entries, "featureStatus", value, preferredKey) ?? preferredKey;
+}
+
+function workStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "active") {
+  return resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ?? preferredKey;
+}
+
+function priorityValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "medium") {
+  return resolveCatalogEntryKey(entries, "priority", value, preferredKey) ?? preferredKey;
+}
+
 export function UseCaseForm({ open, useCase, currentFeatureId, features = [], onSubmit, onPostCreate, onDelete, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: UseCaseFormProps) {
   const comments = useEntityComments("useCase", useCase?.id);
   const catalogs = useCatalogs();
@@ -115,11 +127,25 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
     setActiveTab("details");
   }, [currentFeatureId, open, useCase]);
 
+  useEffect(() => {
+    if (open) {
+      setStatus((currentStatus) => featureStatusValue(catalogs.entries, currentStatus, "draft"));
+    }
+  }, [catalogs.entries, open]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     try {
-      const created = await onSubmit({ featureId: selectedFeatureId ? Number(selectedFeatureId) : undefined, title, slug, status, description, sortOrder, content });
+      const created = await onSubmit({
+        featureId: selectedFeatureId ? Number(selectedFeatureId) : undefined,
+        title,
+        slug,
+        status: resolveCatalogEntryKey(catalogs.entries, "featureStatus", status, "draft"),
+        description,
+        sortOrder,
+        content
+      });
       if (!useCase && created && onPostCreate) {
         await onPostCreate(created.id, { tasks: pendingTasks, tickets: pendingTickets, comments: pendingComments });
       }
@@ -189,9 +215,8 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
         }
         onClose={onClose}
         variant={variant}
+        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
       >
-        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
-
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">
@@ -240,7 +265,7 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section title="Aufgaben">
+          <Section title="Aufgaben" fill={Boolean(taskOwner)}>
             {taskOwner ? (
               <OwnerTaskBoard owner={taskOwner} />
             ) : (
@@ -270,7 +295,7 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets">
+          <Section title="Tickets" fill={Boolean(ticketOwner)}>
             {ticketOwner ? (
               <OwnerTicketBoard owner={ticketOwner} />
             ) : (
@@ -358,7 +383,8 @@ function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(item
 
 function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
   const [title, setTitle] = useState("");
-  const [status, setStatus] = useState<TaskStatus>("todo");
+  const catalogs = useCatalogs();
+  const [status, setStatus] = useState<TaskStatus>("active");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
 
@@ -368,10 +394,14 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, status, priority });
+    onCreate({
+      title: trimmedTitle,
+      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
+      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+    });
     setTitle("");
-    setStatus("todo");
-    setPriority("medium");
+    setStatus(workStatusValue(catalogs.entries, "active", "active"));
+    setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
   };
 
@@ -403,6 +433,7 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
 function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<TicketType>("bug");
+  const catalogs = useCatalogs();
   const [status, setStatus] = useState<TicketStatus>("open");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
@@ -413,11 +444,16 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, type, status, priority });
+    onCreate({
+      title: trimmedTitle,
+      type,
+      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"),
+      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+    });
     setTitle("");
     setType("bug");
-    setStatus("open");
-    setPriority("medium");
+    setStatus(workStatusValue(catalogs.entries, "open", "open"));
+    setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
   };
 

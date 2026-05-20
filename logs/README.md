@@ -2,6 +2,13 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 20.05.26 | Fix | Formular Save-Close Create | ✅ |
+| 20.05.26 | Fix | Backup Pfad Root | ✅ |
+| 20.05.26 | Feature | Lokale Backups | ✅ |
+| 20.05.26 | Fix | Formular-Board-Tabs füllen | ⚠️ |
+| 20.05.26 | Fix | Katalogsichere Create-Flows | ✅ |
+| 20.05.26 | Fix | Admin Account Reset | ✅ |
+| 20.05.26 | Feature | Sticky Formular-Shells | ✅ |
 | 20.05.26 | Fix | Formularfelder | ✅ |
 | 20.05.26 | 1 | Planungsleitplanken-Skill | ✅ |
 | 20.05.26 | Fix | Auth-Rollen-Architektur | ✅ |

@@ -729,11 +729,11 @@ export interface WikiImportReport {
 
 export type DumpReadiness = "ready" | "warning" | "blocked";
 export type DumpImportStatus = "success" | "warning" | "error";
-export type DumpDriveConfigSource = "database" | "environment" | "missing";
 
-export interface DumpDriveFile {
+export interface DumpBackupFile {
   id: string;
   name: string;
+  path: string;
   createdTime: string;
   modifiedTime: string | null;
   sizeBytes: number;
@@ -752,17 +752,25 @@ export interface DumpFileRootSummary {
   sha256: string;
 }
 
-export interface DumpDriveSaveResult {
-  dumpId: string;
-  filename: string;
-  sizeBytes: number;
-  driveFile: DumpDriveFile;
+export interface DumpBackupStatus {
+  backupDirectory: string;
+  ready: boolean;
+  fileCount: number;
+  latestFile: DumpBackupFile | null;
 }
 
-export interface DumpDrivePreviewResult {
+export interface DumpBackupSaveResult {
+  dumpId: string;
+  filename: string;
+  filePath: string;
+  sizeBytes: number;
+  backupFile: DumpBackupFile;
+}
+
+export interface DumpBackupPreviewResult {
   fileHash: string;
   dumpId: string;
-  driveFile: DumpDriveFile;
+  backupFile: DumpBackupFile;
   targetDatabasePath: string;
   transferReadiness: DumpReadiness;
   blockingIssues: string[];
@@ -774,15 +782,15 @@ export interface DumpDrivePreviewResult {
   expectedFileRoots: DumpFileRootSummary[];
 }
 
-export interface DumpDriveApplyRequest {
+export interface DumpBackupApplyRequest {
   fileId: string;
   fileHash: string;
   confirmationPhrase: string;
 }
 
-export interface DumpDriveApplyResult {
+export interface DumpBackupApplyResult {
   dumpId: string;
-  driveFile: DumpDriveFile;
+  backupFile: DumpBackupFile;
   targetBackupPath: string;
   verificationPassed: boolean;
   importStatus: DumpImportStatus;
@@ -790,17 +798,4 @@ export interface DumpDriveApplyResult {
   fileRootsRestored: DumpFileRootSummary[];
   warnings: string[];
   blockingIssues: string[];
-}
-
-export interface DumpDriveConfig {
-  folderId: string | null;
-  folderUrl: string | null;
-  source: DumpDriveConfigSource;
-  oauthConfigured: boolean;
-  ready: boolean;
-  updatedAt: string | null;
-}
-
-export interface DumpDriveConfigUpdateRequest {
-  folderInput: string;
 }

@@ -53,9 +53,8 @@ export function BacklogItemDetailPage() {
         showToast({ tone: "success", title: "Backlog-Item gespeichert" });
         return;
       }
-      const created = await backlog.createItem(input);
+      await backlog.createItem(input);
       showToast({ tone: "success", title: "Backlog-Item erstellt" });
-      navigate(`/backlog/${created.id}?returnTo=${encodeURIComponent(returnTo)}`);
     } catch (backlogError) {
       showToast({ tone: "error", title: "Backlog-Item konnte nicht gespeichert werden", message: errorMessage(backlogError) });
       throw backlogError;
@@ -79,8 +78,8 @@ export function BacklogItemDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
-      <BacklogItemForm open item={item} features={features.features} variant="page" onSubmit={submitBacklogItem} closeOnSubmit={!isCreateMode} onClose={closePage} onOpenInTab={openInTab} />
+    <div className="mx-auto -my-4 min-h-[calc(100%+2rem)] max-w-7xl md:-my-6 md:min-h-[calc(100%+3rem)]">
+      <BacklogItemForm open item={item} features={features.features} variant="page" onSubmit={submitBacklogItem} onClose={closePage} onOpenInTab={openInTab} />
     </div>
   );
 }

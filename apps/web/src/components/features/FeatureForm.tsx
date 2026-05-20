@@ -26,7 +26,7 @@ import { useProjects } from "../../hooks/useProjects";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useUseCases } from "../../hooks/useUseCases";
-import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed } from "../../utils/catalogs";
+import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed, resolveCatalogEntryKey } from "../../utils/catalogs";
 import { ticketTypeLabels } from "../../utils/domainLabels";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
@@ -91,6 +91,18 @@ const tabs: Array<Tab<FeatureFormTab>> = [
   { value: "attachments", label: "Dateien" }
 ];
 
+function featureStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "draft") {
+  return resolveCatalogEntryKey(entries, "featureStatus", value, preferredKey) ?? preferredKey;
+}
+
+function workStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "active") {
+  return resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ?? preferredKey;
+}
+
+function priorityValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "medium") {
+  return resolveCatalogEntryKey(entries, "priority", value, preferredKey) ?? preferredKey;
+}
+
 export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab, onPostCreate }: FeatureFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -154,11 +166,17 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
     setActiveTab("details");
   }, [feature, open]);
 
+  useEffect(() => {
+    if (open) {
+      setStatus((currentStatus) => featureStatusValue(catalogs.entries, currentStatus, "draft"));
+    }
+  }, [catalogs.entries, open]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     try {
-      const created = await onSubmit({ title, slug, status, description, sortOrder, content });
+      const created = await onSubmit({ title, slug, status: resolveCatalogEntryKey(catalogs.entries, "featureStatus", status, "draft"), description, sortOrder, content });
       if (!feature && created && onPostCreate) {
         await onPostCreate(created.id, {
           tasks: pendingTasks,
@@ -253,9 +271,8 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
       >
-        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
-
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">
@@ -284,7 +301,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         ) : null}
 
         {activeTab === "useCases" ? (
-          <Section title="Use Cases">
+          <Section title="Use Cases" fill={Boolean(feature)}>
             {feature ? (
               useCases.loading ? (
                 <TaskListSkeleton />
@@ -313,7 +330,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section title="Aufgaben">
+          <Section title="Aufgaben" fill={Boolean(feature)}>
             {feature ? (
               <OwnerTaskBoard owner={{ type: "feature", id: feature.id }} />
             ) : (
@@ -343,7 +360,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets">
+          <Section title="Tickets" fill={Boolean(feature)}>
             {feature ? (
               <OwnerTicketBoard owner={{ type: "feature", id: feature.id }} />
             ) : (
@@ -373,7 +390,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         ) : null}
 
         {activeTab === "projects" ? (
-          <Section title="Projekte">
+          <Section title="Projekte" fill={Boolean(feature)}>
             {feature ? (
               <FeatureProjectPanel
                 projects={projectLinks.linkedProjects}
@@ -545,6 +562,7 @@ function ProjectLinkDialog({ open, projects, excludeIds, onLink, onClose }: { op
 function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftUseCase, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
+  const catalogs = useCatalogs();
   const [status, setStatus] = useState<FeatureStatus>("draft");
   const trimmedTitle = title.trim();
   const trimmedSlug = slug.trim();
@@ -555,10 +573,10 @@ function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
     if (!trimmedTitle || !trimmedSlug) {
       return;
     }
-    onCreate({ title: trimmedTitle, slug: trimmedSlug, status });
+    onCreate({ title: trimmedTitle, slug: trimmedSlug, status: resolveCatalogEntryKey(catalogs.entries, "featureStatus", status, "draft") });
     setTitle("");
     setSlug("");
-    setStatus("draft");
+    setStatus(featureStatusValue(catalogs.entries, "draft", "draft"));
     onClose();
   };
 
@@ -587,7 +605,8 @@ function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
 
 function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
   const [title, setTitle] = useState("");
-  const [status, setStatus] = useState<TaskStatus>("todo");
+  const catalogs = useCatalogs();
+  const [status, setStatus] = useState<TaskStatus>("active");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
 
@@ -597,10 +616,14 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, status, priority });
+    onCreate({
+      title: trimmedTitle,
+      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
+      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+    });
     setTitle("");
-    setStatus("todo");
-    setPriority("medium");
+    setStatus(workStatusValue(catalogs.entries, "active", "active"));
+    setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
   };
 
@@ -632,6 +655,7 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
 function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<TicketType>("bug");
+  const catalogs = useCatalogs();
   const [status, setStatus] = useState<TicketStatus>("open");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
@@ -642,11 +666,16 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, type, status, priority });
+    onCreate({
+      title: trimmedTitle,
+      type,
+      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"),
+      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+    });
     setTitle("");
     setType("bug");
-    setStatus("open");
-    setPriority("medium");
+    setStatus(workStatusValue(catalogs.entries, "open", "open"));
+    setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
   };
 

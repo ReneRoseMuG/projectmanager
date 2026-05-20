@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import type { DraftFile } from "../../types";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTickets } from "../../hooks/useTickets";
-import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed } from "../../utils/catalogs";
+import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed, resolveCatalogEntryKey } from "../../utils/catalogs";
 import { toDateInput } from "../../utils/date";
 import { priorityPillTones, ticketTypeLabels } from "../../utils/domainLabels";
 import { errorMessage } from "../../hooks/errors";
@@ -75,7 +75,19 @@ const tabs: Array<Tab<TaskFormTab>> = [
   { value: "attachments", label: "Dateien" }
 ];
 
-export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose, onChanged, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab }: TaskFormProps) {
+function taskStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: TaskStatus): TaskStatus {
+  return resolveCatalogEntryKey(entries, "workStatus", value, "active") ?? "active";
+}
+
+function ticketStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: TicketStatus): TicketStatus {
+  return resolveCatalogEntryKey(entries, "workStatus", value, "open") ?? "open";
+}
+
+function priorityValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: Priority): Priority {
+  return resolveCatalogEntryKey(entries, "priority", value, "medium") ?? "medium";
+}
+
+export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClose, onChanged, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab }: TaskFormProps) {
   const taskId = task?.id ?? null;
   const detail = useTaskDetail(open && taskId ? taskId : null);
   const ticketOwner = taskId && open ? { type: "task" as const, id: taskId } : null;
@@ -88,7 +100,7 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
   const [activeTab, setActiveTab] = useState<TaskFormTab>("details");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<TaskStatus>("todo");
+  const [status, setStatus] = useState<TaskStatus>("active");
   const [priority, setPriority] = useState<Priority>("medium");
   const [dueDate, setDueDate] = useState("");
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
@@ -102,7 +114,6 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
-
   useEffect(() => {
     if (!open) {
       setPendingSubtasks([]);
@@ -132,6 +143,13 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
     setSelectedTags(source?.tags ?? []);
   }, [detail.task, initialStatus, open, task]);
 
+  useEffect(() => {
+    if (open) {
+      setStatus((currentStatus) => taskStatusValue(catalogs.entries, currentStatus));
+      setPriority((currentPriority) => priorityValue(catalogs.entries, currentPriority));
+    }
+  }, [catalogs.entries, open]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
@@ -139,8 +157,8 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
       await onSubmit({
         title,
         description,
-        status,
-        priority,
+        status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
+        priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium"),
         assignee: null,
         dueDate: dueDate || null,
         tagIds: selectedTags.map((tag) => tag.id),
@@ -220,6 +238,7 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
         headerMeta={
           <div className="flex flex-wrap gap-2">
             <StatusPill kind="workStatus" value={status} />
@@ -227,8 +246,6 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
           </div>
         }
       >
-        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
-
         {task && detail.loading ? <TaskListSkeleton /> : null}
         {task && detail.error ? <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{detail.error}</div> : null}
 
@@ -321,7 +338,7 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets">
+          <Section title="Tickets" fill={Boolean(ticketOwner)}>
             {ticketOwner ? (
               <OwnerTicketBoard owner={ticketOwner} />
             ) : (
@@ -502,7 +519,8 @@ function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(item
 
 function SubtaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (subtask: DraftSubtask) => void; onClose: () => void }) {
   const [title, setTitle] = useState("");
-  const [status, setStatus] = useState<TaskStatus>("todo");
+  const catalogs = useCatalogs();
+  const [status, setStatus] = useState<TaskStatus>("active");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
 
@@ -512,10 +530,12 @@ function SubtaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, status, priority });
+    const nextStatus = taskStatusValue(catalogs.entries, status);
+    const nextPriority = priorityValue(catalogs.entries, priority);
+    onCreate({ title: trimmedTitle, status: nextStatus, priority: nextPriority });
     setTitle("");
-    setStatus("todo");
-    setPriority("medium");
+    setStatus(taskStatusValue(catalogs.entries, "active"));
+    setPriority(priorityValue(catalogs.entries, "medium"));
     onClose();
   };
 
@@ -542,6 +562,7 @@ function SubtaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
 
 function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (ticket: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
   const [title, setTitle] = useState("");
+  const catalogs = useCatalogs();
   const [type, setType] = useState<TicketType>("bug");
   const [status, setStatus] = useState<TicketStatus>("open");
   const [priority, setPriority] = useState<Priority>("medium");
@@ -553,11 +574,13 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, type, status, priority });
+    const nextStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open");
+    const nextPriority = resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium");
+    onCreate({ title: trimmedTitle, type, status: nextStatus, priority: nextPriority });
     setTitle("");
     setType("bug");
-    setStatus("open");
-    setPriority("medium");
+    setStatus(ticketStatusValue(catalogs.entries, "open"));
+    setPriority(priorityValue(catalogs.entries, "medium"));
     onClose();
   };
 

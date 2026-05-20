@@ -17,7 +17,7 @@ import { useNotes } from "../../hooks/useNotes";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { formatHumanDate } from "../../utils/date";
-import { countOpenStatusItems } from "../../utils/catalogs";
+import { countOpenStatusItems, resolveCatalogEntryKey } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
@@ -60,6 +60,10 @@ interface MilestoneFormProps {
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
   onOpenInTab?: () => void;
+}
+
+function workStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "active") {
+  return resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ?? preferredKey;
 }
 
 type MilestoneFormTab = "details" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "events";
@@ -151,6 +155,12 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
   }, [initialProjectId, milestone, open, projects]);
 
   useEffect(() => {
+    if (open) {
+      setStatus((currentStatus) => workStatusValue(catalogs.entries, currentStatus, "active"));
+    }
+  }, [catalogs.entries, open]);
+
+  useEffect(() => {
     if (selectedFeatureId === "" && availableFeatures[0]) {
       setSelectedFeatureId(availableFeatures[0].id);
     }
@@ -169,7 +179,7 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
           projectId,
           name,
           description,
-          status,
+          status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
           color,
           startDate: startDate || null,
           dueDate: dueDate || null
@@ -313,9 +323,8 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
         }
         onClose={onClose}
         variant={variant}
+        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
       >
-        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
-
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">
@@ -389,13 +398,13 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section title="Aufgaben">
+          <Section title="Aufgaben" fill={Boolean(milestone)}>
             {milestone ? <OwnerTaskBoard owner={{ type: "milestone", id: milestone.id }} /> : <EmptyState icon={<Flag size={22} />} title="Aufgaben sind nach dem Speichern verfügbar." tone="teal" variant="tinted" />}
           </Section>
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets">
+          <Section title="Tickets" fill={Boolean(milestone)}>
             {milestone ? <OwnerTicketBoard owner={{ type: "milestone", id: milestone.id }} /> : <EmptyState icon={<Flag size={22} />} title="Tickets sind nach dem Speichern verfügbar." tone="teal" variant="tinted" />}
           </Section>
         ) : null}

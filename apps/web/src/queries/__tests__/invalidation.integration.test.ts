@@ -67,7 +67,7 @@ const knownQueries = {
   wikiDetail: queryKeys.wiki.detail(wikiPageId),
   eventsList: queryKeys.events.list("2026-05"),
   calendarTasks: queryKeys.calendarTasks.list(),
-  driveConfig: queryKeys.dumps.driveConfig(),
+  localBackupStatus: queryKeys.dumps.localStatus(),
   globalSearch: queryKeys.globalSearch.data()
 } satisfies Record<string, QueryKey>;
 

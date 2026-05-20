@@ -5,6 +5,7 @@
  *
  * Abgedeckte Regeln:
  * - TaskDetailPage setzt onOpenInTab nur im Edit-Modus.
+ * - Create-Modus überschreibt das Formular-Defaultschließen nicht.
  * - Klick öffnet die saubere Aufgaben-URL und navigiert zum returnTo-Wert.
  *
  * Fehlerfälle:
@@ -39,13 +40,13 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("../../components/tasks/TaskForm", () => ({
-  TaskForm({ onOpenInTab }: { onOpenInTab?: () => void }) {
+  TaskForm({ closeOnSubmit, onOpenInTab }: { closeOnSubmit?: boolean; onOpenInTab?: () => void }) {
     return onOpenInTab ? (
       <button type="button" onClick={onOpenInTab}>
         In neuem Tab öffnen
       </button>
     ) : (
-      <div data-testid="task-form" />
+      <div data-close-on-submit={closeOnSubmit === undefined ? "default" : String(closeOnSubmit)} data-testid="task-form" />
     );
   }
 }));
@@ -116,9 +117,19 @@ describe("TaskDetailPage openInTab", () => {
 
   it("zeigt im Create-Modus keinen 'In neuem Tab öffnen'-Button", () => {
     router.params = {};
+    router.search = "ownerType=project&ownerId=1&returnTo=%2Fprojects%2F1";
 
     render(<TaskDetailPage />);
 
     expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
+  });
+
+  it("nutzt im Create-Modus das Formular-Defaultschließen", () => {
+    router.params = {};
+    router.search = "ownerType=project&ownerId=1&returnTo=%2Fprojects%2F1";
+
+    render(<TaskDetailPage />);
+
+    expect(screen.getByTestId("task-form")).toHaveAttribute("data-close-on-submit", "default");
   });
 });

@@ -266,7 +266,7 @@ function deleteOwnerTaskLink(database: DbClient, owner: TaskOwner, taskId: numbe
 
 function insertTask(database: DbClient, input: TaskInput, parentId: number | null = null): TaskRecord {
   const title = requireNonEmpty(input.title, "title");
-  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "todo");
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "active");
   const priority = input.priority ?? resolveDefaultCatalogEntryKey(database, "priority", "medium");
   ensureCatalogEntryExists(database, "workStatus", status);
   ensureCatalogEntryExists(database, "priority", priority);
@@ -313,7 +313,7 @@ export function listSubtasks(database: DbClient, taskId: number): Task[] {
 
 export function createOwnerTask(database: DbClient, owner: TaskOwner, input: TaskInput): TaskBoardItem {
   ensureOwnerExists(database, owner);
-  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "todo");
+  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "active");
   const position = nextOwnerPosition(database, owner, status);
   const created = database.transaction((tx) => {
     const task = insertTask(tx as unknown as DbClient, input);

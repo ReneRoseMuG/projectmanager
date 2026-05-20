@@ -101,7 +101,7 @@ export const queryKeys = {
   },
   dumps: {
     root: ["dumps"] as const,
-    driveConfig: () => [...queryKeys.dumps.root, "driveConfig"] as const
+    localStatus: () => [...queryKeys.dumps.root, "localStatus"] as const
   },
   tickets: {
     root: ["tickets"] as const,

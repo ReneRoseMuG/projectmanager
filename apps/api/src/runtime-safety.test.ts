@@ -7,6 +7,7 @@ import {
   assertSafeTestDirectoryPath,
   assertSafeTestRuntimeTargets,
   isTestRuntime,
+  repoRoot,
   testRuntimeRoot
 } from "./runtime-safety.js";
 
@@ -70,7 +71,7 @@ describe("runtime safety guard", () => {
     expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "uploads"), "UPLOAD_DIR")).toThrow(/application filesystem/);
     expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "previews"), "PREVIEW_CACHE_DIR")).toThrow(/application filesystem/);
     expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "content"), "CONTENT_DIR")).toThrow(/application filesystem/);
-    expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "backups"), "BACKUP_WORK_DIR")).toThrow(/application filesystem/);
+    expect(() => assertSafeTestDirectoryPath(path.join(repoRoot, "backups"), "BACKUP_WORK_DIR")).toThrow(/application filesystem/);
   });
 
   it("prüft komplette Runtime-Ziele gemeinsam", () => {

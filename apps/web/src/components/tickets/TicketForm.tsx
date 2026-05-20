@@ -2,6 +2,8 @@ import type { Priority, Tag, Ticket, TicketInput, TicketResolution, TicketStatus
 import { Bug, UserRound } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { resolveCatalogEntryKey } from "../../utils/catalogs";
 import { toDateInput } from "../../utils/date";
 import { ticketResolutionLabels, ticketTypeLabels } from "../../utils/domainLabels";
 import { TagPicker } from "../tags/TagPicker";
@@ -54,6 +56,7 @@ const resolutionOptions = (["fixed", "wont_fix", "duplicate", "cant_reproduce", 
 }));
 
 export function TicketForm({ open, ticket, initialStatus = "open", title = "Ticket", onSubmit, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: TicketFormProps) {
+  const catalogs = useCatalogs();
   const [ticketTitle, setTicketTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<TicketType>("bug");
@@ -86,6 +89,13 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
     setSelectedTags(ticket?.tags ?? []);
   }, [initialStatus, open, ticket]);
 
+  useEffect(() => {
+    if (open) {
+      setStatus((currentStatus) => resolveCatalogEntryKey(catalogs.entries, "workStatus", currentStatus, "open") ?? "open");
+      setPriority((currentPriority) => resolveCatalogEntryKey(catalogs.entries, "priority", currentPriority, "medium") ?? "medium");
+    }
+  }, [catalogs.entries, open]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
@@ -94,8 +104,8 @@ export function TicketForm({ open, ticket, initialStatus = "open", title = "Tick
         title: ticketTitle,
         description,
         type,
-        status,
-        priority,
+        status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"),
+        priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium"),
         resolution: status === "resolved" || status === "closed" ? resolution : null,
         reporter,
         assignee,

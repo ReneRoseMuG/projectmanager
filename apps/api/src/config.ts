@@ -1,6 +1,6 @@
 import "dotenv/config";
 import path from "node:path";
-import { apiRoot } from "./runtime-safety.js";
+import { apiRoot, repoRoot } from "./runtime-safety.js";
 
 export interface AppConfig {
   databasePath: string;
@@ -14,10 +14,6 @@ export interface AppConfig {
   libreOfficePath: string;
   contentDir: string;
   backupWorkDir: string;
-  googleDriveBackupFolderId: string | null;
-  googleDriveClientId: string | null;
-  googleDriveClientSecret: string | null;
-  googleDriveRefreshToken: string | null;
   aiBaseUrl: string;
   aiDefaultModel: string;
   aiTimeoutMs: number;
@@ -32,6 +28,20 @@ export interface AppConfig {
 
 function resolveFromApiRoot(value: string): string {
   return path.isAbsolute(value) ? value : path.resolve(apiRoot, value);
+}
+
+function resolveFromRepoRoot(value: string): string {
+  return path.isAbsolute(value) ? value : path.resolve(repoRoot, value);
+}
+
+export function resolveBackupWorkDir(value: string | undefined): string {
+  const configuredValue = value?.trim() ? value.trim() : "./backups";
+  const resolvedPath = resolveFromRepoRoot(configuredValue);
+  const legacyApiBackupDir = path.resolve(apiRoot, "backups");
+  if (path.resolve(resolvedPath).toLowerCase() === legacyApiBackupDir.toLowerCase()) {
+    return path.resolve(repoRoot, "backups");
+  }
+  return resolvedPath;
 }
 
 function numberFromEnv(value: string | undefined, fallback: number): number {
@@ -52,11 +62,7 @@ export const config: AppConfig = {
   previewConversionTimeoutMs: numberFromEnv(process.env.PREVIEW_CONVERSION_TIMEOUT_MS, 15000),
   libreOfficePath: process.env.LIBREOFFICE_PATH ?? "soffice",
   contentDir: resolveFromApiRoot(process.env.CONTENT_DIR ?? "./content"),
-  backupWorkDir: resolveFromApiRoot(process.env.BACKUP_WORK_DIR ?? "./backups"),
-  googleDriveBackupFolderId: process.env.GOOGLE_DRIVE_BACKUP_FOLDER_ID ?? null,
-  googleDriveClientId: process.env.GOOGLE_DRIVE_CLIENT_ID ?? null,
-  googleDriveClientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET ?? null,
-  googleDriveRefreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN ?? null,
+  backupWorkDir: resolveBackupWorkDir(process.env.BACKUP_WORK_DIR),
   aiBaseUrl: process.env.AI_BASE_URL ?? "http://127.0.0.1:11434/api",
   aiDefaultModel: process.env.AI_DEFAULT_MODEL ?? "llama3.2:1b",
   aiTimeoutMs: numberFromEnv(process.env.AI_TIMEOUT_MS, 60000),
