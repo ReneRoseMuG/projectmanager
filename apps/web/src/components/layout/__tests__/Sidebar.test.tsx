@@ -16,6 +16,7 @@
  */
 import { fireEvent, screen } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
+import type { CurrentUser } from "@taskmanager/shared-types";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Sidebar } from "../Sidebar";
@@ -33,6 +34,26 @@ function renderSidebar() {
     </MemoryRouter>
   );
 }
+
+const adminUser: CurrentUser = {
+  id: 1,
+  firstName: "Test",
+  lastName: "Admin",
+  fullName: "Admin, Test",
+  email: "admin@local",
+  role: {
+    id: 1,
+    key: "admin",
+    label: "Administrator",
+    isSystem: true,
+    version: 1,
+    createdAt: "2026-05-20T00:00:00",
+    updatedAt: "2026-05-20T00:00:00",
+    permissions: [{ id: 1, roleId: 1, resource: "*", action: "*" }]
+  },
+  permissions: [{ id: 1, roleId: 1, resource: "*", action: "*" }],
+  requiresPasswordSetup: false
+};
 
 beforeEach(() => {
   vi.spyOn(window, "open").mockImplementation(() => null);
@@ -74,5 +95,16 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getByText("Features"));
 
     expect(window.open).not.toHaveBeenCalled();
+  });
+
+  it("zeigt Admin-Navigation nur mit Admin-Rechten", () => {
+    render(
+      <MemoryRouter initialEntries={["/projects"]}>
+        <Sidebar currentUser={adminUser} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("Benutzer")).toBeInTheDocument();
+    expect(screen.getByText("Rollen")).toBeInTheDocument();
   });
 });

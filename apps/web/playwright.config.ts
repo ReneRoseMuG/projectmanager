@@ -37,7 +37,12 @@ export default defineConfig({
         CONTENT_DIR: path.join(e2eRuntimeRoot, "content"),
         BACKUP_WORK_DIR: path.join(e2eRuntimeRoot, "backups"),
         PORT: String(apiPort),
-        CORS_ORIGIN: webBaseUrl
+        CORS_ORIGIN: webBaseUrl,
+        ADMIN_EMAIL: "admin@local",
+        ADMIN_FIRST_NAME: "E2E",
+        ADMIN_LAST_NAME: "Admin",
+        ADMIN_INITIAL_PASSWORD: "password123",
+        SESSION_SECRET: "playwright-session-secret-change-me-12345"
       },
       url: `http://127.0.0.1:${apiPort}/health`,
       reuseExistingServer: false,

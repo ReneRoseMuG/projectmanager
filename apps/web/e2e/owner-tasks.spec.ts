@@ -1,5 +1,6 @@
-import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+﻿import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import {
+  authenticatedGoto,
   apiBaseUrl,
   cleanupTasksByTitle,
   createFeature,
@@ -51,7 +52,7 @@ async function expectTaskStillExists(request: APIRequestContext, taskTitle: stri
 }
 
 async function openProjectTasks(page: Page, projectId: number) {
-  await page.goto(`/projects/${projectId}`);
+  await authenticatedGoto(page, `/projects/${projectId}`);
   const form = formPage(page, "Projekt bearbeiten");
   await form.getByRole("button", { name: /Aufgaben/ }).click();
   await expect(form.getByRole("button", { name: "Neue Aufgabe" })).toBeVisible();
@@ -60,7 +61,7 @@ async function openProjectTasks(page: Page, projectId: number) {
 }
 
 async function openFeatureTasks(page: Page, featureId: number) {
-  await page.goto(`/features/${featureId}`);
+  await authenticatedGoto(page, `/features/${featureId}`);
   const form = formPage(page, "Feature bearbeiten");
   await form.getByRole("button", { name: /Aufgaben/ }).click();
   await expect(form.getByRole("button", { name: "Neue Aufgabe" })).toBeVisible();
@@ -69,7 +70,7 @@ async function openFeatureTasks(page: Page, featureId: number) {
 }
 
 async function openUseCaseTasks(page: Page, useCaseId: number, featureId: number) {
-  await page.goto(`/use-cases/${useCaseId}?returnTo=${encodeURIComponent(`/features/${featureId}`)}`);
+  await authenticatedGoto(page, `/use-cases/${useCaseId}?returnTo=${encodeURIComponent(`/features/${featureId}`)}`);
   const form = formPage(page, "Use Case bearbeiten");
   await form.getByRole("button", { name: /Aufgaben/ }).click();
   await expect(form.getByRole("button", { name: "Neue Aufgabe" })).toBeVisible();

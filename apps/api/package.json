@@ -18,11 +18,14 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^9.4.0",
     "@fastify/cors": "^9.0.1",
     "@fastify/multipart": "^8.3.1",
+    "@fastify/session": "^10.9.0",
     "@fastify/static": "^7.0.4",
     "@taskmanager/shared-types": "file:../../packages/shared-types",
     "archiver": "^8.0.0",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.10.0",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.30.10",

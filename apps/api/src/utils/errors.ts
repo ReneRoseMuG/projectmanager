@@ -27,6 +27,14 @@ export function conflict(message: string): AppError {
   return new AppError("CONFLICT", message, 409);
 }
 
+export function unauthorized(message: string): AppError {
+  return new AppError("UNAUTHORIZED", message, 401);
+}
+
+export function forbidden(message: string): AppError {
+  return new AppError("FORBIDDEN", message, 403);
+}
+
 export function internalError(message: string): AppError {
   return new AppError("INTERNAL_ERROR", message, 500);
 }
@@ -67,7 +75,7 @@ export function errorHandler(error: FastifyError, _request: FastifyRequest, repl
 
   const statusCode = error.statusCode && error.statusCode >= 400 ? error.statusCode : 500;
   void reply.status(statusCode).send({
-    error: statusCode >= 500 ? "INTERNAL_ERROR" : "BAD_REQUEST",
+    error: statusCode === 401 ? "UNAUTHORIZED" : statusCode === 403 ? "FORBIDDEN" : statusCode >= 500 ? "INTERNAL_ERROR" : "BAD_REQUEST",
     message: statusCode >= 500 ? "Internal server error" : error.message,
     statusCode
   } satisfies ApiErrorPayload);

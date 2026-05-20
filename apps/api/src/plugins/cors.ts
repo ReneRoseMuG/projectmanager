@@ -5,6 +5,7 @@ import { config } from "../config.js";
 export async function registerCors(app: FastifyInstance): Promise<void> {
   await app.register(cors, {
     origin: config.corsOrigin,
+    credentials: true,
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"]
   });
 }

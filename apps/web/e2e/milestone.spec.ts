@@ -1,5 +1,6 @@
-import { expect, test } from "@playwright/test";
+﻿import { expect, test } from "@playwright/test";
 import {
+  authenticatedGoto,
   apiBaseUrl,
   createEvent,
   createFeature,
@@ -47,7 +48,7 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
     let milestoneId: number | null = null;
 
     try {
-      await page.goto(`/projects/${project.id}`);
+      await authenticatedGoto(page, `/projects/${project.id}`);
       const projectForm = formPage(page, "Projekt bearbeiten");
       await projectForm.getByRole("button", { name: /Meilensteine/ }).click();
       await expect(projectForm.getByRole("button", { name: "Neuer Meilenstein" })).toBeVisible();
@@ -65,7 +66,7 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       await expect(page).toHaveURL(/\/milestones\/\d+/);
       milestoneId = milestoneIdFromUrl(page.url());
 
-      await page.goto(`/projects/${project.id}`);
+      await authenticatedGoto(page, `/projects/${project.id}`);
       const refreshedProjectForm = formPage(page, "Projekt bearbeiten");
       await expect(refreshedProjectForm.getByRole("button", { name: /Meilensteine\s+1/ })).toBeVisible();
       await refreshedProjectForm.getByRole("button", { name: /Meilensteine/ }).click();
@@ -104,7 +105,7 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
     expect(attachmentResponse.ok()).toBeTruthy();
 
     try {
-      await page.goto(`/milestones/${milestone.id}`);
+      await authenticatedGoto(page, `/milestones/${milestone.id}`);
       const milestoneForm = formPage(page, "Meilenstein bearbeiten");
       await expect(milestoneForm.locator("input[required]").first()).toHaveValue(milestone.name);
       await expect(milestoneForm.locator("select[required]")).toHaveValue(String(project.id));

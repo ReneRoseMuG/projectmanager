@@ -33,9 +33,101 @@ export type JsonObject = { [key: string]: JsonValue };
 export type JsonValue = JsonPrimitive | JsonValue[] | JsonObject;
 
 export interface ApiErrorPayload {
-  error: "NOT_FOUND" | "BAD_REQUEST" | "CONFLICT" | "INTERNAL_ERROR";
+  error: "NOT_FOUND" | "BAD_REQUEST" | "CONFLICT" | "UNAUTHORIZED" | "FORBIDDEN" | "INTERNAL_ERROR";
   message: string;
   statusCode: number;
+}
+
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "catalogs", "tags", "dumps", "ai", "users", "roles"] as const;
+export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
+
+export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";
+export type AuthAction = (typeof AUTH_ACTIONS)[number] | "*";
+
+export interface Permission {
+  id: number;
+  roleId: number;
+  resource: AuthResource;
+  action: AuthAction;
+}
+
+export interface PermissionInput {
+  resource: AuthResource;
+  action: AuthAction;
+}
+
+export interface Role {
+  id: number;
+  key: string;
+  label: string;
+  isSystem: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  permissions: Permission[];
+}
+
+export interface RoleInput {
+  key: string;
+  label: string;
+  permissions: PermissionInput[];
+}
+
+export type RoleUpdate = WithExpectedVersion<Partial<RoleInput>>;
+
+export interface PermissionCatalog {
+  resources: readonly (typeof AUTH_RESOURCES)[number][];
+  actions: readonly (typeof AUTH_ACTIONS)[number][];
+}
+
+export interface AdminUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  address: string | null;
+  phone: string | null;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminUserInput {
+  firstName: string;
+  lastName: string;
+  address?: string | null;
+  phone?: string | null;
+  email: string;
+  roleId: number;
+  password?: string;
+  isActive?: boolean;
+}
+
+export type AdminUserUpdate = WithExpectedVersion<Partial<Omit<AdminUserInput, "password">> & {
+  password?: string;
+}>;
+
+export interface CurrentUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  role: Role;
+  permissions: Permission[];
+  requiresPasswordSetup: boolean;
+}
+
+export interface LoginRequest {
+  email: string;
+  password?: string;
+}
+
+export interface SetPasswordRequest {
+  password: string;
 }
 
 export interface VersionedUpdate {

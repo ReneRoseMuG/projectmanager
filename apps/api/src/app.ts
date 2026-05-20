@@ -1,10 +1,14 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { db, sqlite } from "./db/client.js";
 import { registerCors } from "./plugins/cors.js";
+import { registerAuthPlugins, registerGlobalAuthGuard } from "./plugins/auth.js";
 import { registerMultipart } from "./plugins/multipart.js";
 import { registerStatic } from "./plugins/static.js";
+import { registerAdminRoleRoutes } from "./routes/admin-roles.js";
+import { registerAdminUserRoutes } from "./routes/admin-users.js";
 import { registerAttachmentsRoutes } from "./routes/attachments.js";
 import { registerAiRoutes } from "./routes/ai.js";
+import { registerAuthRoutes } from "./routes/auth.js";
 import { registerBacklogRoutes } from "./routes/backlog.js";
 import { registerCommentsRoutes } from "./routes/comments.js";
 import { registerCatalogRoutes } from "./routes/catalogs.js";
@@ -28,6 +32,7 @@ import { createGoogleDriveBackupClient, type GoogleDriveBackupClient } from "./s
 import { createOllamaLocalModelClient, type AiLocalModelClient } from "./services/ai-ollama.service.js";
 import { getEffectiveGoogleDriveBackupFolderId } from "./services/drive-config.service.js";
 import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
+import { seedAuthData } from "./services/auth.service.js";
 import { errorHandler } from "./utils/errors.js";
 import type Database from "better-sqlite3";
 
@@ -50,11 +55,18 @@ export async function buildApp(
   app.setErrorHandler(errorHandler);
 
   await registerCors(app);
+  await registerAuthPlugins(app);
   await registerMultipart(app);
   await registerStatic(app);
+  await seedAuthData(injectedDb);
 
   app.get("/health", async () => ({ ok: true }));
 
+  await app.register(registerAuthRoutes, { prefix: "/api" });
+  await app.register(registerHealthRoutes, { prefix: "/api" });
+  registerGlobalAuthGuard(app);
+  await app.register(registerAdminUserRoutes, { prefix: "/api" });
+  await app.register(registerAdminRoleRoutes, { prefix: "/api" });
   await app.register(registerProjectsRoutes, { prefix: "/api" });
   await app.register(registerAiRoutes, { prefix: "/api" });
   await app.register(registerMilestoneRoutes, { prefix: "/api" });
@@ -67,7 +79,6 @@ export async function buildApp(
   await app.register(registerNotesRoutes, { prefix: "/api" });
   await app.register(registerAttachmentsRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
-  await app.register(registerHealthRoutes, { prefix: "/api" });
   await app.register(registerFeaturesRoutes, { prefix: "/api" });
   await app.register(registerUseCasesRoutes, { prefix: "/api" });
   await app.register(registerWikiRoutes, { prefix: "/api" });

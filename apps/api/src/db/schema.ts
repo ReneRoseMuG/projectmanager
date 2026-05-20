@@ -21,10 +21,45 @@ export const appSettings = sqliteTable("app_settings", {
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
 
+export const roles = sqliteTable("roles", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  key: text("key").notNull().unique(),
+  label: text("label").notNull(),
+  isSystem: integer("is_system", { mode: "boolean" }).notNull().default(false),
+  version: integer("version").notNull().default(1),
+  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+});
+
+export const permissions = sqliteTable(
+  "permissions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    roleId: integer("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    resource: text("resource").notNull(),
+    action: text("action").notNull()
+  },
+  (table) => ({
+    permissionsRoleResourceActionUnique: uniqueIndex("permissions_role_resource_action_unique").on(table.roleId, table.resource, table.action)
+  })
+);
+
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  firstName: text("first_name").notNull().default(""),
+  lastName: text("last_name").notNull().default(""),
+  fullName: text("full_name").notNull().$defaultFn(() => ""),
+  address: text("address"),
+  phone: text("phone"),
   email: text("email").notNull().unique(),
+  passwordHash: text("password_hash"),
+  roleId: integer("role_id")
+    .notNull()
+    .references(() => roles.id, { onDelete: "restrict" }),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
   version: integer("version").notNull().default(1),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)

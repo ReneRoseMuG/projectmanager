@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+﻿import { expect, test, type Page } from "@playwright/test";
 import {
+  authenticatedGoto,
   apiBaseUrl,
   createBacklogItem,
   createFeature,
@@ -32,7 +33,7 @@ import {
  */
 
 async function openProjectList(page: Page) {
-  await page.goto("/projects");
+  await authenticatedGoto(page, "/projects");
   await expect(page.getByRole("heading", { name: "Projekte", exact: true })).toBeVisible();
 }
 
@@ -103,7 +104,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
     const updatedName = uniqueTitle("E2E Project Updated Route");
 
     try {
-      await page.goto(`/projects/${project.id}`);
+      await authenticatedGoto(page, `/projects/${project.id}`);
       const form = formPage(page, "Projekt bearbeiten");
       await expectProjectFormData(page, project);
 
@@ -127,7 +128,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
     try {
       await linkProjectFeature(request, project.id, feature.id);
 
-      await page.goto(`/projects/${project.id}`);
+      await authenticatedGoto(page, `/projects/${project.id}`);
       const projectForm = formPage(page, "Projekt bearbeiten");
       await projectForm.getByRole("button", { name: /Features/ }).click();
       await expect(itemCard(projectForm, feature.title)).toBeVisible();
@@ -140,7 +141,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expectRichText(featureForm, "E2E Feature-Kurzbeschreibung vollständig", 0);
       await expectRichText(featureForm, "E2E Feature-Inhalt vollständig", 1);
 
-      await page.goto(`/projects/${project.id}`);
+      await authenticatedGoto(page, `/projects/${project.id}`);
       await formPage(page, "Projekt bearbeiten").getByRole("button", { name: /Features/ }).click();
       await itemCard(formPage(page, "Projekt bearbeiten"), feature.title).getByRole("button", { name: "Bearbeiten" }).click();
       await expect(page).toHaveURL(new RegExp(`/features/${feature.id}`));
@@ -157,7 +158,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
     const backlogItem = await createBacklogItem(request, project.id, "E2E Project Tab Backlog");
 
     try {
-      await page.goto(`/projects/${project.id}`);
+      await authenticatedGoto(page, `/projects/${project.id}`);
       const projectForm = formPage(page, "Projekt bearbeiten");
 
       await projectForm.getByRole("button", { name: /Aufgaben/ }).click();
@@ -167,7 +168,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expect(taskForm.locator("input[required]").first()).toHaveValue(task.title);
       await expectRichText(taskForm, "E2E Aufgabenbeschreibung vollständig");
 
-      await page.goto(`/projects/${project.id}`);
+      await authenticatedGoto(page, `/projects/${project.id}`);
       await formPage(page, "Projekt bearbeiten").getByRole("button", { name: /Backlog/ }).click();
       await itemCard(formPage(page, "Projekt bearbeiten"), backlogItem.title).dblclick();
       await expect(page).toHaveURL(new RegExp(`/backlog/${backlogItem.id}`));
@@ -175,7 +176,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expect(backlogForm.locator("input[required]").first()).toHaveValue(backlogItem.title);
       await expectRichText(backlogForm, "E2E Backlog-Beschreibung vollständig");
 
-      await page.goto(`/projects/${project.id}`);
+      await authenticatedGoto(page, `/projects/${project.id}`);
       await formPage(page, "Projekt bearbeiten").getByRole("button", { name: /Backlog/ }).click();
       await itemCard(formPage(page, "Projekt bearbeiten"), backlogItem.title).getByRole("button", { name: "Bearbeiten" }).click();
       await expect(page).toHaveURL(new RegExp(`/backlog/${backlogItem.id}`));
@@ -221,7 +222,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
     const featureSlug = slugify(featureTitle);
 
     try {
-      await page.goto(`/projects/${project.id}`);
+      await authenticatedGoto(page, `/projects/${project.id}`);
       const projectForm = formPage(page, "Projekt bearbeiten");
       await projectForm.getByRole("button", { name: /Features/ }).click();
       await projectForm.getByRole("button", { name: "Neues Feature" }).click();

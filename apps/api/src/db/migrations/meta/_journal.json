@@ -155,6 +155,13 @@
       "when": 1779254352226,
       "tag": "0021_eager_moon_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1779266769967,
+      "tag": "0022_hot_pretty_boy",
+      "breakpoints": true
     }
   ]
 }

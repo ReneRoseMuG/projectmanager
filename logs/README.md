@@ -2,6 +2,11 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 20.05.26 | 5 | Auth-Tests und Verifikation | ✅ |
+| 20.05.26 | 4 | Auth-Frontend | ✅ |
+| 20.05.26 | 3 | Auth-API | ✅ |
+| 20.05.26 | 2 | Auth-Schema und Seed | ✅ |
+| 20.05.26 | 1 | Auth-Vorbereitung | ✅ |
 | 20.05.26 | Fix | Create Detailroute | ✅ |
 | 20.05.26 | Fix | Rote Tests Testhelper | ⚠️ |
 | 20.05.26 | Fix | Audit Coverage entfernt | ⚠️ |

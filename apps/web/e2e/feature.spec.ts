@@ -1,5 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+﻿import { expect, test, type Page } from "@playwright/test";
 import {
+  authenticatedGoto,
   createFeature,
   createProject,
   createUseCase,
@@ -30,7 +31,7 @@ import {
  */
 
 async function openFeatureList(page: Page) {
-  await page.goto("/features");
+  await authenticatedGoto(page, "/features");
   await expect(page.getByRole("heading", { name: "Features", exact: true })).toBeVisible();
 }
 
@@ -103,7 +104,7 @@ test.describe("Feature-Routen und Detailformular", () => {
     const updatedTitle = uniqueTitle("E2E Feature Updated Route");
 
     try {
-      await page.goto(`/features/${feature.id}`);
+      await authenticatedGoto(page, `/features/${feature.id}`);
       const form = formPage(page, "Feature bearbeiten");
       await expectFeatureFormData(page, feature);
 
@@ -127,7 +128,7 @@ test.describe("Feature-Routen und Detailformular", () => {
     try {
       await linkProjectFeature(request, project.id, feature.id);
 
-      await page.goto(`/features/${feature.id}`);
+      await authenticatedGoto(page, `/features/${feature.id}`);
       const featureForm = formPage(page, "Feature bearbeiten");
       await featureForm.getByRole("button", { name: /Projekte/ }).click();
       await expect(itemCard(featureForm, project.name)).toBeVisible();
@@ -138,7 +139,7 @@ test.describe("Feature-Routen und Detailformular", () => {
       await expect(projectForm.locator("input[required]").first()).toHaveValue(project.name);
       await expectRichText(projectForm, "E2E Projektbeschreibung vollständig");
 
-      await page.goto(`/features/${feature.id}`);
+      await authenticatedGoto(page, `/features/${feature.id}`);
       await formPage(page, "Feature bearbeiten").getByRole("button", { name: /Projekte/ }).click();
       await itemCard(formPage(page, "Feature bearbeiten"), project.name).getByRole("button", { name: "Bearbeiten" }).click();
       await expect(page).toHaveURL(new RegExp(`/projects/${project.id}`));
@@ -154,7 +155,7 @@ test.describe("Feature-Routen und Detailformular", () => {
     const useCase = await createUseCase(request, feature.id, "E2E Feature Tab UseCase");
 
     try {
-      await page.goto(`/features/${feature.id}`);
+      await authenticatedGoto(page, `/features/${feature.id}`);
       const featureForm = formPage(page, "Feature bearbeiten");
       await featureForm.getByRole("button", { name: /Use Cases/ }).click();
       await expect(itemCard(featureForm, useCase.title)).toBeVisible();
@@ -167,7 +168,7 @@ test.describe("Feature-Routen und Detailformular", () => {
       await expectRichText(useCaseForm, "E2E Use-Case-Beschreibung vollständig", 0);
       await expectRichText(useCaseForm, "E2E Use-Case-Inhalt vollständig", 1);
 
-      await page.goto(`/features/${feature.id}`);
+      await authenticatedGoto(page, `/features/${feature.id}`);
       await formPage(page, "Feature bearbeiten").getByRole("button", { name: /Use Cases/ }).click();
       await itemCard(formPage(page, "Feature bearbeiten"), useCase.title).getByRole("button", { name: "Bearbeiten" }).click();
       await expect(page).toHaveURL(new RegExp(`/use-cases/${useCase.id}`));

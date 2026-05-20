@@ -11,6 +11,18 @@ export async function invalidateProjects(queryClient: QueryClient): Promise<void
   await invalidateMany(queryClient, [queryKeys.projects.root, queryKeys.globalSearch.root]);
 }
 
+export async function invalidateAuth(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.auth.root]);
+}
+
+export async function invalidateAdminUsers(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.adminUsers.root, queryKeys.auth.root]);
+}
+
+export async function invalidateAdminRoles(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.adminRoles.root, queryKeys.adminUsers.root, queryKeys.auth.root]);
+}
+
 export async function invalidateMilestones(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.milestones.root, queryKeys.projects.root, queryKeys.globalSearch.root]);
 }
@@ -168,6 +180,9 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.wiki.root,
     queryKeys.calendarTasks.root,
     queryKeys.tickets.root,
+    queryKeys.auth.root,
+    queryKeys.adminUsers.root,
+    queryKeys.adminRoles.root,
     queryKeys.globalSearch.root
   ]);
 }

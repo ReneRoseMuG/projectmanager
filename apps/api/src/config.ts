@@ -22,6 +22,12 @@ export interface AppConfig {
   aiDefaultModel: string;
   aiTimeoutMs: number;
   aiMaxInputChars: number;
+  adminEmail: string;
+  adminFirstName: string;
+  adminLastName: string;
+  adminInitialPassword: string | null;
+  sessionSecret: string;
+  sessionSecretIsFallback: boolean;
 }
 
 function resolveFromApiRoot(value: string): string {
@@ -32,6 +38,8 @@ function numberFromEnv(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
+
+const configuredSessionSecret = process.env.SESSION_SECRET?.trim();
 
 export const config: AppConfig = {
   databasePath: resolveFromApiRoot(process.env.DATABASE_PATH ?? "./data/taskmanager.sqlite"),
@@ -52,5 +60,11 @@ export const config: AppConfig = {
   aiBaseUrl: process.env.AI_BASE_URL ?? "http://127.0.0.1:11434/api",
   aiDefaultModel: process.env.AI_DEFAULT_MODEL ?? "llama3.2:1b",
   aiTimeoutMs: numberFromEnv(process.env.AI_TIMEOUT_MS, 60000),
-  aiMaxInputChars: numberFromEnv(process.env.AI_MAX_INPUT_CHARS, 12000)
+  aiMaxInputChars: numberFromEnv(process.env.AI_MAX_INPUT_CHARS, 12000),
+  adminEmail: process.env.ADMIN_EMAIL?.trim() || "admin@local",
+  adminFirstName: process.env.ADMIN_FIRST_NAME?.trim() || "Admin",
+  adminLastName: process.env.ADMIN_LAST_NAME?.trim() || "System",
+  adminInitialPassword: process.env.ADMIN_INITIAL_PASSWORD?.trim() ? process.env.ADMIN_INITIAL_PASSWORD.trim() : null,
+  sessionSecret: configuredSessionSecret || "taskmanager-local-dev-session-secret-change-me",
+  sessionSecretIsFallback: !configuredSessionSecret
 };

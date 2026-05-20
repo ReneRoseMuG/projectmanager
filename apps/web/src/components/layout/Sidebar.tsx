@@ -1,4 +1,5 @@
-import { BookOpen, Bug, CalendarDays, DatabaseBackup, ExternalLink, FolderKanban, Library, ListChecks, Tags } from "lucide-react";
+import type { CurrentUser } from "@taskmanager/shared-types";
+import { BookOpen, Bug, CalendarDays, DatabaseBackup, ExternalLink, FolderKanban, Library, ListChecks, LogOut, Tags, UsersRound, ShieldCheck } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
@@ -15,11 +16,27 @@ const settingsItems = [
   { to: "/settings/backup", label: "Sicherung", icon: DatabaseBackup }
 ];
 
+const adminItems = [
+  { to: "/admin/users", label: "Benutzer", icon: UsersRound },
+  { to: "/admin/roles", label: "Rollen", icon: ShieldCheck }
+];
+
 function NavSection({ children }: { children: string }) {
   return <div className="mb-2 mt-5 px-1.5 text-[10px] font-semibold uppercase tracking-widest text-steel-400">{children}</div>;
 }
 
-export function Sidebar() {
+function canAdministerUsers(user: CurrentUser | null | undefined): boolean {
+  return Boolean(user?.permissions.some((permission) => (permission.resource === "*" || permission.resource === "users") && (permission.action === "*" || permission.action === "admin")));
+}
+
+interface SidebarProps {
+  currentUser?: CurrentUser | null;
+  onLogout?: () => void;
+}
+
+export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
+  const showAdmin = canAdministerUsers(currentUser);
+
   return (
     <aside className="hidden w-64 shrink-0 bg-gradient-to-b from-steel-700 to-steel-800 p-4 text-white md:block">
       <div className="mb-8 flex items-center gap-3">
@@ -78,6 +95,40 @@ export function Sidebar() {
           );
         })}
       </nav>
+      {showAdmin ? (
+        <>
+          <NavSection>Administration</NavSection>
+          <nav className="grid gap-1">
+            {adminItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-md" : "text-white/75 hover:bg-white/5 hover:text-white"}`
+                  }
+                >
+                  <Icon size={17} />
+                  {item.label}
+                </NavLink>
+              );
+            })}
+          </nav>
+        </>
+      ) : null}
+      {currentUser ? (
+        <div className="mt-6 border-t border-white/10 pt-4">
+          <div className="mb-3 px-3 text-xs text-white/70">
+            <span className="block font-semibold text-white">{currentUser.fullName}</span>
+            <span>{currentUser.role.label}</span>
+          </div>
+          <button type="button" onClick={onLogout} className="flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/75 transition hover:bg-white/5 hover:text-white">
+            <LogOut size={17} />
+            Abmelden
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }
