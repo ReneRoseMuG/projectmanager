@@ -157,3 +157,7 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.globalSearch.root
   ]);
 }
+
+export async function invalidateAiAgentScopes(queryClient: QueryClient): Promise<void> {
+  await invalidateWikiImportData(queryClient);
+}

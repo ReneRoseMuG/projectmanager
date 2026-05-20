@@ -3,11 +3,13 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { TestDb } from "./db.js";
+import type { AiLocalModelClient } from "../../src/services/ai-ollama.service.js";
 import type { GoogleDriveBackupClient } from "../../src/services/google-drive.service.js";
 
 interface BuildTestAppOptions {
   enableMultipart?: boolean;
   driveClient?: GoogleDriveBackupClient;
+  aiClient?: AiLocalModelClient;
 }
 
 const unavailableDriveClient: GoogleDriveBackupClient = {
@@ -19,6 +21,18 @@ const unavailableDriveClient: GoogleDriveBackupClient = {
   },
   async downloadFile() {
     throw new Error("Google Drive test client is not configured");
+  }
+};
+
+const unavailableAiClient: AiLocalModelClient = {
+  async listModels() {
+    throw new Error("AI test client is not configured");
+  },
+  async chatText() {
+    throw new Error("AI test client is not configured");
+  },
+  async chatJson() {
+    throw new Error("AI test client is not configured");
   }
 };
 
@@ -34,9 +48,11 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   app.decorate("db", testDb.db);
   app.decorate("sqlite", testDb.sqlite);
   app.decorate("driveClient", options.driveClient ?? unavailableDriveClient);
+  app.decorate("aiClient", options.aiClient ?? unavailableAiClient);
 
   const { errorHandler } = await import("../../src/utils/errors.js");
   const { registerCors } = await import("../../src/plugins/cors.js");
+  const { registerAiRoutes } = await import("../../src/routes/ai.js");
   const { registerProjectsRoutes } = await import("../../src/routes/projects.js");
   const { registerMilestoneRoutes } = await import("../../src/routes/milestones.js");
   const { registerTasksRoutes } = await import("../../src/routes/tasks.js");
@@ -69,6 +85,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   }
 
   await app.register(registerProjectsRoutes, { prefix: "/api" });
+  await app.register(registerAiRoutes, { prefix: "/api" });
   await app.register(registerMilestoneRoutes, { prefix: "/api" });
   await app.register(registerTasksRoutes, { prefix: "/api" });
   await app.register(registerSubtasksRoutes, { prefix: "/api" });

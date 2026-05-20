@@ -2,6 +2,9 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 20.05.26 | Fix | Lokale KI Runtime Paket | ✅ |
+| 20.05.26 | Feature | TLDraw-Zeichenblock | ✅ |
+| 20.05.26 | Feature | Lokaler KI-Agent | ✅ |
 | 20.05.26 | Fix | E2E RichText Verifikation | ✅ |
 | 20.05.26 | Fix | Agents Milestone Gate | ⚠️ |
 | 20.05.26 | Fix | RichText-Auswahl-Toolbar | ✅ |

@@ -27,6 +27,10 @@ export function conflict(message: string): AppError {
   return new AppError("CONFLICT", message, 409);
 }
 
+export function internalError(message: string): AppError {
+  return new AppError("INTERNAL_ERROR", message, 500);
+}
+
 export function formatError(error: AppError): ApiErrorPayload {
   return {
     error: error.error,

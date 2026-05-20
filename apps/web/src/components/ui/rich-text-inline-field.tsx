@@ -30,6 +30,7 @@ import TextStyle from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { useMutation } from "@tanstack/react-query";
 import {
   AlignCenter,
   AlignLeft,
@@ -45,16 +46,23 @@ import {
   LinkIcon,
   List,
   ListOrdered,
+  PenLine,
   Pencil,
   Quote,
   RemoveFormatting,
+  Sparkles,
   Strikethrough,
   Text,
+  Wand2,
   Underline as UnderlineIcon
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Markdown } from "tiptap-markdown";
+import { assistAiText } from "../../api/ai";
 import { hasVisibleHtmlContent } from "../../lib/html-utils";
+import { errorMessage } from "../../hooks/errors";
+import { useToast } from "./ToastProvider";
+import { TldrawNode } from "./tldraw-node";
 
 interface RichTextInlineFieldProps {
   /** Current HTML value for the controlled field. */
@@ -92,6 +100,7 @@ interface ToolbarButtonProps {
   active: boolean;
   title: string;
   icon: React.ReactElement<{ className?: string }>;
+  disabled?: boolean;
 }
 
 type RichTextToolbarVariant = "full" | "minimal" | "none";
@@ -192,6 +201,7 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
       Underline,
       Link.configure({ openOnClick: false }),
       Image,
+      TldrawNode,
       Markdown.configure({ html: true }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       TextStyle,
@@ -275,9 +285,25 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
 
 function RichTextToolbar({ editor, variant }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none"> }) {
   const showFullToolbar = variant === "full";
+  const { showToast } = useToast();
+  const aiMutation = useMutation({
+    mutationFn: (operation: "rewrite" | "formatParagraph") => assistAiText({ html: editor.getHTML(), operation }),
+    onSuccess: (result) => {
+      editor.commands.setContent(result.html);
+      editor.commands.focus("end");
+      showToast({ tone: "success", title: "Text aktualisiert" });
+    },
+    onError: (textError) => {
+      showToast({ tone: "error", title: "Text konnte nicht aktualisiert werden", message: errorMessage(textError) });
+    }
+  });
 
   return (
     <div data-testid="rich-text-toolbar" className="flex flex-wrap items-center gap-1 rounded-t-md border-b border-line bg-shell p-1.5">
+      <ToolbarButton onClick={() => aiMutation.mutate("rewrite")} active={false} disabled={aiMutation.isPending} title="Umformulieren" icon={<Sparkles />} />
+      <ToolbarButton onClick={() => aiMutation.mutate("formatParagraph")} active={false} disabled={aiMutation.isPending} title="Absatz formatieren" icon={<Wand2 />} />
+      <ToolbarButton onClick={() => editor.chain().focus().unsetHighlight().run()} active={false} title="Hervorhebungen entfernen" icon={<RemoveFormatting />} />
+      <Separator />
       <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Fett" icon={<Bold />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Kursiv" icon={<Italic />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Unterstrichen" icon={<UnderlineIcon />} />
@@ -305,6 +331,7 @@ function RichTextToolbar({ editor, variant }: { editor: Editor; variant: Exclude
           <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("right").run()} active={editor.isActive({ textAlign: "right" })} title="Rechts" icon={<AlignRight />} />
           <Separator />
           <ToolbarButton onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} active={false} title="Formatierung entfernen" icon={<RemoveFormatting />} />
+          <ToolbarButton onClick={() => editor.chain().focus().insertContent({ type: "tldraw", attrs: { snapshot: "" } }).run()} active={false} title="Zeichnung einfügen" icon={<PenLine />} />
         </>
       ) : null}
     </div>
@@ -337,7 +364,7 @@ function setImage(editor: Editor) {
   editor.chain().focus().setImage({ src: src.trim() }).run();
 }
 
-function ToolbarButton({ onClick, active, title, icon }: ToolbarButtonProps) {
+function ToolbarButton({ onClick, active, title, icon, disabled = false }: ToolbarButtonProps) {
   return (
     <button
       type="button"
@@ -345,7 +372,8 @@ function ToolbarButton({ onClick, active, title, icon }: ToolbarButtonProps) {
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       title={title}
-      className={cn("flex h-7 w-7 items-center justify-center rounded transition-colors", active ? "bg-steel-700 text-white" : "text-slate-500 hover:bg-line/50 hover:text-ink")}
+      disabled={disabled}
+      className={cn("flex h-7 w-7 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50", active ? "bg-steel-700 text-white" : "text-slate-500 hover:bg-line/50 hover:text-ink")}
     >
       {React.cloneElement(icon, { className: "h-3.5 w-3.5" })}
     </button>

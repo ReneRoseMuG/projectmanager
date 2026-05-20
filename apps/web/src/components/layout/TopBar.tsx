@@ -1,8 +1,10 @@
-import { CalendarDays, FolderKanban } from "lucide-react";
+import { Bot, CalendarDays, FolderKanban } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useHealthCheck } from "../../hooks/useHealthCheck";
+import { AiAgentPanel } from "../ai/AiAgentPanel";
 import { GlobalSearch } from "../search/GlobalSearch";
+import { Button } from "../ui/Button";
 import { SearchInput } from "../ui/SearchInput";
 import { ApiHealthPopover } from "./ApiHealthPopover";
 
@@ -26,6 +28,7 @@ export function TopBar() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [apiOpen, setApiOpen] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
 
   useEffect(() => {
     const open = () => setSearchOpen(true);
@@ -55,6 +58,9 @@ export function TopBar() {
         }} placeholder="Global suchen" hint="Ctrl K" />
       </div>
       <nav className="flex gap-1 md:hidden">
+        <button className="flex h-10 w-10 items-center justify-center rounded-md hover:bg-shell" type="button" title="KI-Agent" onClick={() => setAgentOpen(true)}>
+          <Bot size={18} />
+        </button>
         <NavLink className={({ isActive }) => `flex h-10 w-10 items-center justify-center rounded-md ${isActive ? "bg-steel-900 text-white" : "hover:bg-shell"}`} to="/projects" title="Projekte">
           <FolderKanban size={18} />
         </NavLink>
@@ -63,10 +69,14 @@ export function TopBar() {
         </NavLink>
       </nav>
       <div className="hidden items-center gap-3 md:flex">
+        <Button variant="ghost" icon={<Bot size={18} />} onClick={() => setAgentOpen(true)}>
+          KI-Agent
+        </Button>
         <ApiBadge online={health.online} latencyMs={health.latencyMs} onClick={() => setApiOpen((current) => !current)} />
       </div>
       {apiOpen ? <ApiHealthPopover online={health.online} latencyMs={health.latencyMs} onRefetch={health.refetch} /> : null}
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <AiAgentPanel open={agentOpen} onClose={() => setAgentOpen(false)} />
     </header>
   );
 }

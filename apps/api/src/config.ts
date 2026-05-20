@@ -18,6 +18,10 @@ export interface AppConfig {
   googleDriveClientId: string | null;
   googleDriveClientSecret: string | null;
   googleDriveRefreshToken: string | null;
+  aiBaseUrl: string;
+  aiDefaultModel: string;
+  aiTimeoutMs: number;
+  aiMaxInputChars: number;
 }
 
 function resolveFromApiRoot(value: string): string {
@@ -44,5 +48,9 @@ export const config: AppConfig = {
   googleDriveBackupFolderId: process.env.GOOGLE_DRIVE_BACKUP_FOLDER_ID ?? null,
   googleDriveClientId: process.env.GOOGLE_DRIVE_CLIENT_ID ?? null,
   googleDriveClientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET ?? null,
-  googleDriveRefreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN ?? null
+  googleDriveRefreshToken: process.env.GOOGLE_DRIVE_REFRESH_TOKEN ?? null,
+  aiBaseUrl: process.env.AI_BASE_URL ?? "http://127.0.0.1:11434/api",
+  aiDefaultModel: process.env.AI_DEFAULT_MODEL ?? "llama3.2:1b",
+  aiTimeoutMs: numberFromEnv(process.env.AI_TIMEOUT_MS, 60000),
+  aiMaxInputChars: numberFromEnv(process.env.AI_MAX_INPUT_CHARS, 12000)
 };

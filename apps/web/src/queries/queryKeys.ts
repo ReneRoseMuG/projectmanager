@@ -14,6 +14,10 @@ export const queryKeys = {
     backlog: (projectId: number) => [...queryKeys.projects.detail(projectId), "backlog"] as const,
     features: (projectId: number) => [...queryKeys.projects.detail(projectId), "features"] as const
   },
+  ai: {
+    root: ["ai"] as const,
+    models: () => [...queryKeys.ai.root, "models"] as const
+  },
   milestones: {
     root: ["milestones"] as const,
     list: () => [...queryKeys.milestones.root, "list"] as const,

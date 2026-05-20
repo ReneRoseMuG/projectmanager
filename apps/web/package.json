@@ -41,6 +41,7 @@
     "@tiptap/pm": "^2.27.2",
     "@tiptap/react": "^2.4.0",
     "@tiptap/starter-kit": "^2.4.0",
+    "@tldraw/tldraw": "^2.4.6",
     "date-fns": "^3.6.0",
     "ky": "^1.4.0",
     "lucide-react": "^0.383.0",
