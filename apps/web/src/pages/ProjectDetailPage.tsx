@@ -134,7 +134,7 @@ export function ProjectDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="min-h-full">
       <ProjectForm
         open
         project={project}

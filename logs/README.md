@@ -2,6 +2,7 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 20.05.26 | Fix | Sticky Shell und Board-Fill | ✅ |
 | 20.05.26 | Feature | Sticky Formular-Shells | ✅ |
 | 20.05.26 | Fix | Formularfelder | ✅ |
 | 20.05.26 | 1 | Planungsleitplanken-Skill | ✅ |

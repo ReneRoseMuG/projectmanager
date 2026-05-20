@@ -84,7 +84,7 @@ export function MilestoneDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="min-h-full">
       <MilestoneForm
         open
         milestone={milestone}

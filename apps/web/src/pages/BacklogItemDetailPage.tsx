@@ -79,7 +79,7 @@ export function BacklogItemDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="min-h-full">
       <BacklogItemForm open item={item} features={features.features} variant="page" onSubmit={submitBacklogItem} closeOnSubmit={!isCreateMode} onClose={closePage} onOpenInTab={openInTab} />
     </div>
   );

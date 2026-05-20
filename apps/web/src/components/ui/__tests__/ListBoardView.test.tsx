@@ -77,7 +77,7 @@ describe("ListBoardView", () => {
     expect(screen.getByText("Card Alpha")).toBeInTheDocument();
     expect(screen.getByText("Card Beta")).toBeInTheDocument();
     expect(screen.queryByText("Row Alpha")).not.toBeInTheDocument();
-    expect(container.firstElementChild).toHaveClass("min-h-[max(18rem,calc(100vh-22rem))]");
+    expect(container.firstElementChild).toHaveClass("min-h-[max(26rem,calc(100vh-14rem))]");
     expect(container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3")).toHaveClass("min-h-full", "min-w-0");
     container.querySelectorAll("article.rounded-2xl").forEach((card) => {
       expect(card).toHaveClass("min-w-0");
@@ -172,7 +172,7 @@ describe("ListBoardView", () => {
 
     expect(screen.getByText("Keine Einträge")).toBeInTheDocument();
     expect(screen.getByText("Keine Einträge").parentElement).toHaveClass("grid", "min-h-full");
-    expect(container.firstElementChild).toHaveClass("flex", "min-h-[max(18rem,calc(100vh-22rem))]");
+    expect(container.firstElementChild).toHaveClass("flex", "min-h-[max(26rem,calc(100vh-14rem))]");
   });
 
   it("loading=true zeigt Skeleton, kein EmptyState", () => {

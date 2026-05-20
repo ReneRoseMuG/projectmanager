@@ -142,7 +142,7 @@ export function FeatureDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="min-h-full">
       <FeatureForm
         open
         feature={features.feature}

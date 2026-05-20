@@ -45,11 +45,14 @@ describe("FormModal", () => {
     const footer = form.querySelector("footer");
 
     expect(form).toHaveClass("min-h-full");
-    expect(form.querySelector("header")).toHaveClass("rounded-t-2xl");
+    expect(form).not.toHaveClass("rounded-2xl");
+    expect(form.querySelector("header")).not.toHaveClass("rounded-t-2xl");
     expect(tabWrapper).toHaveClass("sticky", "top-0", "z-20", "shadow-sm");
-    expect(bodyWrapper).toHaveClass("flex-1", "pb-24");
+    expect(bodyWrapper).toHaveClass("flex", "flex-1", "flex-col");
+    expect(bodyWrapper).not.toHaveClass("pb-24");
     expect(bodyWrapper).not.toHaveClass("overflow-auto");
-    expect(footer).toHaveClass("sticky", "bottom-0", "z-10", "rounded-b-2xl");
+    expect(footer).toHaveClass("sticky", "bottom-0", "z-10");
+    expect(footer).not.toHaveClass("rounded-b-2xl");
     expect(tabWrapper?.nextElementSibling).toBe(bodyWrapper);
   });
 

@@ -132,7 +132,7 @@ export function UseCaseDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="min-h-full">
       <UseCaseForm
         open
         useCase={useCase}

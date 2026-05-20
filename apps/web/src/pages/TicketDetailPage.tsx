@@ -84,7 +84,7 @@ export function TicketDetailPage() {
 
   if (isCreateMode) {
     return (
-      <div className="mx-auto max-w-7xl">
+      <div className="min-h-full">
         <TicketForm open variant="page" initialStatus={parseTicketStatus(searchParams.get("status"))} onSubmit={createTicket} closeOnSubmit={false} onClose={closePage} />
       </div>
     );
@@ -103,7 +103,7 @@ export function TicketDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="min-h-full">
       <TicketForm open ticket={detail.ticket} variant="page" onSubmit={saveTicket} onClose={closePage} onOpenInTab={openInTab} />
     </div>
   );
