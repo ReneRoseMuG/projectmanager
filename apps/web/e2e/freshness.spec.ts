@@ -1,6 +1,6 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+﻿import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
-import { apiBaseUrl, createFeature, createProject, deleteFeature, deleteProject, fillRichText, formPage, itemCard, slugify, uniqueTitle } from "./domain-test-utils";
+import { authenticatedGoto, apiBaseUrl, createFeature, createProject, deleteFeature, deleteProject, fillRichText, formPage, itemCard, slugify, uniqueTitle } from "./domain-test-utils";
 
 /**
  * Test Scope:
@@ -62,7 +62,7 @@ async function openTab(scope: Page | Locator, label: string) {
 }
 
 async function openProjectDetail(page: Page, projectId: number) {
-  await page.goto(`/projects/${projectId}`);
+  await authenticatedGoto(page, `/projects/${projectId}`);
   await expect(projectForm(page)).toBeVisible();
 }
 
@@ -124,7 +124,7 @@ test.describe("Globale UI-Aktualität", () => {
       await openProjectDetail(page, project.id);
       await expectTabCount(projectForm(page), "Features", 0);
 
-      await page.goto(`/features/${feature.id}`);
+      await authenticatedGoto(page, `/features/${feature.id}`);
       await featureForm(page).getByRole("button", { name: /Projekte/ }).click();
       await featureForm(page).getByRole("button", { name: "Projekt hinzufügen" }).click();
       await activeModal(page).getByRole("combobox").selectOption({ label: project.name });
@@ -140,7 +140,7 @@ test.describe("Globale UI-Aktualität", () => {
       await projectForm(page).getByRole("button", { name: "Kanban" }).click();
       await expect(visibleArticle(projectForm(page), feature.title)).toBeVisible();
 
-      await page.goto(`/features/${feature.id}`);
+      await authenticatedGoto(page, `/features/${feature.id}`);
       await featureForm(page).getByRole("button", { name: /Projekte/ }).click();
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/features`) && response.request().method() === "PUT"),

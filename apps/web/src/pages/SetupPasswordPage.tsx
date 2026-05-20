@@ -1,0 +1,59 @@
+import { KeyRound } from "lucide-react";
+import type { FormEvent } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { useAuth } from "../hooks/useAuth";
+import { errorMessageAsync } from "../hooks/errors";
+
+export function SetupPasswordPage() {
+  const navigate = useNavigate();
+  const { setInitialPassword, setPasswordPending } = useAuth({ enabled: false });
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    if (password !== confirmation) {
+      setError("Passwörter stimmen nicht überein");
+      return;
+    }
+    try {
+      await setInitialPassword({ password });
+      navigate("/projects", { replace: true });
+    } catch (caught) {
+      setError(await errorMessageAsync(caught));
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-shell px-4 text-ink">
+      <section className="w-full max-w-sm rounded-lg border border-line bg-white p-6 shadow-card">
+        <div className="mb-6">
+          <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-md bg-steel-700 text-white">
+            <KeyRound size={20} />
+          </span>
+          <h1 className="text-xl font-bold text-ink">Passwort vergeben</h1>
+          <p className="mt-1 text-sm text-muted">Initiales Admin-Passwort</p>
+        </div>
+        <form className="grid gap-4" onSubmit={handleSubmit}>
+          <label className="grid gap-1.5 text-sm font-medium">
+            Neues Passwort
+            <Input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="new-password" iconLeft={<KeyRound size={16} />} />
+          </label>
+          <label className="grid gap-1.5 text-sm font-medium">
+            Bestätigung
+            <Input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} type="password" autoComplete="new-password" iconLeft={<KeyRound size={16} />} />
+          </label>
+          {error ? <p className="rounded-md border border-crimson/30 bg-crimson/5 px-3 py-2 text-sm text-crimson">{error}</p> : null}
+          <Button type="submit" variant="primary" loading={setPasswordPending}>
+            Speichern
+          </Button>
+        </form>
+      </section>
+    </main>
+  );
+}

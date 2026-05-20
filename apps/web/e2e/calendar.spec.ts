@@ -1,5 +1,5 @@
-import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
-import { apiBaseUrl, createEvent, createProject, createTask, deleteEvent, deleteProject, deleteTask, formPage, uniqueTitle } from "./domain-test-utils";
+﻿import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { authenticatedGoto, apiBaseUrl, createEvent, createProject, createTask, deleteEvent, deleteProject, deleteTask, formPage, uniqueTitle } from "./domain-test-utils";
 
 /**
  * Test Scope:
@@ -17,7 +17,7 @@ import { apiBaseUrl, createEvent, createProject, createTask, deleteEvent, delete
  */
 
 async function openCalendar(page: Page) {
-  await page.goto("/calendar");
+  await authenticatedGoto(page, "/calendar");
   await expect(page.getByRole("heading", { name: "Kalender" })).toBeVisible();
 }
 

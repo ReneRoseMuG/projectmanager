@@ -1,5 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { apiBaseUrl, createProject, createTask, cleanupTasksByTitle, deleteProject, deleteTask, expectRichText, fillRichText, formPage, itemCard, uniqueTitle } from "./domain-test-utils";
+﻿import { expect, test, type Page } from "@playwright/test";
+import { authenticatedGoto, apiBaseUrl, createProject, createTask, cleanupTasksByTitle, deleteProject, deleteTask, expectRichText, fillRichText, formPage, itemCard, uniqueTitle } from "./domain-test-utils";
 
 /**
  * Test Scope:
@@ -17,7 +17,7 @@ import { apiBaseUrl, createProject, createTask, cleanupTasksByTitle, deleteProje
  */
 
 async function openProjectTasks(page: Page, projectId: number) {
-  await page.goto(`/projects/${projectId}`);
+  await authenticatedGoto(page, `/projects/${projectId}`);
   const projectForm = formPage(page, "Projekt bearbeiten");
   await expect(projectForm).toBeVisible();
   await projectForm.getByRole("button", { name: /Aufgaben/ }).click();
@@ -93,7 +93,7 @@ test.describe("Task-Routen und Detailformular", () => {
     const updatedTitle = uniqueTitle("E2E Task Updated Route");
 
     try {
-      await page.goto(`/tasks/${task.id}?returnTo=${encodeURIComponent(`/projects/${project.id}`)}`);
+      await authenticatedGoto(page, `/tasks/${task.id}?returnTo=${encodeURIComponent(`/projects/${project.id}`)}`);
       const taskForm = formPage(page, "Aufgabe bearbeiten");
       await expectTaskFormData(page, task);
 
@@ -139,7 +139,7 @@ test.describe("Task-Routen und Detailformular", () => {
     const task = await createTask(request, { type: "project", id: project.id }, "E2E Task Comment Route");
 
     try {
-      await page.goto(`/tasks/${task.id}?returnTo=${encodeURIComponent(`/projects/${project.id}`)}`);
+      await authenticatedGoto(page, `/tasks/${task.id}?returnTo=${encodeURIComponent(`/projects/${project.id}`)}`);
       const taskForm = formPage(page, "Aufgabe bearbeiten");
       await taskForm.getByRole("button", { name: /Kommentare/ }).click();
       await fillRichText(taskForm, "comment-thread-body", "E2E Kommentar Route");

@@ -174,8 +174,8 @@ function seedCompleteDataset(): void {
   testDb.sqlite.exec(`
     INSERT INTO app_settings (key, value, updated_at)
       VALUES ('googleDriveBackupFolderId', 'drive-folder-seeded', '2026-05-17T08:00:00');
-    INSERT INTO users (id, name, email, created_at, updated_at)
-      VALUES (1, 'Ada Lovelace', 'ada@example.test', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO users (id, name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at)
+      VALUES (1, '', 'Ada', 'Lovelace', 'ada@example.test', NULL, 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO projects (id, name, description, status, color, start_date, due_date, created_at, updated_at)
       VALUES (1, 'Projekt Alpha', 'Beschreibung', 'active', '#123456', '2026-05-01', '2026-05-31', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO milestones (id, project_id, name, description, status, color, start_date, due_date, created_at, updated_at)

@@ -1,15 +1,18 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
+import { Spinner } from "./components/ui/Spinner";
 import { CalendarPage } from "./pages/CalendarPage";
 import { BacklogItemDetailPage } from "./pages/BacklogItemDetailPage";
 import { FeatureDetailPage } from "./pages/FeatureDetailPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
+import { LoginPage } from "./pages/LoginPage";
 import { MilestoneDetailPage } from "./pages/MilestoneDetailPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { SetupPasswordPage } from "./pages/SetupPasswordPage";
 import { SettingsBackupPage } from "./pages/SettingsBackupPage";
 import { SettingsCatalogsPage } from "./pages/SettingsCatalogsPage";
 import { SettingsTagsPage } from "./pages/SettingsTagsPage";
@@ -18,11 +21,61 @@ import { TicketDetailPage } from "./pages/TicketDetailPage";
 import { TaskDetailPage } from "./pages/TaskDetailPage";
 import { UseCaseDetailPage } from "./pages/UseCaseDetailPage";
 import { WikiPage } from "./pages/WikiPage";
+import { RoleDetailPage } from "./pages/admin/RoleDetailPage";
+import { RolesPage } from "./pages/admin/RolesPage";
+import { UserDetailPage } from "./pages/admin/UserDetailPage";
+import { UsersPage } from "./pages/admin/UsersPage";
+import { useAuth } from "./hooks/useAuth";
+
+function hasAdminAccess(user: ReturnType<typeof useAuth>["user"]): boolean {
+  return Boolean(user?.permissions.some((permission) => (permission.resource === "*" || permission.resource === "users" || permission.resource === "roles") && (permission.action === "*" || permission.action === "admin")));
+}
 
 export default function App() {
+  const auth = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  if (auth.loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-shell text-ink">
+        <Spinner />
+      </main>
+    );
+  }
+
+  if (!auth.user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" replace state={{ from: location }} />} />
+      </Routes>
+    );
+  }
+
+  if (auth.requiresPasswordSetup && location.pathname !== "/setup-password") {
+    return <Navigate to="/setup-password" replace />;
+  }
+
+  if (auth.requiresPasswordSetup) {
+    return (
+      <Routes>
+        <Route path="/setup-password" element={<SetupPasswordPage />} />
+        <Route path="*" element={<Navigate to="/setup-password" replace />} />
+      </Routes>
+    );
+  }
+
+  const adminAccess = hasAdminAccess(auth.user);
+
   return (
     <div className="flex min-h-screen bg-shell text-ink">
-      <Sidebar />
+      <Sidebar
+        currentUser={auth.user}
+        onLogout={() => {
+          void auth.logout().then(() => navigate("/login", { replace: true }));
+        }}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
         <main className="min-w-0 flex-1 p-4 md:p-6">
@@ -51,6 +104,14 @@ export default function App() {
             <Route path="/settings/catalogs" element={<SettingsCatalogsPage />} />
             <Route path="/settings/tags" element={<SettingsTagsPage />} />
             <Route path="/settings/backup" element={<SettingsBackupPage />} />
+            <Route path="/admin/users" element={adminAccess ? <UsersPage /> : <ForbiddenPage />} />
+            <Route path="/admin/users/new" element={adminAccess ? <UserDetailPage /> : <ForbiddenPage />} />
+            <Route path="/admin/users/:id" element={adminAccess ? <UserDetailPage /> : <ForbiddenPage />} />
+            <Route path="/admin/roles" element={adminAccess ? <RolesPage /> : <ForbiddenPage />} />
+            <Route path="/admin/roles/new" element={adminAccess ? <RoleDetailPage /> : <ForbiddenPage />} />
+            <Route path="/admin/roles/:id" element={adminAccess ? <RoleDetailPage /> : <ForbiddenPage />} />
+            <Route path="/setup-password" element={<Navigate to="/projects" replace />} />
+            <Route path="/login" element={<Navigate to="/projects" replace />} />
             <Route path="/forbidden" element={<ForbiddenPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

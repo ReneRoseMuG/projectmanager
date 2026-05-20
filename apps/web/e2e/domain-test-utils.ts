@@ -61,6 +61,32 @@ export function slugify(value: string) {
   return value.toLocaleLowerCase("de-DE").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+const authenticatedApiRequests = new WeakSet<APIRequestContext>();
+const authenticatedPages = new WeakSet<Page>();
+
+export async function ensureApiAuth(request: APIRequestContext) {
+  if (authenticatedApiRequests.has(request)) {
+    return;
+  }
+  const response = await request.post(`${apiBaseUrl}/auth/login`, {
+    data: { email: "admin@local", password: "password123" }
+  });
+  expect(response.ok()).toBeTruthy();
+  authenticatedApiRequests.add(request);
+}
+
+export async function authenticatedGoto(page: Page, path: string) {
+  if (!authenticatedPages.has(page)) {
+    await page.goto("/login");
+    await page.getByLabel("E-Mail").fill("admin@local");
+    await page.getByLabel("Passwort").fill("password123");
+    await page.getByRole("button", { name: "Anmelden" }).click();
+    await expect(page.getByRole("heading", { name: "Projekte", exact: true })).toBeVisible();
+    authenticatedPages.add(page);
+  }
+  await page.goto(path);
+}
+
 function taskOwnerPath(owner: TaskOwner) {
   if (owner.type === "project") {
     return `projects/${owner.id}`;
@@ -91,6 +117,7 @@ function ticketOwnerPath(owner: TicketOwner) {
 }
 
 export async function createProject(request: APIRequestContext, titlePrefix: string, input: Partial<{ description: string; status: string; color: string; startDate: string; dueDate: string }> = {}) {
+  await ensureApiAuth(request);
   const name = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/projects`, {
     data: {
@@ -112,6 +139,7 @@ export async function createMilestone(
   titlePrefix: string,
   input: Partial<{ description: string; status: string; color: string; startDate: string; dueDate: string }> = {}
 ) {
+  await ensureApiAuth(request);
   const name = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/milestones`, {
     data: {
@@ -129,6 +157,7 @@ export async function createMilestone(
 }
 
 export async function createFeature(request: APIRequestContext, titlePrefix: string, input: Partial<{ description: string; content: string; status: string; sortOrder: number }> = {}) {
+  await ensureApiAuth(request);
   const title = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/features`, {
     data: {
@@ -145,11 +174,13 @@ export async function createFeature(request: APIRequestContext, titlePrefix: str
 }
 
 export async function linkProjectFeature(request: APIRequestContext, projectId: number, featureId: number) {
+  await ensureApiAuth(request);
   const response = await request.put(`${apiBaseUrl}/projects/${projectId}/features`, { data: { featureIds: [featureId] } });
   expect(response.ok()).toBeTruthy();
 }
 
 export async function createUseCase(request: APIRequestContext, featureId: number, titlePrefix: string, input: Partial<{ description: string; content: string; status: string; sortOrder: number }> = {}) {
+  await ensureApiAuth(request);
   const title = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/features/${featureId}/use-cases`, {
     data: {
@@ -166,6 +197,7 @@ export async function createUseCase(request: APIRequestContext, featureId: numbe
 }
 
 export async function createTask(request: APIRequestContext, owner: TaskOwner, titlePrefix: string, input: Partial<{ description: string; status: string; priority: string; dueDate: string }> = {}) {
+  await ensureApiAuth(request);
   const title = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/${taskOwnerPath(owner)}/tasks`, {
     data: {
@@ -181,6 +213,7 @@ export async function createTask(request: APIRequestContext, owner: TaskOwner, t
 }
 
 export async function createTicket(request: APIRequestContext, owner: TicketOwner | null, titlePrefix: string, input: Partial<{ description: string; type: string; status: string; priority: string; assignee: string; reporter: string; dueDate: string; environment: string; affectedVersion: string }> = {}) {
+  await ensureApiAuth(request);
   const title = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/${owner ? `${ticketOwnerPath(owner)}/tickets` : "tickets"}`, {
     data: {
@@ -205,6 +238,7 @@ export async function createEvent(
   titlePrefix: string,
   input: Partial<{ owners: Array<{ type: "project" | "milestone" | "task"; id: number }>; startTime: string; endTime: string; isAllDay: boolean; color: string | null }> = {}
 ) {
+  await ensureApiAuth(request);
   const title = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/events`, {
     data: {
@@ -221,6 +255,7 @@ export async function createEvent(
 }
 
 export async function createBacklogItem(request: APIRequestContext, projectId: number, titlePrefix: string, input: Partial<{ description: string; status: string; featureId: number }> = {}) {
+  await ensureApiAuth(request);
   const title = uniqueTitle(titlePrefix);
   const response = await request.post(`${apiBaseUrl}/projects/${projectId}/backlog`, {
     data: {
@@ -235,42 +270,49 @@ export async function createBacklogItem(request: APIRequestContext, projectId: n
 }
 
 export async function deleteProject(request: APIRequestContext, projectId: number | null | undefined) {
+  await ensureApiAuth(request);
   if (projectId) {
     await request.delete(`${apiBaseUrl}/projects/${projectId}`);
   }
 }
 
 export async function deleteMilestone(request: APIRequestContext, milestoneId: number | null | undefined) {
+  await ensureApiAuth(request);
   if (milestoneId) {
     await request.delete(`${apiBaseUrl}/milestones/${milestoneId}`);
   }
 }
 
 export async function deleteFeature(request: APIRequestContext, featureId: number | null | undefined) {
+  await ensureApiAuth(request);
   if (featureId) {
     await request.delete(`${apiBaseUrl}/features/${featureId}`);
   }
 }
 
 export async function deleteTicket(request: APIRequestContext, ticketId: number | null | undefined) {
+  await ensureApiAuth(request);
   if (ticketId) {
     await request.delete(`${apiBaseUrl}/tickets/${ticketId}`);
   }
 }
 
 export async function deleteEvent(request: APIRequestContext, eventId: number | null | undefined) {
+  await ensureApiAuth(request);
   if (eventId) {
     await request.delete(`${apiBaseUrl}/events/${eventId}`);
   }
 }
 
 export async function deleteTask(request: APIRequestContext, taskId: number | null | undefined) {
+  await ensureApiAuth(request);
   if (taskId) {
     await request.delete(`${apiBaseUrl}/tasks/${taskId}`);
   }
 }
 
 export async function cleanupTasksByTitle(request: APIRequestContext, titles: string[]) {
+  await ensureApiAuth(request);
   const response = await request.get(`${apiBaseUrl}/tasks`);
   if (!response.ok()) {
     return;
@@ -282,6 +324,7 @@ export async function cleanupTasksByTitle(request: APIRequestContext, titles: st
 }
 
 export async function cleanupTicketsByTitle(request: APIRequestContext, titles: string[]) {
+  await ensureApiAuth(request);
   const response = await request.get(`${apiBaseUrl}/tickets`);
   if (!response.ok()) {
     return;

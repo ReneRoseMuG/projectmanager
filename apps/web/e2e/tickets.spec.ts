@@ -1,5 +1,6 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+﻿import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
+  authenticatedGoto,
   apiBaseUrl,
   createFeature,
   createProject,
@@ -33,7 +34,7 @@ import {
  */
 
 async function openTicketList(page: Page) {
-  await page.goto("/tickets");
+  await authenticatedGoto(page, "/tickets");
   await expect(page.getByRole("heading", { name: "Tickets", exact: true })).toBeVisible();
 }
 
@@ -50,7 +51,7 @@ async function expectTicketFormData(page: Page, ticket: { title: string }, descr
 }
 
 async function openProjectTickets(page: Page, projectId: number) {
-  await page.goto(`/projects/${projectId}`);
+  await authenticatedGoto(page, `/projects/${projectId}`);
   const form = formPage(page, "Projekt bearbeiten");
   await form.getByRole("button", { name: /Tickets/ }).click();
   await expect(form.getByRole("button", { name: "Neues Ticket" })).toBeVisible();
@@ -58,7 +59,7 @@ async function openProjectTickets(page: Page, projectId: number) {
 }
 
 async function openTaskTickets(page: Page, taskId: number, projectId: number) {
-  await page.goto(`/tasks/${taskId}?returnTo=${encodeURIComponent(`/projects/${projectId}`)}`);
+  await authenticatedGoto(page, `/tasks/${taskId}?returnTo=${encodeURIComponent(`/projects/${projectId}`)}`);
   const form = formPage(page, "Aufgabe bearbeiten");
   await form.getByRole("button", { name: /Tickets/ }).click();
   await expect(form.getByRole("button", { name: "Neues Ticket" })).toBeVisible();
@@ -66,7 +67,7 @@ async function openTaskTickets(page: Page, taskId: number, projectId: number) {
 }
 
 async function openFeatureTickets(page: Page, featureId: number) {
-  await page.goto(`/features/${featureId}`);
+  await authenticatedGoto(page, `/features/${featureId}`);
   const form = formPage(page, "Feature bearbeiten");
   await form.getByRole("button", { name: /Tickets/ }).click();
   await expect(form.getByRole("button", { name: "Neues Ticket" })).toBeVisible();
@@ -74,7 +75,7 @@ async function openFeatureTickets(page: Page, featureId: number) {
 }
 
 async function openUseCaseTickets(page: Page, useCaseId: number, featureId: number) {
-  await page.goto(`/use-cases/${useCaseId}?returnTo=${encodeURIComponent(`/features/${featureId}`)}`);
+  await authenticatedGoto(page, `/use-cases/${useCaseId}?returnTo=${encodeURIComponent(`/features/${featureId}`)}`);
   const form = formPage(page, "Use Case bearbeiten");
   await form.getByRole("button", { name: /Tickets/ }).click();
   await expect(form.getByRole("button", { name: "Neues Ticket" })).toBeVisible();
@@ -144,7 +145,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
     const updatedTitle = uniqueTitle("E2E Ticket Updated Route");
 
     try {
-      await page.goto(`/tickets/${ticket.id}`);
+      await authenticatedGoto(page, `/tickets/${ticket.id}`);
       const form = formPage(page, "Ticket bearbeiten");
       await expectTicketFormData(page, ticket);
 

@@ -8,6 +8,7 @@ import type { GoogleDriveBackupClient } from "../../src/services/google-drive.se
 
 interface BuildTestAppOptions {
   enableMultipart?: boolean;
+  enableAuth?: boolean;
   driveClient?: GoogleDriveBackupClient;
   aiClient?: AiLocalModelClient;
 }
@@ -52,6 +53,11 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
 
   const { errorHandler } = await import("../../src/utils/errors.js");
   const { registerCors } = await import("../../src/plugins/cors.js");
+  const { registerAuthPlugins, registerGlobalAuthGuard } = await import("../../src/plugins/auth.js");
+  const { seedAuthData } = await import("../../src/services/auth.service.js");
+  const { registerAuthRoutes } = await import("../../src/routes/auth.js");
+  const { registerAdminUserRoutes } = await import("../../src/routes/admin-users.js");
+  const { registerAdminRoleRoutes } = await import("../../src/routes/admin-roles.js");
   const { registerAiRoutes } = await import("../../src/routes/ai.js");
   const { registerProjectsRoutes } = await import("../../src/routes/projects.js");
   const { registerMilestoneRoutes } = await import("../../src/routes/milestones.js");
@@ -75,6 +81,10 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
 
   app.setErrorHandler(errorHandler);
   await registerCors(app);
+  if (options.enableAuth) {
+    await registerAuthPlugins(app);
+    await seedAuthData(testDb.db);
+  }
   await registerMultipart(app);
 
   if (options.enableMultipart) {
@@ -83,6 +93,14 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
 
     await registerStatic(app);
     await app.register(registerAttachmentsRoutes, { prefix: "/api" });
+  }
+
+  if (options.enableAuth) {
+    await app.register(registerAuthRoutes, { prefix: "/api" });
+    await app.register(registerHealthRoutes, { prefix: "/api" });
+    registerGlobalAuthGuard(app);
+    await app.register(registerAdminUserRoutes, { prefix: "/api" });
+    await app.register(registerAdminRoleRoutes, { prefix: "/api" });
   }
 
   await app.register(registerProjectsRoutes, { prefix: "/api" });
@@ -96,7 +114,9 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerNotesRoutes, { prefix: "/api" });
   await app.register(registerTicketsRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
-  await app.register(registerHealthRoutes, { prefix: "/api" });
+  if (!options.enableAuth) {
+    await app.register(registerHealthRoutes, { prefix: "/api" });
+  }
   await app.register(registerFeaturesRoutes, { prefix: "/api" });
   await app.register(registerUseCasesRoutes, { prefix: "/api" });
   await app.register(registerWikiRoutes, { prefix: "/api" });

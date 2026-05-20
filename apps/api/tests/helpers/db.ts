@@ -40,6 +40,22 @@ function seedDefaultCatalogEntries(sqlite: Database.Database): void {
   }
 }
 
+function seedDefaultAuth(sqlite: Database.Database): void {
+  sqlite.prepare("INSERT INTO roles (key, label, is_system, version, created_at, updated_at) VALUES (?, ?, ?, 1, datetime('now'), datetime('now'))").run("admin", "Administrator", 1);
+  sqlite.prepare("INSERT INTO roles (key, label, is_system, version, created_at, updated_at) VALUES (?, ?, ?, 1, datetime('now'), datetime('now'))").run("editor", "Editor", 1);
+  sqlite.prepare("INSERT INTO roles (key, label, is_system, version, created_at, updated_at) VALUES (?, ?, ?, 1, datetime('now'), datetime('now'))").run("reader", "Leser", 1);
+  sqlite.prepare("INSERT INTO permissions (role_id, resource, action) SELECT id, '*', '*' FROM roles WHERE key = 'admin'").run();
+  sqlite.prepare("INSERT INTO permissions (role_id, resource, action) SELECT id, '*', 'read' FROM roles WHERE key = 'editor'").run();
+  sqlite.prepare("INSERT INTO permissions (role_id, resource, action) SELECT id, '*', 'write' FROM roles WHERE key = 'editor'").run();
+  sqlite.prepare("INSERT INTO permissions (role_id, resource, action) SELECT id, '*', 'read' FROM roles WHERE key = 'reader'").run();
+  sqlite
+    .prepare(
+      "INSERT INTO users (name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at) SELECT '', 'Test', 'Admin', 'admin@local', '$2b$12$6i0aEyMqgUs3z.zKCqvpQexCgDxZk17O0lNs8ChHO4Iy87/pDp40q', id, 1, 1, datetime('now'), datetime('now') FROM roles WHERE key = 'admin'"
+    )
+    .run();
+  sqlite.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('admin_setup_done', 'true', datetime('now'))").run();
+}
+
 function migrateTestDb(sqlite: Database.Database) {
   const db = drizzle(sqlite, { schema });
   const migrationsFolder = fileURLToPath(new URL("../../src/db/migrations", import.meta.url));
@@ -73,6 +89,9 @@ export function createFileTestDb(databasePath: string) {
 export function truncateAll(sqlite: Database.Database): void {
   const tables = [
     "app_settings",
+    "users",
+    "permissions",
+    "roles",
     "catalog_entries",
     "use_case_tasks",
     "feature_tasks",
@@ -133,6 +152,7 @@ export function truncateAll(sqlite: Database.Database): void {
         sqlite.prepare(`DELETE FROM ${table}`).run();
         sqlite.prepare("DELETE FROM sqlite_sequence WHERE name = ?").run(table);
       }
+      seedDefaultAuth(sqlite);
       seedDefaultCatalogEntries(sqlite);
     })();
   } finally {

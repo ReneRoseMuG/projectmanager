@@ -5,6 +5,21 @@ export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "tic
 export type TicketOwnerType = "project" | "milestone" | "task" | "feature" | "useCase";
 
 export const queryKeys = {
+  auth: {
+    root: ["auth"] as const,
+    me: () => [...queryKeys.auth.root, "me"] as const
+  },
+  adminUsers: {
+    root: ["adminUsers"] as const,
+    list: () => [...queryKeys.adminUsers.root, "list"] as const,
+    detail: (userId: number) => [...queryKeys.adminUsers.root, "detail", userId] as const
+  },
+  adminRoles: {
+    root: ["adminRoles"] as const,
+    list: () => [...queryKeys.adminRoles.root, "list"] as const,
+    detail: (roleId: number) => [...queryKeys.adminRoles.root, "detail", roleId] as const,
+    permissionCatalog: () => [...queryKeys.adminRoles.root, "permissionCatalog"] as const
+  },
   projects: {
     root: ["projects"] as const,
     list: () => [...queryKeys.projects.root, "list"] as const,
