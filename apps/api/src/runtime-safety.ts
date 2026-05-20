@@ -13,6 +13,7 @@ export interface RuntimeTargets {
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 export const apiRoot = path.resolve(moduleDir, "..");
+export const repoRoot = path.resolve(apiRoot, "..", "..");
 export const testRuntimeRoot = path.resolve(apiRoot, ".test-runtime");
 export const vitestRuntimeRoot = path.resolve(testRuntimeRoot, "vitest");
 export const protectedDataRoot = path.resolve(apiRoot, "data");
@@ -24,7 +25,7 @@ const protectedRuntimePaths = {
   uploadDir: path.resolve(apiRoot, "uploads"),
   previewCacheDir: path.resolve(apiRoot, "previews"),
   contentDir: path.resolve(apiRoot, "content"),
-  backupWorkDir: path.resolve(apiRoot, "backups")
+  backupWorkDir: path.resolve(repoRoot, "backups")
 };
 
 function isSameOrInside(targetPath: string, rootPath: string): boolean {

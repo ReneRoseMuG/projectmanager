@@ -99,7 +99,7 @@ test.describe("Globale UI-Aktualität", () => {
       await openTab(projectForm(page), "Aufgaben");
       await expect(visibleArticle(projectForm(page), taskTitle)).toBeVisible();
       await projectForm(page).getByRole("button", { name: "Kanban" }).click();
-      await expect(projectForm(page).getByRole("heading", { name: "Offen" }).first()).toBeVisible();
+      await expect(projectForm(page).getByRole("heading", { name: "Aktiv" }).first()).toBeVisible();
       await expect(visibleArticle(projectForm(page), taskTitle)).toBeVisible();
 
       const taskArticle = visibleArticle(projectForm(page), taskTitle);

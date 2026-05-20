@@ -4,26 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import type { TestDb } from "./db.js";
 import type { AiLocalModelClient } from "../../src/services/ai-ollama.service.js";
-import type { GoogleDriveBackupClient } from "../../src/services/google-drive.service.js";
 
 interface BuildTestAppOptions {
   enableMultipart?: boolean;
   enableAuth?: boolean;
-  driveClient?: GoogleDriveBackupClient;
   aiClient?: AiLocalModelClient;
 }
-
-const unavailableDriveClient: GoogleDriveBackupClient = {
-  async listDumpFiles() {
-    throw new Error("Google Drive test client is not configured");
-  },
-  async uploadDump() {
-    throw new Error("Google Drive test client is not configured");
-  },
-  async downloadFile() {
-    throw new Error("Google Drive test client is not configured");
-  }
-};
 
 const unavailableAiClient: AiLocalModelClient = {
   async listModels() {
@@ -48,7 +34,6 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
 
   app.decorate("db", testDb.db);
   app.decorate("sqlite", testDb.sqlite);
-  app.decorate("driveClient", options.driveClient ?? unavailableDriveClient);
   app.decorate("aiClient", options.aiClient ?? unavailableAiClient);
 
   const { errorHandler } = await import("../../src/utils/errors.js");

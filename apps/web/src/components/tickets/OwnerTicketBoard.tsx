@@ -3,8 +3,10 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { TicketOwner } from "../../api/tickets";
 import { errorMessageAsync } from "../../hooks/errors";
+import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTickets } from "../../hooks/useTickets";
 import { useViewMode } from "../../hooks/useViewMode";
+import { resolveCatalogEntryKey } from "../../utils/catalogs";
 import { OwnerRelationBoard } from "../ui/OwnerRelationBoard";
 import { useToast } from "../ui/ToastProvider";
 import { TicketLinkDialog } from "./TicketLinkDialog";
@@ -19,12 +21,16 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
   const location = useLocation();
   const { showToast } = useToast();
   const ticketController = useTickets(owner);
+  const catalogs = useCatalogs();
   const { viewMode, setViewMode } = useViewMode("kanban");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const returnTo = `${location.pathname}${location.search}`;
 
-  const openTicketForm = (status: TicketStatus = "open") => {
-    navigate(`/tickets/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${status}&returnTo=${encodeURIComponent(returnTo)}`);
+  const defaultStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", "open", "open") ?? "open";
+
+  const openTicketForm = (status: TicketStatus = defaultStatus) => {
+    const resolvedStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open") ?? defaultStatus;
+    navigate(`/tickets/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${resolvedStatus}&returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   return (
@@ -32,7 +38,7 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
       <OwnerRelationBoard<Ticket>
         items={ticketController.tickets}
         loading={ticketController.loading}
-        onCreateItem={(status) => openTicketForm(toTicketStatus(status))}
+        onCreateItem={(status) => openTicketForm(status ?? defaultStatus)}
         onLinkItem={() => setLinkDialogOpen(true)}
         onUnlinkItem={(ticket) => ticketController.unlinkTicket(ticket.id)}
         onOpenItem={(ticket) => navigate(`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`)}
@@ -69,11 +75,4 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
       />
     </>
   );
-}
-
-function toTicketStatus(status?: string): TicketStatus {
-  if (status === "in_progress" || status === "in_review" || status === "resolved" || status === "closed") {
-    return status;
-  }
-  return "open";
 }

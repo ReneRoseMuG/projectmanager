@@ -158,7 +158,7 @@ test.describe("Task-Routen und Detailformular", () => {
     try {
       const projectForm = await openProjectTasks(page, project.id);
       await projectForm.getByRole("button", { name: "Kanban" }).click();
-      await expect(projectForm.getByRole("heading", { name: "Offen" }).first()).toBeVisible();
+      await expect(projectForm.getByRole("heading", { name: "Aktiv" }).first()).toBeVisible();
       await expect(itemCard(projectForm, task.title)).toBeVisible();
 
       await projectForm.getByRole("button", { name: "Liste", exact: true }).first().click();

@@ -1,8 +1,9 @@
 import type {
-  DumpDriveApplyResult,
-  DumpDriveFile,
-  DumpDrivePreviewResult,
-  DumpDriveSaveResult,
+  DumpBackupApplyResult,
+  DumpBackupFile,
+  DumpBackupPreviewResult,
+  DumpBackupSaveResult,
+  DumpBackupStatus,
   DumpFileRootSummary,
   DumpTableSummary
 } from "@taskmanager/shared-types";
@@ -18,7 +19,6 @@ import { config } from "../config.js";
 import { assertSafeTestDatabasePath, assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { getContentBaseDir } from "./content.service.js";
-import type { GoogleDriveBackupClient } from "./google-drive.service.js";
 
 const APP_ID = "taskmanager";
 const DUMP_FORMAT_VERSION = 7;
@@ -123,7 +123,7 @@ interface DumpManifest {
   fileRoots: Record<"uploads" | "content", DumpFileRootManifest>;
 }
 
-interface InspectedDump extends DumpDrivePreviewResult {
+interface InspectedDump extends DumpBackupPreviewResult {
   payload: DumpPayload;
   directory: unzipper.CentralDirectory;
 }
@@ -175,6 +175,59 @@ function ensureWorkDir(): string {
   assertSafeTestDirectoryPath(config.backupWorkDir, "BACKUP_WORK_DIR");
   fs.mkdirSync(config.backupWorkDir, { recursive: true });
   return config.backupWorkDir;
+}
+
+function isDumpBackupFilename(filename: string): boolean {
+  return filename.startsWith(DUMP_FILENAME_PREFIX) && filename.endsWith(".zip");
+}
+
+function validateBackupFileId(fileId: string): string {
+  const normalized = fileId.trim();
+  if (!isDumpBackupFilename(normalized) || normalized !== path.basename(normalized) || normalized.includes("/") || normalized.includes("\\")) {
+    throw badRequest("Backup file id is invalid");
+  }
+  return normalized;
+}
+
+function mapBackupFile(filePath: string): DumpBackupFile {
+  const stats = fs.statSync(filePath);
+  return {
+    id: path.basename(filePath),
+    name: path.basename(filePath),
+    path: filePath,
+    createdTime: stats.birthtime.toISOString(),
+    modifiedTime: stats.mtime.toISOString(),
+    sizeBytes: stats.size
+  };
+}
+
+function listLocalBackupFiles(): DumpBackupFile[] {
+  const workDir = ensureWorkDir();
+  return fs
+    .readdirSync(workDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && isDumpBackupFilename(entry.name))
+    .map((entry) => mapBackupFile(path.join(workDir, entry.name)))
+    .sort((a, b) => {
+      const timeCompare = Date.parse(b.modifiedTime ?? b.createdTime) - Date.parse(a.modifiedTime ?? a.createdTime);
+      return timeCompare !== 0 ? timeCompare : b.name.localeCompare(a.name, "en");
+    });
+}
+
+function readLocalBackupFile(fileId: string): { backupFile: DumpBackupFile; buffer: Buffer } {
+  const safeFileId = validateBackupFileId(fileId);
+  const workDir = ensureWorkDir();
+  const filePath = path.resolve(workDir, safeFileId);
+  const workRoot = workDir.endsWith(path.sep) ? workDir : `${workDir}${path.sep}`;
+  if (!filePath.startsWith(workRoot)) {
+    throw badRequest("Backup file id is invalid");
+  }
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    throw notFound("Backup file was not found");
+  }
+  return {
+    backupFile: mapBackupFile(filePath),
+    buffer: fs.readFileSync(filePath)
+  };
 }
 
 function assertSafeDumpRuntimeTargets(): void {
@@ -538,7 +591,7 @@ function buildConfirmationPhrase(dumpId: string, targetDatabasePath: string): st
   return `AKTUALISIERE TASKMANAGER ${dumpId} NACH ${path.basename(targetDatabasePath)}`;
 }
 
-export async function inspectDumpArchive(buffer: Buffer, driveFile: DumpDriveFile): Promise<InspectedDump> {
+export async function inspectDumpArchive(buffer: Buffer, backupFile: DumpBackupFile): Promise<InspectedDump> {
   let directory: unzipper.CentralDirectory;
   try {
     directory = await unzipper.Open.buffer(buffer);
@@ -620,7 +673,7 @@ export async function inspectDumpArchive(buffer: Buffer, driveFile: DumpDriveFil
     directory,
     fileHash: sha256Buffer(buffer),
     dumpId: payload.dumpId,
-    driveFile,
+    backupFile,
     targetDatabasePath: config.databasePath,
     transferReadiness: blockingIssues.length > 0 ? "blocked" : warnings.length > 0 ? "warning" : "ready",
     blockingIssues,
@@ -796,59 +849,62 @@ function verifyRestoredFileRoots(expectedFileRoots: DumpFileRootSummary[]): stri
   return issues;
 }
 
-export async function saveDumpToDrive(sqlite: Database.Database, driveClient: GoogleDriveBackupClient): Promise<DumpDriveSaveResult> {
-  const archive = await buildDumpArchive(sqlite);
-  const driveFile = await driveClient.uploadDump(archive.filename, archive.buffer);
+export function getLocalBackupStatus(): DumpBackupStatus {
+  const files = listLocalBackupFiles();
   return {
-    dumpId: archive.dumpId,
-    filename: archive.filename,
-    sizeBytes: archive.buffer.byteLength,
-    driveFile
+    backupDirectory: config.backupWorkDir,
+    ready: true,
+    fileCount: files.length,
+    latestFile: files[0] ?? null
   };
 }
 
-async function inspectDriveFile(driveClient: GoogleDriveBackupClient, driveFile: DumpDriveFile): Promise<InspectedDump> {
-  const buffer = await driveClient.downloadFile(driveFile.id);
-  return inspectDumpArchive(buffer, driveFile);
+export async function saveDumpToLocalBackup(sqlite: Database.Database): Promise<DumpBackupSaveResult> {
+  const archive = await buildDumpArchive(sqlite);
+  const workDir = ensureWorkDir();
+  const filePath = path.join(workDir, archive.filename);
+  fs.writeFileSync(filePath, archive.buffer);
+  const backupFile = mapBackupFile(filePath);
+  return {
+    dumpId: archive.dumpId,
+    filename: archive.filename,
+    filePath,
+    sizeBytes: archive.buffer.byteLength,
+    backupFile
+  };
 }
 
-export async function previewLatestDriveDump(driveClient: GoogleDriveBackupClient): Promise<DumpDrivePreviewResult> {
-  const files = await driveClient.listDumpFiles();
+export async function previewLatestLocalDump(): Promise<DumpBackupPreviewResult> {
+  const files = listLocalBackupFiles();
   if (files.length === 0) {
-    throw notFound("No Google Drive dump file was found");
+    throw notFound("No local backup dump file was found");
   }
 
   const warnings: string[] = [];
   for (const file of files) {
     try {
-      const preview = await inspectDriveFile(driveClient, file);
+      const { backupFile, buffer } = readLocalBackupFile(file.id);
+      const preview = await inspectDumpArchive(buffer, backupFile);
       return {
         ...preview,
         warnings: [...warnings, ...preview.warnings]
       };
     } catch (error) {
-      warnings.push(`Drive file '${file.name}' was skipped: ${error instanceof Error ? error.message : "unknown error"}.`);
+      warnings.push(`Backup file '${file.name}' was skipped: ${error instanceof Error ? error.message : "unknown error"}.`);
     }
   }
 
-  throw badRequest("No valid Google Drive dump file was found");
+  throw badRequest("No valid local backup dump file was found");
 }
 
-export async function applyDriveDump(
+export async function applyLocalDump(
   sqlite: Database.Database,
-  driveClient: GoogleDriveBackupClient,
   params: { fileId: string; fileHash: string; confirmationPhrase: string },
   options: ApplyDumpOptions = {}
-): Promise<DumpDriveApplyResult> {
+): Promise<DumpBackupApplyResult> {
   assertSafeDumpRuntimeTargets();
-  const files = await driveClient.listDumpFiles();
-  const driveFile = files.find((file) => file.id === params.fileId);
-  if (!driveFile) {
-    throw notFound("Google Drive dump file was not found");
-  }
-
-  const buffer = await driveClient.downloadFile(driveFile.id);
-  const preview = await inspectDumpArchive(buffer, driveFile);
+  const { backupFile, buffer } = readLocalBackupFile(params.fileId);
+  const preview = await inspectDumpArchive(buffer, backupFile);
   if (preview.fileHash !== params.fileHash) {
     throw conflict("Dump file hash changed since preview");
   }
@@ -902,7 +958,7 @@ export async function applyDriveDump(
   const verificationPassed = blockingIssues.length === 0;
   return {
     dumpId: preview.dumpId,
-    driveFile,
+    backupFile,
     targetBackupPath,
     verificationPassed,
     importStatus: verificationPassed ? (preview.warnings.length > 0 ? "warning" : "success") : "error",

@@ -19,10 +19,7 @@ function parseTicketOwner(searchParams: URLSearchParams): TicketOwner | undefine
 }
 
 function parseTicketStatus(value: string | null): TicketStatus {
-  if (value === "in_progress" || value === "in_review" || value === "resolved" || value === "closed") {
-    return value;
-  }
-  return "open";
+  return value && value.trim().length > 0 ? value : "open";
 }
 
 export function TicketDetailPage() {
@@ -84,7 +81,7 @@ export function TicketDetailPage() {
 
   if (isCreateMode) {
     return (
-      <div className="min-h-full">
+      <div className="mx-auto -my-4 min-h-[calc(100%+2rem)] max-w-7xl md:-my-6 md:min-h-[calc(100%+3rem)]">
         <TicketForm open variant="page" initialStatus={parseTicketStatus(searchParams.get("status"))} onSubmit={createTicket} closeOnSubmit={false} onClose={closePage} />
       </div>
     );
@@ -103,7 +100,7 @@ export function TicketDetailPage() {
   }
 
   return (
-    <div className="min-h-full">
+    <div className="mx-auto -my-4 min-h-[calc(100%+2rem)] max-w-7xl md:-my-6 md:min-h-[calc(100%+3rem)]">
       <TicketForm open ticket={detail.ticket} variant="page" onSubmit={saveTicket} onClose={closePage} onOpenInTab={openInTab} />
     </div>
   );

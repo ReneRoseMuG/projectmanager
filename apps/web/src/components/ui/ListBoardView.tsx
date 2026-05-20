@@ -195,7 +195,7 @@ function ListBoardViewContent<T>({
   const boardByStatus = mode === "board" && hasStatusGrouping;
 
   return (
-    <div className="flex min-h-[max(26rem,calc(100vh-14rem))] min-w-0 flex-col gap-4" data-testid="list-board-view">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4" data-testid="list-board-view">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {onSearchChange ? <SearchInput value={searchValue} onChange={onSearchChange} /> : <span />}
         <div className="flex flex-wrap items-center gap-2">

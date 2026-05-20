@@ -3,8 +3,10 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { TaskOwner } from "../../api/tasks";
 import { errorMessage } from "../../hooks/errors";
+import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTasks } from "../../hooks/useTasks";
 import { useViewMode } from "../../hooks/useViewMode";
+import { resolveCatalogEntryKey } from "../../utils/catalogs";
 import { OwnerRelationBoard } from "../ui/OwnerRelationBoard";
 import { useToast } from "../ui/ToastProvider";
 import { TaskLinkDialog } from "./TaskLinkDialog";
@@ -19,13 +21,16 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
   const location = useLocation();
   const { showToast } = useToast();
   const taskController = useTasks(owner);
+  const catalogs = useCatalogs();
   const { viewMode, setViewMode } = useViewMode();
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
 
   const returnTo = `${location.pathname}${location.search}`;
+  const defaultStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", "active", "active") ?? "active";
 
-  const openTaskForm = (status: TaskStatus = "todo") => {
-    navigate(`/tasks/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${status}&returnTo=${encodeURIComponent(returnTo)}`);
+  const openTaskForm = (status: TaskStatus = defaultStatus) => {
+    const resolvedStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active") ?? defaultStatus;
+    navigate(`/tasks/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${resolvedStatus}&returnTo=${encodeURIComponent(returnTo)}`);
   };
 
   return (
@@ -33,7 +38,7 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
       <OwnerRelationBoard<TaskBoardItem>
         items={taskController.tasks}
         loading={taskController.loading}
-        onCreateItem={(status) => openTaskForm(toTaskStatus(status))}
+        onCreateItem={(status) => openTaskForm(status ?? defaultStatus)}
         onLinkItem={() => setLinkDialogOpen(true)}
         onUnlinkItem={(task) => taskController.unlinkTask(task.id)}
         onOpenItem={(task) => navigate(`/tasks/${task.id}?returnTo=${encodeURIComponent(returnTo)}`)}
@@ -70,11 +75,4 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
       />
     </>
   );
-}
-
-function toTaskStatus(status?: string): TaskStatus {
-  if (status === "in_progress" || status === "done") {
-    return status;
-  }
-  return "todo";
 }

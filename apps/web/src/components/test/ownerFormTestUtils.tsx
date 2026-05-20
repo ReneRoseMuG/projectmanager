@@ -484,12 +484,13 @@ vi.mock("../../hooks/useCatalogs", () => ({
       { id: 1, kind: "workStatus", key: "active", label: "Aktiv", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
       { id: 2, kind: "workStatus", key: "open", label: "Offen", sortOrder: 200, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
       { id: 3, kind: "workStatus", key: "todo", label: "Offen", sortOrder: 300, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 4, kind: "workStatus", key: "done", label: "Erledigt", sortOrder: 400, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
-      { id: 5, kind: "workStatus", key: "closed", label: "Geschlossen", sortOrder: 500, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
-      { id: 6, kind: "featureStatus", key: "draft", label: "Entwurf", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 7, kind: "featureStatus", key: "active", label: "Aktiv", sortOrder: 200, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 8, kind: "featureStatus", key: "done", label: "Erledigt", sortOrder: 300, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
-      { id: 9, kind: "priority", key: "medium", label: "Mittel", sortOrder: 200, isClosed: false, version: 1, createdAt: "", updatedAt: "" }
+      { id: 4, kind: "workStatus", key: "in_progress", label: "In Arbeit", sortOrder: 350, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
+      { id: 5, kind: "workStatus", key: "done", label: "Erledigt", sortOrder: 400, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
+      { id: 6, kind: "workStatus", key: "closed", label: "Geschlossen", sortOrder: 500, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
+      { id: 7, kind: "featureStatus", key: "draft", label: "Entwurf", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
+      { id: 8, kind: "featureStatus", key: "active", label: "Aktiv", sortOrder: 200, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
+      { id: 9, kind: "featureStatus", key: "done", label: "Erledigt", sortOrder: 300, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
+      { id: 10, kind: "priority", key: "medium", label: "Mittel", sortOrder: 200, isClosed: false, version: 1, createdAt: "", updatedAt: "" }
     ];
     return {
       entries,

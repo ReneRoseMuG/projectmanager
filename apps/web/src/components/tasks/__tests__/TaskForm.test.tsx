@@ -103,6 +103,16 @@ describe("TaskForm", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("ersetzt einen nicht mehr vorhandenen Initialstatus durch den Katalog-Default", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<TaskForm open initialStatus="legacy_missing" onSubmit={onSubmit} onClose={vi.fn()} />);
+
+    changeInput(0, "Neue Aufgabe mit Katalogstatus");
+    fireEvent.click(screen.getByRole("button", { name: "Aufgabe anlegen" }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ status: "active" })));
+  });
+
   it("erstellt und entfernt einen Subtask-Draft lokal", () => {
     renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
@@ -146,7 +156,7 @@ describe("TaskForm", () => {
         expect.objectContaining({
           title: "Neue Aufgabe",
           status: "in_progress",
-          pendingSubtasks: [{ title: "Subtask im Create", status: "todo", priority: "medium" }],
+          pendingSubtasks: [{ title: "Subtask im Create", status: "active", priority: "medium" }],
           pendingTickets: [{ kind: "existing", ticket }],
           pendingComments: [{ text: "Task-Kommentar" }],
           pendingNotes: [{ title: "Task-Notiz", contentJson: {} }],

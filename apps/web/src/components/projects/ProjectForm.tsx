@@ -33,7 +33,7 @@ import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useWikiImport } from "../../hooks/useWikiImport";
 import { taskStatusLabels, taskStatusTones, ticketStatusLabels, ticketStatusTones } from "../../utils/domainLabels";
-import { countOpenStatusItems } from "../../utils/catalogs";
+import { countOpenStatusItems, resolveCatalogEntryKey } from "../../utils/catalogs";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { BacklogListBoardView } from "../backlog/BacklogListBoardView";
@@ -131,6 +131,14 @@ function projectCode(name: string) {
     .toUpperCase();
 }
 
+function workStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "active") {
+  return resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ?? preferredKey;
+}
+
+function priorityValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "medium") {
+  return resolveCatalogEntryKey(entries, "priority", value, preferredKey) ?? preferredKey;
+}
+
 export function ProjectForm({ open, project, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab, onPostCreate }: ProjectFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -202,6 +210,12 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
     setActiveTab("details");
   }, [open, project]);
 
+  useEffect(() => {
+    if (open) {
+      setStatus((currentStatus) => workStatusValue(catalogs.entries, currentStatus, "active"));
+    }
+  }, [catalogs.entries, open]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
@@ -210,7 +224,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         {
           name,
           description,
-          status,
+          status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
           color,
           startDate: startDate || null,
           dueDate: dueDate || null
@@ -429,7 +443,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         ) : null}
 
         {activeTab === "milestones" ? (
-          <Section title="Meilensteine">
+          <Section title="Meilensteine" fill={Boolean(project)}>
             {project ? (
               <MilestoneListBoardView
                 milestones={milestones.milestones}
@@ -447,7 +461,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         ) : null}
 
         {activeTab === "features" ? (
-          <Section title="Features">
+          <Section title="Features" fill={Boolean(project)}>
             {project ? (
               featureLinks.loading ? (
                 <TaskListSkeleton />
@@ -476,7 +490,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section title="Aufgaben">
+          <Section title="Aufgaben" fill={Boolean(project)}>
             {project ? (
               <OwnerTaskBoard owner={{ type: "project", id: project.id }} />
             ) : (
@@ -497,7 +511,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets">
+          <Section title="Tickets" fill={Boolean(project)}>
             {project ? (
               <OwnerTicketBoard owner={{ type: "project", id: project.id }} />
             ) : (
@@ -564,7 +578,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         ) : null}
 
         {activeTab === "backlog" ? (
-          <Section title="Backlog">
+          <Section title="Backlog" fill={Boolean(project)}>
             {project ? (
               backlog.loading || allFeatures.loading ? (
                 <TaskListSkeleton />
@@ -693,7 +707,8 @@ function FeatureLinkDialog({ open, features, excludeIds, onLink, onClose }: { op
 
 function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
   const [title, setTitle] = useState("");
-  const [status, setStatus] = useState<TaskStatus>("todo");
+  const catalogs = useCatalogs();
+  const [status, setStatus] = useState<TaskStatus>("active");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
 
@@ -703,10 +718,14 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, status, priority });
+    onCreate({
+      title: trimmedTitle,
+      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
+      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+    });
     setTitle("");
-    setStatus("todo");
-    setPriority("medium");
+    setStatus(workStatusValue(catalogs.entries, "active", "active"));
+    setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
   };
 
@@ -737,6 +756,7 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
 
 function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
   const [title, setTitle] = useState("");
+  const catalogs = useCatalogs();
   const [status, setStatus] = useState<TicketStatus>("open");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
@@ -747,10 +767,15 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, type: "bug", status, priority });
+    onCreate({
+      title: trimmedTitle,
+      type: "bug",
+      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"),
+      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+    });
     setTitle("");
-    setStatus("open");
-    setPriority("medium");
+    setStatus(workStatusValue(catalogs.entries, "open", "open"));
+    setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
   };
 

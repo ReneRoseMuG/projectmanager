@@ -103,7 +103,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
     const project = await createProject(request, "E2E Project Sticky Shell");
 
     try {
-      await page.setViewportSize({ width: 1920, height: 1080 });
+      await page.setViewportSize({ width: 1280, height: 720 });
       await authenticatedGoto(page, `/projects/${project.id}`);
 
       const main = page.locator("main").first();
@@ -119,19 +119,18 @@ test.describe("Projekt-Routen und Detailformular", () => {
 
       await expect(tabBar).toBeVisible();
       await expect(footer).toBeVisible();
-      await expect.poll(async () => (await tabBar.boundingBox())?.width ?? 0).toBeGreaterThan(mainBox.width - 72);
-      await expect.poll(async () => (await footer.boundingBox())?.width ?? 0).toBeGreaterThan(mainBox.width - 72);
 
       await main.evaluate((element) => {
         element.scrollTop = 360;
       });
 
       await expect.poll(async () => (await header.boundingBox())?.bottom ?? Number.NEGATIVE_INFINITY).toBeLessThan(mainBox.y + 8);
-      await expect.poll(async () => (await tabBar.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(mainBox.y + 28);
+      await expect.poll(async () => (await tabBar.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(mainBox.y + 4);
+      await expect.poll(async () => (await tabBar.boundingBox())?.y ?? Number.NEGATIVE_INFINITY).toBeGreaterThan(mainBox.y - 1);
       await expect.poll(async () => {
         const box = await footer.boundingBox();
         return box ? box.y + box.height : 0;
-      }).toBeGreaterThan(mainBox.y + mainBox.height - 32);
+      }).toBeGreaterThan(mainBox.y + mainBox.height - 4);
       await expect.poll(async () => {
         const box = await footer.boundingBox();
         return box ? box.y + box.height : Number.POSITIVE_INFINITY;
@@ -140,15 +139,13 @@ test.describe("Projekt-Routen und Detailformular", () => {
       const featuresTab = form.getByRole("button", { name: /Features/ });
       await featuresTab.click();
       await expect(featuresTab).toHaveClass(/text-steel-700/);
-
       const listBoardView = form.getByTestId("list-board-view");
       await expect(listBoardView).toBeVisible();
-      await expect.poll(async () => (await listBoardView.boundingBox())?.height ?? 0).toBeGreaterThan(800);
       await expect.poll(async () => {
         const boardBox = await listBoardView.boundingBox();
         const footerBox = await footer.boundingBox();
-        return boardBox && footerBox ? boardBox.y + boardBox.height - footerBox.y : Number.NEGATIVE_INFINITY;
-      }).toBeGreaterThan(-32);
+        return boardBox && footerBox ? boardBox.y + boardBox.height - footerBox.y : Number.POSITIVE_INFINITY;
+      }).toBeLessThan(4);
     } finally {
       await deleteProject(request, project.id);
     }

@@ -123,7 +123,7 @@ export async function createProject(request: APIRequestContext, titlePrefix: str
     data: {
       name,
       description: input.description ?? "<p>E2E Projektbeschreibung vollständig</p>",
-      status: input.status ?? "active",
+      ...(input.status !== undefined ? { status: input.status } : {}),
       color: input.color ?? "#4682B4",
       startDate: input.startDate ?? "2026-05-01",
       dueDate: input.dueDate ?? "2026-05-31"
@@ -146,7 +146,7 @@ export async function createMilestone(
       projectId,
       name,
       description: input.description ?? "<p>E2E Meilensteinbeschreibung vollständig</p>",
-      status: input.status ?? "active",
+      ...(input.status !== undefined ? { status: input.status } : {}),
       color: input.color ?? "#14B8A6",
       startDate: input.startDate ?? "2026-06-01",
       dueDate: input.dueDate ?? "2026-06-30"
@@ -163,7 +163,7 @@ export async function createFeature(request: APIRequestContext, titlePrefix: str
     data: {
       title,
       slug: slugify(title),
-      status: input.status ?? "active",
+      ...(input.status !== undefined ? { status: input.status } : {}),
       description: input.description ?? "<p>E2E Feature-Kurzbeschreibung vollständig</p>",
       content: input.content ?? "<p>E2E Feature-Inhalt vollständig</p>",
       sortOrder: input.sortOrder ?? 7
@@ -186,7 +186,7 @@ export async function createUseCase(request: APIRequestContext, featureId: numbe
     data: {
       title,
       slug: slugify(title),
-      status: input.status ?? "active",
+      ...(input.status !== undefined ? { status: input.status } : {}),
       description: input.description ?? "<p>E2E Use-Case-Beschreibung vollständig</p>",
       content: input.content ?? "<p>E2E Use-Case-Inhalt vollständig</p>",
       sortOrder: input.sortOrder ?? 3
@@ -203,8 +203,8 @@ export async function createTask(request: APIRequestContext, owner: TaskOwner, t
     data: {
       title,
       description: input.description ?? "<p>E2E Aufgabenbeschreibung vollständig</p>",
-      status: input.status ?? "todo",
-      priority: input.priority ?? "high",
+      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.priority !== undefined ? { priority: input.priority } : {}),
       dueDate: input.dueDate ?? "2026-05-29"
     }
   });
@@ -220,8 +220,8 @@ export async function createTicket(request: APIRequestContext, owner: TicketOwne
       title,
       description: input.description ?? "<p>E2E Ticketbeschreibung vollständig</p>",
       type: input.type ?? "bug",
-      status: input.status ?? "open",
-      priority: input.priority ?? "urgent",
+      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.priority !== undefined ? { priority: input.priority } : {}),
       assignee: input.assignee ?? "Ada Lovelace",
       reporter: input.reporter ?? "Grace Hopper",
       dueDate: input.dueDate ?? "2026-05-30",
@@ -261,7 +261,7 @@ export async function createBacklogItem(request: APIRequestContext, projectId: n
     data: {
       title,
       description: input.description ?? "<p>E2E Backlog-Beschreibung vollständig</p>",
-      status: input.status ?? "open",
+      ...(input.status !== undefined ? { status: input.status } : {}),
       featureId: input.featureId ?? null
     }
   });

@@ -29,6 +29,21 @@ export function catalogEntriesByKind(entries: CatalogEntry[], kind: CatalogKind)
   return source.filter((entry) => entry.kind === kind).sort((left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label));
 }
 
+export function actualCatalogEntriesByKind(entries: CatalogEntry[], kind: CatalogKind): CatalogEntry[] {
+  return entries.filter((entry) => entry.kind === kind).sort((left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label));
+}
+
+export function resolveCatalogEntryKey(entries: CatalogEntry[], kind: CatalogKind, value: string | null | undefined, preferredKey: string): string | undefined {
+  const actualEntries = actualCatalogEntriesByKind(entries, kind);
+  if (actualEntries.length === 0) {
+    return undefined;
+  }
+  if (value && actualEntries.some((entry) => entry.key === value)) {
+    return value;
+  }
+  return actualEntries.find((entry) => entry.key === preferredKey)?.key ?? actualEntries[0]?.key;
+}
+
 export function catalogLabel(entries: CatalogEntry[], kind: CatalogKind, key: string): string {
   return catalogEntriesByKind(entries, kind).find((entry) => entry.key === key)?.label ?? key;
 }

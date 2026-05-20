@@ -27,10 +27,7 @@ function parseTaskOwner(searchParams: URLSearchParams): TaskOwner | undefined {
 }
 
 function parseTaskStatus(value: string | null): TaskStatus {
-  if (value === "in_progress" || value === "done") {
-    return value;
-  }
-  return "todo";
+  return value && value.trim().length > 0 ? value : "active";
 }
 
 export function TaskDetailPage() {
@@ -147,7 +144,7 @@ export function TaskDetailPage() {
   }
 
   return (
-    <div className="min-h-full">
+    <div className="mx-auto -my-4 min-h-[calc(100%+2rem)] max-w-7xl md:-my-6 md:min-h-[calc(100%+3rem)]">
       <TaskForm
         open
         task={detail.task}

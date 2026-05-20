@@ -1,7 +1,6 @@
-import type { DumpDriveApplyRequest, DumpDriveConfigUpdateRequest } from "@taskmanager/shared-types";
+import type { DumpBackupApplyRequest } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
-import { getDriveBackupConfig, updateDriveBackupConfig } from "../services/drive-config.service.js";
-import { applyDriveDump, previewLatestDriveDump, saveDumpToDrive } from "../services/dump.service.js";
+import { applyLocalDump, getLocalBackupStatus, previewLatestLocalDump, saveDumpToLocalBackup } from "../services/dump.service.js";
 import { objectResponseSchema } from "../utils/route-schemas.js";
 
 const applyBodySchema = {
@@ -15,43 +14,28 @@ const applyBodySchema = {
   }
 } as const;
 
-const driveConfigBodySchema = {
-  type: "object",
-  required: ["folderInput"],
-  additionalProperties: false,
-  properties: {
-    folderInput: { type: "string", minLength: 1 }
-  }
-} as const;
-
 export async function registerDumpRoutes(app: FastifyInstance): Promise<void> {
   app.get(
-    "/dumps/drive/config",
+    "/dumps/local/status",
     { schema: { response: { 200: objectResponseSchema } } },
-    async () => getDriveBackupConfig(app.db)
-  );
-
-  app.put<{ Body: DumpDriveConfigUpdateRequest }>(
-    "/dumps/drive/config",
-    { schema: { body: driveConfigBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateDriveBackupConfig(app.db, request.body)
+    async () => getLocalBackupStatus()
   );
 
   app.post(
-    "/dumps/drive/save",
+    "/dumps/local/save",
     { schema: { response: { 200: objectResponseSchema } } },
-    async () => saveDumpToDrive(app.sqlite, app.driveClient)
+    async () => saveDumpToLocalBackup(app.sqlite)
   );
 
-  app.post(
-    "/dumps/drive/latest/preview",
+  app.get(
+    "/dumps/local/latest/preview",
     { schema: { response: { 200: objectResponseSchema } } },
-    async () => previewLatestDriveDump(app.driveClient)
+    async () => previewLatestLocalDump()
   );
 
-  app.post<{ Body: DumpDriveApplyRequest }>(
-    "/dumps/drive/latest/apply",
+  app.post<{ Body: DumpBackupApplyRequest }>(
+    "/dumps/local/latest/apply",
     { schema: { body: applyBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => applyDriveDump(app.sqlite, app.driveClient, request.body)
+    async (request) => applyLocalDump(app.sqlite, request.body)
   );
 }

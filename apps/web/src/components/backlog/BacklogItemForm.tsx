@@ -11,6 +11,8 @@ import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
 import { useEntityComments } from "../../hooks/useEntityComments";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { resolveCatalogEntryKey } from "../../utils/catalogs";
 import { StatusToggle } from "../ui/StatusToggle";
 
 interface BacklogItemFormProps {
@@ -26,6 +28,7 @@ interface BacklogItemFormProps {
 
 export function BacklogItemForm({ open, item, features, onSubmit, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: BacklogItemFormProps) {
   const comments = useEntityComments("backlogItem", item?.id);
+  const catalogs = useCatalogs();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<BacklogStatus>("open");
@@ -46,11 +49,17 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
     setSortOrder(item?.sortOrder ?? 0);
   }, [open, item]);
 
+  useEffect(() => {
+    if (open) {
+      setStatus((currentStatus) => resolveCatalogEntryKey(catalogs.entries, "workStatus", currentStatus, "open") ?? "open");
+    }
+  }, [catalogs.entries, open]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     try {
-      await onSubmit({ title, description, status, featureId, sortOrder });
+      await onSubmit({ title, description, status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"), featureId, sortOrder });
       if (closeOnSubmit) {
         onClose();
       }
