@@ -121,6 +121,8 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
   const hasContent = hasVisibleHtmlContent(value);
   const minRowsStyle = useMemo(() => (minRows ? ({ "--rich-text-field-min-rows": minRows } as React.CSSProperties) : undefined), [minRows]);
   const minRowsClassName = minRows ? "rich-text-inline-min-rows" : "";
+  const fieldChromeClassName = readOnly ? "" : "border border-line bg-shell/70 shadow-sm";
+  const fieldHoverClassName = !readOnly && "cursor-text hover:border-steel-300 hover:bg-white";
 
   const handleActivate = (event: React.MouseEvent<HTMLDivElement>) => {
     if (readOnly) {
@@ -153,7 +155,8 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
           className={cn(
             "rich-text-surface max-w-none rounded-md px-3 py-2 text-sm leading-relaxed transition-colors [&_li]:mb-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4",
             minRowsClassName,
-            !readOnly && "cursor-text hover:bg-shell/80"
+            fieldChromeClassName,
+            fieldHoverClassName
           )}
           data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
           style={minRowsStyle}
@@ -162,7 +165,7 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
         />
       ) : (
         <div
-          className={cn("rounded-md px-3 py-2 text-sm italic text-slate-500 transition-colors", minRowsClassName, !readOnly && "cursor-text hover:bg-shell/80")}
+          className={cn("rounded-md px-3 py-2 text-sm italic text-slate-500 transition-colors", minRowsClassName, fieldChromeClassName, fieldHoverClassName)}
           data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
           style={minRowsStyle}
           onClick={readOnly ? undefined : handleActivate}
@@ -276,7 +279,7 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
   }
 
   return (
-    <div className="rounded-md ring-1 ring-steel-600" data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
+    <div className="overflow-hidden rounded-md border border-steel-600 bg-white shadow-sm ring-2 ring-steel-700/10" data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
       {toolbar !== "none" ? <RichTextToolbar editor={editor} variant={toolbar} /> : null}
       <EditorContent editor={editor} />
     </div>

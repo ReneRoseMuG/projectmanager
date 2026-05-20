@@ -80,14 +80,16 @@ export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "mo
 
   const ticket = detail.ticket;
   const counts: Partial<Record<DetailTab, number>> = {
-    details: 0,
     subTickets: countOpenStatusItems(ticket?.subTickets ?? [], catalogs.entries, "workStatus"),
     relations: ticket?.relations.length ?? 0,
     comments: comments.comments.length,
     notes: notes.notes.length,
     attachments: attachments.attachments.length
   };
-  const tabItems = tabs.map((tab) => ({ ...tab, count: counts[tab.value] }));
+  const tabItems = tabs.map((tab) => {
+    const count = counts[tab.value];
+    return typeof count === "number" ? { ...tab, count } : tab;
+  });
 
   const saveTicket = async (input: TicketFormInput) => {
     if (!ticket) {

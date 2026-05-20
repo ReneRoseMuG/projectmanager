@@ -237,6 +237,13 @@ afterEach(() => {
 });
 
 describe("MilestoneForm", () => {
+  it("zeigt den Stammdaten-Tab ohne Counter", () => {
+    renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    expect(screen.getByRole("button", { name: "Stammdaten" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Stammdaten 0" })).not.toBeInTheDocument();
+  });
+
   it("bindet RichTextInlineField an die Beschreibung", async () => {
     const onSubmit = vi.fn().mockResolvedValue(milestone);
     renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);

@@ -266,6 +266,9 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
   };
 
   const tabItems = tabs.map((tab) => {
+    if (tab.value === "details") {
+      return tab;
+    }
     if (tab.value === "features") {
       return { ...tab, count: milestone ? countOpenStatusItems(featureLinks.features, catalogs.entries, "featureStatus") : 0 };
     }

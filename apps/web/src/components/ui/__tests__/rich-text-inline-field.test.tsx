@@ -281,4 +281,14 @@ describe("RichTextInlineField", () => {
     expect(tiptapMock.config?.editorProps?.attributes?.class).toContain("rich-text-inline-min-rows");
     expect(tiptapMock.config?.editorProps?.attributes?.style).toBe("--rich-text-field-min-rows: 12;");
   });
+
+  it("T-16 kennzeichnet editierbare Leseansicht und Editor als Textfeld", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    expect(screen.getByTestId("field-view")).toHaveClass("border", "border-line", "bg-shell/70");
+
+    fireEvent.click(screen.getByTestId("field-view"));
+
+    expect(screen.getByTestId("field-editor")).toHaveClass("border", "border-steel-600", "bg-white");
+  });
 });

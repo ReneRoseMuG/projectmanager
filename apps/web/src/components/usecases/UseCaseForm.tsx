@@ -152,6 +152,9 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
   const taskOwner = useCase ? { type: "useCase" as const, id: useCase.id } : null;
   const ticketOwner = useCase ? { type: "useCase" as const, id: useCase.id } : null;
   const tabItems = tabs.map((tab) => {
+    if (tab.value === "details") {
+      return tab;
+    }
     if (tab.value === "tasks") {
       const pending = pendingTasks.map((item) => (item.kind === "existing" ? item.task : item.draft));
       return { ...tab, count: useCase ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };

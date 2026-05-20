@@ -184,6 +184,9 @@ export function TaskForm({ open, task, initialStatus = "todo", onSubmit, onClose
   };
 
   const tabItems = tabs.map((tab) => {
+    if (tab.value === "details") {
+      return tab;
+    }
     if (tab.value === "subtasks") {
       return { ...tab, count: task ? countOpenStatusItems(detail.task?.subtasks ?? [], catalogs.entries, "workStatus") : countOpenStatusItems(pendingSubtasks, catalogs.entries, "workStatus") };
     }

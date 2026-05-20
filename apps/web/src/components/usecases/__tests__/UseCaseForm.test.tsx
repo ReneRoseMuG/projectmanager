@@ -41,6 +41,8 @@ describe("UseCaseForm", () => {
   it("zeigt im Create-Modus die Relation-Tabs und keinen Dateien-Tab", () => {
     renderWithProviders(<UseCaseForm open currentFeatureId={feature.id} features={[feature]} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
+    expect(screen.getByRole("button", { name: "Stammdaten" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Stammdaten 0" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Aufgaben/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Tickets/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Kommentare/ })).toBeInTheDocument();

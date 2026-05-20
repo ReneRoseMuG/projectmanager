@@ -206,6 +206,9 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
   };
 
   const tabItems = tabs.map((tab) => {
+    if (tab.value === "details") {
+      return tab;
+    }
     if (tab.value === "useCases") {
       const pending = pendingUseCases.map((item) => (item.kind === "existing" ? item.useCase : item.draft));
       return { ...tab, count: feature ? countOpenStatusItems(useCases.useCases, catalogs.entries, "featureStatus") : countOpenStatusItems(pending, catalogs.entries, "featureStatus") };

@@ -41,6 +41,8 @@ describe("FeatureForm", () => {
   it("zeigt im Create-Modus alle erwarteten Verwaltungs-Tabs", () => {
     renderWithProviders(<FeatureForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
+    expect(screen.getByRole("button", { name: "Details" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Details 0" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Use Cases/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Aufgaben/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Tickets/ })).toBeInTheDocument();

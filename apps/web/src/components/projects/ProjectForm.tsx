@@ -337,6 +337,9 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
 
   const visibleTabs = project ? baseTabs : baseTabs.filter((tab) => tab.value !== "import");
   const tabItems = visibleTabs.map((tab) => {
+    if (tab.value === "details") {
+      return tab;
+    }
     if (tab.value === "milestones") {
       return { ...tab, count: project ? countOpenStatusItems(milestones.milestones, catalogs.entries, "workStatus") : 0 };
     }

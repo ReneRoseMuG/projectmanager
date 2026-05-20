@@ -39,6 +39,8 @@ describe("TaskForm", () => {
   it("zeigt im Create-Modus alle erwarteten Verwaltungs-Tabs", () => {
     renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
+    expect(screen.getByRole("button", { name: "Details" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Details 0" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Subtasks/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Tickets/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Kommentare/ })).toBeInTheDocument();
