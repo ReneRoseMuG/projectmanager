@@ -19,7 +19,7 @@ import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { AiChatMessage, AiLocalModelClient } from "../../../apps/api/src/services/ai-ollama.service.js";
-import { buildTestApp, createProject, createTask, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
+import { buildTestApp, createMilestone, createProject, createTask, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 class MockAiClient implements AiLocalModelClient {
   public failModels = false;
@@ -145,6 +145,7 @@ describe("AI API", () => {
 
   it("POST /api/ai/agent/execute führt bestätigte Aufgabenanlage aus", async () => {
     const project = await createProject(app, { name: "Test" });
+    await createMilestone(app, project.id, { name: "Test-Meilenstein" });
 
     const res = await supertest(app.server)
       .post("/api/ai/agent/execute")
@@ -154,7 +155,7 @@ describe("AI API", () => {
             type: "createTask",
             label: "Aufgabe anlegen",
             description: "Aufgabe in Projekt Test anlegen",
-            payload: { ownerType: "project", ownerId: project.id, title: "Aufgabe 1" },
+            payload: { ownerType: "project", ownerId: project.id, title: "Aufgabe 1", description: "<p>Agent Beschreibung</p>" },
             requiresConfirmation: true
           }
         ]
@@ -162,9 +163,15 @@ describe("AI API", () => {
       .expect(200);
 
     expect(res.body.results[0]).toMatchObject({ success: true, entityType: "task" });
+    expect(res.body.results[0].entityId).toEqual(expect.any(Number));
 
     const tasks = await supertest(app.server).get(`/api/projects/${project.id}/tasks`).expect(200);
     expect(tasks.body[0].title).toBe("Aufgabe 1");
+    expect(tasks.body[0].description).toBe("<p>Agent Beschreibung</p>");
+
+    const detail = await supertest(app.server).get(`/api/tasks/${res.body.results[0].entityId}`).expect(200);
+    expect(detail.body.title).toBe("Aufgabe 1");
+    expect(detail.body.description).toBe("<p>Agent Beschreibung</p>");
   });
 
   it("POST /api/ai/agent/plan blockiert nicht erlaubte Aktionen", async () => {
@@ -198,5 +205,24 @@ describe("AI API", () => {
         ]
       })
       .expect(400);
+  });
+
+  it("POST /api/ai/agent/execute lehnt unbekannte Aktionen ab", async () => {
+    const res = await supertest(app.server)
+      .post("/api/ai/agent/execute")
+      .send({
+        actions: [
+          {
+            type: "unknownAction",
+            label: "Unbekannt",
+            description: "Nicht erlaubt",
+            payload: {},
+            requiresConfirmation: true
+          }
+        ]
+      })
+      .expect(400);
+
+    expect(res.body.error).toBe("BAD_REQUEST");
   });
 });

@@ -2,6 +2,7 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 21.05.26 | Feature | KI RichText Beschreibungsfeld | ✅ |
 | 21.05.26 | Feature | Test-Entwurfsleitplanken-Skill | ⚠️ |
 | 21.05.26 | Fix | Rote Tests TLDraw und Migration | ✅ |
 | 21.05.26 | 1 | Settings-System | ⚠️ |

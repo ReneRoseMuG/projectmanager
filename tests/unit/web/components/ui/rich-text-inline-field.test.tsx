@@ -16,13 +16,15 @@
  * Die Inline-Rich-Text-Basiskomponente gegen Regressionsfehler bei Anzeige und State-Übergängen absichern.
  */
 import "@testing-library/jest-dom/vitest";
+import type { CurrentUser } from "@taskmanager/shared-types";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, screen } from "@testing-library/dom";
+import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { act, cleanup, render } from "@testing-library/react";
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RichTextInlineField } from "../../../../../apps/web/src/components/ui/rich-text-inline-field";
 import { ToastProvider } from "../../../../../apps/web/src/components/ui/ToastProvider";
+import { queryKeys } from "../../../../../apps/web/src/queries/queryKeys";
 
 interface MockEditor {
   getHTML: ReturnType<typeof vi.fn<[], string>>;
@@ -75,6 +77,10 @@ const tiptapMock = vi.hoisted(() => ({
   editor: undefined as MockEditor | undefined,
   config: undefined as MockEditorConfig | undefined,
   html: "<p>mock content</p>"
+}));
+
+const aiApiMock = vi.hoisted(() => ({
+  assistAiText: vi.fn()
 }));
 
 function createCommandChain(): MockCommandChain {
@@ -138,13 +144,51 @@ vi.mock("../../../../../apps/web/src/components/ui/tldraw-node", () => ({
   }
 }));
 
-function renderWithProviders(ui: ReactElement) {
+vi.mock("../../../../../apps/web/src/api/ai", () => aiApiMock);
+
+const adminUser: CurrentUser = {
+  id: 1,
+  firstName: "Ada",
+  lastName: "Admin",
+  fullName: "Ada Admin",
+  email: "admin@local",
+  requiresPasswordSetup: false,
+  role: {
+    id: 1,
+    key: "admin",
+    label: "Admin",
+    isSystem: true,
+    version: 1,
+    createdAt: "2026-05-21T00:00:00",
+    updatedAt: "2026-05-21T00:00:00",
+    permissions: [{ id: 1, roleId: 1, resource: "*", action: "*" }]
+  },
+  permissions: [{ id: 1, roleId: 1, resource: "*", action: "*" }]
+};
+
+const readerUser: CurrentUser = {
+  ...adminUser,
+  id: 2,
+  role: {
+    ...adminUser.role,
+    id: 2,
+    key: "reader",
+    label: "Reader",
+    permissions: [{ id: 2, roleId: 2, resource: "ai", action: "read" }]
+  },
+  permissions: [{ id: 2, roleId: 2, resource: "ai", action: "read" }]
+};
+
+function renderWithProviders(ui: ReactElement, user: CurrentUser | null = adminUser) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
       mutations: { retry: false }
     }
   });
+  if (user) {
+    queryClient.setQueryData(queryKeys.auth.me(), user);
+  }
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -296,5 +340,61 @@ describe("RichTextInlineField", () => {
     fireEvent.click(screen.getByTestId("field-view"));
 
     expect(screen.getByTestId("field-editor")).toHaveClass("border", "border-steel-600", "bg-white");
+  });
+
+  it("T-17 zeigt den KI-Bearbeiten-Button in der editierbaren Leseansicht", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    expect(screen.getByRole("button", { name: "Mit KI bearbeiten" })).toBeInTheDocument();
+    expect(screen.getByTestId("field-ai-button")).toBeInTheDocument();
+  });
+
+  it("T-18 zeigt den KI-Bearbeiten-Button nicht bei readOnly", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} readOnly testIdPrefix="field" />);
+
+    expect(screen.queryByRole("button", { name: "Mit KI bearbeiten" })).not.toBeInTheDocument();
+  });
+
+  it("T-19 zeigt den KI-Bearbeiten-Button nicht ohne ai-write-Berechtigung", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />, readerUser);
+
+    expect(screen.queryByRole("button", { name: "Mit KI bearbeiten" })).not.toBeInTheDocument();
+  });
+
+  it("T-20 öffnet den KI-Dialog nach Klick auf den Button", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Mit KI bearbeiten" }));
+
+    expect(screen.getByLabelText("Anweisung")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generieren" })).toBeInTheDocument();
+  });
+
+  it("T-21 übernimmt KI-Ergebnis und wechselt in den Editierzustand", async () => {
+    const onChange = vi.fn();
+    aiApiMock.assistAiText.mockResolvedValue({ model: "llama3.2:1b", html: "<p>KI Ergebnis</p>" });
+
+    function StatefulField() {
+      const [html, setHtml] = useState("<p>Alt</p>");
+      return (
+        <RichTextInlineField
+          value={html}
+          onChange={(nextHtml) => {
+            onChange(nextHtml);
+            setHtml(nextHtml);
+          }}
+          testIdPrefix="field"
+        />
+      );
+    }
+
+    renderWithProviders(<StatefulField />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Mit KI bearbeiten" }));
+    fireEvent.change(screen.getByLabelText("Anweisung"), { target: { value: "Schreibe besser" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generieren" }));
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith("<p>KI Ergebnis</p>"));
+    expect(screen.getByTestId("field-editor")).toBeInTheDocument();
   });
 });

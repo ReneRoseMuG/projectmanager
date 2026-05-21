@@ -19,6 +19,7 @@
 // components/wiki/WikiPageDetail.tsx              | content                  | wiki-page-detail-content
 // components/wiki/WikiPageForm.tsx                | content                  | wiki-page-form-content
 
+import type { CurrentUser } from "@taskmanager/shared-types";
 import type { Editor } from "@tiptap/core";
 import Color from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
@@ -30,7 +31,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlignCenter,
   AlignLeft,
@@ -59,8 +60,10 @@ import {
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Markdown } from "tiptap-markdown";
 import { assistAiText } from "../../api/ai";
-import { hasVisibleHtmlContent } from "../../lib/html-utils";
+import { AiFieldEditDialog } from "../ai/AiFieldEditDialog";
 import { errorMessage } from "../../hooks/errors";
+import { hasVisibleHtmlContent } from "../../lib/html-utils";
+import { queryKeys } from "../../queries/queryKeys";
 import { useToast } from "./ToastProvider";
 import { TldrawNode } from "./tldraw-node";
 
@@ -114,8 +117,16 @@ function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+function canWriteAi(user: CurrentUser | null | undefined): boolean {
+  return Boolean(user?.permissions.some((permission) => (permission.resource === "*" || permission.resource === "ai") && (permission.action === "*" || permission.action === "write" || permission.action === "admin")));
+}
+
 export function RichTextInlineField({ value, onChange, placeholder, minRows, toolbar = "full", readOnly = false, className = "", testIdPrefix }: RichTextInlineFieldProps) {
+  const queryClient = useQueryClient();
+  const currentUser = queryClient.getQueryData<CurrentUser>(queryKeys.auth.me());
+  const canUseAi = canWriteAi(currentUser);
   const [isEditing, setIsEditing] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [originalValue, setOriginalValue] = useState("");
   const [clickPosition, setClickPosition] = useState<ClickPosition | null>(null);
   const hasContent = hasVisibleHtmlContent(value);
@@ -144,6 +155,13 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
     setIsEditing(false);
     setClickPosition(null);
     onChange(originalValue);
+  };
+
+  const handleApplyAiText = (html: string) => {
+    setOriginalValue(value ?? "");
+    setClickPosition(null);
+    onChange(html);
+    setIsEditing(true);
   };
 
   return (
@@ -175,10 +193,24 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
       )}
 
       {!readOnly && !isEditing ? (
-        <div className="pointer-events-none absolute right-1 top-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="pointer-events-none absolute right-1 top-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          {canUseAi ? (
+            <button
+              type="button"
+              aria-label="Mit KI bearbeiten"
+              title="Mit KI bearbeiten"
+              data-testid={testIdPrefix ? `${testIdPrefix}-ai-button` : undefined}
+              className="pointer-events-auto flex h-6 w-6 items-center justify-center rounded text-slate-500 transition hover:bg-line/50 hover:text-ink"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => setDialogOpen(true)}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
           <Pencil className="h-3 w-3 text-slate-500" />
         </div>
       ) : null}
+      <AiFieldEditDialog open={dialogOpen} currentHtml={value ?? ""} onApply={handleApplyAiText} onClose={() => setDialogOpen(false)} />
     </div>
   );
 }
@@ -288,6 +320,9 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
 
 function RichTextToolbar({ editor, variant }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none"> }) {
   const showFullToolbar = variant === "full";
+  const queryClient = useQueryClient();
+  const currentUser = queryClient.getQueryData<CurrentUser>(queryKeys.auth.me());
+  const canUseAi = canWriteAi(currentUser);
   const { showToast } = useToast();
   const aiMutation = useMutation({
     mutationFn: (operation: "rewrite" | "formatParagraph") => assistAiText({ html: editor.getHTML(), operation }),
@@ -303,8 +338,12 @@ function RichTextToolbar({ editor, variant }: { editor: Editor; variant: Exclude
 
   return (
     <div data-testid="rich-text-toolbar" className="flex flex-wrap items-center gap-1 rounded-t-md border-b border-line bg-shell p-1.5">
-      <ToolbarButton onClick={() => aiMutation.mutate("rewrite")} active={false} disabled={aiMutation.isPending} title="Umformulieren" icon={<Sparkles />} />
-      <ToolbarButton onClick={() => aiMutation.mutate("formatParagraph")} active={false} disabled={aiMutation.isPending} title="Absatz formatieren" icon={<Wand2 />} />
+      {canUseAi ? (
+        <>
+          <ToolbarButton onClick={() => aiMutation.mutate("rewrite")} active={false} disabled={aiMutation.isPending} title="Umformulieren" icon={<Sparkles />} />
+          <ToolbarButton onClick={() => aiMutation.mutate("formatParagraph")} active={false} disabled={aiMutation.isPending} title="Absatz formatieren" icon={<Wand2 />} />
+        </>
+      ) : null}
       <ToolbarButton onClick={() => editor.chain().focus().unsetHighlight().run()} active={false} title="Hervorhebungen entfernen" icon={<RemoveFormatting />} />
       <Separator />
       <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Fett" icon={<Bold />} />
