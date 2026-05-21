@@ -21,7 +21,7 @@ import { FeatureDetailPage } from "../../../../apps/web/src/pages/FeatureDetailP
 const router = vi.hoisted(() => ({
   navigate: vi.fn(),
   params: { id: "10" } as Record<string, string>,
-  search: "returnTo=%2Ffeatures"
+  search: "returnTo=%2Ffeatures",
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -30,7 +30,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
     ...actual,
     useNavigate: () => router.navigate,
     useParams: () => router.params,
-    useSearchParams: () => [new URLSearchParams(router.search), vi.fn()]
+    useSearchParams: () => [new URLSearchParams(router.search), vi.fn()],
   };
 });
 
@@ -43,15 +43,15 @@ vi.mock("../../../../apps/web/src/components/features/FeatureForm", () => ({
     ) : (
       <div data-testid="feature-form" />
     );
-  }
+  },
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({
-  useToast: () => ({ showToast: vi.fn() })
+  useToast: () => ({ showToast: vi.fn() }),
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ConfirmDialogProvider", () => ({
-  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) })
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useFeatures", () => ({
@@ -69,15 +69,15 @@ vi.mock("../../../../apps/web/src/hooks/useFeatures", () => ({
           useCaseCount: 0,
           version: 1,
           createdAt: "2026-05-20T08:00:00.000Z",
-          updatedAt: "2026-05-20T08:00:00.000Z"
+          updatedAt: "2026-05-20T08:00:00.000Z",
         }
       : undefined,
     loading: false,
     createFeature: vi.fn(),
     updateFeature: vi.fn(),
     removeFeature: vi.fn(),
-    reload: vi.fn()
-  })
+    reload: vi.fn(),
+  }),
 }));
 
 beforeEach(() => {
@@ -96,20 +96,31 @@ describe("FeatureDetailPage openInTab", () => {
   it("nutzt die volle verfügbare Detailseitenbreite", () => {
     const { container } = render(<FeatureDetailPage />);
 
-    expect(container.firstElementChild).toHaveClass("w-full", "min-w-0");
+    expect(container.firstElementChild).toHaveClass(
+      "flex",
+      "h-full",
+      "w-full",
+      "min-w-0",
+      "flex-1",
+      "flex-col",
+    );
     expect(container.firstElementChild).not.toHaveClass("mx-auto", "max-w-7xl");
   });
 
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button", () => {
     render(<FeatureDetailPage />);
 
-    expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "In neuem Tab öffnen" }),
+    ).toBeInTheDocument();
   });
 
   it("öffnet die Feature-URL und navigiert zurück", () => {
     render(<FeatureDetailPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "In neuem Tab öffnen" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "In neuem Tab öffnen" }),
+    );
 
     expect(window.open).toHaveBeenCalledWith("/features/10", "_blank");
     expect(router.navigate).toHaveBeenCalledWith("/features");
@@ -120,6 +131,8 @@ describe("FeatureDetailPage openInTab", () => {
 
     render(<FeatureDetailPage />);
 
-    expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "In neuem Tab öffnen" }),
+    ).not.toBeInTheDocument();
   });
 });

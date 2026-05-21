@@ -1,5 +1,23 @@
-import type { CalendarEvent, EventInput, Feature, Milestone, MilestoneInput, Note, Project, ProjectStatus, Tag } from "@taskmanager/shared-types";
-import { CalendarClock, Edit3, Flag, FolderKanban, Paperclip, StickyNote, Trash2 } from "lucide-react";
+import type {
+  CalendarEvent,
+  EventInput,
+  Feature,
+  Milestone,
+  MilestoneInput,
+  Note,
+  Project,
+  ProjectStatus,
+  Tag,
+} from "@taskmanager/shared-types";
+import {
+  CalendarClock,
+  Edit3,
+  Flag,
+  FolderKanban,
+  Paperclip,
+  StickyNote,
+  Trash2,
+} from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -17,7 +35,10 @@ import { useNotes } from "../../hooks/useNotes";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { formatHumanDate } from "../../utils/date";
-import { countOpenStatusItems, resolveCatalogEntryKey } from "../../utils/catalogs";
+import {
+  countOpenStatusItems,
+  resolveCatalogEntryKey,
+} from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
@@ -55,7 +76,10 @@ interface MilestoneFormProps {
   milestone?: Milestone | null;
   projects: Project[];
   initialProjectId?: number;
-  onSubmit: (input: MilestoneInput, tagIds: number[]) => Promise<Milestone | void>;
+  onSubmit: (
+    input: MilestoneInput,
+    tagIds: number[],
+  ) => Promise<Milestone | void>;
   onClose: () => void;
   onDelete?: (milestone: Milestone) => Promise<boolean>;
   savingLabel?: string;
@@ -64,11 +88,27 @@ interface MilestoneFormProps {
   onOpenInTab?: () => void;
 }
 
-function workStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "active") {
-  return resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ?? preferredKey;
+function workStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "active",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ??
+    preferredKey
+  );
 }
 
-type MilestoneFormTab = "details" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "events" | "journal";
+type MilestoneFormTab =
+  | "details"
+  | "features"
+  | "tasks"
+  | "tickets"
+  | "comments"
+  | "notes"
+  | "attachments"
+  | "events"
+  | "journal";
 
 const tabs: Array<Tab<MilestoneFormTab>> = [
   { value: "details", label: "Stammdaten" },
@@ -79,7 +119,7 @@ const tabs: Array<Tab<MilestoneFormTab>> = [
   { value: "notes", label: "Notizen" },
   { value: "attachments", label: "Dateien" },
   { value: "events", label: "Events" },
-  { value: "journal", label: "Journal" }
+  { value: "journal", label: "Journal" },
 ];
 
 const swatches = [
@@ -91,10 +131,22 @@ const swatches = [
   "var(--color-fern)",
   "var(--color-violet)",
   "var(--color-magenta)",
-  "var(--color-ink)"
+  "var(--color-ink)",
 ];
 
-export function MilestoneForm({ open, milestone, projects, initialProjectId, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab }: MilestoneFormProps) {
+export function MilestoneForm({
+  open,
+  milestone,
+  projects,
+  initialProjectId,
+  onSubmit,
+  onClose,
+  onDelete,
+  savingLabel,
+  variant = "modal",
+  closeOnSubmit = true,
+  onOpenInTab,
+}: MilestoneFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
@@ -102,12 +154,20 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
   const allFeatures = useFeatures();
   const allMilestones = useMilestones();
   const featureLinks = useMilestoneFeatureLinks(milestoneId);
-  const taskOwner = milestoneId ? { type: "milestone" as const, id: milestoneId } : undefined;
+  const taskOwner = milestoneId
+    ? { type: "milestone" as const, id: milestoneId }
+    : undefined;
   const tasks = useTasks(taskOwner);
-  const tickets = useTickets(milestoneId ? { type: "milestone", id: milestoneId } : null);
+  const tickets = useTickets(
+    milestoneId ? { type: "milestone", id: milestoneId } : null,
+  );
   const catalogs = useCatalogs();
-  const notes = useNotes(milestoneId ? { type: "milestone", id: milestoneId } : null);
-  const attachments = useAttachments(milestoneId ? { type: "milestone", id: milestoneId } : null);
+  const notes = useNotes(
+    milestoneId ? { type: "milestone", id: milestoneId } : null,
+  );
+  const attachments = useAttachments(
+    milestoneId ? { type: "milestone", id: milestoneId } : null,
+  );
   const comments = useEntityComments("milestone", milestoneId);
   const events = useEvents();
   const calendarTasks = useCalendarTasks();
@@ -124,19 +184,39 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
   const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("list");
   const [selectedFeatureId, setSelectedFeatureId] = useState<number | "">("");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
+    null,
+  );
   const [eventFormOpen, setEventFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const returnTo = `${location.pathname}${location.search}`;
-  const projectOptions = projects.map((project) => ({ value: project.id, label: project.name }));
-  const linkedFeatureIds = new Set(featureLinks.features.map((feature) => feature.id));
-  const availableFeatures = allFeatures.features.filter((feature) => !linkedFeatureIds.has(feature.id));
-  const milestoneEvents = useMemo(
-    () => (milestoneId ? events.events.filter((event) => event.owners.some((owner) => owner.type === "milestone" && owner.id === milestoneId)) : []),
-    [events.events, milestoneId]
+  const projectOptions = projects.map((project) => ({
+    value: project.id,
+    label: project.name,
+  }));
+  const linkedFeatureIds = new Set(
+    featureLinks.features.map((feature) => feature.id),
   );
-  const initialEventOwners = useMemo(() => (milestoneId ? [{ type: "milestone" as const, id: milestoneId }] : []), [milestoneId]);
+  const availableFeatures = allFeatures.features.filter(
+    (feature) => !linkedFeatureIds.has(feature.id),
+  );
+  const milestoneEvents = useMemo(
+    () =>
+      milestoneId
+        ? events.events.filter((event) =>
+            event.owners.some(
+              (owner) => owner.type === "milestone" && owner.id === milestoneId,
+            ),
+          )
+        : [],
+    [events.events, milestoneId],
+  );
+  const initialEventOwners = useMemo(
+    () =>
+      milestoneId ? [{ type: "milestone" as const, id: milestoneId }] : [],
+    [milestoneId],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -160,7 +240,9 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
 
   useEffect(() => {
     if (open) {
-      setStatus((currentStatus) => workStatusValue(catalogs.entries, currentStatus, "active"));
+      setStatus((currentStatus) =>
+        workStatusValue(catalogs.entries, currentStatus, "active"),
+      );
     }
   }, [catalogs.entries, open]);
 
@@ -183,12 +265,17 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
           projectId,
           name,
           description,
-          status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
+          status: resolveCatalogEntryKey(
+            catalogs.entries,
+            "workStatus",
+            status,
+            "active",
+          ),
           color,
           startDate: startDate || null,
-          dueDate: dueDate || null
+          dueDate: dueDate || null,
         },
-        selectedTags.map((tag) => tag.id)
+        selectedTags.map((tag) => tag.id),
       );
       if (closeOnSubmit) {
         onClose();
@@ -217,13 +304,20 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
 
   const createNote = async () => {
     try {
-      const note = await notes.createNote({ title: "Ohne Titel", contentJson: {} });
+      const note = await notes.createNote({
+        title: "Ohne Titel",
+        contentJson: {},
+      });
       if (note) {
         setEditingNote(note);
         showToast({ tone: "success", title: "Notiz erstellt" });
       }
     } catch (noteError) {
-      showToast({ tone: "error", title: "Notiz konnte nicht erstellt werden", message: errorMessage(noteError) });
+      showToast({
+        tone: "error",
+        title: "Notiz konnte nicht erstellt werden",
+        message: errorMessage(noteError),
+      });
     }
   };
 
@@ -233,7 +327,11 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {
-      showToast({ tone: "error", title: "Datei konnte nicht hochgeladen werden", message: errorMessage(attachmentError) });
+      showToast({
+        tone: "error",
+        title: "Datei konnte nicht hochgeladen werden",
+        message: errorMessage(attachmentError),
+      });
       throw attachmentError;
     }
   };
@@ -243,27 +341,43 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
       return;
     }
     try {
-      await featureLinks.setFeaturesForMilestone([...featureLinks.features.map((feature) => feature.id), selectedFeatureId]);
+      await featureLinks.setFeaturesForMilestone([
+        ...featureLinks.features.map((feature) => feature.id),
+        selectedFeatureId,
+      ]);
       setSelectedFeatureId("");
       showToast({ tone: "success", title: "Feature verknüpft" });
     } catch (featureError) {
-      showToast({ tone: "error", title: "Feature konnte nicht verknüpft werden", message: errorMessage(featureError) });
+      showToast({
+        tone: "error",
+        title: "Feature konnte nicht verknüpft werden",
+        message: errorMessage(featureError),
+      });
     }
   };
 
   const unlinkFeature = async (feature: Feature) => {
     try {
-      await featureLinks.setFeaturesForMilestone(featureLinks.features.filter((item) => item.id !== feature.id).map((item) => item.id));
+      await featureLinks.setFeaturesForMilestone(
+        featureLinks.features
+          .filter((item) => item.id !== feature.id)
+          .map((item) => item.id),
+      );
       showToast({ tone: "success", title: "Feature-Zuordnung entfernt" });
     } catch (featureError) {
-      showToast({ tone: "error", title: "Feature-Zuordnung konnte nicht entfernt werden", message: errorMessage(featureError) });
+      showToast({
+        tone: "error",
+        title: "Feature-Zuordnung konnte nicht entfernt werden",
+        message: errorMessage(featureError),
+      });
     }
   };
 
   const submitEvent = async (input: EventInput, eventId?: number) => {
     try {
       if (eventId) {
-        const expectedVersion = selectedEvent?.id === eventId ? selectedEvent.version : undefined;
+        const expectedVersion =
+          selectedEvent?.id === eventId ? selectedEvent.version : undefined;
         if (!expectedVersion) {
           throw new Error("Event version is missing");
         }
@@ -274,24 +388,53 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
       await events.createEvent(input);
       showToast({ tone: "success", title: "Termin erstellt" });
     } catch (eventError) {
-      showToast({ tone: "error", title: "Termin konnte nicht gespeichert werden", message: errorMessage(eventError) });
+      showToast({
+        tone: "error",
+        title: "Termin konnte nicht gespeichert werden",
+        message: errorMessage(eventError),
+      });
       throw eventError;
     }
   };
 
-  const visibleTabs = milestone ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal) : tabs.filter((tab) => tab.value !== "journal");
+  const visibleTabs = milestone
+    ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
+    : tabs.filter((tab) => tab.value !== "journal");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
     }
     if (tab.value === "features") {
-      return { ...tab, count: milestone ? countOpenStatusItems(featureLinks.features, catalogs.entries, "featureStatus") : 0 };
+      return {
+        ...tab,
+        count: milestone
+          ? countOpenStatusItems(
+              featureLinks.features,
+              catalogs.entries,
+              "featureStatus",
+            )
+          : 0,
+      };
     }
     if (tab.value === "tasks") {
-      return { ...tab, count: milestone ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : 0 };
+      return {
+        ...tab,
+        count: milestone
+          ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus")
+          : 0,
+      };
     }
     if (tab.value === "tickets") {
-      return { ...tab, count: milestone ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : 0 };
+      return {
+        ...tab,
+        count: milestone
+          ? countOpenStatusItems(
+              tickets.tickets,
+              catalogs.entries,
+              "workStatus",
+            )
+          : 0,
+      };
     }
     if (tab.value === "comments") {
       return { ...tab, count: milestone ? comments.comments.length : 0 };
@@ -314,31 +457,65 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
         open={open}
         title={milestone ? "Meilenstein bearbeiten" : "Meilenstein anlegen"}
         icon={<Flag size={21} />}
-        breadcrumb={["Meilensteine", milestone ? milestone.name : "Neuer Meilenstein"]}
+        breadcrumb={[
+          "Meilensteine",
+          milestone ? milestone.name : "Neuer Meilenstein",
+        ]}
         onSubmit={submit}
         saving={saving}
-        submitLabel={saving ? savingLabel ?? "Speichern..." : milestone ? "Speichern" : "Meilenstein anlegen"}
+        submitLabel={
+          saving
+            ? (savingLabel ?? "Speichern...")
+            : milestone
+              ? "Speichern"
+              : "Meilenstein anlegen"
+        }
         onOpenInTab={onOpenInTab}
         footerStart={
           milestone && onDelete ? (
-            <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" disabled={deleting} onClick={() => void deleteCurrentMilestone()}>
+            <Button
+              className="text-crimson hover:bg-crimson/10"
+              icon={<Trash2 size={18} />}
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => void deleteCurrentMilestone()}
+            >
               Löschen
             </Button>
           ) : undefined
         }
         onClose={onClose}
         variant={variant}
-        contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
-        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
+        contentClassName={
+          activeTab === "details" ? "w-full max-w-7xl self-center" : ""
+        }
+        tabBar={
+          <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+        }
       >
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(13rem,16rem)]">
                 <FormField label="Name" required className="min-w-0">
-                  <Input value={name} onChange={(inputEvent) => setName(inputEvent.target.value)} required />
+                  <Input
+                    value={name}
+                    onChange={(inputEvent) => setName(inputEvent.target.value)}
+                    required
+                  />
                 </FormField>
-                <Select label="Projekt" required value={projectId} onChange={(inputEvent) => setProjectId(inputEvent.target.value ? Number(inputEvent.target.value) : "")}>
+                <Select
+                  label="Projekt"
+                  required
+                  value={projectId}
+                  onChange={(inputEvent) =>
+                    setProjectId(
+                      inputEvent.target.value
+                        ? Number(inputEvent.target.value)
+                        : "",
+                    )
+                  }
+                >
                   <option value="">Projekt auswählen</option>
                   {projectOptions.map((project) => (
                     <option key={project.value} value={project.value}>
@@ -348,23 +525,47 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
                 </Select>
               </div>
               <FormField label="Beschreibung" className="mt-4">
-                <RichTextInlineField value={description} onChange={setDescription} placeholder="Wofür steht dieser Meilenstein?" minRows={12} testIdPrefix="milestone-description" />
+                <RichTextInlineField
+                  value={description}
+                  onChange={setDescription}
+                  placeholder="Wofür steht dieser Meilenstein?"
+                  minRows={12}
+                  testIdPrefix="milestone-description"
+                />
               </FormField>
             </Section>
             <Section title="Identität">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <FormField label="Farbe">
-                  <ColorPicker value={color} onChange={setColor} swatches={swatches} />
+                  <ColorPicker
+                    value={color}
+                    onChange={setColor}
+                    swatches={swatches}
+                  />
                 </FormField>
                 <FormField label="Status">
-                  <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+                  <StatusToggle
+                    kind="workStatus"
+                    value={status}
+                    onChange={setStatus}
+                  />
                 </FormField>
               </div>
             </Section>
             <Section title="Zeitraum">
               <div className="grid gap-4 md:grid-cols-2">
-                <DatePicker label="Start" value={startDate} onChange={(inputEvent) => setStartDate(inputEvent.target.value)} />
-                <DatePicker label="Fällig" value={dueDate} onChange={(inputEvent) => setDueDate(inputEvent.target.value)} />
+                <DatePicker
+                  label="Start"
+                  value={startDate}
+                  onChange={(inputEvent) =>
+                    setStartDate(inputEvent.target.value)
+                  }
+                />
+                <DatePicker
+                  label="Fällig"
+                  value={dueDate}
+                  onChange={(inputEvent) => setDueDate(inputEvent.target.value)}
+                />
               </div>
             </Section>
             <Section title="Tags">
@@ -381,7 +582,17 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
               ) : (
                 <div className="grid gap-4">
                   <div className="flex flex-wrap items-end gap-3">
-                    <Select label="Feature verknüpfen" value={selectedFeatureId} onChange={(inputEvent) => setSelectedFeatureId(inputEvent.target.value ? Number(inputEvent.target.value) : "")}>
+                    <Select
+                      label="Feature verknüpfen"
+                      value={selectedFeatureId}
+                      onChange={(inputEvent) =>
+                        setSelectedFeatureId(
+                          inputEvent.target.value
+                            ? Number(inputEvent.target.value)
+                            : "",
+                        )
+                      }
+                    >
                       <option value="">Feature auswählen</option>
                       {availableFeatures.map((feature) => (
                         <option key={feature.id} value={feature.id}>
@@ -389,35 +600,96 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
                         </option>
                       ))}
                     </Select>
-                    <Button variant="primary" disabled={selectedFeatureId === ""} onClick={() => void linkFeature()}>
+                    <Button
+                      variant="primary"
+                      disabled={selectedFeatureId === ""}
+                      onClick={() => void linkFeature()}
+                    >
                       Verknüpfen
                     </Button>
-                    <Button onClick={() => navigate(`/features/new?returnTo=${encodeURIComponent(returnTo)}`)}>Neues Feature</Button>
+                    <Button
+                      onClick={() =>
+                        navigate(
+                          `/features/new?returnTo=${encodeURIComponent(returnTo)}`,
+                        )
+                      }
+                    >
+                      Neues Feature
+                    </Button>
                   </div>
-                  <MilestoneFeatureList features={featureLinks.features} viewMode={featureViewMode} onViewModeChange={setFeatureViewMode} onOpen={(feature) => navigate(`/features/${feature.id}?returnTo=${encodeURIComponent(returnTo)}`)} onUnlink={(feature) => void unlinkFeature(feature)} />
+                  <MilestoneFeatureList
+                    features={featureLinks.features}
+                    viewMode={featureViewMode}
+                    onViewModeChange={setFeatureViewMode}
+                    onOpen={(feature) =>
+                      navigate(
+                        `/features/${feature.id}?returnTo=${encodeURIComponent(returnTo)}`,
+                      )
+                    }
+                    onUnlink={(feature) => void unlinkFeature(feature)}
+                  />
                 </div>
               )
             ) : (
-              <EmptyState icon={<FolderKanban size={22} />} title="Features sind nach dem Speichern verfügbar." tone="violet" variant="tinted" />
+              <EmptyState
+                icon={<FolderKanban size={22} />}
+                title="Features sind nach dem Speichern verfügbar."
+                tone="violet"
+                variant="tinted"
+              />
             )}
           </Section>
         ) : null}
 
         {activeTab === "tasks" ? (
           <Section title="Aufgaben" fill={Boolean(milestone)}>
-            {milestone ? <OwnerTaskBoard owner={{ type: "milestone", id: milestone.id }} /> : <EmptyState icon={<Flag size={22} />} title="Aufgaben sind nach dem Speichern verfügbar." tone="teal" variant="tinted" />}
+            {milestone ? (
+              <OwnerTaskBoard owner={{ type: "milestone", id: milestone.id }} />
+            ) : (
+              <EmptyState
+                icon={<Flag size={22} />}
+                title="Aufgaben sind nach dem Speichern verfügbar."
+                tone="teal"
+                variant="tinted"
+              />
+            )}
           </Section>
         ) : null}
 
         {activeTab === "tickets" ? (
           <Section title="Tickets" fill={Boolean(milestone)}>
-            {milestone ? <OwnerTicketBoard owner={{ type: "milestone", id: milestone.id }} /> : <EmptyState icon={<Flag size={22} />} title="Tickets sind nach dem Speichern verfügbar." tone="teal" variant="tinted" />}
+            {milestone ? (
+              <OwnerTicketBoard
+                owner={{ type: "milestone", id: milestone.id }}
+              />
+            ) : (
+              <EmptyState
+                icon={<Flag size={22} />}
+                title="Tickets sind nach dem Speichern verfügbar."
+                tone="teal"
+                variant="tinted"
+              />
+            )}
           </Section>
         ) : null}
 
         {activeTab === "comments" ? (
           <Section title="Kommentare">
-            {milestone ? <CommentThread comments={comments.comments} entityLabel="Meilenstein" onCreate={comments.createComment} onDelete={comments.removeComment} /> : <EmptyState icon={<Flag size={22} />} title="Kommentare sind nach dem Speichern verfügbar." tone="teal" variant="tinted" />}
+            {milestone ? (
+              <CommentThread
+                comments={comments.comments}
+                entityLabel="Meilenstein"
+                onCreate={comments.createComment}
+                onDelete={comments.removeComment}
+              />
+            ) : (
+              <EmptyState
+                icon={<Flag size={22} />}
+                title="Kommentare sind nach dem Speichern verfügbar."
+                tone="teal"
+                variant="tinted"
+              />
+            )}
           </Section>
         ) : null}
 
@@ -429,11 +701,26 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
             </div>
             {milestone ? (
               <>
-                <NoteList notes={notes.notes} onCreate={createNote} onEdit={setEditingNote} onDelete={(note) => void notes.removeNote(note.id)} />
-                <NoteEditor note={editingNote} open={Boolean(editingNote)} onSave={notes.updateNote} onClose={() => setEditingNote(null)} />
+                <NoteList
+                  notes={notes.notes}
+                  onCreate={createNote}
+                  onEdit={setEditingNote}
+                  onDelete={(note) => void notes.removeNote(note.id)}
+                />
+                <NoteEditor
+                  note={editingNote}
+                  open={Boolean(editingNote)}
+                  onSave={notes.updateNote}
+                  onClose={() => setEditingNote(null)}
+                />
               </>
             ) : (
-              <EmptyState icon={<StickyNote size={22} />} title="Notizen sind nach dem Speichern verfügbar." tone="fern" variant="tinted" />
+              <EmptyState
+                icon={<StickyNote size={22} />}
+                title="Notizen sind nach dem Speichern verfügbar."
+                tone="fern"
+                variant="tinted"
+              />
             )}
           </Section>
         ) : null}
@@ -447,10 +734,20 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
             {milestone ? (
               <div className="grid gap-4">
                 <AttachmentUploader onUpload={uploadAttachment} />
-                <AttachmentList attachments={attachments.attachments} onDelete={(attachment) => void attachments.removeAttachment(attachment.id)} />
+                <AttachmentList
+                  attachments={attachments.attachments}
+                  onDelete={(attachment) =>
+                    void attachments.removeAttachment(attachment.id)
+                  }
+                />
               </div>
             ) : (
-              <EmptyState icon={<Paperclip size={22} />} title="Dateien sind nach dem Speichern verfügbar." tone="fern" variant="tinted" />
+              <EmptyState
+                icon={<Paperclip size={22} />}
+                title="Dateien sind nach dem Speichern verfügbar."
+                tone="fern"
+                variant="tinted"
+              />
             )}
           </Section>
         ) : null}
@@ -480,7 +777,12 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
                 />
               </div>
             ) : (
-              <EmptyState icon={<CalendarClock size={22} />} title="Events sind nach dem Speichern verfügbar." tone="teal" variant="tinted" />
+              <EmptyState
+                icon={<CalendarClock size={22} />}
+                title="Events sind nach dem Speichern verfügbar."
+                tone="teal"
+                variant="tinted"
+              />
             )}
           </Section>
         ) : null}
@@ -506,7 +808,11 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
             setEventFormOpen(false);
             showToast({ tone: "success", title: "Termin gelöscht" });
           } catch (eventError) {
-            showToast({ tone: "error", title: "Termin konnte nicht gelöscht werden", message: errorMessage(eventError) });
+            showToast({
+              tone: "error",
+              title: "Termin konnte nicht gelöscht werden",
+              message: errorMessage(eventError),
+            });
             throw eventError;
           }
         }}
@@ -521,7 +827,7 @@ function MilestoneFeatureList({
   viewMode,
   onViewModeChange,
   onOpen,
-  onUnlink
+  onUnlink,
 }: {
   features: Feature[];
   viewMode: ViewMode;
@@ -530,7 +836,15 @@ function MilestoneFeatureList({
   onUnlink: (feature: Feature) => void;
 }) {
   if (features.length === 0) {
-    return <EmptyState icon={<FolderKanban size={22} />} title="Keine Features" body="Für diesen Meilenstein sind noch keine Features verknüpft." tone="violet" variant="tinted" />;
+    return (
+      <EmptyState
+        icon={<FolderKanban size={22} />}
+        title="Keine Features"
+        body="Für diesen Meilenstein sind noch keine Features verknüpft."
+        tone="violet"
+        variant="tinted"
+      />
+    );
   }
 
   return (
@@ -539,13 +853,29 @@ function MilestoneFeatureList({
         <SegmentedControl
           value={viewMode}
           options={[
-            { value: "list", label: "Liste", activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" },
-            { value: "kanban", label: "Board", activeClassName: "data-[active=true]:bg-steel-700 data-[active=true]:text-white" }
+            {
+              value: "list",
+              label: "Liste",
+              activeClassName:
+                "data-[active=true]:bg-steel-700 data-[active=true]:text-white",
+            },
+            {
+              value: "kanban",
+              label: "Board",
+              activeClassName:
+                "data-[active=true]:bg-steel-700 data-[active=true]:text-white",
+            },
           ]}
           onChange={onViewModeChange}
         />
       </div>
-      <div className={viewMode === "kanban" ? "grid gap-3 md:grid-cols-2 xl:grid-cols-3" : "grid gap-2"}>
+      <div
+        className={
+          viewMode === "kanban"
+            ? "grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+            : "grid gap-2"
+        }
+      >
         {features.map((feature) => (
           <ItemRow
             key={feature.id}
@@ -560,8 +890,22 @@ function MilestoneFeatureList({
             }
             actions={
               <>
-                <Button aria-label="Öffnen" title="Öffnen" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(feature)} />
-                <Button aria-label="Zuordnung entfernen" title="Zuordnung entfernen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onUnlink(feature)} />
+                <Button
+                  aria-label="Öffnen"
+                  title="Öffnen"
+                  className="h-10 w-10"
+                  icon={<Edit3 size={18} />}
+                  variant="ghost"
+                  onClick={() => onOpen(feature)}
+                />
+                <Button
+                  aria-label="Zuordnung entfernen"
+                  title="Zuordnung entfernen"
+                  className="h-10 w-10"
+                  icon={<Trash2 size={18} />}
+                  variant="ghost"
+                  onClick={() => onUnlink(feature)}
+                />
               </>
             }
             onOpen={() => onOpen(feature)}
@@ -572,9 +916,23 @@ function MilestoneFeatureList({
   );
 }
 
-function MilestoneEventList({ events, onOpen }: { events: CalendarEvent[]; onOpen: (event: CalendarEvent) => void }) {
+function MilestoneEventList({
+  events,
+  onOpen,
+}: {
+  events: CalendarEvent[];
+  onOpen: (event: CalendarEvent) => void;
+}) {
   if (events.length === 0) {
-    return <EmptyState icon={<CalendarClock size={22} />} title="Keine Events" body="Termine mit Meilensteinbezug erscheinen hier." tone="teal" variant="tinted" />;
+    return (
+      <EmptyState
+        icon={<CalendarClock size={22} />}
+        title="Keine Events"
+        body="Termine mit Meilensteinbezug erscheinen hier."
+        tone="teal"
+        variant="tinted"
+      />
+    );
   }
 
   return (
@@ -587,11 +945,22 @@ function MilestoneEventList({ events, onOpen }: { events: CalendarEvent[]; onOpe
           description={richTextToPlainText(event.description)}
           pills={
             <>
-              <Badge tone={event.isAllDay ? "violet" : "teal"}>{event.isAllDay ? "Ganztägig" : "Termin"}</Badge>
+              <Badge tone={event.isAllDay ? "violet" : "teal"}>
+                {event.isAllDay ? "Ganztägig" : "Termin"}
+              </Badge>
               <Badge tone="steel">{formatHumanDate(event.startTime)}</Badge>
             </>
           }
-          actions={<Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(event)} />}
+          actions={
+            <Button
+              aria-label="Bearbeiten"
+              title="Bearbeiten"
+              className="h-10 w-10"
+              icon={<Edit3 size={18} />}
+              variant="ghost"
+              onClick={() => onOpen(event)}
+            />
+          }
           onOpen={() => onOpen(event)}
         />
       ))}

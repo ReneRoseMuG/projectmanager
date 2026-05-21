@@ -14,7 +14,11 @@ interface TabBarProps<T extends string> {
 }
 
 /** Horizontally scrollable tab bar with optional counts and icons. */
-export function TabBar<T extends string>({ tabs, active, onChange }: TabBarProps<T>) {
+export function TabBar<T extends string>({
+  tabs,
+  active,
+  onChange,
+}: TabBarProps<T>) {
   return (
     <nav className="relative z-10 flex min-h-12 shrink-0 gap-1 overflow-x-auto border-b border-line bg-white px-4 md:px-5">
       {tabs.map((tab) => {
@@ -29,7 +33,16 @@ export function TabBar<T extends string>({ tabs, active, onChange }: TabBarProps
           >
             {tab.icon}
             {tab.label}
-            {typeof tab.count === "number" ? <span className={`rounded-full px-2 py-0.5 text-xs ${selected ? "bg-steel-700 text-white" : "bg-shell text-slate-500"}`}>{tab.count}</span> : null}
+            {typeof tab.count === "number" && tab.count > 0 ? (
+              <>
+                {" "}
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs ${selected ? "bg-steel-700 text-white" : "bg-shell text-slate-500"}`}
+                >
+                  {tab.count}
+                </span>
+              </>
+            ) : null}
           </button>
         );
       })}

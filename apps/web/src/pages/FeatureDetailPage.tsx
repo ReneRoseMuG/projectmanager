@@ -1,4 +1,11 @@
-import type { DraftComment, DraftTask, DraftTicket, DraftUseCase, Feature, FeatureInput } from "@taskmanager/shared-types";
+import type {
+  DraftComment,
+  DraftTask,
+  DraftTicket,
+  DraftUseCase,
+  Feature,
+  FeatureInput,
+} from "@taskmanager/shared-types";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { uploadFeatureAttachment } from "../api/attachments";
@@ -24,7 +31,9 @@ export function FeatureDetailPage() {
   const isCreateMode = params.id === undefined;
   const featureId = isCreateMode ? undefined : Number(params.id);
   const initialProjectIdParam = searchParams.get("projectId");
-  const initialProjectId = initialProjectIdParam ? Number(initialProjectIdParam) : undefined;
+  const initialProjectId = initialProjectIdParam
+    ? Number(initialProjectIdParam)
+    : undefined;
   const features = useFeatures(featureId);
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
 
@@ -41,7 +50,10 @@ export function FeatureDetailPage() {
   const saveFeature = async (input: FeatureInput) => {
     try {
       if (features.feature) {
-        const updated = await features.updateFeature(features.feature.id, { ...input, expectedVersion: features.feature.version });
+        const updated = await features.updateFeature(features.feature.id, {
+          ...input,
+          expectedVersion: features.feature.version,
+        });
         await features.reload();
         showToast({ tone: "success", title: "Feature gespeichert" });
         return updated;
@@ -51,14 +63,25 @@ export function FeatureDetailPage() {
       showToast({ tone: "success", title: "Feature erstellt" });
       return created;
     } catch (featureError) {
-      showToast({ tone: "error", title: "Feature konnte nicht gespeichert werden", message: errorMessage(featureError) });
+      showToast({
+        tone: "error",
+        title: "Feature konnte nicht gespeichert werden",
+        message: errorMessage(featureError),
+      });
       throw featureError;
     }
   };
 
   const postCreateFeature = async (
     featureId: number,
-    pending: { tasks: DraftTask[]; tickets: DraftTicket[]; useCases: DraftUseCase[]; projectIds: number[]; comments: DraftComment[]; files: DraftFile[] }
+    pending: {
+      tasks: DraftTask[];
+      tickets: DraftTicket[];
+      useCases: DraftUseCase[];
+      projectIds: number[];
+      comments: DraftComment[];
+      files: DraftFile[];
+    },
   ) => {
     const owner = { type: "feature" as const, id: featureId };
     try {
@@ -81,10 +104,18 @@ export function FeatureDetailPage() {
           await createUseCaseRequest(featureId, useCase.draft);
         }
       }
-      const projectIds = initialProjectId !== undefined && Number.isFinite(initialProjectId) ? [...new Set([...pending.projectIds, initialProjectId])] : pending.projectIds;
+      const projectIds =
+        initialProjectId !== undefined && Number.isFinite(initialProjectId)
+          ? [...new Set([...pending.projectIds, initialProjectId])]
+          : pending.projectIds;
       for (const projectId of projectIds) {
         const linkedFeatures = await getProjectFeatures(projectId);
-        await setProjectFeatures(projectId, [...new Set([...linkedFeatures.map((feature) => feature.id), featureId])]);
+        await setProjectFeatures(projectId, [
+          ...new Set([
+            ...linkedFeatures.map((feature) => feature.id),
+            featureId,
+          ]),
+        ]);
       }
       for (const comment of pending.comments) {
         await createEntityComment("feature", featureId, { body: comment.text });
@@ -94,13 +125,20 @@ export function FeatureDetailPage() {
         if (!file) {
           continue;
         }
-        setSavingLabel(`Speichern… (Datei ${index + 1} von ${pending.files.length})`);
+        setSavingLabel(
+          `Speichern… (Datei ${index + 1} von ${pending.files.length})`,
+        );
         await uploadFeatureAttachment(featureId, file.file);
       }
       await features.reload();
       showToast({ tone: "success", title: "Feature-Zuordnungen gespeichert" });
     } catch (postCreateError) {
-      showToast({ tone: "error", title: "Feature wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
+      showToast({
+        tone: "error",
+        title:
+          "Feature wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden",
+        message: errorMessage(postCreateError),
+      });
       throw postCreateError;
     } finally {
       setSavingLabel(undefined);
@@ -112,7 +150,7 @@ export function FeatureDetailPage() {
       title: "Feature löschen?",
       body: `Das Feature "${feature.title}" wird entfernt.`,
       severity: "danger",
-      confirmLabel: "Löschen"
+      confirmLabel: "Löschen",
     });
     if (!approved) {
       return false;
@@ -123,13 +161,21 @@ export function FeatureDetailPage() {
       navigate("/features");
       return true;
     } catch (featureError) {
-      showToast({ tone: "error", title: "Feature konnte nicht gelöscht werden", message: errorMessage(featureError) });
+      showToast({
+        tone: "error",
+        title: "Feature konnte nicht gelöscht werden",
+        message: errorMessage(featureError),
+      });
       return false;
     }
   };
 
   if (!isCreateMode && !Number.isFinite(featureId)) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Feature nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Feature nicht gefunden
+      </div>
+    );
   }
 
   if (!isCreateMode && features.loading) {
@@ -137,11 +183,15 @@ export function FeatureDetailPage() {
   }
 
   if (!isCreateMode && !features.feature) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Feature nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Feature nicht gefunden
+      </div>
+    );
   }
 
   return (
-    <div className="-my-4 min-h-[calc(100%+2rem)] w-full min-w-0 md:-my-6 md:min-h-[calc(100%+3rem)]">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
       <FeatureForm
         open
         feature={features.feature}

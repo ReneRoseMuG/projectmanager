@@ -1,4 +1,7 @@
-import type { CatalogEntry, StatusCatalogKind } from "@taskmanager/shared-types";
+import type {
+  CatalogEntry,
+  StatusCatalogKind,
+} from "@taskmanager/shared-types";
 import { Plus } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
@@ -31,6 +34,7 @@ interface ListBoardViewProps<T> {
   onAdd: () => void;
   onAddToColumn?: (status: string) => void;
   addLabel?: string;
+  showToolbarAdd?: boolean;
   secondaryAction?: ReactNode;
   statusKey?: keyof T;
   statusCatalogKind?: StatusCatalogKind;
@@ -52,12 +56,15 @@ function toListBoardMode(mode: ViewMode): ListBoardMode {
   return mode === "kanban" ? "board" : "list";
 }
 
-function catalogColumns(entries: CatalogEntry[], kind: StatusCatalogKind): StatusColumn[] {
+function catalogColumns(
+  entries: CatalogEntry[],
+  kind: StatusCatalogKind,
+): StatusColumn[] {
   return catalogEntriesByKind(entries, kind).map((entry) => ({
     value: entry.key,
     label: entry.label,
     sortOrder: entry.sortOrder,
-    isClosed: entry.isClosed
+    isClosed: entry.isClosed,
   }));
 }
 
@@ -75,17 +82,31 @@ function unknownStatusColumn(status: string | null): StatusColumn {
   return {
     value: status ?? "__without_status",
     label: status ?? "Ohne Status",
-    sortOrder: Number.MAX_SAFE_INTEGER
+    sortOrder: Number.MAX_SAFE_INTEGER,
   };
 }
 
-function groupItemsByStatus<T>(items: T[], statusKey: keyof T | undefined, statusColumns: StatusColumn[] | undefined, includeEmptyKnownGroups: boolean): StatusGroup<T>[] {
-  if (statusKey === undefined || statusColumns === undefined || statusColumns.length === 0) {
+function groupItemsByStatus<T>(
+  items: T[],
+  statusKey: keyof T | undefined,
+  statusColumns: StatusColumn[] | undefined,
+  includeEmptyKnownGroups: boolean,
+): StatusGroup<T>[] {
+  if (
+    statusKey === undefined ||
+    statusColumns === undefined ||
+    statusColumns.length === 0
+  ) {
     return [];
   }
 
-  const knownGroups = statusColumns.map((column) => ({ column, items: [] as T[] }));
-  const knownGroupsByValue = new Map(knownGroups.map((group) => [group.column.value, group]));
+  const knownGroups = statusColumns.map((column) => ({
+    column,
+    items: [] as T[],
+  }));
+  const knownGroupsByValue = new Map(
+    knownGroups.map((group) => [group.column.value, group]),
+  );
   const unknownGroups = new Map<string, StatusGroup<T>>();
 
   items.forEach((item) => {
@@ -101,7 +122,10 @@ function groupItemsByStatus<T>(items: T[], statusKey: keyof T | undefined, statu
     const unknownGroup =
       unknownGroups.get(unknownKey) ??
       (() => {
-        const nextGroup = { column: unknownStatusColumn(status), items: [] as T[] };
+        const nextGroup = {
+          column: unknownStatusColumn(status),
+          items: [] as T[],
+        };
         unknownGroups.set(unknownKey, nextGroup);
         return nextGroup;
       })();
@@ -109,7 +133,9 @@ function groupItemsByStatus<T>(items: T[], statusKey: keyof T | undefined, statu
     unknownGroup.items.push(item);
   });
 
-  const orderedKnownGroups = includeEmptyKnownGroups ? knownGroups : knownGroups.filter((group) => group.items.length > 0);
+  const orderedKnownGroups = includeEmptyKnownGroups
+    ? knownGroups
+    : knownGroups.filter((group) => group.items.length > 0);
   return [...orderedKnownGroups, ...unknownGroups.values()];
 }
 
@@ -125,11 +151,16 @@ function statusGroupClass(column: StatusColumn): string {
   return "border-line bg-shell/70";
 }
 
-function isKnownColumn(statusColumns: StatusColumn[] | undefined, value: string): boolean {
+function isKnownColumn(
+  statusColumns: StatusColumn[] | undefined,
+  value: string,
+): boolean {
   return statusColumns?.some((column) => column.value === value) ?? false;
 }
 
-function sortedStatusColumns(statusColumns: StatusColumn[] | undefined): StatusColumn[] | undefined {
+function sortedStatusColumns(
+  statusColumns: StatusColumn[] | undefined,
+): StatusColumn[] | undefined {
   if (statusColumns === undefined) {
     return undefined;
   }
@@ -137,15 +168,25 @@ function sortedStatusColumns(statusColumns: StatusColumn[] | undefined): StatusC
   return statusColumns
     .map((column, index) => ({ column, index }))
     .sort((left, right) => {
-      if (left.column.sortOrder !== undefined && right.column.sortOrder !== undefined && left.column.sortOrder !== right.column.sortOrder) {
+      if (
+        left.column.sortOrder !== undefined &&
+        right.column.sortOrder !== undefined &&
+        left.column.sortOrder !== right.column.sortOrder
+      ) {
         return left.column.sortOrder - right.column.sortOrder;
       }
 
-      if (left.column.sortOrder !== undefined && right.column.sortOrder === undefined) {
+      if (
+        left.column.sortOrder !== undefined &&
+        right.column.sortOrder === undefined
+      ) {
         return -1;
       }
 
-      if (left.column.sortOrder === undefined && right.column.sortOrder !== undefined) {
+      if (
+        left.column.sortOrder === undefined &&
+        right.column.sortOrder !== undefined
+      ) {
         return 1;
       }
 
@@ -157,15 +198,25 @@ function sortedStatusColumns(statusColumns: StatusColumn[] | undefined): StatusC
 /** Shared list/board surface with search, filters, view toggle and add button. */
 export function ListBoardView<T>(props: ListBoardViewProps<T>) {
   if (props.statusCatalogKind && props.statusColumns === undefined) {
-    return <CatalogAwareListBoardView {...props} statusCatalogKind={props.statusCatalogKind} />;
+    return (
+      <CatalogAwareListBoardView
+        {...props}
+        statusCatalogKind={props.statusCatalogKind}
+      />
+    );
   }
 
   return <ListBoardViewContent {...props} />;
 }
 
-function CatalogAwareListBoardView<T>(props: ListBoardViewProps<T> & { statusCatalogKind: StatusCatalogKind }) {
+function CatalogAwareListBoardView<T>(
+  props: ListBoardViewProps<T> & { statusCatalogKind: StatusCatalogKind },
+) {
   const catalogs = useCatalogs();
-  const statusColumns = useMemo(() => catalogColumns(catalogs.entries, props.statusCatalogKind), [catalogs.entries, props.statusCatalogKind]);
+  const statusColumns = useMemo(
+    () => catalogColumns(catalogs.entries, props.statusCatalogKind),
+    [catalogs.entries, props.statusCatalogKind],
+  );
 
   return <ListBoardViewContent {...props} statusColumns={statusColumns} />;
 }
@@ -177,6 +228,7 @@ function ListBoardViewContent<T>({
   onAdd,
   onAddToColumn,
   addLabel = "Neu",
+  showToolbarAdd = true,
   secondaryAction,
   statusKey,
   statusColumns,
@@ -186,43 +238,90 @@ function ListBoardViewContent<T>({
   onSearchChange,
   filters,
   emptyState,
-  loading = false
+  loading = false,
 }: ListBoardViewProps<T>) {
   const orderedStatusColumns = sortedStatusColumns(statusColumns);
-  const hasStatusGrouping = statusKey !== undefined && orderedStatusColumns !== undefined && orderedStatusColumns.length > 0;
-  const listStatusGroups = groupItemsByStatus(items, statusKey, orderedStatusColumns, false);
-  const boardStatusGroups = groupItemsByStatus(items, statusKey, orderedStatusColumns, true);
+  const hasStatusGrouping =
+    statusKey !== undefined &&
+    orderedStatusColumns !== undefined &&
+    orderedStatusColumns.length > 0;
+  const listStatusGroups = groupItemsByStatus(
+    items,
+    statusKey,
+    orderedStatusColumns,
+    false,
+  );
+  const boardStatusGroups = groupItemsByStatus(
+    items,
+    statusKey,
+    orderedStatusColumns,
+    true,
+  );
   const boardByStatus = mode === "board" && hasStatusGrouping;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4" data-testid="list-board-view">
+    <div
+      className="flex h-full min-h-[30rem] w-full min-w-0 flex-1 flex-col gap-4"
+      data-testid="list-board-view"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {onSearchChange ? <SearchInput value={searchValue} onChange={onSearchChange} /> : <span />}
+        {onSearchChange ? (
+          <SearchInput value={searchValue} onChange={onSearchChange} />
+        ) : (
+          <span />
+        )}
         <div className="flex flex-wrap items-center gap-2">
           {filters}
           {secondaryAction}
-          <ViewToggle value={toViewMode(mode)} onChange={(value) => onModeChange(toListBoardMode(value))} />
-          <Button aria-label={addLabel} title={addLabel} variant="primary" icon={<Plus size={17} />} onClick={onAdd} />
+          <ViewToggle
+            value={toViewMode(mode)}
+            onChange={(value) => onModeChange(toListBoardMode(value))}
+          />
+          {showToolbarAdd ? (
+            <Button
+              aria-label={addLabel}
+              title={addLabel}
+              variant="primary"
+              icon={<Plus size={17} />}
+              className="h-9 w-9"
+              onClick={onAdd}
+            />
+          ) : null}
         </div>
       </div>
 
-      <div className="min-h-0 flex-1">
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col">
         {loading ? <TaskListSkeleton /> : null}
-        {!loading && items.length === 0 ? <div className="grid min-h-full">{emptyState}</div> : null}
-        {!loading && items.length > 0 && mode === "list" && !hasStatusGrouping ? (
-          <div className="grid min-h-full content-start gap-3">
+        {!loading && items.length === 0 ? (
+          <div className="grid h-full min-h-[30rem] w-full flex-1">{emptyState}</div>
+        ) : null}
+        {!loading &&
+        items.length > 0 &&
+        mode === "list" &&
+        !hasStatusGrouping ? (
+          <div className="grid h-full min-h-[30rem] w-full flex-1 content-start gap-3">
             {items.map((item, index) => (
               <div key={index}>{renderRow(item)}</div>
             ))}
           </div>
         ) : null}
-        {!loading && items.length > 0 && mode === "list" && hasStatusGrouping ? (
-          <div className="grid min-h-full content-start gap-4">
+        {!loading &&
+        items.length > 0 &&
+        mode === "list" &&
+        hasStatusGrouping ? (
+          <div className="grid h-full min-h-[30rem] w-full flex-1 content-start gap-4">
             {listStatusGroups.map((group) => (
-              <section key={group.column.value} className={`grid min-w-0 gap-0 rounded-lg border p-0 ${statusGroupClass(group.column)}`}>
-                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white/60 px-3 py-2 backdrop-blur-sm">
-                  <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{group.column.label}</h2>
-                  <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">{group.items.length}</span>
+              <section
+                key={group.column.value}
+                className={`grid min-w-0 gap-0 rounded-lg border p-0 ${statusGroupClass(group.column)}`}
+              >
+                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2">
+                  <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
+                    {group.column.label}
+                  </h2>
+                  <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                    {group.items.length}
+                  </span>
                 </header>
                 <div className="grid gap-3 p-3">
                   {group.items.map((item, index) => (
@@ -243,14 +342,22 @@ function ListBoardViewContent<T>({
           </CardGrid>
         ) : null}
         {!loading && items.length > 0 && boardByStatus ? (
-          <div className="grid h-full min-h-full min-w-0 grid-flow-col auto-cols-[minmax(17rem,1fr)] gap-4 overflow-x-auto pb-2">
+          <div className="grid h-full min-h-[30rem] w-full min-w-0 flex-1 grid-flow-col auto-cols-[minmax(17rem,1fr)] gap-4 overflow-x-auto pb-2">
             {boardStatusGroups.map((group) => (
-              <section key={group.column.value} className={`grid h-full min-h-[240px] min-w-0 content-start gap-0 rounded-lg border p-0 ${statusGroupClass(group.column)}`}>
-                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white/60 px-3 py-2 backdrop-blur-sm">
-                  <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{group.column.label}</h2>
+              <section
+                key={group.column.value}
+                className={`grid h-full min-h-full min-w-0 content-start gap-0 rounded-lg border p-0 ${statusGroupClass(group.column)}`}
+              >
+                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2">
+                  <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
+                    {group.column.label}
+                  </h2>
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">{group.items.length}</span>
-                    {onAddToColumn && isKnownColumn(orderedStatusColumns, group.column.value) ? (
+                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                      {group.items.length}
+                    </span>
+                    {onAddToColumn &&
+                    isKnownColumn(orderedStatusColumns, group.column.value) ? (
                       <Button
                         aria-label={`${group.column.label} hinzufügen`}
                         title={`${group.column.label} hinzufügen`}

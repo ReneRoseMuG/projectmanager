@@ -1,4 +1,10 @@
-import type { DraftComment, DraftTask, DraftTicket, UseCase, UseCaseInput } from "@taskmanager/shared-types";
+import type {
+  DraftComment,
+  DraftTask,
+  DraftTicket,
+  UseCase,
+  UseCaseInput,
+} from "@taskmanager/shared-types";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { createEntityComment } from "../api/comments";
@@ -22,13 +28,20 @@ export function UseCaseDetailPage() {
   const isCreateMode = params.id === undefined;
   const useCaseId = isCreateMode ? null : Number(params.id);
   const initialFeatureIdParam = searchParams.get("featureId");
-  const initialFeatureId = initialFeatureIdParam ? Number(initialFeatureIdParam) : undefined;
-  const validFeatureId = initialFeatureId !== undefined && Number.isFinite(initialFeatureId) ? initialFeatureId : undefined;
+  const initialFeatureId = initialFeatureIdParam
+    ? Number(initialFeatureIdParam)
+    : undefined;
+  const validFeatureId =
+    initialFeatureId !== undefined && Number.isFinite(initialFeatureId)
+      ? initialFeatureId
+      : undefined;
   const allFeatures = useFeatures();
   const useCases = useUseCases(validFeatureId);
   const [useCase, setUseCase] = useState<UseCase | null>(null);
   const [loading, setLoading] = useState(false);
-  const returnTo = searchParams.get("returnTo") ?? (useCase ? `/features/${useCase.featureId}` : "/features");
+  const returnTo =
+    searchParams.get("returnTo") ??
+    (useCase ? `/features/${useCase.featureId}` : "/features");
   const openInTab =
     !isCreateMode && useCaseId !== null && Number.isFinite(useCaseId)
       ? () => {
@@ -53,7 +66,10 @@ export function UseCaseDetailPage() {
   const submitUseCase = async (input: UseCaseInput) => {
     try {
       if (useCase) {
-        const updated = await useCases.updateUseCase(useCase.id, { ...input, expectedVersion: useCase.version });
+        const updated = await useCases.updateUseCase(useCase.id, {
+          ...input,
+          expectedVersion: useCase.version,
+        });
         setUseCase(updated);
         showToast({ tone: "success", title: "Use Case gespeichert" });
         return updated;
@@ -62,12 +78,23 @@ export function UseCaseDetailPage() {
       showToast({ tone: "success", title: "Use Case erstellt" });
       return created;
     } catch (useCaseError) {
-      showToast({ tone: "error", title: "Use Case konnte nicht gespeichert werden", message: errorMessage(useCaseError) });
+      showToast({
+        tone: "error",
+        title: "Use Case konnte nicht gespeichert werden",
+        message: errorMessage(useCaseError),
+      });
       throw useCaseError;
     }
   };
 
-  const postCreateUseCase = async (useCaseId: number, pending: { tasks: DraftTask[]; tickets: DraftTicket[]; comments: DraftComment[] }) => {
+  const postCreateUseCase = async (
+    useCaseId: number,
+    pending: {
+      tasks: DraftTask[];
+      tickets: DraftTicket[];
+      comments: DraftComment[];
+    },
+  ) => {
     const owner = { type: "useCase" as const, id: useCaseId };
     try {
       for (const task of pending.tasks) {
@@ -88,7 +115,12 @@ export function UseCaseDetailPage() {
         await createEntityComment("useCase", useCaseId, { body: comment.text });
       }
     } catch (postCreateError) {
-      showToast({ tone: "error", title: "Use Case wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
+      showToast({
+        tone: "error",
+        title:
+          "Use Case wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden",
+        message: errorMessage(postCreateError),
+      });
       throw postCreateError;
     }
   };
@@ -98,7 +130,7 @@ export function UseCaseDetailPage() {
       title: "Use Case löschen?",
       body: `Der Use Case "${targetUseCase.title}" wird entfernt.`,
       severity: "danger",
-      confirmLabel: "Löschen"
+      confirmLabel: "Löschen",
     });
     if (!approved) {
       return false;
@@ -109,17 +141,29 @@ export function UseCaseDetailPage() {
       navigate(returnTo);
       return true;
     } catch (useCaseError) {
-      showToast({ tone: "error", title: "Use Case konnte nicht gelöscht werden", message: errorMessage(useCaseError) });
+      showToast({
+        tone: "error",
+        title: "Use Case konnte nicht gelöscht werden",
+        message: errorMessage(useCaseError),
+      });
       return false;
     }
   };
 
   if (isCreateMode && validFeatureId === undefined) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Use Cases benötigen ein Feature.</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Use Cases benötigen ein Feature.
+      </div>
+    );
   }
 
   if (!isCreateMode && !Number.isFinite(useCaseId)) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Use Case nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Use Case nicht gefunden
+      </div>
+    );
   }
 
   if (!isCreateMode && loading) {
@@ -127,11 +171,15 @@ export function UseCaseDetailPage() {
   }
 
   if (!isCreateMode && !useCase) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Use Case nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Use Case nicht gefunden
+      </div>
+    );
   }
 
   return (
-    <div className="-my-4 min-h-[calc(100%+2rem)] w-full min-w-0 md:-my-6 md:min-h-[calc(100%+3rem)]">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
       <UseCaseForm
         open
         useCase={useCase}

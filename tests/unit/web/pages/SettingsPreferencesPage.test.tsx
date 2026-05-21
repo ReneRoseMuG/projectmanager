@@ -37,16 +37,18 @@ const settings: ResolvedSetting[] = [
     values: {},
     resolvedValue: "list",
     resolvedScope: "DEFAULT",
-    resolvedVersion: null
-  }
+    resolvedVersion: null,
+  },
 ];
 
 vi.mock("../../../../apps/web/src/hooks/useAuth", () => ({
   useAuth: () => ({
     user: {
-      permissions: adminAccess ? [{ id: 1, roleId: 1, resource: "settings", action: "admin" }] : [{ id: 2, roleId: 2, resource: "*", action: "read" }]
-    }
-  })
+      permissions: adminAccess
+        ? [{ id: 1, roleId: 1, resource: "settings", action: "admin" }]
+        : [{ id: 2, roleId: 2, resource: "*", action: "read" }],
+    },
+  }),
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useSettings", () => ({
@@ -56,15 +58,15 @@ vi.mock("../../../../apps/web/src/hooks/useSettings", () => ({
     error: null,
     isSaving: false,
     setSetting: setSettingMock,
-    resetSetting: resetSettingMock
-  })
+    resetSetting: resetSettingMock,
+  }),
 }));
 
 function renderPage() {
   render(
     <ToastProvider>
       <SettingsPreferencesPage />
-    </ToastProvider>
+    </ToastProvider>,
   );
 }
 
@@ -79,26 +81,42 @@ describe("SettingsPreferencesPage", () => {
   it("zeigt normale USER-Präferenzen ohne globale Admin-Controls", () => {
     renderPage();
 
-    expect(screen.getByRole("heading", { name: "Präferenzen" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Mein Profil" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Globale Defaults" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Präferenzen" })).toHaveClass(
+      "font-semibold",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Mein Profil" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Globale Defaults" }),
+    ).not.toBeInTheDocument();
   });
 
   it("speichert Enum-Settings über den Settings-Hook", async () => {
     setSettingMock.mockResolvedValue({ settings });
     renderPage();
 
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "kanban" } });
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: "kanban" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(setSettingMock).toHaveBeenCalledWith({ key: "taskBoard.viewMode", scopeType: "USER", value: "kanban" }));
+    await waitFor(() =>
+      expect(setSettingMock).toHaveBeenCalledWith({
+        key: "taskBoard.viewMode",
+        scopeType: "USER",
+        value: "kanban",
+      }),
+    );
   });
 
   it("zeigt globale Controls nur für Settings-Admins", () => {
     adminAccess = true;
     renderPage();
 
-    expect(screen.getByRole("heading", { name: "Globale Defaults" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Globale Defaults" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")).toHaveLength(2);
   });
 });

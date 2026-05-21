@@ -32,16 +32,16 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
       reload: async () => undefined,
       createEntry: async () => undefined,
       updateEntry: async () => undefined,
-      deleteEntry: async () => undefined
+      deleteEntry: async () => undefined,
     };
-  }
+  },
 }));
 
 const statusColumns = [
   { value: "draft", label: "Entwurf" },
   { value: "active", label: "Aktiv" },
   { value: "done", label: "Erledigt" },
-  { value: "archived", label: "Archiviert" }
+  { value: "archived", label: "Archiviert" },
 ] as const;
 
 function LocationProbe() {
@@ -53,7 +53,7 @@ function renderFeatureList({
   features = buildFeatureSet(),
   onCreate = vi.fn(),
   onOpen = vi.fn(),
-  onDelete = vi.fn()
+  onDelete = vi.fn(),
 }: {
   features?: Feature[];
   onCreate?: () => void;
@@ -62,9 +62,14 @@ function renderFeatureList({
 } = {}) {
   return render(
     <MemoryRouter initialEntries={["/"]}>
-      <FeatureListBoardView features={features} onCreate={onCreate} onOpen={onOpen} onDelete={onDelete} />
+      <FeatureListBoardView
+        features={features}
+        onCreate={onCreate}
+        onOpen={onOpen}
+        onDelete={onDelete}
+      />
       <LocationProbe />
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -72,7 +77,9 @@ function expectToolbar() {
   expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Neues Feature" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Neues Feature" }),
+  ).toBeInTheDocument();
 }
 
 function expectItemCardClasses(cards: NodeListOf<Element>) {
@@ -84,7 +91,9 @@ function expectItemCardClasses(cards: NodeListOf<Element>) {
     expect(card).toHaveClass("max-w-full");
     expect(card).toHaveClass("p-5");
     expect(card).toHaveClass("shadow-sm");
-    expect(card.querySelector("span.absolute.inset-x-0.top-0.h-1")).toBeInTheDocument();
+    expect(
+      card.querySelector("span.absolute.inset-x-0.top-0.h-1"),
+    ).toBeInTheDocument();
   });
 }
 
@@ -107,32 +116,44 @@ describe("FeatureListBoardView", () => {
       expect(column).toHaveClass("min-w-0");
     });
     statusColumns.forEach((column) => {
-      expect(screen.getByRole("heading", { name: column.label })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: column.label }),
+      ).toBeInTheDocument();
     });
 
-    const activeColumn = screen.getByRole("heading", { name: "Aktiv" }).closest("section");
+    const activeColumn = screen
+      .getByRole("heading", { name: "Aktiv" })
+      .closest("section");
     expect(activeColumn).toContainElement(screen.getByText("Feature Aktiv"));
-    const archivedColumn = screen.getByRole("heading", { name: "Archiviert" }).closest("section");
-    expect(archivedColumn).toContainElement(screen.getByText("Feature Archiviert"));
+    const archivedColumn = screen
+      .getByRole("heading", { name: "Archiviert" })
+      .closest("section");
+    expect(archivedColumn).toContainElement(
+      screen.getByText("Feature Archiviert"),
+    );
 
     expectItemCardClasses(container.querySelectorAll("article.rounded-2xl"));
-    expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(features.length);
+    expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(
+      features.length,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Aktiv hinzufügen" }));
     expect(onCreate).toHaveBeenCalledWith("active");
 
-    const activeHeader = screen.getByRole("heading", { name: "Aktiv" }).closest("header");
+    const activeHeader = screen
+      .getByRole("heading", { name: "Aktiv" })
+      .closest("header");
     expect(activeHeader).toHaveTextContent("1");
   });
 
-  it("öffnet die Feature-Route per Doppelklick auf eine Karte", () => {
+  it("öffnet die Feature-Route per einfachem Klick auf eine Karte", () => {
     const features = buildFeatureSet();
     const onOpen = vi.fn();
     renderFeatureList({ features, onOpen });
 
     const card = screen.getByText("Feature Aktiv").closest("article");
     expect(card).toBeInTheDocument();
-    fireEvent.doubleClick(card as HTMLElement);
+    fireEvent.click(card as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledWith(features[1]);
   });
@@ -148,7 +169,9 @@ describe("FeatureListBoardView", () => {
     const cards = container.querySelectorAll("article.rounded-2xl");
     expect(cards).toHaveLength(features.length);
     expectItemCardClasses(cards);
-    expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+    expect(
+      container.querySelector("article.rounded-xl"),
+    ).not.toBeInTheDocument();
     features.forEach((feature) => {
       expect(screen.getByText(feature.title)).toBeInTheDocument();
     });
@@ -158,7 +181,11 @@ describe("FeatureListBoardView", () => {
     const { container } = renderFeatureList({ features: [] });
 
     expect(screen.getByText("Keine Features")).toBeInTheDocument();
-    expect(container.querySelector("article.rounded-2xl")).not.toBeInTheDocument();
-    expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+    expect(
+      container.querySelector("article.rounded-2xl"),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector("article.rounded-xl"),
+    ).not.toBeInTheDocument();
   });
 });

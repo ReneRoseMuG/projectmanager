@@ -1,4 +1,8 @@
-import type { Task, TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
+import type {
+  Task,
+  TaskBoardItem,
+  TaskStatus,
+} from "@taskmanager/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -20,7 +24,13 @@ function parseTaskOwner(searchParams: URLSearchParams): TaskOwner | undefined {
   const ownerType = searchParams.get("ownerType");
   const ownerIdParam = searchParams.get("ownerId");
   const ownerId = ownerIdParam ? Number(ownerIdParam) : NaN;
-  if ((ownerType === "project" || ownerType === "milestone" || ownerType === "feature" || ownerType === "useCase") && Number.isFinite(ownerId)) {
+  if (
+    (ownerType === "project" ||
+      ownerType === "milestone" ||
+      ownerType === "feature" ||
+      ownerType === "useCase") &&
+    Number.isFinite(ownerId)
+  ) {
     return { type: ownerType, id: ownerId };
   }
   return undefined;
@@ -40,9 +50,15 @@ export function TaskDetailPage() {
   const taskId = isCreateMode ? null : Number(params.id);
   const owner = parseTaskOwner(searchParams);
   const taskController = useTasks(owner);
-  const detail = useTaskDetail(!isCreateMode && Number.isFinite(taskId) ? taskId : null);
+  const detail = useTaskDetail(
+    !isCreateMode && Number.isFinite(taskId) ? taskId : null,
+  );
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
-  const returnTo = searchParams.get("returnTo") ?? (owner ? `/${owner.type === "useCase" ? "use-cases" : `${owner.type}s`}/${owner.id}` : "/projects");
+  const returnTo =
+    searchParams.get("returnTo") ??
+    (owner
+      ? `/${owner.type === "useCase" ? "use-cases" : `${owner.type}s`}/${owner.id}`
+      : "/projects");
 
   const closePage = () => navigate(returnTo);
   const openInTab =
@@ -54,18 +70,33 @@ export function TaskDetailPage() {
       : undefined;
 
   const submitTask = async (input: TaskFormInput): Promise<Task | void> => {
-    const { tagIds, pendingSubtasks, pendingTickets, pendingComments, pendingNotes, pendingFiles, ...taskInput } = input;
+    const {
+      tagIds,
+      pendingSubtasks,
+      pendingTickets,
+      pendingComments,
+      pendingNotes,
+      pendingFiles,
+      ...taskInput
+    } = input;
 
     if (!isCreateMode && detail.task) {
       try {
-        const updated = await taskController.updateTask(detail.task.id, { ...taskInput, expectedVersion: detail.task.version });
+        const updated = await taskController.updateTask(detail.task.id, {
+          ...taskInput,
+          expectedVersion: detail.task.version,
+        });
         await setTaskTags(detail.task.id, tagIds);
         await invalidateTags(queryClient);
         await detail.reload();
         showToast({ tone: "success", title: "Aufgabe gespeichert" });
         return updated ?? detail.task;
       } catch (taskError) {
-        showToast({ tone: "error", title: "Aufgabe konnte nicht gespeichert werden", message: errorMessage(taskError) });
+        showToast({
+          tone: "error",
+          title: "Aufgabe konnte nicht gespeichert werden",
+          message: errorMessage(taskError),
+        });
         throw taskError;
       }
     }
@@ -112,14 +143,22 @@ export function TaskDetailPage() {
         if (!file) {
           continue;
         }
-        setSavingLabel(`Speichern… (Datei ${index + 1} von ${pendingFiles.length})`);
+        setSavingLabel(
+          `Speichern… (Datei ${index + 1} von ${pendingFiles.length})`,
+        );
         await uploadTaskAttachment(created.id, file.file);
       }
 
       showToast({ tone: "success", title: "Aufgabe erstellt" });
       return created;
     } catch (taskError) {
-      showToast({ tone: "error", title: created ? "Aufgabe wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden" : "Aufgabe konnte nicht erstellt werden", message: errorMessage(taskError) });
+      showToast({
+        tone: "error",
+        title: created
+          ? "Aufgabe wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Aufgabe konnte nicht erstellt werden",
+        message: errorMessage(taskError),
+      });
       throw taskError;
     } finally {
       setSavingLabel(undefined);
@@ -127,11 +166,19 @@ export function TaskDetailPage() {
   };
 
   if (isCreateMode && !owner) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Aufgaben benötigen einen Parent-Kontext.</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Aufgaben benötigen einen Parent-Kontext.
+      </div>
+    );
   }
 
   if (!isCreateMode && !Number.isFinite(taskId)) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Aufgabe nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Aufgabe nicht gefunden
+      </div>
+    );
   }
 
   if (!isCreateMode && detail.loading) {
@@ -139,11 +186,15 @@ export function TaskDetailPage() {
   }
 
   if (!isCreateMode && !detail.task) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Aufgabe nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Aufgabe nicht gefunden
+      </div>
+    );
   }
 
   return (
-    <div className="-my-4 min-h-[calc(100%+2rem)] w-full min-w-0 md:-my-6 md:min-h-[calc(100%+3rem)]">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
       <TaskForm
         open
         task={detail.task}

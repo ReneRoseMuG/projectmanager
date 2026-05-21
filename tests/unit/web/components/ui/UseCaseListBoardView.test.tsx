@@ -3,7 +3,7 @@
  *
  * Abgedeckte Regeln:
  * - UseCaseListBoardView rendert Board-Modus mit katalogbasierten Feature-Statusspalten und Listenmodus als ItemRows.
- * - UseCase-Karten und -Zeilen zeigen erwartete Dimensionen, Toolbar, Doppelklick-Öffnen und Bearbeiten-Controls.
+ * - UseCase-Karten und -Zeilen zeigen erwartete Dimensionen, Toolbar, Klick-Öffnen und Bearbeiten-Controls.
  *
  * Fehlerfälle:
  * - Leere Use-Case-Listen müssen den EmptyState ohne Karten oder Zeilen anzeigen.
@@ -36,15 +36,24 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
       reload: async () => undefined,
       createEntry: async () => undefined,
       updateEntry: async () => undefined,
-      deleteEntry: async () => undefined
+      deleteEntry: async () => undefined,
     };
-  }
+  },
 }));
 
 function buildUseCases(): UseCase[] {
   return [
-    buildUseCase({ id: 1, title: "Use Case Anmeldung erfolgreich", sortOrder: 1 }),
-    buildUseCase({ id: 2, title: "Use Case Passwort vergessen", slug: "uc-password-reset", sortOrder: 2 })
+    buildUseCase({
+      id: 1,
+      title: "Use Case Anmeldung erfolgreich",
+      sortOrder: 1,
+    }),
+    buildUseCase({
+      id: 2,
+      title: "Use Case Passwort vergessen",
+      slug: "uc-password-reset",
+      sortOrder: 2,
+    }),
   ];
 }
 
@@ -53,7 +62,7 @@ function renderUseCaseList({
   viewMode = "kanban",
   onViewModeChange = vi.fn(),
   onCreate = vi.fn(),
-  onOpen = vi.fn()
+  onOpen = vi.fn(),
 }: {
   useCases?: UseCase[];
   viewMode?: ViewMode;
@@ -63,12 +72,24 @@ function renderUseCaseList({
 } = {}) {
   return render(
     <MemoryRouter>
-      <UseCaseListBoardView useCases={useCases} viewMode={viewMode} onViewModeChange={onViewModeChange} onCreate={onCreate} onOpen={onOpen} />
-    </MemoryRouter>
+      <UseCaseListBoardView
+        useCases={useCases}
+        viewMode={viewMode}
+        onViewModeChange={onViewModeChange}
+        onCreate={onCreate}
+        onOpen={onOpen}
+      />
+    </MemoryRouter>,
   );
 }
 
-function UseCaseHarness({ useCases, onViewModeChange }: { useCases: UseCase[]; onViewModeChange: (viewMode: ViewMode) => void }) {
+function UseCaseHarness({
+  useCases,
+  onViewModeChange,
+}: {
+  useCases: UseCase[];
+  onViewModeChange: (viewMode: ViewMode) => void;
+}) {
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
 
   return (
@@ -91,7 +112,9 @@ function expectToolbar() {
   expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Neuer Use Case" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Neuer Use Case" }),
+  ).toBeInTheDocument();
 }
 
 function expectItemCardClasses(cards: NodeListOf<Element>) {
@@ -103,7 +126,9 @@ function expectItemCardClasses(cards: NodeListOf<Element>) {
     expect(card).toHaveClass("max-w-full");
     expect(card).toHaveClass("p-5");
     expect(card).toHaveClass("shadow-sm");
-    expect(card.querySelector("span.absolute.inset-x-0.top-0.h-1")).toBeInTheDocument();
+    expect(
+      card.querySelector("span.absolute.inset-x-0.top-0.h-1"),
+    ).toBeInTheDocument();
   });
 }
 
@@ -129,34 +154,52 @@ describe("UseCaseListBoardView", () => {
     const { container } = renderUseCaseList({ useCases, onCreate });
 
     expectToolbar();
-    expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
-    expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(featureStatusColumnCount);
-    expect(screen.getByRole("heading", { name: "Entwurf" })).toBeInTheDocument();
+    expect(
+      container.querySelector(".lg\\:grid-cols-3"),
+    ).not.toBeInTheDocument();
+    expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(
+      featureStatusColumnCount,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Entwurf" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Aktiv" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Erledigt" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Archiviert" })).toBeInTheDocument();
-    expect(container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Erledigt" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Archiviert" }),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3"),
+    ).not.toBeInTheDocument();
 
     const cards = container.querySelectorAll("article.rounded-2xl");
     expect(cards).toHaveLength(useCases.length);
     expectItemCardClasses(cards);
     cards.forEach((card) => {
-      expect(within(card as HTMLElement).getByRole("button", { name: "Aktionen" })).toBeInTheDocument();
+      expect(
+        within(card as HTMLElement).getByRole("button", { name: "Aktionen" }),
+      ).toBeInTheDocument();
     });
-    expect(screen.queryByRole("button", { name: "Löschen" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Löschen" }),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Entwurf hinzufügen" }));
     expect(onCreate).toHaveBeenCalledTimes(1);
   });
 
-  it("ruft onOpen per Doppelklick auf eine Karte auf", () => {
+  it("ruft onOpen per einfachem Klick auf eine Karte auf", () => {
     const useCases = buildUseCases();
     const onOpen = vi.fn();
     renderUseCaseList({ useCases, onOpen });
 
-    const card = screen.getByText("Use Case Anmeldung erfolgreich").closest("article");
+    const card = screen
+      .getByText("Use Case Anmeldung erfolgreich")
+      .closest("article");
     expect(card).toBeInTheDocument();
-    fireEvent.doubleClick(card as HTMLElement);
+    fireEvent.click(card as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledWith(useCases[0]);
   });
@@ -165,35 +208,60 @@ describe("UseCaseListBoardView", () => {
     const useCases = buildUseCases();
     const { container } = renderUseCaseList({ useCases, viewMode: "list" });
 
-    expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
+    expect(
+      container.querySelector(".lg\\:grid-cols-3"),
+    ).not.toBeInTheDocument();
     const rows = container.querySelectorAll("article.rounded-xl");
     expect(rows).toHaveLength(useCases.length);
     expectItemRowClasses(rows);
     useCases.forEach((useCase, index) => {
-      expect(within(rows[index] as HTMLElement).getByText(useCase.title)).toBeInTheDocument();
-      expect(within(rows[index] as HTMLElement).getByRole("button", { name: "Aktionen" })).toBeInTheDocument();
+      expect(
+        within(rows[index] as HTMLElement).getByText(useCase.title),
+      ).toBeInTheDocument();
+      expect(
+        within(rows[index] as HTMLElement).getByRole("button", {
+          name: "Aktionen",
+        }),
+      ).toBeInTheDocument();
     });
-    expect(screen.queryByRole("button", { name: "Löschen" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Löschen" }),
+    ).not.toBeInTheDocument();
   });
 
   it("wechselt von Board- in Listen-Modus und rendert Rows", () => {
     const useCases = buildUseCases();
     const onViewModeChange = vi.fn();
-    const { container } = render(<UseCaseHarness useCases={useCases} onViewModeChange={onViewModeChange} />);
+    const { container } = render(
+      <UseCaseHarness
+        useCases={useCases}
+        onViewModeChange={onViewModeChange}
+      />,
+    );
 
-    expect(container.querySelectorAll("article.rounded-2xl")).toHaveLength(useCases.length);
+    expect(container.querySelectorAll("article.rounded-2xl")).toHaveLength(
+      useCases.length,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
     expect(onViewModeChange).toHaveBeenCalledWith("list");
-    expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
-    expect(container.querySelectorAll("article.rounded-xl")).toHaveLength(useCases.length);
+    expect(
+      container.querySelector(".lg\\:grid-cols-3"),
+    ).not.toBeInTheDocument();
+    expect(container.querySelectorAll("article.rounded-xl")).toHaveLength(
+      useCases.length,
+    );
   });
 
   it("zeigt EmptyState wenn keine Use Cases vorhanden sind", () => {
     const { container } = renderUseCaseList({ useCases: [] });
 
     expect(screen.getByText("Keine Use Cases")).toBeInTheDocument();
-    expect(container.querySelector("article.rounded-2xl")).not.toBeInTheDocument();
-    expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+    expect(
+      container.querySelector("article.rounded-2xl"),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector("article.rounded-xl"),
+    ).not.toBeInTheDocument();
   });
 });

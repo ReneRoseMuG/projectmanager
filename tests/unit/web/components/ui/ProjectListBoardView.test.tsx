@@ -32,9 +32,9 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
       reload: async () => undefined,
       createEntry: async () => undefined,
       updateEntry: async () => undefined,
-      deleteEntry: async () => undefined
+      deleteEntry: async () => undefined,
     };
-  }
+  },
 }));
 
 const statusColumns = [
@@ -49,7 +49,7 @@ const statusColumns = [
   { value: "done", label: "Erledigt" },
   { value: "resolved", label: "Gelöst" },
   { value: "closed", label: "Geschlossen" },
-  { value: "rejected", label: "Verworfen" }
+  { value: "rejected", label: "Verworfen" },
 ] as const;
 
 function LocationProbe() {
@@ -61,7 +61,7 @@ function renderProjectList({
   projects = buildProjectSet(),
   onCreate = vi.fn(),
   onEdit = vi.fn(),
-  onDelete = vi.fn()
+  onDelete = vi.fn(),
 }: {
   projects?: Project[];
   onCreate?: () => void;
@@ -70,9 +70,14 @@ function renderProjectList({
 } = {}) {
   return render(
     <MemoryRouter initialEntries={["/"]}>
-      <ProjectListBoardView projects={projects} onCreate={onCreate} onEdit={onEdit} onDelete={onDelete} />
+      <ProjectListBoardView
+        projects={projects}
+        onCreate={onCreate}
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
       <LocationProbe />
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
@@ -80,7 +85,9 @@ function expectToolbar() {
   expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Neues Projekt" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Neues Projekt" }),
+  ).toBeInTheDocument();
 }
 
 function expectItemCardClasses(cards: NodeListOf<Element>) {
@@ -92,7 +99,9 @@ function expectItemCardClasses(cards: NodeListOf<Element>) {
     expect(card).toHaveClass("max-w-full");
     expect(card).toHaveClass("p-5");
     expect(card).toHaveClass("shadow-sm");
-    expect(card.querySelector("span.absolute.inset-x-0.top-0.h-1")).toBeInTheDocument();
+    expect(
+      card.querySelector("span.absolute.inset-x-0.top-0.h-1"),
+    ).toBeInTheDocument();
   });
 }
 
@@ -126,38 +135,60 @@ describe("ProjectListBoardView", () => {
       expect(column).toHaveClass("min-w-0");
     });
     statusColumns.forEach((column, index) => {
-      expect(within(columns[index] as HTMLElement).getByRole("heading", { name: column.label })).toBeInTheDocument();
+      expect(
+        within(columns[index] as HTMLElement).getByRole("heading", {
+          name: column.label,
+        }),
+      ).toBeInTheDocument();
     });
 
-    const activeColumn = screen.getByRole("heading", { name: "Aktiv" }).closest("section");
+    const activeColumn = screen
+      .getByRole("heading", { name: "Aktiv" })
+      .closest("section");
     expect(activeColumn).toContainElement(screen.getByText("Projekt Aktiv"));
-    const archivedColumn = screen.getByRole("heading", { name: "Archiviert" }).closest("section");
-    expect(archivedColumn).toContainElement(screen.getByText("Projekt Archiviert"));
+    const archivedColumn = screen
+      .getByRole("heading", { name: "Archiviert" })
+      .closest("section");
+    expect(archivedColumn).toContainElement(
+      screen.getByText("Projekt Archiviert"),
+    );
 
     expectItemCardClasses(container.querySelectorAll("article.rounded-2xl"));
-    expect(within(activeColumn as HTMLElement).getByText("Aufgaben")).toBeInTheDocument();
-    expect(within(activeColumn as HTMLElement).getByText("2 / 5 erledigt")).toBeInTheDocument();
-    expect(within(activeColumn as HTMLElement).getByText("3 offen")).toBeInTheDocument();
-    expect(within(activeColumn as HTMLElement).queryByText("PA")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(projects.length);
+    expect(
+      within(activeColumn as HTMLElement).getByText("Aufgaben"),
+    ).toBeInTheDocument();
+    expect(
+      within(activeColumn as HTMLElement).getByText("2 / 5 erledigt"),
+    ).toBeInTheDocument();
+    expect(
+      within(activeColumn as HTMLElement).getByText("3 offen"),
+    ).toBeInTheDocument();
+    expect(
+      within(activeColumn as HTMLElement).queryByText("PA"),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(
+      projects.length,
+    );
 
     const addButtons = screen.getAllByRole("button", { name: /hinzufügen/ });
     expect(addButtons).toHaveLength(statusColumns.length);
     fireEvent.click(screen.getByRole("button", { name: "Aktiv hinzufügen" }));
     expect(onCreate).toHaveBeenCalledWith("active");
 
-    const activeHeader = screen.getByRole("heading", { name: "Aktiv" }).closest("header");
+    const activeHeader = screen
+      .getByRole("heading", { name: "Aktiv" })
+      .closest("header");
     expect(activeHeader).toHaveTextContent("1");
   });
 
-  it("ruft onEdit per Doppelklick auf eine Karte auf", () => {
+  it("ruft onEdit per einfachem Klick auf eine Karte auf", () => {
     const projects = buildProjectSet();
     const onEdit = vi.fn();
     renderProjectList({ projects, onEdit });
 
     const card = screen.getByText("Projekt Aktiv").closest("article");
     expect(card).toBeInTheDocument();
-    fireEvent.doubleClick(card as HTMLElement);
+    fireEvent.click(card as HTMLElement);
 
     expect(onEdit).toHaveBeenCalledWith(projects[0]);
   });
@@ -177,7 +208,9 @@ describe("ProjectListBoardView", () => {
       const row = rows[index] as HTMLElement;
       expect(within(row).getByText(project.name)).toBeInTheDocument();
       expect(within(row).getByText("Aufgaben")).toBeInTheDocument();
-      expect(within(row).getByRole("button", { name: "Aktionen" })).toBeInTheDocument();
+      expect(
+        within(row).getByRole("button", { name: "Aktionen" }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -185,7 +218,11 @@ describe("ProjectListBoardView", () => {
     const { container } = renderProjectList({ projects: [] });
 
     expect(screen.getByText("Keine Projekte")).toBeInTheDocument();
-    expect(container.querySelector("article.rounded-2xl")).not.toBeInTheDocument();
-    expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+    expect(
+      container.querySelector("article.rounded-2xl"),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector("article.rounded-xl"),
+    ).not.toBeInTheDocument();
   });
 });

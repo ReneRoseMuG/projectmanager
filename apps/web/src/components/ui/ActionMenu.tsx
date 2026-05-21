@@ -57,16 +57,20 @@ export function ActionMenu({ items, ariaLabel = "Aktionen" }: ActionMenuProps) {
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         title={ariaLabel}
-        icon={<MoreVertical size={18} />}
+        icon={<MoreVertical size={20} />}
         variant="ghost"
-        className="h-8 w-6 px-0"
+        className="h-10 w-10 border border-line bg-white px-0 text-steel-700 shadow-sm hover:bg-steel-50"
         onClick={(event) => {
           event.stopPropagation();
           setOpen((current) => !current);
         }}
       />
       {open ? (
-        <div id={menuId} role="menu" className="absolute right-0 top-full z-50 mt-1 min-w-[140px] rounded-lg border border-line bg-white py-1 shadow-panel">
+        <div
+          id={menuId}
+          role="menu"
+          className="absolute right-0 top-full z-50 mt-1 min-w-[140px] rounded-lg border border-line bg-white py-1 shadow-panel"
+        >
           {items.map((item) => (
             <button
               key={item.label}

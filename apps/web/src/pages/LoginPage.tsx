@@ -19,14 +19,17 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const from = (location.state as LocationState | null)?.from?.pathname ?? "/projects";
+  const from =
+    (location.state as LocationState | null)?.from?.pathname ?? "/projects";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     try {
       const user = await login({ email, password });
-      navigate(user.requiresPasswordSetup ? "/setup-password" : from, { replace: true });
+      navigate(user.requiresPasswordSetup ? "/setup-password" : from, {
+        replace: true,
+      });
     } catch (caught) {
       setError(await errorMessageAsync(caught));
     }
@@ -40,18 +43,34 @@ export function LoginPage() {
             <Lock size={20} />
           </span>
           <h1 className="text-xl font-bold text-ink">Projekt Manager</h1>
-          <p className="mt-1 text-sm text-muted">Anmeldung</p>
+          <p className="mt-1 text-sm text-slate-500">Anmeldung</p>
         </div>
         <form className="grid gap-4" onSubmit={handleSubmit}>
           <label className="grid gap-1.5 text-sm font-medium">
             E-Mail
-            <Input value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" iconLeft={<Mail size={16} />} />
+            <Input
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              autoFocus
+              iconLeft={<Mail size={16} />}
+            />
           </label>
           <label className="grid gap-1.5 text-sm font-medium">
             Passwort
-            <Input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" iconLeft={<Lock size={16} />} />
+            <Input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              type="password"
+              autoComplete="current-password"
+              iconLeft={<Lock size={16} />}
+            />
           </label>
-          {error ? <p className="rounded-md border border-crimson/30 bg-crimson/5 px-3 py-2 text-sm text-crimson">{error}</p> : null}
+          {error ? (
+            <p className="rounded-md border border-crimson/30 bg-crimson/5 px-3 py-2 text-sm text-crimson">
+              {error}
+            </p>
+          ) : null}
           <Button type="submit" variant="primary" loading={loginPending}>
             Anmelden
           </Button>

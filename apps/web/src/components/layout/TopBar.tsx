@@ -8,7 +8,15 @@ import { Button } from "../ui/Button";
 import { SearchInput } from "../ui/SearchInput";
 import { ApiHealthPopover } from "./ApiHealthPopover";
 
-function ApiBadge({ online, latencyMs, onClick }: { online: boolean; latencyMs: number | null; onClick: () => void }) {
+function ApiBadge({
+  online,
+  latencyMs,
+  onClick,
+}: {
+  online: boolean;
+  latencyMs: number | null;
+  onClick: () => void;
+}) {
   const slow = online && latencyMs !== null && latencyMs > 250;
   return (
     <button
@@ -18,7 +26,7 @@ function ApiBadge({ online, latencyMs, onClick }: { online: boolean; latencyMs: 
       onClick={onClick}
     >
       <span className="h-2 w-2 rounded-full bg-white/80" />
-      API {online ? (slow ? "slow" : "online") : "offline"}
+      API {online ? (slow ? "langsam" : "erreichbar") : "offline"}
     </button>
   );
 }
@@ -49,32 +57,73 @@ export function TopBar() {
   return (
     <header className="relative flex h-16 items-center justify-between border-b border-line bg-white px-4 md:px-6">
       <div className="flex items-center gap-3 md:hidden">
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-steel-900 text-sm text-white">PM</span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-steel-900 text-sm text-white">
+          PM
+        </span>
       </div>
-      <div className="hidden min-w-0 flex-1 md:block" onClick={() => setSearchOpen(true)}>
-        <SearchInput value={globalSearch} onChange={(value) => {
-          setGlobalSearch(value);
-          setSearchOpen(true);
-        }} placeholder="Global suchen" hint="Ctrl K" />
+      <div
+        className="hidden min-w-0 flex-1 md:block"
+        onClick={() => setSearchOpen(true)}
+      >
+        <SearchInput
+          value={globalSearch}
+          onChange={(value) => {
+            setGlobalSearch(value);
+            setSearchOpen(true);
+          }}
+          placeholder="Global suchen"
+          hint="Ctrl K"
+        />
       </div>
       <nav className="flex gap-1 md:hidden">
-        <button className="flex h-10 w-10 items-center justify-center rounded-md hover:bg-shell" type="button" title="KI-Agent" onClick={() => setAgentOpen(true)}>
+        <button
+          className="flex h-10 w-10 items-center justify-center rounded-md hover:bg-shell"
+          type="button"
+          title="KI-Agent"
+          onClick={() => setAgentOpen(true)}
+        >
           <Bot size={18} />
         </button>
-        <NavLink className={({ isActive }) => `flex h-10 w-10 items-center justify-center rounded-md ${isActive ? "bg-steel-900 text-white" : "hover:bg-shell"}`} to="/projects" title="Projekte">
+        <NavLink
+          className={({ isActive }) =>
+            `flex h-10 w-10 items-center justify-center rounded-md ${isActive ? "bg-steel-900 text-white" : "hover:bg-shell"}`
+          }
+          to="/projects"
+          title="Projekte"
+        >
           <FolderKanban size={18} />
         </NavLink>
-        <NavLink className={({ isActive }) => `flex h-10 w-10 items-center justify-center rounded-md ${isActive ? "bg-steel-900 text-white" : "hover:bg-shell"}`} to="/calendar" title="Kalender">
+        <NavLink
+          className={({ isActive }) =>
+            `flex h-10 w-10 items-center justify-center rounded-md ${isActive ? "bg-steel-900 text-white" : "hover:bg-shell"}`
+          }
+          to="/calendar"
+          title="Kalender"
+        >
           <CalendarDays size={18} />
         </NavLink>
       </nav>
       <div className="hidden items-center gap-3 md:flex">
-        <Button variant="ghost" icon={<Bot size={18} />} onClick={() => setAgentOpen(true)}>
+        <Button
+          variant="ghost"
+          icon={<Bot size={18} />}
+          onClick={() => setAgentOpen(true)}
+        >
           KI-Agent
         </Button>
-        <ApiBadge online={health.online} latencyMs={health.latencyMs} onClick={() => setApiOpen((current) => !current)} />
+        <ApiBadge
+          online={health.online}
+          latencyMs={health.latencyMs}
+          onClick={() => setApiOpen((current) => !current)}
+        />
       </div>
-      {apiOpen ? <ApiHealthPopover online={health.online} latencyMs={health.latencyMs} onRefetch={health.refetch} /> : null}
+      {apiOpen ? (
+        <ApiHealthPopover
+          online={health.online}
+          latencyMs={health.latencyMs}
+          onRefetch={health.refetch}
+        />
+      ) : null}
       <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       <AiAgentPanel open={agentOpen} onClose={() => setAgentOpen(false)} />
     </header>

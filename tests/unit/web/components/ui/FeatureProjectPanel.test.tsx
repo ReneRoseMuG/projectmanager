@@ -35,19 +35,21 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
       reload: async () => undefined,
       createEntry: async () => undefined,
       updateEntry: async () => undefined,
-      deleteEntry: async () => undefined
+      deleteEntry: async () => undefined,
     };
-  }
+  },
 }));
 
 function renderFeatureProjectPanel({
-  projects = buildProjectSet().filter((project) => project.status === "active" || project.status === "archived"),
+  projects = buildProjectSet().filter(
+    (project) => project.status === "active" || project.status === "archived",
+  ),
   availableProjects = buildProjectSet(),
   viewMode = "kanban",
   onViewModeChange = vi.fn(),
   onAddProject = vi.fn(),
   onRemoveProject = vi.fn(),
-  onOpen = vi.fn()
+  onOpen = vi.fn(),
 }: {
   projects?: Project[];
   availableProjects?: Project[];
@@ -66,7 +68,7 @@ function renderFeatureProjectPanel({
       onAddProject={onAddProject}
       onRemoveProject={onRemoveProject}
       onOpen={onOpen}
-    />
+    />,
   );
 }
 
@@ -83,25 +85,41 @@ afterEach(() => {
 
 describe("FeatureProjectPanel", () => {
   it("zeigt verknüpfte Projekte im Board nach Statusspalten und ohne RelationPanel-Speichern", () => {
-    const projects = buildProjectSet().filter((project) => project.status === "active" || project.status === "archived");
+    const projects = buildProjectSet().filter(
+      (project) => project.status === "active" || project.status === "archived",
+    );
     const { container } = renderFeatureProjectPanel({ projects });
 
     expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Projekt hinzufügen" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Projekt hinzufügen" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-    expect(container.querySelector('input[type="checkbox"]')).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Speichern" })).not.toBeInTheDocument();
+    expect(
+      container.querySelector('input[type="checkbox"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Speichern" }),
+    ).not.toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns).toHaveLength(workStatusColumnCount);
     expect(screen.getByRole("heading", { name: "Aktiv" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Archiviert" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Archiviert" }),
+    ).toBeInTheDocument();
 
-    const activeColumn = screen.getByRole("heading", { name: "Aktiv" }).closest("section");
+    const activeColumn = screen
+      .getByRole("heading", { name: "Aktiv" })
+      .closest("section");
     expect(activeColumn).toContainElement(screen.getByText("Projekt Aktiv"));
-    const archivedColumn = screen.getByRole("heading", { name: "Archiviert" }).closest("section");
-    expect(archivedColumn).toContainElement(screen.getByText("Projekt Archiviert"));
+    const archivedColumn = screen
+      .getByRole("heading", { name: "Archiviert" })
+      .closest("section");
+    expect(archivedColumn).toContainElement(
+      screen.getByText("Projekt Archiviert"),
+    );
   });
 
   it("fügt ein ausgewähltes Projekt über den Plus-Flow hinzu", async () => {
@@ -109,15 +127,25 @@ describe("FeatureProjectPanel", () => {
     const linkedProjects = [requiredProject(allProjects[0])];
     const addableProject = requiredProject(allProjects[1]);
     const onAddProject = vi.fn().mockResolvedValue(undefined);
-    renderFeatureProjectPanel({ projects: linkedProjects, availableProjects: allProjects, onAddProject });
+    renderFeatureProjectPanel({
+      projects: linkedProjects,
+      availableProjects: allProjects,
+      onAddProject,
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Projekt hinzufügen" }));
-    expect(screen.getByRole("heading", { name: "Projekt hinzufügen" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Projekt hinzufügen" }),
+    ).toBeInTheDocument();
 
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: String(addableProject.id) } });
+    fireEvent.change(screen.getByRole("combobox"), {
+      target: { value: String(addableProject.id) },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
 
-    await waitFor(() => expect(onAddProject).toHaveBeenCalledWith(addableProject));
+    await waitFor(() =>
+      expect(onAddProject).toHaveBeenCalledWith(addableProject),
+    );
   });
 
   it("entfernt eine Projekt-Zuordnung über Karten und Zeilen", async () => {
@@ -134,13 +162,18 @@ describe("FeatureProjectPanel", () => {
         onAddProject={vi.fn()}
         onRemoveProject={onRemoveProject}
         onOpen={vi.fn()}
-      />
+      />,
     );
 
     const card = screen.getByText("Projekt Aktiv").closest("article");
     expect(card).toBeInTheDocument();
-    fireEvent.click(within(card as HTMLElement).getByRole("button", { name: "Entfernen" }));
-    await waitFor(() => expect(onRemoveProject).toHaveBeenCalledWith(linkedProject));
+    fireEvent.click(
+      within(card as HTMLElement).getByRole("button", { name: "Aktionen" }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Entfernen" }));
+    await waitFor(() =>
+      expect(onRemoveProject).toHaveBeenCalledWith(linkedProject),
+    );
 
     onRemoveProject.mockClear();
     rerender(
@@ -152,23 +185,33 @@ describe("FeatureProjectPanel", () => {
         onAddProject={vi.fn()}
         onRemoveProject={onRemoveProject}
         onOpen={vi.fn()}
-      />
+      />,
     );
 
     const row = screen.getByText("Projekt Aktiv").closest("article");
     expect(row).toBeInTheDocument();
-    fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "Entfernen" }));
-    await waitFor(() => expect(onRemoveProject).toHaveBeenCalledWith(linkedProject));
+    fireEvent.click(
+      within(row as HTMLElement).getByRole("button", { name: "Aktionen" }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Entfernen" }));
+    await waitFor(() =>
+      expect(onRemoveProject).toHaveBeenCalledWith(linkedProject),
+    );
   });
 
   it("meldet Moduswechsel und zeigt EmptyState ohne verknüpfte Projekte", () => {
     const onViewModeChange = vi.fn();
-    const { container } = renderFeatureProjectPanel({ projects: [], onViewModeChange });
+    const { container } = renderFeatureProjectPanel({
+      projects: [],
+      onViewModeChange,
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
     expect(onViewModeChange).toHaveBeenCalledWith("list");
     expect(screen.getByText("Keine Projekte verknüpft")).toBeInTheDocument();
-    expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+    expect(
+      container.querySelector("article.rounded-xl"),
+    ).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,8 @@
-import type { WikiPage as WikiPageType, WikiPageInput, WikiPageUpdate } from "@taskmanager/shared-types";
+import type {
+  WikiPage as WikiPageType,
+  WikiPageInput,
+  WikiPageUpdate,
+} from "@taskmanager/shared-types";
 import { FileText, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -13,6 +17,10 @@ import { WikiPageForm } from "../components/wiki/WikiPageForm";
 import { WikiTree } from "../components/wiki/WikiTree";
 import { errorMessage } from "../hooks/errors";
 import { useWiki, type WikiTreeNode } from "../hooks/useWiki";
+
+function countPages(nodes: WikiTreeNode[]): number {
+  return nodes.reduce((sum, node) => sum + 1 + countPages(node.children), 0);
+}
 
 export function WikiPage() {
   const params = useParams();
@@ -50,11 +58,16 @@ export function WikiPage() {
 
   const savePage = async (id: number, input: WikiPageUpdate) => {
     try {
-      const expectedVersion = wiki.page?.id === id ? wiki.page.version : input.expectedVersion;
+      const expectedVersion =
+        wiki.page?.id === id ? wiki.page.version : input.expectedVersion;
       await wiki.updateWikiPage(id, { ...input, expectedVersion });
       showToast({ tone: "success", title: "Wiki-Seite gespeichert" });
     } catch (wikiError) {
-      showToast({ tone: "error", title: "Wiki-Seite konnte nicht gespeichert werden", message: errorMessage(wikiError) });
+      showToast({
+        tone: "error",
+        title: "Wiki-Seite konnte nicht gespeichert werden",
+        message: errorMessage(wikiError),
+      });
       throw wikiError;
     }
   };
@@ -62,7 +75,10 @@ export function WikiPage() {
   const submitForm = async (input: WikiPageInput) => {
     try {
       if (editingPage) {
-        await wiki.updateWikiPage(editingPage.id, { ...input, expectedVersion: editingPage.version });
+        await wiki.updateWikiPage(editingPage.id, {
+          ...input,
+          expectedVersion: editingPage.version,
+        });
         showToast({ tone: "success", title: "Wiki-Seite gespeichert" });
       } else {
         const created = await wiki.createWikiPage(input);
@@ -70,7 +86,11 @@ export function WikiPage() {
         navigate(`/wiki/${created.id}`);
       }
     } catch (wikiError) {
-      showToast({ tone: "error", title: "Wiki-Seite konnte nicht gespeichert werden", message: errorMessage(wikiError) });
+      showToast({
+        tone: "error",
+        title: "Wiki-Seite konnte nicht gespeichert werden",
+        message: errorMessage(wikiError),
+      });
       throw wikiError;
     }
   };
@@ -80,7 +100,7 @@ export function WikiPage() {
       title: "Wiki-Seite löschen?",
       body: `Die Seite "${page.title}" wird entfernt.`,
       severity: "danger",
-      confirmLabel: "Löschen"
+      confirmLabel: "Löschen",
     });
     if (!approved) {
       return;
@@ -90,7 +110,11 @@ export function WikiPage() {
       showToast({ tone: "success", title: "Wiki-Seite gelöscht" });
       navigate("/wiki");
     } catch (wikiError) {
-      showToast({ tone: "error", title: "Wiki-Seite konnte nicht gelöscht werden", message: errorMessage(wikiError) });
+      showToast({
+        tone: "error",
+        title: "Wiki-Seite konnte nicht gelöscht werden",
+        message: errorMessage(wikiError),
+      });
     }
   };
 
@@ -99,9 +123,15 @@ export function WikiPage() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ink">Wiki</h1>
-          <p className="text-sm text-slate-600">Projektwissen und Dokumentation</p>
+          <p className="text-sm text-slate-500">
+            {wiki.loading ? "" : `${countPages(wiki.tree)} Seiten`}
+          </p>
         </div>
-        <Button variant="primary" icon={<Plus size={17} />} onClick={() => openCreate(null)}>
+        <Button
+          variant="primary"
+          icon={<Plus size={17} />}
+          onClick={() => openCreate(null)}
+        >
           Neue Seite
         </Button>
       </header>
@@ -112,12 +142,35 @@ export function WikiPage() {
         <div className="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
           <WikiTree tree={wiki.tree} onCreate={openCreate} />
           <div className="grid content-start gap-4">
-            {wiki.error ? <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">{wiki.error}</div> : null}
+            {wiki.error ? (
+              <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">
+                {wiki.error}
+              </div>
+            ) : null}
             <WikiBreadcrumb items={wiki.breadcrumb} />
             {wiki.page ? (
-              <WikiPageDetail page={wiki.page} onSave={savePage} onDelete={deletePage} onEditMetadata={openEditMetadata} />
+              <WikiPageDetail
+                page={wiki.page}
+                onSave={savePage}
+                onDelete={deletePage}
+                onEditMetadata={openEditMetadata}
+              />
             ) : (
-              <EmptyState icon={<FileText size={22} />} title="Keine Wiki-Seite ausgewählt" body="Wähle links eine Seite aus oder lege eine neue Wiki-Seite an." tone="teal" variant="tinted" actions={[{ label: "Neue Seite", onClick: () => openCreate(null), primary: true, icon: <Plus size={16} /> }]} />
+              <EmptyState
+                icon={<FileText size={22} />}
+                title="Keine Wiki-Seite ausgewählt"
+                body="Wähle links eine Seite aus oder lege eine neue Wiki-Seite an."
+                tone="teal"
+                variant="tinted"
+                actions={[
+                  {
+                    label: "Neue Seite",
+                    onClick: () => openCreate(null),
+                    primary: true,
+                    icon: <Plus size={16} />,
+                  },
+                ]}
+              />
             )}
           </div>
         </div>

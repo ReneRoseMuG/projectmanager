@@ -31,23 +31,30 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
       reload: async () => undefined,
       createEntry: async () => undefined,
       updateEntry: async () => undefined,
-      deleteEntry: async () => undefined
+      deleteEntry: async () => undefined,
     };
-  }
+  },
 }));
 
 function renderMilestoneList({
   milestones = buildMilestoneSet(),
   onCreate = vi.fn(),
   onEdit = vi.fn(),
-  onDelete = vi.fn()
+  onDelete = vi.fn(),
 }: {
   milestones?: Milestone[];
   onCreate?: () => void;
   onEdit?: (milestone: Milestone) => void;
   onDelete?: (milestone: Milestone) => void;
 } = {}) {
-  return render(<MilestoneListBoardView milestones={milestones} onCreate={onCreate} onEdit={onEdit} onDelete={onDelete} />);
+  return render(
+    <MilestoneListBoardView
+      milestones={milestones}
+      onCreate={onCreate}
+      onEdit={onEdit}
+      onDelete={onDelete}
+    />,
+  );
 }
 
 afterEach(() => {
@@ -59,14 +66,26 @@ describe("MilestoneListBoardView", () => {
     const milestones = buildMilestoneSet();
     const { container } = renderMilestoneList({ milestones });
 
-    const activeColumn = screen.getByRole("heading", { name: "Aktiv" }).closest("section") as HTMLElement;
-    expect(activeColumn).toContainElement(screen.getByText("Meilenstein Aktiv"));
+    const activeColumn = screen
+      .getByRole("heading", { name: "Aktiv" })
+      .closest("section") as HTMLElement;
+    expect(activeColumn).toContainElement(
+      screen.getByText("Meilenstein Aktiv"),
+    );
     expect(within(activeColumn).getByText("Aufgaben")).toBeInTheDocument();
-    expect(within(activeColumn).getByText("2 / 5 erledigt")).toBeInTheDocument();
+    expect(
+      within(activeColumn).getByText("2 / 5 erledigt"),
+    ).toBeInTheDocument();
     expect(within(activeColumn).getByText("3 offen")).toBeInTheDocument();
-    expect(within(activeColumn).queryByText("5 Aufgaben")).not.toBeInTheDocument();
-    expect(within(activeColumn).queryByText("1 Tickets")).not.toBeInTheDocument();
-    expect(within(activeColumn).queryByText("2 Features")).not.toBeInTheDocument();
+    expect(
+      within(activeColumn).queryByText("5 Aufgaben"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(activeColumn).queryByText("1 Tickets"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(activeColumn).queryByText("2 Features"),
+    ).not.toBeInTheDocument();
 
     const cards = container.querySelectorAll("article.rounded-2xl");
     expect(cards).toHaveLength(milestones.length);
@@ -92,7 +111,7 @@ describe("MilestoneListBoardView", () => {
     expect(within(firstRow).getByText("Aufgaben")).toBeInTheDocument();
     expect(within(firstRow).getByText("3 offen")).toBeInTheDocument();
 
-    fireEvent.doubleClick(firstRow);
+    fireEvent.click(firstRow);
     expect(onEdit).toHaveBeenCalledWith(firstMilestone);
   });
 });

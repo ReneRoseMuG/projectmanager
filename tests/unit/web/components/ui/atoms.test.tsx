@@ -22,9 +22,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Avatar } from "../../../../../apps/web/src/components/ui/Avatar";
 import { Badge } from "../../../../../apps/web/src/components/ui/Badge";
 import { Button } from "../../../../../apps/web/src/components/ui/Button";
+import { DatePicker } from "../../../../../apps/web/src/components/ui/DatePicker";
 import { FilterChips } from "../../../../../apps/web/src/components/ui/FilterChips";
 import { Input } from "../../../../../apps/web/src/components/ui/Input";
 import { Pill } from "../../../../../apps/web/src/components/ui/Pill";
+import { Select } from "../../../../../apps/web/src/components/ui/Select";
 import { Skeleton } from "../../../../../apps/web/src/components/ui/Skeleton";
 
 afterEach(() => {
@@ -35,13 +37,25 @@ describe("Button", () => {
   it("rendert label", () => {
     render(<Button>Speichern</Button>);
 
-    expect(screen.getByRole("button", { name: "Speichern" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Speichern" }),
+    ).toBeInTheDocument();
   });
 
   it('variant="primary" hat korrekte CSS-Klasse', () => {
     render(<Button variant="primary">Speichern</Button>);
 
-    expect(screen.getByRole("button", { name: "Speichern" })).toHaveClass("bg-steel-700");
+    expect(screen.getByRole("button", { name: "Speichern" })).toHaveClass(
+      "bg-steel-700",
+    );
+  });
+
+  it('variant="ghost" hat sichtbaren Hover-Hintergrund', () => {
+    render(<Button variant="ghost">Abbrechen</Button>);
+
+    expect(screen.getByRole("button", { name: "Abbrechen" })).toHaveClass(
+      "hover:bg-steel-100",
+    );
   });
 
   it("loading=true deaktiviert den Button", () => {
@@ -60,17 +74,33 @@ describe("Button", () => {
   });
 
   it("icon-only: kein Label, quadratisch", () => {
-    render(<Button aria-label="Suchen" icon={<Search aria-hidden="true" size={16} />} />);
+    render(
+      <Button
+        aria-label="Suchen"
+        icon={<Search aria-hidden="true" size={16} />}
+      />,
+    );
 
-    expect(screen.getByRole("button", { name: "Suchen" })).toHaveClass("h-10", "w-10", "px-0");
+    expect(screen.getByRole("button", { name: "Suchen" })).toHaveClass(
+      "h-10",
+      "w-10",
+      "px-0",
+    );
   });
 
   it('size="sm" hat Höhe 32px', () => {
     render(
-      <Button size="sm" aria-label="Suchen" icon={<Search aria-hidden="true" size={16} />} />
+      <Button
+        size="sm"
+        aria-label="Suchen"
+        icon={<Search aria-hidden="true" size={16} />}
+      />,
     );
 
-    expect(screen.getByRole("button", { name: "Suchen" })).toHaveClass("h-8", "w-8");
+    expect(screen.getByRole("button", { name: "Suchen" })).toHaveClass(
+      "h-8",
+      "w-8",
+    );
   });
 });
 
@@ -79,7 +109,9 @@ describe("Input", () => {
     const onChange = vi.fn();
     render(<Input aria-label="Titel" value="Alt" onChange={onChange} />);
 
-    fireEvent.change(screen.getByLabelText("Titel"), { target: { value: "Neu" } });
+    fireEvent.change(screen.getByLabelText("Titel"), {
+      target: { value: "Neu" },
+    });
 
     expect(onChange).toHaveBeenCalledTimes(1);
   });
@@ -87,7 +119,11 @@ describe("Input", () => {
   it("focus-Klassen werden nicht inline überschrieben", () => {
     render(<Input aria-label="Titel" />);
 
-    expect(screen.getByLabelText("Titel")).toHaveClass("focus:border-steel-600", "focus:ring-2", "focus:ring-steel-700/10");
+    expect(screen.getByLabelText("Titel")).toHaveClass(
+      "focus:border-steel-600",
+      "focus:ring-2",
+      "focus:ring-steel-700/10",
+    );
   });
 
   it('variant="mono" enthält font-mono', () => {
@@ -97,9 +133,37 @@ describe("Input", () => {
   });
 
   it("iconLeft verschiebt den Text korrekt", () => {
-    render(<Input aria-label="Suche" iconLeft={<Search aria-hidden="true" size={16} />} />);
+    render(
+      <Input
+        aria-label="Suche"
+        iconLeft={<Search aria-hidden="true" size={16} />}
+      />,
+    );
 
     expect(screen.getByLabelText("Suche")).toHaveClass("pl-9");
+  });
+});
+
+describe("DatePicker / Select", () => {
+  it("DatePicker nutzt die gemeinsame Formularhöhe und volle Breite", () => {
+    const { container } = render(
+      <DatePicker label="Start" value="" onChange={vi.fn()} />,
+    );
+
+    expect(container.querySelector('input[type="date"]')).toHaveClass(
+      "h-11",
+      "w-full",
+    );
+  });
+
+  it("Select nutzt die gemeinsame Formularhöhe und volle Breite", () => {
+    const { container } = render(
+      <Select label="Status" value="active" onChange={vi.fn()}>
+        <option value="active">Aktiv</option>
+      </Select>,
+    );
+
+    expect(container.querySelector("select")).toHaveClass("h-11", "w-full");
   });
 });
 
@@ -116,7 +180,7 @@ describe("Avatar", () => {
     expect(screen.getByText("A")).toBeInTheDocument();
   });
 
-  it("null → \"?\"", () => {
+  it('null → "?"', () => {
     render(<Avatar name={null} />);
 
     expect(screen.getByText("?")).toBeInTheDocument();
@@ -131,7 +195,17 @@ describe("Avatar", () => {
 
 describe("Badge / Pill / Skeleton", () => {
   it("Badge rendert jeden Tone ohne Fehler", () => {
-    const tones = ["crimson", "tangerine", "mustard", "fern", "teal", "violet", "magenta", "steel", "mute"] as const;
+    const tones = [
+      "crimson",
+      "tangerine",
+      "mustard",
+      "fern",
+      "teal",
+      "violet",
+      "magenta",
+      "steel",
+      "mute",
+    ] as const;
 
     tones.forEach((tone) => {
       render(<Badge tone={tone}>{tone}</Badge>);
@@ -140,7 +214,14 @@ describe("Badge / Pill / Skeleton", () => {
   });
 
   it("Pill rendert jeden Tone ohne Fehler", () => {
-    const tones = ["fern", "tangerine", "violet", "crimson", "steel", "mustard"] as const;
+    const tones = [
+      "fern",
+      "tangerine",
+      "violet",
+      "crimson",
+      "steel",
+      "mustard",
+    ] as const;
 
     tones.forEach((tone) => {
       render(<Pill tone={tone}>{tone}</Pill>);
@@ -151,15 +232,29 @@ describe("Badge / Pill / Skeleton", () => {
   it('Skeleton aria-hidden="true"', () => {
     render(<Skeleton data-testid="skeleton" />);
 
-    expect(screen.getByTestId("skeleton")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("skeleton")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
   });
 });
 
 describe("FilterChips", () => {
   it("rendert Chips in Toolbar-Höhe", () => {
-    render(<FilterChips value="all" onChange={vi.fn()} options={[{ value: "open", label: "Offen", count: 2 }]} allCount={3} />);
+    render(
+      <FilterChips
+        value="all"
+        onChange={vi.fn()}
+        options={[{ value: "open", label: "Offen", count: 2 }]}
+        allCount={3}
+      />,
+    );
 
-    expect(screen.getByRole("button", { name: /^Alle\s*3$/ })).toHaveClass("h-10");
-    expect(screen.getByRole("button", { name: /^Offen\s*2$/ })).toHaveClass("h-10");
+    expect(screen.getByRole("button", { name: /^Alle\s*3$/ })).toHaveClass(
+      "h-10",
+    );
+    expect(screen.getByRole("button", { name: /^Offen\s*2$/ })).toHaveClass(
+      "h-10",
+    );
   });
 });

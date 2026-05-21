@@ -20,7 +20,9 @@ export function CalendarPage() {
   const calendarTasks = useCalendarTasks();
   const events = useEvents();
   const [formOpen, setFormOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
+    null,
+  );
   const [initialDate, setInitialDate] = useState<string | null>(null);
 
   const openCreate = (date?: string) => {
@@ -32,7 +34,8 @@ export function CalendarPage() {
   const submit = async (input: EventInput, eventId?: number) => {
     try {
       if (eventId) {
-        const expectedVersion = selectedEvent?.id === eventId ? selectedEvent.version : undefined;
+        const expectedVersion =
+          selectedEvent?.id === eventId ? selectedEvent.version : undefined;
         if (!expectedVersion) {
           throw new Error("Event version is missing");
         }
@@ -43,7 +46,11 @@ export function CalendarPage() {
       await events.createEvent(input);
       showToast({ tone: "success", title: "Termin erstellt" });
     } catch (eventError) {
-      showToast({ tone: "error", title: "Termin konnte nicht gespeichert werden", message: errorMessage(eventError) });
+      showToast({
+        tone: "error",
+        title: "Termin konnte nicht gespeichert werden",
+        message: errorMessage(eventError),
+      });
       throw eventError;
     }
   };
@@ -53,15 +60,28 @@ export function CalendarPage() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ink">Kalender</h1>
-          <p className="text-sm text-slate-600">{events.events.length} Termine</p>
+          <p className="text-sm text-slate-500">
+            {events.events.length} Termine
+          </p>
         </div>
-        <Button variant="primary" icon={<Plus size={17} />} onClick={() => openCreate()}>
+        <Button
+          variant="primary"
+          icon={<Plus size={17} />}
+          onClick={() => openCreate()}
+        >
           Neuer Termin
         </Button>
       </header>
 
-      {events.error || calendarTasks.error ? <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">{events.error ?? calendarTasks.error}</div> : null}
-      {events.loading || calendarTasks.loading || projectsLoading || milestonesLoading ? (
+      {events.error || calendarTasks.error ? (
+        <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
+          {events.error ?? calendarTasks.error}
+        </div>
+      ) : null}
+      {events.loading ||
+      calendarTasks.loading ||
+      projectsLoading ||
+      milestonesLoading ? (
         <CalendarSkeleton />
       ) : (
         <>
@@ -75,10 +95,18 @@ export function CalendarPage() {
             }}
             onEventMove={async (event, startTime, endTime) => {
               try {
-                await events.updateEvent(event.id, { startTime, endTime, expectedVersion: event.version });
+                await events.updateEvent(event.id, {
+                  startTime,
+                  endTime,
+                  expectedVersion: event.version,
+                });
                 showToast({ tone: "success", title: "Termin verschoben" });
               } catch (eventError) {
-                showToast({ tone: "error", title: "Termin konnte nicht verschoben werden", message: errorMessage(eventError) });
+                showToast({
+                  tone: "error",
+                  title: "Termin konnte nicht verschoben werden",
+                  message: errorMessage(eventError),
+                });
                 throw eventError;
               }
             }}
@@ -106,7 +134,11 @@ export function CalendarPage() {
             setFormOpen(false);
             showToast({ tone: "success", title: "Termin gelöscht" });
           } catch (eventError) {
-            showToast({ tone: "error", title: "Termin konnte nicht gelöscht werden", message: errorMessage(eventError) });
+            showToast({
+              tone: "error",
+              title: "Termin konnte nicht gelöscht werden",
+              message: errorMessage(eventError),
+            });
             throw eventError;
           }
         }}

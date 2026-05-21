@@ -5,7 +5,7 @@
  * FormModal
  *
  * Abgedeckte Regeln:
- * - Page-Formulare rendern TabBar und Footer sticky außerhalb des Inhaltsbereichs.
+ * - Page-Formulare halten TabBar und Footer außerhalb des scrollbaren Inhaltsbereichs.
  * - Modal-Formulare behalten ihren begrenzten internen Scrollbereich.
  *
  * Fehlerfälle:
@@ -33,34 +33,58 @@ afterEach(() => {
 });
 
 describe("FormModal", () => {
-  it("rendert die Page-Variante mit sticky TabBar und sticky Footer", () => {
+  it("rendert die Page-Variante mit festem TabBar-/Footer-Bereich", () => {
     const { form } = renderFormModal(
-      <FormModal open title="Projekt bearbeiten" variant="page" contentClassName="w-full max-w-7xl" onClose={vi.fn()} onSubmit={vi.fn()} tabBar={<nav data-testid="tab-bar">Tabs</nav>}>
+      <FormModal
+        open
+        title="Projekt bearbeiten"
+        variant="page"
+        contentClassName="w-full max-w-7xl self-center"
+        breadcrumb={["Projekte", "Alpha"]}
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        tabBar={<nav data-testid="tab-bar">Tabs</nav>}
+      >
         <section data-testid="form-body">Inhalt</section>
-      </FormModal>
+      </FormModal>,
     );
 
     const tabWrapper = screen.getByTestId("tab-bar").parentElement;
     const bodyWrapper = screen.getByTestId("form-body").parentElement;
     const footer = form.querySelector("footer");
 
-    expect(form).toHaveClass("min-h-[calc(100dvh-4rem)]");
+    expect(form).toHaveClass("h-full", "min-h-0", "flex-1", "overflow-hidden");
     expect(form).not.toHaveClass("rounded-2xl");
     expect(form.querySelector("header")).not.toHaveClass("rounded-t-2xl");
-    expect(tabWrapper).toHaveClass("sticky", "top-[-1rem]", "z-20", "shadow-sm", "md:top-[-1.5rem]");
-    expect(bodyWrapper).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
-    expect(bodyWrapper).toHaveClass("w-full", "max-w-7xl");
+    expect(tabWrapper).toHaveClass("shrink-0", "shadow-sm");
+    expect(tabWrapper).not.toHaveClass("sticky");
+    expect(bodyWrapper).toHaveClass(
+      "flex",
+      "min-h-0",
+      "flex-1",
+      "flex-col",
+      "overflow-auto",
+    );
+    expect(bodyWrapper).toHaveClass("w-full", "max-w-7xl", "self-center");
     expect(bodyWrapper).not.toHaveClass("pb-24");
-    expect(bodyWrapper).not.toHaveClass("overflow-auto");
-    expect(footer).toHaveClass("sticky", "bottom-[-1rem]", "z-10", "rounded-b-2xl", "md:bottom-[-1.5rem]");
+    expect(footer).toHaveClass("shrink-0");
+    expect(footer).not.toHaveClass("sticky");
     expect(tabWrapper?.nextElementSibling).toBe(bodyWrapper);
+    expect(screen.getByText("Projekte · Alpha")).toHaveClass("text-white/60");
+    expect(form).not.toHaveTextContent("›");
   });
 
   it("behält in der Modal-Variante den internen Scrollbereich", () => {
     const { form } = renderFormModal(
-      <FormModal open title="Projekt bearbeiten" onClose={vi.fn()} onSubmit={vi.fn()} tabBar={<nav data-testid="tab-bar">Tabs</nav>}>
+      <FormModal
+        open
+        title="Projekt bearbeiten"
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        tabBar={<nav data-testid="tab-bar">Tabs</nav>}
+      >
         <section data-testid="form-body">Inhalt</section>
-      </FormModal>
+      </FormModal>,
     );
 
     const tabWrapper = screen.getByTestId("tab-bar").parentElement;

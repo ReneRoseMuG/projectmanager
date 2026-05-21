@@ -9,7 +9,7 @@ import type {
   TicketStatus,
   TicketType,
   UseCase,
-  UseCaseInput
+  UseCaseInput,
 } from "@taskmanager/shared-types";
 import { BookOpen, Bug, LinkIcon, ListTodo, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
@@ -18,8 +18,14 @@ import { useCatalogs } from "../../hooks/useCatalogs";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
-import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed, resolveCatalogEntryKey } from "../../utils/catalogs";
+import {
+  catalogLabel,
+  countOpenStatusItems,
+  isCatalogStatusClosed,
+  resolveCatalogEntryKey,
+} from "../../utils/catalogs";
 import { ticketTypeLabels } from "../../utils/domainLabels";
+import { statusToneForKey } from "../../utils/statusTones";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { JournalPanel } from "../journal/JournalPanel";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
@@ -54,7 +60,7 @@ interface UseCaseFormProps {
       tasks: DraftTask[];
       tickets: DraftTicket[];
       comments: DraftComment[];
-    }
+    },
   ) => Promise<void>;
   onDelete?: (useCase: UseCase) => Promise<boolean> | boolean;
   onClose: () => void;
@@ -70,26 +76,63 @@ const tabs: Array<Tab<UseCaseFormTab>> = [
   { value: "tasks", label: "Aufgaben" },
   { value: "tickets", label: "Tickets" },
   { value: "comments", label: "Kommentare" },
-  { value: "journal", label: "Journal" }
+  { value: "journal", label: "Journal" },
 ];
 
-function featureStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "draft") {
-  return resolveCatalogEntryKey(entries, "featureStatus", value, preferredKey) ?? preferredKey;
+function featureStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "draft",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "featureStatus", value, preferredKey) ??
+    preferredKey
+  );
 }
 
-function workStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "active") {
-  return resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ?? preferredKey;
+function workStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "active",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ??
+    preferredKey
+  );
 }
 
-function priorityValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "medium") {
-  return resolveCatalogEntryKey(entries, "priority", value, preferredKey) ?? preferredKey;
+function priorityValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "medium",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "priority", value, preferredKey) ??
+    preferredKey
+  );
 }
 
-export function UseCaseForm({ open, useCase, currentFeatureId, features = [], onSubmit, onPostCreate, onDelete, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: UseCaseFormProps) {
+export function UseCaseForm({
+  open,
+  useCase,
+  currentFeatureId,
+  features = [],
+  onSubmit,
+  onPostCreate,
+  onDelete,
+  onClose,
+  variant = "modal",
+  closeOnSubmit = true,
+  onOpenInTab,
+}: UseCaseFormProps) {
   const comments = useEntityComments("useCase", useCase?.id);
   const catalogs = useCatalogs();
-  const tasks = useTasks(useCase ? { type: "useCase", id: useCase.id } : undefined);
-  const tickets = useTickets(useCase ? { type: "useCase", id: useCase.id } : null);
+  const tasks = useTasks(
+    useCase ? { type: "useCase", id: useCase.id } : undefined,
+  );
+  const tickets = useTickets(
+    useCase ? { type: "useCase", id: useCase.id } : null,
+  );
   const canReadJournal = useHasPermission("journal", "read");
   const [activeTab, setActiveTab] = useState<UseCaseFormTab>("details");
   const [title, setTitle] = useState("");
@@ -133,7 +176,9 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
 
   useEffect(() => {
     if (open) {
-      setStatus((currentStatus) => featureStatusValue(catalogs.entries, currentStatus, "draft"));
+      setStatus((currentStatus) =>
+        featureStatusValue(catalogs.entries, currentStatus, "draft"),
+      );
     }
   }, [catalogs.entries, open]);
 
@@ -145,13 +190,22 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
         featureId: selectedFeatureId ? Number(selectedFeatureId) : undefined,
         title,
         slug,
-        status: resolveCatalogEntryKey(catalogs.entries, "featureStatus", status, "draft"),
+        status: resolveCatalogEntryKey(
+          catalogs.entries,
+          "featureStatus",
+          status,
+          "draft",
+        ),
         description,
         sortOrder,
-        content
+        content,
       });
       if (!useCase && created && onPostCreate) {
-        await onPostCreate(created.id, { tasks: pendingTasks, tickets: pendingTickets, comments: pendingComments });
+        await onPostCreate(created.id, {
+          tasks: pendingTasks,
+          tickets: pendingTickets,
+          comments: pendingComments,
+        });
       }
       if (closeOnSubmit) {
         onClose();
@@ -179,23 +233,50 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
     }
   };
 
-  const taskOwner = useCase ? { type: "useCase" as const, id: useCase.id } : null;
-  const ticketOwner = useCase ? { type: "useCase" as const, id: useCase.id } : null;
-  const visibleTabs = useCase ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal) : tabs.filter((tab) => tab.value !== "journal");
+  const taskOwner = useCase
+    ? { type: "useCase" as const, id: useCase.id }
+    : null;
+  const ticketOwner = useCase
+    ? { type: "useCase" as const, id: useCase.id }
+    : null;
+  const visibleTabs = useCase
+    ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
+    : tabs.filter((tab) => tab.value !== "journal");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
     }
     if (tab.value === "tasks") {
-      const pending = pendingTasks.map((item) => (item.kind === "existing" ? item.task : item.draft));
-      return { ...tab, count: useCase ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
+      const pending = pendingTasks.map((item) =>
+        item.kind === "existing" ? item.task : item.draft,
+      );
+      return {
+        ...tab,
+        count: useCase
+          ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus")
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "tickets") {
-      const pending = pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft));
-      return { ...tab, count: useCase ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
+      const pending = pendingTickets.map((item) =>
+        item.kind === "existing" ? item.ticket : item.draft,
+      );
+      return {
+        ...tab,
+        count: useCase
+          ? countOpenStatusItems(
+              tickets.tickets,
+              catalogs.entries,
+              "workStatus",
+            )
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "comments") {
-      return { ...tab, count: useCase ? comments.comments.length : pendingComments.length };
+      return {
+        ...tab,
+        count: useCase ? comments.comments.length : pendingComments.length,
+      };
     }
     return { ...tab, count: 0 };
   });
@@ -213,31 +294,60 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
         headerMeta={<StatusPill kind="featureStatus" value={status} />}
         footerStart={
           useCase && onDelete ? (
-            <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" disabled={deleting} onClick={() => void deleteCurrentUseCase()}>
+            <Button
+              className="text-crimson hover:bg-crimson/10"
+              icon={<Trash2 size={18} />}
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => void deleteCurrentUseCase()}
+            >
               Löschen
             </Button>
           ) : undefined
         }
         onClose={onClose}
         variant={variant}
-        contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
-        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
+        contentClassName={
+          activeTab === "details" ? "w-full max-w-7xl self-center" : ""
+        }
+        tabBar={
+          <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+        }
       >
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">
               <div className="grid gap-4 md:grid-cols-2">
                 <FormField label="Titel" required className="min-w-0">
-                  <Input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} required />
+                  <Input
+                    autoFocus
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    required
+                  />
                 </FormField>
                 <FormField label="Slug" required className="min-w-0">
-                  <Input iconLeft={<LinkIcon size={16} />} value={slug} onChange={(event) => setSlug(event.target.value)} required variant="mono" />
+                  <Input
+                    iconLeft={<LinkIcon size={16} />}
+                    value={slug}
+                    onChange={(event) => setSlug(event.target.value)}
+                    required
+                    variant="mono"
+                  />
                 </FormField>
               </div>
             </Section>
 
             <Section title="Zuordnung">
-              <Select label="Feature" value={selectedFeatureId} onChange={(event) => setSelectedFeatureId(event.target.value ? Number(event.target.value) : "")}>
+              <Select
+                label="Feature"
+                value={selectedFeatureId}
+                onChange={(event) =>
+                  setSelectedFeatureId(
+                    event.target.value ? Number(event.target.value) : "",
+                  )
+                }
+              >
                 <option value="">Ohne Feature</option>
                 {features.map((feature) => (
                   <option key={feature.id} value={feature.id}>
@@ -250,22 +360,50 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
             <Section title="Status & Sortierung">
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
                 <FormField label="Status">
-                  <StatusToggle kind="featureStatus" value={status} onChange={setStatus} />
+                  <StatusToggle
+                    kind="featureStatus"
+                    value={status}
+                    onChange={setStatus}
+                  />
                 </FormField>
                 <FormField label="Sortierung">
-                  <Input type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
+                  <Input
+                    type="number"
+                    value={sortOrder}
+                    onChange={(event) =>
+                      setSortOrder(Number(event.target.value))
+                    }
+                  />
                 </FormField>
               </div>
             </Section>
 
             <Section title="Kurzbeschreibung">
               <FormField label="Kurzbeschreibung">
-                <RichTextInlineField value={description} placeholder="Kurze fachliche Zusammenfassung" minRows={12} testIdPrefix="use-case-description" onChange={setDescription} />
+                <RichTextInlineField
+                  value={description}
+                  placeholder="Kurze fachliche Zusammenfassung"
+                  minRows={12}
+                  testIdPrefix="use-case-description"
+                  onChange={setDescription}
+                />
               </FormField>
             </Section>
 
-            <Section title="Inhalt" actions={<span className="text-xs font-semibold text-slate-500">HTML</span>}>
-              <RichTextInlineField value={content} placeholder="Use-Case-Inhalt" testIdPrefix="use-case-content" onChange={setContent} />
+            <Section
+              title="Inhalt"
+              actions={
+                <span className="text-xs font-semibold text-slate-500">
+                  HTML
+                </span>
+              }
+            >
+              <RichTextInlineField
+                value={content}
+                placeholder="Use-Case-Inhalt"
+                testIdPrefix="use-case-content"
+                onChange={setContent}
+              />
             </Section>
           </>
         ) : null}
@@ -282,19 +420,43 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
                         {
                           id: item.task.id,
                           title: item.task.title,
-                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.task.status),
-                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.task.status) ? "steel" : "fern"
-                        }
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.task.status,
+                          ),
+                          statusTone: statusToneForKey(
+                            "workStatus",
+                            item.task.status,
+                            isCatalogStatusClosed(
+                              catalogs.entries,
+                              "workStatus",
+                              item.task.status,
+                            ),
+                          ),
+                        },
                       ]
-                    : []
+                    : [],
                 )}
-                draftItems={pendingTasks.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTasks.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Aufgaben vorgemerkt"
                 onLinkExisting={() => setTaskLinkOpen(true)}
                 onCreateNew={() => setTaskDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "new", index))}
+                onRemoveExisting={(index) =>
+                  setPendingTasks((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTasks((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
@@ -312,19 +474,43 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
                         {
                           id: item.ticket.id,
                           title: item.ticket.title,
-                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.ticket.status),
-                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.ticket.status) ? "steel" : "fern"
-                        }
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.ticket.status,
+                          ),
+                          statusTone: statusToneForKey(
+                            "workStatus",
+                            item.ticket.status,
+                            isCatalogStatusClosed(
+                              catalogs.entries,
+                              "workStatus",
+                              item.ticket.status,
+                            ),
+                          ),
+                        },
                       ]
-                    : []
+                    : [],
                 )}
-                draftItems={pendingTickets.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTickets.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<Bug size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
                 onLinkExisting={() => setTicketLinkOpen(true)}
                 onCreateNew={() => setTicketDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "new", index))}
+                onRemoveExisting={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
@@ -334,11 +520,30 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
           <Section title="Kommentare">
             {useCase ? (
               <>
-                {comments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{comments.error}</div> : null}
-                <CommentThread comments={comments.comments} entityLabel="Use Case" onCreate={comments.createComment} onDelete={comments.removeComment} />
+                {comments.error ? (
+                  <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">
+                    {comments.error}
+                  </div>
+                ) : null}
+                <CommentThread
+                  comments={comments.comments}
+                  entityLabel="Use Case"
+                  onCreate={comments.createComment}
+                  onDelete={comments.removeComment}
+                />
               </>
             ) : (
-              <PendingCommentList comments={pendingComments} onAdd={(comment) => setPendingComments((items) => [...items, comment])} onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingCommentList
+                comments={pendingComments}
+                onAdd={(comment) =>
+                  setPendingComments((items) => [...items, comment])
+                }
+                onRemove={(index) =>
+                  setPendingComments((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
@@ -352,7 +557,9 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
 
       <TaskLinkDialog
         open={taskLinkOpen}
-        currentTasks={pendingTasks.flatMap((item) => (item.kind === "existing" ? [item.task] : []))}
+        currentTasks={pendingTasks.flatMap((item) =>
+          item.kind === "existing" ? [item.task] : [],
+        )}
         onLink={async (task) => {
           setPendingTasks((items) => [...items, { kind: "existing", task }]);
           setTaskLinkOpen(false);
@@ -361,28 +568,41 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
       />
       <TicketLinkDialog
         open={ticketLinkOpen}
-        currentTickets={pendingTickets.flatMap((item) => (item.kind === "existing" ? [item.ticket] : []))}
+        currentTickets={pendingTickets.flatMap((item) =>
+          item.kind === "existing" ? [item.ticket] : [],
+        )}
         onLink={async (ticket) => {
-          setPendingTickets((items) => [...items, { kind: "existing", ticket }]);
+          setPendingTickets((items) => [
+            ...items,
+            { kind: "existing", ticket },
+          ]);
           setTicketLinkOpen(false);
         }}
         onClose={() => setTicketLinkOpen(false)}
       />
       <TaskDraftDialog
         open={taskDraftOpen}
-        onCreate={(draft) => setPendingTasks((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingTasks((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setTaskDraftOpen(false)}
       />
       <TicketDraftDialog
         open={ticketDraftOpen}
-        onCreate={(draft) => setPendingTickets((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingTickets((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setTicketDraftOpen(false)}
       />
     </>
   );
 }
 
-function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(items: TItem[], kind: TItem["kind"], removeIndex: number): TItem[] {
+function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(
+  items: TItem[],
+  kind: TItem["kind"],
+  removeIndex: number,
+): TItem[] {
   let currentIndex = -1;
   return items.filter((item) => {
     if (item.kind !== kind) {
@@ -393,7 +613,15 @@ function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(item
   });
 }
 
-function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TaskDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
   const catalogs = useCatalogs();
   const [status, setStatus] = useState<TaskStatus>("active");
@@ -408,8 +636,18 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     }
     onCreate({
       title: trimmedTitle,
-      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
-      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "workStatus",
+        status,
+        "active",
+      ),
+      priority: resolveCatalogEntryKey(
+        catalogs.entries,
+        "priority",
+        priority,
+        "medium",
+      ),
     });
     setTitle("");
     setStatus(workStatusValue(catalogs.entries, "active", "active"));
@@ -421,11 +659,20 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     <Modal open={open} title="Aufgabe vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />
@@ -442,7 +689,15 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
   );
 }
 
-function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TicketDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<TicketType>("bug");
   const catalogs = useCatalogs();
@@ -459,8 +714,18 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     onCreate({
       title: trimmedTitle,
       type,
-      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"),
-      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "workStatus",
+        status,
+        "open",
+      ),
+      priority: resolveCatalogEntryKey(
+        catalogs.entries,
+        "priority",
+        priority,
+        "medium",
+      ),
     });
     setTitle("");
     setType("bug");
@@ -473,9 +738,18 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     <Modal open={open} title="Ticket vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
-        <Select label="Typ" value={type} onChange={(event) => setType(event.target.value as TicketType)}>
+        <Select
+          label="Typ"
+          value={type}
+          onChange={(event) => setType(event.target.value as TicketType)}
+        >
           <option value="bug">{ticketTypeLabels.bug}</option>
           <option value="improvement">{ticketTypeLabels.improvement}</option>
           <option value="question">{ticketTypeLabels.question}</option>
@@ -483,7 +757,11 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
         </Select>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />

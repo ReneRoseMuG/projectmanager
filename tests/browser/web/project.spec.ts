@@ -15,7 +15,7 @@ import {
   itemCard,
   linkProjectFeature,
   slugify,
-  uniqueTitle
+  uniqueTitle,
 } from "./domain-test-utils";
 
 /**
@@ -24,7 +24,7 @@ import {
  * Abgedeckte Regeln:
  * - Projekt-Create läuft über `/projects/new` und schließt nach Speichern zurück zur Übersicht.
  * - Projekt-Edit läuft über die kanonische Route `/projects/:id`.
- * - Doppelklick und Bearbeiten-Button in Board- und Listenansicht navigieren auf dieselbe Detailformular-Seite.
+ * - Einfacher Klick und Bearbeiten-Button in Board- und Listenansicht navigieren auf dieselbe Detailformular-Seite.
  * - Projekt-Tab-Views öffnen verknüpfte Domänenobjekte per Route statt per Overlay.
  *
  * Fehlerfälle:
@@ -36,20 +36,35 @@ import {
 
 async function openProjectList(page: Page) {
   await authenticatedGoto(page, "/projects");
-  await expect(page.getByRole("heading", { name: "Projekte", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Projekte", exact: true }),
+  ).toBeVisible();
 }
 
-async function expectProjectFormData(page: Page, project: { name: string }, descriptionText = "E2E Projektbeschreibung vollständig") {
+async function expectProjectFormData(
+  page: Page,
+  project: { name: string },
+  descriptionText = "E2E Projektbeschreibung vollständig",
+) {
   const form = formPage(page, "Projekt bearbeiten");
   await expect(form).toBeVisible();
-  await expect(form.locator("input[required]").first()).toHaveValue(project.name);
+  await expect(form.locator("input[required]").first()).toHaveValue(
+    project.name,
+  );
   await expectRichText(form, descriptionText);
-  await expect(form.locator('input[type="date"]').nth(0)).toHaveValue("2026-05-01");
-  await expect(form.locator('input[type="date"]').nth(1)).toHaveValue("2026-05-31");
+  await expect(form.locator('input[type="date"]').nth(0)).toHaveValue(
+    "2026-05-01",
+  );
+  await expect(form.locator('input[type="date"]').nth(1)).toHaveValue(
+    "2026-05-31",
+  );
 }
 
 test.describe("Projekt-Routen und Detailformular", () => {
-  test("Projekt erstellen: Plus-Button navigiert auf Create-Detailseite und Speichern schließt", async ({ page, request }) => {
+  test("Projekt erstellen: Plus-Button navigiert auf Create-Detailseite und Speichern schließt", async ({
+    page,
+    request,
+  }) => {
     let projectId: number | null = null;
     const name = uniqueTitle("E2E Project Create Route");
 
@@ -61,12 +76,22 @@ test.describe("Projekt-Routen und Detailformular", () => {
       const form = formPage(page, "Projekt anlegen");
       await expect(form).toBeVisible();
       await form.locator("input[required]").first().fill(name);
-      await fillRichText(form, "project-description", "E2E neu angelegte Projektbeschreibung vollständig");
+      await fillRichText(
+        form,
+        "project-description",
+        "E2E neu angelegte Projektbeschreibung vollständig",
+      );
       await form.locator('input[type="date"]').nth(0).fill("2026-05-01");
       await form.locator('input[type="date"]').nth(1).fill("2026-05-31");
-      const projectResponsePromise = page.waitForResponse((response) => response.url().includes("/api/projects") && response.request().method() === "POST");
+      const projectResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/projects") &&
+          response.request().method() === "POST",
+      );
       await form.getByRole("button", { name: "Projekt anlegen" }).click();
-      const createdProject = (await (await projectResponsePromise).json()) as { id: number };
+      const createdProject = (await (await projectResponsePromise).json()) as {
+        id: number;
+      };
       projectId = createdProject.id;
 
       await expect(page).toHaveURL(/\/projects$/);
@@ -76,12 +101,15 @@ test.describe("Projekt-Routen und Detailformular", () => {
     }
   });
 
-  test("Projekt öffnen: Doppelklick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({ page, request }) => {
+  test("Projekt öffnen: Klick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({
+    page,
+    request,
+  }) => {
     const project = await createProject(request, "E2E Project Open Route");
 
     try {
       await openProjectList(page);
-      await itemCard(page, project.name).dblclick();
+      await itemCard(page, project.name).click();
       await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
       await expectProjectFormData(page, project);
 
@@ -100,7 +128,10 @@ test.describe("Projekt-Routen und Detailformular", () => {
     }
   });
 
-  test("Projektformular hält Tab Bar und Footer im Content-Scrollcontainer sichtbar", async ({ page, request }) => {
+  test("Projektformular hält Tab Bar und Footer im Content-Scrollcontainer sichtbar", async ({
+    page,
+    request,
+  }) => {
     const project = await createProject(request, "E2E Project Sticky Shell");
 
     try {
@@ -111,6 +142,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       const form = formPage(page, "Projekt bearbeiten");
       const header = form.locator(":scope > header");
       const tabBar = form.locator(":scope > div").first();
+      const body = form.getByTestId("form-page-body");
       const footer = form.locator(":scope > footer");
       const mainBox = await main.boundingBox();
 
@@ -121,38 +153,66 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expect(tabBar).toBeVisible();
       await expect(footer).toBeVisible();
 
-      await main.evaluate((element) => {
+      await body.evaluate((element) => {
         element.scrollTop = 360;
       });
 
-      await expect.poll(async () => (await header.boundingBox())?.bottom ?? Number.NEGATIVE_INFINITY).toBeLessThan(mainBox.y + 8);
-      await expect.poll(async () => (await tabBar.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(mainBox.y + 4);
-      await expect.poll(async () => (await tabBar.boundingBox())?.y ?? Number.NEGATIVE_INFINITY).toBeGreaterThan(mainBox.y - 1);
-      await expect.poll(async () => {
-        const box = await footer.boundingBox();
-        return box ? box.y + box.height : 0;
-      }).toBeGreaterThan(mainBox.y + mainBox.height - 4);
-      await expect.poll(async () => {
-        const box = await footer.boundingBox();
-        return box ? box.y + box.height : Number.POSITIVE_INFINITY;
-      }).toBeLessThan(mainBox.y + mainBox.height + 2);
+      await expect
+        .poll(
+          async () =>
+            (await header.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
+        )
+        .toBeLessThan(mainBox.y + 2);
+      await expect
+        .poll(
+          async () =>
+            (await tabBar.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
+        )
+        .toBeGreaterThan((await header.boundingBox())?.bottom ?? mainBox.y);
+      await expect
+        .poll(
+          async () =>
+            await body.evaluate(
+              (element) => element.getBoundingClientRect().bottom,
+            ),
+        )
+        .toBeLessThanOrEqual((await footer.boundingBox())?.y ?? mainBox.y + mainBox.height);
+      await expect
+        .poll(async () => {
+          const box = await footer.boundingBox();
+          return box ? box.y + box.height : 0;
+        })
+        .toBeGreaterThan(mainBox.y + mainBox.height - 4);
+      await expect
+        .poll(async () => {
+          const box = await footer.boundingBox();
+          return box ? box.y + box.height : Number.POSITIVE_INFINITY;
+        })
+        .toBeLessThan(mainBox.y + mainBox.height + 2);
 
       const featuresTab = form.getByRole("button", { name: /Features/ });
       await featuresTab.click();
       await expect(featuresTab).toHaveClass(/text-steel-700/);
       const listBoardView = form.getByTestId("list-board-view");
       await expect(listBoardView).toBeVisible();
-      await expect.poll(async () => {
-        const boardBox = await listBoardView.boundingBox();
-        const footerBox = await footer.boundingBox();
-        return boardBox && footerBox ? boardBox.y + boardBox.height - footerBox.y : Number.POSITIVE_INFINITY;
-      }).toBeLessThan(4);
+      await expect
+        .poll(async () => {
+          const boardBox = await listBoardView.boundingBox();
+          const footerBox = await footer.boundingBox();
+          return boardBox && footerBox
+            ? boardBox.y + boardBox.height - footerBox.y
+            : Number.POSITIVE_INFINITY;
+        })
+        .toBeLessThan(4);
     } finally {
       await deleteProject(request, project.id);
     }
   });
 
-  test("Projekt bearbeiten: Speichern schließt auf die Rücksprung-Route und aktualisiert die Übersicht", async ({ page, request }) => {
+  test("Projekt bearbeiten: Speichern schließt auf die Rücksprung-Route und aktualisiert die Übersicht", async ({
+    page,
+    request,
+  }) => {
     const project = await createProject(request, "E2E Project Edit Route");
     const updatedName = uniqueTitle("E2E Project Updated Route");
 
@@ -163,8 +223,12 @@ test.describe("Projekt-Routen und Detailformular", () => {
 
       await form.locator("input[required]").first().fill(updatedName);
       await Promise.all([
-        page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}`) && response.request().method() === "PATCH"),
-        form.getByRole("button", { name: "Speichern" }).click()
+        page.waitForResponse(
+          (response) =>
+            response.url().includes(`/api/projects/${project.id}`) &&
+            response.request().method() === "PATCH",
+        ),
+        form.getByRole("button", { name: "Speichern" }).click(),
       ]);
 
       await expect(page).toHaveURL(/\/projects$/);
@@ -174,7 +238,10 @@ test.describe("Projekt-Routen und Detailformular", () => {
     }
   });
 
-  test("Projekt-Features-Tab: Doppelklick und Bearbeiten öffnen das Feature-Detailformular per Route", async ({ page, request }) => {
+  test("Projekt-Features-Tab: Klick und Bearbeiten öffnen das Feature-Detailformular per Route", async ({
+    page,
+    request,
+  }) => {
     const project = await createProject(request, "E2E Project Feature Tab");
     const feature = await createFeature(request, "E2E Project Tab Feature");
 
@@ -186,73 +253,126 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await projectForm.getByRole("button", { name: /Features/ }).click();
       await expect(itemCard(projectForm, feature.title)).toBeVisible();
 
-      await itemCard(projectForm, feature.title).dblclick();
+      await itemCard(projectForm, feature.title).click();
       await expect(page).toHaveURL(new RegExp(`/features/${feature.id}`));
       const featureForm = formPage(page, "Feature bearbeiten");
-      await expect(featureForm.locator("input[required]").nth(0)).toHaveValue(feature.title);
-      await expect(featureForm.locator("input[required]").nth(1)).toHaveValue(feature.slug);
-      await expectRichText(featureForm, "E2E Feature-Kurzbeschreibung vollständig", 0);
+      await expect(featureForm.locator("input[required]").nth(0)).toHaveValue(
+        feature.title,
+      );
+      await expect(featureForm.locator("input[required]").nth(1)).toHaveValue(
+        feature.slug,
+      );
+      await expectRichText(
+        featureForm,
+        "E2E Feature-Kurzbeschreibung vollständig",
+        0,
+      );
       await expectRichText(featureForm, "E2E Feature-Inhalt vollständig", 1);
 
       await authenticatedGoto(page, `/projects/${project.id}`);
-      await formPage(page, "Projekt bearbeiten").getByRole("button", { name: /Features/ }).click();
-      await clickItemAction(formPage(page, "Projekt bearbeiten"), feature.title, "Bearbeiten");
+      await formPage(page, "Projekt bearbeiten")
+        .getByRole("button", { name: /Features/ })
+        .click();
+      await clickItemAction(
+        formPage(page, "Projekt bearbeiten"),
+        feature.title,
+        "Bearbeiten",
+      );
       await expect(page).toHaveURL(new RegExp(`/features/${feature.id}`));
-      await expect(formPage(page, "Feature bearbeiten").locator("input[required]").nth(0)).toHaveValue(feature.title);
+      await expect(
+        formPage(page, "Feature bearbeiten").locator("input[required]").nth(0),
+      ).toHaveValue(feature.title);
     } finally {
       await deleteProject(request, project.id);
       await deleteFeature(request, feature.id);
     }
   });
 
-  test("Projekt-Tabs: Aufgaben und Backlog öffnen ihre Detailformular-Seiten mit geladenen Daten", async ({ page, request }) => {
+  test("Projekt-Tabs: Aufgaben und Backlog öffnen ihre Detailformular-Seiten mit geladenen Daten", async ({
+    page,
+    request,
+  }) => {
     const project = await createProject(request, "E2E Project Tabs");
-    const task = await createTask(request, { type: "project", id: project.id }, "E2E Project Tab Task");
-    const backlogItem = await createBacklogItem(request, project.id, "E2E Project Tab Backlog");
+    const task = await createTask(
+      request,
+      { type: "project", id: project.id },
+      "E2E Project Tab Task",
+    );
+    const backlogItem = await createBacklogItem(
+      request,
+      project.id,
+      "E2E Project Tab Backlog",
+    );
 
     try {
       await authenticatedGoto(page, `/projects/${project.id}`);
       const projectForm = formPage(page, "Projekt bearbeiten");
 
       await projectForm.getByRole("button", { name: /Aufgaben/ }).click();
-      await itemCard(projectForm, task.title).dblclick();
+      await itemCard(projectForm, task.title).click();
       await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}`));
       const taskForm = formPage(page, "Aufgabe bearbeiten");
-      await expect(taskForm.locator("input[required]").first()).toHaveValue(task.title);
+      await expect(taskForm.locator("input[required]").first()).toHaveValue(
+        task.title,
+      );
       await expectRichText(taskForm, "E2E Aufgabenbeschreibung vollständig");
 
       await authenticatedGoto(page, `/projects/${project.id}`);
-      await formPage(page, "Projekt bearbeiten").getByRole("button", { name: /Backlog/ }).click();
-      await itemCard(formPage(page, "Projekt bearbeiten"), backlogItem.title).dblclick();
+      await formPage(page, "Projekt bearbeiten")
+        .getByRole("button", { name: /Backlog/ })
+        .click();
+      await itemCard(
+        formPage(page, "Projekt bearbeiten"),
+        backlogItem.title,
+      ).click();
       await expect(page).toHaveURL(new RegExp(`/backlog/${backlogItem.id}`));
       let backlogForm = formPage(page, "Backlog-Item bearbeiten");
-      await expect(backlogForm.locator("input[required]").first()).toHaveValue(backlogItem.title);
+      await expect(backlogForm.locator("input[required]").first()).toHaveValue(
+        backlogItem.title,
+      );
       await expectRichText(backlogForm, "E2E Backlog-Beschreibung vollständig");
 
       await authenticatedGoto(page, `/projects/${project.id}`);
-      await formPage(page, "Projekt bearbeiten").getByRole("button", { name: /Backlog/ }).click();
-      await clickItemAction(formPage(page, "Projekt bearbeiten"), backlogItem.title, "Bearbeiten");
+      await formPage(page, "Projekt bearbeiten")
+        .getByRole("button", { name: /Backlog/ })
+        .click();
+      await clickItemAction(
+        formPage(page, "Projekt bearbeiten"),
+        backlogItem.title,
+        "Bearbeiten",
+      );
       await expect(page).toHaveURL(new RegExp(`/backlog/${backlogItem.id}`));
       backlogForm = formPage(page, "Backlog-Item bearbeiten");
-      await expect(backlogForm.locator("input[required]").first()).toHaveValue(backlogItem.title);
+      await expect(backlogForm.locator("input[required]").first()).toHaveValue(
+        backlogItem.title,
+      );
       await expectRichText(backlogForm, "E2E Backlog-Beschreibung vollständig");
     } finally {
       await deleteProject(request, project.id);
     }
   });
 
-  test("Projekt löschen: Delete und Confirm entfernen die Karte aus der Übersicht", async ({ page, request }) => {
+  test("Projekt löschen: Delete und Confirm entfernen die Karte aus der Übersicht", async ({
+    page,
+    request,
+  }) => {
     const project = await createProject(request, "E2E Project Delete Route");
 
     await openProjectList(page);
     await clickItemAction(page, project.name, "Löschen");
-    await page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Löschen" })
+      .click();
 
     await expect(itemCard(page, project.name)).not.toBeVisible();
     await deleteProject(request, project.id);
   });
 
-  test("Board- und Listenansicht zeigen echte Projektdaten", async ({ page, request }) => {
+  test("Board- und Listenansicht zeigen echte Projektdaten", async ({
+    page,
+    request,
+  }) => {
     const project = await createProject(request, "E2E Project Toggle Route");
 
     try {
@@ -268,8 +388,14 @@ test.describe("Projekt-Routen und Detailformular", () => {
     }
   });
 
-  test("Feature erstellen aus Projekt-Tab nutzt die Feature-Create-Route, schließt und verknüpft echte Daten", async ({ page, request }) => {
-    const project = await createProject(request, "E2E Project Feature Create Route");
+  test("Feature erstellen aus Projekt-Tab nutzt die Feature-Create-Route, schließt und verknüpft echte Daten", async ({
+    page,
+    request,
+  }) => {
+    const project = await createProject(
+      request,
+      "E2E Project Feature Create Route",
+    );
     let featureId: number | null = null;
     const featureTitle = uniqueTitle("E2E Project Created Feature Route");
     const featureSlug = slugify(featureTitle);
@@ -284,19 +410,39 @@ test.describe("Projekt-Routen und Detailformular", () => {
       const featureForm = formPage(page, "Neues Feature");
       await featureForm.locator("input[required]").nth(0).fill(featureTitle);
       await featureForm.locator("input[required]").nth(1).fill(featureSlug);
-      await fillRichText(featureForm, "feature-form-description", "E2E verknüpfte Kurzbeschreibung vollständig");
-      await fillRichText(featureForm, "feature-form-content", "E2E verknüpfter Inhalt vollständig");
-      const featureResponsePromise = page.waitForResponse((response) => response.url().includes("/api/features") && response.request().method() === "POST");
-      await featureForm.getByRole("button", { name: "Feature anlegen" }).click();
-      const createdFeature = (await (await featureResponsePromise).json()) as { id: number };
+      await fillRichText(
+        featureForm,
+        "feature-form-description",
+        "E2E verknüpfte Kurzbeschreibung vollständig",
+      );
+      await fillRichText(
+        featureForm,
+        "feature-form-content",
+        "E2E verknüpfter Inhalt vollständig",
+      );
+      const featureResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/features") &&
+          response.request().method() === "POST",
+      );
+      await featureForm
+        .getByRole("button", { name: "Feature anlegen" })
+        .click();
+      const createdFeature = (await (await featureResponsePromise).json()) as {
+        id: number;
+      };
       featureId = createdFeature.id;
 
       await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
       const refreshedProjectForm = formPage(page, "Projekt bearbeiten");
-      await refreshedProjectForm.getByRole("button", { name: /Features/ }).click();
+      await refreshedProjectForm
+        .getByRole("button", { name: /Features/ })
+        .click();
       await expect(itemCard(refreshedProjectForm, featureTitle)).toBeVisible();
 
-      const linkedResponse = await request.get(`${apiBaseUrl}/projects/${project.id}/features`);
+      const linkedResponse = await request.get(
+        `${apiBaseUrl}/projects/${project.id}/features`,
+      );
       const linked = (await linkedResponse.json()) as Array<{ id: number }>;
       expect(linked.some((feature) => feature.id === featureId)).toBe(true);
     } finally {

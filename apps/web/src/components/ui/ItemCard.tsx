@@ -14,21 +14,55 @@ interface ItemCardProps {
 }
 
 /** Shared card base for domain items in board/grid layouts. */
-export function ItemCard({ accentColor, onOpen, onEdit, onDelete, header, body, footer, className = "" }: ItemCardProps) {
+export function ItemCard({
+  accentColor,
+  onOpen,
+  onEdit,
+  onDelete,
+  header,
+  body,
+  footer,
+  className = "",
+}: ItemCardProps) {
   return (
     <article
-      className={`relative grid min-w-0 max-w-full gap-3 overflow-hidden rounded-2xl border border-line bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-panel ${onOpen ? "cursor-pointer" : ""} ${className}`}
-      onDoubleClick={onOpen}
+      className={`relative grid min-w-0 max-w-full gap-3 overflow-visible rounded-2xl border border-line bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-panel ${onOpen ? "cursor-pointer" : ""} ${className}`}
+      onClick={onOpen}
     >
-      {accentColor ? <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: accentColor }} /> : null}
+      {accentColor ? (
+        <span
+          className="pointer-events-none absolute inset-x-0 top-0 h-1 rounded-t-2xl"
+          style={{ backgroundColor: accentColor }}
+        />
+      ) : null}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">{header}</div>
         {onEdit || onDelete ? (
-          <div className="relative z-20 shrink-0">
+          <div
+            className="relative z-20 shrink-0"
+            onClick={(event) => event.stopPropagation()}
+          >
             <ActionMenu
               items={[
-                ...(onEdit ? [{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: onEdit }] : []),
-                ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: onDelete, danger: true }] : [])
+                ...(onEdit
+                  ? [
+                      {
+                        label: "Bearbeiten",
+                        icon: <Edit3 size={16} />,
+                        onClick: onEdit,
+                      },
+                    ]
+                  : []),
+                ...(onDelete
+                  ? [
+                      {
+                        label: "Löschen",
+                        icon: <Trash2 size={16} />,
+                        onClick: onDelete,
+                        danger: true,
+                      },
+                    ]
+                  : []),
               ]}
             />
           </div>

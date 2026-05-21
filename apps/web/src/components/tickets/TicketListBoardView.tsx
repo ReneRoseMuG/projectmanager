@@ -19,6 +19,7 @@ interface TicketListBoardViewProps {
   linkAction?: ReactNode;
   filters?: ReactNode;
   loading?: boolean;
+  showToolbarAdd?: boolean;
 }
 
 function toListBoardMode(viewMode: ViewMode): ListBoardMode {
@@ -43,14 +44,31 @@ function matchesSearch(ticket: Ticket, searchValue: string) {
     ticket.status,
     ticket.type,
     ticket.priority,
-    ...ticket.tags.map((tag) => tag.name)
+    ...ticket.tags.map((tag) => tag.name),
   ];
-  return values.some((value) => (value ?? "").toLocaleLowerCase("de-DE").includes(normalized));
+  return values.some((value) =>
+    (value ?? "").toLocaleLowerCase("de-DE").includes(normalized),
+  );
 }
 
-export function TicketListBoardView({ tickets, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, linkAction, filters, loading = false }: TicketListBoardViewProps) {
+export function TicketListBoardView({
+  tickets,
+  viewMode,
+  onViewModeChange,
+  onAdd,
+  onAddStatus,
+  onOpen,
+  onDelete,
+  linkAction,
+  filters,
+  loading = false,
+  showToolbarAdd = true,
+}: TicketListBoardViewProps) {
   const [searchValue, setSearchValue] = useState("");
-  const visibleTickets = useMemo(() => tickets.filter((ticket) => matchesSearch(ticket, searchValue)), [searchValue, tickets]);
+  const visibleTickets = useMemo(
+    () => tickets.filter((ticket) => matchesSearch(ticket, searchValue)),
+    [searchValue, tickets],
+  );
 
   return (
     <ListBoardView
@@ -58,8 +76,11 @@ export function TicketListBoardView({ tickets, viewMode, onViewModeChange, onAdd
       mode={toListBoardMode(viewMode)}
       onModeChange={(mode) => onViewModeChange(toViewMode(mode))}
       onAdd={onAdd}
-      onAddToColumn={(columnStatus) => (onAddStatus ? onAddStatus(columnStatus as Ticket["status"]) : onAdd())}
+      onAddToColumn={(columnStatus) =>
+        onAddStatus ? onAddStatus(columnStatus as Ticket["status"]) : onAdd()
+      }
       addLabel="Neues Ticket"
+      showToolbarAdd={showToolbarAdd}
       statusKey="status"
       statusCatalogKind="workStatus"
       searchValue={searchValue}
@@ -67,9 +88,26 @@ export function TicketListBoardView({ tickets, viewMode, onViewModeChange, onAdd
       filters={filters}
       secondaryAction={linkAction}
       loading={loading}
-      emptyState={<EmptyState icon={<Bug size={22} />} title="Keine Tickets" body="Für diesen Kontext sind noch keine Tickets vorhanden." tone="violet" variant="tinted" />}
-      renderCard={(ticket) => <TicketCard ticket={ticket} onOpen={onOpen} onDelete={onDelete} />}
-      renderRow={(ticket) => <TicketCard ticket={ticket} variant="row" onOpen={onOpen} onDelete={onDelete} />}
+      emptyState={
+        <EmptyState
+          icon={<Bug size={22} />}
+          title="Keine Tickets"
+          body="Für diesen Kontext sind noch keine Tickets vorhanden."
+          tone="violet"
+          variant="tinted"
+        />
+      }
+      renderCard={(ticket) => (
+        <TicketCard ticket={ticket} onOpen={onOpen} onDelete={onDelete} />
+      )}
+      renderRow={(ticket) => (
+        <TicketCard
+          ticket={ticket}
+          variant="row"
+          onOpen={onOpen}
+          onDelete={onDelete}
+        />
+      )}
     />
   );
 }

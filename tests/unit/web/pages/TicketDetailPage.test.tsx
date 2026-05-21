@@ -21,7 +21,7 @@ import { TicketDetailPage } from "../../../../apps/web/src/pages/TicketDetailPag
 const router = vi.hoisted(() => ({
   navigate: vi.fn(),
   params: { id: "10" } as Record<string, string>,
-  search: "returnTo=%2Ftickets"
+  search: "returnTo=%2Ftickets",
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -30,7 +30,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
     ...actual,
     useNavigate: () => router.navigate,
     useParams: () => router.params,
-    useSearchParams: () => [new URLSearchParams(router.search), vi.fn()]
+    useSearchParams: () => [new URLSearchParams(router.search), vi.fn()],
   };
 });
 
@@ -43,18 +43,18 @@ vi.mock("../../../../apps/web/src/components/tickets/TicketForm", () => ({
     ) : (
       <div data-testid="ticket-form" />
     );
-  }
+  },
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({
-  useToast: () => ({ showToast: vi.fn() })
+  useToast: () => ({ showToast: vi.fn() }),
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useTickets", () => ({
   useTickets: () => ({
     createTicket: vi.fn(),
-    reload: vi.fn()
-  })
+    reload: vi.fn(),
+  }),
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useTicketDetail", () => ({
@@ -80,13 +80,13 @@ vi.mock("../../../../apps/web/src/hooks/useTicketDetail", () => ({
           createdAt: "2026-05-20T08:00:00.000Z",
           updatedAt: "2026-05-20T08:00:00.000Z",
           tags: [],
-          subTicketCount: 0
+          subTicketCount: 0,
         }
       : null,
     loading: false,
     updateTicket: vi.fn(),
-    reload: vi.fn()
-  })
+    reload: vi.fn(),
+  }),
 }));
 
 beforeEach(() => {
@@ -105,20 +105,31 @@ describe("TicketDetailPage openInTab", () => {
   it("nutzt die volle verfügbare Detailseitenbreite", () => {
     const { container } = render(<TicketDetailPage />);
 
-    expect(container.firstElementChild).toHaveClass("w-full", "min-w-0");
+    expect(container.firstElementChild).toHaveClass(
+      "flex",
+      "h-full",
+      "w-full",
+      "min-w-0",
+      "flex-1",
+      "flex-col",
+    );
     expect(container.firstElementChild).not.toHaveClass("mx-auto", "max-w-7xl");
   });
 
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button", () => {
     render(<TicketDetailPage />);
 
-    expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "In neuem Tab öffnen" }),
+    ).toBeInTheDocument();
   });
 
   it("öffnet die Ticket-URL und navigiert zurück", () => {
     render(<TicketDetailPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "In neuem Tab öffnen" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "In neuem Tab öffnen" }),
+    );
 
     expect(window.open).toHaveBeenCalledWith("/tickets/10", "_blank");
     expect(router.navigate).toHaveBeenCalledWith("/tickets");
@@ -129,6 +140,8 @@ describe("TicketDetailPage openInTab", () => {
 
     render(<TicketDetailPage />);
 
-    expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "In neuem Tab öffnen" }),
+    ).not.toBeInTheDocument();
   });
 });

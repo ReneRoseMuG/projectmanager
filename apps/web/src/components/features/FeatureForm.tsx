@@ -10,9 +10,18 @@ import type {
   Project,
   TaskStatus,
   TicketStatus,
-  TicketType
+  TicketType,
 } from "@taskmanager/shared-types";
-import { BookOpen, Bug, FileText, FolderKanban, LinkIcon, ListTodo, Paperclip, Trash2 } from "lucide-react";
+import {
+  BookOpen,
+  Bug,
+  FileText,
+  FolderKanban,
+  LinkIcon,
+  ListTodo,
+  Paperclip,
+  Trash2,
+} from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -26,8 +35,14 @@ import { useProjects } from "../../hooks/useProjects";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useUseCases } from "../../hooks/useUseCases";
-import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed, resolveCatalogEntryKey } from "../../utils/catalogs";
+import {
+  catalogLabel,
+  countOpenStatusItems,
+  isCatalogStatusClosed,
+  resolveCatalogEntryKey,
+} from "../../utils/catalogs";
 import { ticketTypeLabels } from "../../utils/domainLabels";
+import { statusToneForKey } from "../../utils/statusTones";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { JournalPanel } from "../journal/JournalPanel";
@@ -77,11 +92,19 @@ interface FeatureFormProps {
       projectIds: number[];
       comments: DraftComment[];
       files: DraftFile[];
-    }
+    },
   ) => Promise<void>;
 }
 
-type FeatureFormTab = "details" | "useCases" | "tasks" | "tickets" | "projects" | "comments" | "attachments" | "journal";
+type FeatureFormTab =
+  | "details"
+  | "useCases"
+  | "tasks"
+  | "tickets"
+  | "projects"
+  | "comments"
+  | "attachments"
+  | "journal";
 
 const tabs: Array<Tab<FeatureFormTab>> = [
   { value: "details", label: "Details" },
@@ -91,22 +114,54 @@ const tabs: Array<Tab<FeatureFormTab>> = [
   { value: "projects", label: "Projekte" },
   { value: "comments", label: "Kommentare" },
   { value: "attachments", label: "Dateien" },
-  { value: "journal", label: "Journal" }
+  { value: "journal", label: "Journal" },
 ];
 
-function featureStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "draft") {
-  return resolveCatalogEntryKey(entries, "featureStatus", value, preferredKey) ?? preferredKey;
+function featureStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "draft",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "featureStatus", value, preferredKey) ??
+    preferredKey
+  );
 }
 
-function workStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "active") {
-  return resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ?? preferredKey;
+function workStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "active",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ??
+    preferredKey
+  );
 }
 
-function priorityValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "medium") {
-  return resolveCatalogEntryKey(entries, "priority", value, preferredKey) ?? preferredKey;
+function priorityValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "medium",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "priority", value, preferredKey) ??
+    preferredKey
+  );
 }
 
-export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab, onPostCreate }: FeatureFormProps) {
+export function FeatureForm({
+  open,
+  feature,
+  onSubmit,
+  onClose,
+  onDelete,
+  savingLabel,
+  variant = "modal",
+  closeOnSubmit = true,
+  onOpenInTab,
+  onPostCreate,
+}: FeatureFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const featureId = feature?.id;
@@ -115,12 +170,18 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
   const canReadJournal = useHasPermission("journal", "read");
   const projects = useProjects();
   const useCases = useUseCases(featureId);
-  const tasks = useTasks(featureId ? { type: "feature", id: featureId } : undefined);
-  const tickets = useTickets(featureId ? { type: "feature", id: featureId } : null);
+  const tasks = useTasks(
+    featureId ? { type: "feature", id: featureId } : undefined,
+  );
+  const tickets = useTickets(
+    featureId ? { type: "feature", id: featureId } : null,
+  );
   const catalogs = useCatalogs();
   const projectLinks = useFeatureProjectLinks(featureId);
   const comments = useEntityComments("feature", featureId);
-  const attachments = useAttachments(featureId ? { type: "feature", id: featureId } : null);
+  const attachments = useAttachments(
+    featureId ? { type: "feature", id: featureId } : null,
+  );
   const [activeTab, setActiveTab] = useState<FeatureFormTab>("details");
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -172,7 +233,9 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
 
   useEffect(() => {
     if (open) {
-      setStatus((currentStatus) => featureStatusValue(catalogs.entries, currentStatus, "draft"));
+      setStatus((currentStatus) =>
+        featureStatusValue(catalogs.entries, currentStatus, "draft"),
+      );
     }
   }, [catalogs.entries, open]);
 
@@ -180,7 +243,19 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
     event.preventDefault();
     setSaving(true);
     try {
-      const created = await onSubmit({ title, slug, status: resolveCatalogEntryKey(catalogs.entries, "featureStatus", status, "draft"), description, sortOrder, content });
+      const created = await onSubmit({
+        title,
+        slug,
+        status: resolveCatalogEntryKey(
+          catalogs.entries,
+          "featureStatus",
+          status,
+          "draft",
+        ),
+        description,
+        sortOrder,
+        content,
+      });
       if (!feature && created && onPostCreate) {
         await onPostCreate(created.id, {
           tasks: pendingTasks,
@@ -188,7 +263,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
           useCases: pendingUseCases,
           projectIds: pendingProjects.map((project) => project.id),
           comments: pendingComments,
-          files: pendingFiles
+          files: pendingFiles,
         });
       }
       if (closeOnSubmit) {
@@ -222,36 +297,90 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {
-      showToast({ tone: "error", title: "Datei konnte nicht hochgeladen werden", message: errorMessage(attachmentError) });
+      showToast({
+        tone: "error",
+        title: "Datei konnte nicht hochgeladen werden",
+        message: errorMessage(attachmentError),
+      });
       throw attachmentError;
     }
   };
 
-  const visibleTabs = feature ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal) : tabs.filter((tab) => tab.value !== "journal");
+  const visibleTabs = feature
+    ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
+    : tabs.filter((tab) => tab.value !== "journal");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
     }
     if (tab.value === "useCases") {
-      const pending = pendingUseCases.map((item) => (item.kind === "existing" ? item.useCase : item.draft));
-      return { ...tab, count: feature ? countOpenStatusItems(useCases.useCases, catalogs.entries, "featureStatus") : countOpenStatusItems(pending, catalogs.entries, "featureStatus") };
+      const pending = pendingUseCases.map((item) =>
+        item.kind === "existing" ? item.useCase : item.draft,
+      );
+      return {
+        ...tab,
+        count: feature
+          ? countOpenStatusItems(
+              useCases.useCases,
+              catalogs.entries,
+              "featureStatus",
+            )
+          : countOpenStatusItems(pending, catalogs.entries, "featureStatus"),
+      };
     }
     if (tab.value === "tasks") {
-      const pending = pendingTasks.map((item) => (item.kind === "existing" ? item.task : item.draft));
-      return { ...tab, count: feature ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
+      const pending = pendingTasks.map((item) =>
+        item.kind === "existing" ? item.task : item.draft,
+      );
+      return {
+        ...tab,
+        count: feature
+          ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus")
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "tickets") {
-      const pending = pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft));
-      return { ...tab, count: feature ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
+      const pending = pendingTickets.map((item) =>
+        item.kind === "existing" ? item.ticket : item.draft,
+      );
+      return {
+        ...tab,
+        count: feature
+          ? countOpenStatusItems(
+              tickets.tickets,
+              catalogs.entries,
+              "workStatus",
+            )
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "projects") {
-      return { ...tab, count: feature ? countOpenStatusItems(projectLinks.linkedProjects, catalogs.entries, "workStatus") : countOpenStatusItems(pendingProjects, catalogs.entries, "workStatus") };
+      return {
+        ...tab,
+        count: feature
+          ? countOpenStatusItems(
+              projectLinks.linkedProjects,
+              catalogs.entries,
+              "workStatus",
+            )
+          : countOpenStatusItems(
+              pendingProjects,
+              catalogs.entries,
+              "workStatus",
+            ),
+      };
     }
     if (tab.value === "comments") {
-      return { ...tab, count: feature ? comments.comments.length : pendingComments.length };
+      return {
+        ...tab,
+        count: feature ? comments.comments.length : pendingComments.length,
+      };
     }
     if (tab.value === "attachments") {
-      return { ...tab, count: feature ? attachments.attachments.length : pendingFiles.length };
+      return {
+        ...tab,
+        count: feature ? attachments.attachments.length : pendingFiles.length,
+      };
     }
     return { ...tab, count: 0 };
   });
@@ -263,11 +392,23 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         title={feature ? "Feature bearbeiten" : "Neues Feature"}
         icon={<BookOpen size={20} />}
         breadcrumb={["Features", feature ? "Bearbeiten" : "Neu"]}
-        submitLabel={saving ? savingLabel ?? "Speichern…" : feature ? "Speichern" : "Feature anlegen"}
+        submitLabel={
+          saving
+            ? (savingLabel ?? "Speichern…")
+            : feature
+              ? "Speichern"
+              : "Feature anlegen"
+        }
         saving={saving}
         footerStart={
           feature && onDelete ? (
-            <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" disabled={deleting} onClick={() => void deleteCurrentFeature()}>
+            <Button
+              className="text-crimson hover:bg-crimson/10"
+              icon={<Trash2 size={18} />}
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => void deleteCurrentFeature()}
+            >
               Löschen
             </Button>
           ) : undefined
@@ -276,32 +417,68 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
-        contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
-        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
+        contentClassName={
+          activeTab === "details" ? "w-full max-w-7xl self-center" : ""
+        }
+        tabBar={
+          <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+        }
       >
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem]">
                 <FormField label="Titel" required className="min-w-0">
-                  <Input autoFocus={!feature} value={title} onChange={(event) => setTitle(event.target.value)} required />
+                  <Input
+                    autoFocus={!feature}
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    required
+                  />
                 </FormField>
                 <FormField label="Slug" required className="min-w-0">
-                  <Input iconLeft={<LinkIcon size={16} />} variant="mono" value={slug} onChange={(event) => setSlug(event.target.value)} required />
+                  <Input
+                    iconLeft={<LinkIcon size={16} />}
+                    variant="mono"
+                    value={slug}
+                    onChange={(event) => setSlug(event.target.value)}
+                    required
+                  />
                 </FormField>
                 <FormField label="Sortierung" className="min-w-0">
-                  <Input type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
+                  <Input
+                    type="number"
+                    value={sortOrder}
+                    onChange={(event) =>
+                      setSortOrder(Number(event.target.value))
+                    }
+                  />
                 </FormField>
               </div>
             </Section>
             <Section title="Status">
-              <StatusToggle kind="featureStatus" value={status} onChange={setStatus} />
+              <StatusToggle
+                kind="featureStatus"
+                value={status}
+                onChange={setStatus}
+              />
             </Section>
             <Section title="Kurzbeschreibung">
-              <RichTextInlineField value={description} placeholder="Kurzbeschreibung" minRows={12} testIdPrefix="feature-form-description" onChange={setDescription} />
+              <RichTextInlineField
+                value={description}
+                placeholder="Kurzbeschreibung"
+                minRows={12}
+                testIdPrefix="feature-form-description"
+                onChange={setDescription}
+              />
             </Section>
             <Section title="Inhalt">
-              <RichTextInlineField value={content} placeholder="Feature-Inhalt" testIdPrefix="feature-form-content" onChange={setContent} />
+              <RichTextInlineField
+                value={content}
+                placeholder="Feature-Inhalt"
+                testIdPrefix="feature-form-content"
+                onChange={setContent}
+              />
             </Section>
           </>
         ) : null}
@@ -316,20 +493,36 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                   useCases={useCases.useCases}
                   viewMode={useCaseViewMode}
                   onViewModeChange={setUseCaseViewMode}
-                  onCreate={() => navigate(`/use-cases/new?featureId=${feature.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
-                  onOpen={(useCase) => navigate(`/use-cases/${useCase.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                  onCreate={() =>
+                    navigate(
+                      `/use-cases/new?featureId=${feature.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
+                  onOpen={(useCase) =>
+                    navigate(
+                      `/use-cases/${useCase.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
                 />
               )
             ) : (
               <PendingRelationList
                 existingItems={[]}
-                draftItems={pendingUseCases.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingUseCases.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<FileText size={22} />}
                 emptyTitle="Keine Use Cases vorgemerkt"
                 showLinkExisting={false}
                 onCreateNew={() => setUseCaseDraftOpen(true)}
                 onRemoveExisting={() => undefined}
-                onRemoveDraft={(index) => setPendingUseCases((items) => items.filter((_, itemIndex) => itemIndex !== index))}
+                onRemoveDraft={(index) =>
+                  setPendingUseCases((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
               />
             )}
           </Section>
@@ -347,19 +540,43 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                         {
                           id: item.task.id,
                           title: item.task.title,
-                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.task.status),
-                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.task.status) ? "steel" : "fern"
-                        }
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.task.status,
+                          ),
+                          statusTone: statusToneForKey(
+                            "workStatus",
+                            item.task.status,
+                            isCatalogStatusClosed(
+                              catalogs.entries,
+                              "workStatus",
+                              item.task.status,
+                            ),
+                          ),
+                        },
                       ]
-                    : []
+                    : [],
                 )}
-                draftItems={pendingTasks.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTasks.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Aufgaben vorgemerkt"
                 onLinkExisting={() => setTaskLinkOpen(true)}
                 onCreateNew={() => setTaskDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "new", index))}
+                onRemoveExisting={(index) =>
+                  setPendingTasks((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTasks((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
@@ -377,19 +594,43 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                         {
                           id: item.ticket.id,
                           title: item.ticket.title,
-                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.ticket.status),
-                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.ticket.status) ? "steel" : "fern"
-                        }
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.ticket.status,
+                          ),
+                          statusTone: statusToneForKey(
+                            "workStatus",
+                            item.ticket.status,
+                            isCatalogStatusClosed(
+                              catalogs.entries,
+                              "workStatus",
+                              item.ticket.status,
+                            ),
+                          ),
+                        },
                       ]
-                    : []
+                    : [],
                 )}
-                draftItems={pendingTickets.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTickets.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<Bug size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
                 onLinkExisting={() => setTicketLinkOpen(true)}
                 onCreateNew={() => setTicketDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "new", index))}
+                onRemoveExisting={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
@@ -403,19 +644,34 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                 availableProjects={projectLinks.projects}
                 viewMode={projectViewMode}
                 onViewModeChange={setProjectViewMode}
-                onAddProject={(project) => projectLinks.addProjectToFeature(project.id)}
-                onRemoveProject={(project) => projectLinks.removeProjectFromFeature(project.id)}
-                onOpen={(project) => navigate(`/projects/${project.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                onAddProject={(project) =>
+                  projectLinks.addProjectToFeature(project.id)
+                }
+                onRemoveProject={(project) =>
+                  projectLinks.removeProjectFromFeature(project.id)
+                }
+                onOpen={(project) =>
+                  navigate(
+                    `/projects/${project.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                  )
+                }
               />
             ) : (
               <PendingRelationList
-                existingItems={pendingProjects.map((project) => ({ id: project.id, title: project.name }))}
+                existingItems={pendingProjects.map((project) => ({
+                  id: project.id,
+                  title: project.name,
+                }))}
                 draftItems={[]}
                 emptyIcon={<FolderKanban size={22} />}
                 emptyTitle="Keine Projekte vorgemerkt"
                 showCreateNew={false}
                 onLinkExisting={() => setProjectLinkOpen(true)}
-                onRemoveExisting={(index) => setPendingProjects((items) => items.filter((_, itemIndex) => itemIndex !== index))}
+                onRemoveExisting={(index) =>
+                  setPendingProjects((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
                 onRemoveDraft={() => undefined}
               />
             )}
@@ -425,9 +681,24 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         {activeTab === "comments" ? (
           <Section title="Kommentare">
             {feature ? (
-              <CommentThread comments={comments.comments} entityLabel="Feature" onCreate={comments.createComment} onDelete={comments.removeComment} />
+              <CommentThread
+                comments={comments.comments}
+                entityLabel="Feature"
+                onCreate={comments.createComment}
+                onDelete={comments.removeComment}
+              />
             ) : (
-              <PendingCommentList comments={pendingComments} onAdd={(comment) => setPendingComments((items) => [...items, comment])} onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingCommentList
+                comments={pendingComments}
+                onAdd={(comment) =>
+                  setPendingComments((items) => [...items, comment])
+                }
+                onRemove={(index) =>
+                  setPendingComments((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
@@ -448,20 +719,41 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                       title: "Datei löschen?",
                       body: attachment.originalName,
                       severity: "danger",
-                      confirmLabel: "Löschen"
+                      confirmLabel: "Löschen",
                     }).then((approved) => {
                       if (approved) {
                         void attachments
                           .removeAttachment(attachment.id)
-                          .then(() => showToast({ tone: "success", title: "Datei gelöscht" }))
-                          .catch((attachmentError: unknown) => showToast({ tone: "error", title: "Datei konnte nicht gelöscht werden", message: errorMessage(attachmentError) }));
+                          .then(() =>
+                            showToast({
+                              tone: "success",
+                              title: "Datei gelöscht",
+                            }),
+                          )
+                          .catch((attachmentError: unknown) =>
+                            showToast({
+                              tone: "error",
+                              title: "Datei konnte nicht gelöscht werden",
+                              message: errorMessage(attachmentError),
+                            }),
+                          );
                       }
                     });
                   }}
                 />
               </div>
             ) : (
-              <PendingFileList files={pendingFiles} onAdd={(files) => setPendingFiles((items) => [...items, ...files])} onRemove={(index) => setPendingFiles((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingFileList
+                files={pendingFiles}
+                onAdd={(files) =>
+                  setPendingFiles((items) => [...items, ...files])
+                }
+                onRemove={(index) =>
+                  setPendingFiles((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
@@ -475,7 +767,9 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
 
       <TaskLinkDialog
         open={taskLinkOpen}
-        currentTasks={pendingTasks.flatMap((item) => (item.kind === "existing" ? [item.task] : []))}
+        currentTasks={pendingTasks.flatMap((item) =>
+          item.kind === "existing" ? [item.task] : [],
+        )}
         onLink={async (task) => {
           setPendingTasks((items) => [...items, { kind: "existing", task }]);
           setTaskLinkOpen(false);
@@ -484,9 +778,14 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
       />
       <TicketLinkDialog
         open={ticketLinkOpen}
-        currentTickets={pendingTickets.flatMap((item) => (item.kind === "existing" ? [item.ticket] : []))}
+        currentTickets={pendingTickets.flatMap((item) =>
+          item.kind === "existing" ? [item.ticket] : [],
+        )}
         onLink={async (ticket) => {
-          setPendingTickets((items) => [...items, { kind: "existing", ticket }]);
+          setPendingTickets((items) => [
+            ...items,
+            { kind: "existing", ticket },
+          ]);
           setTicketLinkOpen(false);
         }}
         onClose={() => setTicketLinkOpen(false)}
@@ -500,24 +799,34 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
       />
       <UseCaseDraftDialog
         open={useCaseDraftOpen}
-        onCreate={(draft) => setPendingUseCases((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingUseCases((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setUseCaseDraftOpen(false)}
       />
       <TaskDraftDialog
         open={taskDraftOpen}
-        onCreate={(draft) => setPendingTasks((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingTasks((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setTaskDraftOpen(false)}
       />
       <TicketDraftDialog
         open={ticketDraftOpen}
-        onCreate={(draft) => setPendingTickets((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingTickets((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setTicketDraftOpen(false)}
       />
     </>
   );
 }
 
-function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(items: TItem[], kind: TItem["kind"], removeIndex: number): TItem[] {
+function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(
+  items: TItem[],
+  kind: TItem["kind"],
+  removeIndex: number,
+): TItem[] {
   let currentIndex = -1;
   return items.filter((item) => {
     if (item.kind !== kind) {
@@ -528,9 +837,23 @@ function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(item
   });
 }
 
-function ProjectLinkDialog({ open, projects, excludeIds, onLink, onClose }: { open: boolean; projects: Project[]; excludeIds: number[]; onLink: (project: Project) => void; onClose: () => void }) {
+function ProjectLinkDialog({
+  open,
+  projects,
+  excludeIds,
+  onLink,
+  onClose,
+}: {
+  open: boolean;
+  projects: Project[];
+  excludeIds: number[];
+  onLink: (project: Project) => void;
+  onClose: () => void;
+}) {
   const [selectedProjectId, setSelectedProjectId] = useState<number | "">("");
-  const availableProjects = projects.filter((project) => !excludeIds.includes(project.id));
+  const availableProjects = projects.filter(
+    (project) => !excludeIds.includes(project.id),
+  );
   const firstProjectId = availableProjects[0]?.id ?? "";
 
   useEffect(() => {
@@ -542,7 +865,9 @@ function ProjectLinkDialog({ open, projects, excludeIds, onLink, onClose }: { op
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
     event.preventDefault();
-    const project = availableProjects.find((item) => item.id === selectedProjectId);
+    const project = availableProjects.find(
+      (item) => item.id === selectedProjectId,
+    );
     if (!project) {
       return;
     }
@@ -553,7 +878,15 @@ function ProjectLinkDialog({ open, projects, excludeIds, onLink, onClose }: { op
   return (
     <Modal open={open} title="Projekt verknüpfen" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
-        <Select label="Projekt" value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value ? Number(event.target.value) : "")}>
+        <Select
+          label="Projekt"
+          value={selectedProjectId}
+          onChange={(event) =>
+            setSelectedProjectId(
+              event.target.value ? Number(event.target.value) : "",
+            )
+          }
+        >
           {availableProjects.map((project) => (
             <option key={project.id} value={project.id}>
               {project.name}
@@ -571,7 +904,15 @@ function ProjectLinkDialog({ open, projects, excludeIds, onLink, onClose }: { op
   );
 }
 
-function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftUseCase, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function UseCaseDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftUseCase, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const catalogs = useCatalogs();
@@ -585,7 +926,16 @@ function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
     if (!trimmedTitle || !trimmedSlug) {
       return;
     }
-    onCreate({ title: trimmedTitle, slug: trimmedSlug, status: resolveCatalogEntryKey(catalogs.entries, "featureStatus", status, "draft") });
+    onCreate({
+      title: trimmedTitle,
+      slug: trimmedSlug,
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "featureStatus",
+        status,
+        "draft",
+      ),
+    });
     setTitle("");
     setSlug("");
     setStatus(featureStatusValue(catalogs.entries, "draft", "draft"));
@@ -596,17 +946,35 @@ function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
     <Modal open={open} title="Use Case vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
         <FormField label="Slug" required>
-          <Input value={slug} onChange={(event) => setSlug(event.target.value)} required variant="mono" />
+          <Input
+            value={slug}
+            onChange={(event) => setSlug(event.target.value)}
+            required
+            variant="mono"
+          />
         </FormField>
         <FormField label="Status">
-          <StatusToggle kind="featureStatus" value={status} onChange={setStatus} />
+          <StatusToggle
+            kind="featureStatus"
+            value={status}
+            onChange={setStatus}
+          />
         </FormField>
         <footer className="flex justify-end gap-2">
           <Button onClick={onClose}>Abbrechen</Button>
-          <Button type="submit" variant="primary" disabled={!trimmedTitle || !trimmedSlug}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!trimmedTitle || !trimmedSlug}
+          >
             Vormerken
           </Button>
         </footer>
@@ -615,7 +983,15 @@ function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
   );
 }
 
-function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TaskDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
   const catalogs = useCatalogs();
   const [status, setStatus] = useState<TaskStatus>("active");
@@ -630,8 +1006,18 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     }
     onCreate({
       title: trimmedTitle,
-      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
-      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "workStatus",
+        status,
+        "active",
+      ),
+      priority: resolveCatalogEntryKey(
+        catalogs.entries,
+        "priority",
+        priority,
+        "medium",
+      ),
     });
     setTitle("");
     setStatus(workStatusValue(catalogs.entries, "active", "active"));
@@ -643,11 +1029,20 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     <Modal open={open} title="Aufgabe vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />
@@ -664,7 +1059,15 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
   );
 }
 
-function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TicketDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<TicketType>("bug");
   const catalogs = useCatalogs();
@@ -681,8 +1084,18 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     onCreate({
       title: trimmedTitle,
       type,
-      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"),
-      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "workStatus",
+        status,
+        "open",
+      ),
+      priority: resolveCatalogEntryKey(
+        catalogs.entries,
+        "priority",
+        priority,
+        "medium",
+      ),
     });
     setTitle("");
     setType("bug");
@@ -695,9 +1108,18 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     <Modal open={open} title="Ticket vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
-        <Select label="Typ" value={type} onChange={(event) => setType(event.target.value as TicketType)}>
+        <Select
+          label="Typ"
+          value={type}
+          onChange={(event) => setType(event.target.value as TicketType)}
+        >
           <option value="bug">{ticketTypeLabels.bug}</option>
           <option value="improvement">{ticketTypeLabels.improvement}</option>
           <option value="question">{ticketTypeLabels.question}</option>
@@ -705,7 +1127,11 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
         </Select>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />

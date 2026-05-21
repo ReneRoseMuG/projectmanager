@@ -5,7 +5,7 @@
  * DetailModal
  *
  * Abgedeckte Regeln:
- * - Page-Detailansichten rendern TabBar und Footer sticky.
+ * - Page-Detailansichten halten TabBar und Footer außerhalb des scrollbaren Inhaltsbereichs.
  * - Modal-Detailansichten behalten ihren internen Scrollbereich.
  *
  * Fehlerfälle:
@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe("DetailModal", () => {
-  it("rendert die Page-Variante mit sticky TabBar und sticky Footer", () => {
+  it("rendert die Page-Variante mit festem TabBar-/Footer-Bereich", () => {
     render(
       <DetailModal open title="Ticket" variant="page" tabs={tabs} activeTab="details" onTabChange={vi.fn()} onClose={vi.fn()} footer={<button type="button">Bearbeiten</button>}>
         <section data-testid="detail-body">Inhalt</section>
@@ -42,12 +42,14 @@ describe("DetailModal", () => {
     const main = screen.getByTestId("detail-body").closest("main");
     const footer = screen.getByRole("button", { name: "Bearbeiten" }).closest("footer");
 
-    expect(screen.getByRole("heading", { name: "Ticket" }).closest("header")).toHaveClass("rounded-t-2xl");
-    expect(tabWrapper).toHaveClass("sticky", "top-[-1rem]", "z-20", "shadow-sm", "md:top-[-1.5rem]");
-    expect(main).toHaveClass("flex", "flex-1", "flex-col");
+    expect(screen.getByRole("heading", { name: "Ticket" }).closest("header")).not.toHaveClass("rounded-t-2xl");
+    expect(tabWrapper).toHaveClass("shrink-0", "shadow-sm");
+    expect(tabWrapper).not.toHaveClass("sticky");
+    expect(main).toHaveClass("flex", "min-h-0", "flex-1", "flex-col", "overflow-auto");
     expect(main).not.toHaveClass("pb-24");
-    expect(main).not.toHaveClass("overflow-auto");
-    expect(footer).toHaveClass("sticky", "bottom-[-1rem]", "z-10", "rounded-b-2xl", "md:bottom-[-1.5rem]");
+    expect(footer).toHaveClass("shrink-0");
+    expect(footer).not.toHaveClass("sticky");
+    expect(footer).not.toHaveClass("rounded-b-2xl");
   });
 
   it("behält in der Modal-Variante das bestehende Scrollmodell", () => {

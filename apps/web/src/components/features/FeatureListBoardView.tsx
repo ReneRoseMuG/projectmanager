@@ -12,6 +12,7 @@ interface FeatureListBoardViewProps {
   onOpen: (feature: Feature) => void;
   onDelete: (feature: Feature) => void;
   filters?: React.ReactNode;
+  showToolbarAdd?: boolean;
 }
 
 function matchesSearch(feature: Feature, searchValue: string) {
@@ -19,14 +20,28 @@ function matchesSearch(feature: Feature, searchValue: string) {
   if (!normalized) {
     return true;
   }
-  return [feature.title, feature.slug, richTextToPlainText(feature.description)].some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
+  return [
+    feature.title,
+    feature.slug,
+    richTextToPlainText(feature.description),
+  ].some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
 }
 
 /** Feature-specific ListBoardView adapter with status board columns. */
-export function FeatureListBoardView({ features, onCreate, onOpen, onDelete, filters }: FeatureListBoardViewProps) {
+export function FeatureListBoardView({
+  features,
+  onCreate,
+  onOpen,
+  onDelete,
+  filters,
+  showToolbarAdd = true,
+}: FeatureListBoardViewProps) {
   const [mode, setMode] = useState<ListBoardMode>("board");
   const [searchValue, setSearchValue] = useState("");
-  const visibleFeatures = useMemo(() => features.filter((feature) => matchesSearch(feature, searchValue)), [features, searchValue]);
+  const visibleFeatures = useMemo(
+    () => features.filter((feature) => matchesSearch(feature, searchValue)),
+    [features, searchValue],
+  );
 
   return (
     <ListBoardView
@@ -36,14 +51,27 @@ export function FeatureListBoardView({ features, onCreate, onOpen, onDelete, fil
       onAdd={onCreate}
       onAddToColumn={onCreate}
       addLabel="Neues Feature"
+      showToolbarAdd={showToolbarAdd}
       statusKey="status"
       statusCatalogKind="featureStatus"
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={filters}
-      emptyState={<EmptyState icon={<BookOpen size={22} />} title="Keine Features" body="Lege ein Feature an, um Use Cases und Aufgaben fachlich zu gruppieren." tone="violet" variant="tinted" />}
-      renderCard={(feature) => <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} />}
-      renderRow={(feature) => <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} />}
+      emptyState={
+        <EmptyState
+          icon={<BookOpen size={22} />}
+          title="Keine Features"
+          body="Lege ein Feature an, um Use Cases und Aufgaben fachlich zu gruppieren."
+          tone="violet"
+          variant="tinted"
+        />
+      }
+      renderCard={(feature) => (
+        <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} />
+      )}
+      renderRow={(feature) => (
+        <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} />
+      )}
     />
   );
 }
