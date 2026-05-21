@@ -20,15 +20,42 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CommentThread } from "../../../../../apps/web/src/components/ui/CommentThread";
 
-vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
-  RichTextInlineField({ value, onChange, placeholder, readOnly, testIdPrefix }: { value: string | null | undefined; onChange: (value: string) => void; placeholder?: string; readOnly?: boolean; testIdPrefix?: string }) {
-    if (readOnly) {
-      return <div data-testid={testIdPrefix ?? "readonly-comment"} dangerouslySetInnerHTML={{ __html: value ?? "" }} />;
-    }
+vi.mock(
+  "../../../../../apps/web/src/components/ui/rich-text-inline-field",
+  () => ({
+    RichTextInlineField({
+      value,
+      onChange,
+      placeholder,
+      readOnly,
+      testIdPrefix,
+    }: {
+      value: string | null | undefined;
+      onChange: (value: string) => void;
+      placeholder?: string;
+      readOnly?: boolean;
+      testIdPrefix?: string;
+    }) {
+      if (readOnly) {
+        return (
+          <div
+            data-testid={testIdPrefix ?? "readonly-comment"}
+            dangerouslySetInnerHTML={{ __html: value ?? "" }}
+          />
+        );
+      }
 
-    return <textarea aria-label={placeholder ?? "Editor"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
-  }
-}));
+      return (
+        <textarea
+          aria-label={placeholder ?? "Editor"}
+          data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
+          value={value ?? ""}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+      );
+    },
+  }),
+);
 
 const comments = [
   {
@@ -37,7 +64,7 @@ const comments = [
     body: "<p>Erster Kommentar</p>",
     createdAt: "2026-05-17T08:00:00.000Z",
     updatedAt: "2026-05-17T08:00:00.000Z",
-    version: 1
+    version: 1,
   },
   {
     id: 2,
@@ -45,8 +72,8 @@ const comments = [
     body: "<p>Zweiter Kommentar</p>",
     createdAt: "2026-05-17T09:00:00.000Z",
     updatedAt: "2026-05-17T09:00:00.000Z",
-    version: 1
-  }
+    version: 1,
+  },
 ];
 
 afterEach(() => {
@@ -56,31 +83,51 @@ afterEach(() => {
 
 describe("CommentThread", () => {
   it("zeigt EmptyState wenn comments=[]", () => {
-    render(<CommentThread comments={[]} onCreate={vi.fn()} onDelete={vi.fn()} />);
+    render(
+      <CommentThread comments={[]} onCreate={vi.fn()} onDelete={vi.fn()} />,
+    );
 
     expect(screen.getByText("Noch keine Kommentare")).toBeInTheDocument();
   });
 
   it("rendert alle übergebenen Kommentare", () => {
-    render(<CommentThread comments={comments} onCreate={vi.fn()} onDelete={vi.fn()} />);
+    render(
+      <CommentThread
+        comments={comments}
+        onCreate={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
 
     expect(screen.getByText("Erster Kommentar")).toBeInTheDocument();
     expect(screen.getByText("Zweiter Kommentar")).toBeInTheDocument();
+    expect(screen.queryByText("Single User")).not.toBeInTheDocument();
+    expect(screen.queryByText("0 Reaktionen")).not.toBeInTheDocument();
+    expect(screen.queryByText("Antworten")).not.toBeInTheDocument();
+    expect(screen.getAllByText("17.05.26")).toHaveLength(2);
   });
 
   it("onCreate wird mit body aufgerufen beim Absenden", async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
-    render(<CommentThread comments={[]} onCreate={onCreate} onDelete={vi.fn()} />);
+    render(
+      <CommentThread comments={[]} onCreate={onCreate} onDelete={vi.fn()} />,
+    );
 
-    fireEvent.change(screen.getByLabelText("Kommentar schreiben"), { target: { value: "<p>Neu</p>" } });
+    fireEvent.change(screen.getByLabelText("Kommentar schreiben"), {
+      target: { value: "<p>Neu</p>" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Kommentar" }));
 
-    await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ body: "<p>Neu</p>" }));
+    await waitFor(() =>
+      expect(onCreate).toHaveBeenCalledWith({ body: "<p>Neu</p>" }),
+    );
   });
 
   it("onCreate mit leerem body wird nicht aufgerufen", () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
-    render(<CommentThread comments={[]} onCreate={onCreate} onDelete={vi.fn()} />);
+    render(
+      <CommentThread comments={[]} onCreate={onCreate} onDelete={vi.fn()} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Kommentar" }));
 
@@ -89,7 +136,13 @@ describe("CommentThread", () => {
 
   it("onDelete wird mit korrekter id aufgerufen", async () => {
     const onDelete = vi.fn().mockResolvedValue(undefined);
-    render(<CommentThread comments={comments} onCreate={vi.fn()} onDelete={onDelete} />);
+    render(
+      <CommentThread
+        comments={comments}
+        onCreate={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
 
     const deleteButton = screen.getAllByRole("button", { name: "Löschen" })[1];
     expect(deleteButton).toBeDefined();
@@ -99,8 +152,19 @@ describe("CommentThread", () => {
   });
 
   it("entityLabel erscheint im EmptyState-Text", () => {
-    render(<CommentThread comments={[]} onCreate={vi.fn()} onDelete={vi.fn()} entityLabel="Projekt" />);
+    render(
+      <CommentThread
+        comments={[]}
+        onCreate={vi.fn()}
+        onDelete={vi.fn()}
+        entityLabel="Projekt"
+      />,
+    );
 
-    expect(screen.getByText("Kommentare und Rückfragen zu diesem Projekt erscheinen hier.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Kommentare und Rückfragen zu diesem Projekt erscheinen hier.",
+      ),
+    ).toBeInTheDocument();
   });
 });

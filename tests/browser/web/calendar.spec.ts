@@ -1,5 +1,23 @@
-﻿import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
-import { authenticatedGoto, apiBaseUrl, createEvent, createProject, createTask, deleteEvent, deleteProject, deleteTask, formPage, uniqueTitle } from "./domain-test-utils";
+﻿import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
+import {
+  authenticatedGoto,
+  apiBaseUrl,
+  createEvent,
+  createProject,
+  createTask,
+  deleteEvent,
+  deleteProject,
+  deleteTask,
+  formPage,
+  todayIsoDate,
+  uniqueTitle,
+} from "./domain-test-utils";
 
 /**
  * Test Scope:
@@ -22,16 +40,30 @@ async function openCalendar(page: Page) {
 }
 
 function eventByTitle(page: Page, title: string) {
-  return page.getByRole("button", { name: title }).first();
+  return page.getByText(title, { exact: true }).first();
 }
 
-async function fillEventBase(form: Locator, title: string, day = "2026-12-01") {
+async function fillEventBase(
+  form: Locator,
+  title: string,
+  day = todayIsoDate(),
+) {
   await form.locator("input[required]").first().fill(title);
-  await form.locator('input[type="datetime-local"]').nth(0).fill(`${day}T09:00`);
-  await form.locator('input[type="datetime-local"]').nth(1).fill(`${day}T10:00`);
+  await form
+    .locator('input[type="datetime-local"]')
+    .nth(0)
+    .fill(`${day}T09:00`);
+  await form
+    .locator('input[type="datetime-local"]')
+    .nth(1)
+    .fill(`${day}T10:00`);
 }
 
-async function createEventViaUi(page: Page, title: string, options: { projectName?: string; taskTitle?: string } = {}) {
+async function createEventViaUi(
+  page: Page,
+  title: string,
+  options: { projectName?: string; taskTitle?: string } = {},
+) {
   await page.getByRole("button", { name: "Neuer Termin" }).click();
   const form = formPage(page, "Termin anlegen");
   await expect(form).toBeVisible();
@@ -44,12 +76,19 @@ async function createEventViaUi(page: Page, title: string, options: { projectNam
   }
 
   const [response] = await Promise.all([
-    page.waitForResponse((item) => item.url().includes(`${apiBaseUrl}/events`) && item.request().method() === "POST"),
-    form.getByRole("button", { name: "Speichern" }).click()
+    page.waitForResponse(
+      (item) =>
+        item.url().includes(`${apiBaseUrl}/events`) &&
+        item.request().method() === "POST",
+    ),
+    form.getByRole("button", { name: "Speichern" }).click(),
   ]);
   expect(response.ok()).toBeTruthy();
   await expect(eventByTitle(page, title)).toBeVisible();
-  return (await response.json()) as { id: number; owners: Array<{ type: "project" | "task"; id: number }> };
+  return (await response.json()) as {
+    id: number;
+    owners: Array<{ type: "project" | "task"; id: number }>;
+  };
 }
 
 async function deleteEventsByTitle(request: APIRequestContext, title: string) {
@@ -57,7 +96,10 @@ async function deleteEventsByTitle(request: APIRequestContext, title: string) {
   if (!response.ok()) {
     return;
   }
-  const events = (await response.json()) as Array<{ id: number; title: string }>;
+  const events = (await response.json()) as Array<{
+    id: number;
+    title: string;
+  }>;
   for (const event of events.filter((item) => item.title === title)) {
     await deleteEvent(request, event.id);
   }
@@ -86,7 +128,9 @@ test.describe("Kalender-Events", () => {
 
     try {
       await openCalendar(page);
-      const event = await createEventViaUi(page, title, { projectName: project.name });
+      const event = await createEventViaUi(page, title, {
+        projectName: project.name,
+      });
       eventId = event.id;
       expect(event.owners).toEqual([{ type: "project", id: project.id }]);
     } finally {
@@ -98,13 +142,19 @@ test.describe("Kalender-Events", () => {
 
   test("Termin mit Aufgaben-Owner erstellen", async ({ page, request }) => {
     const project = await createProject(request, "E2E Calendar Task Project");
-    const task = await createTask(request, { type: "project", id: project.id }, "E2E Calendar Task");
+    const task = await createTask(
+      request,
+      { type: "project", id: project.id },
+      "E2E Calendar Task",
+    );
     const title = uniqueTitle("E2E Calendar Task Event");
     let eventId: number | null = null;
 
     try {
       await openCalendar(page);
-      const event = await createEventViaUi(page, title, { taskTitle: task.title });
+      const event = await createEventViaUi(page, title, {
+        taskTitle: task.title,
+      });
       eventId = event.id;
       expect(event.owners).toEqual([{ type: "task", id: task.id }]);
     } finally {
@@ -117,8 +167,14 @@ test.describe("Kalender-Events", () => {
 
   test("Termin mit mehreren Ownern bearbeiten", async ({ page, request }) => {
     const project = await createProject(request, "E2E Calendar Multi Project");
-    const task = await createTask(request, { type: "project", id: project.id }, "E2E Calendar Multi Task");
-    const event = await createEvent(request, "E2E Calendar Multi Event", { owners: [{ type: "project", id: project.id }] });
+    const task = await createTask(
+      request,
+      { type: "project", id: project.id },
+      "E2E Calendar Multi Task",
+    );
+    const event = await createEvent(request, "E2E Calendar Multi Event", {
+      owners: [{ type: "project", id: project.id }],
+    });
 
     try {
       await openCalendar(page);
@@ -128,13 +184,17 @@ test.describe("Kalender-Events", () => {
       await form.getByLabel(task.title).check();
 
       const [response] = await Promise.all([
-        page.waitForResponse((item) => item.url().includes(`${apiBaseUrl}/events/${event.id}`) && item.request().method() === "PATCH"),
-        form.getByRole("button", { name: "Speichern" }).click()
+        page.waitForResponse(
+          (item) =>
+            item.url().includes(`${apiBaseUrl}/events/${event.id}`) &&
+            item.request().method() === "PATCH",
+        ),
+        form.getByRole("button", { name: "Speichern" }).click(),
       ]);
       expect(response.ok()).toBeTruthy();
       expect((await response.json()).owners).toEqual([
         { type: "project", id: project.id },
-        { type: "task", id: task.id }
+        { type: "task", id: task.id },
       ]);
     } finally {
       await deleteEvent(request, event.id);
@@ -143,7 +203,10 @@ test.describe("Kalender-Events", () => {
     }
   });
 
-  test("Termin löschen und aus Kalender entfernen", async ({ page, request }) => {
+  test("Termin löschen und aus Kalender entfernen", async ({
+    page,
+    request,
+  }) => {
     const event = await createEvent(request, "E2E Calendar Delete Event");
 
     try {
@@ -152,8 +215,12 @@ test.describe("Kalender-Events", () => {
       const form = formPage(page, "Termin bearbeiten");
 
       await Promise.all([
-        page.waitForResponse((item) => item.url().includes(`${apiBaseUrl}/events/${event.id}`) && item.request().method() === "DELETE"),
-        form.getByRole("button", { name: "Löschen" }).click()
+        page.waitForResponse(
+          (item) =>
+            item.url().includes(`${apiBaseUrl}/events/${event.id}`) &&
+            item.request().method() === "DELETE",
+        ),
+        form.getByRole("button", { name: "Löschen" }).click(),
       ]);
 
       await expect(eventByTitle(page, event.title)).toHaveCount(0);

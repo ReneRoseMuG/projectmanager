@@ -13,9 +13,17 @@ import type {
   ProjectStatus,
   Tag,
   TaskStatus,
-  TicketStatus
+  TicketStatus,
 } from "@taskmanager/shared-types";
-import { Flag, FolderKanban, Inbox, ListTodo, Paperclip, StickyNote, Trash2 } from "lucide-react";
+import {
+  Flag,
+  FolderKanban,
+  Inbox,
+  ListTodo,
+  Paperclip,
+  StickyNote,
+  Trash2,
+} from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -32,8 +40,16 @@ import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useWikiImport } from "../../hooks/useWikiImport";
-import { taskStatusLabels, taskStatusTones, ticketStatusLabels, ticketStatusTones } from "../../utils/domainLabels";
-import { countOpenStatusItems, resolveCatalogEntryKey } from "../../utils/catalogs";
+import {
+  taskStatusLabels,
+  taskStatusTones,
+  ticketStatusLabels,
+  ticketStatusTones,
+} from "../../utils/domainLabels";
+import {
+  countOpenStatusItems,
+  resolveCatalogEntryKey,
+} from "../../utils/catalogs";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { BacklogListBoardView } from "../backlog/BacklogListBoardView";
@@ -92,11 +108,22 @@ interface ProjectFormProps {
       comments: DraftComment[];
       notes: DraftNote[];
       files: DraftFile[];
-    }
+    },
   ) => Promise<void>;
 }
 
-type ProjectFormTab = "details" | "milestones" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "backlog" | "journal" | "import";
+type ProjectFormTab =
+  | "details"
+  | "milestones"
+  | "features"
+  | "tasks"
+  | "tickets"
+  | "comments"
+  | "notes"
+  | "attachments"
+  | "backlog"
+  | "journal"
+  | "import";
 
 const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "details", label: "Details" },
@@ -109,7 +136,7 @@ const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "attachments", label: "Dateien" },
   { value: "backlog", label: "Backlog" },
   { value: "journal", label: "Journal" },
-  { value: "import", label: "Import" }
+  { value: "import", label: "Import" },
 ];
 
 const swatches = [
@@ -121,7 +148,7 @@ const swatches = [
   "var(--color-teal)",
   "var(--color-violet)",
   "var(--color-magenta)",
-  "var(--color-ink)"
+  "var(--color-ink)",
 ];
 
 function projectCode(name: string) {
@@ -134,15 +161,40 @@ function projectCode(name: string) {
     .toUpperCase();
 }
 
-function workStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "active") {
-  return resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ?? preferredKey;
+function workStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "active",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ??
+    preferredKey
+  );
 }
 
-function priorityValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "medium") {
-  return resolveCatalogEntryKey(entries, "priority", value, preferredKey) ?? preferredKey;
+function priorityValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "medium",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "priority", value, preferredKey) ??
+    preferredKey
+  );
 }
 
-export function ProjectForm({ open, project, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab, onPostCreate }: ProjectFormProps) {
+export function ProjectForm({
+  open,
+  project,
+  onSubmit,
+  onClose,
+  onDelete,
+  savingLabel,
+  variant = "modal",
+  closeOnSubmit = true,
+  onOpenInTab,
+  onPostCreate,
+}: ProjectFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const projectId = project?.id;
@@ -151,13 +203,19 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
   const allFeatures = useFeatures();
   const milestones = useMilestones(null, projectId);
   const featureLinks = useProjectFeatureLinks(projectId);
-  const taskOwner = projectId ? { type: "project" as const, id: projectId } : undefined;
+  const taskOwner = projectId
+    ? { type: "project" as const, id: projectId }
+    : undefined;
   const tasks = useTasks(taskOwner);
-  const tickets = useTickets(projectId ? { type: "project", id: projectId } : null);
+  const tickets = useTickets(
+    projectId ? { type: "project", id: projectId } : null,
+  );
   const backlog = useBacklog(projectId);
   const catalogs = useCatalogs();
   const notes = useNotes(projectId ? { type: "project", id: projectId } : null);
-  const attachments = useAttachments(projectId ? { type: "project", id: projectId } : null);
+  const attachments = useAttachments(
+    projectId ? { type: "project", id: projectId } : null,
+  );
   const comments = useEntityComments("project", projectId);
   const wikiImport = useWikiImport(projectId);
   const [activeTab, setActiveTab] = useState<ProjectFormTab>("details");
@@ -170,7 +228,8 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
   const [deleting, setDeleting] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [milestoneViewMode, setMilestoneViewMode] = useState<ViewMode>("kanban");
+  const [milestoneViewMode, setMilestoneViewMode] =
+    useState<ViewMode>("kanban");
   const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
@@ -216,7 +275,9 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
 
   useEffect(() => {
     if (open) {
-      setStatus((currentStatus) => workStatusValue(catalogs.entries, currentStatus, "active"));
+      setStatus((currentStatus) =>
+        workStatusValue(catalogs.entries, currentStatus, "active"),
+      );
     }
   }, [catalogs.entries, open]);
 
@@ -228,12 +289,17 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         {
           name,
           description,
-          status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
+          status: resolveCatalogEntryKey(
+            catalogs.entries,
+            "workStatus",
+            status,
+            "active",
+          ),
           color,
           startDate: startDate || null,
-          dueDate: dueDate || null
+          dueDate: dueDate || null,
         },
-        selectedTags.map((tag) => tag.id)
+        selectedTags.map((tag) => tag.id),
       );
       if (!project && created && onPostCreate) {
         await onPostCreate(created.id, {
@@ -242,7 +308,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
           featureIds: pendingFeatures.map((feature) => feature.id),
           comments: pendingComments,
           notes: pendingNotes,
-          files: pendingFiles
+          files: pendingFiles,
         });
       }
       if (closeOnSubmit) {
@@ -272,13 +338,20 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
 
   const createNote = async () => {
     try {
-      const note = await notes.createNote({ title: "Ohne Titel", contentJson: {} });
+      const note = await notes.createNote({
+        title: "Ohne Titel",
+        contentJson: {},
+      });
       if (note) {
         setEditingNote(note);
         showToast({ tone: "success", title: "Notiz erstellt" });
       }
     } catch (noteError) {
-      showToast({ tone: "error", title: "Notiz konnte nicht erstellt werden", message: errorMessage(noteError) });
+      showToast({
+        tone: "error",
+        title: "Notiz konnte nicht erstellt werden",
+        message: errorMessage(noteError),
+      });
     }
   };
 
@@ -288,7 +361,11 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {
-      showToast({ tone: "error", title: "Datei konnte nicht hochgeladen werden", message: errorMessage(attachmentError) });
+      showToast({
+        tone: "error",
+        title: "Datei konnte nicht hochgeladen werden",
+        message: errorMessage(attachmentError),
+      });
       throw attachmentError;
     }
   };
@@ -298,7 +375,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       title: "Backlog-Item löschen?",
       body: `Das Backlog-Item "${item.title}" wird entfernt.`,
       severity: "danger",
-      confirmLabel: "Löschen"
+      confirmLabel: "Löschen",
     });
     if (!approved) {
       return;
@@ -307,7 +384,11 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       await backlog.removeItem(item.id);
       showToast({ tone: "success", title: "Backlog-Item gelöscht" });
     } catch (backlogError) {
-      showToast({ tone: "error", title: "Backlog-Item konnte nicht gelöscht werden", message: errorMessage(backlogError) });
+      showToast({
+        tone: "error",
+        title: "Backlog-Item konnte nicht gelöscht werden",
+        message: errorMessage(backlogError),
+      });
     }
   };
 
@@ -316,7 +397,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       title: "Meilenstein löschen?",
       body: `Der Meilenstein "${milestone.name}" wird entfernt.`,
       severity: "danger",
-      confirmLabel: "Löschen"
+      confirmLabel: "Löschen",
     });
     if (!approved) {
       return;
@@ -325,7 +406,11 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       await milestones.removeMilestone(milestone.id);
       showToast({ tone: "success", title: "Meilenstein gelöscht" });
     } catch (milestoneError) {
-      showToast({ tone: "error", title: "Meilenstein konnte nicht gelöscht werden", message: errorMessage(milestoneError) });
+      showToast({
+        tone: "error",
+        title: "Meilenstein konnte nicht gelöscht werden",
+        message: errorMessage(milestoneError),
+      });
     }
   };
 
@@ -336,7 +421,11 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         showToast({ tone: "success", title: "Import-Vorschau erstellt" });
       }
     } catch (importError) {
-      showToast({ tone: "error", title: "Import-Vorschau fehlgeschlagen", message: errorMessage(importError) });
+      showToast({
+        tone: "error",
+        title: "Import-Vorschau fehlgeschlagen",
+        message: errorMessage(importError),
+      });
     }
   };
 
@@ -349,40 +438,102 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         showToast({ tone: "success", title: "Wiki importiert" });
       }
     } catch (importError) {
-      showToast({ tone: "error", title: "Wiki-Import fehlgeschlagen", message: errorMessage(importError) });
+      showToast({
+        tone: "error",
+        title: "Wiki-Import fehlgeschlagen",
+        message: errorMessage(importError),
+      });
     }
   };
 
-  const visibleTabs = project ? baseTabs.filter((tab) => tab.value !== "journal" || canReadJournal) : baseTabs.filter((tab) => tab.value !== "import" && tab.value !== "journal");
+  const visibleTabs = project
+    ? baseTabs.filter((tab) => tab.value !== "journal" || canReadJournal)
+    : baseTabs.filter(
+        (tab) => tab.value !== "import" && tab.value !== "journal",
+      );
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
     }
     if (tab.value === "milestones") {
-      return { ...tab, count: project ? countOpenStatusItems(milestones.milestones, catalogs.entries, "workStatus") : 0 };
+      return {
+        ...tab,
+        count: project
+          ? countOpenStatusItems(
+              milestones.milestones,
+              catalogs.entries,
+              "workStatus",
+            )
+          : 0,
+      };
     }
     if (tab.value === "features") {
-      return { ...tab, count: project ? countOpenStatusItems(featureLinks.features, catalogs.entries, "featureStatus") : countOpenStatusItems(pendingFeatures, catalogs.entries, "featureStatus") };
+      return {
+        ...tab,
+        count: project
+          ? countOpenStatusItems(
+              featureLinks.features,
+              catalogs.entries,
+              "featureStatus",
+            )
+          : countOpenStatusItems(
+              pendingFeatures,
+              catalogs.entries,
+              "featureStatus",
+            ),
+      };
     }
     if (tab.value === "tasks") {
-      const pending = pendingTasks.map((item) => (item.kind === "existing" ? item.task : item.draft));
-      return { ...tab, count: project ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
+      const pending = pendingTasks.map((item) =>
+        item.kind === "existing" ? item.task : item.draft,
+      );
+      return {
+        ...tab,
+        count: project
+          ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus")
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "tickets") {
-      const pending = pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft));
-      return { ...tab, count: project ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
+      const pending = pendingTickets.map((item) =>
+        item.kind === "existing" ? item.ticket : item.draft,
+      );
+      return {
+        ...tab,
+        count: project
+          ? countOpenStatusItems(
+              tickets.tickets,
+              catalogs.entries,
+              "workStatus",
+            )
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "comments") {
-      return { ...tab, count: project ? comments.comments.length : pendingComments.length };
+      return {
+        ...tab,
+        count: project ? comments.comments.length : pendingComments.length,
+      };
     }
     if (tab.value === "notes") {
-      return { ...tab, count: project ? notes.notes.length : pendingNotes.length };
+      return {
+        ...tab,
+        count: project ? notes.notes.length : pendingNotes.length,
+      };
     }
     if (tab.value === "attachments") {
-      return { ...tab, count: project ? attachments.attachments.length : pendingFiles.length };
+      return {
+        ...tab,
+        count: project ? attachments.attachments.length : pendingFiles.length,
+      };
     }
     if (tab.value === "backlog") {
-      return { ...tab, count: project ? countOpenStatusItems(backlog.items, catalogs.entries, "workStatus") : 0 };
+      return {
+        ...tab,
+        count: project
+          ? countOpenStatusItems(backlog.items, catalogs.entries, "workStatus")
+          : 0,
+      };
     }
     return { ...tab, count: 0 };
   });
@@ -396,10 +547,22 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         breadcrumb={["Projekte", project ? project.name : "Neues Projekt"]}
         onSubmit={submit}
         saving={saving}
-        submitLabel={saving ? savingLabel ?? "Speichern…" : project ? "Speichern" : "Projekt anlegen"}
+        submitLabel={
+          saving
+            ? (savingLabel ?? "Speichern…")
+            : project
+              ? "Speichern"
+              : "Projekt anlegen"
+        }
         footerStart={
           project && onDelete ? (
-            <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" disabled={deleting} onClick={() => void deleteCurrentProject()}>
+            <Button
+              className="text-crimson hover:bg-crimson/10"
+              icon={<Trash2 size={18} />}
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => void deleteCurrentProject()}
+            >
               Löschen
             </Button>
           ) : undefined
@@ -408,37 +571,71 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         variant={variant}
         onOpenInTab={onOpenInTab}
         contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
-        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
+        tabBar={
+          <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+        }
       >
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
                 <FormField label="Projektname" required className="min-w-0">
-                  <Input value={name} onChange={(event) => setName(event.target.value)} required />
+                  <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    required
+                  />
                 </FormField>
                 <FormField label="Kürzel" className="min-w-0">
-                  <Input value={code} readOnly maxLength={5} variant="mono" className="uppercase text-slate-600" />
+                  <Input
+                    value={code}
+                    readOnly
+                    maxLength={5}
+                    variant="mono"
+                    className="uppercase text-slate-600"
+                  />
                 </FormField>
               </div>
               <FormField label="Beschreibung" className="mt-4">
-                <RichTextInlineField value={description} onChange={setDescription} placeholder="Worum geht es in diesem Projekt?" minRows={12} testIdPrefix="project-description" />
+                <RichTextInlineField
+                  value={description}
+                  onChange={setDescription}
+                  placeholder="Worum geht es in diesem Projekt?"
+                  minRows={5}
+                  testIdPrefix="project-description"
+                />
               </FormField>
             </Section>
             <Section title="Identität">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                 <FormField label="Farbe">
-                  <ColorPicker value={color} onChange={setColor} swatches={swatches} />
+                  <ColorPicker
+                    value={color}
+                    onChange={setColor}
+                    swatches={swatches}
+                  />
                 </FormField>
                 <FormField label="Status">
-                  <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+                  <StatusToggle
+                    kind="workStatus"
+                    value={status}
+                    onChange={setStatus}
+                  />
                 </FormField>
               </div>
             </Section>
             <Section title="Zeitraum">
               <div className="grid gap-4 md:grid-cols-2">
-                <DatePicker label="Start" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-                <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+                <DatePicker
+                  label="Start"
+                  value={startDate}
+                  onChange={(event) => setStartDate(event.target.value)}
+                />
+                <DatePicker
+                  label="Fällig"
+                  value={dueDate}
+                  onChange={(event) => setDueDate(event.target.value)}
+                />
               </div>
             </Section>
             <Section title="Tags">
@@ -455,12 +652,25 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
                 loading={milestones.loading}
                 viewMode={milestoneViewMode}
                 onViewModeChange={setMilestoneViewMode}
-                onCreate={() => navigate(`/milestones/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
-                onEdit={(milestone) => navigate(`/milestones/${milestone.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                onCreate={() =>
+                  navigate(
+                    `/milestones/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                  )
+                }
+                onEdit={(milestone) =>
+                  navigate(
+                    `/milestones/${milestone.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                  )
+                }
                 onDelete={(milestone) => void deleteMilestone(milestone)}
               />
             ) : (
-              <EmptyState icon={<Flag size={22} />} title="Meilensteine sind nach dem Speichern verfügbar." tone="teal" variant="tinted" />
+              <EmptyState
+                icon={<Flag size={22} />}
+                title="Meilensteine sind nach dem Speichern verfügbar."
+                tone="teal"
+                variant="tinted"
+              />
             )}
           </Section>
         ) : null}
@@ -475,19 +685,34 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
                   features={featureLinks.features}
                   viewMode={featureViewMode}
                   onViewModeChange={setFeatureViewMode}
-                  onCreate={() => navigate(`/features/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
-                  onOpen={(feature) => navigate(`/features/${feature.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                  onCreate={() =>
+                    navigate(
+                      `/features/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
+                  onOpen={(feature) =>
+                    navigate(
+                      `/features/${feature.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
                 />
               )
             ) : (
               <PendingRelationList
-                existingItems={pendingFeatures.map((feature) => ({ id: feature.id, title: feature.title }))}
+                existingItems={pendingFeatures.map((feature) => ({
+                  id: feature.id,
+                  title: feature.title,
+                }))}
                 draftItems={[]}
                 emptyIcon={<FolderKanban size={22} />}
                 emptyTitle="Keine Features vorgemerkt"
                 showCreateNew={false}
                 onLinkExisting={() => setFeatureLinkOpen(true)}
-                onRemoveExisting={(index) => setPendingFeatures((items) => items.filter((_, itemIndex) => itemIndex !== index))}
+                onRemoveExisting={(index) =>
+                  setPendingFeatures((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
                 onRemoveDraft={() => undefined}
               />
             )}
@@ -501,15 +726,36 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
             ) : (
               <PendingRelationList
                 existingItems={pendingTasks.flatMap((item) =>
-                  item.kind === "existing" ? [{ id: item.task.id, title: item.task.title, statusLabel: taskStatusLabels[item.task.status], statusTone: taskStatusTones[item.task.status] }] : []
+                  item.kind === "existing"
+                    ? [
+                        {
+                          id: item.task.id,
+                          title: item.task.title,
+                          statusLabel: taskStatusLabels[item.task.status],
+                          statusTone: taskStatusTones[item.task.status],
+                        },
+                      ]
+                    : [],
                 )}
-                draftItems={pendingTasks.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTasks.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Aufgaben vorgemerkt"
                 onLinkExisting={() => setTaskLinkOpen(true)}
                 onCreateNew={() => setTaskDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "new", index))}
+                onRemoveExisting={(index) =>
+                  setPendingTasks((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTasks((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
@@ -523,16 +769,35 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
               <PendingRelationList
                 existingItems={pendingTickets.flatMap((item) =>
                   item.kind === "existing"
-                    ? [{ id: item.ticket.id, title: item.ticket.title, statusLabel: ticketStatusLabels[item.ticket.status], statusTone: ticketStatusTones[item.ticket.status] }]
-                    : []
+                    ? [
+                        {
+                          id: item.ticket.id,
+                          title: item.ticket.title,
+                          statusLabel: ticketStatusLabels[item.ticket.status],
+                          statusTone: ticketStatusTones[item.ticket.status],
+                        },
+                      ]
+                    : [],
                 )}
-                draftItems={pendingTickets.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTickets.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
                 onLinkExisting={() => setTicketLinkOpen(true)}
                 onCreateNew={() => setTicketDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "new", index))}
+                onRemoveExisting={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
@@ -541,9 +806,24 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         {activeTab === "comments" ? (
           <Section title="Kommentare">
             {project ? (
-              <CommentThread comments={comments.comments} entityLabel="Projekt" onCreate={comments.createComment} onDelete={comments.removeComment} />
+              <CommentThread
+                comments={comments.comments}
+                entityLabel="Projekt"
+                onCreate={comments.createComment}
+                onDelete={comments.removeComment}
+              />
             ) : (
-              <PendingCommentList comments={pendingComments} onAdd={(comment) => setPendingComments((items) => [...items, comment])} onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingCommentList
+                comments={pendingComments}
+                onAdd={(comment) =>
+                  setPendingComments((items) => [...items, comment])
+                }
+                onRemove={(index) =>
+                  setPendingComments((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
@@ -556,11 +836,29 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
             </div>
             {project ? (
               <>
-                <NoteList notes={notes.notes} onCreate={createNote} onEdit={setEditingNote} onDelete={(note) => void notes.removeNote(note.id)} />
-                <NoteEditor note={editingNote} open={Boolean(editingNote)} onSave={notes.updateNote} onClose={() => setEditingNote(null)} />
+                <NoteList
+                  notes={notes.notes}
+                  onCreate={createNote}
+                  onEdit={setEditingNote}
+                  onDelete={(note) => void notes.removeNote(note.id)}
+                />
+                <NoteEditor
+                  note={editingNote}
+                  open={Boolean(editingNote)}
+                  onSave={notes.updateNote}
+                  onClose={() => setEditingNote(null)}
+                />
               </>
             ) : (
-              <PendingNoteList notes={pendingNotes} onAdd={(note) => setPendingNotes((items) => [...items, note])} onRemove={(index) => setPendingNotes((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingNoteList
+                notes={pendingNotes}
+                onAdd={(note) => setPendingNotes((items) => [...items, note])}
+                onRemove={(index) =>
+                  setPendingNotes((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
@@ -574,10 +872,25 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
             {project ? (
               <div className="grid gap-4">
                 <AttachmentUploader onUpload={uploadAttachment} />
-                <AttachmentList attachments={attachments.attachments} onDelete={(attachment) => void attachments.removeAttachment(attachment.id)} />
+                <AttachmentList
+                  attachments={attachments.attachments}
+                  onDelete={(attachment) =>
+                    void attachments.removeAttachment(attachment.id)
+                  }
+                />
               </div>
             ) : (
-              <PendingFileList files={pendingFiles} onAdd={(files) => setPendingFiles((items) => [...items, ...files])} onRemove={(index) => setPendingFiles((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingFileList
+                files={pendingFiles}
+                onAdd={(files) =>
+                  setPendingFiles((items) => [...items, ...files])
+                }
+                onRemove={(index) =>
+                  setPendingFiles((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
@@ -593,13 +906,26 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
                   features={allFeatures.features}
                   statusFilter={backlog.statusFilter}
                   onStatusFilterChange={backlog.setStatusFilter}
-                  onCreate={() => navigate(`/backlog/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
-                  onEdit={(item) => navigate(`/backlog/${item.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                  onCreate={() =>
+                    navigate(
+                      `/backlog/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
+                  onEdit={(item) =>
+                    navigate(
+                      `/backlog/${item.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
                   onDelete={(item) => void deleteBacklogItem(item)}
                 />
               )
             ) : (
-              <EmptyState icon={<Inbox size={22} />} title="Backlog ist nach dem Speichern verfügbar." tone="tangerine" variant="tinted" />
+              <EmptyState
+                icon={<Inbox size={22} />}
+                title="Backlog ist nach dem Speichern verfügbar."
+                tone="tangerine"
+                variant="tinted"
+              />
             )}
           </Section>
         ) : null}
@@ -632,7 +958,9 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       />
       <TaskLinkDialog
         open={taskLinkOpen}
-        currentTasks={pendingTasks.flatMap((item) => (item.kind === "existing" ? [item.task] : []))}
+        currentTasks={pendingTasks.flatMap((item) =>
+          item.kind === "existing" ? [item.task] : [],
+        )}
         onLink={async (task) => {
           setPendingTasks((items) => [...items, { kind: "existing", task }]);
           setTaskLinkOpen(false);
@@ -641,28 +969,41 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       />
       <TicketLinkDialog
         open={ticketLinkOpen}
-        currentTickets={pendingTickets.flatMap((item) => (item.kind === "existing" ? [item.ticket] : []))}
+        currentTickets={pendingTickets.flatMap((item) =>
+          item.kind === "existing" ? [item.ticket] : [],
+        )}
         onLink={async (ticket) => {
-          setPendingTickets((items) => [...items, { kind: "existing", ticket }]);
+          setPendingTickets((items) => [
+            ...items,
+            { kind: "existing", ticket },
+          ]);
           setTicketLinkOpen(false);
         }}
         onClose={() => setTicketLinkOpen(false)}
       />
       <TaskDraftDialog
         open={taskDraftOpen}
-        onCreate={(draft) => setPendingTasks((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingTasks((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setTaskDraftOpen(false)}
       />
       <TicketDraftDialog
         open={ticketDraftOpen}
-        onCreate={(draft) => setPendingTickets((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingTickets((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setTicketDraftOpen(false)}
       />
     </>
   );
 }
 
-function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(items: TItem[], kind: TItem["kind"], removeIndex: number): TItem[] {
+function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(
+  items: TItem[],
+  kind: TItem["kind"],
+  removeIndex: number,
+): TItem[] {
   let currentIndex = -1;
   return items.filter((item) => {
     if (item.kind !== kind) {
@@ -673,9 +1014,23 @@ function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(item
   });
 }
 
-function FeatureLinkDialog({ open, features, excludeIds, onLink, onClose }: { open: boolean; features: Feature[]; excludeIds: number[]; onLink: (feature: Feature) => void; onClose: () => void }) {
+function FeatureLinkDialog({
+  open,
+  features,
+  excludeIds,
+  onLink,
+  onClose,
+}: {
+  open: boolean;
+  features: Feature[];
+  excludeIds: number[];
+  onLink: (feature: Feature) => void;
+  onClose: () => void;
+}) {
   const [selectedFeatureId, setSelectedFeatureId] = useState<number | "">("");
-  const availableFeatures = features.filter((feature) => !excludeIds.includes(feature.id));
+  const availableFeatures = features.filter(
+    (feature) => !excludeIds.includes(feature.id),
+  );
   const firstFeatureId = availableFeatures[0]?.id ?? "";
 
   useEffect(() => {
@@ -687,7 +1042,9 @@ function FeatureLinkDialog({ open, features, excludeIds, onLink, onClose }: { op
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
     event.preventDefault();
-    const feature = availableFeatures.find((item) => item.id === selectedFeatureId);
+    const feature = availableFeatures.find(
+      (item) => item.id === selectedFeatureId,
+    );
     if (!feature) {
       return;
     }
@@ -698,7 +1055,15 @@ function FeatureLinkDialog({ open, features, excludeIds, onLink, onClose }: { op
   return (
     <Modal open={open} title="Feature verknüpfen" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
-        <Select label="Feature" value={selectedFeatureId} onChange={(event) => setSelectedFeatureId(event.target.value ? Number(event.target.value) : "")}>
+        <Select
+          label="Feature"
+          value={selectedFeatureId}
+          onChange={(event) =>
+            setSelectedFeatureId(
+              event.target.value ? Number(event.target.value) : "",
+            )
+          }
+        >
           {availableFeatures.map((feature) => (
             <option key={feature.id} value={feature.id}>
               {feature.title}
@@ -716,7 +1081,15 @@ function FeatureLinkDialog({ open, features, excludeIds, onLink, onClose }: { op
   );
 }
 
-function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TaskDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
   const catalogs = useCatalogs();
   const [status, setStatus] = useState<TaskStatus>("active");
@@ -731,8 +1104,18 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     }
     onCreate({
       title: trimmedTitle,
-      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
-      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "workStatus",
+        status,
+        "active",
+      ),
+      priority: resolveCatalogEntryKey(
+        catalogs.entries,
+        "priority",
+        priority,
+        "medium",
+      ),
     });
     setTitle("");
     setStatus(workStatusValue(catalogs.entries, "active", "active"));
@@ -744,11 +1127,20 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     <Modal open={open} title="Aufgabe vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />
@@ -765,7 +1157,15 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
   );
 }
 
-function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TicketDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
   const catalogs = useCatalogs();
   const [status, setStatus] = useState<TicketStatus>("open");
@@ -781,8 +1181,18 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     onCreate({
       title: trimmedTitle,
       type: "bug",
-      status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"),
-      priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium")
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "workStatus",
+        status,
+        "open",
+      ),
+      priority: resolveCatalogEntryKey(
+        catalogs.entries,
+        "priority",
+        priority,
+        "medium",
+      ),
     });
     setTitle("");
     setStatus(workStatusValue(catalogs.entries, "open", "open"));
@@ -794,11 +1204,20 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     <Modal open={open} title="Ticket vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />

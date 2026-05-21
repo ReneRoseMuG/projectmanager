@@ -1,6 +1,11 @@
-import type { TicketRelationType, TicketResolution, TicketType } from "@taskmanager/shared-types";
+import type {
+  TicketRelationType,
+  TicketResolution,
+  TicketType,
+} from "@taskmanager/shared-types";
 import type { BadgeTone } from "../components/ui/Badge";
 import type { PillTone } from "../components/ui/Pill";
+import { statusTonesByKind } from "./statusTones";
 
 export const projectStatusLabels: Record<string, string> = {
   active: "Aktiv",
@@ -14,41 +19,27 @@ export const projectStatusLabels: Record<string, string> = {
   done: "Erledigt",
   resolved: "Gelöst",
   closed: "Geschlossen",
-  rejected: "Verworfen"
+  rejected: "Verworfen",
 };
 
-export const projectStatusTones: Record<string, PillTone> = {
-  active: "fern",
-  on_hold: "tangerine",
-  completed: "violet",
-  archived: "steel",
-  todo: "crimson",
-  open: "steel",
-  in_progress: "tangerine",
-  in_review: "mustard",
-  done: "fern",
-  resolved: "fern",
-  closed: "violet",
-  rejected: "crimson"
-};
+export const projectStatusTones: Record<string, PillTone> =
+  statusTonesByKind.workStatus;
 
-export const milestoneStatusLabels: Record<string, string> = projectStatusLabels;
+export const milestoneStatusLabels: Record<string, string> =
+  projectStatusLabels;
 
-export const milestoneStatusTones: Record<string, PillTone> = projectStatusTones;
+export const milestoneStatusTones: Record<string, PillTone> =
+  projectStatusTones;
 
 export const featureStatusLabels: Record<string, string> = {
   draft: "Entwurf",
   active: "Aktiv",
   done: "Erledigt",
-  archived: "Archiviert"
+  archived: "Archiviert",
 };
 
-export const featureStatusTones: Record<string, PillTone> = {
-  draft: "mustard",
-  active: "fern",
-  done: "violet",
-  archived: "steel"
-};
+export const featureStatusTones: Record<string, PillTone> =
+  statusTonesByKind.featureStatus;
 
 export const taskStatusLabels: Record<string, string> = projectStatusLabels;
 
@@ -62,21 +53,21 @@ export const priorityLabels: Record<string, string> = {
   low: "Niedrig",
   medium: "Mittel",
   high: "Hoch",
-  urgent: "Dringend"
+  urgent: "Dringend",
 };
 
 export const priorityPillTones: Record<string, PillTone> = {
   urgent: "crimson",
   high: "tangerine",
   medium: "mustard",
-  low: "steel"
+  low: "steel",
 };
 
 export const priorityBadgeTones: Record<string, BadgeTone> = {
   urgent: "crimson",
   high: "tangerine",
   medium: "mustard",
-  low: "steel"
+  low: "steel",
 };
 
 export const ticketStatusLabels: Record<string, string> = projectStatusLabels;
@@ -87,14 +78,14 @@ export const ticketTypeLabels: Record<TicketType, string> = {
   bug: "Bug",
   improvement: "Verbesserung",
   question: "Frage",
-  task: "Aufgabe"
+  task: "Aufgabe",
 };
 
 export const ticketTypeTones: Record<TicketType, BadgeTone> = {
   bug: "crimson",
   improvement: "teal",
   question: "violet",
-  task: "steel"
+  task: "steel",
 };
 
 export const ticketResolutionLabels: Record<TicketResolution, string> = {
@@ -102,11 +93,11 @@ export const ticketResolutionLabels: Record<TicketResolution, string> = {
   wont_fix: "Wird nicht behoben",
   duplicate: "Duplikat",
   cant_reproduce: "Nicht reproduzierbar",
-  by_design: "Beabsichtigt"
+  by_design: "Beabsichtigt",
 };
 
 export const ticketRelationTypeLabels: Record<TicketRelationType, string> = {
   blocks: "Blockiert",
   related: "Verwandt",
-  duplicate: "Duplikat"
+  duplicate: "Duplikat",
 };

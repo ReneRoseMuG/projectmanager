@@ -18,7 +18,10 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ViewMode } from "../../../../../apps/web/src/types";
 import { ProjectFeaturePanel } from "../../../../../apps/web/src/components/features/ProjectFeaturePanel";
-import { buildFeature, buildFeatureSet } from "../../../../fixtures/web/components/ui/factories";
+import {
+  buildFeature,
+  buildFeatureSet,
+} from "../../../../fixtures/web/components/ui/factories";
 
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
@@ -32,9 +35,9 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
       reload: async () => undefined,
       createEntry: async () => undefined,
       updateEntry: async () => undefined,
-      deleteEntry: async () => undefined
+      deleteEntry: async () => undefined,
     };
-  }
+  },
 }));
 
 function renderProjectFeaturePanel({
@@ -76,7 +79,7 @@ describe("ProjectFeaturePanel", () => {
     expect(
       screen.getByRole("button", { name: "Neues Feature" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Neues Feature")).not.toBeInTheDocument();
+    expect(screen.getByText("Neues Feature")).toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns).toHaveLength(4);
@@ -156,7 +159,7 @@ describe("ProjectFeaturePanel", () => {
         name: "Aktionen",
       }),
     ).toBeInTheDocument();
-    fireEvent.doubleClick(activeRow as HTMLElement);
+    fireEvent.click(activeRow as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledWith(features[1]);
   });

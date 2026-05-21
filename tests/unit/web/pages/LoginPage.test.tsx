@@ -24,8 +24,8 @@ const loginMock = vi.fn();
 vi.mock("../../../../apps/web/src/hooks/useAuth", () => ({
   useAuth: () => ({
     login: loginMock,
-    loginPending: false
-  })
+    loginPending: false,
+  }),
 }));
 
 afterEach(() => {
@@ -39,14 +39,34 @@ describe("LoginPage", () => {
     render(
       <MemoryRouter>
         <LoginPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: "user@example.test" } });
-    fireEvent.change(screen.getByLabelText("Passwort"), { target: { value: "password123" } });
+    fireEvent.change(screen.getByLabelText("E-Mail"), {
+      target: { value: "user@example.test" },
+    });
+    fireEvent.change(screen.getByLabelText("Passwort"), {
+      target: { value: "password123" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Anmelden" }));
 
-    await waitFor(() => expect(loginMock).toHaveBeenCalledWith({ email: "user@example.test", password: "password123" }));
+    await waitFor(() =>
+      expect(loginMock).toHaveBeenCalledWith({
+        email: "user@example.test",
+        password: "password123",
+      }),
+    );
+  });
+
+  it("fokussiert das E-Mail-Feld und rendert den Untertitel im hellgrauen Ton", async () => {
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("E-Mail")).toHaveFocus());
+    expect(screen.getByText("Anmeldung")).toHaveClass("text-slate-500");
   });
 
   it("zeigt Fehler aus fehlgeschlagenem Login", async () => {
@@ -54,11 +74,13 @@ describe("LoginPage", () => {
     render(
       <MemoryRouter>
         <LoginPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Anmelden" }));
 
-    expect(await screen.findByText("Invalid email or password")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Invalid email or password"),
+    ).toBeInTheDocument();
   });
 });

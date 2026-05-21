@@ -38,26 +38,39 @@ export function ItemRow({
     <article
       className={`grid ${columns} items-center gap-4 rounded-xl border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:border-steel-300 hover:shadow-md ${onOpen ? "cursor-pointer" : ""} ${className}`}
       style={accentColor ? { borderLeftColor: accentColor } : undefined}
-      onDoubleClick={onOpen}
+      onClick={onOpen}
     >
-      {statusIndicator ? <span>{statusIndicator}</span> : null}
-      <button type="button" className="min-w-0 text-left" onClick={onOpen}>
+      {statusIndicator ? (
+        <span onClick={(event) => event.stopPropagation()}>
+          {statusIndicator}
+        </span>
+      ) : null}
+      <div className="min-w-0 text-left">
         <h3 className="truncate text-[14px] font-semibold text-ink">{title}</h3>
         {description ? (
           <p className="truncate text-[12px] text-slate-500">{description}</p>
         ) : null}
-      </button>
+      </div>
       {pills ? (
-        <div className={`flex shrink-0 items-center gap-2 ${pillsClassName}`}>
+        <div
+          className={`flex shrink-0 items-center gap-2 ${pillsClassName}`}
+          onClick={(event) => event.stopPropagation()}
+        >
           {pills}
         </div>
       ) : null}
       {meta ? (
-        <div className={`min-w-0 shrink-0 ${metaClassName}`}>{meta}</div>
+        <div
+          className={`min-w-0 shrink-0 ${metaClassName}`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {meta}
+        </div>
       ) : null}
       {actions ? (
         <div
           className={`relative z-20 flex shrink-0 justify-end gap-1 ${actionsClassName}`}
+          onClick={(event) => event.stopPropagation()}
         >
           {actions}
         </div>

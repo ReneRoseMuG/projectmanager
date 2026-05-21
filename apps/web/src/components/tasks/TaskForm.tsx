@@ -1,13 +1,32 @@
-import type { DraftComment, DraftNote, DraftSubtask, DraftTicket, Note, Priority, Tag, Task, TaskInput, TaskStatus, TicketStatus, TicketType } from "@taskmanager/shared-types";
+import type {
+  DraftComment,
+  DraftNote,
+  DraftSubtask,
+  DraftTicket,
+  Note,
+  Priority,
+  Tag,
+  Task,
+  TaskInput,
+  TaskStatus,
+  TicketStatus,
+  TicketType,
+} from "@taskmanager/shared-types";
 import { ClipboardList, ListChecks, Paperclip, StickyNote } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import type { DraftFile } from "../../types";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTickets } from "../../hooks/useTickets";
-import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed, resolveCatalogEntryKey } from "../../utils/catalogs";
+import {
+  catalogLabel,
+  countOpenStatusItems,
+  isCatalogStatusClosed,
+  resolveCatalogEntryKey,
+} from "../../utils/catalogs";
 import { toDateInput } from "../../utils/date";
 import { priorityPillTones, ticketTypeLabels } from "../../utils/domainLabels";
+import { statusToneForKey } from "../../utils/statusTones";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useNotes } from "../../hooks/useNotes";
@@ -66,7 +85,14 @@ export interface TaskFormInput extends TaskInput {
   pendingFiles: DraftFile[];
 }
 
-type TaskFormTab = "details" | "subtasks" | "tickets" | "comments" | "notes" | "attachments" | "journal";
+type TaskFormTab =
+  | "details"
+  | "subtasks"
+  | "tickets"
+  | "comments"
+  | "notes"
+  | "attachments"
+  | "journal";
 
 const tabs: Array<Tab<TaskFormTab>> = [
   { value: "details", label: "Details" },
@@ -75,29 +101,56 @@ const tabs: Array<Tab<TaskFormTab>> = [
   { value: "comments", label: "Kommentare" },
   { value: "notes", label: "Notizen" },
   { value: "attachments", label: "Dateien" },
-  { value: "journal", label: "Journal" }
+  { value: "journal", label: "Journal" },
 ];
 
-function taskStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: TaskStatus): TaskStatus {
-  return resolveCatalogEntryKey(entries, "workStatus", value, "active") ?? "active";
+function taskStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: TaskStatus,
+): TaskStatus {
+  return (
+    resolveCatalogEntryKey(entries, "workStatus", value, "active") ?? "active"
+  );
 }
 
-function ticketStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: TicketStatus): TicketStatus {
+function ticketStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: TicketStatus,
+): TicketStatus {
   return resolveCatalogEntryKey(entries, "workStatus", value, "open") ?? "open";
 }
 
-function priorityValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: Priority): Priority {
-  return resolveCatalogEntryKey(entries, "priority", value, "medium") ?? "medium";
+function priorityValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: Priority,
+): Priority {
+  return (
+    resolveCatalogEntryKey(entries, "priority", value, "medium") ?? "medium"
+  );
 }
 
-export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClose, onChanged, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab }: TaskFormProps) {
+export function TaskForm({
+  open,
+  task,
+  initialStatus = "active",
+  onSubmit,
+  onClose,
+  onChanged,
+  savingLabel,
+  variant = "modal",
+  closeOnSubmit = true,
+  onOpenInTab,
+}: TaskFormProps) {
   const taskId = task?.id ?? null;
   const detail = useTaskDetail(open && taskId ? taskId : null);
-  const ticketOwner = taskId && open ? { type: "task" as const, id: taskId } : null;
+  const ticketOwner =
+    taskId && open ? { type: "task" as const, id: taskId } : null;
   const tickets = useTickets(ticketOwner);
   const catalogs = useCatalogs();
   const notes = useNotes(taskId && open ? { type: "task", id: taskId } : null);
-  const attachments = useAttachments(taskId && open ? { type: "task", id: taskId } : null);
+  const attachments = useAttachments(
+    taskId && open ? { type: "task", id: taskId } : null,
+  );
   const { showToast } = useToast();
   const canReadJournal = useHasPermission("journal", "read");
   const { confirm } = useConfirm();
@@ -149,8 +202,12 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
 
   useEffect(() => {
     if (open) {
-      setStatus((currentStatus) => taskStatusValue(catalogs.entries, currentStatus));
-      setPriority((currentPriority) => priorityValue(catalogs.entries, currentPriority));
+      setStatus((currentStatus) =>
+        taskStatusValue(catalogs.entries, currentStatus),
+      );
+      setPriority((currentPriority) =>
+        priorityValue(catalogs.entries, currentPriority),
+      );
     }
   }, [catalogs.entries, open]);
 
@@ -161,8 +218,18 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
       await onSubmit({
         title,
         description,
-        status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active"),
-        priority: resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium"),
+        status: resolveCatalogEntryKey(
+          catalogs.entries,
+          "workStatus",
+          status,
+          "active",
+        ),
+        priority: resolveCatalogEntryKey(
+          catalogs.entries,
+          "priority",
+          priority,
+          "medium",
+        ),
         assignee: null,
         dueDate: dueDate || null,
         tagIds: selectedTags.map((tag) => tag.id),
@@ -170,7 +237,7 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
         pendingTickets,
         pendingComments,
         pendingNotes,
-        pendingFiles
+        pendingFiles,
       });
       if (closeOnSubmit) {
         onClose();
@@ -184,13 +251,20 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
 
   const createNote = async () => {
     try {
-      const note = await notes.createNote({ title: "Ohne Titel", contentJson: {} });
+      const note = await notes.createNote({
+        title: "Ohne Titel",
+        contentJson: {},
+      });
       if (note) {
         setEditingNote(note);
         showToast({ tone: "success", title: "Notiz erstellt" });
       }
     } catch (noteError) {
-      showToast({ tone: "error", title: "Notiz konnte nicht erstellt werden", message: errorMessage(noteError) });
+      showToast({
+        tone: "error",
+        title: "Notiz konnte nicht erstellt werden",
+        message: errorMessage(noteError),
+      });
     }
   };
 
@@ -200,31 +274,69 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {
-      showToast({ tone: "error", title: "Datei konnte nicht hochgeladen werden", message: errorMessage(attachmentError) });
+      showToast({
+        tone: "error",
+        title: "Datei konnte nicht hochgeladen werden",
+        message: errorMessage(attachmentError),
+      });
       throw attachmentError;
     }
   };
 
-  const visibleTabs = task ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal) : tabs.filter((tab) => tab.value !== "journal");
+  const visibleTabs = task
+    ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
+    : tabs.filter((tab) => tab.value !== "journal");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
     }
     if (tab.value === "subtasks") {
-      return { ...tab, count: task ? countOpenStatusItems(detail.task?.subtasks ?? [], catalogs.entries, "workStatus") : countOpenStatusItems(pendingSubtasks, catalogs.entries, "workStatus") };
+      return {
+        ...tab,
+        count: task
+          ? countOpenStatusItems(
+              detail.task?.subtasks ?? [],
+              catalogs.entries,
+              "workStatus",
+            )
+          : countOpenStatusItems(
+              pendingSubtasks,
+              catalogs.entries,
+              "workStatus",
+            ),
+      };
     }
     if (tab.value === "tickets") {
-      const pending = pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft));
-      return { ...tab, count: task ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
+      const pending = pendingTickets.map((item) =>
+        item.kind === "existing" ? item.ticket : item.draft,
+      );
+      return {
+        ...tab,
+        count: task
+          ? countOpenStatusItems(
+              tickets.tickets,
+              catalogs.entries,
+              "workStatus",
+            )
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "comments") {
-      return { ...tab, count: task ? detail.task?.comments.length ?? 0 : pendingComments.length };
+      return {
+        ...tab,
+        count: task
+          ? (detail.task?.comments.length ?? 0)
+          : pendingComments.length,
+      };
     }
     if (tab.value === "notes") {
       return { ...tab, count: task ? notes.notes.length : pendingNotes.length };
     }
     if (tab.value === "attachments") {
-      return { ...tab, count: task ? attachments.attachments.length : pendingFiles.length };
+      return {
+        ...tab,
+        count: task ? attachments.attachments.length : pendingFiles.length,
+      };
     }
     return { ...tab, count: 0 };
   });
@@ -237,33 +349,58 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
         title={task ? "Aufgabe bearbeiten" : "Aufgabe anlegen"}
         icon={<ClipboardList size={20} />}
         breadcrumb={["Aufgaben", task ? task.title : "Neu"]}
-        submitLabel={saving ? savingLabel ?? "Speichern…" : task ? "Speichern" : "Aufgabe anlegen"}
+        submitLabel={
+          saving
+            ? (savingLabel ?? "Speichern…")
+            : task
+              ? "Speichern"
+              : "Aufgabe anlegen"
+        }
         saving={saving}
         onSubmit={submit}
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
         contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
-        tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
+        tabBar={
+          <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+        }
         headerMeta={
           <div className="flex flex-wrap gap-2">
             <StatusPill kind="workStatus" value={status} />
-            <Pill tone={priorityPillTones[priority] ?? "steel"}>{catalogLabel(catalogs.entries, "priority", priority)}</Pill>
+            <Pill tone={priorityPillTones[priority] ?? "steel"}>
+              {catalogLabel(catalogs.entries, "priority", priority)}
+            </Pill>
           </div>
         }
       >
         {task && detail.loading ? <TaskListSkeleton /> : null}
-        {task && detail.error ? <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{detail.error}</div> : null}
+        {task && detail.error ? (
+          <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">
+            {detail.error}
+          </div>
+        ) : null}
 
         {activeTab === "details" ? (
           <>
             <Section title="Basisdaten">
               <div className="grid gap-4">
                 <FormField label="Titel" required>
-                  <Input value={title} onChange={(event) => setTitle(event.target.value)} required autoFocus={!task} />
+                  <Input
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    required
+                    autoFocus={!task}
+                  />
                 </FormField>
                 <FormField label="Beschreibung">
-                  <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="task-description" onChange={setDescription} />
+                  <RichTextInlineField
+                    value={description}
+                    placeholder="Beschreibung"
+                    minRows={12}
+                    testIdPrefix="task-description"
+                    onChange={setDescription}
+                  />
                 </FormField>
               </div>
             </Section>
@@ -271,7 +408,11 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
             <Section title="Status & Priorität">
               <div className="grid items-start gap-4 md:grid-cols-2">
                 <FormField label="Status">
-                  <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+                  <StatusToggle
+                    kind="workStatus"
+                    value={status}
+                    onChange={setStatus}
+                  />
                 </FormField>
                 <FormField label="Priorität">
                   <PrioritySelect value={priority} onChange={setPriority} />
@@ -280,7 +421,11 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
             </Section>
 
             <Section title="Termin">
-              <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              <DatePicker
+                label="Fällig"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+              />
             </Section>
 
             <Section title="Tags">
@@ -301,7 +446,11 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
                     await onChanged?.();
                     showToast({ tone: "success", title: "Aufgabe erstellt" });
                   } catch (taskError) {
-                    showToast({ tone: "error", title: "Aufgabe konnte nicht erstellt werden", message: errorMessage(taskError) });
+                    showToast({
+                      tone: "error",
+                      title: "Aufgabe konnte nicht erstellt werden",
+                      message: errorMessage(taskError),
+                    });
                     throw taskError;
                   }
                 }}
@@ -310,9 +459,16 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
                     await detail.updateSubtask(id, input);
                     await detail.reload();
                     await onChanged?.();
-                    showToast({ tone: "success", title: "Aufgabe aktualisiert" });
+                    showToast({
+                      tone: "success",
+                      title: "Aufgabe aktualisiert",
+                    });
                   } catch (taskError) {
-                    showToast({ tone: "error", title: "Aufgabe konnte nicht aktualisiert werden", message: errorMessage(taskError) });
+                    showToast({
+                      tone: "error",
+                      title: "Aufgabe konnte nicht aktualisiert werden",
+                      message: errorMessage(taskError),
+                    });
                     throw taskError;
                   }
                 }}
@@ -323,7 +479,11 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
                     await onChanged?.();
                     showToast({ tone: "success", title: "Aufgabe gelöscht" });
                   } catch (taskError) {
-                    showToast({ tone: "error", title: "Aufgabe konnte nicht gelöscht werden", message: errorMessage(taskError) });
+                    showToast({
+                      tone: "error",
+                      title: "Aufgabe konnte nicht gelöscht werden",
+                      message: errorMessage(taskError),
+                    });
                     throw taskError;
                   }
                 }}
@@ -331,13 +491,20 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
             ) : (
               <PendingRelationList
                 existingItems={[]}
-                draftItems={pendingSubtasks.map((subtask) => ({ title: subtask.title, badge: "Wird erstellt" }))}
+                draftItems={pendingSubtasks.map((subtask) => ({
+                  title: subtask.title,
+                  badge: "Wird erstellt",
+                }))}
                 emptyIcon={<ListChecks size={22} />}
                 emptyTitle="Keine Subtasks vorgemerkt"
                 showLinkExisting={false}
                 onCreateNew={() => setSubtaskDraftOpen(true)}
                 onRemoveExisting={() => undefined}
-                onRemoveDraft={(index) => setPendingSubtasks((items) => items.filter((_, itemIndex) => itemIndex !== index))}
+                onRemoveDraft={(index) =>
+                  setPendingSubtasks((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
               />
             )}
           </Section>
@@ -355,19 +522,43 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
                         {
                           id: item.ticket.id,
                           title: item.ticket.title,
-                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.ticket.status),
-                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.ticket.status) ? "steel" : "fern"
-                        }
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.ticket.status,
+                          ),
+                          statusTone: statusToneForKey(
+                            "workStatus",
+                            item.ticket.status,
+                            isCatalogStatusClosed(
+                              catalogs.entries,
+                              "workStatus",
+                              item.ticket.status,
+                            ),
+                          ),
+                        },
                       ]
-                    : []
+                    : [],
                 )}
-                draftItems={pendingTickets.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTickets.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<ClipboardList size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
                 onLinkExisting={() => setTicketLinkOpen(true)}
                 onCreateNew={() => setTicketDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "new", index))}
+                onRemoveExisting={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
@@ -385,7 +576,11 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
                     await detail.reload();
                     showToast({ tone: "success", title: "Kommentar erstellt" });
                   } catch (commentError) {
-                    showToast({ tone: "error", title: "Kommentar konnte nicht erstellt werden", message: errorMessage(commentError) });
+                    showToast({
+                      tone: "error",
+                      title: "Kommentar konnte nicht erstellt werden",
+                      message: errorMessage(commentError),
+                    });
                     throw commentError;
                   }
                 }}
@@ -395,13 +590,27 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
                     await detail.reload();
                     showToast({ tone: "success", title: "Kommentar gelöscht" });
                   } catch (commentError) {
-                    showToast({ tone: "error", title: "Kommentar konnte nicht gelöscht werden", message: errorMessage(commentError) });
+                    showToast({
+                      tone: "error",
+                      title: "Kommentar konnte nicht gelöscht werden",
+                      message: errorMessage(commentError),
+                    });
                     throw commentError;
                   }
                 }}
               />
             ) : (
-              <PendingCommentList comments={pendingComments} onAdd={(comment) => setPendingComments((items) => [...items, comment])} onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingCommentList
+                comments={pendingComments}
+                onAdd={(comment) =>
+                  setPendingComments((items) => [...items, comment])
+                }
+                onRemove={(index) =>
+                  setPendingComments((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
@@ -423,21 +632,45 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
                       title: "Notiz löschen?",
                       body: `Die Notiz "${note.title}" wird entfernt.`,
                       severity: "danger",
-                      confirmLabel: "Löschen"
+                      confirmLabel: "Löschen",
                     }).then((approved) => {
                       if (approved) {
                         void notes
                           .removeNote(note.id)
-                          .then(() => showToast({ tone: "success", title: "Notiz gelöscht" }))
-                          .catch((noteError: unknown) => showToast({ tone: "error", title: "Notiz konnte nicht gelöscht werden", message: errorMessage(noteError) }));
+                          .then(() =>
+                            showToast({
+                              tone: "success",
+                              title: "Notiz gelöscht",
+                            }),
+                          )
+                          .catch((noteError: unknown) =>
+                            showToast({
+                              tone: "error",
+                              title: "Notiz konnte nicht gelöscht werden",
+                              message: errorMessage(noteError),
+                            }),
+                          );
                       }
                     });
                   }}
                 />
-                <NoteEditor note={editingNote} open={Boolean(editingNote)} onSave={notes.updateNote} onClose={() => setEditingNote(null)} />
+                <NoteEditor
+                  note={editingNote}
+                  open={Boolean(editingNote)}
+                  onSave={notes.updateNote}
+                  onClose={() => setEditingNote(null)}
+                />
               </>
             ) : (
-              <PendingNoteList notes={pendingNotes} onAdd={(note) => setPendingNotes((items) => [...items, note])} onRemove={(index) => setPendingNotes((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingNoteList
+                notes={pendingNotes}
+                onAdd={(note) => setPendingNotes((items) => [...items, note])}
+                onRemove={(index) =>
+                  setPendingNotes((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
@@ -458,13 +691,24 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
                       title: "Datei löschen?",
                       body: attachment.originalName,
                       severity: "danger",
-                      confirmLabel: "Löschen"
+                      confirmLabel: "Löschen",
                     }).then((approved) => {
                       if (approved) {
                         void attachments
                           .removeAttachment(attachment.id)
-                          .then(() => showToast({ tone: "success", title: "Datei gelöscht" }))
-                          .catch((attachmentError: unknown) => showToast({ tone: "error", title: "Datei konnte nicht gelöscht werden", message: errorMessage(attachmentError) }));
+                          .then(() =>
+                            showToast({
+                              tone: "success",
+                              title: "Datei gelöscht",
+                            }),
+                          )
+                          .catch((attachmentError: unknown) =>
+                            showToast({
+                              tone: "error",
+                              title: "Datei konnte nicht gelöscht werden",
+                              message: errorMessage(attachmentError),
+                            }),
+                          );
                       }
                     });
                   }}
@@ -473,7 +717,9 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
             ) : (
               <PendingFileList
                 files={pendingFiles}
-                onAdd={(files) => setPendingFiles((items) => [...items, ...files])}
+                onAdd={(files) =>
+                  setPendingFiles((items) => [...items, ...files])
+                }
                 onRemove={(index) =>
                   setPendingFiles((items) => {
                     const removed = items[index];
@@ -497,28 +743,44 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
 
       <TicketLinkDialog
         open={ticketLinkOpen}
-        currentTickets={pendingTickets.flatMap((item) => (item.kind === "existing" ? [item.ticket] : []))}
+        currentTickets={pendingTickets.flatMap((item) =>
+          item.kind === "existing" ? [item.ticket] : [],
+        )}
         onLink={async (ticket) => {
-          setPendingTickets((items) => [...items, { kind: "existing", ticket }]);
+          setPendingTickets((items) => [
+            ...items,
+            { kind: "existing", ticket },
+          ]);
           setTicketLinkOpen(false);
         }}
         onClose={() => setTicketLinkOpen(false)}
       />
       <SubtaskDraftDialog
         open={subtaskDraftOpen}
-        onCreate={(subtask) => setPendingSubtasks((items) => [...items, subtask])}
+        onCreate={(subtask) =>
+          setPendingSubtasks((items) => [...items, subtask])
+        }
         onClose={() => setSubtaskDraftOpen(false)}
       />
       <TicketDraftDialog
         open={ticketDraftOpen}
-        onCreate={(ticket) => setPendingTickets((items) => [...items, { kind: "new", draft: ticket }])}
+        onCreate={(ticket) =>
+          setPendingTickets((items) => [
+            ...items,
+            { kind: "new", draft: ticket },
+          ])
+        }
         onClose={() => setTicketDraftOpen(false)}
       />
     </>
   );
 }
 
-function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(items: TItem[], kind: TItem["kind"], removeIndex: number): TItem[] {
+function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(
+  items: TItem[],
+  kind: TItem["kind"],
+  removeIndex: number,
+): TItem[] {
   let currentIndex = -1;
   return items.filter((item) => {
     if (item.kind !== kind) {
@@ -529,7 +791,15 @@ function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(item
   });
 }
 
-function SubtaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (subtask: DraftSubtask) => void; onClose: () => void }) {
+function SubtaskDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (subtask: DraftSubtask) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
   const catalogs = useCatalogs();
   const [status, setStatus] = useState<TaskStatus>("active");
@@ -544,7 +814,11 @@ function SubtaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
     }
     const nextStatus = taskStatusValue(catalogs.entries, status);
     const nextPriority = priorityValue(catalogs.entries, priority);
-    onCreate({ title: trimmedTitle, status: nextStatus, priority: nextPriority });
+    onCreate({
+      title: trimmedTitle,
+      status: nextStatus,
+      priority: nextPriority,
+    });
     setTitle("");
     setStatus(taskStatusValue(catalogs.entries, "active"));
     setPriority(priorityValue(catalogs.entries, "medium"));
@@ -552,16 +826,33 @@ function SubtaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
   };
 
   return (
-    <FormModal open={open} title="Subtask vormerken" icon={<ListChecks size={20} />} breadcrumb={["Aufgaben", "Subtask"]} submitLabel="Vormerken" onSubmit={submit} onClose={onClose}>
+    <FormModal
+      open={open}
+      title="Subtask vormerken"
+      icon={<ListChecks size={20} />}
+      breadcrumb={["Aufgaben", "Subtask"]}
+      submitLabel="Vormerken"
+      onSubmit={submit}
+      onClose={onClose}
+    >
       <Section title="Subtask">
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
       </Section>
       <Section title="Status & Priorität">
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />
@@ -572,7 +863,15 @@ function SubtaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
   );
 }
 
-function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (ticket: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TicketDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (ticket: Extract<DraftTicket, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
   const catalogs = useCatalogs();
   const [type, setType] = useState<TicketType>("bug");
@@ -586,9 +885,24 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     if (!trimmedTitle) {
       return;
     }
-    const nextStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open");
-    const nextPriority = resolveCatalogEntryKey(catalogs.entries, "priority", priority, "medium");
-    onCreate({ title: trimmedTitle, type, status: nextStatus, priority: nextPriority });
+    const nextStatus = resolveCatalogEntryKey(
+      catalogs.entries,
+      "workStatus",
+      status,
+      "open",
+    );
+    const nextPriority = resolveCatalogEntryKey(
+      catalogs.entries,
+      "priority",
+      priority,
+      "medium",
+    );
+    onCreate({
+      title: trimmedTitle,
+      type,
+      status: nextStatus,
+      priority: nextPriority,
+    });
     setTitle("");
     setType("bug");
     setStatus(ticketStatusValue(catalogs.entries, "open"));
@@ -597,13 +911,30 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
   };
 
   return (
-    <FormModal open={open} title="Ticket vormerken" icon={<ClipboardList size={20} />} breadcrumb={["Aufgaben", "Ticket"]} submitLabel="Vormerken" onSubmit={submit} onClose={onClose}>
+    <FormModal
+      open={open}
+      title="Ticket vormerken"
+      icon={<ClipboardList size={20} />}
+      breadcrumb={["Aufgaben", "Ticket"]}
+      submitLabel="Vormerken"
+      onSubmit={submit}
+      onClose={onClose}
+    >
       <Section title="Ticket">
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
         <div className="mt-4">
-          <Select label="Typ" value={type} onChange={(event) => setType(event.target.value as TicketType)}>
+          <Select
+            label="Typ"
+            value={type}
+            onChange={(event) => setType(event.target.value as TicketType)}
+          >
             <option value="bug">{ticketTypeLabels.bug}</option>
             <option value="improvement">{ticketTypeLabels.improvement}</option>
             <option value="question">{ticketTypeLabels.question}</option>
@@ -614,7 +945,11 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
       <Section title="Status & Priorität">
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />
@@ -624,4 +959,3 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     </FormModal>
   );
 }
-

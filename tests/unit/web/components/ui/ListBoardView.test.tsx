@@ -18,9 +18,13 @@ import "@testing-library/jest-dom/vitest";
 import { fireEvent, screen, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Button } from "../../../../../apps/web/src/components/ui/Button";
 import { ItemCard } from "../../../../../apps/web/src/components/ui/ItemCard";
 import { ItemRow } from "../../../../../apps/web/src/components/ui/ItemRow";
-import { ListBoardView, type ListBoardMode } from "../../../../../apps/web/src/components/ui/ListBoardView";
+import {
+  ListBoardView,
+  type ListBoardMode,
+} from "../../../../../apps/web/src/components/ui/ListBoardView";
 
 interface TestItem {
   id: number;
@@ -31,7 +35,7 @@ interface TestItem {
 
 const items: TestItem[] = [
   { id: 1, title: "Alpha", description: "Erste Karte", status: "todo" },
-  { id: 2, title: "Beta", description: "Zweite Karte", status: "done" }
+  { id: 2, title: "Beta", description: "Zweite Karte", status: "done" },
 ];
 
 function renderListBoardView({
@@ -40,7 +44,7 @@ function renderListBoardView({
   loading = false,
   onModeChange = vi.fn(),
   onAdd = vi.fn(),
-  onSearchChange = vi.fn()
+  onSearchChange = vi.fn(),
 }: {
   mode?: ListBoardMode;
   viewItems?: TestItem[];
@@ -60,9 +64,16 @@ function renderListBoardView({
       onSearchChange={onSearchChange}
       emptyState={<div>Keine Einträge</div>}
       loading={loading}
-      renderCard={(item) => <ItemCard header={<h3>Card {item.title}</h3>} body={<p>{item.description}</p>} />}
-      renderRow={(item) => <ItemRow title={`Row ${item.title}`} description={item.description} />}
-    />
+      renderCard={(item) => (
+        <ItemCard
+          header={<h3>Card {item.title}</h3>}
+          body={<p>{item.description}</p>}
+        />
+      )}
+      renderRow={(item) => (
+        <ItemRow title={`Row ${item.title}`} description={item.description} />
+      )}
+    />,
   );
 }
 
@@ -78,7 +89,9 @@ describe("ListBoardView", () => {
     expect(screen.getByText("Card Beta")).toBeInTheDocument();
     expect(screen.queryByText("Row Alpha")).not.toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass("min-h-0", "flex-1");
-    expect(container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3")).toHaveClass("min-h-full", "min-w-0");
+    expect(
+      container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3"),
+    ).toHaveClass("min-h-full", "min-w-0");
     container.querySelectorAll("article.rounded-2xl").forEach((card) => {
       expect(card).toHaveClass("min-w-0");
       expect(card).toHaveClass("max-w-full");
@@ -103,20 +116,39 @@ describe("ListBoardView", () => {
         statusKey="status"
         statusColumns={[
           { value: "done", label: "Erledigt", sortOrder: 200, isClosed: true },
-          { value: "todo", label: "Offen", sortOrder: 100 }
+          { value: "todo", label: "Offen", sortOrder: 100 },
         ]}
-        renderCard={(item) => <ItemCard header={<h3>Card {item.title}</h3>} body={<p>{item.description}</p>} />}
-        renderRow={(item) => <ItemRow title={`Row ${item.title}`} description={item.description} />}
-      />
+        renderCard={(item) => (
+          <ItemCard
+            header={<h3>Card {item.title}</h3>}
+            body={<p>{item.description}</p>}
+          />
+        )}
+        renderRow={(item) => (
+          <ItemRow title={`Row ${item.title}`} description={item.description} />
+        )}
+      />,
     );
 
     const sections = container.querySelectorAll("section.rounded-lg");
     expect(sections).toHaveLength(2);
-    expect(within(sections[0] as HTMLElement).getByRole("heading", { name: "Offen" })).toBeInTheDocument();
-    expect(within(sections[0] as HTMLElement).getByText("Row Alpha")).toBeInTheDocument();
+    expect(
+      within(sections[0] as HTMLElement).getByRole("heading", {
+        name: "Offen",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(sections[0] as HTMLElement).getByText("Row Alpha"),
+    ).toBeInTheDocument();
     expect(sections[0]).toHaveClass("bg-shell/70");
-    expect(within(sections[1] as HTMLElement).getByRole("heading", { name: "Erledigt" })).toBeInTheDocument();
-    expect(within(sections[1] as HTMLElement).getByText("Row Beta")).toBeInTheDocument();
+    expect(
+      within(sections[1] as HTMLElement).getByRole("heading", {
+        name: "Erledigt",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(sections[1] as HTMLElement).getByText("Row Beta"),
+    ).toBeInTheDocument();
     expect(sections[1]).toHaveClass("bg-steel-50/80");
   });
 
@@ -138,6 +170,32 @@ describe("ListBoardView", () => {
     expect(onAdd).toHaveBeenCalledTimes(1);
   });
 
+  it("blendet den Toolbar-Add-Button bei showToolbarAdd=false aus", () => {
+    render(
+      <ListBoardView
+        items={items}
+        mode="board"
+        onModeChange={vi.fn()}
+        onAdd={vi.fn()}
+        addLabel="Anlegen"
+        showToolbarAdd={false}
+        renderCard={(item) => (
+          <ItemCard
+            header={<h3>Card {item.title}</h3>}
+            body={<p>{item.description}</p>}
+          />
+        )}
+        renderRow={(item) => (
+          <ItemRow title={`Row ${item.title}`} description={item.description} />
+        )}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "Anlegen" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("Spalten-Button ruft onAddToColumn mit Status auf", () => {
     const onAddToColumn = vi.fn();
     render(
@@ -151,11 +209,18 @@ describe("ListBoardView", () => {
         statusKey="status"
         statusColumns={[
           { value: "todo", label: "Offen" },
-          { value: "done", label: "Erledigt" }
+          { value: "done", label: "Erledigt" },
         ]}
-        renderCard={(item) => <ItemCard header={<h3>Card {item.title}</h3>} body={<p>{item.description}</p>} />}
-        renderRow={(item) => <ItemRow title={`Row ${item.title}`} description={item.description} />}
-      />
+        renderCard={(item) => (
+          <ItemCard
+            header={<h3>Card {item.title}</h3>}
+            body={<p>{item.description}</p>}
+          />
+        )}
+        renderRow={(item) => (
+          <ItemRow title={`Row ${item.title}`} description={item.description} />
+        )}
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Offen hinzufügen" }));
@@ -171,8 +236,15 @@ describe("ListBoardView", () => {
     const { container } = renderListBoardView({ viewItems: [] });
 
     expect(screen.getByText("Keine Einträge")).toBeInTheDocument();
-    expect(screen.getByText("Keine Einträge").parentElement).toHaveClass("grid", "min-h-full");
-    expect(container.firstElementChild).toHaveClass("flex", "min-h-0", "flex-1");
+    expect(screen.getByText("Keine Einträge").parentElement).toHaveClass(
+      "grid",
+      "min-h-full",
+    );
+    expect(container.firstElementChild).toHaveClass(
+      "flex",
+      "min-h-0",
+      "flex-1",
+    );
   });
 
   it("loading=true zeigt Skeleton, kein EmptyState", () => {
@@ -186,27 +258,29 @@ describe("ListBoardView", () => {
     const onSearchChange = vi.fn();
     renderListBoardView({ onSearchChange });
 
-    fireEvent.change(screen.getByPlaceholderText("Suchen"), { target: { value: "Alpha" } });
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "Alpha" },
+    });
 
     expect(onSearchChange).toHaveBeenCalledWith("Alpha");
   });
 });
 
 describe("ItemCard", () => {
-  it("Doppelklick ruft onOpen auf", () => {
+  it("einfacher Klick ruft onOpen auf", () => {
     const onOpen = vi.fn();
     render(<ItemCard header={<h3>Alpha</h3>} onOpen={onOpen} />);
 
     const card = screen.getByText("Alpha").closest("article");
     expect(card).toBeInTheDocument();
-    fireEvent.doubleClick(card as HTMLElement);
+    fireEvent.click(card as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("Einfacher Klick ruft onOpen nicht auf", () => {
+  it("Karte ohne onOpen reagiert nicht auf Klick", () => {
     const onOpen = vi.fn();
-    render(<ItemCard header={<h3>Alpha</h3>} onOpen={onOpen} />);
+    render(<ItemCard header={<h3>Alpha</h3>} />);
 
     const card = screen.getByText("Alpha").closest("article");
     expect(card).toBeInTheDocument();
@@ -218,14 +292,18 @@ describe("ItemCard", () => {
   it("ActionMenu ruft onEdit auf (nicht onOpen)", () => {
     const onEdit = vi.fn();
     const onOpen = vi.fn();
-    render(<ItemCard header={<h3>Alpha</h3>} onOpen={onOpen} onEdit={onEdit} />);
+    render(
+      <ItemCard header={<h3>Alpha</h3>} onOpen={onOpen} onEdit={onEdit} />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Aktionen" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Bearbeiten" }));
 
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onOpen).not.toHaveBeenCalled();
-    expect(screen.queryByRole("menuitem", { name: "Bearbeiten" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("menuitem", { name: "Bearbeiten" }),
+    ).not.toBeInTheDocument();
   });
 
   it("ActionMenu ruft onDelete auf", () => {
@@ -239,7 +317,9 @@ describe("ItemCard", () => {
   });
 
   it("accentColor setzt backgroundColor", () => {
-    const { container } = render(<ItemCard accentColor="rgb(18, 52, 86)" header={<h3>Alpha</h3>} />);
+    const { container } = render(
+      <ItemCard accentColor="rgb(18, 52, 86)" header={<h3>Alpha</h3>} />,
+    );
     const accent = container.querySelector("span[style]");
 
     expect(accent).toHaveStyle({ backgroundColor: "rgb(18, 52, 86)" });
@@ -263,14 +343,42 @@ describe("ItemRow", () => {
     expect(screen.getByText("Beschreibung")).toBeInTheDocument();
   });
 
-  it("Doppelklick ruft onOpen auf", () => {
+  it("einfacher Klick ruft onOpen auf", () => {
     const onOpen = vi.fn();
     render(<ItemRow title="Alpha" onOpen={onOpen} />);
 
     const row = screen.getByText("Alpha").closest("article");
     expect(row).toBeInTheDocument();
-    fireEvent.doubleClick(row as HTMLElement);
+    fireEvent.click(row as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it("Klick auf Row-Aktion löst kein onOpen aus", () => {
+    const onOpen = vi.fn();
+    const onAction = vi.fn();
+    render(
+      <ItemRow
+        title="Alpha"
+        onOpen={onOpen}
+        actions={<Button onClick={onAction}>Aktion</Button>}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Aktion" }));
+
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("Klick auf Row-Pills löst kein onOpen aus", () => {
+    const onOpen = vi.fn();
+    render(
+      <ItemRow title="Alpha" onOpen={onOpen} pills={<span>Status</span>} />,
+    );
+
+    fireEvent.click(screen.getByText("Status"));
+
+    expect(onOpen).not.toHaveBeenCalled();
   });
 });
