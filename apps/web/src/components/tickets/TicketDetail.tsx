@@ -304,6 +304,8 @@ export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "mo
                       }
                     });
                   }}
+                  onOpen={(attachment) => attachments.openAttachment(attachment.id)}
+                  openingAttachmentId={attachments.openingAttachmentId}
                 />
               </div>
             </Section>

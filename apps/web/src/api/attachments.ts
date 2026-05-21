@@ -45,6 +45,10 @@ export async function deleteAttachment(id: number): Promise<void> {
   await api.delete(`attachments/${id}`).json();
 }
 
+export async function openAttachment(id: number): Promise<void> {
+  await api.post(`attachments/${id}/open`);
+}
+
 export async function getAttachmentPreview(id: number): Promise<AttachmentPreviewInfo> {
   return api.get(`attachments/${id}/preview`).json<AttachmentPreviewInfo>();
 }

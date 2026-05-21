@@ -13,10 +13,10 @@ const items = [
 ];
 
 const settingsItems = [
-  { to: "/settings/preferences", label: "Präferenzen", icon: SlidersHorizontal },
-  { to: "/settings/catalogs", label: "Kataloge", icon: ListChecks },
-  { to: "/settings/tags", label: "Tags", icon: Tags },
-  { to: "/settings/backup", label: "Sicherung", icon: DatabaseBackup }
+  { to: "/settings/preferences", label: "Präferenzen", icon: SlidersHorizontal, resource: "settings" as const },
+  { to: "/settings/catalogs", label: "Kataloge", icon: ListChecks, resource: "catalogs" as const },
+  { to: "/settings/tags", label: "Tags", icon: Tags, resource: "tags" as const },
+  { to: "/settings/backup", label: "Sicherung", icon: DatabaseBackup, resource: "dumps" as const }
 ];
 
 const adminItems = [
@@ -34,6 +34,10 @@ function canAdministerUsers(user: CurrentUser | null | undefined): boolean {
 
 function canReadItem(user: CurrentUser | null | undefined, item: (typeof items)[number]): boolean {
   return item.resource === undefined || hasPermission(user, item.resource, "read");
+}
+
+function canReadSettingsItem(user: CurrentUser | null | undefined, item: (typeof settingsItems)[number]): boolean {
+  return hasPermission(user, item.resource, "read");
 }
 
 interface SidebarProps {
@@ -86,7 +90,7 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
       </nav>
       <NavSection>Einstellungen</NavSection>
       <nav className="grid gap-1">
-        {settingsItems.map((item) => {
+        {settingsItems.filter((item) => canReadSettingsItem(currentUser, item)).map((item) => {
           const Icon = item.icon;
           return (
             <NavLink

@@ -739,6 +739,8 @@ export function MilestoneForm({
                   onDelete={(attachment) =>
                     void attachments.removeAttachment(attachment.id)
                   }
+                  onOpen={(attachment) => attachments.openAttachment(attachment.id)}
+                  openingAttachmentId={attachments.openingAttachmentId}
                 />
               </div>
             ) : (

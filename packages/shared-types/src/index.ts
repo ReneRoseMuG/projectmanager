@@ -927,12 +927,36 @@ export interface DumpBackupStatus {
   latestFile: DumpBackupFile | null;
 }
 
+export interface DumpRemoteBackupFile extends DumpBackupFile {
+  imported: boolean;
+  importedAt: string | null;
+}
+
+export interface DumpRemoteBackupStatus {
+  remoteDirectory: string;
+  configured: boolean;
+  protectedConfirmed: boolean;
+  ready: boolean;
+  fileCount: number;
+  latestFile: DumpRemoteBackupFile | null;
+  files: DumpRemoteBackupFile[];
+  blockingIssues: string[];
+}
+
+export interface DumpRemoteUploadResult {
+  attempted: boolean;
+  success: boolean;
+  remoteFile: DumpRemoteBackupFile | null;
+  error: string | null;
+}
+
 export interface DumpBackupSaveResult {
   dumpId: string;
   filename: string;
   filePath: string;
   sizeBytes: number;
   backupFile: DumpBackupFile;
+  remoteUpload: DumpRemoteUploadResult | null;
 }
 
 export interface DumpBackupPreviewResult {
@@ -954,6 +978,16 @@ export interface DumpBackupApplyRequest {
   fileId: string;
   fileHash: string;
   confirmationPhrase: string;
+}
+
+export interface DumpRemoteBackupPreviewRequest {
+  fileId?: string | null;
+}
+
+export interface DumpRemoteBackupApplyRequest {
+  fileId: string;
+  fileHash: string;
+  confirmed: boolean;
 }
 
 export interface DumpBackupApplyResult {

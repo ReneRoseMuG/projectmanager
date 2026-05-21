@@ -8,7 +8,8 @@ import {
   listFeatureAttachments,
   listMilestoneAttachments,
   listProjectAttachments,
-  listTaskAttachments
+  listTaskAttachments,
+  openAttachment
 } from "../services/attachments.service.js";
 import { getAttachmentPreview } from "../services/attachment-preview.service.js";
 import { createJournalActor } from "../services/journal.service.js";
@@ -79,6 +80,18 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     "/attachments/:id/preview",
     { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => getAttachmentPreview(app.db, request.params.id)
+  );
+
+  app.post<{ Params: { id: number } }>(
+    "/attachments/:id/open",
+    {
+      config: { auth: { resource: "attachments", action: "read" } },
+      schema: { params: idParamSchema, response: { 204: { type: "null" } } }
+    },
+    async (request, reply) => {
+      await openAttachment(app.db, request.params.id, app.fileOpener);
+      return reply.status(204).send();
+    }
   );
 
   app.post<{ Params: { id: number } }>(

@@ -69,6 +69,7 @@ const knownQueries = {
   eventsList: queryKeys.events.list("2026-05"),
   calendarTasks: queryKeys.calendarTasks.list(),
   localBackupStatus: queryKeys.dumps.localStatus(),
+  remoteBackupStatus: queryKeys.dumps.remoteStatus(),
   settingsResolved: queryKeys.settings.resolved(),
   globalSearch: queryKeys.globalSearch.data()
 } satisfies Record<string, QueryKey>;
@@ -118,6 +119,7 @@ describe("Query invalidation integration", () => {
     expect(queryKeys.tasks.features(taskId)).toEqual(["tasks", "detail", taskId, "features"]);
     expect(queryKeys.features.projects(featureId)).toEqual(["features", "detail", featureId, "projects"]);
     expect(queryKeys.settings.resolved()).toEqual(["settings", "resolved"]);
+    expect(queryKeys.dumps.remoteStatus()).toEqual(["dumps", "remoteStatus"]);
     expect(queryKeys.globalSearch.data()).toEqual(["globalSearch", "data"]);
   });
 
@@ -321,6 +323,8 @@ describe("Query invalidation integration", () => {
       "wikiTree",
       "wikiDetail",
       "calendarTasks",
+      "localBackupStatus",
+      "remoteBackupStatus",
       "settingsResolved",
       "globalSearch"
     ]);

@@ -31,6 +31,7 @@ import { registerUseCasesRoutes } from "./routes/use-cases.js";
 import { registerWikiRoutes } from "./routes/wiki.js";
 import { config } from "./config.js";
 import { createOllamaLocalModelClient, type AiLocalModelClient } from "./services/ai-ollama.service.js";
+import { openFileWithDefaultApp } from "./services/file-opener.service.js";
 import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
 import { seedAuthData } from "./services/auth.service.js";
 import { errorHandler } from "./utils/errors.js";
@@ -49,6 +50,7 @@ export async function buildApp(
   app.decorate("db", injectedDb);
   app.decorate("sqlite", injectedSqlite);
   app.decorate("aiClient", aiClient);
+  app.decorate("fileOpener", openFileWithDefaultApp);
   app.setErrorHandler(errorHandler);
 
   await registerCors(app);

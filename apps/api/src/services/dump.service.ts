@@ -5,6 +5,9 @@ import type {
   DumpBackupSaveResult,
   DumpBackupStatus,
   DumpFileRootSummary,
+  DumpRemoteBackupFile,
+  DumpRemoteBackupStatus,
+  DumpRemoteUploadResult,
   DumpTableSummary
 } from "@taskmanager/shared-types";
 import * as archiverPackage from "archiver";
@@ -18,11 +21,15 @@ import unzipper from "unzipper";
 import { config } from "../config.js";
 import { assertSafeTestDatabasePath, assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
+import { downloadBackupSftpFile, getBackupSftpReadiness, listBackupSftpFiles, uploadBackupSftpFile } from "./backup-sftp.service.js";
 import { getContentBaseDir } from "./content.service.js";
 
 const APP_ID = "taskmanager";
-const DUMP_FORMAT_VERSION = 8;
+const DUMP_FORMAT_VERSION = 9;
+const SUPPORTED_DUMP_FORMAT_VERSIONS = [8, DUMP_FORMAT_VERSION] as const;
 const DUMP_FILENAME_PREFIX = "taskmanager_dump_";
+const STANDARD_ADMIN_SETUP_SETTING_KEY = "admin_setup_done";
+const REMOTE_IMPORT_HISTORY_SETTING_KEY = "remote_dump_import_history";
 const ZipArchive = (archiverPackage as unknown as {
   ZipArchive: new (options: { zlib: { level: number } }) => Archiver;
 }).ZipArchive;
@@ -100,7 +107,7 @@ type DumpTableRows = Record<DumpTableKey, Array<Record<string, unknown>>>;
 
 interface DumpPayload {
   appId: typeof APP_ID;
-  formatVersion: typeof DUMP_FORMAT_VERSION;
+  formatVersion: number;
   dumpId: string;
   exportedAt: string;
   schemaRevision: string;
@@ -119,7 +126,7 @@ interface DumpFileRootManifest extends DumpFileRootSummary {
 
 interface DumpManifest {
   appId: typeof APP_ID;
-  formatVersion: typeof DUMP_FORMAT_VERSION;
+  formatVersion: number;
   dumpId: string;
   exportedAt: string;
   schemaRevision: string;
@@ -144,9 +151,26 @@ interface FileRootBackup {
   existed: boolean;
 }
 
+interface PreservedLocalAuth {
+  admin: Record<string, unknown> | null;
+  adminSetup: Record<string, unknown> | null;
+  remoteImportHistory: Record<string, unknown> | null;
+  adminSettings: Array<Record<string, unknown>>;
+}
+
 interface ApplyDumpOptions {
   afterFileSwap?: () => void;
+  afterTablesRestore?: (sqlite: Database.Database, preview: InspectedDump) => void;
 }
+
+interface RemoteDumpImportHistoryEntry {
+  fileId: string;
+  fileHash: string;
+  dumpId: string;
+  importedAt: string;
+}
+
+const activeRemoteImports = new Set<string>();
 
 function quoteIdentifier(value: string): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) {
@@ -234,6 +258,23 @@ function readLocalBackupFile(fileId: string): { backupFile: DumpBackupFile; buff
   };
 }
 
+function mapRemoteBackupFile(
+  file: { name: string; path: string; sizeBytes: number; modifiedTime: string },
+  importedByFileId: Map<string, RemoteDumpImportHistoryEntry>
+): DumpRemoteBackupFile {
+  const imported = importedByFileId.get(file.name) ?? null;
+  return {
+    id: file.name,
+    name: file.name,
+    path: file.path,
+    createdTime: file.modifiedTime,
+    modifiedTime: file.modifiedTime,
+    sizeBytes: file.sizeBytes,
+    imported: imported !== null,
+    importedAt: imported?.importedAt ?? null
+  };
+}
+
 function assertSafeDumpRuntimeTargets(): void {
   assertSafeTestDatabasePath(config.databasePath);
   assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
@@ -270,8 +311,112 @@ function getSchemaRevision(): string {
   return "unknown";
 }
 
+function isSupportedDumpFormatVersion(value: unknown): value is (typeof SUPPORTED_DUMP_FORMAT_VERSIONS)[number] {
+  return SUPPORTED_DUMP_FORMAT_VERSIONS.includes(value as (typeof SUPPORTED_DUMP_FORMAT_VERSIONS)[number]);
+}
+
+function standardAdminEmail(): string {
+  return config.adminEmail.toLowerCase();
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function numericValue(value: unknown): number | null {
+  const numeric = Number(value);
+  return Number.isInteger(numeric) ? numeric : null;
+}
+
 function selectTableRows(sqlite: Database.Database, tableName: string): Array<Record<string, unknown>> {
   return sqlite.prepare(`SELECT * FROM ${quoteIdentifier(tableName)} ORDER BY rowid`).all() as Array<Record<string, unknown>>;
+}
+
+function findStandardAdminId(rows: Array<Record<string, unknown>>): number | null {
+  const admin = rows.find((row) => stringValue(row.email)?.toLowerCase() === standardAdminEmail());
+  return admin ? numericValue(admin.id) : null;
+}
+
+function buildRoleCodeById(rows: Array<Record<string, unknown>>): Map<number, string> {
+  const result = new Map<number, string>();
+  for (const row of rows) {
+    const id = numericValue(row.id);
+    const key = stringValue(row.key);
+    if (id !== null && key) {
+      result.set(id, key);
+    }
+  }
+  return result;
+}
+
+function clearStandardAdminReferences(row: Record<string, unknown>, standardAdminId: number | null): Record<string, unknown> {
+  if (standardAdminId === null) {
+    return { ...row };
+  }
+
+  const result = { ...row };
+  for (const column of ["created_by", "updated_by", "actor_user_id"]) {
+    if (numericValue(result[column]) === standardAdminId) {
+      result[column] = null;
+    }
+  }
+  return result;
+}
+
+function normalizeUserRows(rows: Array<Record<string, unknown>>, roleCodeById: Map<number, string>): Array<Record<string, unknown>> {
+  return rows
+    .filter((row) => stringValue(row.email)?.toLowerCase() !== standardAdminEmail())
+    .map((row) => {
+      const result = { ...row };
+      const roleCode = stringValue(result.roleCode);
+      if (!roleCode) {
+        const roleId = numericValue(result.role_id);
+        if (roleId === null) {
+          throw badRequest("Dump user is missing a role reference");
+        }
+        const mappedRoleCode = roleCodeById.get(roleId);
+        if (!mappedRoleCode) {
+          throw badRequest("Dump user references an unknown role");
+        }
+        result.roleCode = mappedRoleCode;
+      }
+      delete result.role_id;
+      return result;
+    });
+}
+
+function normalizeDumpTables(tables: DumpTableRows): DumpTableRows {
+  const result = {} as DumpTableRows;
+  const standardAdminId = findStandardAdminId(tables.users);
+  const roleCodeById = buildRoleCodeById(tables.roles);
+
+  for (const entry of DUMP_TABLES) {
+    if (entry.key === "users") {
+      result.users = normalizeUserRows(tables.users, roleCodeById);
+      continue;
+    }
+    if (entry.key === "appSettings") {
+      result.appSettings = tables.appSettings.filter((row) => row.key !== STANDARD_ADMIN_SETUP_SETTING_KEY && row.key !== REMOTE_IMPORT_HISTORY_SETTING_KEY);
+      continue;
+    }
+    if (entry.key === "settingsValues") {
+      result.settingsValues = tables.settingsValues
+        .filter((row) => !(standardAdminId !== null && row.scope_type === "USER" && String(row.scope_id) === String(standardAdminId)))
+        .map((row) => clearStandardAdminReferences(row, standardAdminId));
+      continue;
+    }
+    result[entry.key] = tables[entry.key].map((row) => clearStandardAdminReferences(row, standardAdminId));
+  }
+
+  return result;
+}
+
+function normalizeDumpPayload(payload: DumpPayload): DumpPayload {
+  return {
+    ...payload,
+    formatVersion: DUMP_FORMAT_VERSION,
+    tables: normalizeDumpTables(payload.tables)
+  };
 }
 
 function collectDumpTableRows(sqlite: Database.Database): DumpTableRows {
@@ -279,7 +424,7 @@ function collectDumpTableRows(sqlite: Database.Database): DumpTableRows {
   for (const entry of DUMP_TABLES) {
     result[entry.key] = selectTableRows(sqlite, entry.tableName);
   }
-  return result;
+  return normalizeDumpTables(result);
 }
 
 function buildTableManifest(rows: DumpTableRows): Record<DumpTableKey, DumpTableSummary> {
@@ -442,7 +587,7 @@ function parsePayload(raw: unknown): DumpPayload {
   if (candidate.appId !== APP_ID) {
     throw badRequest("Dump belongs to another application");
   }
-  if (candidate.formatVersion !== DUMP_FORMAT_VERSION) {
+  if (!isSupportedDumpFormatVersion(candidate.formatVersion)) {
     throw badRequest("Unsupported dump format version");
   }
   if (typeof candidate.dumpId !== "string" || typeof candidate.exportedAt !== "string" || typeof candidate.schemaRevision !== "string") {
@@ -466,7 +611,7 @@ function parsePayload(raw: unknown): DumpPayload {
 
   return {
     appId: APP_ID,
-    formatVersion: DUMP_FORMAT_VERSION,
+    formatVersion: Number(candidate.formatVersion),
     dumpId: candidate.dumpId,
     exportedAt: candidate.exportedAt,
     schemaRevision: candidate.schemaRevision,
@@ -516,7 +661,7 @@ function parseManifest(raw: unknown): DumpManifest {
   if (candidate.appId !== APP_ID) {
     throw badRequest("manifest.json belongs to another application");
   }
-  if (candidate.formatVersion !== DUMP_FORMAT_VERSION) {
+  if (!isSupportedDumpFormatVersion(candidate.formatVersion)) {
     throw badRequest("manifest.json has an unsupported format version");
   }
   if (typeof candidate.dumpId !== "string" || typeof candidate.exportedAt !== "string" || typeof candidate.schemaRevision !== "string") {
@@ -542,7 +687,7 @@ function parseManifest(raw: unknown): DumpManifest {
   const fileRoots = parseObject(candidate.fileRoots, "manifest fileRoots");
   return {
     appId: APP_ID,
-    formatVersion: DUMP_FORMAT_VERSION,
+    formatVersion: Number(candidate.formatVersion),
     dumpId: candidate.dumpId,
     exportedAt: candidate.exportedAt,
     schemaRevision: candidate.schemaRevision,
@@ -607,7 +752,8 @@ export async function inspectDumpArchive(buffer: Buffer, backupFile: DumpBackupF
   if (!rawPayload) {
     throw badRequest("Dump ZIP does not contain data.json");
   }
-  const payload = parsePayload(rawPayload);
+  const rawDumpPayload = parsePayload(rawPayload);
+  const payload = normalizeDumpPayload(rawDumpPayload);
   const rawManifest = await parseJsonFile(directory, "manifest.json");
   const manifest = rawManifest ? parseManifest(rawManifest) : null;
 
@@ -621,7 +767,7 @@ export async function inspectDumpArchive(buffer: Buffer, backupFile: DumpBackupF
 
   const actualUploads = await collectZipFiles(directory, "uploads");
   const actualContent = await collectZipFiles(directory, "content");
-  const expectedTables = manifest ? Object.values(manifest.tables) : Object.values(buildTableManifest(payload.tables));
+  const expectedTables = Object.values(buildTableManifest(payload.tables));
   const expectedFileRoots = manifest
     ? buildFileRootSummaries(manifest)
     : [
@@ -635,11 +781,14 @@ export async function inspectDumpArchive(buffer: Buffer, backupFile: DumpBackupF
     if (manifest.dumpId !== payload.dumpId) {
       blockingIssues.push("manifest.json dumpId does not match data.json.");
     }
+    if (manifest.formatVersion !== rawDumpPayload.formatVersion) {
+      blockingIssues.push("manifest.json formatVersion does not match data.json.");
+    }
     if (manifest.schemaRevision !== getSchemaRevision()) {
       blockingIssues.push(`Schema revision differs: dump=${manifest.schemaRevision}, target=${getSchemaRevision()}.`);
     }
     for (const key of DUMP_TABLE_KEYS) {
-      const actualRows = payload.tables[key];
+      const actualRows = rawDumpPayload.tables[key];
       const expected = manifest.tables[key];
       if (actualRows.length !== expected.rowCount) {
         blockingIssues.push(`Manifest row count does not match table '${key}'.`);
@@ -661,6 +810,14 @@ export async function inspectDumpArchive(buffer: Buffer, backupFile: DumpBackupF
       manifest.fileRoots.content.sha256 !== actualContent.sha256
     ) {
       blockingIssues.push("Manifest content summary does not match ZIP content.");
+    }
+  }
+
+  const roleCodes = new Set(payload.tables.roles.map((row) => stringValue(row.key)).filter((key): key is string => Boolean(key)));
+  for (const row of payload.tables.users) {
+    const roleCode = stringValue(row.roleCode);
+    if (!roleCode || !roleCodes.has(roleCode)) {
+      blockingIssues.push(`Dump user '${stringValue(row.email) ?? "unknown"}' references an unknown role.`);
     }
   }
 
@@ -759,6 +916,86 @@ function restoreFileRootBackups(backups: FileRootBackup[]): void {
   }
 }
 
+function selectSingleRow(sqlite: Database.Database, tableName: string, whereSql: string, params: unknown[]): Record<string, unknown> | null {
+  return (sqlite.prepare(`SELECT * FROM ${quoteIdentifier(tableName)} WHERE ${whereSql}`).get(...params) as Record<string, unknown> | undefined) ?? null;
+}
+
+function parseRemoteImportHistory(value: unknown): RemoteDumpImportHistoryEntry[] {
+  if (typeof value !== "string" || value.trim() === "") {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.flatMap((entry) => {
+      if (
+        typeof entry === "object" &&
+        entry !== null &&
+        typeof (entry as { fileId?: unknown }).fileId === "string" &&
+        typeof (entry as { fileHash?: unknown }).fileHash === "string" &&
+        typeof (entry as { dumpId?: unknown }).dumpId === "string" &&
+        typeof (entry as { importedAt?: unknown }).importedAt === "string"
+      ) {
+        const typedEntry = entry as RemoteDumpImportHistoryEntry;
+        return [typedEntry];
+      }
+      return [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function readRemoteImportHistory(sqlite: Database.Database): RemoteDumpImportHistoryEntry[] {
+  const row = selectSingleRow(sqlite, "app_settings", `${quoteIdentifier("key")} = ?`, [REMOTE_IMPORT_HISTORY_SETTING_KEY]);
+  return parseRemoteImportHistory(row?.value);
+}
+
+function remoteImportHistoryByFileId(sqlite: Database.Database): Map<string, RemoteDumpImportHistoryEntry> {
+  return new Map(readRemoteImportHistory(sqlite).map((entry) => [entry.fileId, entry]));
+}
+
+function writeRemoteImportHistory(sqlite: Database.Database, entries: RemoteDumpImportHistoryEntry[]): void {
+  sqlite.prepare(`DELETE FROM ${quoteIdentifier("app_settings")} WHERE ${quoteIdentifier("key")} = ?`).run(REMOTE_IMPORT_HISTORY_SETTING_KEY);
+  insertRows(sqlite, "app_settings", [
+    {
+      key: REMOTE_IMPORT_HISTORY_SETTING_KEY,
+      value: JSON.stringify(entries),
+      updated_at: nowIso()
+    }
+  ]);
+}
+
+function recordRemoteDumpImport(sqlite: Database.Database, entry: RemoteDumpImportHistoryEntry): void {
+  const byFileId = remoteImportHistoryByFileId(sqlite);
+  byFileId.set(entry.fileId, entry);
+  writeRemoteImportHistory(sqlite, [...byFileId.values()].sort((a, b) => Date.parse(b.importedAt) - Date.parse(a.importedAt)));
+}
+
+function assertRemoteDumpWasNotImported(sqlite: Database.Database, fileId: string): void {
+  if (remoteImportHistoryByFileId(sqlite).has(fileId)) {
+    throw conflict("Remote backup file was already imported");
+  }
+}
+
+function preserveLocalAuth(sqlite: Database.Database): PreservedLocalAuth {
+  const admin = selectSingleRow(sqlite, "users", "lower(email) = ?", [standardAdminEmail()]);
+  const adminId = admin ? numericValue(admin.id) : null;
+  return {
+    admin,
+    adminSetup: selectSingleRow(sqlite, "app_settings", `${quoteIdentifier("key")} = ?`, [STANDARD_ADMIN_SETUP_SETTING_KEY]),
+    remoteImportHistory: selectSingleRow(sqlite, "app_settings", `${quoteIdentifier("key")} = ?`, [REMOTE_IMPORT_HISTORY_SETTING_KEY]),
+    adminSettings:
+      adminId === null
+        ? []
+        : (sqlite
+            .prepare(`SELECT * FROM ${quoteIdentifier("settings_values")} WHERE ${quoteIdentifier("scope_type")} = 'USER' AND ${quoteIdentifier("scope_id")} = ? ORDER BY rowid`)
+            .all(String(adminId)) as Array<Record<string, unknown>>)
+  };
+}
+
 function tableColumns(sqlite: Database.Database, tableName: string): string[] {
   const rows = sqlite.prepare(`PRAGMA table_info(${quoteIdentifier(tableName)})`).all() as Array<{ name: string }>;
   return rows.map((row) => row.name);
@@ -778,7 +1015,105 @@ function insertRows(sqlite: Database.Database, tableName: string, rows: Array<Re
   }
 }
 
+function roleIdsByCode(sqlite: Database.Database): Map<string, number> {
+  const rows = sqlite.prepare(`SELECT id, key FROM ${quoteIdentifier("roles")}`).all() as Array<{ id: number; key: string }>;
+  return new Map(rows.map((row) => [row.key, row.id]));
+}
+
+function prepareUserRowsForRestore(sqlite: Database.Database, rows: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  const roleIds = roleIdsByCode(sqlite);
+  return rows
+    .filter((row) => stringValue(row.email)?.toLowerCase() !== standardAdminEmail())
+    .map((row) => {
+      const result = { ...row };
+      const roleCode = stringValue(result.roleCode);
+      if (roleCode) {
+        const roleId = roleIds.get(roleCode);
+        if (!roleId) {
+          throw badRequest(`Dump user '${stringValue(result.email) ?? "unknown"}' references an unknown role`);
+        }
+        result.role_id = roleId;
+        delete result.roleCode;
+        return result;
+      }
+      return result;
+    });
+}
+
+function nextFreeId(sqlite: Database.Database, tableName: string): number {
+  const row = sqlite.prepare(`SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM ${quoteIdentifier(tableName)}`).get() as { nextId: number };
+  return row.nextId;
+}
+
+function userIdExists(sqlite: Database.Database, id: number): boolean {
+  const row = sqlite.prepare(`SELECT 1 AS existsRow FROM ${quoteIdentifier("users")} WHERE id = ?`).get(id) as { existsRow: number } | undefined;
+  return Boolean(row);
+}
+
+function adminRoleId(sqlite: Database.Database): number {
+  const row = sqlite.prepare(`SELECT id FROM ${quoteIdentifier("roles")} WHERE ${quoteIdentifier("key")} = 'admin'`).get() as { id: number } | undefined;
+  if (!row) {
+    throw badRequest("Dump import requires an admin role");
+  }
+  return row.id;
+}
+
+function restorePreservedAdmin(sqlite: Database.Database, preserved: PreservedLocalAuth): number | null {
+  if (!preserved.admin) {
+    return null;
+  }
+
+  const row = { ...preserved.admin };
+  const originalAdminId = numericValue(row.id);
+  const restoredAdminId = originalAdminId !== null && !userIdExists(sqlite, originalAdminId) ? originalAdminId : nextFreeId(sqlite, "users");
+  row.id = restoredAdminId;
+  row.email = standardAdminEmail();
+  row.role_id = adminRoleId(sqlite);
+  insertRows(sqlite, "users", [row]);
+  return restoredAdminId;
+}
+
+function insertPreservedAppSetting(sqlite: Database.Database, row: Record<string, unknown> | null): void {
+  if (!row) {
+    return;
+  }
+  const key = stringValue(row.key);
+  if (!key) {
+    return;
+  }
+  sqlite.prepare(`DELETE FROM ${quoteIdentifier("app_settings")} WHERE ${quoteIdentifier("key")} = ?`).run(key);
+  insertRows(sqlite, "app_settings", [row]);
+}
+
+function restorePreservedAdminSettings(sqlite: Database.Database, rows: Array<Record<string, unknown>>, adminId: number | null): void {
+  if (adminId === null) {
+    return;
+  }
+
+  for (const row of rows) {
+    const nextRow: Record<string, unknown> = { ...row, scope_id: String(adminId) };
+    if (numericValue(nextRow.created_by) !== null) {
+      nextRow.created_by = adminId;
+    }
+    if (numericValue(nextRow.updated_by) !== null) {
+      nextRow.updated_by = adminId;
+    }
+    const rowId = numericValue(nextRow.id);
+    if (rowId !== null) {
+      const exists = sqlite.prepare(`SELECT 1 AS existsRow FROM ${quoteIdentifier("settings_values")} WHERE id = ?`).get(rowId);
+      if (exists) {
+        nextRow.id = nextFreeId(sqlite, "settings_values");
+      }
+    }
+    sqlite
+      .prepare(`DELETE FROM ${quoteIdentifier("settings_values")} WHERE ${quoteIdentifier("setting_key")} = ? AND ${quoteIdentifier("scope_type")} = 'USER' AND ${quoteIdentifier("scope_id")} = ?`)
+      .run(nextRow.setting_key, String(adminId));
+    insertRows(sqlite, "settings_values", [nextRow]);
+  }
+}
+
 function restoreTables(sqlite: Database.Database, payload: DumpPayload): number {
+  const preservedLocalAuth = preserveLocalAuth(sqlite);
   for (const entry of [...DUMP_TABLES].reverse()) {
     sqlite.prepare(`DELETE FROM ${quoteIdentifier(entry.tableName)}`).run();
     sqlite.prepare("DELETE FROM sqlite_sequence WHERE name = ?").run(entry.tableName);
@@ -786,12 +1121,16 @@ function restoreTables(sqlite: Database.Database, payload: DumpPayload): number 
 
   let restored = 0;
   for (const entry of DUMP_TABLES) {
-    const rows = payload.tables[entry.key];
+    const rows = entry.key === "users" ? prepareUserRowsForRestore(sqlite, payload.tables.users) : payload.tables[entry.key];
     insertRows(sqlite, entry.tableName, rows);
     if (rows.length > 0) {
       restored += 1;
     }
   }
+  const adminId = restorePreservedAdmin(sqlite, preservedLocalAuth);
+  insertPreservedAppSetting(sqlite, preservedLocalAuth.adminSetup);
+  insertPreservedAppSetting(sqlite, preservedLocalAuth.remoteImportHistory);
+  restorePreservedAdminSettings(sqlite, preservedLocalAuth.adminSettings, adminId);
   return restored;
 }
 
@@ -831,8 +1170,9 @@ function currentFileRootSummaries(): DumpFileRootSummary[] {
 function verifyRestoredTables(sqlite: Database.Database, expectedTables: DumpTableSummary[]): string[] {
   const issues: string[] = [];
   const expectedByKey = new Map(expectedTables.map((entry) => [entry.key, entry]));
+  const restoredTables = collectDumpTableRows(sqlite);
   for (const entry of DUMP_TABLES) {
-    const rows = selectTableRows(sqlite, entry.tableName);
+    const rows = restoredTables[entry.key];
     const expected = expectedByKey.get(entry.key);
     if (!expected || expected.rowCount !== rows.length || expected.sha256 !== sha256Json(rows)) {
       issues.push(`Restored table '${entry.key}' does not match the dump manifest.`);
@@ -863,19 +1203,116 @@ export function getLocalBackupStatus(): DumpBackupStatus {
   };
 }
 
+function remoteUploadNotAttempted(error: string): DumpRemoteUploadResult {
+  return {
+    attempted: false,
+    success: false,
+    remoteFile: null,
+    error
+  };
+}
+
+async function uploadDumpArchiveToRemote(sqlite: Database.Database, filename: string, buffer: Buffer): Promise<DumpRemoteUploadResult> {
+  const readiness = getBackupSftpReadiness();
+  if (!readiness.ready) {
+    return remoteUploadNotAttempted(readiness.blockingIssues.join(" | "));
+  }
+
+  try {
+    const uploadedFile = await uploadBackupSftpFile(filename, buffer);
+    return {
+      attempted: true,
+      success: true,
+      remoteFile: mapRemoteBackupFile(uploadedFile, remoteImportHistoryByFileId(sqlite)),
+      error: null
+    };
+  } catch (error) {
+    return {
+      attempted: true,
+      success: false,
+      remoteFile: null,
+      error: error instanceof Error ? error.message : "SFTP upload failed"
+    };
+  }
+}
+
 export async function saveDumpToLocalBackup(sqlite: Database.Database): Promise<DumpBackupSaveResult> {
   const archive = await buildDumpArchive(sqlite);
   const workDir = ensureWorkDir();
   const filePath = path.join(workDir, archive.filename);
   fs.writeFileSync(filePath, archive.buffer);
   const backupFile = mapBackupFile(filePath);
+  const remoteUpload = await uploadDumpArchiveToRemote(sqlite, archive.filename, archive.buffer);
   return {
     dumpId: archive.dumpId,
     filename: archive.filename,
     filePath,
     sizeBytes: archive.buffer.byteLength,
-    backupFile
+    backupFile,
+    remoteUpload
   };
+}
+
+export async function getRemoteBackupStatus(sqlite: Database.Database): Promise<DumpRemoteBackupStatus> {
+  const readiness = getBackupSftpReadiness();
+  if (!readiness.ready) {
+    return {
+      remoteDirectory: readiness.remoteDirectory,
+      configured: readiness.configured,
+      protectedConfirmed: readiness.protectedConfirmed,
+      ready: false,
+      fileCount: 0,
+      latestFile: null,
+      files: [],
+      blockingIssues: readiness.blockingIssues
+    };
+  }
+
+  try {
+    const importedByFileId = remoteImportHistoryByFileId(sqlite);
+    const files = (await listBackupSftpFiles()).map((file) => mapRemoteBackupFile(file, importedByFileId));
+    return {
+      remoteDirectory: readiness.remoteDirectory,
+      configured: readiness.configured,
+      protectedConfirmed: readiness.protectedConfirmed,
+      ready: true,
+      fileCount: files.length,
+      latestFile: files[0] ?? null,
+      files,
+      blockingIssues: []
+    };
+  } catch (error) {
+    return {
+      remoteDirectory: readiness.remoteDirectory,
+      configured: readiness.configured,
+      protectedConfirmed: readiness.protectedConfirmed,
+      ready: false,
+      fileCount: 0,
+      latestFile: null,
+      files: [],
+      blockingIssues: [error instanceof Error ? error.message : "SFTP remote status failed"]
+    };
+  }
+}
+
+async function readRemoteBackupFile(sqlite: Database.Database, fileId?: string | null): Promise<{ backupFile: DumpRemoteBackupFile; buffer: Buffer }> {
+  const safeFileId = fileId ? validateBackupFileId(fileId) : null;
+  const remoteFiles = await listBackupSftpFiles();
+  const selectedFile = safeFileId ? remoteFiles.find((file) => file.name === safeFileId) : remoteFiles[0];
+  if (!selectedFile) {
+    throw notFound(safeFileId ? "Remote backup file was not found" : "No remote backup dump file was found");
+  }
+
+  return {
+    backupFile: mapRemoteBackupFile(selectedFile, remoteImportHistoryByFileId(sqlite)),
+    buffer: await downloadBackupSftpFile(selectedFile.name)
+  };
+}
+
+export async function previewRemoteDump(sqlite: Database.Database, params: { fileId?: string | null } = {}): Promise<DumpBackupPreviewResult> {
+  const { backupFile, buffer } = await readRemoteBackupFile(sqlite, params.fileId);
+  const preview = await inspectDumpArchive(buffer, backupFile);
+  return backupFile.imported ? { ...preview, warnings: ["Remote backup file was already imported.", ...preview.warnings] } : preview;
 }
 
 export async function previewLatestLocalDump(): Promise<DumpBackupPreviewResult> {
@@ -919,6 +1356,10 @@ export async function applyLocalDump(
     throw badRequest(`Dump import is blocked: ${preview.blockingIssues.join(" | ")}`);
   }
 
+  return applyInspectedDump(sqlite, preview, options);
+}
+
+async function applyInspectedDump(sqlite: Database.Database, preview: InspectedDump, options: ApplyDumpOptions = {}): Promise<DumpBackupApplyResult> {
   const workDir = ensureWorkDir();
   const transferDir = fs.mkdtempSync(path.join(workDir, "transfer-"));
   const backupRoot = path.join(transferDir, "file-root-backups");
@@ -935,6 +1376,7 @@ export async function applyLocalDump(
   try {
     beginImportTransaction(sqlite);
     tablesRestored = restoreTables(sqlite, preview.payload);
+    options.afterTablesRestore?.(sqlite, preview);
     assertForeignKeys(sqlite);
     replaceFileRoots(stagedRoots);
     fileRootsTouched = true;
@@ -962,7 +1404,7 @@ export async function applyLocalDump(
   const verificationPassed = blockingIssues.length === 0;
   return {
     dumpId: preview.dumpId,
-    backupFile,
+    backupFile: preview.backupFile,
     targetBackupPath,
     verificationPassed,
     importStatus: verificationPassed ? (preview.warnings.length > 0 ? "warning" : "success") : "error",
@@ -971,6 +1413,46 @@ export async function applyLocalDump(
     warnings: preview.warnings,
     blockingIssues
   };
+}
+
+export async function applyRemoteDump(
+  sqlite: Database.Database,
+  params: { fileId: string; fileHash: string; confirmed: boolean }
+): Promise<DumpBackupApplyResult> {
+  assertSafeDumpRuntimeTargets();
+  const safeFileId = validateBackupFileId(params.fileId);
+  if (!params.confirmed) {
+    throw badRequest("Remote dump import must be confirmed");
+  }
+  if (activeRemoteImports.has(safeFileId)) {
+    throw conflict("Remote backup file import is already running");
+  }
+
+  activeRemoteImports.add(safeFileId);
+  try {
+    assertRemoteDumpWasNotImported(sqlite, safeFileId);
+    const { backupFile, buffer } = await readRemoteBackupFile(sqlite, safeFileId);
+    const preview = await inspectDumpArchive(buffer, backupFile);
+    if (preview.fileHash !== params.fileHash) {
+      throw conflict("Dump file hash changed since preview");
+    }
+    if (preview.blockingIssues.length > 0) {
+      throw badRequest(`Dump import is blocked: ${preview.blockingIssues.join(" | ")}`);
+    }
+    assertRemoteDumpWasNotImported(sqlite, safeFileId);
+    return await applyInspectedDump(sqlite, preview, {
+      afterTablesRestore: (database, inspectedPreview) => {
+        recordRemoteDumpImport(database, {
+          fileId: safeFileId,
+          fileHash: inspectedPreview.fileHash,
+          dumpId: inspectedPreview.dumpId,
+          importedAt: nowIso()
+        });
+      }
+    });
+  } finally {
+    activeRemoteImports.delete(safeFileId);
+  }
 }
 
 export function getRegisteredDumpTableKeys(): string[] {

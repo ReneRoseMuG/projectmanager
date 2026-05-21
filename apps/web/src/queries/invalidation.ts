@@ -186,6 +186,7 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.calendarTasks.root,
     queryKeys.tickets.root,
     queryKeys.settings.root,
+    queryKeys.dumps.root,
     queryKeys.journal.root,
     queryKeys.auth.root,
     queryKeys.adminUsers.root,

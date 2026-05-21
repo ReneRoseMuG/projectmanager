@@ -28,13 +28,18 @@ import { vitestRuntimeRoot } from "../../../apps/api/src/runtime-safety.js";
 import { config } from "../../../apps/api/src/config.js";
 import {
   applyLocalDump,
+  applyRemoteDump,
   buildDumpArchive,
   DUMP_TABLE_KEYS,
   getRegisteredDumpTables,
   getLocalBackupStatus,
+  getRemoteBackupStatus,
   inspectDumpArchive,
-  previewLatestLocalDump
+  previewLatestLocalDump,
+  previewRemoteDump,
+  saveDumpToLocalBackup
 } from "../../../apps/api/src/services/dump.service.js";
+import { setBackupSftpClientFactoryForTests, type BackupSftpClient } from "../../../apps/api/src/services/backup-sftp.service.js";
 import { setContentBaseDir } from "../../../apps/api/src/services/content.service.js";
 import { buildTestApp } from "../../fixtures/api/app.js";
 import { createFileTestDb, type TestDb } from "../../fixtures/api/db.js";
@@ -60,6 +65,54 @@ let contentDir: string;
 let backupDir: string;
 let previewDir: string;
 let testDb: TestDb;
+
+interface RemoteMockFile {
+  buffer: Buffer;
+  modifiedAt: number;
+}
+
+function configureMockSftp(remoteFiles: Map<string, RemoteMockFile>): void {
+  const remoteDir = "/remote/backups";
+  config.backupSftpEnabled = true;
+  config.backupSftpHost = "sftp.test";
+  config.backupSftpPort = 22;
+  config.backupSftpUser = "tester";
+  config.backupSftpPassword = "secret";
+  config.backupSftpRemoteDir = remoteDir;
+  config.backupSftpProtectedConfirmed = true;
+
+  setBackupSftpClientFactoryForTests((): BackupSftpClient => ({
+    async connect() {
+      return undefined;
+    },
+    async list() {
+      return [...remoteFiles.entries()].map(([name, file]) => ({
+        type: "-",
+        name,
+        size: file.buffer.byteLength,
+        modifyTime: file.modifiedAt
+      }));
+    },
+    async get(remotePath) {
+      const name = path.basename(remotePath);
+      const file = remoteFiles.get(name);
+      if (!file) {
+        throw new Error("Remote file missing");
+      }
+      return file.buffer;
+    },
+    async put(input, remotePath) {
+      remoteFiles.set(path.basename(remotePath), {
+        buffer: input,
+        modifiedAt: Date.now()
+      });
+      return remotePath;
+    },
+    async end() {
+      return true;
+    }
+  }));
+}
 
 function quoteIdentifier(value: string): string {
   return `"${value.replace(/"/g, "\"\"")}"`;
@@ -120,6 +173,16 @@ function collectSnapshot(): Snapshot {
   };
 }
 
+function withoutRemoteImportHistory(snapshot: Snapshot): Snapshot {
+  return {
+    ...snapshot,
+    tables: {
+      ...snapshot.tables,
+      appSettings: snapshot.tables.appSettings?.filter((row) => row.key !== "remote_dump_import_history") ?? []
+    }
+  };
+}
+
 function seedCompleteDataset(): void {
   fs.mkdirSync(path.join(uploadDir, "docs"), { recursive: true });
   fs.mkdirSync(path.join(contentDir, "features"), { recursive: true });
@@ -136,13 +199,17 @@ function seedCompleteDataset(): void {
 
   testDb.sqlite.exec(`
     INSERT INTO users (id, name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at)
-      VALUES (1, '', 'Ada', 'Lovelace', 'ada@example.test', NULL, 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+      VALUES (1, '', 'Test', 'Admin', 'admin@local', '$2b$12$6i0aEyMqgUs3z.zKCqvpQexCgDxZk17O0lNs8ChHO4Iy87/pDp40q', 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO users (id, name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at)
+      VALUES (2, '', 'Ada', 'Lovelace', 'ada@example.test', NULL, 2, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO app_settings (key, value, updated_at)
+      VALUES ('admin_setup_done', 'true', '2026-05-17T08:00:00');
     INSERT INTO settings_values (id, setting_key, scope_type, scope_id, value_json, version, created_by, updated_by, created_at, updated_at)
       VALUES (1, 'taskBoard.viewMode', 'USER', '1', '"kanban"', 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO projects (id, name, description, status, color, start_date, due_date, created_at, updated_at)
       VALUES (1, 'Projekt Alpha', 'Beschreibung', 'active', '#123456', '2026-05-01', '2026-05-31', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO journal_entries (id, operation, object_type, object_id, object_label, summary, actor_user_id, actor_name, created_at)
-      VALUES (1, 'update', 'project', 1, 'Projekt Alpha', 'Projekt "Projekt Alpha" hat ein neues Enddatum: 31.05.26 → 15.06.26.', 1, 'Lovelace, Ada', '2026-05-17T08:30:00');
+      VALUES (1, 'update', 'project', 1, 'Projekt Alpha', 'Projekt "Projekt Alpha" hat ein neues Enddatum: 31.05.26 → 15.06.26.', 2, 'Lovelace, Ada', '2026-05-17T08:30:00');
     INSERT INTO journal_entry_changes (id, journal_entry_id, field_key, field_label, old_value_json, old_value_label, new_value_json, new_value_label, summary)
       VALUES (1, 1, 'dueDate', 'Enddatum', '"2026-05-31"', '31.05.26', '"2026-06-15"', '15.06.26', 'Enddatum: 31.05.26 → 15.06.26');
     INSERT INTO journal_entry_contexts (id, journal_entry_id, object_type, object_id, object_label, relation)
@@ -292,12 +359,21 @@ beforeEach(() => {
   config.backupWorkDir = backupDir;
   config.previewCacheDir = previewDir;
   config.databasePath = path.join(tempRoot, "taskmanager.sqlite");
+  config.backupSftpEnabled = false;
+  config.backupSftpHost = "";
+  config.backupSftpPort = 22;
+  config.backupSftpUser = "";
+  config.backupSftpPassword = "";
+  config.backupSftpRemoteDir = "";
+  config.backupSftpProtectedConfirmed = false;
+  setBackupSftpClientFactoryForTests(null);
   setContentBaseDir(contentDir);
   testDb = createFileTestDb(config.databasePath);
   seedCompleteDataset();
 });
 
 afterEach(() => {
+  setBackupSftpClientFactoryForTests(null);
   testDb.sqlite.close();
   fs.rmSync(tempRoot, { recursive: true, force: true });
 });
@@ -373,7 +449,81 @@ describe("Local backup status", () => {
   });
 });
 
+describe("Remote SFTP backup status", () => {
+  it("lädt lokal erzeugte Dump-Dateien in den konfigurierten SFTP-Ordner hoch", async () => {
+    const remoteFiles = new Map<string, RemoteMockFile>();
+    configureMockSftp(remoteFiles);
+
+    const saveResult = await saveDumpToLocalBackup(testDb.sqlite);
+
+    expect(saveResult.remoteUpload?.success).toBe(true);
+    expect(saveResult.remoteUpload?.remoteFile?.name).toBe(saveResult.filename);
+    expect(remoteFiles.has(saveResult.filename)).toBe(true);
+
+    const status = await getRemoteBackupStatus(testDb.sqlite);
+    expect(status.ready).toBe(true);
+    expect(status.latestFile?.name).toBe(saveResult.filename);
+  });
+
+  it("importiert die neueste Remote-Datei und blockiert denselben Dateinamen dauerhaft", async () => {
+    const remoteFiles = new Map<string, RemoteMockFile>();
+    configureMockSftp(remoteFiles);
+    const before = collectSnapshot();
+    const archive = await buildDumpArchive(testDb.sqlite);
+    remoteFiles.set(archive.filename, { buffer: archive.buffer, modifiedAt: Date.parse("2026-05-17T09:00:00.000Z") });
+    mutateLocalState();
+
+    const preview = await previewRemoteDump(testDb.sqlite);
+    const applyResult = await applyRemoteDump(testDb.sqlite, {
+      fileId: preview.backupFile.id,
+      fileHash: preview.fileHash,
+      confirmed: true
+    });
+
+    expect(applyResult.verificationPassed).toBe(true);
+    expect(withoutRemoteImportHistory(collectSnapshot())).toEqual(before);
+    await expect(
+      applyRemoteDump(testDb.sqlite, {
+        fileId: preview.backupFile.id,
+        fileHash: preview.fileHash,
+        confirmed: true
+      })
+    ).rejects.toThrow("already imported");
+
+    const status = await getRemoteBackupStatus(testDb.sqlite);
+    expect(status.latestFile?.imported).toBe(true);
+  });
+});
+
 describe("Local dump roundtrip", () => {
+  it("exportiert Benutzer ohne Standardadmin und mit roleCode", async () => {
+    const archive = await buildDumpArchive(testDb.sqlite);
+    const data = await parseZipJson(archive.buffer, "data.json");
+    const tables = data.tables as Record<string, Array<Record<string, unknown>>>;
+
+    expect(tables.users.some((user) => user.email === "admin@local")).toBe(false);
+    const exportedUser = tables.users.find((user) => user.email === "ada@example.test");
+
+    expect(exportedUser).toMatchObject({ roleCode: "editor" });
+    expect(exportedUser).not.toHaveProperty("role_id");
+    expect(tables.appSettings.some((setting) => setting.key === "admin_setup_done")).toBe(false);
+    expect(tables.settingsValues.some((setting) => setting.scope_type === "USER" && setting.scope_id === "1")).toBe(false);
+  });
+
+  it("neutralisiert Referenzen auf den Standardadmin im Export", async () => {
+    testDb.sqlite.prepare("UPDATE projects SET created_by = 1, updated_by = 1 WHERE id = 1").run();
+    testDb.sqlite.prepare("UPDATE journal_entries SET actor_user_id = 1 WHERE id = 1").run();
+
+    const archive = await buildDumpArchive(testDb.sqlite);
+    const data = await parseZipJson(archive.buffer, "data.json");
+    const tables = data.tables as Record<string, Array<Record<string, unknown>>>;
+    const project = tables.projects.find((row) => row.id === 1);
+    const journalEntry = tables.journalEntries.find((row) => row.id === 1);
+
+    expect(project).toMatchObject({ created_by: null, updated_by: null });
+    expect(journalEntry).toMatchObject({ actor_user_id: null });
+  });
+
   it("sichert und aktualisiert DB, uploads und content als echten Roundtrip", async () => {
     const before = collectSnapshot();
     const app = await buildTestApp(testDb, { enableMultipart: true });
@@ -402,6 +552,69 @@ describe("Local dump roundtrip", () => {
     expect(applyResult.verificationPassed).toBe(true);
     expect(collectSnapshot()).toEqual(before);
     await app.close();
+  });
+
+  it("behält lokalen Standardadmin, Setup-Status und Admin-Einstellungen beim Import", async () => {
+    const archive = await buildDumpArchive(testDb.sqlite);
+    const file = writeBackupFile(archive.filename, archive.buffer);
+    const preview = await inspectDumpArchive(archive.buffer, file);
+    testDb.sqlite
+      .prepare("UPDATE users SET first_name = 'Local', last_name = 'Owner', password_hash = 'target-only-hash', is_active = 0 WHERE email = 'admin@local'")
+      .run();
+    testDb.sqlite.prepare("UPDATE app_settings SET value = 'false' WHERE key = 'admin_setup_done'").run();
+    testDb.sqlite.prepare("UPDATE settings_values SET value_json = '\"local-kanban\"' WHERE scope_type = 'USER' AND scope_id = '1'").run();
+
+    const applyResult = await applyLocalDump(testDb.sqlite, {
+      fileId: file.id,
+      fileHash: preview.fileHash,
+      confirmationPhrase: preview.confirmationPhrase
+    });
+    const admin = testDb.sqlite.prepare("SELECT first_name, last_name, password_hash, is_active FROM users WHERE email = 'admin@local'").get() as {
+      first_name: string;
+      last_name: string;
+      password_hash: string;
+      is_active: number;
+    };
+    const setup = testDb.sqlite.prepare("SELECT value FROM app_settings WHERE key = 'admin_setup_done'").get() as { value: string };
+    const adminSetting = testDb.sqlite.prepare("SELECT value_json FROM settings_values WHERE scope_type = 'USER' AND scope_id = '1'").get() as { value_json: string };
+
+    expect(applyResult.verificationPassed).toBe(true);
+    expect(admin).toEqual({ first_name: "Local", last_name: "Owner", password_hash: "target-only-hash", is_active: 0 });
+    expect(setup.value).toBe("false");
+    expect(adminSetting.value_json).toBe("\"local-kanban\"");
+  });
+
+  it("importiert bestehende rohe User-Dumps mit role_id weiterhin", async () => {
+    const archive = await buildDumpArchive(testDb.sqlite);
+    const data = await parseZipJson(archive.buffer, "data.json");
+    const manifest = await parseZipJson(archive.buffer, "manifest.json");
+    data.formatVersion = 8;
+    manifest.formatVersion = 8;
+    const tables = data.tables as Record<string, Array<Record<string, unknown>>>;
+    tables.users = tables.users.map((user) => {
+      const nextUser = { ...user, role_id: 2 };
+      delete nextUser.roleCode;
+      return nextUser;
+    });
+    const manifestTables = manifest.tables as Record<string, { rowCount: number; sha256: string }>;
+    manifestTables.users = {
+      ...manifestTables.users,
+      sha256: sha256Json(tables.users)
+    };
+    const legacyArchive = await replaceDumpJson(archive.buffer, data, manifest);
+    const file = writeBackupFile(archive.filename, legacyArchive);
+    const preview = await inspectDumpArchive(legacyArchive, file);
+    mutateLocalState();
+
+    const applyResult = await applyLocalDump(testDb.sqlite, {
+      fileId: file.id,
+      fileHash: preview.fileHash,
+      confirmationPhrase: preview.confirmationPhrase
+    });
+
+    expect(preview.transferReadiness).toBe("ready");
+    expect(applyResult.verificationPassed).toBe(true);
+    expect(testDb.sqlite.prepare("SELECT role_id FROM users WHERE email = 'ada@example.test'").get()).toEqual({ role_id: 2 });
   });
 
   it("überspringt neuere defekte lokale Dateien und nutzt die neueste valide Sicherung", async () => {
@@ -454,6 +667,34 @@ describe("Dump import failure safety", () => {
 
     const preview = await inspectDumpArchive(badArchive, file);
     expect(preview.transferReadiness).toBe("blocked");
+    await expect(
+      applyLocalDump(testDb.sqlite, {
+        fileId: file.id,
+        fileHash: preview.fileHash,
+        confirmationPhrase: preview.confirmationPhrase
+      })
+    ).rejects.toThrow();
+    expect(collectSnapshot()).toEqual(before);
+  });
+
+  it("blockiert User-Dumps mit unbekanntem roleCode ohne lokale Änderung", async () => {
+    const archive = await buildDumpArchive(testDb.sqlite);
+    const data = await parseZipJson(archive.buffer, "data.json");
+    const manifest = await parseZipJson(archive.buffer, "manifest.json");
+    const tables = data.tables as Record<string, Array<Record<string, unknown>>>;
+    tables.users[0] = { ...tables.users[0], roleCode: "missing-role" };
+    const manifestTables = manifest.tables as Record<string, { rowCount: number; sha256: string }>;
+    manifestTables.users = {
+      ...manifestTables.users,
+      sha256: sha256Json(tables.users)
+    };
+    const badArchive = await replaceDumpJson(archive.buffer, data, manifest);
+    const file = writeBackupFile(archive.filename, badArchive);
+    const before = collectSnapshot();
+
+    const preview = await inspectDumpArchive(badArchive, file);
+    expect(preview.transferReadiness).toBe("blocked");
+    expect(preview.blockingIssues.some((issue) => issue.includes("unknown role"))).toBe(true);
     await expect(
       applyLocalDump(testDb.sqlite, {
         fileId: file.id,

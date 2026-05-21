@@ -76,6 +76,10 @@ function sessionUserId(request: FastifyRequest): number | undefined {
   return typeof value === "number" && Number.isInteger(value) ? value : undefined;
 }
 
+function routeAuthOverride(request: FastifyRequest): { resource: AuthResource; action: AuthAction } | undefined {
+  return request.routeOptions.config.auth;
+}
+
 export function requireCurrentUser(request: FastifyRequest): CurrentUser {
   if (request.currentUser) {
     return request.currentUser;
@@ -147,6 +151,11 @@ export function registerGlobalAuthGuard(app: FastifyInstance): void {
     }
     if (path.startsWith("/api/settings")) {
       await requirePermission("settings", "read")(request);
+      return;
+    }
+    const routeAuth = routeAuthOverride(request);
+    if (routeAuth) {
+      await requirePermission(routeAuth.resource, routeAuth.action)(request);
       return;
     }
     const resource = resourceForPath(path);

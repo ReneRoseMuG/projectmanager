@@ -3,7 +3,10 @@ import type {
   DumpBackupApplyResult,
   DumpBackupPreviewResult,
   DumpBackupSaveResult,
-  DumpBackupStatus
+  DumpBackupStatus,
+  DumpRemoteBackupApplyRequest,
+  DumpRemoteBackupPreviewRequest,
+  DumpRemoteBackupStatus
 } from "@taskmanager/shared-types";
 import { api } from "./client";
 
@@ -21,4 +24,16 @@ export async function previewLatestLocalDump(): Promise<DumpBackupPreviewResult>
 
 export async function applyLatestLocalDump(input: DumpBackupApplyRequest): Promise<DumpBackupApplyResult> {
   return api.post("dumps/local/latest/apply", { json: input }).json<DumpBackupApplyResult>();
+}
+
+export async function getRemoteDumpStatus(): Promise<DumpRemoteBackupStatus> {
+  return api.get("dumps/remote/status").json<DumpRemoteBackupStatus>();
+}
+
+export async function previewRemoteDump(input: DumpRemoteBackupPreviewRequest = {}): Promise<DumpBackupPreviewResult> {
+  return api.post("dumps/remote/preview", { json: input }).json<DumpBackupPreviewResult>();
+}
+
+export async function applyRemoteDump(input: DumpRemoteBackupApplyRequest): Promise<DumpBackupApplyResult> {
+  return api.post("dumps/remote/apply", { json: input }).json<DumpBackupApplyResult>();
 }

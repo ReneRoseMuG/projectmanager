@@ -1,7 +1,16 @@
 /**
- * Test Scope: Attachments API
+ * Test Scope:
+ * Attachments API
  *
- * Covers multipart uploads for projects/tasks, metadata listing, deletion, and missing resources.
+ * Abgedeckte Regeln:
+ * - Multipart-Uploads, Listen, Vorschau, Löschen und lokales Öffnen von Attachments.
+ * - Lokales Öffnen nutzt einen injizierten File-Opener und verlangt attachments:read.
+ *
+ * Fehlerfälle:
+ * - Fehlende Owner, fehlende Attachments, fehlende Dateien und fehlende Berechtigungen.
+ *
+ * Ziel:
+ * Attachment-Metadaten, Dateisystemzugriffe und Berechtigungsschutz ohne echte native App-Aufrufe absichern.
  */
 
 import type { FastifyInstance } from "fastify";
@@ -18,15 +27,31 @@ const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-attachment-previ
 describe("Attachments API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
+  let openedPaths: string[];
+  let openerError: Error | null;
 
   beforeAll(async () => {
     process.env.UPLOAD_DIR = uploadDir;
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
     testDb = createTestDb();
-    app = await buildTestApp(testDb, { enableMultipart: true });
+    openedPaths = [];
+    openerError = null;
+    app = await buildTestApp(testDb, {
+      enableMultipart: true,
+      fileOpener: async (filePath) => {
+        if (openerError) {
+          throw openerError;
+        }
+        openedPaths.push(filePath);
+      }
+    });
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(() => {
+    openedPaths = [];
+    openerError = null;
+    truncateAll(testDb.sqlite);
+  });
 
   afterEach(async () => {
     await fs.rm(uploadDir, { recursive: true, force: true });
@@ -140,5 +165,139 @@ describe("Attachments API", () => {
       previewUrl: upload.body.url,
       text: null
     });
+  });
+
+  it("POST /api/attachments/:id/open oeffnet die absolute Upload-Datei", async () => {
+    const project = await createProject(app);
+    const upload = await supertest(app.server)
+      .post(`/api/projects/${project.id}/attachments`)
+      .attach("file", Buffer.from("Lokal öffnen"), { filename: "lokal.txt", contentType: "text/plain" })
+      .expect(201);
+
+    await supertest(app.server).post(`/api/attachments/${upload.body.id}/open`).expect(204);
+
+    expect(openedPaths).toHaveLength(1);
+    expect(path.isAbsolute(openedPaths[0] ?? "")).toBe(true);
+    expect(path.relative(uploadDir, openedPaths[0] ?? "")).toBe(upload.body.filename);
+  });
+
+  it("POST /api/attachments/:id/open gibt 404 fuer unbekanntes Attachment zurueck", async () => {
+    await supertest(app.server).post("/api/attachments/9999/open").expect(404);
+    expect(openedPaths).toHaveLength(0);
+  });
+
+  it("POST /api/attachments/:id/open gibt 404 fuer fehlende Upload-Datei zurueck", async () => {
+    const project = await createProject(app);
+    const upload = await supertest(app.server)
+      .post(`/api/projects/${project.id}/attachments`)
+      .attach("file", Buffer.from("Fehlt"), { filename: "fehlt.txt", contentType: "text/plain" })
+      .expect(201);
+
+    await fs.rm(path.join(uploadDir, upload.body.filename), { force: true });
+
+    await supertest(app.server).post(`/api/attachments/${upload.body.id}/open`).expect(404);
+    expect(openedPaths).toHaveLength(0);
+  });
+
+  it("POST /api/attachments/:id/open meldet Opener-Fehler einheitlich", async () => {
+    const project = await createProject(app);
+    const upload = await supertest(app.server)
+      .post(`/api/projects/${project.id}/attachments`)
+      .attach("file", Buffer.from("Fehler"), { filename: "fehler.txt", contentType: "text/plain" })
+      .expect(201);
+
+    openerError = new Error("Native App fehlt");
+
+    const res = await supertest(app.server).post(`/api/attachments/${upload.body.id}/open`).expect(500);
+    expect(res.body).toMatchObject({
+      error: "INTERNAL_ERROR",
+      message: "Datei konnte nicht geöffnet werden.",
+      statusCode: 500
+    });
+  });
+});
+
+describe("Attachments API Auth", () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    process.env.UPLOAD_DIR = uploadDir;
+    process.env.PREVIEW_CACHE_DIR = previewCacheDir;
+    testDb = createTestDb();
+    app = await buildTestApp(testDb, {
+      enableAuth: true,
+      enableMultipart: true,
+      fileOpener: async () => undefined
+    });
+  });
+
+  beforeEach(() => truncateAll(testDb.sqlite));
+
+  afterEach(async () => {
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.mkdir(previewCacheDir, { recursive: true });
+  });
+
+  afterAll(async () => {
+    await app.close();
+    testDb.sqlite.close();
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
+  });
+
+  async function loginAdmin() {
+    const agent = supertest.agent(app.server);
+    await agent.post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
+    return agent;
+  }
+
+  async function createAttachmentWithAdmin() {
+    const admin = await loginAdmin();
+    const project = await admin.post("/api/projects").send({ name: "Auth-Projekt", status: "active", color: "#6366f1" }).expect(201);
+    const upload = await admin
+      .post(`/api/projects/${project.body.id}/attachments`)
+      .attach("file", Buffer.from("Auth"), { filename: "auth.txt", contentType: "text/plain" })
+      .expect(201);
+    return upload.body as { id: number };
+  }
+
+  it("POST /api/attachments/:id/open verlangt eine Session", async () => {
+    await supertest(app.server).post("/api/attachments/9999/open").expect(401);
+  });
+
+  it("POST /api/attachments/:id/open erlaubt Readern mit attachments:read den POST", async () => {
+    const attachment = await createAttachmentWithAdmin();
+    const admin = await loginAdmin();
+    const readerRole = testDb.sqlite.prepare("SELECT id FROM roles WHERE key = 'reader'").get() as { id: number };
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Read", lastName: "Only", email: "attachment-reader@example.test", roleId: readerRole.id, password: "password123", isActive: true })
+      .expect(201);
+
+    const reader = supertest.agent(app.server);
+    await reader.post("/api/auth/login").send({ email: "attachment-reader@example.test", password: "password123" }).expect(200);
+
+    await reader.post(`/api/attachments/${attachment.id}/open`).expect(204);
+  });
+
+  it("POST /api/attachments/:id/open lehnt Rollen ohne attachments:read ab", async () => {
+    const attachment = await createAttachmentWithAdmin();
+    const admin = await loginAdmin();
+    const role = await admin
+      .post("/api/admin/roles")
+      .send({ key: "project_reader_without_attachments", label: "Projektleser ohne Attachments", permissions: [{ resource: "projects", action: "read" }] })
+      .expect(201);
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "No", lastName: "Attachments", email: "no-attachments@example.test", roleId: role.body.id, password: "password123", isActive: true })
+      .expect(201);
+
+    const custom = supertest.agent(app.server);
+    await custom.post("/api/auth/login").send({ email: "no-attachments@example.test", password: "password123" }).expect(200);
+
+    await custom.post(`/api/attachments/${attachment.id}/open`).expect(403);
   });
 });

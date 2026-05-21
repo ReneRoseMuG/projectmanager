@@ -14,6 +14,13 @@ export interface AppConfig {
   libreOfficePath: string;
   contentDir: string;
   backupWorkDir: string;
+  backupSftpEnabled: boolean;
+  backupSftpHost: string;
+  backupSftpPort: number;
+  backupSftpUser: string;
+  backupSftpPassword: string;
+  backupSftpRemoteDir: string;
+  backupSftpProtectedConfirmed: boolean;
   aiBaseUrl: string;
   aiDefaultModel: string;
   aiTimeoutMs: number;
@@ -68,6 +75,13 @@ export const config: AppConfig = {
   libreOfficePath: process.env.LIBREOFFICE_PATH ?? "soffice",
   contentDir: resolveFromApiRoot(process.env.CONTENT_DIR ?? "./content"),
   backupWorkDir: resolveBackupWorkDir(process.env.BACKUP_WORK_DIR),
+  backupSftpEnabled: booleanFromEnv(process.env.BACKUP_SFTP_ENABLED),
+  backupSftpHost: process.env.BACKUP_SFTP_HOST?.trim() ?? "",
+  backupSftpPort: numberFromEnv(process.env.BACKUP_SFTP_PORT, 22),
+  backupSftpUser: process.env.BACKUP_SFTP_USER?.trim() ?? "",
+  backupSftpPassword: process.env.BACKUP_SFTP_PASSWORD ?? "",
+  backupSftpRemoteDir: process.env.BACKUP_SFTP_REMOTE_DIR?.trim() ?? "",
+  backupSftpProtectedConfirmed: booleanFromEnv(process.env.BACKUP_SFTP_PROTECTED_CONFIRMED),
   aiBaseUrl: process.env.AI_BASE_URL ?? "http://127.0.0.1:11434/api",
   aiDefaultModel: process.env.AI_DEFAULT_MODEL ?? "llama3.2:1b",
   aiTimeoutMs: numberFromEnv(process.env.AI_TIMEOUT_MS, 60000),

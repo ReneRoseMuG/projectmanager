@@ -4,11 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import type { TestDb } from "./db.js";
 import type { AiLocalModelClient } from "../../../apps/api/src/services/ai-ollama.service.js";
+import type { FileOpener } from "../../../apps/api/src/services/file-opener.service.js";
 
 interface BuildTestAppOptions {
   enableMultipart?: boolean;
   enableAuth?: boolean;
   aiClient?: AiLocalModelClient;
+  fileOpener?: FileOpener;
 }
 
 const unavailableAiClient: AiLocalModelClient = {
@@ -23,6 +25,10 @@ const unavailableAiClient: AiLocalModelClient = {
   }
 };
 
+const unavailableFileOpener: FileOpener = async () => {
+  throw new Error("File opener test client is not configured");
+};
+
 export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions = {}) {
   const app = Fastify({ logger: false });
   const contentDir = await fs.mkdtemp(path.join(os.tmpdir(), "taskmanager-api-content-"));
@@ -35,6 +41,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   app.decorate("db", testDb.db);
   app.decorate("sqlite", testDb.sqlite);
   app.decorate("aiClient", options.aiClient ?? unavailableAiClient);
+  app.decorate("fileOpener", options.fileOpener ?? unavailableFileOpener);
 
   const { errorHandler } = await import("../../../apps/api/src/utils/errors.js");
   const { registerCors } = await import("../../../apps/api/src/plugins/cors.js");
@@ -76,10 +83,8 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
 
   if (options.enableMultipart) {
     const { registerStatic } = await import("../../../apps/api/src/plugins/static.js");
-    const { registerAttachmentsRoutes } = await import("../../../apps/api/src/routes/attachments.js");
 
     await registerStatic(app);
-    await app.register(registerAttachmentsRoutes, { prefix: "/api" });
   }
 
   if (options.enableAuth) {
@@ -100,6 +105,10 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerTagsRoutes, { prefix: "/api" });
   await app.register(registerSettingsRoutes, { prefix: "/api" });
   await app.register(registerNotesRoutes, { prefix: "/api" });
+  if (options.enableMultipart) {
+    const { registerAttachmentsRoutes } = await import("../../../apps/api/src/routes/attachments.js");
+    await app.register(registerAttachmentsRoutes, { prefix: "/api" });
+  }
   await app.register(registerTicketsRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
   if (!options.enableAuth) {

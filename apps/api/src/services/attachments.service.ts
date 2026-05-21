@@ -8,8 +8,9 @@ import type { DbClient, DbSession } from "../db/client.js";
 import { attachments, featureAttachments, features, milestoneAttachments, milestones, projectAttachments, projects, taskAttachments, tasks, ticketAttachments, tickets } from "../db/schema.js";
 import { attachmentRepository, type AttachmentRecord } from "../repositories/attachment.repository.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
-import { notFound } from "../utils/errors.js";
+import { badRequest, internalError, notFound } from "../utils/errors.js";
 import { removeAttachmentPreviews } from "./attachment-preview.service.js";
+import type { FileOpener } from "./file-opener.service.js";
 import {
   buildDeleteSummary,
   buildLinkSummary,
@@ -159,6 +160,28 @@ function buildAttachmentCreateSummary(attachment: JournalObjectRef, owner: Journ
 function makeFilename(originalName: string): string {
   const extension = path.extname(originalName);
   return `${randomUUID()}${extension}`;
+}
+
+function isSameOrInside(targetPath: string, rootPath: string): boolean {
+  const relative = path.relative(path.resolve(rootPath), path.resolve(targetPath));
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function attachmentDiskPath(record: AttachmentRecord): string {
+  const diskPath = path.resolve(config.uploadDir, record.filename);
+  if (!isSameOrInside(diskPath, config.uploadDir)) {
+    throw badRequest("Attachment filename points outside the upload directory");
+  }
+  return diskPath;
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function listAttachmentOwners(database: DbClient, attachmentId: number): AttachmentOwner[] {
@@ -467,4 +490,23 @@ export async function deleteAttachment(database: DbClient, id: number, actor?: J
     attachmentRepository.deleteByIds(tx, [id]);
   });
   await removeAttachmentFiles([record]);
+}
+
+export async function openAttachment(database: DbClient, id: number, fileOpener: FileOpener): Promise<void> {
+  const record = attachmentRepository.findById(database, id);
+  if (!record) {
+    throw notFound(`Attachment with id ${id} not found`);
+  }
+
+  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
+  const diskPath = attachmentDiskPath(record);
+  if (!(await fileExists(diskPath))) {
+    throw notFound("Die Datei wurde im Upload-Verzeichnis nicht gefunden.");
+  }
+
+  try {
+    await fileOpener(diskPath);
+  } catch {
+    throw internalError("Datei konnte nicht geöffnet werden.");
+  }
 }

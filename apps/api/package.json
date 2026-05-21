@@ -30,12 +30,14 @@
     "dotenv": "^16.4.5",
     "drizzle-orm": "^1.0.0-rc.3",
     "fastify": "^5.8.5",
+    "ssh2-sftp-client": "^12.1.1",
     "unzipper": "^0.12.3"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.14.10",
+    "@types/ssh2-sftp-client": "^9.0.6",
     "@types/supertest": "^6.0.3",
     "@types/unzipper": "^0.10.11",
     "@typescript-eslint/eslint-plugin": "^7.16.0",

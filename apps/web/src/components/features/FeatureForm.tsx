@@ -740,6 +740,8 @@ export function FeatureForm({
                       }
                     });
                   }}
+                  onOpen={(attachment) => attachments.openAttachment(attachment.id)}
+                  openingAttachmentId={attachments.openingAttachmentId}
                 />
               </div>
             ) : (

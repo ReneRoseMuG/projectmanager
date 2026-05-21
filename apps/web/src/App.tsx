@@ -28,6 +28,7 @@ import { RolesPage } from "./pages/admin/RolesPage";
 import { UserDetailPage } from "./pages/admin/UserDetailPage";
 import { UsersPage } from "./pages/admin/UsersPage";
 import { useAuth } from "./hooks/useAuth";
+import { hasPermission } from "./hooks/usePermissions";
 import { SettingsProvider } from "./providers/SettingsProvider";
 
 function hasAdminAccess(user: ReturnType<typeof useAuth>["user"]): boolean {
@@ -74,6 +75,7 @@ export default function App() {
   }
 
   const adminAccess = hasAdminAccess(auth.user);
+  const backupAccess = hasPermission(auth.user, "dumps", "read");
   const fullBleedDetailRoute = isFullBleedDetailRoute(location.pathname);
 
   return (
@@ -114,7 +116,7 @@ export default function App() {
               <Route path="/settings/preferences" element={<SettingsPreferencesPage />} />
               <Route path="/settings/catalogs" element={<SettingsCatalogsPage />} />
               <Route path="/settings/tags" element={<SettingsTagsPage />} />
-              <Route path="/settings/backup" element={<SettingsBackupPage />} />
+              <Route path="/settings/backup" element={backupAccess ? <SettingsBackupPage /> : <ForbiddenPage />} />
               <Route path="/admin/users" element={adminAccess ? <UsersPage /> : <ForbiddenPage />} />
               <Route path="/admin/users/new" element={adminAccess ? <UserDetailPage /> : <ForbiddenPage />} />
               <Route path="/admin/users/:id" element={adminAccess ? <UserDetailPage /> : <ForbiddenPage />} />

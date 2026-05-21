@@ -6,6 +6,7 @@ import {
   getMilestoneAttachments,
   getProjectAttachments,
   getTaskAttachments,
+  openAttachment as openAttachmentRequest,
   uploadMilestoneAttachment,
   uploadFeatureAttachment,
   uploadProjectAttachment,
@@ -90,6 +91,10 @@ export function useAttachments(owner: AttachmentOwner | null) {
     }
   });
 
+  const openMutation = useMutation({
+    mutationFn: openAttachmentRequest
+  });
+
   const uploadAttachment = useCallback(
     async (file: File) => {
       return uploadMutation.mutateAsync(file);
@@ -104,12 +109,21 @@ export function useAttachments(owner: AttachmentOwner | null) {
     [removeMutation]
   );
 
+  const openAttachment = useCallback(
+    async (id: number) => {
+      await openMutation.mutateAsync(id);
+    },
+    [openMutation]
+  );
+
   return {
     attachments: attachmentsQuery.data ?? [],
     loading: attachmentsQuery.isLoading,
     error: toQueryError(attachmentsQuery.error),
     reload,
     uploadAttachment,
-    removeAttachment
+    removeAttachment,
+    openAttachment,
+    openingAttachmentId: openMutation.isPending ? (openMutation.variables ?? null) : null
   };
 }

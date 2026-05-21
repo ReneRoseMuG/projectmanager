@@ -488,4 +488,69 @@ test.describe("Globale UI-Aktualität", () => {
       await deleteProject(request, project.id);
     }
   });
+
+  test("Dateien: Lokal öffnen sendet Open-Request und zeigt 404-Fehler", async ({
+    page,
+    request,
+  }) => {
+    const project = await createProject(request, "E2E Fresh Attachment Open");
+    const attachmentName = uniqueTitle("e2e-open-attachment") + ".txt";
+
+    try {
+      await openProjectDetail(page, project.id);
+      await openTab(projectForm(page), "Dateien");
+
+      const createAttachmentResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/projects/${project.id}/attachments`) &&
+          response.request().method() === "POST",
+      );
+      await projectForm(page)
+        .locator('input[type="file"]')
+        .setInputFiles({
+          name: attachmentName,
+          mimeType: "text/plain",
+          buffer: Buffer.from("E2E attachment local open"),
+        });
+      const createdAttachment = (await (
+        await createAttachmentResponsePromise
+      ).json()) as IdFixture;
+      const attachmentCard = visibleArticle(projectForm(page), attachmentName);
+      await expect(attachmentCard).toBeVisible();
+
+      await page.route(
+        `**/api/attachments/${createdAttachment.id}/open`,
+        async (route) => route.fulfill({ status: 204 }),
+        { times: 1 },
+      );
+      const openRequestPromise = page.waitForRequest(
+        (openRequest) =>
+          openRequest.url().includes(`/api/attachments/${createdAttachment.id}/open`) &&
+          openRequest.method() === "POST",
+      );
+      await attachmentCard.getByRole("button", { name: "Lokal öffnen" }).click();
+      await openRequestPromise;
+
+      await page.route(
+        `**/api/attachments/${createdAttachment.id}/open`,
+        async (route) =>
+          route.fulfill({
+            status: 404,
+            contentType: "application/json",
+            body: JSON.stringify({
+              error: "NOT_FOUND",
+              message: "Die Datei wurde im Upload-Verzeichnis nicht gefunden.",
+              statusCode: 404,
+            }),
+          }),
+        { times: 1 },
+      );
+      await attachmentCard.getByRole("button", { name: "Lokal öffnen" }).click();
+      await expect(
+        page.getByText("Die Datei wurde im Upload-Verzeichnis nicht gefunden."),
+      ).toBeVisible();
+    } finally {
+      await deleteProject(request, project.id);
+    }
+  });
 });
