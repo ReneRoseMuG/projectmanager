@@ -52,7 +52,6 @@ export function UseCaseRelationPanel({
           </span>
           <span className="min-w-0">
             <span className="block truncate text-[14px] font-semibold text-ink">{useCase.title}</span>
-            <span className="block truncate font-mono text-[11px] text-slate-500">/use-cases/{useCase.slug}</span>
           </span>
           <span className="hidden md:inline-flex">
             <StatusPill kind="featureStatus" value={useCase.status} />

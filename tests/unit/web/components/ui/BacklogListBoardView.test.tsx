@@ -113,7 +113,8 @@ afterEach(() => {
 describe("BacklogListBoardView", () => {
   it("rendert Board-Modus mit katalogbasierten Statusspalten", () => {
     const items = buildBacklogItems();
-    const { container } = renderBacklogList({ items });
+    const onCreate = vi.fn();
+    const { container } = renderBacklogList({ items, onCreate });
 
     expectToolbar();
     fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
@@ -125,8 +126,10 @@ describe("BacklogListBoardView", () => {
     const cards = container.querySelectorAll("article.rounded-2xl");
     expect(cards).toHaveLength(items.length);
     expectItemCardClasses(cards);
-    expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(items.length);
-    expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(items.length);
+    expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(items.length);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Offen hinzufügen" })[0]!);
+    expect(onCreate).toHaveBeenCalledTimes(1);
   });
 
   it("rendert Listen-Modus mit ItemRows und Row-Controls", () => {
@@ -140,8 +143,7 @@ describe("BacklogListBoardView", () => {
     items.forEach((item, index) => {
       const row = rows[index] as HTMLElement;
       expect(within(row).getByText(item.title)).toBeInTheDocument();
-      expect(within(row).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
-      expect(within(row).getByRole("button", { name: "Löschen" })).toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: "Aktionen" })).toBeInTheDocument();
     });
   });
 

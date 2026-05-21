@@ -2,6 +2,7 @@
 import {
   authenticatedGoto,
   apiBaseUrl,
+  clickItemAction,
   createBacklogItem,
   createFeature,
   createProject,
@@ -85,13 +86,13 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expectProjectFormData(page, project);
 
       await openProjectList(page);
-      await itemCard(page, project.name).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(page, project.name, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
       await expectProjectFormData(page, project);
 
       await openProjectList(page);
       await page.getByRole("button", { name: "Liste", exact: true }).click();
-      await itemCard(page, project.name).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(page, project.name, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
       await expectProjectFormData(page, project);
     } finally {
@@ -195,7 +196,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
 
       await authenticatedGoto(page, `/projects/${project.id}`);
       await formPage(page, "Projekt bearbeiten").getByRole("button", { name: /Features/ }).click();
-      await itemCard(formPage(page, "Projekt bearbeiten"), feature.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(formPage(page, "Projekt bearbeiten"), feature.title, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/features/${feature.id}`));
       await expect(formPage(page, "Feature bearbeiten").locator("input[required]").nth(0)).toHaveValue(feature.title);
     } finally {
@@ -230,7 +231,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
 
       await authenticatedGoto(page, `/projects/${project.id}`);
       await formPage(page, "Projekt bearbeiten").getByRole("button", { name: /Backlog/ }).click();
-      await itemCard(formPage(page, "Projekt bearbeiten"), backlogItem.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(formPage(page, "Projekt bearbeiten"), backlogItem.title, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/backlog/${backlogItem.id}`));
       backlogForm = formPage(page, "Backlog-Item bearbeiten");
       await expect(backlogForm.locator("input[required]").first()).toHaveValue(backlogItem.title);
@@ -244,7 +245,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
     const project = await createProject(request, "E2E Project Delete Route");
 
     await openProjectList(page);
-    await itemCard(page, project.name).getByRole("button", { name: "Löschen" }).click();
+    await clickItemAction(page, project.name, "Löschen");
     await page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click();
 
     await expect(itemCard(page, project.name)).not.toBeVisible();

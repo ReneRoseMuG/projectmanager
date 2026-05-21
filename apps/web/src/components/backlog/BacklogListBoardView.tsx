@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { catalogEntriesByKind, isCatalogStatusClosed } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
+import { ActionMenu } from "../ui/ActionMenu";
 import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { FilterChips } from "../ui/FilterChips";
 import { ItemCard } from "../ui/ItemCard";
@@ -63,6 +63,7 @@ export function BacklogListBoardView({ items, features, statusFilter, onStatusFi
       mode={mode}
       onModeChange={setMode}
       onAdd={onCreate}
+      onAddToColumn={onCreate}
       addLabel="Neues Backlog-Item"
       statusKey="status"
       statusCatalogKind="workStatus"
@@ -117,10 +118,12 @@ function BacklogItemRow({ item, featureName, onEdit, onDelete }: { item: Backlog
       pills={null}
       meta={featureName ? <Badge tone="teal">{featureName}</Badge> : <Badge tone="mute">Ohne Feature</Badge>}
       actions={
-        <>
-          <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onEdit(item)} />
-          <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(item)} />
-        </>
+        <ActionMenu
+          items={[
+            { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onEdit(item) },
+            { label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(item), danger: true }
+          ]}
+        />
       }
       onOpen={() => onEdit(item)}
       className={closed ? "opacity-65" : ""}

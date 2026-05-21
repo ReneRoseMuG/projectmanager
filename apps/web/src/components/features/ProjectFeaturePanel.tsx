@@ -1,12 +1,12 @@
 import type { Feature } from "@taskmanager/shared-types";
-import { BookOpen, Edit3, FileText } from "lucide-react";
+import { BookOpen, Edit3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { catalogLabel } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
+import { ActionMenu } from "../ui/ActionMenu";
 import { EmptyState } from "../ui/EmptyState";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
@@ -58,10 +58,6 @@ function matchesSearch(feature: Feature, searchValue: string, statusLabel: strin
 
 function getUseCaseCount(feature: Feature): number {
   return Number.isFinite(feature.useCaseCount) ? feature.useCaseCount : 0;
-}
-
-function getFeaturePath(feature: Feature): string {
-  return feature.slug ? `/features/${feature.slug}` : "";
 }
 
 /** Project feature surface built on the shared list/board toolbar. */
@@ -117,7 +113,6 @@ function FeatureBoardCard({
   onOpen: (feature: Feature) => void;
 }) {
   const description = richTextToPlainText(feature.description);
-  const featurePath = getFeaturePath(feature);
 
   return (
     <ItemCard
@@ -140,14 +135,6 @@ function FeatureBoardCard({
           <p className="line-clamp-3 text-xs text-slate-600">{description}</p>
         ) : null
       }
-      footer={
-        featurePath ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-steel-700">
-            <FileText size={14} />
-            {featurePath}
-          </span>
-        ) : null
-      }
     />
   );
 }
@@ -160,7 +147,6 @@ function FeatureRow({
   onOpen: (feature: Feature) => void;
 }) {
   const description = richTextToPlainText(feature.description);
-  const featurePath = getFeaturePath(feature);
 
   return (
     <ItemRow
@@ -173,24 +159,11 @@ function FeatureRow({
           <Badge tone="steel">{getUseCaseCount(feature)} Use Cases</Badge>
         </>
       }
-      meta={
-        <span className="block truncate font-mono text-xs text-slate-500">
-          {featurePath}
-        </span>
-      }
       actions={
-        <Button
-          aria-label="Bearbeiten"
-          title="Bearbeiten"
-          className="h-10 w-10"
-          icon={<Edit3 size={18} />}
-          variant="ghost"
-          onClick={() => onOpen(feature)}
-        />
+        <ActionMenu items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(feature) }]} />
       }
       onOpen={() => onOpen(feature)}
       pillsClassName="w-52"
-      metaClassName="w-72"
     />
   );
 }

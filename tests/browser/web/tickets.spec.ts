@@ -2,6 +2,7 @@
 import {
   authenticatedGoto,
   apiBaseUrl,
+  clickItemAction,
   createFeature,
   createProject,
   createTask,
@@ -128,13 +129,13 @@ test.describe("Ticket-Routen und Detailformular", () => {
       await expectTicketFormData(page, ticket);
 
       await openTicketList(page);
-      await itemCard(page, ticket.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(page, ticket.title, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
       await expectTicketFormData(page, ticket);
 
       await openTicketList(page);
       await page.getByRole("button", { name: "Liste", exact: true }).click();
-      await itemCard(page, ticket.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(page, ticket.title, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
       await expectTicketFormData(page, ticket);
     } finally {
@@ -188,7 +189,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
       await expectTicketNavigationFromScope(page, scope, existingTicket.title, existingTicket.id);
 
       scope = await openProjectTickets(page, project.id);
-      await itemCard(scope, existingTicket.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(scope, existingTicket.title, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/tickets/${existingTicket.id}`));
       await expectTicketFormData(page, existingTicket);
     } finally {
@@ -229,7 +230,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
 
     try {
       const scope = await openProjectTickets(page, project.id);
-      await itemCard(scope, ticket.title).getByRole("button", { name: "Löschen", exact: true }).click();
+      await clickItemAction(scope, ticket.title, "Löschen");
       await page.getByRole("alertdialog").getByRole("button", { name: "Entfernen" }).click();
 
       await expect(itemCard(scope, ticket.title)).toHaveCount(0);
@@ -247,7 +248,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
 
     try {
       await openTicketList(page);
-      await itemCard(page, ticket.title).getByRole("button", { name: "Löschen", exact: true }).click();
+      await clickItemAction(page, ticket.title, "Löschen");
       await page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click();
 
       await expect(page.getByRole("status")).toContainText("Ticket konnte nicht gelöscht werden");

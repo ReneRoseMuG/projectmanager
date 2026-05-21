@@ -162,11 +162,11 @@ describe("TaskListBoardView", () => {
     expect(doneColumn).toContainElement(screen.getByText("Aufgabe Erledigt"));
 
     expectItemCardClasses(container.querySelectorAll("article.rounded-2xl"));
-    const editButtons = screen.getAllByRole("button", { name: "Bearbeiten" });
-    expect(editButtons).toHaveLength(tasks.length);
-    expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(tasks.length);
+    const actionButtons = screen.getAllByRole("button", { name: "Aktionen" });
+    expect(actionButtons).toHaveLength(tasks.length);
 
-    fireEvent.click(editButtons[0]!);
+    fireEvent.click(actionButtons[0]!);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Bearbeiten" }));
     expect(onOpen).toHaveBeenCalledWith(tasks[0]);
 
     fireEvent.click(within(todoColumn).getByRole("button", { name: "Offen hinzufügen" }));
@@ -187,8 +187,7 @@ describe("TaskListBoardView", () => {
     tasks.forEach((task, index) => {
       const row = rows[index] as HTMLElement;
       expect(within(row).getByText(task.title)).toBeInTheDocument();
-      expect(within(row).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
-      expect(within(row).getByRole("button", { name: "Löschen" })).toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: "Aktionen" })).toBeInTheDocument();
     });
   });
 

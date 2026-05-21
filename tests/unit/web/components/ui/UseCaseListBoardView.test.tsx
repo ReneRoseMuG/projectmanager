@@ -125,7 +125,8 @@ afterEach(() => {
 describe("UseCaseListBoardView", () => {
   it("rendert Board-Modus mit Feature-Statusspalten", () => {
     const useCases = buildUseCases();
-    const { container } = renderUseCaseList({ useCases });
+    const onCreate = vi.fn();
+    const { container } = renderUseCaseList({ useCases, onCreate });
 
     expectToolbar();
     expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
@@ -140,9 +141,12 @@ describe("UseCaseListBoardView", () => {
     expect(cards).toHaveLength(useCases.length);
     expectItemCardClasses(cards);
     cards.forEach((card) => {
-      expect(within(card as HTMLElement).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
+      expect(within(card as HTMLElement).getByRole("button", { name: "Aktionen" })).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "Löschen" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Entwurf hinzufügen" }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
   });
 
   it("ruft onOpen per Doppelklick auf eine Karte auf", () => {
@@ -167,7 +171,7 @@ describe("UseCaseListBoardView", () => {
     expectItemRowClasses(rows);
     useCases.forEach((useCase, index) => {
       expect(within(rows[index] as HTMLElement).getByText(useCase.title)).toBeInTheDocument();
-      expect(within(rows[index] as HTMLElement).getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
+      expect(within(rows[index] as HTMLElement).getByRole("button", { name: "Aktionen" })).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "Löschen" })).not.toBeInTheDocument();
   });

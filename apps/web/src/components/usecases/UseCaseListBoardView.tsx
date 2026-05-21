@@ -48,6 +48,7 @@ export function UseCaseListBoardView({ useCases, viewMode, onViewModeChange, onC
       mode={toListBoardMode(viewMode)}
       onModeChange={(mode) => onViewModeChange(toViewMode(mode))}
       onAdd={onCreate}
+      onAddToColumn={onCreate}
       addLabel="Neuer Use Case"
       statusKey="status"
       statusCatalogKind="featureStatus"
