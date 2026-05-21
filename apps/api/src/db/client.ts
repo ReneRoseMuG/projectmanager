@@ -12,6 +12,6 @@ fs.mkdirSync(path.dirname(config.databasePath), { recursive: true });
 export const sqlite = new Database(config.databasePath);
 sqlite.pragma("foreign_keys = ON");
 
-export const db = drizzle(sqlite, { schema });
-export type DbClient = typeof db;
-export type DbSession = Omit<DbClient, "$client">;
+export const db = drizzle({ client: sqlite, schema });
+export type DbClient = Omit<typeof db, "$client">;
+export type DbSession = DbClient;

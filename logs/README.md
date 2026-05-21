@@ -2,6 +2,7 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 21.05.26 | Fix           | API Drizzle Startscript                      | ✅     |
 | 21.05.26 | Feature       | SFTP Backups                                 | ⚠️     |
 | 21.05.26 | Fix           | Dump Standardadmin                           | ✅     |
 | 21.05.26 | Feature       | Attachments lokal öffnen                     | ✅     |
