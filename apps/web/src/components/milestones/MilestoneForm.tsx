@@ -22,6 +22,7 @@ import { richTextToPlainText } from "../../utils/richText";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { EventForm } from "../calendar/EventForm";
+import { JournalPanel } from "../journal/JournalPanel";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { TagPicker } from "../tags/TagPicker";
@@ -47,6 +48,7 @@ import { StatusPill } from "../ui/StatusPill";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface MilestoneFormProps {
   open: boolean;
@@ -66,7 +68,7 @@ function workStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], 
   return resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ?? preferredKey;
 }
 
-type MilestoneFormTab = "details" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "events";
+type MilestoneFormTab = "details" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "events" | "journal";
 
 const tabs: Array<Tab<MilestoneFormTab>> = [
   { value: "details", label: "Stammdaten" },
@@ -76,7 +78,8 @@ const tabs: Array<Tab<MilestoneFormTab>> = [
   { value: "comments", label: "Kommentare" },
   { value: "notes", label: "Notizen" },
   { value: "attachments", label: "Dateien" },
-  { value: "events", label: "Events" }
+  { value: "events", label: "Events" },
+  { value: "journal", label: "Journal" }
 ];
 
 const swatches = [
@@ -108,6 +111,7 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
   const comments = useEntityComments("milestone", milestoneId);
   const events = useEvents();
   const calendarTasks = useCalendarTasks();
+  const canReadJournal = useHasPermission("journal", "read");
   const [activeTab, setActiveTab] = useState<MilestoneFormTab>("details");
   const [projectId, setProjectId] = useState<number | "">("");
   const [name, setName] = useState("");
@@ -275,7 +279,8 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
     }
   };
 
-  const tabItems = tabs.map((tab) => {
+  const visibleTabs = milestone ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal) : tabs.filter((tab) => tab.value !== "journal");
+  const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
     }
@@ -477,6 +482,12 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
             ) : (
               <EmptyState icon={<CalendarClock size={22} />} title="Events sind nach dem Speichern verfügbar." tone="teal" variant="tinted" />
             )}
+          </Section>
+        ) : null}
+
+        {activeTab === "journal" && milestone ? (
+          <Section title="Journal" fill>
+            <JournalPanel objectType="milestone" objectId={milestone.id} />
           </Section>
         ) : null}
       </FormModal>

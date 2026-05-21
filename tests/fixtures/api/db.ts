@@ -85,7 +85,7 @@ export function migrateLegacyTestDb(sqlite: Database.Database, migrationsFolder:
 }
 
 function migrateTestDb(sqlite: Database.Database) {
-  const db = drizzle({ client: sqlite, schema });
+  const db = drizzle(sqlite, { schema });
   const migrationsFolder = fileURLToPath(new URL("../../../apps/api/src/db/migrations", import.meta.url));
 
   sqlite.pragma("foreign_keys = OFF");
@@ -118,6 +118,9 @@ export function truncateAll(sqlite: Database.Database): void {
   const tables = [
     "app_settings",
     "settings_values",
+    "journal_entry_contexts",
+    "journal_entry_changes",
+    "journal_entries",
     "users",
     "permissions",
     "roles",

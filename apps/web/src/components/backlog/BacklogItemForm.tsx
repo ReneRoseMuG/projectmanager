@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
+import { JournalPanel } from "../journal/JournalPanel";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
@@ -14,6 +15,7 @@ import { useEntityComments } from "../../hooks/useEntityComments";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { resolveCatalogEntryKey } from "../../utils/catalogs";
 import { StatusToggle } from "../ui/StatusToggle";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface BacklogItemFormProps {
   open: boolean;
@@ -29,6 +31,7 @@ interface BacklogItemFormProps {
 export function BacklogItemForm({ open, item, features, onSubmit, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: BacklogItemFormProps) {
   const comments = useEntityComments("backlogItem", item?.id);
   const catalogs = useCatalogs();
+  const canReadJournal = useHasPermission("journal", "read");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<BacklogStatus>("open");
@@ -129,6 +132,12 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
         <Section title="Kommentare">
           {comments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{comments.error}</div> : null}
           <CommentThread comments={comments.comments} entityLabel="Backlog-Item" onCreate={comments.createComment} onDelete={comments.removeComment} />
+        </Section>
+      ) : null}
+
+      {item && canReadJournal ? (
+        <Section title="Journal" fill>
+          <JournalPanel objectType="backlogItem" objectId={item.id} />
         </Section>
       ) : null}
     </FormModal>

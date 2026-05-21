@@ -1,7 +1,9 @@
+import type { JsonValue } from "@taskmanager/shared-types";
 import { eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { features } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
+import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { useCaseRepository, type UseCaseRecord, type UseCaseUpdateData } from "../repositories/use-case.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import {
@@ -16,6 +18,18 @@ import {
 } from "./content.service.js";
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
+import {
+  buildCreateSummary,
+  buildDeleteSummary,
+  buildJournalChanges,
+  buildUpdateSummary,
+  makeJournalContext,
+  makeJournalObject,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalFieldDefinition,
+  type JournalObjectRef
+} from "./journal.service.js";
 
 type UseCaseStatus = UseCaseRecord["status"];
 
@@ -45,6 +59,14 @@ export interface UseCaseDto {
   updatedAt: string;
 }
 
+const useCaseJournalFields: Array<JournalFieldDefinition<UseCaseRecord>> = [
+  { key: "title", label: "Titel" },
+  { key: "slug", label: "Slug" },
+  { key: "status", label: "Status" },
+  { key: "description", label: "Beschreibung" },
+  { key: "sortOrder", label: "Sortierung" }
+];
+
 function contentFilename(id: number, slug: string): string {
   return buildFilename("usecase", id, slug);
 }
@@ -73,6 +95,14 @@ function ensureFeatureExists(database: DbClient, featureId: number): void {
   }
 }
 
+function getFeatureJournalObject(database: DbClient, featureId: number): JournalObjectRef {
+  const feature = database.select({ id: features.id, title: features.title }).from(features).where(eq(features.id, featureId)).get();
+  if (!feature) {
+    throw notFound(`Feature with id ${featureId} not found`);
+  }
+  return makeJournalObject("feature", feature.id, feature.title);
+}
+
 function getUseCaseRecord(database: DbClient, id: number): UseCaseRecord {
   const useCase = useCaseRepository.findById(database, id);
   if (!useCase) {
@@ -92,6 +122,37 @@ function readUseCaseContent(record: UseCaseRecord): string {
   return record.contentPath ? readContent(resolveStoredContentPath(record.contentPath)) : "";
 }
 
+function useCaseJournalObject(record: UseCaseRecord): JournalObjectRef {
+  return makeJournalObject("useCase", record.id, record.title);
+}
+
+function contentValueLabel(value: string): string | null {
+  return value.trim() === "" ? null : `${value.length} Zeichen`;
+}
+
+function contentValue(value: string): JsonValue {
+  return { length: value.length };
+}
+
+function buildContentChange(before: string, after: string): JournalChangeCreateData[] {
+  if (before === after) {
+    return [];
+  }
+  const oldValueLabel = contentValueLabel(before);
+  const newValueLabel = contentValueLabel(after);
+  return [
+    {
+      fieldKey: "content",
+      fieldLabel: "Inhalt",
+      oldValue: contentValue(before),
+      oldValueLabel,
+      newValue: contentValue(after),
+      newValueLabel,
+      summary: `Inhalt: ${oldValueLabel ?? "leer"} → ${newValueLabel ?? "leer"}`
+    }
+  ];
+}
+
 export function listUseCases(database: DbClient, featureId: number): UseCaseDto[] {
   ensureFeatureExists(database, featureId);
   return useCaseRepository.findByFeatureId(database, featureId).map((useCase) => mapUseCase(useCase));
@@ -102,24 +163,28 @@ export function getUseCase(database: DbClient, id: number): UseCaseDto {
   return mapUseCase(useCase, readUseCaseContent(useCase));
 }
 
-export function createUseCase(database: DbClient, featureId: number, input: UseCaseInput): UseCaseDto {
+export function createUseCase(database: DbClient, featureId: number, input: UseCaseInput, actor?: JournalActor | null): UseCaseDto {
   const targetFeatureId = input.featureId ?? featureId;
-  ensureFeatureExists(database, targetFeatureId);
+  const featureObject = getFeatureJournalObject(database, targetFeatureId);
   const title = requireNonEmpty(input.title, "title");
   const slug = requireNonEmpty(input.slug, "slug");
   ensureSlugIsUnique(database, slug);
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
   ensureCatalogEntryExists(database, "featureStatus", status);
 
-  const created = useCaseRepository.create(database, {
-    featureId: targetFeatureId,
-    title,
-    slug,
-    status,
-    description: cleanNullable(input.description) ?? null,
-    contentPath: null,
-    sortOrder: input.sortOrder ?? 0
-  });
+  const created = useCaseRepository.create(
+    database,
+    {
+      featureId: targetFeatureId,
+      title,
+      slug,
+      status,
+      description: cleanNullable(input.description) ?? null,
+      contentPath: null,
+      sortOrder: input.sortOrder ?? 0
+    },
+    actor?.actorUserId ?? undefined
+  );
 
   const filename = contentFilename(created.id, slug);
   const absolutePath = resolveContentPath("usecases", filename);
@@ -127,7 +192,21 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
 
   try {
     writeContent(absolutePath, input.content ?? "");
-    const updated = useCaseRepository.setContentPath(database, created.id, storedPath);
+    const updated = database.transaction((tx) => {
+      const useCase = useCaseRepository.setContentPath(tx, created.id, storedPath);
+      if (!useCase) {
+        throw notFound(`Use case with id ${created.id} not found`);
+      }
+      const journalObject = useCaseJournalObject(useCase);
+      recordJournalEntry(tx, {
+        operation: "create",
+        object: journalObject,
+        summary: buildCreateSummary(journalObject),
+        actor,
+        contexts: [makeJournalContext(featureObject, "owner")]
+      });
+      return useCase;
+    });
     if (!updated) {
       throw notFound(`Use case with id ${created.id} not found`);
     }
@@ -140,8 +219,9 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
   }
 }
 
-export function updateUseCase(database: DbClient, id: number, input: UseCaseInput): UseCaseDto {
+export function updateUseCase(database: DbClient, id: number, input: UseCaseInput, actor?: JournalActor | null): UseCaseDto {
   const current = getUseCaseRecord(database, id);
+  const previousContent = readUseCaseContent(current);
   assertVersion(current.version, input.expectedVersion ?? 0);
   const values: UseCaseUpdateData = {};
   let contentPath = current.contentPath;
@@ -195,16 +275,49 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
     writeContent(resolveStoredContentPath(contentPath), input.content);
   }
 
-  const updated = useCaseRepository.update(database, id, input.expectedVersion ?? 0, values);
+  const updated = database.transaction((tx) => {
+    const useCase = useCaseRepository.update(tx, id, input.expectedVersion ?? 0, values, actor?.actorUserId ?? undefined);
+    if (!useCase) {
+      throw notFound(`Use case with id ${id} not found`);
+    }
+    const featureField: JournalFieldDefinition<UseCaseRecord> = {
+      key: "featureId",
+      label: "Feature",
+      format: (value) => (typeof value === "number" ? getFeatureJournalObject(database, value).label : null)
+    };
+    const nextContent = input.content ?? previousContent;
+    const journalObject = useCaseJournalObject(useCase);
+    const changes = [...buildJournalChanges(current, useCase, [featureField, ...useCaseJournalFields]), ...buildContentChange(previousContent, nextContent)];
+    recordJournalEntry(tx, {
+      operation: "update",
+      object: journalObject,
+      summary: buildUpdateSummary(journalObject, changes),
+      actor,
+      changes,
+      contexts: [makeJournalContext(getFeatureJournalObject(database, useCase.featureId), "owner")]
+    });
+    return useCase;
+  });
   if (!updated) {
     throw notFound(`Use case with id ${id} not found`);
   }
   return mapUseCase(updated, input.content ?? readUseCaseContent(updated));
 }
 
-export function deleteUseCase(database: DbClient, id: number): void {
+export function deleteUseCase(database: DbClient, id: number, actor?: JournalActor | null): void {
   const useCase = getUseCaseRecord(database, id);
-  useCaseRepository.delete(database, id);
+  const featureObject = getFeatureJournalObject(database, useCase.featureId);
+  database.transaction((tx) => {
+    const journalObject = useCaseJournalObject(useCase);
+    recordJournalEntry(tx, {
+      operation: "delete",
+      object: journalObject,
+      summary: buildDeleteSummary(journalObject),
+      actor,
+      contexts: [makeJournalContext(featureObject, "owner")]
+    });
+    useCaseRepository.delete(tx, id);
+  });
 
   if (useCase.contentPath) {
     deleteContent(resolveStoredContentPath(useCase.contentPath));

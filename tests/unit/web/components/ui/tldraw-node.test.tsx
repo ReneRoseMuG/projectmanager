@@ -21,8 +21,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import type { ReactNodeViewProps } from "@tiptap/react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TldrawNodeView } from "../../../../../apps/web/src/components/ui/TldrawNodeView";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface MockTldrawSnapshot {
   document: {
@@ -39,6 +38,9 @@ interface MockTldrawEditor {
 }
 
 type UpdateAttributesMock = ReturnType<typeof vi.fn<[Record<string, unknown>], void>>;
+type TldrawNodeViewComponent = typeof import("../../../../../apps/web/src/components/ui/TldrawNodeView")["TldrawNodeView"];
+
+let TldrawNodeView: TldrawNodeViewComponent;
 
 const tldrawMocks = vi.hoisted(() => ({
   currentShapeIds: ["shape:one"],
@@ -59,21 +61,19 @@ const revokeObjectUrlMock = vi.fn<[string], void>();
 const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
 
-vi.mock("@tldraw/tldraw", () => ({
-  Tldraw: ({ onMount }: { onMount?: (editor: MockTldrawEditor) => void }) => {
-    const mockEditor: MockTldrawEditor = {
-      getSnapshot: vi.fn(() => tldrawMocks.snapshot),
-      getCurrentPageShapeIds: vi.fn(() => new Set(tldrawMocks.currentShapeIds)),
-      getSvgString: vi.fn<[string[], { background: boolean }], Promise<{ svg: string } | null>>(() =>
-        Promise.resolve({ svg: "<svg/>" })
-      )
-    };
+const mockTldrawComponent = ({ onMount }: { onMount?: (editor: MockTldrawEditor) => void }) => {
+  const mockEditor: MockTldrawEditor = {
+    getSnapshot: vi.fn(() => tldrawMocks.snapshot),
+    getCurrentPageShapeIds: vi.fn(() => new Set(tldrawMocks.currentShapeIds)),
+    getSvgString: vi.fn<[string[], { background: boolean }], Promise<{ svg: string } | null>>(() =>
+      Promise.resolve({ svg: "<svg/>" })
+    )
+  };
 
-    tldrawMocks.lastEditor = mockEditor;
-    onMount?.(mockEditor);
-    return <div data-testid="tldraw-canvas" />;
-  }
-}));
+  tldrawMocks.lastEditor = mockEditor;
+  onMount?.(mockEditor);
+  return <div data-testid="tldraw-canvas" />;
+};
 
 vi.mock("@tiptap/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tiptap/react")>();
@@ -81,6 +81,22 @@ vi.mock("@tiptap/react", async (importOriginal) => {
     ...actual,
     NodeViewWrapper: ({ children }: { children: ReactNode }) => <div>{children}</div>
   };
+});
+
+beforeAll(async () => {
+  vi.doMock("../../../../../apps/web/node_modules/tldraw/dist-esm/index.mjs", () => ({
+    Tldraw: mockTldrawComponent
+  }));
+  vi.doMock("../../../../../apps/web/node_modules/@tldraw/tldraw/dist-esm/index.mjs", () => ({
+    Tldraw: mockTldrawComponent
+  }));
+  vi.doMock("tldraw", () => ({
+    Tldraw: mockTldrawComponent
+  }));
+  vi.doMock("@tldraw/tldraw", () => ({
+    Tldraw: mockTldrawComponent
+  }));
+  ({ TldrawNodeView } = await import("../../../../../apps/web/src/components/ui/TldrawNodeView"));
 });
 
 function renderNodeView({

@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm";
+import type { JsonValue } from "@taskmanager/shared-types";
 import type { DbClient } from "../db/client.js";
 import { useCases } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import { featureRepository, type FeatureRecord, type FeatureUpdateData } from "../repositories/feature.repository.js";
+import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { useCaseRepository } from "../repositories/use-case.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteFeatureAttachmentsForIds } from "./attachments.service.js";
@@ -18,6 +20,17 @@ import {
   writeContent
 } from "./content.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
+import {
+  buildCreateSummary,
+  buildDeleteSummary,
+  buildJournalChanges,
+  buildUpdateSummary,
+  makeJournalObject,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalFieldDefinition,
+  type JournalObjectRef
+} from "./journal.service.js";
 
 type FeatureStatus = FeatureRecord["status"];
 
@@ -45,6 +58,14 @@ export interface FeatureDto {
   createdAt: string;
   updatedAt: string;
 }
+
+const featureJournalFields: Array<JournalFieldDefinition<FeatureRecord>> = [
+  { key: "title", label: "Titel" },
+  { key: "slug", label: "Slug" },
+  { key: "status", label: "Status" },
+  { key: "description", label: "Beschreibung" },
+  { key: "sortOrder", label: "Sortierung" }
+];
 
 function contentFilename(id: number, slug: string): string {
   return buildFilename("feature", id, slug);
@@ -102,6 +123,37 @@ function readFeatureContent(record: FeatureRecord): string {
   return record.contentPath ? readContent(resolveStoredContentPath(record.contentPath)) : "";
 }
 
+function featureJournalObject(record: FeatureRecord): JournalObjectRef {
+  return makeJournalObject("feature", record.id, record.title);
+}
+
+function contentValueLabel(value: string): string | null {
+  return value.trim() === "" ? null : `${value.length} Zeichen`;
+}
+
+function contentValue(value: string): JsonValue {
+  return { length: value.length };
+}
+
+function buildContentChange(before: string, after: string): JournalChangeCreateData[] {
+  if (before === after) {
+    return [];
+  }
+  const oldValueLabel = contentValueLabel(before);
+  const newValueLabel = contentValueLabel(after);
+  return [
+    {
+      fieldKey: "content",
+      fieldLabel: "Inhalt",
+      oldValue: contentValue(before),
+      oldValueLabel,
+      newValue: contentValue(after),
+      newValueLabel,
+      summary: `Inhalt: ${oldValueLabel ?? "leer"} → ${newValueLabel ?? "leer"}`
+    }
+  ];
+}
+
 export function listFeatures(database: DbClient): FeatureDto[] {
   const rows = featureRepository.findAll(database);
   const counts = getUseCaseCounts(database);
@@ -114,21 +166,25 @@ export function getFeature(database: DbClient, id: number): FeatureDto {
   return mapFeature(feature, countUseCases(database, id), readFeatureContent(feature));
 }
 
-export function createFeature(database: DbClient, input: FeatureInput): FeatureDto {
+export function createFeature(database: DbClient, input: FeatureInput, actor?: JournalActor | null): FeatureDto {
   const title = requireNonEmpty(input.title, "title");
   const slug = requireNonEmpty(input.slug, "slug");
   ensureSlugIsUnique(database, slug);
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
   ensureCatalogEntryExists(database, "featureStatus", status);
 
-  const created = featureRepository.create(database, {
-    title,
-    slug,
-    status,
-    description: cleanNullable(input.description) ?? null,
-    contentPath: null,
-    sortOrder: input.sortOrder ?? 0
-  });
+  const created = featureRepository.create(
+    database,
+    {
+      title,
+      slug,
+      status,
+      description: cleanNullable(input.description) ?? null,
+      contentPath: null,
+      sortOrder: input.sortOrder ?? 0
+    },
+    actor?.actorUserId ?? undefined
+  );
 
   const filename = contentFilename(created.id, slug);
   const absolutePath = resolveContentPath("features", filename);
@@ -136,7 +192,20 @@ export function createFeature(database: DbClient, input: FeatureInput): FeatureD
 
   try {
     writeContent(absolutePath, input.content ?? "");
-    const updated = featureRepository.setContentPath(database, created.id, storedPath);
+    const updated = database.transaction((tx) => {
+      const feature = featureRepository.setContentPath(tx, created.id, storedPath);
+      if (!feature) {
+        throw notFound(`Feature with id ${created.id} not found`);
+      }
+      const journalObject = featureJournalObject(feature);
+      recordJournalEntry(tx, {
+        operation: "create",
+        object: journalObject,
+        summary: buildCreateSummary(journalObject),
+        actor
+      });
+      return feature;
+    });
     if (!updated) {
       throw notFound(`Feature with id ${created.id} not found`);
     }
@@ -149,8 +218,9 @@ export function createFeature(database: DbClient, input: FeatureInput): FeatureD
   }
 }
 
-export function updateFeature(database: DbClient, id: number, input: FeatureInput): FeatureDto {
+export function updateFeature(database: DbClient, id: number, input: FeatureInput, actor?: JournalActor | null): FeatureDto {
   const current = getFeatureRecord(database, id);
+  const previousContent = readFeatureContent(current);
   assertVersion(current.version, input.expectedVersion ?? 0);
   const values: FeatureUpdateData = {};
   let contentPath = current.contentPath;
@@ -204,19 +274,44 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
     writeContent(resolveStoredContentPath(contentPath), input.content);
   }
 
-  const updated = featureRepository.update(database, id, input.expectedVersion ?? 0, values);
+  const updated = database.transaction((tx) => {
+    const feature = featureRepository.update(tx, id, input.expectedVersion ?? 0, values, actor?.actorUserId ?? undefined);
+    if (!feature) {
+      throw notFound(`Feature with id ${id} not found`);
+    }
+    const nextContent = input.content ?? previousContent;
+    const journalObject = featureJournalObject(feature);
+    const changes = [...buildJournalChanges(current, feature, featureJournalFields), ...buildContentChange(previousContent, nextContent)];
+    recordJournalEntry(tx, {
+      operation: "update",
+      object: journalObject,
+      summary: buildUpdateSummary(journalObject, changes),
+      actor,
+      changes
+    });
+    return feature;
+  });
   if (!updated) {
     throw notFound(`Feature with id ${id} not found`);
   }
   return mapFeature(updated, countUseCases(database, id), input.content ?? readFeatureContent(updated));
 }
 
-export async function deleteFeature(database: DbClient, id: number): Promise<void> {
+export async function deleteFeature(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
   const feature = getFeatureRecord(database, id);
   const linkedUseCases = useCaseRepository.findByFeatureId(database, id);
 
   await deleteFeatureAttachmentsForIds(database, [id]);
-  featureRepository.delete(database, id);
+  database.transaction((tx) => {
+    const journalObject = featureJournalObject(feature);
+    recordJournalEntry(tx, {
+      operation: "delete",
+      object: journalObject,
+      summary: buildDeleteSummary(journalObject),
+      actor
+    });
+    featureRepository.delete(tx, id);
+  });
 
   if (feature.contentPath) {
     deleteContent(resolveStoredContentPath(feature.contentPath));

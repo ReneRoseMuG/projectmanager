@@ -23,6 +23,17 @@ import {
 import { commentRepository, type CommentRecord } from "../repositories/comment.repository.js";
 import { notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
+import {
+  buildDeleteSummary,
+  buildLinkSummary,
+  buildUnlinkSummary,
+  makeJournalContext,
+  makeJournalObject,
+  objectTypeLabel,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalObjectRef
+} from "./journal.service.js";
 
 const commentSelect = {
   id: comments.id,
@@ -131,6 +142,43 @@ function ensureOwnerExists(database: DbClient, owner: CommentOwner): void {
     return;
   }
   ensureTicketExists(database, owner.id);
+}
+
+function getOwnerJournalObject(database: DbClient, owner: CommentOwner): JournalObjectRef {
+  if (owner.type === "project") {
+    const project = database.select({ name: projects.name }).from(projects).where(eq(projects.id, owner.id)).get();
+    return makeJournalObject("project", owner.id, project?.name ?? `Projekt ${owner.id}`);
+  }
+  if (owner.type === "task") {
+    const task = database.select({ title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)).get();
+    return makeJournalObject("task", owner.id, task?.title ?? `Aufgabe ${owner.id}`);
+  }
+  if (owner.type === "milestone") {
+    const milestone = database.select({ name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
+    return makeJournalObject("milestone", owner.id, milestone?.name ?? `Meilenstein ${owner.id}`);
+  }
+  if (owner.type === "feature") {
+    const feature = database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)).get();
+    return makeJournalObject("feature", owner.id, feature?.title ?? `Feature ${owner.id}`);
+  }
+  if (owner.type === "useCase") {
+    const useCase = database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)).get();
+    return makeJournalObject("useCase", owner.id, useCase?.title ?? `Use Case ${owner.id}`);
+  }
+  if (owner.type === "backlogItem") {
+    const item = database.select({ title: backlogItems.title }).from(backlogItems).where(eq(backlogItems.id, owner.id)).get();
+    return makeJournalObject("backlogItem", owner.id, item?.title ?? `Backlog-Eintrag ${owner.id}`);
+  }
+  if (owner.type === "wikiPage") {
+    const page = database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)).get();
+    return makeJournalObject("wikiPage", owner.id, page?.title ?? `Wiki-Seite ${owner.id}`);
+  }
+  const ticket = database.select({ title: tickets.title }).from(tickets).where(eq(tickets.id, owner.id)).get();
+  return makeJournalObject("ticket", owner.id, ticket?.title ?? `Ticket ${owner.id}`);
+}
+
+function commentJournalObject(comment: Pick<CommentRecord, "id" | "body">): JournalObjectRef {
+  return makeJournalObject("comment", comment.id, comment.body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || `Kommentar ${comment.id}`);
 }
 
 function listCommentOwners(database: DbClient, commentId: number): CommentOwner[] {
@@ -292,51 +340,105 @@ export function listEntityComments(database: DbClient, entityType: CommentEntity
   return selectOwnerComments(database, owner).map((comment) => mapComment(database, comment));
 }
 
-export function createEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, input: CommentInput): Comment {
+export function createEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, input: CommentInput, actor?: JournalActor | null): Comment {
   const owner = { type: entityType, id: entityId };
   ensureOwnerExists(database, owner);
   const body = requireNonEmpty(input.body, "body");
   const created = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
     const comment = commentRepository.create(tx, {
       body
     });
     insertCommentLink(tx, owner, comment.id);
+    const commentObject = commentJournalObject(comment);
+    const ownerObject = getOwnerJournalObject(txDb, owner);
+    recordJournalEntry(txDb, {
+      operation: "create",
+      object: commentObject,
+      summary: `${objectTypeLabel(commentObject.type)} wurde zu ${objectTypeLabel(ownerObject.type)} "${ownerObject.label}" hinzugefügt.`,
+      actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
     return comment;
   });
 
   return mapComment(database, created);
 }
 
-export function linkEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, commentId: number): Comment {
+export function linkEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, commentId: number, actor?: JournalActor | null): Comment {
   const owner = { type: entityType, id: entityId };
   ensureOwnerExists(database, owner);
   const comment = commentRepository.findById(database, commentId);
   if (!comment) {
     throw notFound(`Comment with id ${commentId} not found`);
   }
-  insertCommentLink(database, owner, commentId);
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    insertCommentLink(tx, owner, commentId);
+    const commentObject = commentJournalObject(comment);
+    const ownerObject = getOwnerJournalObject(txDb, owner);
+    recordJournalEntry(txDb, {
+      operation: "link",
+      object: commentObject,
+      summary: buildLinkSummary(ownerObject, commentObject),
+      actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
+  });
   return mapComment(database, comment);
 }
 
-export function deleteEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, id: number): void {
+export function deleteEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, id: number, actor?: JournalActor | null): void {
   const owner = { type: entityType, id: entityId };
   ensureOwnerExists(database, owner);
-  const changes = deleteCommentLink(database, owner, id);
-  if (changes === 0) {
+  const comment = commentRepository.findById(database, id);
+  if (!comment) {
     throw notFound(`Comment with id ${id} not found`);
   }
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const changes = deleteCommentLink(txDb, owner, id);
+    if (changes === 0) {
+      throw notFound(`Comment with id ${id} not found`);
+    }
+    const commentObject = commentJournalObject(comment);
+    const ownerObject = getOwnerJournalObject(txDb, owner);
+    recordJournalEntry(txDb, {
+      operation: "unlink",
+      object: commentObject,
+      summary: buildUnlinkSummary(ownerObject, commentObject),
+      actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
+  });
 }
 
 export function listComments(database: DbClient, taskId: number): Comment[] {
   return listEntityComments(database, "task", taskId);
 }
 
-export function createComment(database: DbClient, taskId: number, input: CommentInput): Comment {
-  return createEntityComment(database, "task", taskId, input);
+export function createComment(database: DbClient, taskId: number, input: CommentInput, actor?: JournalActor | null): Comment {
+  return createEntityComment(database, "task", taskId, input, actor);
 }
 
-export function deleteComment(database: DbClient, id: number): void {
-  if (commentRepository.delete(database, id) === 0) {
+export function deleteComment(database: DbClient, id: number, actor?: JournalActor | null): void {
+  const comment = commentRepository.findById(database, id);
+  if (!comment) {
     throw notFound(`Comment with id ${id} not found`);
   }
+  const owners = listCommentOwners(database, id);
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const commentObject = commentJournalObject(comment);
+    recordJournalEntry(txDb, {
+      operation: "delete",
+      object: commentObject,
+      summary: buildDeleteSummary(commentObject),
+      actor,
+      contexts: owners.map((owner) => makeJournalContext(getOwnerJournalObject(txDb, owner), "owner"))
+    });
+    if (commentRepository.delete(tx, id) === 0) {
+      throw notFound(`Comment with id ${id} not found`);
+    }
+  });
 }

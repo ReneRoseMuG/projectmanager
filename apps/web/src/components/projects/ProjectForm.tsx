@@ -39,6 +39,7 @@ import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { BacklogListBoardView } from "../backlog/BacklogListBoardView";
 import { ProjectFeaturePanel } from "../features/ProjectFeaturePanel";
 import { WikiImportPanel } from "../imports/WikiImportPanel";
+import { JournalPanel } from "../journal/JournalPanel";
 import { MilestoneListBoardView } from "../milestones/MilestoneListBoardView";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
@@ -70,6 +71,7 @@ import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface ProjectFormProps {
   open: boolean;
@@ -94,7 +96,7 @@ interface ProjectFormProps {
   ) => Promise<void>;
 }
 
-type ProjectFormTab = "details" | "milestones" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "backlog" | "import";
+type ProjectFormTab = "details" | "milestones" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "backlog" | "journal" | "import";
 
 const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "details", label: "Details" },
@@ -106,6 +108,7 @@ const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "notes", label: "Notizen" },
   { value: "attachments", label: "Dateien" },
   { value: "backlog", label: "Backlog" },
+  { value: "journal", label: "Journal" },
   { value: "import", label: "Import" }
 ];
 
@@ -171,6 +174,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
   const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
+  const canReadJournal = useHasPermission("journal", "read");
   const [pendingFeatures, setPendingFeatures] = useState<Feature[]>([]);
   const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
   const [pendingTickets, setPendingTickets] = useState<DraftTicket[]>([]);
@@ -349,7 +353,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
     }
   };
 
-  const visibleTabs = project ? baseTabs : baseTabs.filter((tab) => tab.value !== "import");
+  const visibleTabs = project ? baseTabs.filter((tab) => tab.value !== "journal" || canReadJournal) : baseTabs.filter((tab) => tab.value !== "import" && tab.value !== "journal");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
@@ -610,6 +614,12 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
             onPreview={() => void previewWikiImport()}
             onRun={() => void runWikiImport()}
           />
+        ) : null}
+
+        {activeTab === "journal" && project ? (
+          <Section title="Journal" fill>
+            <JournalPanel objectType="project" objectId={project.id} />
+          </Section>
         ) : null}
       </FormModal>
 

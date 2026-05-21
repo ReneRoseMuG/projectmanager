@@ -1,4 +1,4 @@
-import type { CommentEntityType } from "@taskmanager/shared-types";
+import type { CommentEntityType, JournalObjectType } from "@taskmanager/shared-types";
 
 export type NoteOwnerType = "project" | "milestone" | "task" | "ticket";
 export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket";
@@ -98,6 +98,11 @@ export const queryKeys = {
   events: {
     root: ["events"] as const,
     list: (rangeKey: string) => [...queryKeys.events.root, "list", rangeKey] as const
+  },
+  journal: {
+    root: ["journal"] as const,
+    list: (filters: object = {}) => [...queryKeys.journal.root, "list", filters] as const,
+    object: (objectType: JournalObjectType, objectId: number, filters: object = {}) => [...queryKeys.journal.root, "object", objectType, objectId, filters] as const
   },
   calendarTasks: {
     root: ["calendarTasks"] as const,

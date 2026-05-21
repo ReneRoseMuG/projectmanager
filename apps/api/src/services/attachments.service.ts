@@ -10,6 +10,16 @@ import { attachmentRepository, type AttachmentRecord } from "../repositories/att
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { notFound } from "../utils/errors.js";
 import { removeAttachmentPreviews } from "./attachment-preview.service.js";
+import {
+  buildDeleteSummary,
+  buildLinkSummary,
+  makeJournalContext,
+  makeJournalObject,
+  objectTypeLabel,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalObjectRef
+} from "./journal.service.js";
 
 type AttachmentCleanupRecord = Pick<AttachmentRecord, "id" | "filename">;
 
@@ -100,6 +110,50 @@ function ensureOwnerExists(database: DbClient, owner: AttachmentOwner): void {
     return;
   }
   ensureTicketExists(database, owner.id);
+}
+
+function getOwnerJournalObject(database: DbClient, owner: AttachmentOwner): JournalObjectRef {
+  if (owner.type === "project") {
+    const project = database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, owner.id)).get();
+    if (!project) {
+      throw notFound(`Project with id ${owner.id} not found`);
+    }
+    return makeJournalObject("project", project.id, project.name);
+  }
+  if (owner.type === "task") {
+    const task = database.select({ id: tasks.id, title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)).get();
+    if (!task) {
+      throw notFound(`Task with id ${owner.id} not found`);
+    }
+    return makeJournalObject("task", task.id, task.title);
+  }
+  if (owner.type === "milestone") {
+    const milestone = database.select({ id: milestones.id, name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
+    if (!milestone) {
+      throw notFound(`Milestone with id ${owner.id} not found`);
+    }
+    return makeJournalObject("milestone", milestone.id, milestone.name);
+  }
+  if (owner.type === "feature") {
+    const feature = database.select({ id: features.id, title: features.title }).from(features).where(eq(features.id, owner.id)).get();
+    if (!feature) {
+      throw notFound(`Feature with id ${owner.id} not found`);
+    }
+    return makeJournalObject("feature", feature.id, feature.title);
+  }
+  const ticket = database.select({ id: tickets.id, title: tickets.title }).from(tickets).where(eq(tickets.id, owner.id)).get();
+  if (!ticket) {
+    throw notFound(`Ticket with id ${owner.id} not found`);
+  }
+  return makeJournalObject("ticket", ticket.id, ticket.title);
+}
+
+function attachmentJournalObject(record: Pick<AttachmentRecord, "id" | "originalName">): JournalObjectRef {
+  return makeJournalObject("attachment", record.id, record.originalName);
+}
+
+function buildAttachmentCreateSummary(attachment: JournalObjectRef, owner: JournalObjectRef): string {
+  return `${objectTypeLabel(attachment.type)} "${attachment.label}" wurde zu ${objectTypeLabel(owner.type)} "${owner.label}" hinzugefügt.`;
 }
 
 function makeFilename(originalName: string): string {
@@ -217,6 +271,7 @@ async function persistAttachment(values: {
   database: DbClient;
   owner: AttachmentOwner;
   upload: AttachmentUpload;
+  actor?: JournalActor | null;
 }): Promise<Attachment> {
   assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   await fs.mkdir(config.uploadDir, { recursive: true });
@@ -231,8 +286,17 @@ async function persistAttachment(values: {
       filename,
       mimetype: values.upload.mimetype,
       size: values.upload.buffer.byteLength
-    });
+    }, values.actor?.actorUserId ?? undefined);
     insertAttachmentLink(tx, values.owner, attachment.id);
+    const attachmentObject = attachmentJournalObject(attachment);
+    const ownerObject = getOwnerJournalObject(values.database, values.owner);
+    recordJournalEntry(tx, {
+      operation: "create",
+      object: attachmentObject,
+      summary: buildAttachmentCreateSummary(attachmentObject, ownerObject),
+      actor: values.actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
     return attachment;
   });
 
@@ -330,51 +394,77 @@ export async function deleteTicketAttachmentsForIds(database: DbClient, ticketId
   await deleteAttachmentsOwnedOnlyBy(database, "ticket", ticketIds);
 }
 
-export async function createProjectAttachment(database: DbClient, projectId: number, upload: AttachmentUpload): Promise<Attachment> {
+export async function createProjectAttachment(database: DbClient, projectId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "project" as const, id: projectId };
   ensureOwnerExists(database, owner);
-  return persistAttachment({ database, owner, upload });
+  return persistAttachment({ database, owner, upload, actor });
 }
 
-export async function createTaskAttachment(database: DbClient, taskId: number, upload: AttachmentUpload): Promise<Attachment> {
+export async function createTaskAttachment(database: DbClient, taskId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "task" as const, id: taskId };
   ensureOwnerExists(database, owner);
-  return persistAttachment({ database, owner, upload });
+  return persistAttachment({ database, owner, upload, actor });
 }
 
-export async function createMilestoneAttachment(database: DbClient, milestoneId: number, upload: AttachmentUpload): Promise<Attachment> {
+export async function createMilestoneAttachment(database: DbClient, milestoneId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "milestone" as const, id: milestoneId };
   ensureOwnerExists(database, owner);
-  return persistAttachment({ database, owner, upload });
+  return persistAttachment({ database, owner, upload, actor });
 }
 
-export async function createFeatureAttachment(database: DbClient, featureId: number, upload: AttachmentUpload): Promise<Attachment> {
+export async function createFeatureAttachment(database: DbClient, featureId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "feature" as const, id: featureId };
   ensureOwnerExists(database, owner);
-  return persistAttachment({ database, owner, upload });
+  return persistAttachment({ database, owner, upload, actor });
 }
 
-export async function createTicketAttachment(database: DbClient, ticketId: number, upload: AttachmentUpload): Promise<Attachment> {
+export async function createTicketAttachment(database: DbClient, ticketId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "ticket" as const, id: ticketId };
   ensureOwnerExists(database, owner);
-  return persistAttachment({ database, owner, upload });
+  return persistAttachment({ database, owner, upload, actor });
 }
 
-export async function linkAttachment(database: DbClient, owner: AttachmentOwner, attachmentId: number): Promise<Attachment> {
+export async function linkAttachment(database: DbClient, owner: AttachmentOwner, attachmentId: number, actor?: JournalActor | null): Promise<Attachment> {
   ensureOwnerExists(database, owner);
   const attachment = attachmentRepository.findById(database, attachmentId);
   if (!attachment) {
     throw notFound(`Attachment with id ${attachmentId} not found`);
   }
-  insertAttachmentLink(database, owner, attachmentId);
+  const ownerObject = getOwnerJournalObject(database, owner);
+  const attachmentObject = attachmentJournalObject(attachment);
+  const alreadyLinked = listAttachmentOwners(database, attachmentId).some((currentOwner) => currentOwner.type === owner.type && currentOwner.id === owner.id);
+  database.transaction((tx) => {
+    insertAttachmentLink(tx, owner, attachmentId);
+    if (!alreadyLinked) {
+      recordJournalEntry(tx, {
+        operation: "link",
+        object: attachmentObject,
+        summary: buildLinkSummary(attachmentObject, ownerObject),
+        actor,
+        contexts: [makeJournalContext(ownerObject, "owner")]
+      });
+    }
+  });
   return mapAttachment(database, attachment);
 }
 
-export async function deleteAttachment(database: DbClient, id: number): Promise<void> {
+export async function deleteAttachment(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
   const record = attachmentRepository.findById(database, id);
   if (!record) {
     throw notFound(`Attachment with id ${id} not found`);
   }
 
-  await deleteAttachmentRecords(database, [record]);
+  const ownerContexts = listAttachmentOwners(database, id).map((owner) => makeJournalContext(getOwnerJournalObject(database, owner), "owner"));
+  database.transaction((tx) => {
+    const journalObject = attachmentJournalObject(record);
+    recordJournalEntry(tx, {
+      operation: "delete",
+      object: journalObject,
+      summary: buildDeleteSummary(journalObject),
+      actor,
+      contexts: ownerContexts
+    });
+    attachmentRepository.deleteByIds(tx, [id]);
+  });
+  await removeAttachmentFiles([record]);
 }

@@ -325,4 +325,14 @@ describe("Query invalidation integration", () => {
       "globalSearch"
     ]);
   });
+
+  it("invalidiert Journal-Queries nach fachlichen Mutationen", async () => {
+    queryClient = createQueryClient();
+    const journalKey = queryKeys.journal.list({ limit: 100 });
+    queryClient.setQueryData(journalKey, { entries: [], nextCursor: null });
+
+    await invalidateProjectScope(queryClient, projectId);
+
+    expect(queryClient.getQueryState(journalKey)?.isInvalidated).toBe(true);
+  });
 });

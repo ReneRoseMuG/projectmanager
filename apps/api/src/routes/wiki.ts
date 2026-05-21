@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { createWikiPage, deleteWikiPage, getWikiBreadcrumb, getWikiPage, listRootWikiPages, listWikiChildren, updateWikiPage, type WikiPageInput } from "../services/wiki.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const wikiBodySchema = {
@@ -44,7 +45,7 @@ export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: WikiPageInput }>(
     "/wiki",
     { schema: { body: wikiBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createWikiPage(app.db, request.body))
+    async (request, reply) => reply.status(201).send(createWikiPage(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -56,14 +57,14 @@ export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: number }; Body: WikiPageInput }>(
     "/wiki/:id",
     { schema: { params: idParamSchema, body: wikiPatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateWikiPage(app.db, request.params.id, request.body)
+    async (request) => updateWikiPage(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number } }>(
     "/wiki/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteWikiPage(app.db, request.params.id);
+      deleteWikiPage(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

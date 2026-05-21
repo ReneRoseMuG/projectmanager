@@ -4,10 +4,12 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
+import { JournalPanel } from "../journal/JournalPanel";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useEntityComments } from "../../hooks/useEntityComments";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface WikiPageDetailProps {
   page: WikiPage;
@@ -18,9 +20,10 @@ interface WikiPageDetailProps {
 
 export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiPageDetailProps) {
   const comments = useEntityComments("wikiPage", page.id);
+  const canReadJournal = useHasPermission("journal", "read");
   const [content, setContent] = useState(page.content ?? "");
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"content" | "comments">("content");
+  const [activeTab, setActiveTab] = useState<"content" | "comments" | "journal">("content");
 
   useEffect(() => {
     setContent(page.content ?? "");
@@ -36,9 +39,10 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
     }
   };
 
-  const tabs: Array<Tab<"content" | "comments">> = [
+  const tabs: Array<Tab<"content" | "comments" | "journal">> = [
     { value: "content", label: "Inhalt", count: 0 },
-    { value: "comments", label: "Kommentare", count: comments.comments.length }
+    { value: "comments", label: "Kommentare", count: comments.comments.length },
+    ...(canReadJournal ? [{ value: "journal" as const, label: "Journal" }] : [])
   ];
 
   return (
@@ -73,6 +77,11 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
           <Section title="Kommentare">
             {comments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{comments.error}</div> : null}
             <CommentThread comments={comments.comments} entityLabel="Wiki-Seite" onCreate={comments.createComment} onDelete={comments.removeComment} />
+          </Section>
+        ) : null}
+        {activeTab === "journal" ? (
+          <Section title="Journal" fill>
+            <JournalPanel objectType="wikiPage" objectId={page.id} />
           </Section>
         ) : null}
       </div>

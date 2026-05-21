@@ -4,7 +4,8 @@ import type { NoteOwnerType, QueryOwnerType, TicketOwnerType } from "./queryKeys
 import { queryKeys } from "./queryKeys";
 
 async function invalidateMany(queryClient: QueryClient, keys: QueryKey[]): Promise<void> {
-  await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+  const keysWithJournal = keys.some((queryKey) => queryKey[0] === queryKeys.journal.root[0]) ? keys : [...keys, queryKeys.journal.root];
+  await Promise.all(keysWithJournal.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 
 export async function invalidateProjects(queryClient: QueryClient): Promise<void> {
@@ -185,6 +186,7 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.calendarTasks.root,
     queryKeys.tickets.root,
     queryKeys.settings.root,
+    queryKeys.journal.root,
     queryKeys.auth.root,
     queryKeys.adminUsers.root,
     queryKeys.adminRoles.root,

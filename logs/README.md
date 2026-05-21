@@ -2,6 +2,8 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 21.05.26 | Fix | Journal-Test-Fixtures | ✅ |
+| 21.05.26 | Feature | Journal-Komponente | ⚠️ |
 | 21.05.26 | 4 | Tests UI-Board-Overhaul | ✅ |
 | 21.05.26 | 3 | Slug- & Icon-Bereinigung | ✅ |
 | 21.05.26 | 2 | Board-Toolbar & Statusspalten | ✅ |

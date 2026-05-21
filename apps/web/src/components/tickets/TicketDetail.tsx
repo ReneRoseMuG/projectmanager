@@ -20,6 +20,7 @@ import {
 import { richTextToPlainText } from "../../utils/richText";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
+import { JournalPanel } from "../journal/JournalPanel";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { Button } from "../ui/Button";
@@ -36,6 +37,7 @@ import { useToast } from "../ui/ToastProvider";
 import { TicketCard } from "./TicketCard";
 import { TicketForm, type TicketFormInput } from "./TicketForm";
 import { TicketRelationPanel } from "./TicketRelationPanel";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface TicketDetailProps {
   ticketId: number | null;
@@ -45,7 +47,7 @@ interface TicketDetailProps {
   variant?: "modal" | "page";
 }
 
-type DetailTab = "details" | "subTickets" | "relations" | "comments" | "notes" | "attachments";
+type DetailTab = "details" | "subTickets" | "relations" | "comments" | "notes" | "attachments" | "journal";
 
 const tabs: Array<{ value: DetailTab; label: string }> = [
   { value: "details", label: "Details" },
@@ -53,7 +55,8 @@ const tabs: Array<{ value: DetailTab; label: string }> = [
   { value: "relations", label: "Relationen" },
   { value: "comments", label: "Kommentare" },
   { value: "notes", label: "Notizen" },
-  { value: "attachments", label: "Dateien" }
+  { value: "attachments", label: "Dateien" },
+  { value: "journal", label: "Journal" }
 ];
 
 export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "modal" }: TicketDetailProps) {
@@ -67,6 +70,7 @@ export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "mo
   const comments = useEntityComments("ticket", open ? ticketId : null);
   const notes = useNotes(ticketId && open ? { type: "ticket", id: ticketId } : null);
   const attachments = useAttachments(ticketId && open ? { type: "ticket", id: ticketId } : null);
+  const canReadJournal = useHasPermission("journal", "read");
   const [activeTab, setActiveTab] = useState<DetailTab>("details");
   const [formOpen, setFormOpen] = useState(false);
   const [subTicketFormOpen, setSubTicketFormOpen] = useState(false);
@@ -86,7 +90,8 @@ export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "mo
     notes: notes.notes.length,
     attachments: attachments.attachments.length
   };
-  const tabItems = tabs.map((tab) => {
+  const visibleTabs = ticket ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal) : tabs.filter((tab) => tab.value !== "journal");
+  const tabItems = visibleTabs.map((tab) => {
     const count = counts[tab.value];
     return typeof count === "number" ? { ...tab, count } : tab;
   });
@@ -301,6 +306,12 @@ export function TicketDetail({ ticketId, open, onClose, onChanged, variant = "mo
                   }}
                 />
               </div>
+            </Section>
+          ) : null}
+
+          {activeTab === "journal" ? (
+            <Section title="Journal" fill>
+              <JournalPanel objectType="ticket" objectId={ticket.id} />
             </Section>
           ) : null}
 

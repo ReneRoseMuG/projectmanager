@@ -108,5 +108,6 @@ describe("Sidebar", () => {
 
     expect(screen.getByText("Benutzer")).toBeInTheDocument();
     expect(screen.getByText("Rollen")).toBeInTheDocument();
+    expect(screen.getByText("Journal")).toBeInTheDocument();
   });
 });

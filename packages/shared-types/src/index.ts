@@ -145,7 +145,7 @@ export interface ApiErrorPayload {
   statusCode: number;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "catalogs", "tags", "dumps", "settings", "ai", "users", "roles"] as const;
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "catalogs", "tags", "journal", "dumps", "settings", "ai", "users", "roles"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";
@@ -263,6 +263,67 @@ export interface CatalogEntryInput {
 }
 
 export type CatalogEntryUpdate = WithExpectedVersion<Partial<Omit<CatalogEntryInput, "key">>>;
+
+export const JOURNAL_OBJECT_TYPES = [
+  "project",
+  "milestone",
+  "task",
+  "feature",
+  "useCase",
+  "wikiPage",
+  "backlogItem",
+  "ticket",
+  "event",
+  "tag",
+  "note",
+  "attachment",
+  "comment"
+] as const;
+
+export const JOURNAL_OPERATIONS = ["create", "update", "delete", "link", "unlink"] as const;
+export const JOURNAL_CONTEXT_RELATIONS = ["self", "owner", "parent", "related"] as const;
+
+export type JournalObjectType = (typeof JOURNAL_OBJECT_TYPES)[number];
+export type JournalOperation = (typeof JOURNAL_OPERATIONS)[number];
+export type JournalContextRelation = (typeof JOURNAL_CONTEXT_RELATIONS)[number];
+
+export interface JournalChange {
+  id: number;
+  fieldKey: string;
+  fieldLabel: string;
+  oldValue: JsonValue;
+  oldValueLabel: string | null;
+  newValue: JsonValue;
+  newValueLabel: string | null;
+  summary: string;
+}
+
+export interface JournalContext {
+  id: number;
+  objectType: JournalObjectType;
+  objectId: number;
+  objectLabel: string;
+  relation: JournalContextRelation;
+}
+
+export interface JournalEntry {
+  id: number;
+  operation: JournalOperation;
+  objectType: JournalObjectType;
+  objectId: number;
+  objectLabel: string;
+  summary: string;
+  actorUserId: number | null;
+  actorName: string;
+  createdAt: string;
+  changes: JournalChange[];
+  contexts: JournalContext[];
+}
+
+export interface JournalListResponse {
+  entries: JournalEntry[];
+  nextCursor: number | null;
+}
 
 export interface AiModelInfo {
   name: string;

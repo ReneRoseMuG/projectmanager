@@ -57,6 +57,7 @@ function resourceForPath(path: string): AuthResource {
     ["/events", "events"],
     ["/catalogs", "catalogs"],
     ["/tags", "tags"],
+    ["/journal", "journal"],
     ["/dumps", "dumps"],
     ["/settings", "settings"],
     ["/ai", "ai"],

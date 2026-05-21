@@ -17,6 +17,20 @@ import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachme
 import { ensureCatalogEntryExists, isCatalogEntryClosed, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { listEntityComments } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
+import {
+  buildCreateSummary,
+  buildDeleteSummary,
+  buildJournalChanges,
+  buildLinkSummary,
+  buildUnlinkSummary,
+  buildUpdateSummary,
+  makeJournalContext,
+  makeJournalObject,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalFieldDefinition,
+  type JournalObjectRef
+} from "./journal.service.js";
 import { deleteTicketNotesForIds, listTicketNotes } from "./notes.service.js";
 import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
 
@@ -46,6 +60,22 @@ const ticketSelect = {
   createdAt: tickets.createdAt,
   updatedAt: tickets.updatedAt
 };
+
+const ticketJournalFields: Array<JournalFieldDefinition<TicketRecord>> = [
+  { key: "type", label: "Typ" },
+  { key: "title", label: "Titel" },
+  { key: "description", label: "Beschreibung" },
+  { key: "status", label: "Status" },
+  { key: "priority", label: "Priorität" },
+  { key: "resolution", label: "Lösung" },
+  { key: "reporter", label: "Reporter" },
+  { key: "assignee", label: "Zuständige Person" },
+  { key: "environment", label: "Umgebung" },
+  { key: "affectedVersion", label: "Betroffene Version" },
+  { key: "dueDate", label: "Fälligkeitsdatum" },
+  { key: "resolvedAt", label: "Gelöst am" },
+  { key: "position", label: "Position" }
+];
 
 function ensureProjectExists(database: DbClient, projectId: number): void {
   const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
@@ -100,6 +130,31 @@ function ensureOwnerExists(database: DbClient, owner: TicketOwner): void {
     return;
   }
   ensureUseCaseExists(database, owner.id);
+}
+
+function getOwnerJournalObject(database: DbClient, owner: TicketOwner): JournalObjectRef {
+  if (owner.type === "project") {
+    const project = database.select({ name: projects.name }).from(projects).where(eq(projects.id, owner.id)).get();
+    return makeJournalObject("project", owner.id, project?.name ?? `Projekt ${owner.id}`);
+  }
+  if (owner.type === "milestone") {
+    const milestone = database.select({ name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
+    return makeJournalObject("milestone", owner.id, milestone?.name ?? `Meilenstein ${owner.id}`);
+  }
+  if (owner.type === "task") {
+    const task = database.select({ title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)).get();
+    return makeJournalObject("task", owner.id, task?.title ?? `Aufgabe ${owner.id}`);
+  }
+  if (owner.type === "feature") {
+    const feature = database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)).get();
+    return makeJournalObject("feature", owner.id, feature?.title ?? `Feature ${owner.id}`);
+  }
+  const useCase = database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)).get();
+  return makeJournalObject("useCase", owner.id, useCase?.title ?? `Use Case ${owner.id}`);
+}
+
+function ticketJournalObject(ticket: Pick<TicketRecord, "id" | "title">): JournalObjectRef {
+  return makeJournalObject("ticket", ticket.id, ticket.title);
 }
 
 function getTicketRecord(database: DbClient, id: number): TicketRecord {
@@ -256,28 +311,32 @@ function relationEntryId(sourceTicketId: number, targetTicketId: number, relatio
   return sourceTicketId * 1_000_000 + targetTicketId * 10 + relationOffset + directionOffset;
 }
 
-function insertTicketRecord(database: DbClient, input: TicketInput, parentId: number | null = null): TicketRecord {
+function insertTicketRecord(database: DbClient, input: TicketInput, parentId: number | null = null, actor?: JournalActor | null): TicketRecord {
   const title = requireNonEmpty(input.title, "title");
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "open");
   const priority = input.priority ?? resolveDefaultCatalogEntryKey(database, "priority", "medium");
   ensureCatalogEntryExists(database, "workStatus", status);
   ensureCatalogEntryExists(database, "priority", priority);
-  return ticketRepository.create(database, {
-    parentId,
-    type: input.type ?? "bug",
-    title,
-    description: cleanNullable(input.description) ?? null,
-    status,
-    priority,
-    resolution: null,
-    reporter: cleanNullable(input.reporter) ?? null,
-    assignee: cleanNullable(input.assignee) ?? null,
-    environment: cleanNullable(input.environment) ?? null,
-    affectedVersion: cleanNullable(input.affectedVersion) ?? null,
-    dueDate: cleanNullable(input.dueDate) ?? null,
-    resolvedAt: null,
-    position: nextPosition(database, status, parentId)
-  });
+  return ticketRepository.create(
+    database,
+    {
+      parentId,
+      type: input.type ?? "bug",
+      title,
+      description: cleanNullable(input.description) ?? null,
+      status,
+      priority,
+      resolution: null,
+      reporter: cleanNullable(input.reporter) ?? null,
+      assignee: cleanNullable(input.assignee) ?? null,
+      environment: cleanNullable(input.environment) ?? null,
+      affectedVersion: cleanNullable(input.affectedVersion) ?? null,
+      dueDate: cleanNullable(input.dueDate) ?? null,
+      resolvedAt: null,
+      position: nextPosition(database, status, parentId)
+    },
+    actor?.actorUserId ?? undefined
+  );
 }
 
 function ticketDeleteBlockers(database: DbClient, ticketId: number): string[] {
@@ -392,24 +451,41 @@ export function getTicketDetail(database: DbClient, id: number): TicketDetail {
   };
 }
 
-export function createTicket(database: DbClient, input: TicketInput): Ticket {
-  return mapTicket(database, insertTicketRecord(database, input), [], 0);
+export function createTicket(database: DbClient, input: TicketInput, actor?: JournalActor | null): Ticket {
+  const created = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const ticket = insertTicketRecord(txDb, input, null, actor);
+    const ticketObject = ticketJournalObject(ticket);
+    recordJournalEntry(txDb, { operation: "create", object: ticketObject, summary: buildCreateSummary(ticketObject), actor });
+    return ticket;
+  });
+  return mapTicket(database, created, [], 0);
 }
 
-export function createOwnerTicket(database: DbClient, owner: TicketOwner, input: TicketInput): Ticket {
+export function createOwnerTicket(database: DbClient, owner: TicketOwner, input: TicketInput, actor?: JournalActor | null): Ticket {
   ensureOwnerExists(database, owner);
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "open");
   const position = nextOwnerPosition(database, owner, status);
   const created = database.transaction((tx) => {
-    const ticket = insertTicketRecord(tx as unknown as DbClient, input);
-    insertOwnerTicket(tx as unknown as DbClient, owner, ticket.id, position);
+    const txDb = tx as unknown as DbClient;
+    const ticket = insertTicketRecord(txDb, input, null, actor);
+    insertOwnerTicket(txDb, owner, ticket.id, position);
+    const ticketObject = ticketJournalObject(ticket);
+    const ownerObject = getOwnerJournalObject(txDb, owner);
+    recordJournalEntry(txDb, {
+      operation: "create",
+      object: ticketObject,
+      summary: buildCreateSummary(ticketObject),
+      actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
     return ticket;
   });
 
   return mapTicket(database, created, [], 0, position);
 }
 
-export function linkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number): Ticket {
+export function linkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number, actor?: JournalActor | null): Ticket {
   ensureOwnerExists(database, owner);
   const ticket = getTicketRecord(database, ticketId);
   if (ticket.parentId !== null) {
@@ -422,26 +498,63 @@ export function linkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId
   }
 
   const position = nextOwnerPosition(database, owner, ticket.status);
-  insertOwnerTicket(database, owner, ticketId, position);
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    insertOwnerTicket(txDb, owner, ticketId, position);
+    const ticketObject = ticketJournalObject(ticket);
+    const ownerObject = getOwnerJournalObject(txDb, owner);
+    recordJournalEntry(txDb, {
+      operation: "link",
+      object: ticketObject,
+      summary: buildLinkSummary(ownerObject, ticketObject),
+      actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
+  });
   return mapTicket(database, ticket, undefined, undefined, position);
 }
 
-export function unlinkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number): void {
+export function unlinkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number, actor?: JournalActor | null): void {
   ensureOwnerExists(database, owner);
-  getTicketRecord(database, ticketId);
-  const changes = deleteOwnerTicketLink(database, owner, ticketId);
-  if (changes === 0) {
-    throw notFound(`Ticket ${ticketId} is not linked to ${owner.type} ${owner.id}`);
-  }
+  const ticket = getTicketRecord(database, ticketId);
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const changes = deleteOwnerTicketLink(txDb, owner, ticketId);
+    if (changes === 0) {
+      throw notFound(`Ticket ${ticketId} is not linked to ${owner.type} ${owner.id}`);
+    }
+    const ticketObject = ticketJournalObject(ticket);
+    const ownerObject = getOwnerJournalObject(txDb, owner);
+    recordJournalEntry(txDb, {
+      operation: "unlink",
+      object: ticketObject,
+      summary: buildUnlinkSummary(ownerObject, ticketObject),
+      actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
+  });
 }
 
-export function createSubTicket(database: DbClient, parentId: number, input: TicketInput): Ticket {
+export function createSubTicket(database: DbClient, parentId: number, input: TicketInput, actor?: JournalActor | null): Ticket {
   const parent = getTicketRecord(database, parentId);
-  const created = insertTicketRecord(database, { ...input, type: input.type ?? parent.type, priority: input.priority ?? parent.priority }, parentId);
+  const created = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const ticket = insertTicketRecord(txDb, { ...input, type: input.type ?? parent.type, priority: input.priority ?? parent.priority }, parentId, actor);
+    const ticketObject = ticketJournalObject(ticket);
+    const parentObject = ticketJournalObject(parent);
+    recordJournalEntry(txDb, {
+      operation: "create",
+      object: ticketObject,
+      summary: buildCreateSummary(ticketObject),
+      actor,
+      contexts: [makeJournalContext(parentObject, "parent")]
+    });
+    return ticket;
+  });
   return mapTicket(database, created, [], 0);
 }
 
-export function updateTicket(database: DbClient, id: number, input: TicketUpdate): Ticket {
+export function updateTicket(database: DbClient, id: number, input: TicketUpdate, actor?: JournalActor | null): Ticket {
   const existing = getTicketRecord(database, id);
   const values: Partial<
     Pick<
@@ -507,15 +620,30 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
     throw badRequest("No ticket fields provided");
   }
 
-  const updated = ticketRepository.update(database, id, input.expectedVersion, values);
-  if (!updated) {
-    throw notFound(`Ticket with id ${id} not found`);
-  }
+  const updated = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const current = getTicketRecord(txDb, id);
+    const ticket = ticketRepository.update(txDb, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    if (!ticket) {
+      throw notFound(`Ticket with id ${id} not found`);
+    }
+    const ticketObject = ticketJournalObject(ticket);
+    const changes = buildJournalChanges(current, ticket, ticketJournalFields);
+    recordJournalEntry(txDb, {
+      operation: "update",
+      object: ticketObject,
+      summary: buildUpdateSummary(ticketObject, changes),
+      actor,
+      changes,
+      contexts: current.parentId ? [makeJournalContext(makeJournalObject("ticket", current.parentId, `Ticket ${current.parentId}`), "parent")] : []
+    });
+    return ticket;
+  });
 
   return mapTicket(database, updated);
 }
 
-export function updateTicketPosition(database: DbClient, id: number, input: TicketPositionInput): Ticket {
+export function updateTicketPosition(database: DbClient, id: number, input: TicketPositionInput, actor?: JournalActor | null): Ticket {
   const existing = getTicketRecord(database, id);
   ensureCatalogEntryExists(database, "workStatus", input.status);
   const values: Partial<Pick<TicketRecord, "status" | "position" | "resolvedAt">> = {
@@ -527,16 +655,23 @@ export function updateTicketPosition(database: DbClient, id: number, input: Tick
     values.resolvedAt = nowIso();
   }
 
-  const updated = ticketRepository.update(database, id, input.expectedVersion, values);
-  if (!updated) {
-    throw notFound(`Ticket with id ${id} not found`);
-  }
+  const updated = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const ticket = ticketRepository.update(txDb, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    if (!ticket) {
+      throw notFound(`Ticket with id ${id} not found`);
+    }
+    const ticketObject = ticketJournalObject(ticket);
+    const changes = buildJournalChanges(existing, ticket, ticketJournalFields);
+    recordJournalEntry(txDb, { operation: "update", object: ticketObject, summary: buildUpdateSummary(ticketObject, changes), actor, changes });
+    return ticket;
+  });
 
   return mapTicket(database, updated);
 }
 
-export async function deleteTicket(database: DbClient, id: number): Promise<void> {
-  getTicketRecord(database, id);
+export async function deleteTicket(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
+  const ticket = getTicketRecord(database, id);
   const blockers = ticketDeleteBlockers(database, id);
   if (blockers.length > 0) {
     throw conflict(`Ticket kann nicht gelöscht werden, solange Beziehungen bestehen: ${blockers.join(", ")}.`);
@@ -547,9 +682,14 @@ export async function deleteTicket(database: DbClient, id: number): Promise<void
   await deleteTicketAttachmentsForIds(database, ticketIds);
   deleteTicketNotesForIds(database, ticketIds);
 
-  if (ticketRepository.delete(database, id) === 0) {
-    throw notFound(`Ticket with id ${id} not found`);
-  }
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const ticketObject = ticketJournalObject(ticket);
+    recordJournalEntry(txDb, { operation: "delete", object: ticketObject, summary: buildDeleteSummary(ticketObject), actor });
+    if (ticketRepository.delete(txDb, id) === 0) {
+      throw notFound(`Ticket with id ${id} not found`);
+    }
+  });
 }
 
 export function listTicketRelations(database: DbClient, ticketId: number): TicketRelationEntry[] {
@@ -594,9 +734,9 @@ export function listTicketRelations(database: DbClient, ticketId: number): Ticke
   return entries;
 }
 
-export function addTicketRelation(database: DbClient, ticketId: number, input: TicketRelationInput): void {
-  getTicketRecord(database, ticketId);
-  getTicketRecord(database, input.targetTicketId);
+export function addTicketRelation(database: DbClient, ticketId: number, input: TicketRelationInput, actor?: JournalActor | null): void {
+  const source = getTicketRecord(database, ticketId);
+  const target = getTicketRecord(database, input.targetTicketId);
 
   if (ticketId === input.targetTicketId) {
     throw badRequest("Ticket cannot be related to itself");
@@ -618,33 +758,58 @@ export function addTicketRelation(database: DbClient, ticketId: number, input: T
     throw badRequest("Ticket relation already exists");
   }
 
-  database
-    .insert(ticketRelations)
-    .values({
-      sourceTicketId: ticketId,
-      targetTicketId: input.targetTicketId,
-      relationType: input.relationType,
-      createdAt: nowIso()
-    })
-    .run();
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    txDb
+      .insert(ticketRelations)
+      .values({
+        sourceTicketId: ticketId,
+        targetTicketId: input.targetTicketId,
+        relationType: input.relationType,
+        createdAt: nowIso()
+      })
+      .run();
+    const sourceObject = ticketJournalObject(source);
+    const targetObject = ticketJournalObject(target);
+    recordJournalEntry(txDb, {
+      operation: "link",
+      object: sourceObject,
+      summary: buildLinkSummary(sourceObject, targetObject),
+      actor,
+      contexts: [makeJournalContext(targetObject, "related")]
+    });
+  });
 }
 
-export function removeTicketRelation(database: DbClient, ticketId: number, targetTicketId: number, relationType: TicketRelationType): void {
-  getTicketRecord(database, ticketId);
-  const result = database
-    .delete(ticketRelations)
-    .where(
-      and(
-        eq(ticketRelations.relationType, relationType),
-        or(
-          and(eq(ticketRelations.sourceTicketId, ticketId), eq(ticketRelations.targetTicketId, targetTicketId)),
-          and(eq(ticketRelations.sourceTicketId, targetTicketId), eq(ticketRelations.targetTicketId, ticketId))
+export function removeTicketRelation(database: DbClient, ticketId: number, targetTicketId: number, relationType: TicketRelationType, actor?: JournalActor | null): void {
+  const source = getTicketRecord(database, ticketId);
+  const target = getTicketRecord(database, targetTicketId);
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const result = txDb
+      .delete(ticketRelations)
+      .where(
+        and(
+          eq(ticketRelations.relationType, relationType),
+          or(
+            and(eq(ticketRelations.sourceTicketId, ticketId), eq(ticketRelations.targetTicketId, targetTicketId)),
+            and(eq(ticketRelations.sourceTicketId, targetTicketId), eq(ticketRelations.targetTicketId, ticketId))
+          )
         )
       )
-    )
-    .run();
+      .run();
 
-  if (result.changes === 0) {
-    throw notFound("Ticket relation not found");
-  }
+    if (result.changes === 0) {
+      throw notFound("Ticket relation not found");
+    }
+    const sourceObject = ticketJournalObject(source);
+    const targetObject = ticketJournalObject(target);
+    recordJournalEntry(txDb, {
+      operation: "unlink",
+      object: sourceObject,
+      summary: buildUnlinkSummary(sourceObject, targetObject),
+      actor,
+      contexts: [makeJournalContext(targetObject, "related")]
+    });
+  });
 }

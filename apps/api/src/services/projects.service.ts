@@ -7,6 +7,16 @@ import { badRequest, notFound } from "../utils/errors.js";
 import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
+import {
+  buildCreateSummary,
+  buildDeleteSummary,
+  buildJournalChanges,
+  buildUpdateSummary,
+  makeJournalObject,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalFieldDefinition
+} from "./journal.service.js";
 import { deleteMilestoneOwnedSupportForProjectIds } from "./milestones.service.js";
 import { deleteProjectNotesForIds } from "./notes.service.js";
 import { getProjectTags, getProjectTagsMap } from "./tags.service.js";
@@ -16,6 +26,15 @@ interface ProjectTaskCounts {
   doneTaskCount: number;
   totalTaskCount: number;
 }
+
+const projectJournalFields: Array<JournalFieldDefinition<ProjectRecord>> = [
+  { key: "name", label: "Name" },
+  { key: "description", label: "Beschreibung" },
+  { key: "status", label: "Status" },
+  { key: "color", label: "Farbe" },
+  { key: "startDate", label: "Startdatum" },
+  { key: "dueDate", label: "Enddatum" }
+];
 
 function emptyProjectTaskCounts(): ProjectTaskCounts {
   return {
@@ -94,23 +113,37 @@ export function getProject(database: DbClient, id: number): Project {
   return mapProject(database, project, counts.get(id));
 }
 
-export function createProject(database: DbClient, input: ProjectInput): Project {
+export function createProject(database: DbClient, input: ProjectInput, actor?: JournalActor | null): Project {
   const name = requireNonEmpty(input.name, "name");
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "active");
   ensureCatalogEntryExists(database, "workStatus", status);
-  const created = projectRepository.create(database, {
-    name,
-    description: cleanNullable(input.description) ?? null,
-    status,
-    color: input.color ?? "#6366f1",
-    startDate: cleanNullable(input.startDate) ?? null,
-    dueDate: cleanNullable(input.dueDate) ?? null
+  const created = database.transaction((tx) => {
+    const project = projectRepository.create(
+      tx,
+      {
+        name,
+        description: cleanNullable(input.description) ?? null,
+        status,
+        color: input.color ?? "#6366f1",
+        startDate: cleanNullable(input.startDate) ?? null,
+        dueDate: cleanNullable(input.dueDate) ?? null
+      },
+      actor?.actorUserId ?? undefined
+    );
+    const journalObject = makeJournalObject("project", project.id, project.name);
+    recordJournalEntry(tx, {
+      operation: "create",
+      object: journalObject,
+      summary: buildCreateSummary(journalObject),
+      actor
+    });
+    return project;
   });
 
   return mapProject(database, created, emptyProjectTaskCounts(), []);
 }
 
-export function updateProject(database: DbClient, id: number, input: ProjectUpdate): Project {
+export function updateProject(database: DbClient, id: number, input: ProjectUpdate, actor?: JournalActor | null): Project {
   const values: Partial<typeof projects.$inferInsert> = {};
 
   if (input.name !== undefined) {
@@ -137,7 +170,26 @@ export function updateProject(database: DbClient, id: number, input: ProjectUpda
     throw badRequest("No project fields provided");
   }
 
-  const updated = projectRepository.update(database, id, input.expectedVersion, values);
+  const updated = database.transaction((tx) => {
+    const current = projectRepository.findById(tx, id);
+    if (!current) {
+      throw notFound(`Project with id ${id} not found`);
+    }
+    const project = projectRepository.update(tx, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    if (!project) {
+      throw notFound(`Project with id ${id} not found`);
+    }
+    const journalObject = makeJournalObject("project", project.id, project.name);
+    const changes = buildJournalChanges(current, project, projectJournalFields);
+    recordJournalEntry(tx, {
+      operation: "update",
+      object: journalObject,
+      summary: buildUpdateSummary(journalObject, changes),
+      actor,
+      changes
+    });
+    return project;
+  });
   if (!updated) {
     throw notFound(`Project with id ${id} not found`);
   }
@@ -146,8 +198,8 @@ export function updateProject(database: DbClient, id: number, input: ProjectUpda
   return mapProject(database, updated, counts.get(id));
 }
 
-export async function deleteProject(database: DbClient, id: number): Promise<void> {
-  const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, id)).get();
+export async function deleteProject(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
+  const project = database.select().from(projects).where(eq(projects.id, id)).get();
   if (!project) {
     throw notFound(`Project with id ${id} not found`);
   }
@@ -157,8 +209,17 @@ export async function deleteProject(database: DbClient, id: number): Promise<voi
 
   deleteProjectNotesForIds(database, [id]);
 
-  const result = database.delete(projects).where(eq(projects.id, id)).run();
-  if (result.changes === 0) {
-    throw notFound(`Project with id ${id} not found`);
-  }
+  database.transaction((tx) => {
+    const journalObject = makeJournalObject("project", project.id, project.name);
+    recordJournalEntry(tx, {
+      operation: "delete",
+      object: journalObject,
+      summary: buildDeleteSummary(journalObject),
+      actor
+    });
+    const result = tx.delete(projects).where(eq(projects.id, id)).run();
+    if (result.changes === 0) {
+      throw notFound(`Project with id ${id} not found`);
+    }
+  });
 }
