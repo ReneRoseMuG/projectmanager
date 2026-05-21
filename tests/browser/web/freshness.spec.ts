@@ -223,9 +223,7 @@ test.describe("Globale UI-Aktualität", () => {
             response.url().includes(`/api/projects/${project.id}/features`) &&
             response.request().method() === "PUT",
         ),
-        visibleArticle(featureForm(page), project.name)
-          .getByRole("button", { name: "Entfernen" })
-          .click(),
+        clickItemAction(featureForm(page), project.name, "Entfernen"),
       ]);
 
       await openProjectDetail(page, project.id);

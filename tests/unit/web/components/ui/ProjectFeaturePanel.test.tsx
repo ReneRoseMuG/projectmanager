@@ -79,7 +79,6 @@ describe("ProjectFeaturePanel", () => {
     expect(
       screen.getByRole("button", { name: "Neues Feature" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Neues Feature")).toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns).toHaveLength(4);
@@ -119,7 +118,8 @@ describe("ProjectFeaturePanel", () => {
     cards.forEach((card) => {
       expect(card).toHaveClass("min-w-0");
       expect(card).toHaveClass("max-w-full");
-      expect(card).toHaveClass("overflow-hidden");
+      expect(card).toHaveClass("overflow-visible");
+      expect(card).not.toHaveClass("overflow-hidden");
     });
   });
 

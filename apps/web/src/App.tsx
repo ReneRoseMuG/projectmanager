@@ -34,6 +34,10 @@ function hasAdminAccess(user: ReturnType<typeof useAuth>["user"]): boolean {
   return Boolean(user?.permissions.some((permission) => (permission.resource === "*" || permission.resource === "users" || permission.resource === "roles") && (permission.action === "*" || permission.action === "admin")));
 }
 
+function isFullBleedDetailRoute(pathname: string): boolean {
+  return /^\/(?:projects|milestones|tickets|tasks|features|use-cases|backlog)\/(?:new|\d+)\/?$/.test(pathname);
+}
+
 export default function App() {
   const auth = useAuth();
   const location = useLocation();
@@ -70,6 +74,7 @@ export default function App() {
   }
 
   const adminAccess = hasAdminAccess(auth.user);
+  const fullBleedDetailRoute = isFullBleedDetailRoute(location.pathname);
 
   return (
     <SettingsProvider>
@@ -82,7 +87,7 @@ export default function App() {
         />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <TopBar />
-          <main className="min-h-0 min-w-0 flex-1 overflow-auto p-4 md:p-6">
+          <main className={`flex min-h-0 min-w-0 flex-1 flex-col ${fullBleedDetailRoute ? "overflow-hidden p-0" : "overflow-auto p-4 md:p-6"}`}>
             <Routes>
               <Route path="/" element={<Navigate to="/projects" replace />} />
               <Route path="/projects" element={<ProjectsPage />} />

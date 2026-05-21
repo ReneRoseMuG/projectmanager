@@ -2,6 +2,8 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 21.05.26 | Fix           | Board/List Header Hintergrund                | ✅     |
+| 21.05.26 | Fix           | UI-Regressionen                              | ✅     |
 | 21.05.26 | Fix           | Calendar E2E Datum                           | ✅     |
 | 21.05.26 | 7             | Formular-Höhen                               | ⚠️     |
 | 21.05.26 | 6             | StatusPill Farben                            | ⚠️     |

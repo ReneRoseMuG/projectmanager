@@ -307,7 +307,9 @@ export function UseCaseForm({
         }
         onClose={onClose}
         variant={variant}
-        contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
+        contentClassName={
+          activeTab === "details" ? "w-full max-w-7xl self-center" : ""
+        }
         tabBar={
           <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
         }

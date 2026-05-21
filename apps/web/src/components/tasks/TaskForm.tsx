@@ -361,7 +361,9 @@ export function TaskForm({
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
-        contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
+        contentClassName={
+          activeTab === "details" ? "w-full max-w-7xl self-center" : ""
+        }
         tabBar={
           <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
         }

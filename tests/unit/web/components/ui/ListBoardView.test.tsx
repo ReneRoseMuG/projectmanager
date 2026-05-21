@@ -88,10 +88,10 @@ describe("ListBoardView", () => {
     expect(screen.getByText("Card Alpha")).toBeInTheDocument();
     expect(screen.getByText("Card Beta")).toBeInTheDocument();
     expect(screen.queryByText("Row Alpha")).not.toBeInTheDocument();
-    expect(container.firstElementChild).toHaveClass("min-h-0", "flex-1");
+    expect(container.firstElementChild).toHaveClass("min-h-[30rem]", "flex-1");
     expect(
       container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3"),
-    ).toHaveClass("min-h-full", "min-w-0");
+    ).toHaveClass("h-full", "min-h-[30rem]", "min-w-0", "flex-1");
     container.querySelectorAll("article.rounded-2xl").forEach((card) => {
       expect(card).toHaveClass("min-w-0");
       expect(card).toHaveClass("max-w-full");
@@ -142,6 +142,16 @@ describe("ListBoardView", () => {
     ).toBeInTheDocument();
     expect(sections[0]).toHaveClass("bg-shell/70");
     expect(
+      within(sections[0] as HTMLElement)
+        .getByRole("heading", { name: "Offen" })
+        .closest("header"),
+    ).toHaveClass("bg-white");
+    expect(
+      within(sections[0] as HTMLElement)
+        .getByRole("heading", { name: "Offen" })
+        .closest("header"),
+    ).not.toHaveClass("bg-white/60", "backdrop-blur-sm");
+    expect(
       within(sections[1] as HTMLElement).getByRole("heading", {
         name: "Erledigt",
       }),
@@ -156,16 +166,27 @@ describe("ListBoardView", () => {
     const onModeChange = vi.fn();
     renderListBoardView({ mode: "board", onModeChange });
 
-    fireEvent.click(screen.getByRole("button", { name: "Liste" }));
+    const listButton = screen.getByRole("button", { name: "Liste" });
+    expect(listButton).toHaveClass("h-8", "w-8");
+    expect(screen.getByRole("button", { name: "Kanban" })).toHaveClass(
+      "h-8",
+      "w-8",
+    );
+
+    fireEvent.click(listButton);
 
     expect(onModeChange).toHaveBeenCalledWith("list");
   });
 
-  it("+ Button ruft onAdd auf", () => {
+  it("Toolbar-Add ist kompakt, icon-only und ruft onAdd auf", () => {
     const onAdd = vi.fn();
     renderListBoardView({ onAdd });
 
-    fireEvent.click(screen.getByRole("button", { name: "Anlegen" }));
+    const addButton = screen.getByRole("button", { name: "Anlegen" });
+    expect(addButton).toHaveClass("h-9", "w-9");
+    expect(addButton).toHaveTextContent("");
+
+    fireEvent.click(addButton);
 
     expect(onAdd).toHaveBeenCalledTimes(1);
   });
@@ -228,6 +249,12 @@ describe("ListBoardView", () => {
     screen.getAllByRole("heading").forEach((heading) => {
       expect(heading.closest("section")).toHaveClass("min-w-0");
     });
+    expect(
+      screen.getByRole("heading", { name: "Offen" }).closest("header"),
+    ).toHaveClass("bg-white");
+    expect(
+      screen.getByRole("heading", { name: "Offen" }).closest("header"),
+    ).not.toHaveClass("bg-white/60", "backdrop-blur-sm");
 
     expect(onAddToColumn).toHaveBeenCalledWith("todo");
   });
@@ -238,11 +265,14 @@ describe("ListBoardView", () => {
     expect(screen.getByText("Keine Einträge")).toBeInTheDocument();
     expect(screen.getByText("Keine Einträge").parentElement).toHaveClass(
       "grid",
-      "min-h-full",
+      "h-full",
+      "min-h-[30rem]",
+      "w-full",
+      "flex-1",
     );
     expect(container.firstElementChild).toHaveClass(
       "flex",
-      "min-h-0",
+      "min-h-[30rem]",
       "flex-1",
     );
   });
@@ -289,14 +319,17 @@ describe("ItemCard", () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it("ActionMenu ruft onEdit auf (nicht onOpen)", () => {
+  it("ActionMenu ist sichtbar, ruft onEdit auf und löst kein onOpen aus", () => {
     const onEdit = vi.fn();
     const onOpen = vi.fn();
     render(
       <ItemCard header={<h3>Alpha</h3>} onOpen={onOpen} onEdit={onEdit} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Aktionen" }));
+    const trigger = screen.getByRole("button", { name: "Aktionen" });
+    expect(trigger).toHaveClass("h-10", "w-10", "border", "shadow-sm");
+
+    fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: "Bearbeiten" }));
 
     expect(onEdit).toHaveBeenCalledTimes(1);
@@ -325,13 +358,14 @@ describe("ItemCard", () => {
     expect(accent).toHaveStyle({ backgroundColor: "rgb(18, 52, 86)" });
   });
 
-  it("begrenzt Kartenbreite innerhalb von Board-Spalten", () => {
+  it("begrenzt Kartenbreite ohne ActionMenu-Popup zu clippen", () => {
     render(<ItemCard header={<h3>Alpha</h3>} />);
 
     const card = screen.getByText("Alpha").closest("article");
     expect(card).toHaveClass("min-w-0");
     expect(card).toHaveClass("max-w-full");
-    expect(card).toHaveClass("overflow-hidden");
+    expect(card).toHaveClass("overflow-visible");
+    expect(card).not.toHaveClass("overflow-hidden");
   });
 });
 

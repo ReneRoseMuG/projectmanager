@@ -17,12 +17,28 @@ export function MilestoneDetailPage() {
   const isCreateMode = params.id === undefined;
   const milestoneId = isCreateMode ? undefined : Number(params.id);
   const initialProjectIdParam = searchParams.get("projectId");
-  const parsedInitialProjectId = initialProjectIdParam ? Number(initialProjectIdParam) : undefined;
-  const initialProjectId = parsedInitialProjectId !== undefined && Number.isFinite(parsedInitialProjectId) ? parsedInitialProjectId : undefined;
+  const parsedInitialProjectId = initialProjectIdParam
+    ? Number(initialProjectIdParam)
+    : undefined;
+  const initialProjectId =
+    parsedInitialProjectId !== undefined &&
+    Number.isFinite(parsedInitialProjectId)
+      ? parsedInitialProjectId
+      : undefined;
   const { projects, loading: projectsLoading } = useProjects();
-  const { milestone, loading, createMilestone, updateMilestone, removeMilestone } = useMilestones(milestoneId);
+  const {
+    milestone,
+    loading,
+    createMilestone,
+    updateMilestone,
+    removeMilestone,
+  } = useMilestones(milestoneId);
 
-  const returnTo = searchParams.get("returnTo") ?? (initialProjectId && Number.isFinite(initialProjectId) ? `/projects/${initialProjectId}` : "/projects");
+  const returnTo =
+    searchParams.get("returnTo") ??
+    (initialProjectId && Number.isFinite(initialProjectId)
+      ? `/projects/${initialProjectId}`
+      : "/projects");
   const closePage = () => navigate(returnTo);
   const openInTab =
     !isCreateMode && milestoneId !== undefined && Number.isFinite(milestoneId)
@@ -35,7 +51,11 @@ export function MilestoneDetailPage() {
   const submitMilestone = async (input: MilestoneInput, tagIds: number[]) => {
     try {
       if (milestone) {
-        const updated = await updateMilestone(milestone.id, { ...input, expectedVersion: milestone.version }, tagIds);
+        const updated = await updateMilestone(
+          milestone.id,
+          { ...input, expectedVersion: milestone.version },
+          tagIds,
+        );
         showToast({ tone: "success", title: "Meilenstein gespeichert" });
         return updated;
       }
@@ -44,7 +64,11 @@ export function MilestoneDetailPage() {
       showToast({ tone: "success", title: "Meilenstein erstellt" });
       return created;
     } catch (milestoneError) {
-      showToast({ tone: "error", title: "Meilenstein konnte nicht gespeichert werden", message: errorMessage(milestoneError) });
+      showToast({
+        tone: "error",
+        title: "Meilenstein konnte nicht gespeichert werden",
+        message: errorMessage(milestoneError),
+      });
       throw milestoneError;
     }
   };
@@ -54,7 +78,7 @@ export function MilestoneDetailPage() {
       title: "Meilenstein löschen?",
       body: `Der Meilenstein "${targetMilestone.name}" wird entfernt.`,
       severity: "danger",
-      confirmLabel: "Löschen"
+      confirmLabel: "Löschen",
     });
     if (!approved) {
       return false;
@@ -65,13 +89,21 @@ export function MilestoneDetailPage() {
       navigate(returnTo);
       return true;
     } catch (milestoneError) {
-      showToast({ tone: "error", title: "Meilenstein konnte nicht gelöscht werden", message: errorMessage(milestoneError) });
+      showToast({
+        tone: "error",
+        title: "Meilenstein konnte nicht gelöscht werden",
+        message: errorMessage(milestoneError),
+      });
       return false;
     }
   };
 
   if (!isCreateMode && !Number.isFinite(milestoneId)) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Meilenstein nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Meilenstein nicht gefunden
+      </div>
+    );
   }
 
   if ((!isCreateMode && loading) || projectsLoading) {
@@ -79,11 +111,15 @@ export function MilestoneDetailPage() {
   }
 
   if (!isCreateMode && !milestone) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Meilenstein nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Meilenstein nicht gefunden
+      </div>
+    );
   }
 
   return (
-    <div className="-my-4 min-h-[calc(100%+2rem)] w-full min-w-0 md:-my-6 md:min-h-[calc(100%+3rem)]">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
       <MilestoneForm
         open
         milestone={milestone}

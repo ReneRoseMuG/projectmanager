@@ -62,7 +62,7 @@ export function ProjectsPage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-6">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-ink">Projekte</h1>

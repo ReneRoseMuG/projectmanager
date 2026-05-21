@@ -142,6 +142,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       const form = formPage(page, "Projekt bearbeiten");
       const header = form.locator(":scope > header");
       const tabBar = form.locator(":scope > div").first();
+      const body = form.getByTestId("form-page-body");
       const footer = form.locator(":scope > footer");
       const mainBox = await main.boundingBox();
 
@@ -152,28 +153,30 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expect(tabBar).toBeVisible();
       await expect(footer).toBeVisible();
 
-      await main.evaluate((element) => {
+      await body.evaluate((element) => {
         element.scrollTop = 360;
       });
 
       await expect
         .poll(
           async () =>
-            (await header.boundingBox())?.bottom ?? Number.NEGATIVE_INFINITY,
+            (await header.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
         )
-        .toBeLessThan(mainBox.y + 8);
+        .toBeLessThan(mainBox.y + 2);
       await expect
         .poll(
           async () =>
             (await tabBar.boundingBox())?.y ?? Number.POSITIVE_INFINITY,
         )
-        .toBeLessThan(mainBox.y + 4);
+        .toBeGreaterThan((await header.boundingBox())?.bottom ?? mainBox.y);
       await expect
         .poll(
           async () =>
-            (await tabBar.boundingBox())?.y ?? Number.NEGATIVE_INFINITY,
+            await body.evaluate(
+              (element) => element.getBoundingClientRect().bottom,
+            ),
         )
-        .toBeGreaterThan(mainBox.y - 1);
+        .toBeLessThanOrEqual((await footer.boundingBox())?.y ?? mainBox.y + mainBox.height);
       await expect
         .poll(async () => {
           const box = await footer.boundingBox();

@@ -54,7 +54,7 @@ export function FormModal({
     <form
       className={
         isPage
-          ? "flex min-h-[calc(100dvh-4rem)] flex-col bg-shell shadow-panel"
+          ? "flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-shell shadow-panel"
           : "flex max-h-[calc(100vh-64px)] flex-col bg-shell"
       }
       onSubmit={submit}
@@ -115,7 +115,7 @@ export function FormModal({
         <div
           className={
             isPage
-              ? "sticky top-[-1rem] z-20 shadow-sm md:top-[-1.5rem]"
+              ? "shrink-0 shadow-sm"
               : "shrink-0"
           }
         >
@@ -124,13 +124,14 @@ export function FormModal({
       ) : null}
 
       <div
-        className={`${isPage ? "flex min-h-0 flex-1 flex-col gap-4 px-4 pt-4 md:px-5 md:pt-5" : "grid min-h-0 flex-1 content-start gap-4 overflow-auto p-4 md:p-5"} ${contentClassName}`}
+        data-testid={isPage ? "form-page-body" : undefined}
+        className={`${isPage ? "flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto px-4 pt-4 md:px-5 md:pt-5" : "grid min-h-0 flex-1 content-start gap-4 overflow-auto p-4 md:p-5"} ${contentClassName}`}
       >
         {children}
       </div>
 
       <footer
-        className={`flex flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4 ${isPage ? "sticky bottom-[-1rem] z-10 rounded-b-2xl md:bottom-[-1.5rem]" : "shrink-0"}`}
+        className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4"
       >
         <div className="flex flex-wrap items-center gap-2">{footerStart}</div>
         <div className="flex flex-wrap items-center justify-end gap-3">

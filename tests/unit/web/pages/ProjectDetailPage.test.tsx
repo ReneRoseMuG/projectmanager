@@ -21,7 +21,7 @@ import { ProjectDetailPage } from "../../../../apps/web/src/pages/ProjectDetailP
 const router = vi.hoisted(() => ({
   navigate: vi.fn(),
   params: { id: "10" } as Record<string, string>,
-  search: "returnTo=%2Fprojects"
+  search: "returnTo=%2Fprojects",
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -30,7 +30,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
     ...actual,
     useNavigate: () => router.navigate,
     useParams: () => router.params,
-    useSearchParams: () => [new URLSearchParams(router.search), vi.fn()]
+    useSearchParams: () => [new URLSearchParams(router.search), vi.fn()],
   };
 });
 
@@ -43,15 +43,15 @@ vi.mock("../../../../apps/web/src/components/projects/ProjectForm", () => ({
     ) : (
       <div data-testid="project-form" />
     );
-  }
+  },
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({
-  useToast: () => ({ showToast: vi.fn() })
+  useToast: () => ({ showToast: vi.fn() }),
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ConfirmDialogProvider", () => ({
-  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) })
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useProjects", () => ({
@@ -71,14 +71,14 @@ vi.mock("../../../../apps/web/src/hooks/useProjects", () => ({
           openTaskCount: 0,
           doneTaskCount: 0,
           totalTaskCount: 0,
-          tags: []
+          tags: [],
         }
       : undefined,
     loading: false,
     createProject: vi.fn(),
     updateProject: vi.fn(),
-    removeProject: vi.fn()
-  })
+    removeProject: vi.fn(),
+  }),
 }));
 
 beforeEach(() => {
@@ -97,20 +97,31 @@ describe("ProjectDetailPage openInTab", () => {
   it("nutzt die volle verfügbare Detailseitenbreite", () => {
     const { container } = render(<ProjectDetailPage />);
 
-    expect(container.firstElementChild).toHaveClass("w-full", "min-w-0");
+    expect(container.firstElementChild).toHaveClass(
+      "flex",
+      "h-full",
+      "w-full",
+      "min-w-0",
+      "flex-1",
+      "flex-col",
+    );
     expect(container.firstElementChild).not.toHaveClass("mx-auto", "max-w-7xl");
   });
 
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button", () => {
     render(<ProjectDetailPage />);
 
-    expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "In neuem Tab öffnen" }),
+    ).toBeInTheDocument();
   });
 
   it("öffnet die Projekt-URL und navigiert zurück", () => {
     render(<ProjectDetailPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "In neuem Tab öffnen" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "In neuem Tab öffnen" }),
+    );
 
     expect(window.open).toHaveBeenCalledWith("/projects/10", "_blank");
     expect(router.navigate).toHaveBeenCalledWith("/projects");
@@ -121,6 +132,8 @@ describe("ProjectDetailPage openInTab", () => {
 
     render(<ProjectDetailPage />);
 
-    expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "In neuem Tab öffnen" }),
+    ).not.toBeInTheDocument();
   });
 });

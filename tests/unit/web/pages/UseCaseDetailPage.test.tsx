@@ -21,7 +21,7 @@ import { UseCaseDetailPage } from "../../../../apps/web/src/pages/UseCaseDetailP
 const router = vi.hoisted(() => ({
   navigate: vi.fn(),
   params: { id: "10" } as Record<string, string>,
-  search: "returnTo=%2Ffeatures"
+  search: "returnTo=%2Ffeatures",
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -30,7 +30,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
     ...actual,
     useNavigate: () => router.navigate,
     useParams: () => router.params,
-    useSearchParams: () => [new URLSearchParams(router.search), vi.fn()]
+    useSearchParams: () => [new URLSearchParams(router.search), vi.fn()],
   };
 });
 
@@ -47,8 +47,8 @@ vi.mock("../../../../apps/web/src/api/use-cases", () => ({
     sortOrder: 0,
     version: 1,
     createdAt: "2026-05-20T08:00:00.000Z",
-    updatedAt: "2026-05-20T08:00:00.000Z"
-  })
+    updatedAt: "2026-05-20T08:00:00.000Z",
+  }),
 }));
 
 vi.mock("../../../../apps/web/src/components/usecases/UseCaseForm", () => ({
@@ -60,30 +60,30 @@ vi.mock("../../../../apps/web/src/components/usecases/UseCaseForm", () => ({
     ) : (
       <div data-testid="use-case-form" />
     );
-  }
+  },
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({
-  useToast: () => ({ showToast: vi.fn() })
+  useToast: () => ({ showToast: vi.fn() }),
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ConfirmDialogProvider", () => ({
-  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) })
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useFeatures", () => ({
   useFeatures: () => ({
     features: [],
-    loading: false
-  })
+    loading: false,
+  }),
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useUseCases", () => ({
   useUseCases: () => ({
     createUseCase: vi.fn(),
     updateUseCase: vi.fn(),
-    removeUseCase: vi.fn()
-  })
+    removeUseCase: vi.fn(),
+  }),
 }));
 
 beforeEach(() => {
@@ -104,20 +104,31 @@ describe("UseCaseDetailPage openInTab", () => {
 
     await screen.findByRole("button");
 
-    expect(container.firstElementChild).toHaveClass("w-full", "min-w-0");
+    expect(container.firstElementChild).toHaveClass(
+      "flex",
+      "h-full",
+      "w-full",
+      "min-w-0",
+      "flex-1",
+      "flex-col",
+    );
     expect(container.firstElementChild).not.toHaveClass("mx-auto", "max-w-7xl");
   });
 
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button", async () => {
     render(<UseCaseDetailPage />);
 
-    expect(await screen.findByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "In neuem Tab öffnen" }),
+    ).toBeInTheDocument();
   });
 
   it("öffnet die Use-Case-URL und navigiert zurück", async () => {
     render(<UseCaseDetailPage />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "In neuem Tab öffnen" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "In neuem Tab öffnen" }),
+    );
 
     expect(window.open).toHaveBeenCalledWith("/use-cases/10", "_blank");
     expect(router.navigate).toHaveBeenCalledWith("/features");
@@ -128,6 +139,8 @@ describe("UseCaseDetailPage openInTab", () => {
 
     render(<UseCaseDetailPage />);
 
-    expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "In neuem Tab öffnen" }),
+    ).not.toBeInTheDocument();
   });
 });

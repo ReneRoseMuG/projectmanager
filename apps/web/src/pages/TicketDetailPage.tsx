@@ -1,18 +1,30 @@
 import type { TicketStatus } from "@taskmanager/shared-types";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { setTicketTags, type TicketOwner } from "../api/tickets";
-import { TicketForm, type TicketFormInput } from "../components/tickets/TicketForm";
+import {
+  TicketForm,
+  type TicketFormInput,
+} from "../components/tickets/TicketForm";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage, errorMessageAsync } from "../hooks/errors";
 import { useTicketDetail } from "../hooks/useTicketDetail";
 import { useTickets } from "../hooks/useTickets";
 
-function parseTicketOwner(searchParams: URLSearchParams): TicketOwner | undefined {
+function parseTicketOwner(
+  searchParams: URLSearchParams,
+): TicketOwner | undefined {
   const ownerType = searchParams.get("ownerType");
   const ownerIdParam = searchParams.get("ownerId");
   const ownerId = ownerIdParam ? Number(ownerIdParam) : NaN;
-  if ((ownerType === "project" || ownerType === "milestone" || ownerType === "task" || ownerType === "feature" || ownerType === "useCase") && Number.isFinite(ownerId)) {
+  if (
+    (ownerType === "project" ||
+      ownerType === "milestone" ||
+      ownerType === "task" ||
+      ownerType === "feature" ||
+      ownerType === "useCase") &&
+    Number.isFinite(ownerId)
+  ) {
     return { type: ownerType, id: ownerId };
   }
   return undefined;
@@ -31,7 +43,9 @@ export function TicketDetailPage() {
   const ticketId = isCreateMode ? null : Number(params.id);
   const owner = parseTicketOwner(searchParams);
   const tickets = useTickets(owner);
-  const detail = useTicketDetail(!isCreateMode && Number.isFinite(ticketId) ? ticketId : null);
+  const detail = useTicketDetail(
+    !isCreateMode && Number.isFinite(ticketId) ? ticketId : null,
+  );
   const returnTo = searchParams.get("returnTo") ?? "/tickets";
 
   const closePage = () => navigate(returnTo);
@@ -53,7 +67,11 @@ export function TicketDetailPage() {
       await tickets.reload();
       showToast({ tone: "success", title: "Ticket erstellt" });
     } catch (ticketError) {
-      showToast({ tone: "error", title: "Ticket konnte nicht erstellt werden", message: await errorMessageAsync(ticketError) });
+      showToast({
+        tone: "error",
+        title: "Ticket konnte nicht erstellt werden",
+        message: await errorMessageAsync(ticketError),
+      });
       throw ticketError;
     }
   };
@@ -65,27 +83,44 @@ export function TicketDetailPage() {
     }
     const { tagIds, ...ticketInput } = input;
     try {
-      await detail.updateTicket({ ...ticketInput, expectedVersion: ticket.version });
+      await detail.updateTicket({
+        ...ticketInput,
+        expectedVersion: ticket.version,
+      });
       await setTicketTags(ticket.id, tagIds);
       await detail.reload();
       await tickets.reload();
       showToast({ tone: "success", title: "Ticket gespeichert" });
     } catch (ticketError) {
-      showToast({ tone: "error", title: "Ticket konnte nicht gespeichert werden", message: errorMessage(ticketError) });
+      showToast({
+        tone: "error",
+        title: "Ticket konnte nicht gespeichert werden",
+        message: errorMessage(ticketError),
+      });
       throw ticketError;
     }
   };
 
   if (isCreateMode) {
     return (
-      <div className="-my-4 min-h-[calc(100%+2rem)] w-full min-w-0 md:-my-6 md:min-h-[calc(100%+3rem)]">
-        <TicketForm open variant="page" initialStatus={parseTicketStatus(searchParams.get("status"))} onSubmit={createTicket} onClose={closePage} />
+      <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
+        <TicketForm
+          open
+          variant="page"
+          initialStatus={parseTicketStatus(searchParams.get("status"))}
+          onSubmit={createTicket}
+          onClose={closePage}
+        />
       </div>
     );
   }
 
   if (!Number.isFinite(ticketId)) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Ticket nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Ticket nicht gefunden
+      </div>
+    );
   }
 
   if (detail.loading) {
@@ -93,12 +128,23 @@ export function TicketDetailPage() {
   }
 
   if (!detail.ticket) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Ticket nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+        Ticket nicht gefunden
+      </div>
+    );
   }
 
   return (
-    <div className="-my-4 min-h-[calc(100%+2rem)] w-full min-w-0 md:-my-6 md:min-h-[calc(100%+3rem)]">
-      <TicketForm open ticket={detail.ticket} variant="page" onSubmit={saveTicket} onClose={closePage} onOpenInTab={openInTab} />
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
+      <TicketForm
+        open
+        ticket={detail.ticket}
+        variant="page"
+        onSubmit={saveTicket}
+        onClose={closePage}
+        onOpenInTab={openInTab}
+      />
     </div>
   );
 }
