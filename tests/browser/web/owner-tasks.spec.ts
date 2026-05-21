@@ -2,6 +2,7 @@
 import {
   authenticatedGoto,
   apiBaseUrl,
+  clickItemAction,
   cleanupTasksByTitle,
   createFeature,
   createProject,
@@ -117,7 +118,7 @@ async function linkTaskInBoard(page: Page, reopenScope: ScopeFactory, title: str
 
 async function removeTaskRelationInBoard(page: Page, request: APIRequestContext, reopenScope: ScopeFactory, title: string) {
   const scope = await reopenScope();
-  await itemCard(scope, title).getByRole("button", { name: "Löschen", exact: true }).click();
+  await clickItemAction(scope, title, "Löschen");
   await page.getByRole("alertdialog").getByRole("button", { name: "Entfernen" }).click();
   await expect(page.getByRole("status")).toContainText("Zuordnung entfernt");
   await expect(itemCard(scope, title)).toHaveCount(0);
@@ -131,7 +132,7 @@ async function expectTaskNavigation(page: Page, reopenScope: ScopeFactory, title
   await expect(formPage(page, "Aufgabe bearbeiten").locator("input[required]").first()).toHaveValue(title);
 
   scope = await reopenScope();
-  await itemCard(scope, title).getByRole("button", { name: "Bearbeiten" }).click();
+  await clickItemAction(scope, title, "Bearbeiten");
   await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}`));
   await expect(formPage(page, "Aufgabe bearbeiten").locator("input[required]").first()).toHaveValue(title);
 }

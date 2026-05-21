@@ -1,5 +1,5 @@
 import type { Feature } from "@taskmanager/shared-types";
-import { ArrowRight, BookOpen, FileText } from "lucide-react";
+import { ArrowRight, FileText } from "lucide-react";
 import { richTextToPlainText } from "../../utils/richText";
 import { ItemCard } from "../ui/ItemCard";
 import { StatusPill } from "../ui/StatusPill";
@@ -30,17 +30,9 @@ export function FeatureCard({ feature, onOpen, onDelete }: FeatureCardProps) {
 
 function FeatureCardHeader({ feature }: { feature: Feature }) {
   return (
-    <div className="flex min-w-0 items-center gap-3">
-      <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl bg-steel-600 text-white shadow-steel-icon" aria-hidden="true">
-        <BookOpen size={22} />
-      </span>
-      <span className="min-w-0">
-        <span className="line-clamp-2 text-base font-semibold text-ink">{feature.title}</span>
-        <span className="block truncate font-mono text-xs text-slate-500">/features/{feature.slug}</span>
-        <span className="mt-2 inline-flex">
-          <StatusPill kind="featureStatus" value={feature.status} />
-        </span>
-      </span>
+    <div className="grid gap-2">
+      <span className="line-clamp-2 text-base font-semibold text-ink">{feature.title}</span>
+      <StatusPill kind="featureStatus" value={feature.status} />
     </div>
   );
 }

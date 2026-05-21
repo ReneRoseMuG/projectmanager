@@ -2,6 +2,10 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 21.05.26 | 4 | Tests UI-Board-Overhaul | ✅ |
+| 21.05.26 | 3 | Slug- & Icon-Bereinigung | ✅ |
+| 21.05.26 | 2 | Board-Toolbar & Statusspalten | ✅ |
+| 21.05.26 | 1 | ActionMenu & Kartenaktionen | ✅ |
 | 21.05.26 | Feature | KI RichText Beschreibungsfeld | ✅ |
 | 21.05.26 | Feature | Test-Entwurfsleitplanken-Skill | ⚠️ |
 | 21.05.26 | Fix | Rote Tests TLDraw und Migration | ✅ |

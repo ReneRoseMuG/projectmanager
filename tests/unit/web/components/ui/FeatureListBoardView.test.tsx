@@ -116,8 +116,7 @@ describe("FeatureListBoardView", () => {
     expect(archivedColumn).toContainElement(screen.getByText("Feature Archiviert"));
 
     expectItemCardClasses(container.querySelectorAll("article.rounded-2xl"));
-    expect(screen.getAllByRole("button", { name: "Bearbeiten" })).toHaveLength(features.length);
-    expect(screen.getAllByRole("button", { name: "Löschen" })).toHaveLength(features.length);
+    expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(features.length);
 
     fireEvent.click(screen.getByRole("button", { name: "Aktiv hinzufügen" }));
     expect(onCreate).toHaveBeenCalledWith("active");

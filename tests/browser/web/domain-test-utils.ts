@@ -343,6 +343,18 @@ export function itemCard(scope: Page | Locator, title: string) {
   return scope.locator("article:visible").filter({ hasText: title }).first();
 }
 
+export async function clickItemAction(scope: Page | Locator, title: string, action: "Bearbeiten" | "Löschen" | "Entfernen") {
+  const card = itemCard(scope, title);
+  const directButton = card.getByRole("button", { name: action, exact: true }).first();
+  if ((await directButton.count()) > 0 && (await directButton.isVisible())) {
+    await directButton.click();
+    return;
+  }
+
+  await card.getByRole("button", { name: "Aktionen" }).click();
+  await card.getByRole("menuitem", { name: action, exact: true }).click();
+}
+
 export async function expectRichText(form: Locator, text: string, indexOrPrefix: number | string = 0) {
   const view = typeof indexOrPrefix === "string" ? form.locator(`[data-testid="${indexOrPrefix}-view"]`) : form.locator('[data-testid$="-view"]').nth(indexOrPrefix);
   await expect(view).toContainText(text);

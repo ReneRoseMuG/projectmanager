@@ -151,10 +151,9 @@ describe("ProjectFeaturePanel", () => {
     const activeRow = screen.getByText("Feature Aktiv").closest("article");
     expect(activeRow).toBeInTheDocument();
     expect(activeRow?.querySelector(".w-52")).toBeInTheDocument();
-    expect(activeRow?.querySelector(".w-72")).toBeInTheDocument();
     expect(
       within(activeRow as HTMLElement).getByRole("button", {
-        name: "Bearbeiten",
+        name: "Aktionen",
       }),
     ).toBeInTheDocument();
     fireEvent.doubleClick(activeRow as HTMLElement);

@@ -1,5 +1,5 @@
 ﻿import { expect, test, type Page } from "@playwright/test";
-import { authenticatedGoto, apiBaseUrl, createProject, createTask, cleanupTasksByTitle, deleteProject, deleteTask, expectRichText, fillRichText, formPage, itemCard, uniqueTitle } from "./domain-test-utils";
+import { authenticatedGoto, apiBaseUrl, clickItemAction, createProject, createTask, cleanupTasksByTitle, deleteProject, deleteTask, expectRichText, fillRichText, formPage, itemCard, uniqueTitle } from "./domain-test-utils";
 
 /**
  * Test Scope:
@@ -76,13 +76,13 @@ test.describe("Task-Routen und Detailformular", () => {
       await expectTaskFormData(page, task);
 
       projectForm = await openProjectTasks(page, project.id);
-      await itemCard(projectForm, task.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(projectForm, task.title, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}`));
       await expectTaskFormData(page, task);
 
       projectForm = await openProjectTasks(page, project.id);
       await projectForm.getByRole("button", { name: "Liste", exact: true }).first().click();
-      await itemCard(projectForm, task.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(projectForm, task.title, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}`));
       await expectTaskFormData(page, task);
     } finally {
@@ -120,7 +120,7 @@ test.describe("Task-Routen und Detailformular", () => {
 
     try {
       const projectForm = await openProjectTasks(page, project.id);
-      await itemCard(projectForm, task.title).getByRole("button", { name: "Löschen", exact: true }).click();
+      await clickItemAction(projectForm, task.title, "Löschen");
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/tasks/${task.id}`) && response.request().method() === "DELETE"),
         page.getByRole("alertdialog").getByRole("button", { name: "Entfernen" }).click()

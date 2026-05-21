@@ -22,6 +22,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Avatar } from "../../../../../apps/web/src/components/ui/Avatar";
 import { Badge } from "../../../../../apps/web/src/components/ui/Badge";
 import { Button } from "../../../../../apps/web/src/components/ui/Button";
+import { FilterChips } from "../../../../../apps/web/src/components/ui/FilterChips";
 import { Input } from "../../../../../apps/web/src/components/ui/Input";
 import { Pill } from "../../../../../apps/web/src/components/ui/Pill";
 import { Skeleton } from "../../../../../apps/web/src/components/ui/Skeleton";
@@ -151,5 +152,14 @@ describe("Badge / Pill / Skeleton", () => {
     render(<Skeleton data-testid="skeleton" />);
 
     expect(screen.getByTestId("skeleton")).toHaveAttribute("aria-hidden", "true");
+  });
+});
+
+describe("FilterChips", () => {
+  it("rendert Chips in Toolbar-Höhe", () => {
+    render(<FilterChips value="all" onChange={vi.fn()} options={[{ value: "open", label: "Offen", count: 2 }]} allCount={3} />);
+
+    expect(screen.getByRole("button", { name: /^Alle\s*3$/ })).toHaveClass("h-10");
+    expect(screen.getByRole("button", { name: /^Offen\s*2$/ })).toHaveClass("h-10");
   });
 });

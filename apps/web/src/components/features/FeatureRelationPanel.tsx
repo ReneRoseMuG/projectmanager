@@ -61,7 +61,6 @@ export function FeatureRelationPanel({
             </span>
             <span className="min-w-0">
               <span className="block truncate text-[14px] font-semibold text-ink">{feature.title}</span>
-              <span className="block truncate font-mono text-[11px] text-slate-500">/features/{feature.slug}</span>
             </span>
             <span className="hidden md:inline-flex">
               <StatusPill kind="featureStatus" value={feature.status} />

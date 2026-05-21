@@ -215,23 +215,25 @@ describe("ItemCard", () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it("Edit-Button ruft onEdit auf (nicht onOpen)", () => {
+  it("ActionMenu ruft onEdit auf (nicht onOpen)", () => {
     const onEdit = vi.fn();
     const onOpen = vi.fn();
     render(<ItemCard header={<h3>Alpha</h3>} onOpen={onOpen} onEdit={onEdit} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Bearbeiten" }));
+    fireEvent.click(screen.getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Bearbeiten" }));
 
     expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onOpen).not.toHaveBeenCalled();
-    expect(screen.queryByText("Bearbeiten")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Bearbeiten" })).not.toBeInTheDocument();
   });
 
-  it("Delete-Button ruft onDelete auf", () => {
+  it("ActionMenu ruft onDelete auf", () => {
     const onDelete = vi.fn();
     render(<ItemCard header={<h3>Alpha</h3>} onDelete={onDelete} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Löschen" }));
 
     expect(onDelete).toHaveBeenCalledTimes(1);
   });

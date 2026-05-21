@@ -3,9 +3,9 @@ import { CalendarClock, Edit3, GitBranch, Trash2 } from "lucide-react";
 import { formatHumanDate, isOverdue } from "../../utils/date";
 import { ticketTypeLabels, ticketTypeTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
+import { ActionMenu } from "../ui/ActionMenu";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
 import { PriorityBadge } from "../ui/PriorityBadge";
@@ -142,10 +142,12 @@ function TicketRow({ ticket, description, onOpen, onDelete }: { ticket: Ticket; 
           </div>
         }
         actions={
-          <>
-            <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(ticket)} />
-            {onDelete ? <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(ticket)} /> : null}
-          </>
+          <ActionMenu
+            items={[
+              { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(ticket) },
+              ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(ticket), danger: true }] : [])
+            ]}
+          />
         }
         onOpen={() => onOpen(ticket)}
       />

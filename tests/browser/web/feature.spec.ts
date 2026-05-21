@@ -1,6 +1,7 @@
 ﻿import { expect, test, type Page } from "@playwright/test";
 import {
   authenticatedGoto,
+  clickItemAction,
   createFeature,
   createProject,
   createUseCase,
@@ -85,13 +86,13 @@ test.describe("Feature-Routen und Detailformular", () => {
       await expectFeatureFormData(page, feature);
 
       await openFeatureList(page);
-      await itemCard(page, feature.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(page, feature.title, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
       await expectFeatureFormData(page, feature);
 
       await openFeatureList(page);
       await page.getByRole("button", { name: "Liste", exact: true }).click();
-      await itemCard(page, feature.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(page, feature.title, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
       await expectFeatureFormData(page, feature);
     } finally {
@@ -141,7 +142,7 @@ test.describe("Feature-Routen und Detailformular", () => {
 
       await authenticatedGoto(page, `/features/${feature.id}`);
       await formPage(page, "Feature bearbeiten").getByRole("button", { name: /Projekte/ }).click();
-      await itemCard(formPage(page, "Feature bearbeiten"), project.name).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(formPage(page, "Feature bearbeiten"), project.name, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/projects/${project.id}`));
       await expect(formPage(page, "Projekt bearbeiten").locator("input[required]").first()).toHaveValue(project.name);
     } finally {
@@ -170,7 +171,7 @@ test.describe("Feature-Routen und Detailformular", () => {
 
       await authenticatedGoto(page, `/features/${feature.id}`);
       await formPage(page, "Feature bearbeiten").getByRole("button", { name: /Use Cases/ }).click();
-      await itemCard(formPage(page, "Feature bearbeiten"), useCase.title).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(formPage(page, "Feature bearbeiten"), useCase.title, "Bearbeiten");
       await expect(page).toHaveURL(new RegExp(`/use-cases/${useCase.id}`));
       await expect(formPage(page, "Use Case bearbeiten").locator("input[required]").nth(0)).toHaveValue(useCase.title);
     } finally {
@@ -182,7 +183,7 @@ test.describe("Feature-Routen und Detailformular", () => {
     const feature = await createFeature(request, "E2E Feature Delete Route");
 
     await openFeatureList(page);
-    await itemCard(page, feature.title).getByRole("button", { name: "Löschen" }).click();
+    await clickItemAction(page, feature.title, "Löschen");
     await page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click();
 
     await expect(itemCard(page, feature.title)).not.toBeVisible();

@@ -219,12 +219,12 @@ function ListBoardViewContent<T>({
         {!loading && items.length > 0 && mode === "list" && hasStatusGrouping ? (
           <div className="grid min-h-full content-start gap-4">
             {listStatusGroups.map((group) => (
-              <section key={group.column.value} className={`grid min-w-0 gap-3 rounded-lg border p-3 ${statusGroupClass(group.column)}`}>
-                <header className="flex min-w-0 items-center justify-between gap-3">
+              <section key={group.column.value} className={`grid min-w-0 gap-0 rounded-lg border p-0 ${statusGroupClass(group.column)}`}>
+                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white/60 px-3 py-2 backdrop-blur-sm">
                   <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{group.column.label}</h2>
                   <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">{group.items.length}</span>
                 </header>
-                <div className="grid gap-3">
+                <div className="grid gap-3 p-3">
                   {group.items.map((item, index) => (
                     <div key={index}>{renderRow(item)}</div>
                   ))}
@@ -245,8 +245,8 @@ function ListBoardViewContent<T>({
         {!loading && items.length > 0 && boardByStatus ? (
           <div className="grid h-full min-h-full min-w-0 grid-flow-col auto-cols-[minmax(17rem,1fr)] gap-4 overflow-x-auto pb-2">
             {boardStatusGroups.map((group) => (
-              <section key={group.column.value} className={`grid h-full min-h-[240px] min-w-0 content-start gap-3 rounded-lg border p-3 ${statusGroupClass(group.column)}`}>
-                <header className="flex min-w-0 items-center justify-between gap-3">
+              <section key={group.column.value} className={`grid h-full min-h-[240px] min-w-0 content-start gap-0 rounded-lg border p-0 ${statusGroupClass(group.column)}`}>
+                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white/60 px-3 py-2 backdrop-blur-sm">
                   <h2 className="min-w-0 truncate text-sm font-semibold text-ink">{group.column.label}</h2>
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">{group.items.length}</span>
@@ -262,11 +262,13 @@ function ListBoardViewContent<T>({
                     ) : null}
                   </div>
                 </header>
-                {group.items.map((item, index) => (
-                  <div key={index} className="min-w-0 max-w-full">
-                    {renderCard(item)}
-                  </div>
-                ))}
+                <div className="grid gap-3 p-3">
+                  {group.items.map((item, index) => (
+                    <div key={index} className="min-w-0 max-w-full">
+                      {renderCard(item)}
+                    </div>
+                  ))}
+                </div>
               </section>
             ))}
           </div>

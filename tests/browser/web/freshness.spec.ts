@@ -1,6 +1,6 @@
 ﻿import { expect, test, type Locator, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
-import { authenticatedGoto, apiBaseUrl, createFeature, createProject, deleteFeature, deleteProject, fillRichText, formPage, itemCard, slugify, uniqueTitle } from "./domain-test-utils";
+import { authenticatedGoto, apiBaseUrl, clickItemAction, createFeature, createProject, deleteFeature, deleteProject, fillRichText, formPage, itemCard, slugify, uniqueTitle } from "./domain-test-utils";
 
 /**
  * Test Scope:
@@ -104,7 +104,7 @@ test.describe("Globale UI-Aktualität", () => {
 
       const taskArticle = visibleArticle(projectForm(page), taskTitle);
       await taskArticle.scrollIntoViewIfNeeded();
-      await taskArticle.getByRole("button", { name: "Löschen", exact: true }).click();
+      await clickItemAction(projectForm(page), taskTitle, "Löschen");
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/tasks/${createdTask.id}`) && response.request().method() === "DELETE"),
         page.getByRole("alertdialog").getByRole("button", { name: "Entfernen" }).click()
@@ -190,7 +190,7 @@ test.describe("Globale UI-Aktualität", () => {
       await expect(visibleArticle(projectForm(page), backlogTitle)).toBeVisible();
       await projectForm(page).getByRole("button", { name: "Liste", exact: true }).click();
 
-      await visibleArticle(projectForm(page), backlogTitle).getByRole("button", { name: "Bearbeiten" }).click();
+      await clickItemAction(projectForm(page), backlogTitle, "Bearbeiten");
       const editForm = formPage(page, "Backlog-Item bearbeiten");
       await editForm.getByRole("button", { name: "In Arbeit" }).click();
       await Promise.all([
@@ -209,7 +209,7 @@ test.describe("Globale UI-Aktualität", () => {
       await expect(projectForm(page).locator("article:visible").filter({ hasText: backlogTitle })).toHaveCount(0);
       await projectForm(page).getByRole("button", { name: /^Alle\s+1$/ }).click();
 
-      await visibleArticle(projectForm(page), backlogTitle).getByRole("button", { name: "Löschen" }).click();
+      await clickItemAction(projectForm(page), backlogTitle, "Löschen");
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/backlog/${createdBacklogItem.id}`) && response.request().method() === "DELETE"),
         page.getByRole("alertdialog").getByRole("button", { name: "Löschen" }).click()

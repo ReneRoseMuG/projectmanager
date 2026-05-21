@@ -1,6 +1,6 @@
 import { Edit3, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button } from "./Button";
+import { ActionMenu } from "./ActionMenu";
 
 interface ItemCardProps {
   accentColor?: string;
@@ -24,33 +24,13 @@ export function ItemCard({ accentColor, onOpen, onEdit, onDelete, header, body, 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">{header}</div>
         {onEdit || onDelete ? (
-          <div className="relative z-20 flex shrink-0 gap-1">
-            {onEdit ? (
-              <Button
-                aria-label="Bearbeiten"
-                title="Bearbeiten"
-                icon={<Edit3 size={18} />}
-                variant="ghost"
-                className="h-10 w-10"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onEdit();
-                }}
-              />
-            ) : null}
-            {onDelete ? (
-              <Button
-                aria-label="Löschen"
-                title="Löschen"
-                icon={<Trash2 size={18} />}
-                variant="ghost"
-                className="h-10 w-10"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onDelete();
-                }}
-              />
-            ) : null}
+          <div className="relative z-20 shrink-0">
+            <ActionMenu
+              items={[
+                ...(onEdit ? [{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: onEdit }] : []),
+                ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: onDelete, danger: true }] : [])
+              ]}
+            />
           </div>
         ) : null}
       </div>
