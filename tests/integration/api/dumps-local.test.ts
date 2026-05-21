@@ -141,6 +141,12 @@ function seedCompleteDataset(): void {
       VALUES (1, 'taskBoard.viewMode', 'USER', '1', '"kanban"', 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO projects (id, name, description, status, color, start_date, due_date, created_at, updated_at)
       VALUES (1, 'Projekt Alpha', 'Beschreibung', 'active', '#123456', '2026-05-01', '2026-05-31', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO journal_entries (id, operation, object_type, object_id, object_label, summary, actor_user_id, actor_name, created_at)
+      VALUES (1, 'update', 'project', 1, 'Projekt Alpha', 'Projekt "Projekt Alpha" hat ein neues Enddatum: 31.05.26 → 15.06.26.', 1, 'Lovelace, Ada', '2026-05-17T08:30:00');
+    INSERT INTO journal_entry_changes (id, journal_entry_id, field_key, field_label, old_value_json, old_value_label, new_value_json, new_value_label, summary)
+      VALUES (1, 1, 'dueDate', 'Enddatum', '"2026-05-31"', '31.05.26', '"2026-06-15"', '15.06.26', 'Enddatum: 31.05.26 → 15.06.26');
+    INSERT INTO journal_entry_contexts (id, journal_entry_id, object_type, object_id, object_label, relation)
+      VALUES (1, 1, 'project', 1, 'Projekt Alpha', 'self');
     INSERT INTO milestones (id, project_id, name, description, status, color, start_date, due_date, created_at, updated_at)
       VALUES (1, 1, 'Meilenstein Alpha', 'Meilenstein Beschreibung', 'active', '#654321', '2026-05-10', '2026-05-15', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO tags (id, name, color) VALUES (1, 'Wichtig', '#ff0000');

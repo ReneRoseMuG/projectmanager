@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
 import { createMilestone, deleteMilestone, getMilestone, listMilestones, listProjectMilestones, updateMilestone } from "../services/milestones.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const milestoneBodySchema = {
@@ -54,13 +55,13 @@ export async function registerMilestoneRoutes(app: FastifyInstance): Promise<voi
   app.post<{ Body: MilestoneInput }>(
     "/milestones",
     { schema: { body: milestoneBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createMilestone(app.db, request.body))
+    async (request, reply) => reply.status(201).send(createMilestone(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number }; Body: Omit<MilestoneInput, "projectId"> }>(
     "/projects/:id/milestones",
     { schema: { params: idParamSchema, body: projectMilestoneBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createMilestone(app.db, { ...request.body, projectId: request.params.id }))
+    async (request, reply) => reply.status(201).send(createMilestone(app.db, { ...request.body, projectId: request.params.id }, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -72,14 +73,14 @@ export async function registerMilestoneRoutes(app: FastifyInstance): Promise<voi
   app.patch<{ Params: { id: number }; Body: MilestoneUpdate }>(
     "/milestones/:id",
     { schema: { params: idParamSchema, body: milestonePatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateMilestone(app.db, request.params.id, request.body)
+    async (request) => updateMilestone(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number } }>(
     "/milestones/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      await deleteMilestone(app.db, request.params.id);
+      await deleteMilestone(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

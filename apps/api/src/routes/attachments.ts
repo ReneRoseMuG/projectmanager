@@ -11,6 +11,7 @@ import {
   listTaskAttachments
 } from "../services/attachments.service.js";
 import { getAttachmentPreview } from "../services/attachment-preview.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
@@ -84,7 +85,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     "/projects/:id/attachments",
     { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const attachment = await createProjectAttachment(app.db, request.params.id, await readUpload(request));
+      const attachment = await createProjectAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(attachment);
     }
   );
@@ -93,7 +94,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     "/tasks/:id/attachments",
     { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const attachment = await createTaskAttachment(app.db, request.params.id, await readUpload(request));
+      const attachment = await createTaskAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(attachment);
     }
   );
@@ -102,7 +103,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     "/milestones/:id/attachments",
     { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const attachment = await createMilestoneAttachment(app.db, request.params.id, await readUpload(request));
+      const attachment = await createMilestoneAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(attachment);
     }
   );
@@ -111,7 +112,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     "/features/:id/attachments",
     { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const attachment = await createFeatureAttachment(app.db, request.params.id, await readUpload(request));
+      const attachment = await createFeatureAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(attachment);
     }
   );
@@ -120,7 +121,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     "/attachments/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      await deleteAttachment(app.db, request.params.id);
+      await deleteAttachment(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

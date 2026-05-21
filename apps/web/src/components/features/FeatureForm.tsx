@@ -30,6 +30,7 @@ import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed, resolveCatal
 import { ticketTypeLabels } from "../../utils/domainLabels";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
+import { JournalPanel } from "../journal/JournalPanel";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
@@ -55,6 +56,7 @@ import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 import { FeatureProjectPanel } from "./FeatureProjectPanel";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface FeatureFormProps {
   open: boolean;
@@ -79,7 +81,7 @@ interface FeatureFormProps {
   ) => Promise<void>;
 }
 
-type FeatureFormTab = "details" | "useCases" | "tasks" | "tickets" | "projects" | "comments" | "attachments";
+type FeatureFormTab = "details" | "useCases" | "tasks" | "tickets" | "projects" | "comments" | "attachments" | "journal";
 
 const tabs: Array<Tab<FeatureFormTab>> = [
   { value: "details", label: "Details" },
@@ -88,7 +90,8 @@ const tabs: Array<Tab<FeatureFormTab>> = [
   { value: "tickets", label: "Tickets" },
   { value: "projects", label: "Projekte" },
   { value: "comments", label: "Kommentare" },
-  { value: "attachments", label: "Dateien" }
+  { value: "attachments", label: "Dateien" },
+  { value: "journal", label: "Journal" }
 ];
 
 function featureStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "draft") {
@@ -109,6 +112,7 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
   const featureId = feature?.id;
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const canReadJournal = useHasPermission("journal", "read");
   const projects = useProjects();
   const useCases = useUseCases(featureId);
   const tasks = useTasks(featureId ? { type: "feature", id: featureId } : undefined);
@@ -223,7 +227,8 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
     }
   };
 
-  const tabItems = tabs.map((tab) => {
+  const visibleTabs = feature ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal) : tabs.filter((tab) => tab.value !== "journal");
+  const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
     }
@@ -458,6 +463,12 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
             ) : (
               <PendingFileList files={pendingFiles} onAdd={(files) => setPendingFiles((items) => [...items, ...files])} onRemove={(index) => setPendingFiles((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
             )}
+          </Section>
+        ) : null}
+
+        {activeTab === "journal" && feature ? (
+          <Section title="Journal" fill>
+            <JournalPanel objectType="feature" objectId={feature.id} />
           </Section>
         ) : null}
       </FormModal>

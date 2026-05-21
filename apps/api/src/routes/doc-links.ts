@@ -9,6 +9,7 @@ import {
   setMilestoneFeatures,
   setProjectFeatures
 } from "../services/doc-links.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, idParamSchema } from "../utils/route-schemas.js";
 
 const featureIdsBodySchema = {
@@ -54,7 +55,7 @@ export async function registerDocLinksRoutes(app: FastifyInstance): Promise<void
   app.put<{ Params: { id: number }; Body: { featureIds: number[] } }>(
     "/projects/:id/features",
     { schema: { params: idParamSchema, body: featureIdsBodySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => setProjectFeatures(app.db, request.params.id, request.body.featureIds)
+    async (request) => setProjectFeatures(app.db, request.params.id, request.body.featureIds, createJournalActor(request.currentUser))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -66,7 +67,7 @@ export async function registerDocLinksRoutes(app: FastifyInstance): Promise<void
   app.put<{ Params: { id: number }; Body: { featureIds: number[] } }>(
     "/milestones/:id/features",
     { schema: { params: idParamSchema, body: featureIdsBodySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => setMilestoneFeatures(app.db, request.params.id, request.body.featureIds)
+    async (request) => setMilestoneFeatures(app.db, request.params.id, request.body.featureIds, createJournalActor(request.currentUser))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -78,7 +79,7 @@ export async function registerDocLinksRoutes(app: FastifyInstance): Promise<void
   app.put<{ Params: { id: number }; Body: { relations: FeatureRelationInput[] } }>(
     "/features/:id/relations",
     { schema: { params: idParamSchema, body: featureRelationsBodySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => setFeatureRelations(app.db, request.params.id, request.body.relations)
+    async (request) => setFeatureRelations(app.db, request.params.id, request.body.relations, createJournalActor(request.currentUser))
   );
 
 }

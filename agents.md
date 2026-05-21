@@ -882,6 +882,57 @@ Detailformulare erhalten ein optionales Prop `onOpenInTab?: () => void`. Dieses 
 
 ---
 
+## 16. Journal-Architektur (verbindlich)
+
+Das Journal ist die verbindliche Anwender-Chronik für Änderungen an fachlichen Domänenobjekten und bearbeitbaren Support-Objekten. Jede spätere Erweiterung, die neue Objekte erstellt, ändert, löscht, verknüpft oder trennt, muss das Journal im Plan und in der Umsetzung ausdrücklich berücksichtigen.
+
+### 16.1 Anwendernutzen vor Technik
+
+Journal-Einträge müssen aus Sicht des Anwenders aussagekräftig sein. Generische Meldungen wie „Termin wurde geändert“ sind unzulässig. Richtig ist eine konkrete Aussage mit Objekt, Feld und Wertänderung, zum Beispiel: „Termin "Planung" hat ein neues Enddatum: 31.05.26 → 15.06.26.“
+
+Für Updates gilt:
+- geänderte Felder mit fachlichen Labels protokollieren,
+- alte und neue Werte menschenlesbar formatieren,
+- Datumswerte als `dd.MM.yy` oder `dd.MM.yy HH:mm` anzeigen,
+- Status, Prioritäten und Typen mit deutschen Labels ausgeben,
+- große Inhalte nicht vollständig speichern, sondern als sinnvolle Zusammenfassung, zum Beispiel Zeichenanzahl oder kurzer Auszug.
+
+### 16.2 Backend-Einbindung
+
+Neue journalisierte Objekte werden in `packages/shared-types/src/index.ts` in `JOURNAL_OBJECT_TYPES` ergänzt. Neue Operationen oder Kontextarten dürfen nur ergänzt werden, wenn die bestehende Semantik `create`, `update`, `delete`, `link`, `unlink` beziehungsweise `self`, `owner`, `parent`, `related` nicht ausreicht.
+
+Mutierende Services nutzen `recordJournalEntry` aus `apps/api/src/services/journal.service.ts`. Route-Handler übergeben den Akteur mit `createJournalActor(request.currentUser)`. Route-Handler enthalten keine eigene Journal-Logik.
+
+Für jedes journalisierte Objekt gilt:
+- `objectType`, `objectId` und `objectLabel` müssen das tatsächlich betroffene Objekt bezeichnen,
+- `contexts` müssen mindestens das Objekt selbst indirekt über `recordJournalEntry` und bei Unterobjekten den fachlichen Träger als `owner`, `parent` oder `related` enthalten,
+- Update-Operationen verwenden `buildJournalChanges` oder eine gleichwertige strukturierte Änderungsliste,
+- Create/Delete/Link/Unlink verwenden sprechende Summary-Builder oder fachlich gleichwertige eigene Zusammenfassungen,
+- Journal-Schreibvorgang und fachliche DB-Mutation sollen in derselben Transaktion liegen, sofern keine Dateioperation diesen Ablauf technisch verhindert.
+
+### 16.3 Frontend-Einbindung
+
+Das globale Journal bleibt über `/journal` erreichbar und wird in der Sidebar nur angezeigt, wenn `useAuth` beziehungsweise `useHasPermission("journal", "read")` Leserecht bestätigt. Neue geschützte Journal-Views dürfen nicht nur auf Frontend-Gating vertrauen; die API-Permission `journal:read` bleibt maßgeblich.
+
+Neue Detailseiten oder Detailformulare für journalisierte Objekte erhalten ein objektbezogenes Journal:
+- API-Zugriff ausschließlich über `apps/web/src/api/journal.ts`,
+- Server-State ausschließlich über `useJournalEntries` oder `useObjectJournalEntries`,
+- Query-Keys ausschließlich über `queryKeys.journal`,
+- Anzeige über `JournalPanel` oder eine bewusst begründete Erweiterung davon,
+- Journal-Tabs oder -Abschnitte nur im Edit-/Detailmodus mit gültiger Objekt-ID anzeigen.
+
+### 16.4 Tests für spätere Erweiterungen
+
+Jede neue journalisierte Domäne oder jedes neue Support-Objekt benötigt Tests auf drei Ebenen:
+- Unit-Test für Formatierung oder Summary-Builder, wenn neue Feldformatierung, Objektlabels oder Sonderwerte eingeführt werden,
+- API-Integrationstest, der mindestens Create oder Update ausführt und anschließend globales sowie objektbezogenes Journal prüft,
+- Rollen-/Berechtigungstest für `journal:read`, sofern neue Routen oder Views betroffen sind,
+- Web- oder Browser-Test, wenn eine neue Detailansicht ein Objekt-Journal anzeigt.
+
+Akzeptanzkriterium: Ein Test muss mindestens eine fachliche Aussage prüfen, nicht nur die Existenz eines Journal-Eintrags.
+
+---
+
 ## Plan-Aktualisierung im Plan-Modus
 
 Wenn nach der Formulierung eines Plans weitere Informationen, Korrekturen oder Ergänzungen gegeben werden, muss **immer ein vollständig neuer Plan** gepostet werden.

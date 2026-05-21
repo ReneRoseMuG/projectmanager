@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { CommentEntityType, CommentInput } from "@taskmanager/shared-types";
 import { createComment, createEntityComment, deleteComment, deleteEntityComment, linkEntityComment, listComments, listEntityComments } from "../services/comments.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema, taskIdParamSchema } from "../utils/route-schemas.js";
 
 const commentBodySchema = {
@@ -39,20 +40,20 @@ function registerEntityCommentRoutes(app: FastifyInstance, path: string, entityT
   app.post<{ Params: { id: number }; Body: CommentInput }>(
     `${path}/:id/comments`,
     { schema: { params: entityCommentParamsSchema, body: commentBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createEntityComment(app.db, entityType, request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(createEntityComment(app.db, entityType, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number; commentId: number } }>(
     `${path}/:id/comments/:commentId`,
     { schema: { params: entityCommentDeleteParamsSchema, response: { 200: objectResponseSchema } } },
-    async (request) => linkEntityComment(app.db, entityType, request.params.id, request.params.commentId)
+    async (request) => linkEntityComment(app.db, entityType, request.params.id, request.params.commentId, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number; commentId: number } }>(
     `${path}/:id/comments/:commentId`,
     { schema: { params: entityCommentDeleteParamsSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteEntityComment(app.db, entityType, request.params.id, request.params.commentId);
+      deleteEntityComment(app.db, entityType, request.params.id, request.params.commentId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -69,7 +70,7 @@ export async function registerCommentsRoutes(app: FastifyInstance): Promise<void
     "/tasks/:taskId/comments",
     { schema: { params: taskIdParamSchema, body: commentBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const comment = createComment(app.db, request.params.taskId, request.body);
+      const comment = createComment(app.db, request.params.taskId, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(comment);
     }
   );
@@ -78,7 +79,7 @@ export async function registerCommentsRoutes(app: FastifyInstance): Promise<void
     "/comments/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteComment(app.db, request.params.id);
+      deleteComment(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

@@ -17,6 +17,7 @@ import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
+import { JournalPanel } from "../journal/JournalPanel";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { CommentThread } from "../ui/CommentThread";
@@ -41,6 +42,7 @@ import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 import { SubtaskList } from "./SubtaskList";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface TaskFormProps {
   open: boolean;
@@ -64,7 +66,7 @@ export interface TaskFormInput extends TaskInput {
   pendingFiles: DraftFile[];
 }
 
-type TaskFormTab = "details" | "subtasks" | "tickets" | "comments" | "notes" | "attachments";
+type TaskFormTab = "details" | "subtasks" | "tickets" | "comments" | "notes" | "attachments" | "journal";
 
 const tabs: Array<Tab<TaskFormTab>> = [
   { value: "details", label: "Details" },
@@ -72,7 +74,8 @@ const tabs: Array<Tab<TaskFormTab>> = [
   { value: "tickets", label: "Tickets" },
   { value: "comments", label: "Kommentare" },
   { value: "notes", label: "Notizen" },
-  { value: "attachments", label: "Dateien" }
+  { value: "attachments", label: "Dateien" },
+  { value: "journal", label: "Journal" }
 ];
 
 function taskStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: TaskStatus): TaskStatus {
@@ -96,6 +99,7 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
   const notes = useNotes(taskId && open ? { type: "task", id: taskId } : null);
   const attachments = useAttachments(taskId && open ? { type: "task", id: taskId } : null);
   const { showToast } = useToast();
+  const canReadJournal = useHasPermission("journal", "read");
   const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<TaskFormTab>("details");
   const [title, setTitle] = useState("");
@@ -201,7 +205,8 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
     }
   };
 
-  const tabItems = tabs.map((tab) => {
+  const visibleTabs = task ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal) : tabs.filter((tab) => tab.value !== "journal");
+  const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
     }
@@ -480,6 +485,12 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
                 }
               />
             )}
+          </Section>
+        ) : null}
+
+        {activeTab === "journal" && task ? (
+          <Section title="Journal" fill>
+            <JournalPanel objectType="task" objectId={task.id} />
           </Section>
         ) : null}
       </FormModal>

@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
-import { check, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { check, index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const WORK_STATUSES = ["active", "on_hold", "completed", "archived", "todo", "open", "in_progress", "in_review", "done", "resolved", "closed", "rejected"] as const;
 export const PROJECT_STATUSES = WORK_STATUSES;
@@ -15,6 +15,23 @@ export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_repro
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
 export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority"] as const;
 export const SETTING_SCOPE_TYPES = ["GLOBAL", "ROLE", "USER"] as const;
+export const JOURNAL_OBJECT_TYPES = [
+  "project",
+  "milestone",
+  "task",
+  "feature",
+  "useCase",
+  "wikiPage",
+  "backlogItem",
+  "ticket",
+  "event",
+  "tag",
+  "note",
+  "attachment",
+  "comment"
+] as const;
+export const JOURNAL_OPERATIONS = ["create", "update", "delete", "link", "unlink"] as const;
+export const JOURNAL_CONTEXT_RELATIONS = ["self", "owner", "parent", "related"] as const;
 
 export const appSettings = sqliteTable("app_settings", {
   key: text("key").primaryKey(),
@@ -65,6 +82,58 @@ export const users = sqliteTable("users", {
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
+
+export const journalEntries = sqliteTable(
+  "journal_entries",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    operation: text("operation", { enum: JOURNAL_OPERATIONS }).notNull(),
+    objectType: text("object_type", { enum: JOURNAL_OBJECT_TYPES }).notNull(),
+    objectId: integer("object_id").notNull(),
+    objectLabel: text("object_label").notNull(),
+    summary: text("summary").notNull(),
+    actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    actorName: text("actor_name").notNull().default("System"),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    journalEntriesCreatedAtIdx: index("journal_entries_created_at_idx").on(table.createdAt),
+    journalEntriesObjectIdx: index("journal_entries_object_idx").on(table.objectType, table.objectId),
+    journalEntriesActorIdx: index("journal_entries_actor_idx").on(table.actorUserId)
+  })
+);
+
+export const journalEntryChanges = sqliteTable("journal_entry_changes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  journalEntryId: integer("journal_entry_id")
+    .notNull()
+    .references(() => journalEntries.id, { onDelete: "cascade" }),
+  fieldKey: text("field_key").notNull(),
+  fieldLabel: text("field_label").notNull(),
+  oldValueJson: text("old_value_json").notNull(),
+  oldValueLabel: text("old_value_label"),
+  newValueJson: text("new_value_json").notNull(),
+  newValueLabel: text("new_value_label"),
+  summary: text("summary").notNull()
+});
+
+export const journalEntryContexts = sqliteTable(
+  "journal_entry_contexts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    journalEntryId: integer("journal_entry_id")
+      .notNull()
+      .references(() => journalEntries.id, { onDelete: "cascade" }),
+    objectType: text("object_type", { enum: JOURNAL_OBJECT_TYPES }).notNull(),
+    objectId: integer("object_id").notNull(),
+    objectLabel: text("object_label").notNull(),
+    relation: text("relation", { enum: JOURNAL_CONTEXT_RELATIONS }).notNull()
+  },
+  (table) => ({
+    journalContextEntryObjectRelationUnique: uniqueIndex("journal_context_entry_object_relation_unique").on(table.journalEntryId, table.objectType, table.objectId, table.relation),
+    journalContextObjectIdx: index("journal_context_object_idx").on(table.objectType, table.objectId)
+  })
+);
 
 export const settingsValues = sqliteTable(
   "settings_values",

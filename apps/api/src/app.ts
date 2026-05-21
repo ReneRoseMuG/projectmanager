@@ -18,6 +18,7 @@ import { registerEventsRoutes } from "./routes/events.js";
 import { registerFeaturesRoutes } from "./routes/features.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerImportsRoutes } from "./routes/imports.js";
+import { registerJournalRoutes } from "./routes/journal.js";
 import { registerMilestoneRoutes } from "./routes/milestones.js";
 import { registerNotesRoutes } from "./routes/notes.js";
 import { registerProjectsRoutes } from "./routes/projects.js";
@@ -82,6 +83,7 @@ export async function buildApp(
   await app.register(registerBacklogRoutes, { prefix: "/api" });
   await app.register(registerDocLinksRoutes, { prefix: "/api" });
   await app.register(registerImportsRoutes, { prefix: "/api" });
+  await app.register(registerJournalRoutes, { prefix: "/api" });
   await app.register(registerDumpRoutes, { prefix: "/api" });
 
   return app;

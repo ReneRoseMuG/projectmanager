@@ -21,6 +21,7 @@ import { useTickets } from "../../hooks/useTickets";
 import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed, resolveCatalogEntryKey } from "../../utils/catalogs";
 import { ticketTypeLabels } from "../../utils/domainLabels";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
+import { JournalPanel } from "../journal/JournalPanel";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
@@ -39,6 +40,7 @@ import { Select } from "../ui/Select";
 import { StatusPill } from "../ui/StatusPill";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface UseCaseFormProps {
   open: boolean;
@@ -61,13 +63,14 @@ interface UseCaseFormProps {
   onOpenInTab?: () => void;
 }
 
-type UseCaseFormTab = "details" | "tasks" | "tickets" | "comments";
+type UseCaseFormTab = "details" | "tasks" | "tickets" | "comments" | "journal";
 
 const tabs: Array<Tab<UseCaseFormTab>> = [
   { value: "details", label: "Stammdaten" },
   { value: "tasks", label: "Aufgaben" },
   { value: "tickets", label: "Tickets" },
-  { value: "comments", label: "Kommentare" }
+  { value: "comments", label: "Kommentare" },
+  { value: "journal", label: "Journal" }
 ];
 
 function featureStatusValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], value: string, preferredKey = "draft") {
@@ -87,6 +90,7 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
   const catalogs = useCatalogs();
   const tasks = useTasks(useCase ? { type: "useCase", id: useCase.id } : undefined);
   const tickets = useTickets(useCase ? { type: "useCase", id: useCase.id } : null);
+  const canReadJournal = useHasPermission("journal", "read");
   const [activeTab, setActiveTab] = useState<UseCaseFormTab>("details");
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -177,7 +181,8 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
 
   const taskOwner = useCase ? { type: "useCase" as const, id: useCase.id } : null;
   const ticketOwner = useCase ? { type: "useCase" as const, id: useCase.id } : null;
-  const tabItems = tabs.map((tab) => {
+  const visibleTabs = useCase ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal) : tabs.filter((tab) => tab.value !== "journal");
+  const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
     }
@@ -335,6 +340,12 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
             ) : (
               <PendingCommentList comments={pendingComments} onAdd={(comment) => setPendingComments((items) => [...items, comment])} onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
             )}
+          </Section>
+        ) : null}
+
+        {activeTab === "journal" && useCase ? (
+          <Section title="Journal" fill>
+            <JournalPanel objectType="useCase" objectId={useCase.id} />
           </Section>
         ) : null}
       </FormModal>

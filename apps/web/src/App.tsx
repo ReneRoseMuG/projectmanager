@@ -8,6 +8,7 @@ import { FeatureDetailPage } from "./pages/FeatureDetailPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { LoginPage } from "./pages/LoginPage";
+import { JournalPage } from "./pages/JournalPage";
 import { MilestoneDetailPage } from "./pages/MilestoneDetailPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
@@ -104,6 +105,7 @@ export default function App() {
               <Route path="/wiki" element={<WikiPage />} />
               <Route path="/wiki/:id" element={<WikiPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/journal" element={<JournalPage />} />
               <Route path="/settings/preferences" element={<SettingsPreferencesPage />} />
               <Route path="/settings/catalogs" element={<SettingsCatalogsPage />} />
               <Route path="/settings/tags" element={<SettingsTagsPage />} />

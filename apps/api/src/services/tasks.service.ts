@@ -8,6 +8,20 @@ import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { listComments } from "./comments.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
+import {
+  buildCreateSummary,
+  buildDeleteSummary,
+  buildJournalChanges,
+  buildLinkSummary,
+  buildUnlinkSummary,
+  buildUpdateSummary,
+  makeJournalContext,
+  makeJournalObject,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalFieldDefinition,
+  type JournalObjectRef
+} from "./journal.service.js";
 import { deleteTaskNotesForIds, listTaskNotes } from "./notes.service.js";
 import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 
@@ -28,6 +42,15 @@ const taskSelect = {
   createdAt: tasks.createdAt,
   updatedAt: tasks.updatedAt
 };
+
+const taskJournalFields: Array<JournalFieldDefinition<TaskRecord>> = [
+  { key: "title", label: "Titel" },
+  { key: "description", label: "Beschreibung" },
+  { key: "status", label: "Status" },
+  { key: "priority", label: "Priorität" },
+  { key: "assignee", label: "Zuständige Person" },
+  { key: "dueDate", label: "Fälligkeitsdatum" }
+];
 
 export function mapTask(
   database: DbClient,
@@ -101,6 +124,27 @@ function ensureOwnerExists(database: DbClient, owner: TaskOwner): void {
     return;
   }
   ensureUseCaseExists(database, owner.id);
+}
+
+function getOwnerJournalObject(database: DbClient, owner: TaskOwner): JournalObjectRef {
+  if (owner.type === "project") {
+    const project = database.select({ name: projects.name }).from(projects).where(eq(projects.id, owner.id)).get();
+    return makeJournalObject("project", owner.id, project?.name ?? `Projekt ${owner.id}`);
+  }
+  if (owner.type === "milestone") {
+    const milestone = database.select({ name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
+    return makeJournalObject("milestone", owner.id, milestone?.name ?? `Meilenstein ${owner.id}`);
+  }
+  if (owner.type === "feature") {
+    const feature = database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)).get();
+    return makeJournalObject("feature", owner.id, feature?.title ?? `Feature ${owner.id}`);
+  }
+  const useCase = database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)).get();
+  return makeJournalObject("useCase", owner.id, useCase?.title ?? `Use Case ${owner.id}`);
+}
+
+function taskJournalObject(task: Pick<TaskRecord, "id" | "title">): JournalObjectRef {
+  return makeJournalObject("task", task.id, task.title);
 }
 
 function getTaskRecord(database: DbClient, id: number): TaskRecord {
@@ -264,22 +308,26 @@ function deleteOwnerTaskLink(database: DbClient, owner: TaskOwner, taskId: numbe
   return database.delete(useCaseTasks).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId))).run().changes;
 }
 
-function insertTask(database: DbClient, input: TaskInput, parentId: number | null = null): TaskRecord {
+function insertTask(database: DbClient, input: TaskInput, parentId: number | null = null, actor?: JournalActor | null): TaskRecord {
   const title = requireNonEmpty(input.title, "title");
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "active");
   const priority = input.priority ?? resolveDefaultCatalogEntryKey(database, "priority", "medium");
   ensureCatalogEntryExists(database, "workStatus", status);
   ensureCatalogEntryExists(database, "priority", priority);
 
-  return taskRepository.create(database, {
-    parentId,
-    title,
-    description: cleanNullable(input.description) ?? null,
-    status,
-    priority,
-    assignee: cleanNullable(input.assignee) ?? null,
-    dueDate: input.dueDate ?? null
-  });
+  return taskRepository.create(
+    database,
+    {
+      parentId,
+      title,
+      description: cleanNullable(input.description) ?? null,
+      status,
+      priority,
+      assignee: cleanNullable(input.assignee) ?? null,
+      dueDate: input.dueDate ?? null
+    },
+    actor?.actorUserId ?? undefined
+  );
 }
 
 export function listOwnerTasks(database: DbClient, owner: TaskOwner): TaskBoardItem[] {
@@ -311,20 +359,30 @@ export function listSubtasks(database: DbClient, taskId: number): Task[] {
   return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
 }
 
-export function createOwnerTask(database: DbClient, owner: TaskOwner, input: TaskInput): TaskBoardItem {
+export function createOwnerTask(database: DbClient, owner: TaskOwner, input: TaskInput, actor?: JournalActor | null): TaskBoardItem {
   ensureOwnerExists(database, owner);
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "active");
   const position = nextOwnerPosition(database, owner, status);
   const created = database.transaction((tx) => {
-    const task = insertTask(tx as unknown as DbClient, input);
-    insertOwnerTask(tx as unknown as DbClient, owner, task.id, position);
+    const txDb = tx as unknown as DbClient;
+    const task = insertTask(txDb, input, null, actor);
+    insertOwnerTask(txDb, owner, task.id, position);
+    const taskObject = taskJournalObject(task);
+    const ownerObject = getOwnerJournalObject(txDb, owner);
+    recordJournalEntry(txDb, {
+      operation: "create",
+      object: taskObject,
+      summary: buildCreateSummary(taskObject),
+      actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
     return task;
   });
 
   return mapTaskBoardItem(database, { ...created, boardPosition: position }, [], 0);
 }
 
-export function linkOwnerTask(database: DbClient, owner: TaskOwner, taskId: number): TaskBoardItem {
+export function linkOwnerTask(database: DbClient, owner: TaskOwner, taskId: number, actor?: JournalActor | null): TaskBoardItem {
   ensureOwnerExists(database, owner);
   const task = getTaskRecord(database, taskId);
   if (task.parentId !== null) {
@@ -337,19 +395,44 @@ export function linkOwnerTask(database: DbClient, owner: TaskOwner, taskId: numb
   }
 
   const position = nextOwnerPosition(database, owner, task.status);
-  insertOwnerTask(database, owner, taskId, position);
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    insertOwnerTask(txDb, owner, taskId, position);
+    const taskObject = taskJournalObject(task);
+    const ownerObject = getOwnerJournalObject(txDb, owner);
+    recordJournalEntry(txDb, {
+      operation: "link",
+      object: taskObject,
+      summary: buildLinkSummary(ownerObject, taskObject),
+      actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
+  });
   return mapTaskBoardItem(database, { ...task, boardPosition: position });
 }
 
-export function unlinkOwnerTask(database: DbClient, owner: TaskOwner, taskId: number): void {
+export function unlinkOwnerTask(database: DbClient, owner: TaskOwner, taskId: number, actor?: JournalActor | null): void {
   ensureOwnerExists(database, owner);
-  const changes = deleteOwnerTaskLink(database, owner, taskId);
-  if (changes === 0) {
-    throw notFound(`Task ${taskId} is not linked to ${owner.type} ${owner.id}`);
-  }
+  const task = getTaskRecord(database, taskId);
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const changes = deleteOwnerTaskLink(txDb, owner, taskId);
+    if (changes === 0) {
+      throw notFound(`Task ${taskId} is not linked to ${owner.type} ${owner.id}`);
+    }
+    const taskObject = taskJournalObject(task);
+    const ownerObject = getOwnerJournalObject(txDb, owner);
+    recordJournalEntry(txDb, {
+      operation: "unlink",
+      object: taskObject,
+      summary: buildUnlinkSummary(ownerObject, taskObject),
+      actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
+  });
 }
 
-export function updateOwnerTaskBoard(database: DbClient, owner: TaskOwner, taskId: number, input: TaskBoardPositionInput): TaskBoardItem {
+export function updateOwnerTaskBoard(database: DbClient, owner: TaskOwner, taskId: number, input: TaskBoardPositionInput, actor?: JournalActor | null): TaskBoardItem {
   ensureOwnerExists(database, owner);
   ensureCatalogEntryExists(database, "workStatus", input.status);
   const linked = getOwnerTaskRow(database, owner, taskId);
@@ -357,22 +440,54 @@ export function updateOwnerTaskBoard(database: DbClient, owner: TaskOwner, taskI
     throw notFound(`Task ${taskId} is not linked to ${owner.type} ${owner.id}`);
   }
 
-  const updated = taskRepository.update(database, taskId, input.expectedVersion, { status: input.status });
-  if (!updated) {
-    throw notFound(`Task with id ${taskId} not found`);
-  }
-  updateOwnerTaskPosition(database, owner, taskId, input.position);
+  const updated = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const task = taskRepository.update(txDb, taskId, input.expectedVersion, { status: input.status }, actor?.actorUserId ?? undefined);
+    if (!task) {
+      throw notFound(`Task with id ${taskId} not found`);
+    }
+    updateOwnerTaskPosition(txDb, owner, taskId, input.position);
+    const taskObject = taskJournalObject(task);
+    const ownerObject = getOwnerJournalObject(txDb, owner);
+    const changes = buildJournalChanges(linked, { ...task, boardPosition: input.position }, [
+      { key: "status", label: "Status" },
+      { key: "boardPosition", label: "Board-Position" }
+    ]);
+    recordJournalEntry(txDb, {
+      operation: "update",
+      object: taskObject,
+      summary: buildUpdateSummary(taskObject, changes),
+      actor,
+      changes,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
+    return task;
+  });
 
   return mapTaskBoardItem(database, { ...updated, boardPosition: input.position });
 }
 
-export function createSubtask(database: DbClient, taskId: number, input: TaskInput): Task {
+export function createSubtask(database: DbClient, taskId: number, input: TaskInput, actor?: JournalActor | null): Task {
   const parent = getTaskRecord(database, taskId);
   if (parent.parentId !== null) {
     throw badRequest("Subtasks cannot have subtasks");
   }
 
-  return mapTask(database, insertTask(database, input, parent.id), [], 0);
+  const created = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const task = insertTask(txDb, input, parent.id, actor);
+    const taskObject = taskJournalObject(task);
+    const parentObject = taskJournalObject(parent);
+    recordJournalEntry(txDb, {
+      operation: "create",
+      object: taskObject,
+      summary: buildCreateSummary(taskObject),
+      actor,
+      contexts: [makeJournalContext(parentObject, "parent")]
+    });
+    return task;
+  });
+  return mapTask(database, created, [], 0);
 }
 
 export function getTask(database: DbClient, id: number): Task {
@@ -390,7 +505,7 @@ export function getTaskDetail(database: DbClient, id: number): TaskDetail {
   };
 }
 
-export function updateTask(database: DbClient, id: number, input: TaskUpdate): Task {
+export function updateTask(database: DbClient, id: number, input: TaskUpdate, actor?: JournalActor | null): Task {
   const values: Partial<Pick<TaskRecord, "title" | "description" | "status" | "priority" | "assignee" | "dueDate">> = {};
 
   if (input.title !== undefined) {
@@ -418,16 +533,32 @@ export function updateTask(database: DbClient, id: number, input: TaskUpdate): T
     throw badRequest("No task fields provided");
   }
 
-  const updated = taskRepository.update(database, id, input.expectedVersion, values);
-  if (!updated) {
-    throw notFound(`Task with id ${id} not found`);
-  }
+  const updated = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const current = getTaskRecord(txDb, id);
+    const task = taskRepository.update(txDb, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    if (!task) {
+      throw notFound(`Task with id ${id} not found`);
+    }
+    const taskObject = taskJournalObject(task);
+    const changes = buildJournalChanges(current, task, taskJournalFields);
+    recordJournalEntry(txDb, {
+      operation: "update",
+      object: taskObject,
+      summary: buildUpdateSummary(taskObject, changes),
+      actor,
+      changes,
+      contexts: current.parentId ? [makeJournalContext(makeJournalObject("task", current.parentId, `Aufgabe ${current.parentId}`), "parent")] : []
+    });
+    return task;
+  });
 
   return mapTask(database, updated);
 }
 
-export async function deleteTask(database: DbClient, id: number): Promise<void> {
+export async function deleteTask(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
   const taskIds = collectTaskSubtreeIds(database, id);
+  const task = getTaskRecord(database, id);
   const blockers = taskDeleteBlockers(database, taskIds);
   if (blockers.length > 0) {
     throw conflict(`Aufgabe kann nicht gelöscht werden, solange Beziehungen bestehen: ${blockers.join(", ")}.`);
@@ -436,7 +567,17 @@ export async function deleteTask(database: DbClient, id: number): Promise<void> 
   await deleteTaskAttachmentsForIds(database, taskIds);
   deleteTaskNotesForIds(database, taskIds);
 
-  if (taskRepository.delete(database, id) === 0) {
-    throw notFound(`Task with id ${id} not found`);
-  }
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const taskObject = taskJournalObject(task);
+    recordJournalEntry(txDb, {
+      operation: "delete",
+      object: taskObject,
+      summary: buildDeleteSummary(taskObject),
+      actor
+    });
+    if (taskRepository.delete(txDb, id) === 0) {
+      throw notFound(`Task with id ${id} not found`);
+    }
+  });
 }

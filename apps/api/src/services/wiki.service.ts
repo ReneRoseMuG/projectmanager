@@ -1,7 +1,9 @@
+import type { JsonValue } from "@taskmanager/shared-types";
 import { eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { projects } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
+import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { wikiPageRepository, type WikiPageRecord, type WikiPageUpdateData } from "../repositories/wiki-page.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import {
@@ -14,6 +16,18 @@ import {
   writeContent
 } from "./content.service.js";
 import { requireNonEmpty } from "./helpers.js";
+import {
+  buildCreateSummary,
+  buildDeleteSummary,
+  buildJournalChanges,
+  buildUpdateSummary,
+  makeJournalContext,
+  makeJournalObject,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalFieldDefinition,
+  type JournalObjectRef
+} from "./journal.service.js";
 
 export interface WikiPageInput {
   parentId?: number | null;
@@ -45,6 +59,12 @@ export interface WikiBreadcrumbDto {
   title: string;
   slug: string;
 }
+
+const wikiJournalFields: Array<JournalFieldDefinition<WikiPageRecord>> = [
+  { key: "title", label: "Titel" },
+  { key: "slug", label: "Slug" },
+  { key: "sortOrder", label: "Sortierung" }
+];
 
 function mapWikiPage(record: WikiPageRecord, childCount: number, content?: string): WikiPageDto {
   return {
@@ -109,8 +129,54 @@ function ensureProjectExists(database: DbClient, projectId: number | null | unde
   }
 }
 
+function getProjectJournalObject(database: DbClient, projectId: number): JournalObjectRef {
+  const project = database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, projectId)).get();
+  if (!project) {
+    throw notFound(`Project with id ${projectId} not found`);
+  }
+  return makeJournalObject("project", project.id, project.name);
+}
+
 function readWikiContent(record: WikiPageRecord): string {
   return record.contentPath ? readContent(resolveStoredContentPath(record.contentPath)) : "";
+}
+
+function wikiJournalObject(record: WikiPageRecord): JournalObjectRef {
+  return makeJournalObject("wikiPage", record.id, record.title);
+}
+
+function contentValueLabel(value: string): string | null {
+  return value.trim() === "" ? null : `${value.length} Zeichen`;
+}
+
+function contentValue(value: string): JsonValue {
+  return { length: value.length };
+}
+
+function buildContentChange(before: string, after: string): JournalChangeCreateData[] {
+  if (before === after) {
+    return [];
+  }
+  const oldValueLabel = contentValueLabel(before);
+  const newValueLabel = contentValueLabel(after);
+  return [
+    {
+      fieldKey: "content",
+      fieldLabel: "Inhalt",
+      oldValue: contentValue(before),
+      oldValueLabel,
+      newValue: contentValue(after),
+      newValueLabel,
+      summary: `Inhalt: ${oldValueLabel ?? "leer"} → ${newValueLabel ?? "leer"}`
+    }
+  ];
+}
+
+function wikiContexts(database: DbClient, record: WikiPageRecord) {
+  return [
+    ...(record.projectId ? [makeJournalContext(getProjectJournalObject(database, record.projectId), "owner" as const)] : []),
+    ...(record.parentId ? [makeJournalContext(wikiJournalObject(getWikiPageRecord(database, record.parentId)), "parent" as const)] : [])
+  ];
 }
 
 export function listRootWikiPages(database: DbClient): WikiPageDto[] {
@@ -127,7 +193,7 @@ export function getWikiPage(database: DbClient, id: number): WikiPageDto {
   return mapWikiPage(page, childCount(database, id), readWikiContent(page));
 }
 
-export function createWikiPage(database: DbClient, input: WikiPageInput): WikiPageDto {
+export function createWikiPage(database: DbClient, input: WikiPageInput, actor?: JournalActor | null): WikiPageDto {
   const title = requireNonEmpty(input.title, "title");
   const slug = requireNonEmpty(input.slug, "slug");
   ensureSlugIsUnique(database, slug);
@@ -138,17 +204,29 @@ export function createWikiPage(database: DbClient, input: WikiPageInput): WikiPa
   const absolutePath = resolveContentPath("wiki", filename);
   const storedPath = buildStoredContentPath("wiki", filename);
 
-  const created = wikiPageRepository.create(database, {
-    parentId: input.parentId ?? null,
-    projectId: input.projectId ?? null,
-    title,
-    slug,
-    contentPath: storedPath,
-    sortOrder: input.sortOrder ?? 0
-  });
+  const created = wikiPageRepository.create(
+    database,
+    {
+      parentId: input.parentId ?? null,
+      projectId: input.projectId ?? null,
+      title,
+      slug,
+      contentPath: storedPath,
+      sortOrder: input.sortOrder ?? 0
+    },
+    actor?.actorUserId ?? undefined
+  );
 
   try {
     writeContent(absolutePath, input.content ?? "");
+    const journalObject = wikiJournalObject(created);
+    recordJournalEntry(database, {
+      operation: "create",
+      object: journalObject,
+      summary: buildCreateSummary(journalObject),
+      actor,
+      contexts: wikiContexts(database, created)
+    });
     return mapWikiPage(created, 0, input.content ?? "");
   } catch (error) {
     wikiPageRepository.delete(database, created.id);
@@ -157,8 +235,9 @@ export function createWikiPage(database: DbClient, input: WikiPageInput): WikiPa
   }
 }
 
-export function updateWikiPage(database: DbClient, id: number, input: WikiPageInput): WikiPageDto {
+export function updateWikiPage(database: DbClient, id: number, input: WikiPageInput, actor?: JournalActor | null): WikiPageDto {
   const current = getWikiPageRecord(database, id);
+  const previousContent = readWikiContent(current);
   assertVersion(current.version, input.expectedVersion ?? 0);
   const values: WikiPageUpdateData = {};
   let contentPath = current.contentPath;
@@ -209,20 +288,59 @@ export function updateWikiPage(database: DbClient, id: number, input: WikiPageIn
     writeContent(resolveStoredContentPath(contentPath), input.content);
   }
 
-  const updated = wikiPageRepository.update(database, id, input.expectedVersion ?? 0, values);
+  const updated = database.transaction((tx) => {
+    const page = wikiPageRepository.update(tx, id, input.expectedVersion ?? 0, values, actor?.actorUserId ?? undefined);
+    if (!page) {
+      throw notFound(`Wiki page with id ${id} not found`);
+    }
+    const relationFields: Array<JournalFieldDefinition<WikiPageRecord>> = [
+      {
+        key: "projectId",
+        label: "Projekt",
+        format: (value) => (typeof value === "number" ? getProjectJournalObject(database, value).label : null)
+      },
+      {
+        key: "parentId",
+        label: "Übergeordnete Wiki-Seite",
+        format: (value) => (typeof value === "number" ? wikiJournalObject(getWikiPageRecord(database, value)).label : null)
+      }
+    ];
+    const nextContent = input.content ?? previousContent;
+    const journalObject = wikiJournalObject(page);
+    const changes = [...buildJournalChanges(current, page, [...relationFields, ...wikiJournalFields]), ...buildContentChange(previousContent, nextContent)];
+    recordJournalEntry(tx, {
+      operation: "update",
+      object: journalObject,
+      summary: buildUpdateSummary(journalObject, changes),
+      actor,
+      changes,
+      contexts: wikiContexts(database, page)
+    });
+    return page;
+  });
   if (!updated) {
     throw notFound(`Wiki page with id ${id} not found`);
   }
   return mapWikiPage(updated, childCount(database, id), input.content ?? readWikiContent(updated));
 }
 
-export function deleteWikiPage(database: DbClient, id: number): void {
+export function deleteWikiPage(database: DbClient, id: number, actor?: JournalActor | null): void {
   const page = getWikiPageRecord(database, id);
   if (childCount(database, id) > 0) {
     throw conflict("Wiki page has child pages");
   }
 
-  wikiPageRepository.delete(database, id);
+  database.transaction((tx) => {
+    const journalObject = wikiJournalObject(page);
+    recordJournalEntry(tx, {
+      operation: "delete",
+      object: journalObject,
+      summary: buildDeleteSummary(journalObject),
+      actor,
+      contexts: wikiContexts(database, page)
+    });
+    wikiPageRepository.delete(tx, id);
+  });
 
   if (page.contentPath) {
     deleteContent(resolveStoredContentPath(page.contentPath));

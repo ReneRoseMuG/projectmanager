@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { createBacklogItem, deleteBacklogItem, getBacklogItem, listBacklogItems, updateBacklogItem, type BacklogFilters, type BacklogInput } from "../services/backlog.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const backlogQuerySchema = {
@@ -47,7 +48,7 @@ export async function registerBacklogRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: { id: number }; Body: BacklogInput }>(
     "/projects/:id/backlog",
     { schema: { params: idParamSchema, body: backlogBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createBacklogItem(app.db, request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(createBacklogItem(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -59,14 +60,14 @@ export async function registerBacklogRoutes(app: FastifyInstance): Promise<void>
   app.patch<{ Params: { id: number }; Body: BacklogInput }>(
     "/backlog/:id",
     { schema: { params: idParamSchema, body: backlogPatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateBacklogItem(app.db, request.params.id, request.body)
+    async (request) => updateBacklogItem(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number } }>(
     "/backlog/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteBacklogItem(app.db, request.params.id);
+      deleteBacklogItem(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

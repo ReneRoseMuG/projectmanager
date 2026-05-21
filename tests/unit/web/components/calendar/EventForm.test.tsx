@@ -27,6 +27,11 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
   }
 }));
 
+vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
+  hasPermission: () => false,
+  useHasPermission: () => false
+}));
+
 const projects: Project[] = [
   {
     id: 1,

@@ -11,6 +11,7 @@ import {
   listTaskNotes,
   updateNote
 } from "../services/notes.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const noteBodySchema = {
@@ -54,19 +55,19 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/projects/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createProjectNote(app.db, request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(createProjectNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/tasks/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createTaskNote(app.db, request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(createTaskNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/milestones/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createMilestoneNote(app.db, request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(createMilestoneNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -78,14 +79,14 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: number }; Body: NoteUpdate }>(
     "/notes/:id",
     { schema: { params: idParamSchema, body: notePatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateNote(app.db, request.params.id, request.body)
+    async (request) => updateNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number } }>(
     "/notes/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteNote(app.db, request.params.id);
+      deleteNote(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

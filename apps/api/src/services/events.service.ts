@@ -5,8 +5,29 @@ import { events, milestoneEvents, milestones, projectEvents, projects, taskEvent
 import { assertVersion } from "../repositories/base.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
+import {
+  buildCreateSummary,
+  buildDeleteSummary,
+  buildJournalChanges,
+  buildUpdateSummary,
+  makeJournalContext,
+  makeJournalObject,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalFieldDefinition,
+  type JournalObjectRef
+} from "./journal.service.js";
 
 type EventRecord = typeof events.$inferSelect;
+
+const eventJournalFields: Array<JournalFieldDefinition<EventRecord>> = [
+  { key: "title", label: "Titel" },
+  { key: "description", label: "Beschreibung" },
+  { key: "startTime", label: "Startzeit" },
+  { key: "endTime", label: "Endzeit" },
+  { key: "isAllDay", label: "Ganztägig" },
+  { key: "color", label: "Farbe" }
+];
 
 function listEventOwners(database: DbClient, eventId: number): EventOwner[] {
   const projectOwners = database
@@ -103,6 +124,27 @@ function ensureOwnersExist(database: DbClient, owners: EventOwner[]): void {
   }
 }
 
+function getOwnerJournalObject(database: DbClient, owner: EventOwner): JournalObjectRef {
+  if (owner.type === "project") {
+    const project = database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, owner.id)).get();
+    return makeJournalObject("project", owner.id, project?.name ?? `Projekt ${owner.id}`);
+  }
+  if (owner.type === "milestone") {
+    const milestone = database.select({ id: milestones.id, name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
+    return makeJournalObject("milestone", owner.id, milestone?.name ?? `Meilenstein ${owner.id}`);
+  }
+  const task = database.select({ id: tasks.id, title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)).get();
+  return makeJournalObject("task", owner.id, task?.title ?? `Aufgabe ${owner.id}`);
+}
+
+function getOwnerJournalContexts(database: DbClient, owners: EventOwner[]) {
+  return owners.map((owner) => makeJournalContext(getOwnerJournalObject(database, owner), "owner"));
+}
+
+function ownerLabels(database: DbClient, owners: EventOwner[]): string {
+  return owners.map((owner) => getOwnerJournalObject(database, owner).label).join(", ");
+}
+
 function insertEventOwner(database: DbClient, eventId: number, owner: EventOwner): void {
   if (owner.type === "project") {
     database.insert(projectEvents).values({ projectId: owner.id, eventId }).onConflictDoNothing().run();
@@ -145,7 +187,7 @@ export function listEvents(database: DbClient, query: { from?: string; to?: stri
   return database.select().from(events).where(where).all().map((event) => mapEvent(database, event));
 }
 
-export function createEvent(database: DbClient, input: EventInput): Event {
+export function createEvent(database: DbClient, input: EventInput, actor?: JournalActor | null): Event {
   const title = requireNonEmpty(input.title, "title");
   const owners = normalizeOwners(input.owners);
   ensureDateRange(input.startTime, input.endTime);
@@ -172,6 +214,14 @@ export function createEvent(database: DbClient, input: EventInput): Event {
     for (const owner of owners) {
       insertEventOwner(txDb, event.id, owner);
     }
+    const journalObject = makeJournalObject("event", event.id, event.title);
+    recordJournalEntry(txDb, {
+      operation: "create",
+      object: journalObject,
+      summary: buildCreateSummary(journalObject),
+      actor,
+      contexts: getOwnerJournalContexts(txDb, owners)
+    });
     return event;
   });
 
@@ -187,7 +237,7 @@ export function getEvent(database: DbClient, id: number): Event {
   return mapEvent(database, event);
 }
 
-export function updateEvent(database: DbClient, id: number, input: EventUpdate): Event {
+export function updateEvent(database: DbClient, id: number, input: EventUpdate, actor?: JournalActor | null): Event {
   const current = database.select().from(events).where(eq(events.id, id)).get();
   if (!current) {
     throw notFound(`Event with id ${id} not found`);
@@ -217,6 +267,7 @@ export function updateEvent(database: DbClient, id: number, input: EventUpdate):
 
   const ownersSpecified = input.owners !== undefined;
   const owners = ownersSpecified ? normalizeOwners(input.owners) : [];
+  const currentOwners = listEventOwners(database, id);
   if (Object.keys(values).length === 0 && !ownersSpecified) {
     throw badRequest("No event fields provided");
   }
@@ -238,15 +289,54 @@ export function updateEvent(database: DbClient, id: number, input: EventUpdate):
     if (ownersSpecified) {
       replaceEventOwners(txDb, event, owners);
     }
+    const journalObject = makeJournalObject("event", event.id, event.title);
+    const changes = buildJournalChanges(current, event, eventJournalFields);
+    if (ownersSpecified && JSON.stringify(currentOwners) !== JSON.stringify(owners)) {
+      const oldValueLabel = ownerLabels(txDb, currentOwners) || null;
+      const newValueLabel = ownerLabels(txDb, owners) || null;
+      changes.push({
+        fieldKey: "owners",
+        fieldLabel: "Zuordnung",
+        oldValue: currentOwners,
+        oldValueLabel,
+        newValue: owners,
+        newValueLabel,
+        summary: `Zuordnung: ${oldValueLabel ?? "leer"} → ${newValueLabel ?? "leer"}`
+      });
+    }
+    recordJournalEntry(txDb, {
+      operation: "update",
+      object: journalObject,
+      summary: buildUpdateSummary(journalObject, changes),
+      actor,
+      changes,
+      contexts: getOwnerJournalContexts(txDb, ownersSpecified ? owners : currentOwners)
+    });
     return event;
   });
 
   return mapEvent(database, updated);
 }
 
-export function deleteEvent(database: DbClient, id: number): void {
-  const result = database.delete(events).where(eq(events.id, id)).run();
-  if (result.changes === 0) {
+export function deleteEvent(database: DbClient, id: number, actor?: JournalActor | null): void {
+  const current = database.select().from(events).where(eq(events.id, id)).get();
+  if (!current) {
     throw notFound(`Event with id ${id} not found`);
   }
+  const currentOwners = listEventOwners(database, id);
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const journalObject = makeJournalObject("event", current.id, current.title);
+    recordJournalEntry(txDb, {
+      operation: "delete",
+      object: journalObject,
+      summary: buildDeleteSummary(journalObject),
+      actor,
+      contexts: getOwnerJournalContexts(txDb, currentOwners)
+    });
+    const result = txDb.delete(events).where(eq(events.id, id)).run();
+    if (result.changes === 0) {
+      throw notFound(`Event with id ${id} not found`);
+    }
+  });
 }

@@ -207,6 +207,11 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
   }
 }));
 
+vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
+  hasPermission: () => false,
+  useHasPermission: () => false
+}));
+
 vi.mock("../../../../../apps/web/src/components/tasks/OwnerTaskBoard", () => ({
   OwnerTaskBoard({ owner }: { owner: { type: string; id: number } }) {
     return <div data-testid="owner-task-board">{`${owner.type}:${owner.id}`}</div>;

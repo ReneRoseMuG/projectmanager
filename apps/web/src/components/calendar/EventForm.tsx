@@ -9,8 +9,10 @@ import { DatePicker } from "../ui/DatePicker";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
+import { JournalPanel } from "../journal/JournalPanel";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface EventFormProps {
   open: boolean;
@@ -50,6 +52,7 @@ function toggleId(values: number[], id: number): number[] {
 }
 
 export function EventForm({ open, event, initialDate, initialOwners, projects, milestones = [], tasks, onSubmit, onDelete, onClose }: EventFormProps) {
+  const canReadJournal = useHasPermission("journal", "read");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -191,6 +194,12 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
           <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => void onDelete(event).catch(() => undefined)}>
             Löschen
           </Button>
+        </Section>
+      ) : null}
+
+      {event && canReadJournal ? (
+        <Section title="Journal" fill>
+          <JournalPanel objectType="event" objectId={event.id} />
         </Section>
       ) : null}
     </FormModal>

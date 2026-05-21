@@ -7,6 +7,18 @@ import { badRequest, notFound } from "../utils/errors.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import { deleteMilestoneAttachmentsForIds } from "./attachments.service.js";
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
+import {
+  buildCreateSummary,
+  buildDeleteSummary,
+  buildJournalChanges,
+  buildUpdateSummary,
+  makeJournalContext,
+  makeJournalObject,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalFieldDefinition,
+  type JournalObjectRef
+} from "./journal.service.js";
 import { deleteMilestoneNotesForIds } from "./notes.service.js";
 import { getMilestoneTags, getMilestoneTagsMap } from "./tags.service.js";
 
@@ -18,6 +30,15 @@ interface MilestoneCounts {
   ticketCount: number;
   featureCount: number;
 }
+
+const milestoneJournalFields: Array<JournalFieldDefinition<MilestoneRecord>> = [
+  { key: "name", label: "Name" },
+  { key: "description", label: "Beschreibung" },
+  { key: "status", label: "Status" },
+  { key: "color", label: "Farbe" },
+  { key: "startDate", label: "Startdatum" },
+  { key: "dueDate", label: "Enddatum" }
+];
 
 function emptyMilestoneCounts(): MilestoneCounts {
   return {
@@ -58,6 +79,18 @@ function ensureProjectExists(database: DbClient, projectId: number): void {
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
+}
+
+function getProjectJournalObject(database: DbClient, projectId: number): JournalObjectRef {
+  const project = database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, projectId)).get();
+  if (!project) {
+    throw notFound(`Project with id ${projectId} not found`);
+  }
+  return makeJournalObject("project", project.id, project.name);
+}
+
+function milestoneJournalObject(record: MilestoneRecord): JournalObjectRef {
+  return makeJournalObject("milestone", record.id, record.name);
 }
 
 function getMilestoneCounts(database: DbClient, milestoneIds: number[]): Map<number, MilestoneCounts> {
@@ -133,25 +166,40 @@ export function getMilestone(database: DbClient, id: number): Milestone {
   return mapMilestone(database, milestone, counts.get(id));
 }
 
-export function createMilestone(database: DbClient, input: MilestoneInput): Milestone {
-  ensureProjectExists(database, input.projectId);
+export function createMilestone(database: DbClient, input: MilestoneInput, actor?: JournalActor | null): Milestone {
+  const projectObject = getProjectJournalObject(database, input.projectId);
   const name = requireNonEmpty(input.name, "name");
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "active");
   ensureCatalogEntryExists(database, "workStatus", status);
-  const created = milestoneRepository.create(database, {
-    projectId: input.projectId,
-    name,
-    description: cleanNullable(input.description) ?? null,
-    status,
-    color: input.color ?? "#6366f1",
-    startDate: cleanNullable(input.startDate) ?? null,
-    dueDate: cleanNullable(input.dueDate) ?? null
+  const created = database.transaction((tx) => {
+    const milestone = milestoneRepository.create(
+      tx,
+      {
+        projectId: input.projectId,
+        name,
+        description: cleanNullable(input.description) ?? null,
+        status,
+        color: input.color ?? "#6366f1",
+        startDate: cleanNullable(input.startDate) ?? null,
+        dueDate: cleanNullable(input.dueDate) ?? null
+      },
+      actor?.actorUserId ?? undefined
+    );
+    const journalObject = milestoneJournalObject(milestone);
+    recordJournalEntry(tx, {
+      operation: "create",
+      object: journalObject,
+      summary: buildCreateSummary(journalObject),
+      actor,
+      contexts: [makeJournalContext(projectObject, "owner")]
+    });
+    return milestone;
   });
 
   return mapMilestone(database, created, emptyMilestoneCounts(), []);
 }
 
-export function updateMilestone(database: DbClient, id: number, input: MilestoneUpdate): Milestone {
+export function updateMilestone(database: DbClient, id: number, input: MilestoneUpdate, actor?: JournalActor | null): Milestone {
   const values: Partial<typeof milestones.$inferInsert> = {};
 
   if (input.projectId !== undefined) {
@@ -182,7 +230,32 @@ export function updateMilestone(database: DbClient, id: number, input: Milestone
     throw badRequest("No milestone fields provided");
   }
 
-  const updated = milestoneRepository.update(database, id, input.expectedVersion, values);
+  const updated = database.transaction((tx) => {
+    const current = milestoneRepository.findById(tx, id);
+    if (!current) {
+      throw notFound(`Milestone with id ${id} not found`);
+    }
+    const milestone = milestoneRepository.update(tx, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    if (!milestone) {
+      throw notFound(`Milestone with id ${id} not found`);
+    }
+    const projectField: JournalFieldDefinition<MilestoneRecord> = {
+      key: "projectId",
+      label: "Projekt",
+      format: (value) => (typeof value === "number" ? getProjectJournalObject(database, value).label : null)
+    };
+    const journalObject = milestoneJournalObject(milestone);
+    const changes = buildJournalChanges(current, milestone, [projectField, ...milestoneJournalFields]);
+    recordJournalEntry(tx, {
+      operation: "update",
+      object: journalObject,
+      summary: buildUpdateSummary(journalObject, changes),
+      actor,
+      changes,
+      contexts: [makeJournalContext(getProjectJournalObject(database, milestone.projectId), "owner")]
+    });
+    return milestone;
+  });
   if (!updated) {
     throw notFound(`Milestone with id ${id} not found`);
   }
@@ -191,18 +264,29 @@ export function updateMilestone(database: DbClient, id: number, input: Milestone
   return mapMilestone(database, updated, counts.get(id));
 }
 
-export async function deleteMilestone(database: DbClient, id: number): Promise<void> {
+export async function deleteMilestone(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
   const milestone = milestoneRepository.findById(database, id);
   if (!milestone) {
     throw notFound(`Milestone with id ${id} not found`);
   }
+  const projectObject = getProjectJournalObject(database, milestone.projectId);
 
   await deleteMilestoneAttachmentsForIds(database, [id]);
   deleteMilestoneNotesForIds(database, [id]);
 
-  if (milestoneRepository.delete(database, id) === 0) {
-    throw notFound(`Milestone with id ${id} not found`);
-  }
+  database.transaction((tx) => {
+    const journalObject = milestoneJournalObject(milestone);
+    recordJournalEntry(tx, {
+      operation: "delete",
+      object: journalObject,
+      summary: buildDeleteSummary(journalObject),
+      actor,
+      contexts: [makeJournalContext(projectObject, "owner")]
+    });
+    if (milestoneRepository.delete(tx, id) === 0) {
+      throw notFound(`Milestone with id ${id} not found`);
+    }
+  });
 }
 
 export async function deleteMilestoneOwnedSupportForProjectIds(database: DbClient, projectIds: number[]): Promise<void> {

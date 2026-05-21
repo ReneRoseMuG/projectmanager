@@ -1,13 +1,15 @@
 import type { CurrentUser } from "@taskmanager/shared-types";
-import { BookOpen, Bug, CalendarDays, DatabaseBackup, ExternalLink, FolderKanban, Library, ListChecks, LogOut, Tags, UsersRound, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { BookOpen, Bug, CalendarDays, DatabaseBackup, ExternalLink, FolderKanban, History, Library, ListChecks, LogOut, Tags, UsersRound, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { hasPermission } from "../../hooks/usePermissions";
 
 const items = [
   { to: "/projects", label: "Projekte", icon: FolderKanban },
   { to: "/tickets", label: "Tickets", icon: Bug },
   { to: "/features", label: "Features", icon: BookOpen },
   { to: "/wiki", label: "Wiki", icon: Library },
-  { to: "/calendar", label: "Kalender", icon: CalendarDays }
+  { to: "/calendar", label: "Kalender", icon: CalendarDays },
+  { to: "/journal", label: "Journal", icon: History, resource: "journal" as const }
 ];
 
 const settingsItems = [
@@ -30,6 +32,10 @@ function canAdministerUsers(user: CurrentUser | null | undefined): boolean {
   return Boolean(user?.permissions.some((permission) => (permission.resource === "*" || permission.resource === "users") && (permission.action === "*" || permission.action === "admin")));
 }
 
+function canReadItem(user: CurrentUser | null | undefined, item: (typeof items)[number]): boolean {
+  return item.resource === undefined || hasPermission(user, item.resource, "read");
+}
+
 interface SidebarProps {
   currentUser?: CurrentUser | null;
   onLogout?: () => void;
@@ -49,7 +55,7 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
       </div>
       <NavSection>Navigation</NavSection>
       <nav className="grid gap-1">
-        {items.map((item) => {
+        {items.filter((item) => canReadItem(currentUser, item)).map((item) => {
           const Icon = item.icon;
           return (
             <NavLink

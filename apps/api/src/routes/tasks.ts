@@ -11,6 +11,7 @@ import {
   updateOwnerTaskBoard,
   updateTask
 } from "../services/tasks.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const taskBodySchema = {
@@ -70,7 +71,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/projects/:id/tasks",
     { schema: { params: idParamSchema, body: taskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const task = createOwnerTask(app.db, { type: "project", id: request.params.id }, request.body);
+      const task = createOwnerTask(app.db, { type: "project", id: request.params.id }, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(task);
     }
   );
@@ -85,7 +86,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/milestones/:id/tasks",
     { schema: { params: idParamSchema, body: taskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const task = createOwnerTask(app.db, { type: "milestone", id: request.params.id }, request.body);
+      const task = createOwnerTask(app.db, { type: "milestone", id: request.params.id }, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(task);
     }
   );
@@ -100,7 +101,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/features/:id/tasks",
     { schema: { params: idParamSchema, body: taskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const task = createOwnerTask(app.db, { type: "feature", id: request.params.id }, request.body);
+      const task = createOwnerTask(app.db, { type: "feature", id: request.params.id }, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(task);
     }
   );
@@ -115,7 +116,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/use-cases/:id/tasks",
     { schema: { params: idParamSchema, body: taskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const task = createOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.body);
+      const task = createOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(task);
     }
   );
@@ -123,32 +124,32 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: number; taskId: number } }>(
     "/projects/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 200: objectResponseSchema } } },
-    async (request) => linkOwnerTask(app.db, { type: "project", id: request.params.id }, request.params.taskId)
+    async (request) => linkOwnerTask(app.db, { type: "project", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser))
   );
 
   app.post<{ Params: { id: number; taskId: number } }>(
     "/milestones/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 200: objectResponseSchema } } },
-    async (request) => linkOwnerTask(app.db, { type: "milestone", id: request.params.id }, request.params.taskId)
+    async (request) => linkOwnerTask(app.db, { type: "milestone", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser))
   );
 
   app.post<{ Params: { id: number; taskId: number } }>(
     "/features/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 200: objectResponseSchema } } },
-    async (request) => linkOwnerTask(app.db, { type: "feature", id: request.params.id }, request.params.taskId)
+    async (request) => linkOwnerTask(app.db, { type: "feature", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser))
   );
 
   app.post<{ Params: { id: number; taskId: number } }>(
     "/use-cases/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 200: objectResponseSchema } } },
-    async (request) => linkOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.params.taskId)
+    async (request) => linkOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number; taskId: number } }>(
     "/projects/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      unlinkOwnerTask(app.db, { type: "project", id: request.params.id }, request.params.taskId);
+      unlinkOwnerTask(app.db, { type: "project", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -157,7 +158,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/milestones/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      unlinkOwnerTask(app.db, { type: "milestone", id: request.params.id }, request.params.taskId);
+      unlinkOwnerTask(app.db, { type: "milestone", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -166,7 +167,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/features/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      unlinkOwnerTask(app.db, { type: "feature", id: request.params.id }, request.params.taskId);
+      unlinkOwnerTask(app.db, { type: "feature", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -175,7 +176,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/use-cases/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      unlinkOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.params.taskId);
+      unlinkOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -183,25 +184,25 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: number; taskId: number }; Body: TaskBoardPositionInput }>(
     "/projects/:id/tasks/:taskId/board",
     { schema: { params: ownerTaskParamSchema, body: taskBoardPositionSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateOwnerTaskBoard(app.db, { type: "project", id: request.params.id }, request.params.taskId, request.body)
+    async (request) => updateOwnerTaskBoard(app.db, { type: "project", id: request.params.id }, request.params.taskId, request.body, createJournalActor(request.currentUser))
   );
 
   app.patch<{ Params: { id: number; taskId: number }; Body: TaskBoardPositionInput }>(
     "/milestones/:id/tasks/:taskId/board",
     { schema: { params: ownerTaskParamSchema, body: taskBoardPositionSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateOwnerTaskBoard(app.db, { type: "milestone", id: request.params.id }, request.params.taskId, request.body)
+    async (request) => updateOwnerTaskBoard(app.db, { type: "milestone", id: request.params.id }, request.params.taskId, request.body, createJournalActor(request.currentUser))
   );
 
   app.patch<{ Params: { id: number; taskId: number }; Body: TaskBoardPositionInput }>(
     "/features/:id/tasks/:taskId/board",
     { schema: { params: ownerTaskParamSchema, body: taskBoardPositionSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateOwnerTaskBoard(app.db, { type: "feature", id: request.params.id }, request.params.taskId, request.body)
+    async (request) => updateOwnerTaskBoard(app.db, { type: "feature", id: request.params.id }, request.params.taskId, request.body, createJournalActor(request.currentUser))
   );
 
   app.patch<{ Params: { id: number; taskId: number }; Body: TaskBoardPositionInput }>(
     "/use-cases/:id/tasks/:taskId/board",
     { schema: { params: ownerTaskParamSchema, body: taskBoardPositionSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateOwnerTaskBoard(app.db, { type: "useCase", id: request.params.id }, request.params.taskId, request.body)
+    async (request) => updateOwnerTaskBoard(app.db, { type: "useCase", id: request.params.id }, request.params.taskId, request.body, createJournalActor(request.currentUser))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -213,14 +214,14 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: number }; Body: TaskUpdate }>(
     "/tasks/:id",
     { schema: { params: idParamSchema, body: taskPatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateTask(app.db, request.params.id, request.body)
+    async (request) => updateTask(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number } }>(
     "/tasks/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      await deleteTask(app.db, request.params.id);
+      await deleteTask(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

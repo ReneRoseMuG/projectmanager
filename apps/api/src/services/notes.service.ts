@@ -5,8 +5,27 @@ import { milestoneNotes, milestones, notes, projectNotes, projects, taskNotes, t
 import { noteRepository, type NoteRecord, type NoteUpdateData } from "../repositories/note.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { parseJsonObject, stringifyJsonObject } from "./helpers.js";
+import {
+  buildCreateSummary,
+  buildDeleteSummary,
+  buildJournalChanges,
+  buildUnlinkSummary,
+  buildUpdateSummary,
+  makeJournalContext,
+  makeJournalObject,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalFieldDefinition,
+  type JournalObjectRef
+} from "./journal.service.js";
 
 type MappableNoteRecord = Pick<NoteRecord, "id" | "title" | "contentJson" | "version" | "createdAt" | "updatedAt">;
+type NoteOwner = { type: "project" | "milestone" | "task" | "ticket"; id: number };
+
+const noteJournalFields: Array<JournalFieldDefinition<NoteRecord>> = [
+  { key: "title", label: "Titel" },
+  { key: "contentJson", label: "Inhalt", format: () => "geändert" }
+];
 
 function mapNote(record: MappableNoteRecord): Note {
   return {
@@ -50,6 +69,40 @@ function ensureTicketExists(database: DbClient, ticketId: number): void {
   if (!ticket) {
     throw notFound(`Ticket with id ${ticketId} not found`);
   }
+}
+
+function noteJournalObject(note: Pick<NoteRecord, "id" | "title">): JournalObjectRef {
+  return makeJournalObject("note", note.id, note.title);
+}
+
+function getOwnerJournalObject(database: DbClient, owner: NoteOwner): JournalObjectRef {
+  if (owner.type === "project") {
+    const project = database.select({ name: projects.name }).from(projects).where(eq(projects.id, owner.id)).get();
+    return makeJournalObject("project", owner.id, project?.name ?? `Projekt ${owner.id}`);
+  }
+  if (owner.type === "milestone") {
+    const milestone = database.select({ name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
+    return makeJournalObject("milestone", owner.id, milestone?.name ?? `Meilenstein ${owner.id}`);
+  }
+  if (owner.type === "task") {
+    const task = database.select({ title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)).get();
+    return makeJournalObject("task", owner.id, task?.title ?? `Aufgabe ${owner.id}`);
+  }
+  const ticket = database.select({ title: tickets.title }).from(tickets).where(eq(tickets.id, owner.id)).get();
+  return makeJournalObject("ticket", owner.id, ticket?.title ?? `Ticket ${owner.id}`);
+}
+
+function ownerContext(database: DbClient, owner: NoteOwner) {
+  return makeJournalContext(getOwnerJournalObject(database, owner), "owner");
+}
+
+function listNoteOwners(database: DbClient, noteId: number): NoteOwner[] {
+  return [
+    ...database.select({ id: projectNotes.projectId }).from(projectNotes).where(eq(projectNotes.noteId, noteId)).all().map((row) => ({ type: "project" as const, id: row.id })),
+    ...database.select({ id: milestoneNotes.milestoneId }).from(milestoneNotes).where(eq(milestoneNotes.noteId, noteId)).all().map((row) => ({ type: "milestone" as const, id: row.id })),
+    ...database.select({ id: taskNotes.taskId }).from(taskNotes).where(eq(taskNotes.noteId, noteId)).all().map((row) => ({ type: "task" as const, id: row.id })),
+    ...database.select({ id: ticketNotes.ticketId }).from(ticketNotes).where(eq(ticketNotes.noteId, noteId)).all().map((row) => ({ type: "ticket" as const, id: row.id }))
+  ];
 }
 
 export function listProjectNotes(database: DbClient, projectId: number): Note[] {
@@ -132,56 +185,68 @@ export function listTicketNotes(database: DbClient, ticketId: number): Note[] {
   return rows.map(mapNote);
 }
 
-export function createProjectNote(database: DbClient, projectId: number, input: NoteInput): Note {
+export function createProjectNote(database: DbClient, projectId: number, input: NoteInput, actor?: JournalActor | null): Note {
   ensureProjectExists(database, projectId);
   const created = database.transaction((tx) => {
-    const note = noteRepository.create(tx as unknown as DbClient, {
+    const txDb = tx as unknown as DbClient;
+    const note = noteRepository.create(txDb, {
       title: cleanTitle(input.title),
       contentJson: stringifyJsonObject(input.contentJson)
-    });
+    }, actor?.actorUserId ?? undefined);
     tx.insert(projectNotes).values({ projectId, noteId: note.id }).run();
+    const noteObject = noteJournalObject(note);
+    recordJournalEntry(txDb, { operation: "create", object: noteObject, summary: buildCreateSummary(noteObject), actor, contexts: [ownerContext(txDb, { type: "project", id: projectId })] });
     return note;
   });
 
   return mapNote(created);
 }
 
-export function createTaskNote(database: DbClient, taskId: number, input: NoteInput): Note {
+export function createTaskNote(database: DbClient, taskId: number, input: NoteInput, actor?: JournalActor | null): Note {
   ensureTaskExists(database, taskId);
   const created = database.transaction((tx) => {
-    const note = noteRepository.create(tx as unknown as DbClient, {
+    const txDb = tx as unknown as DbClient;
+    const note = noteRepository.create(txDb, {
       title: cleanTitle(input.title),
       contentJson: stringifyJsonObject(input.contentJson)
-    });
+    }, actor?.actorUserId ?? undefined);
     tx.insert(taskNotes).values({ taskId, noteId: note.id }).run();
+    const noteObject = noteJournalObject(note);
+    recordJournalEntry(txDb, { operation: "create", object: noteObject, summary: buildCreateSummary(noteObject), actor, contexts: [ownerContext(txDb, { type: "task", id: taskId })] });
     return note;
   });
 
   return mapNote(created);
 }
 
-export function createMilestoneNote(database: DbClient, milestoneId: number, input: NoteInput): Note {
+export function createMilestoneNote(database: DbClient, milestoneId: number, input: NoteInput, actor?: JournalActor | null): Note {
   ensureMilestoneExists(database, milestoneId);
   const created = database.transaction((tx) => {
-    const note = noteRepository.create(tx as unknown as DbClient, {
+    const txDb = tx as unknown as DbClient;
+    const note = noteRepository.create(txDb, {
       title: cleanTitle(input.title),
       contentJson: stringifyJsonObject(input.contentJson)
-    });
+    }, actor?.actorUserId ?? undefined);
     tx.insert(milestoneNotes).values({ milestoneId, noteId: note.id }).run();
+    const noteObject = noteJournalObject(note);
+    recordJournalEntry(txDb, { operation: "create", object: noteObject, summary: buildCreateSummary(noteObject), actor, contexts: [ownerContext(txDb, { type: "milestone", id: milestoneId })] });
     return note;
   });
 
   return mapNote(created);
 }
 
-export function createTicketNote(database: DbClient, ticketId: number, input: NoteInput): Note {
+export function createTicketNote(database: DbClient, ticketId: number, input: NoteInput, actor?: JournalActor | null): Note {
   ensureTicketExists(database, ticketId);
   const created = database.transaction((tx) => {
-    const note = noteRepository.create(tx as unknown as DbClient, {
+    const txDb = tx as unknown as DbClient;
+    const note = noteRepository.create(txDb, {
       title: cleanTitle(input.title),
       contentJson: stringifyJsonObject(input.contentJson)
-    });
+    }, actor?.actorUserId ?? undefined);
     tx.insert(ticketNotes).values({ ticketId, noteId: note.id }).run();
+    const noteObject = noteJournalObject(note);
+    recordJournalEntry(txDb, { operation: "create", object: noteObject, summary: buildCreateSummary(noteObject), actor, contexts: [ownerContext(txDb, { type: "ticket", id: ticketId })] });
     return note;
   });
 
@@ -197,7 +262,7 @@ export function getNote(database: DbClient, id: number): Note {
   return mapNote(note);
 }
 
-export function updateNote(database: DbClient, id: number, input: NoteUpdate): Note {
+export function updateNote(database: DbClient, id: number, input: NoteUpdate, actor?: JournalActor | null): Note {
   const values: NoteUpdateData = {};
 
   if (input.title !== undefined) {
@@ -210,18 +275,46 @@ export function updateNote(database: DbClient, id: number, input: NoteUpdate): N
     throw badRequest("No note fields provided");
   }
 
-  const updated = noteRepository.update(database, id, input.expectedVersion, values);
-  if (!updated) {
-    throw notFound(`Note with id ${id} not found`);
-  }
+  const updated = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const current = noteRepository.findById(txDb, id);
+    if (!current) {
+      throw notFound(`Note with id ${id} not found`);
+    }
+    const note = noteRepository.update(txDb, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    if (!note) {
+      throw notFound(`Note with id ${id} not found`);
+    }
+    const noteObject = noteJournalObject(note);
+    const changes = buildJournalChanges(current, note, noteJournalFields);
+    recordJournalEntry(txDb, {
+      operation: "update",
+      object: noteObject,
+      summary: buildUpdateSummary(noteObject, changes),
+      actor,
+      changes,
+      contexts: listNoteOwners(txDb, id).map((owner) => ownerContext(txDb, owner))
+    });
+    return note;
+  });
 
   return mapNote(updated);
 }
 
-export function deleteNote(database: DbClient, id: number): void {
-  if (noteRepository.delete(database, id) === 0) {
+export function deleteNote(database: DbClient, id: number, actor?: JournalActor | null): void {
+  const note = noteRepository.findById(database, id);
+  if (!note) {
     throw notFound(`Note with id ${id} not found`);
   }
+  const owners = listNoteOwners(database, id);
+  database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const noteObject = noteJournalObject(note);
+    recordJournalEntry(txDb, { operation: "delete", object: noteObject, summary: buildDeleteSummary(noteObject), actor, contexts: owners.map((owner) => ownerContext(txDb, owner)) });
+    if (noteRepository.delete(txDb, id) === 0) {
+      throw notFound(`Note with id ${id} not found`);
+    }
+  });
 }
 
 function deleteNotesByIds(database: DbClient, noteIds: number[]): void {
@@ -273,11 +366,19 @@ export function deleteTicketNotesForIds(database: DbClient, ticketIds: number[])
   deleteNotesByIds(database, rows.map((row) => row.noteId));
 }
 
-export function deleteTicketNote(database: DbClient, ticketId: number, noteId: number): void {
+export function deleteTicketNote(database: DbClient, ticketId: number, noteId: number, actor?: JournalActor | null): void {
   ensureTicketExists(database, ticketId);
+  const note = noteRepository.findById(database, noteId);
+  if (!note) {
+    throw notFound(`Note with id ${noteId} not found`);
+  }
   const result = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
     const deletedLink = tx.delete(ticketNotes).where(and(eq(ticketNotes.ticketId, ticketId), eq(ticketNotes.noteId, noteId))).run();
     if (deletedLink.changes > 0) {
+      const noteObject = noteJournalObject(note);
+      const ticketObject = getOwnerJournalObject(txDb, { type: "ticket", id: ticketId });
+      recordJournalEntry(txDb, { operation: "unlink", object: noteObject, summary: buildUnlinkSummary(ticketObject, noteObject), actor, contexts: [makeJournalContext(ticketObject, "owner")] });
       tx.delete(notes).where(eq(notes.id, noteId)).run();
     }
     return deletedLink;
