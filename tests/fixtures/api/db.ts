@@ -1,6 +1,5 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -33,6 +32,16 @@ const defaultCatalogEntries = [
   ["priority", "urgent", "Dringend", 400, 0]
 ] as const;
 
+interface DrizzleJournalEntry {
+  tag: string;
+  when: number;
+  breakpoints: boolean;
+}
+
+interface DrizzleJournal {
+  entries: DrizzleJournalEntry[];
+}
+
 function seedDefaultCatalogEntries(sqlite: Database.Database): void {
   const insert = sqlite.prepare("INSERT INTO catalog_entries (kind, key, label, sort_order, is_closed, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))");
   for (const entry of defaultCatalogEntries) {
@@ -56,12 +65,31 @@ function seedDefaultAuth(sqlite: Database.Database): void {
   sqlite.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('admin_setup_done', 'true', datetime('now'))").run();
 }
 
+function migrateLegacyTestDb(sqlite: Database.Database, migrationsFolder: string): void {
+  const journal = JSON.parse(fs.readFileSync(path.join(migrationsFolder, "meta", "_journal.json"), "utf8")) as DrizzleJournal;
+  sqlite.prepare("CREATE TABLE IF NOT EXISTS __drizzle_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, hash TEXT NOT NULL, created_at NUMERIC)").run();
+
+  const insertMigration = sqlite.prepare("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)");
+  for (const entry of journal.entries) {
+    const migrationPath = path.join(migrationsFolder, `${entry.tag}.sql`);
+    const query = fs.readFileSync(migrationPath, "utf8");
+    const statements = entry.breakpoints ? query.split("--> statement-breakpoint") : [query];
+    for (const statement of statements) {
+      const trimmedStatement = statement.trim();
+      if (trimmedStatement) {
+        sqlite.exec(trimmedStatement);
+      }
+    }
+    insertMigration.run(crypto.createHash("sha256").update(query).digest("hex"), entry.when);
+  }
+}
+
 function migrateTestDb(sqlite: Database.Database) {
-  const db = drizzle(sqlite, { schema });
+  const db = drizzle({ client: sqlite, schema });
   const migrationsFolder = fileURLToPath(new URL("../../../apps/api/src/db/migrations", import.meta.url));
 
   sqlite.pragma("foreign_keys = OFF");
-  migrate(db, { migrationsFolder });
+  migrateLegacyTestDb(sqlite, migrationsFolder);
   sqlite.pragma("foreign_keys = ON");
 
   const foreignKeyErrors = sqlite.pragma("foreign_key_check") as unknown[];

@@ -3,7 +3,7 @@ import session from "@fastify/session";
 import type { AuthAction, AuthResource, CurrentUser } from "@taskmanager/shared-types";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { config } from "../config.js";
-import { getCurrentUser } from "../services/auth.service.js";
+import { getBypassAdminUser, getCurrentUser } from "../services/auth.service.js";
 import { hasPermission } from "../services/roles.service.js";
 import { forbidden, unauthorized } from "../utils/errors.js";
 
@@ -80,6 +80,11 @@ export function requireCurrentUser(request: FastifyRequest): CurrentUser {
   }
   const userId = sessionUserId(request);
   if (!userId) {
+    if (config.authBypassAdmin) {
+      const currentUser = getBypassAdminUser(request.server.db);
+      request.currentUser = currentUser;
+      return currentUser;
+    }
     throw unauthorized("Authentication required");
   }
   const currentUser = getCurrentUser(request.server.db, userId);

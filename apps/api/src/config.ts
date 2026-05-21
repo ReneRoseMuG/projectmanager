@@ -22,6 +22,7 @@ export interface AppConfig {
   adminFirstName: string;
   adminLastName: string;
   adminInitialPassword: string | null;
+  authBypassAdmin: boolean;
   sessionSecret: string;
   sessionSecretIsFallback: boolean;
 }
@@ -49,6 +50,10 @@ function numberFromEnv(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function booleanFromEnv(value: string | undefined): boolean {
+  return value === "true" || value === "1";
+}
+
 const configuredSessionSecret = process.env.SESSION_SECRET?.trim();
 
 export const config: AppConfig = {
@@ -71,6 +76,7 @@ export const config: AppConfig = {
   adminFirstName: process.env.ADMIN_FIRST_NAME?.trim() || "Admin",
   adminLastName: process.env.ADMIN_LAST_NAME?.trim() || "System",
   adminInitialPassword: process.env.ADMIN_INITIAL_PASSWORD?.trim() ? process.env.ADMIN_INITIAL_PASSWORD.trim() : null,
+  authBypassAdmin: booleanFromEnv(process.env.AUTH_BYPASS_ADMIN),
   sessionSecret: configuredSessionSecret || "taskmanager-local-dev-session-secret-change-me",
   sessionSecretIsFallback: !configuredSessionSecret
 };

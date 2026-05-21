@@ -2,6 +2,7 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 21.05.26 | Fix | Auth Bypass Admin | ✅ |
 | 21.05.26 | 4 | Dev-Tooling Audit Cluster | ✅ |
 | 21.05.26 | 3 | tldraw TipTap Audit Cluster | ✅ |
 | 21.05.26 | 2 | Drizzle Audit Cluster | ✅ |

@@ -35,6 +35,7 @@ set "AI_BASE_URL=http://127.0.0.1:11434/api"
 set "AI_DEFAULT_MODEL=llama3.2:1b"
 set "AI_TIMEOUT_MS=60000"
 set "AI_MAX_INPUT_CHARS=12000"
+set "AUTH_BYPASS_ADMIN=true"
 
 echo Starte Projekt Manager im lokalen Produktionsmodus.
 echo Projektordner: %APP_DIR%

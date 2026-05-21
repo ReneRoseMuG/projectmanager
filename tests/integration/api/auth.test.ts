@@ -17,6 +17,7 @@ import type { FastifyInstance } from "fastify";
 import bcrypt from "bcryptjs";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { config } from "../../../apps/api/src/config.js";
 import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 async function loginAdmin(app: FastifyInstance) {
@@ -28,15 +29,21 @@ async function loginAdmin(app: FastifyInstance) {
 describe("Auth API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
+  let originalAuthBypassAdmin: boolean;
 
   beforeAll(async () => {
+    originalAuthBypassAdmin = config.authBypassAdmin;
     testDb = createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true });
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(() => {
+    config.authBypassAdmin = false;
+    truncateAll(testDb.sqlite);
+  });
 
   afterAll(async () => {
+    config.authBypassAdmin = originalAuthBypassAdmin;
     await app.close();
     testDb.sqlite.close();
   });
@@ -103,6 +110,25 @@ describe("Auth API", () => {
     expect(setup.body.requiresPasswordSetup).toBe(false);
     await agent.get("/api/projects").expect(200);
     expect((testDb.sqlite.prepare("SELECT value FROM app_settings WHERE key = 'admin_setup_done'").get() as { value: string }).value).toBe("true");
+  });
+
+  it("umgeht Login nur bei aktivem Admin-Bypass und nutzt Standardadmin-Rechte", async () => {
+    config.authBypassAdmin = true;
+    testDb.sqlite.prepare("UPDATE users SET password_hash = NULL WHERE email = 'admin@local'").run();
+    testDb.sqlite.prepare("UPDATE app_settings SET value = 'false' WHERE key = 'admin_setup_done'").run();
+
+    const me = await supertest(app.server).get("/api/auth/me").expect(200);
+    expect(me.body).toMatchObject({
+      email: "admin@local",
+      role: { key: "admin" },
+      requiresPasswordSetup: false
+    });
+
+    await supertest(app.server).get("/api/projects").expect(200);
+    await supertest(app.server).get("/api/admin/users").expect(200);
+
+    config.authBypassAdmin = false;
+    await supertest(app.server).get("/api/projects").expect(401);
   });
 
   it("legt Benutzer an, speichert Passwörter gehasht und schützt Admin-Routen vor Nicht-Admins", async () => {
