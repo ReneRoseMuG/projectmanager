@@ -14,6 +14,7 @@ export const TICKET_STATUSES = WORK_STATUSES;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
 export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority"] as const;
+export const SETTING_SCOPE_TYPES = ["GLOBAL", "ROLE", "USER"] as const;
 
 export const appSettings = sqliteTable("app_settings", {
   key: text("key").primaryKey(),
@@ -64,6 +65,25 @@ export const users = sqliteTable("users", {
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
+
+export const settingsValues = sqliteTable(
+  "settings_values",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    settingKey: text("setting_key").notNull(),
+    scopeType: text("scope_type", { enum: SETTING_SCOPE_TYPES }).notNull(),
+    scopeId: text("scope_id").notNull(),
+    valueJson: text("value_json").notNull(),
+    version: integer("version").notNull().default(1),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    settingsValuesSettingScopeUnique: uniqueIndex("settings_values_setting_scope_unique").on(table.settingKey, table.scopeType, table.scopeId)
+  })
+);
 
 export const catalogEntries = sqliteTable(
   "catalog_entries",

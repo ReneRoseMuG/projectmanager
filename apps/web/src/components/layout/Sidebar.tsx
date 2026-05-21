@@ -1,5 +1,5 @@
 import type { CurrentUser } from "@taskmanager/shared-types";
-import { BookOpen, Bug, CalendarDays, DatabaseBackup, ExternalLink, FolderKanban, Library, ListChecks, LogOut, Tags, UsersRound, ShieldCheck } from "lucide-react";
+import { BookOpen, Bug, CalendarDays, DatabaseBackup, ExternalLink, FolderKanban, Library, ListChecks, LogOut, Tags, UsersRound, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
@@ -11,6 +11,7 @@ const items = [
 ];
 
 const settingsItems = [
+  { to: "/settings/preferences", label: "Präferenzen", icon: SlidersHorizontal },
   { to: "/settings/catalogs", label: "Kataloge", icon: ListChecks },
   { to: "/settings/tags", label: "Tags", icon: Tags },
   { to: "/settings/backup", label: "Sicherung", icon: DatabaseBackup }

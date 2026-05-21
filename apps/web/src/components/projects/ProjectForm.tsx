@@ -403,6 +403,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
         tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
       >
         {activeTab === "details" ? (

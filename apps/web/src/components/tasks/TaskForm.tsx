@@ -238,6 +238,7 @@ export function TaskForm({ open, task, initialStatus = "active", onSubmit, onClo
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
         tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
         headerMeta={
           <div className="flex flex-wrap gap-2">

@@ -65,7 +65,7 @@ function seedDefaultAuth(sqlite: Database.Database): void {
   sqlite.prepare("INSERT INTO app_settings (key, value, updated_at) VALUES ('admin_setup_done', 'true', datetime('now'))").run();
 }
 
-function migrateLegacyTestDb(sqlite: Database.Database, migrationsFolder: string): void {
+export function migrateLegacyTestDb(sqlite: Database.Database, migrationsFolder: string): void {
   const journal = JSON.parse(fs.readFileSync(path.join(migrationsFolder, "meta", "_journal.json"), "utf8")) as DrizzleJournal;
   sqlite.prepare("CREATE TABLE IF NOT EXISTS __drizzle_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, hash TEXT NOT NULL, created_at NUMERIC)").run();
 
@@ -117,6 +117,7 @@ export function createFileTestDb(databasePath: string) {
 export function truncateAll(sqlite: Database.Database): void {
   const tables = [
     "app_settings",
+    "settings_values",
     "users",
     "permissions",
     "roles",

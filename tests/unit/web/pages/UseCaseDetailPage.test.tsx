@@ -99,6 +99,15 @@ afterEach(() => {
 });
 
 describe("UseCaseDetailPage openInTab", () => {
+  it("nutzt die volle verfügbare Detailseitenbreite", async () => {
+    const { container } = render(<UseCaseDetailPage />);
+
+    await screen.findByRole("button");
+
+    expect(container.firstElementChild).toHaveClass("w-full", "min-w-0");
+    expect(container.firstElementChild).not.toHaveClass("mx-auto", "max-w-7xl");
+  });
+
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button", async () => {
     render(<UseCaseDetailPage />);
 

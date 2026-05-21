@@ -1,21 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
+import type { SettingKey } from "@taskmanager/shared-types";
+import { useCallback, useState } from "react";
 import type { ViewMode } from "../types";
+import { useSetting, useSettings } from "./useSettings";
 
-const storageKey = "taskmanager:view-mode";
+type ViewModeSettingKey = Extract<SettingKey, "taskBoard.viewMode" | "ticketBoard.viewMode">;
 
-export function useViewMode(defaultMode: ViewMode = "list") {
-  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
-    const stored = window.localStorage.getItem(storageKey);
-    return stored === "kanban" || stored === "list" ? stored : defaultMode;
-  });
+function isViewMode(value: unknown): value is ViewMode {
+  return value === "kanban" || value === "list";
+}
 
-  useEffect(() => {
-    window.localStorage.setItem(storageKey, viewMode);
-  }, [viewMode]);
+export function useViewMode(defaultMode: ViewMode = "list", settingKey: ViewModeSettingKey = "taskBoard.viewMode") {
+  const settingsValue = useSetting(settingKey);
+  const { setSetting } = useSettings();
+  const [optimisticMode, setOptimisticMode] = useState<ViewMode | null>(null);
+  const resolvedMode = isViewMode(settingsValue) ? settingsValue : defaultMode;
+  const viewMode = optimisticMode ?? resolvedMode;
 
   const setViewMode = useCallback((mode: ViewMode) => {
-    setViewModeState(mode);
-  }, []);
+    setOptimisticMode(mode);
+    void setSetting({ key: settingKey, scopeType: "USER", value: mode }).finally(() => {
+      setOptimisticMode(null);
+    });
+  }, [setSetting, settingKey]);
 
   return { viewMode, setViewMode };
 }

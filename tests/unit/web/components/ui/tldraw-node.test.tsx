@@ -35,20 +35,13 @@ interface MockTldrawSnapshot {
 interface MockTldrawEditor {
   getSnapshot: ReturnType<typeof vi.fn<[], MockTldrawSnapshot>>;
   getCurrentPageShapeIds: ReturnType<typeof vi.fn<[], Set<string>>>;
-}
-
-interface ExportToBlobInput {
-  editor: MockTldrawEditor;
-  ids: string[];
-  format: "svg";
-  opts?: { background: boolean };
+  getSvgString: ReturnType<typeof vi.fn<[string[], { background: boolean }], Promise<{ svg: string } | null>>>;
 }
 
 type UpdateAttributesMock = ReturnType<typeof vi.fn<[Record<string, unknown>], void>>;
 
 const tldrawMocks = vi.hoisted(() => ({
   currentShapeIds: ["shape:one"],
-  exportToBlob: vi.fn<[ExportToBlobInput], Promise<Blob>>(),
   lastEditor: undefined as MockTldrawEditor | undefined,
   snapshot: {
     document: {
@@ -70,14 +63,16 @@ vi.mock("@tldraw/tldraw", () => ({
   Tldraw: ({ onMount }: { onMount?: (editor: MockTldrawEditor) => void }) => {
     const mockEditor: MockTldrawEditor = {
       getSnapshot: vi.fn(() => tldrawMocks.snapshot),
-      getCurrentPageShapeIds: vi.fn(() => new Set(tldrawMocks.currentShapeIds))
+      getCurrentPageShapeIds: vi.fn(() => new Set(tldrawMocks.currentShapeIds)),
+      getSvgString: vi.fn<[string[], { background: boolean }], Promise<{ svg: string } | null>>(() =>
+        Promise.resolve({ svg: "<svg/>" })
+      )
     };
 
     tldrawMocks.lastEditor = mockEditor;
     onMount?.(mockEditor);
     return <div data-testid="tldraw-canvas" />;
-  },
-  exportToBlob: tldrawMocks.exportToBlob
+  }
 }));
 
 vi.mock("@tiptap/react", async (importOriginal) => {
@@ -112,7 +107,6 @@ function renderNodeView({
 beforeEach(() => {
   tldrawMocks.currentShapeIds = ["shape:one"];
   tldrawMocks.lastEditor = undefined;
-  tldrawMocks.exportToBlob.mockResolvedValue(new Blob(["<svg/>"], { type: "image/svg+xml" }));
   createObjectUrlMock.mockReturnValue("blob:tldraw-preview");
   Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrlMock });
   Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectUrlMock });

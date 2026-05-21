@@ -86,6 +86,10 @@ export const queryKeys = {
     root: ["catalogs"] as const,
     list: () => [...queryKeys.catalogs.root, "list"] as const
   },
+  settings: {
+    root: ["settings"] as const,
+    resolved: () => [...queryKeys.settings.root, "resolved"] as const
+  },
   wiki: {
     root: ["wiki"] as const,
     tree: () => [...queryKeys.wiki.root, "tree"] as const,

@@ -25,6 +25,18 @@ import { addPendingComment, changeInput, clickTab, feature, getFileInput, projec
 import { ProjectForm } from "../../../../../apps/web/src/components/projects/ProjectForm";
 
 describe("ProjectForm", () => {
+  it("begrenzt nur den Details-Tab auf die frühere Formularbreite", () => {
+    renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    const detailsBody = screen.getByText("Stammdaten").closest("section")?.parentElement;
+    expect(detailsBody).toHaveClass("w-full", "max-w-7xl");
+
+    clickTab("Aufgaben");
+
+    const boardBody = screen.getByTestId("owner-task-board").closest("section")?.parentElement;
+    expect(boardBody).not.toHaveClass("max-w-7xl");
+  });
+
   it("bindet das RichTextInlineField an die Projektbeschreibung", async () => {
     const onSubmit = vi.fn().mockResolvedValue(project);
     renderWithProviders(<ProjectForm open project={project} onSubmit={onSubmit} onClose={vi.fn()} />);

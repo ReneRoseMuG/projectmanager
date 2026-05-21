@@ -83,7 +83,7 @@ export function MilestoneDetailPage() {
   }
 
   return (
-    <div className="mx-auto -my-4 min-h-[calc(100%+2rem)] max-w-7xl md:-my-6 md:min-h-[calc(100%+3rem)]">
+    <div className="-my-4 min-h-[calc(100%+2rem)] w-full min-w-0 md:-my-6 md:min-h-[calc(100%+3rem)]">
       <MilestoneForm
         open
         milestone={milestone}

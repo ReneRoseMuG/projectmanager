@@ -51,6 +51,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerCatalogRoutes } = await import("../../../apps/api/src/routes/catalogs.js");
   const { registerCommentsRoutes } = await import("../../../apps/api/src/routes/comments.js");
   const { registerTagsRoutes } = await import("../../../apps/api/src/routes/tags.js");
+  const { registerSettingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
   const { registerNotesRoutes } = await import("../../../apps/api/src/routes/notes.js");
   const { registerTicketsRoutes } = await import("../../../apps/api/src/routes/tickets.js");
   const { registerMultipart } = await import("../../../apps/api/src/plugins/multipart.js");
@@ -96,6 +97,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerCatalogRoutes, { prefix: "/api" });
   await app.register(registerCommentsRoutes, { prefix: "/api" });
   await app.register(registerTagsRoutes, { prefix: "/api" });
+  await app.register(registerSettingsRoutes, { prefix: "/api" });
   await app.register(registerNotesRoutes, { prefix: "/api" });
   await app.register(registerTicketsRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });

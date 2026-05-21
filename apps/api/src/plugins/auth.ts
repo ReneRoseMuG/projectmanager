@@ -58,6 +58,7 @@ function resourceForPath(path: string): AuthResource {
     ["/catalogs", "catalogs"],
     ["/tags", "tags"],
     ["/dumps", "dumps"],
+    ["/settings", "settings"],
     ["/ai", "ai"],
     ["/imports", "wiki"],
     ["/doc-links", "wiki"],
@@ -141,6 +142,10 @@ export function registerGlobalAuthGuard(app: FastifyInstance): void {
     }
     if (path.startsWith("/api/admin/roles") || path.startsWith("/api/admin/permissions")) {
       await requirePermission("roles", "admin")(request);
+      return;
+    }
+    if (path.startsWith("/api/settings")) {
+      await requirePermission("settings", "read")(request);
       return;
     }
     const resource = resourceForPath(path);

@@ -32,13 +32,120 @@ export type JsonPrimitive = string | number | boolean | null;
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonValue = JsonPrimitive | JsonValue[] | JsonObject;
 
+export const SETTING_SCOPE_TYPES = ["GLOBAL", "ROLE", "USER"] as const;
+export const SETTING_VALUE_TYPES = ["boolean", "number", "color", "enum", "string", "json"] as const;
+
+export type SettingScopeType = (typeof SETTING_SCOPE_TYPES)[number];
+export type SettingValueType = (typeof SETTING_VALUE_TYPES)[number];
+
+export interface SettingConstraints {
+  options?: readonly string[];
+  min?: number;
+  max?: number;
+  step?: number;
+  integer?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  format?: "hex";
+}
+
+export interface SettingDefinition<Value extends JsonValue = JsonValue> {
+  key: string;
+  label: string;
+  description: string;
+  valueType: SettingValueType;
+  defaultValue: Value;
+  allowedScopes: readonly SettingScopeType[];
+  constraints?: SettingConstraints;
+  validate: (value: unknown) => value is Value;
+}
+
+export const settingsRegistry = {
+  "taskBoard.viewMode": {
+    key: "taskBoard.viewMode",
+    label: "Aufgaben-Board Ansicht",
+    description: "Steuert die Standarddarstellung für Aufgabenlisten.",
+    valueType: "enum",
+    defaultValue: "list",
+    allowedScopes: ["GLOBAL", "USER"],
+    constraints: { options: ["list", "kanban"] },
+    validate: (value): value is "list" | "kanban" => value === "list" || value === "kanban"
+  },
+  "ticketBoard.viewMode": {
+    key: "ticketBoard.viewMode",
+    label: "Ticket-Board Ansicht",
+    description: "Steuert die Standarddarstellung für Ticketlisten.",
+    valueType: "enum",
+    defaultValue: "kanban",
+    allowedScopes: ["GLOBAL", "USER"],
+    constraints: { options: ["list", "kanban"] },
+    validate: (value): value is "list" | "kanban" => value === "list" || value === "kanban"
+  }
+} as const satisfies Record<string, SettingDefinition>;
+
+export type SettingKey = keyof typeof settingsRegistry;
+export type SettingValueByKey = {
+  [Key in SettingKey]: (typeof settingsRegistry)[Key]["defaultValue"];
+};
+
+export interface SettingScopeValue {
+  value: JsonValue;
+  version: number;
+  updatedAt: string;
+  updatedBy: number | null;
+}
+
+export interface ResolvedSetting {
+  key: SettingKey;
+  label: string;
+  description: string;
+  valueType: SettingValueType;
+  constraints: SettingConstraints | null;
+  allowedScopes: readonly SettingScopeType[];
+  defaultValue: JsonValue;
+  values: Partial<Record<SettingScopeType, SettingScopeValue>>;
+  resolvedValue: JsonValue;
+  resolvedScope: SettingScopeType | "DEFAULT";
+  resolvedVersion: number | null;
+}
+
+export interface SettingsResolvedResponse {
+  settings: ResolvedSetting[];
+}
+
+export interface SetSettingValueRequest {
+  key: SettingKey;
+  scopeType: SettingScopeType;
+  scopeId?: string;
+  value: JsonValue;
+  expectedVersion: number;
+}
+
+export interface DeleteSettingValueRequest {
+  key: SettingKey;
+  scopeType: SettingScopeType;
+  scopeId?: string;
+  expectedVersion: number;
+}
+
+export function isSettingKey(value: string): value is SettingKey {
+  return Object.prototype.hasOwnProperty.call(settingsRegistry, value);
+}
+
+export function getSettingDefinition(key: string): SettingDefinition | undefined {
+  return isSettingKey(key) ? settingsRegistry[key] : undefined;
+}
+
+export const settingDefinitions = Object.values(settingsRegistry) as SettingDefinition[];
+
 export interface ApiErrorPayload {
   error: "NOT_FOUND" | "BAD_REQUEST" | "CONFLICT" | "UNAUTHORIZED" | "FORBIDDEN" | "INTERNAL_ERROR";
   message: string;
   statusCode: number;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "catalogs", "tags", "dumps", "ai", "users", "roles"] as const;
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "catalogs", "tags", "dumps", "settings", "ai", "users", "roles"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";

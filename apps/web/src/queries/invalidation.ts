@@ -157,6 +157,10 @@ export async function invalidateCatalogs(queryClient: QueryClient): Promise<void
   ]);
 }
 
+export async function invalidateSettings(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.settings.root]);
+}
+
 export async function invalidateWiki(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.wiki.root, queryKeys.globalSearch.root]);
 }
@@ -180,6 +184,7 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.wiki.root,
     queryKeys.calendarTasks.root,
     queryKeys.tickets.root,
+    queryKeys.settings.root,
     queryKeys.auth.root,
     queryKeys.adminUsers.root,
     queryKeys.adminRoles.root,

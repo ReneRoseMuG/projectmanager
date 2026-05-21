@@ -1,11 +1,11 @@
 import type { Attachment, BacklogItem, CatalogEntry, Comment, Event, Feature, FeatureRelation, Milestone, Note, Project, Tag, Task, TaskBoardItem, TaskDetail, Ticket, UseCase, WikiImportReport } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { migrateLegacyTestDb } from "../../fixtures/api/db";
 import { vitestRuntimeRoot } from "../../../apps/api/src/runtime-safety.js";
 
 /**
@@ -24,7 +24,7 @@ import { vitestRuntimeRoot } from "../../../apps/api/src/runtime-safety.js";
  * Die HTTP-Verträge der Projekt Manager API werden über echte Fastify-Routen und eine Temp-DB abgesichert.
  */
 describe("Projekt Manager API integration", () => {
-  let app: FastifyInstance;
+  let app: FastifyInstance | undefined;
   let api: ReturnType<typeof request.agent>;
   let tempDir: string;
   let closeDatabase: (() => void) | null = null;
@@ -49,7 +49,7 @@ describe("Projekt Manager API integration", () => {
     const migrationsFolder = fileURLToPath(new URL("../../../apps/api/src/db/migrations", import.meta.url));
 
     dbModule.sqlite.pragma("foreign_keys = OFF");
-    migrate(dbModule.db, { migrationsFolder });
+    migrateLegacyTestDb(dbModule.sqlite, migrationsFolder);
     dbModule.sqlite.pragma("foreign_keys = ON");
     expect(dbModule.sqlite.pragma("foreign_key_check")).toEqual([]);
     closeDatabase = () => dbModule.sqlite.close();
@@ -62,7 +62,7 @@ describe("Projekt Manager API integration", () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
     closeDatabase?.();
     await fs.rm(tempDir, { recursive: true, force: true });
   });

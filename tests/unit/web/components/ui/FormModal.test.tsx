@@ -35,7 +35,7 @@ afterEach(() => {
 describe("FormModal", () => {
   it("rendert die Page-Variante mit sticky TabBar und sticky Footer", () => {
     const { form } = renderFormModal(
-      <FormModal open title="Projekt bearbeiten" variant="page" onClose={vi.fn()} onSubmit={vi.fn()} tabBar={<nav data-testid="tab-bar">Tabs</nav>}>
+      <FormModal open title="Projekt bearbeiten" variant="page" contentClassName="w-full max-w-7xl" onClose={vi.fn()} onSubmit={vi.fn()} tabBar={<nav data-testid="tab-bar">Tabs</nav>}>
         <section data-testid="form-body">Inhalt</section>
       </FormModal>
     );
@@ -45,9 +45,11 @@ describe("FormModal", () => {
     const footer = form.querySelector("footer");
 
     expect(form).toHaveClass("min-h-[calc(100dvh-4rem)]");
-    expect(form.querySelector("header")).toHaveClass("rounded-t-2xl");
+    expect(form).not.toHaveClass("rounded-2xl");
+    expect(form.querySelector("header")).not.toHaveClass("rounded-t-2xl");
     expect(tabWrapper).toHaveClass("sticky", "top-[-1rem]", "z-20", "shadow-sm", "md:top-[-1.5rem]");
     expect(bodyWrapper).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
+    expect(bodyWrapper).toHaveClass("w-full", "max-w-7xl");
     expect(bodyWrapper).not.toHaveClass("pb-24");
     expect(bodyWrapper).not.toHaveClass("overflow-auto");
     expect(footer).toHaveClass("sticky", "bottom-[-1rem]", "z-10", "rounded-b-2xl", "md:bottom-[-1.5rem]");

@@ -21,7 +21,7 @@ import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { getContentBaseDir } from "./content.service.js";
 
 const APP_ID = "taskmanager";
-const DUMP_FORMAT_VERSION = 7;
+const DUMP_FORMAT_VERSION = 8;
 const DUMP_FILENAME_PREFIX = "taskmanager_dump_";
 const ZipArchive = (archiverPackage as unknown as {
   ZipArchive: new (options: { zlib: { level: number } }) => Archiver;
@@ -36,6 +36,7 @@ const DUMP_TABLES = [
   { key: "roles", tableName: "roles" },
   { key: "permissions", tableName: "permissions" },
   { key: "users", tableName: "users" },
+  { key: "settingsValues", tableName: "settings_values" },
   { key: "catalogEntries", tableName: "catalog_entries" },
   { key: "projects", tableName: "projects" },
   { key: "milestones", tableName: "milestones" },

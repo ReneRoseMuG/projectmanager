@@ -22,7 +22,7 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
   const { showToast } = useToast();
   const ticketController = useTickets(owner);
   const catalogs = useCatalogs();
-  const { viewMode, setViewMode } = useViewMode("kanban");
+  const { viewMode, setViewMode } = useViewMode("kanban", "ticketBoard.viewMode");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const returnTo = `${location.pathname}${location.search}`;
 

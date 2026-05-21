@@ -215,6 +215,7 @@ export function UseCaseForm({ open, useCase, currentFeatureId, features = [], on
         }
         onClose={onClose}
         variant={variant}
+        contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
         tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
       >
         {activeTab === "details" ? (

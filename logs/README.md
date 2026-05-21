@@ -2,6 +2,11 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 21.05.26 | Fix | Rote Tests TLDraw und Migration | ✅ |
+| 21.05.26 | 1 | Settings-System | ⚠️ |
+| 21.05.26 | Fix | Details-Tab-Body-Breite | ✅ |
+| 21.05.26 | Fix | Tab-Board-Außenrand und Header | ✅ |
+| 21.05.26 | Fix | Detailseiten-Formulare Breite | ✅ |
 | 21.05.26 | Fix | Auth Bypass Admin | ✅ |
 | 21.05.26 | 4 | Dev-Tooling Audit Cluster | ✅ |
 | 21.05.26 | 3 | tldraw TipTap Audit Cluster | ✅ |

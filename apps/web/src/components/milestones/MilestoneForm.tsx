@@ -323,6 +323,7 @@ export function MilestoneForm({ open, milestone, projects, initialProjectId, onS
         }
         onClose={onClose}
         variant={variant}
+        contentClassName={activeTab === "details" ? "w-full max-w-7xl" : ""}
         tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
       >
         {activeTab === "details" ? (

@@ -93,6 +93,13 @@ afterEach(() => {
 });
 
 describe("FeatureDetailPage openInTab", () => {
+  it("nutzt die volle verfügbare Detailseitenbreite", () => {
+    const { container } = render(<FeatureDetailPage />);
+
+    expect(container.firstElementChild).toHaveClass("w-full", "min-w-0");
+    expect(container.firstElementChild).not.toHaveClass("mx-auto", "max-w-7xl");
+  });
+
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button", () => {
     render(<FeatureDetailPage />);
 

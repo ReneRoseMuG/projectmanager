@@ -132,6 +132,12 @@ vi.mock("@tiptap/react", () => ({
   EditorContent: ({ editor }: { editor: MockEditor }) => <div data-testid="tiptap-editor-content" tabIndex={0} onBlur={() => tiptapMock.config?.onBlur?.({ editor })} />
 }));
 
+vi.mock("../../../../../apps/web/src/components/ui/tldraw-node", () => ({
+  TldrawNode: {
+    name: "tldraw"
+  }
+}));
+
 function renderWithProviders(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: {

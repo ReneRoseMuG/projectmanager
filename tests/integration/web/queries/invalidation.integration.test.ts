@@ -23,6 +23,7 @@ import {
   invalidateNotes,
   invalidateProjectScope,
   invalidateProjects,
+  invalidateSettings,
   invalidateTags,
   invalidateTaskScope,
   invalidateUseCaseScope,
@@ -68,6 +69,7 @@ const knownQueries = {
   eventsList: queryKeys.events.list("2026-05"),
   calendarTasks: queryKeys.calendarTasks.list(),
   localBackupStatus: queryKeys.dumps.localStatus(),
+  settingsResolved: queryKeys.settings.resolved(),
   globalSearch: queryKeys.globalSearch.data()
 } satisfies Record<string, QueryKey>;
 
@@ -115,6 +117,7 @@ describe("Query invalidation integration", () => {
     expect(queryKeys.projects.tasks(projectId)).toEqual(["projects", "detail", projectId, "tasks"]);
     expect(queryKeys.tasks.features(taskId)).toEqual(["tasks", "detail", taskId, "features"]);
     expect(queryKeys.features.projects(featureId)).toEqual(["features", "detail", featureId, "projects"]);
+    expect(queryKeys.settings.resolved()).toEqual(["settings", "resolved"]);
     expect(queryKeys.globalSearch.data()).toEqual(["globalSearch", "data"]);
   });
 
@@ -281,6 +284,13 @@ describe("Query invalidation integration", () => {
     queryClient.clear();
     seedKnownQueries(queryClient);
 
+    await invalidateSettings(queryClient);
+
+    expectInvalidated(queryClient, ["settingsResolved"]);
+
+    queryClient.clear();
+    seedKnownQueries(queryClient);
+
     await invalidateWikiImportData(queryClient);
 
     expectInvalidated(queryClient, [
@@ -311,6 +321,7 @@ describe("Query invalidation integration", () => {
       "wikiTree",
       "wikiDetail",
       "calendarTasks",
+      "settingsResolved",
       "globalSearch"
     ]);
   });

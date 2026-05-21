@@ -11,7 +11,7 @@ export function TicketsPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
-  const { viewMode, setViewMode } = useViewMode("kanban");
+  const { viewMode, setViewMode } = useViewMode("kanban", "ticketBoard.viewMode");
   const tickets = useTickets();
 
   const deleteTicket = async (ticket: Ticket) => {
