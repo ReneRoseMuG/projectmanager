@@ -1,5 +1,7 @@
 import type { UseCase } from "@taskmanager/shared-types";
 import { Edit3 } from "lucide-react";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
 import { ItemCard } from "../ui/ItemCard";
@@ -12,15 +14,10 @@ interface UseCaseCardProps {
   onOpen: (useCase: UseCase) => void;
 }
 
-const statusAccent: Record<string, string> = {
-  draft: "var(--color-mustard)",
-  active: "var(--color-fern)",
-  done: "var(--color-violet)",
-  archived: "var(--color-steel-400)"
-};
-
 export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardProps) {
+  const catalogs = useCatalogs();
   const description = richTextToPlainText(useCase.description);
+  const statusColor = catalogColor(catalogs.entries, "featureStatus", useCase.status);
 
   if (variant === "row") {
     return (
@@ -30,7 +27,7 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
         </div>
         <div className="hidden md:block">
           <ItemRow
-            accentColor={statusAccent[useCase.status] ?? "var(--color-steel-400)"}
+            accentColor={statusColor}
             title={useCase.title}
             description={description}
             pills={<StatusPill kind="featureStatus" value={useCase.status} />}
@@ -44,7 +41,7 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
 
   return (
     <ItemCard
-      accentColor={statusAccent[useCase.status] ?? "var(--color-steel-400)"}
+      accentColor={statusColor}
       header={
         <div className="grid gap-2">
           <h3 className="line-clamp-2 text-sm font-semibold text-ink">{useCase.title}</h3>

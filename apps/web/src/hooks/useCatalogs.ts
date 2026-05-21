@@ -55,6 +55,7 @@ export function useCatalogs() {
     workStatuses: catalogEntriesByKind(entries, "workStatus"),
     featureStatuses: catalogEntriesByKind(entries, "featureStatus"),
     priorities: catalogEntriesByKind(entries, "priority"),
+    ticketTypes: catalogEntriesByKind(entries, "ticketType"),
     loading: catalogsQuery.isLoading,
     error: toQueryError(catalogsQuery.error),
     reload,

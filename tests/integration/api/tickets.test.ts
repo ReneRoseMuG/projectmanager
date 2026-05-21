@@ -135,6 +135,20 @@ describe("Tickets API", () => {
     await supertest(app.server).post("/api/tickets").send({ title: "Invalid", type: "invalid" }).expect(400);
   });
 
+  it("POST /api/tickets accepts dynamic ticket types from the catalog", async () => {
+    await supertest(app.server)
+      .post("/api/catalogs/ticketType")
+      .send({ key: "support", label: "Support", sortOrder: 50, color: "#123456" })
+      .expect(201);
+
+    const res = await supertest(app.server)
+      .post("/api/tickets")
+      .send({ title: "Support request", type: "support" })
+      .expect(201);
+
+    expect(res.body.type).toBe("support");
+  });
+
   it("POST /api/tickets with invalid status returns 400", async () => {
     await supertest(app.server).post("/api/tickets").send({ title: "Invalid", status: "waiting" }).expect(400);
   });

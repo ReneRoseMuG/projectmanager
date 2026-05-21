@@ -1,6 +1,10 @@
-import type { Tag, TicketInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
+import type { CommentInput, Tag, TicketInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
+import {
+  createEntityComment as createEntityCommentRequest,
+  deleteEntityComment as deleteEntityCommentRequest
+} from "../api/comments";
 import {
   addTicketRelation as addTicketRelationRequest,
   createSubTicket as createSubTicketRequest,
@@ -10,7 +14,7 @@ import {
   setTicketTags,
   updateTicket as updateTicketRequest
 } from "../api/tickets";
-import { invalidateTags, invalidateTicketScope } from "../queries/invalidation";
+import { invalidateComments, invalidateTags, invalidateTicketScope } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
@@ -111,6 +115,36 @@ export function useTicketDetail(ticketId: number | null) {
     }
   });
 
+  const createCommentMutation = useMutation({
+    mutationFn: async (input: CommentInput) => {
+      if (validTicketId === undefined) {
+        return null;
+      }
+      return createEntityCommentRequest("ticket", validTicketId, input);
+    },
+    onSuccess: async () => {
+      if (validTicketId !== undefined) {
+        await invalidateComments(queryClient, "ticket", validTicketId);
+      }
+      await invalidateTicketScope(queryClient, undefined, validTicketId);
+    }
+  });
+
+  const removeCommentMutation = useMutation({
+    mutationFn: async (commentId: number) => {
+      if (validTicketId === undefined) {
+        return;
+      }
+      return deleteEntityCommentRequest("ticket", validTicketId, commentId);
+    },
+    onSuccess: async () => {
+      if (validTicketId !== undefined) {
+        await invalidateComments(queryClient, "ticket", validTicketId);
+      }
+      await invalidateTicketScope(queryClient, undefined, validTicketId);
+    }
+  });
+
   const updateTicket = useCallback(
     async (input: TicketUpdate) => {
       if (validTicketId === undefined) {
@@ -164,6 +198,20 @@ export function useTicketDetail(ticketId: number | null) {
     [removeRelationMutation]
   );
 
+  const createComment = useCallback(
+    async (input: CommentInput) => {
+      return createCommentMutation.mutateAsync(input);
+    },
+    [createCommentMutation]
+  );
+
+  const removeComment = useCallback(
+    async (commentId: number) => {
+      await removeCommentMutation.mutateAsync(commentId);
+    },
+    [removeCommentMutation]
+  );
+
   return {
     ticket: ticketQuery.data ?? null,
     loading: ticketQuery.isLoading,
@@ -175,6 +223,8 @@ export function useTicketDetail(ticketId: number | null) {
     updateSubTicket,
     removeSubTicket,
     addRelation,
-    removeRelation
+    removeRelation,
+    createComment,
+    removeComment
   };
 }

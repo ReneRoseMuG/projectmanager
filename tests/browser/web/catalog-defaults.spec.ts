@@ -39,7 +39,7 @@ async function restoreCatalogEntries(request: APIRequestContext, entries: Catalo
       continue;
     }
     const restoreResponse = await request.post(`${apiBaseUrl}/catalogs/${entry.kind}`, {
-      data: { key: entry.key, label: entry.label, sortOrder: entry.sortOrder, isClosed: entry.isClosed }
+      data: { key: entry.key, label: entry.label, sortOrder: entry.sortOrder, isClosed: entry.isClosed, color: entry.color }
     });
     expect(restoreResponse.ok()).toBeTruthy();
   }
@@ -54,6 +54,7 @@ test.describe("Kataloggekürzte Create-Flows", () => {
       removedEntries.push(...(await trimCatalog(request, "workStatus", ["active"])));
       removedEntries.push(...(await trimCatalog(request, "featureStatus", ["active"])));
       removedEntries.push(...(await trimCatalog(request, "priority", ["low"])));
+      removedEntries.push(...(await trimCatalog(request, "ticketType", ["question"])));
 
       const projectName = uniqueTitle("E2E Trimmed Catalog Project");
       await authenticatedGoto(page, "/projects");
@@ -116,10 +117,11 @@ test.describe("Kataloggekürzte Create-Flows", () => {
       await ticketForm.locator("input[required]").first().fill(ticketTitle);
       const ticketResponsePromise = page.waitForResponse((response) => response.url().includes(`/api/projects/${project.id}/tickets`) && response.request().method() === "POST");
       await ticketForm.getByRole("button", { name: "Ticket anlegen" }).click();
-      const ticket = (await (await ticketResponsePromise).json()) as { id: number; status: string; priority: string };
+      const ticket = (await (await ticketResponsePromise).json()) as { id: number; status: string; priority: string; type: string };
       createdIds.ticket = ticket.id;
       expect(ticket.status).toBe("active");
       expect(ticket.priority).toBe("low");
+      expect(ticket.type).toBe("question");
 
       const backlogTitle = uniqueTitle("E2E Trimmed Catalog Backlog");
       await authenticatedGoto(page, `/backlog/new?projectId=${project.id}&returnTo=${encodeURIComponent(`/projects/${project.id}`)}`);

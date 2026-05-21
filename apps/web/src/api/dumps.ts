@@ -10,12 +10,14 @@ import type {
 } from "@taskmanager/shared-types";
 import { api } from "./client";
 
+const BACKUP_SAVE_TIMEOUT_MS = 10 * 60 * 1000;
+
 export async function getLocalDumpStatus(): Promise<DumpBackupStatus> {
   return api.get("dumps/local/status").json<DumpBackupStatus>();
 }
 
 export async function saveLocalDump(): Promise<DumpBackupSaveResult> {
-  return api.post("dumps/local/save").json<DumpBackupSaveResult>();
+  return api.post("dumps/local/save", { timeout: BACKUP_SAVE_TIMEOUT_MS }).json<DumpBackupSaveResult>();
 }
 
 export async function previewLatestLocalDump(): Promise<DumpBackupPreviewResult> {

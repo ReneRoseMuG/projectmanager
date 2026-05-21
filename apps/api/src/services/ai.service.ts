@@ -9,7 +9,6 @@ import {
   TASK_STATUSES,
   TICKET_RELATION_TYPES,
   TICKET_STATUSES,
-  TICKET_TYPES,
   type AiAgentAction,
   type AiAgentActionResult,
   type AiAgentExecuteRequest,
@@ -550,7 +549,7 @@ function taskInput(payload: JsonObject): TaskInput {
 function ticketInput(payload: JsonObject): TicketInput {
   return {
     title: requiredText(payload, "title"),
-    type: enumField(payload, "type", TICKET_TYPES),
+    type: cleanTextField(payload, "type"),
     description: nullableTextField(payload, "description"),
     status: enumField(payload, "status", TICKET_STATUSES),
     priority: enumField(payload, "priority", PRIORITIES),

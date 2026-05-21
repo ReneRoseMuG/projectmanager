@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { CommentInput, NoteInput, TicketInput, TicketPositionInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
-import { TICKET_RELATION_TYPES, TICKET_RESOLUTIONS, TICKET_TYPES } from "../db/schema.js";
+import { TICKET_RELATION_TYPES, TICKET_RESOLUTIONS } from "../db/schema.js";
 import { createTicketAttachment, deleteAttachment, listTicketAttachments } from "../services/attachments.service.js";
 import { createEntityComment, deleteEntityComment, listEntityComments } from "../services/comments.service.js";
 import { createJournalActor } from "../services/journal.service.js";
@@ -44,7 +44,7 @@ const ticketBodySchema = {
   additionalProperties: false,
   properties: {
     title: { type: "string", minLength: 1 },
-    type: { type: "string", enum: TICKET_TYPES },
+    type: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
     status: { type: "string", minLength: 1 },
     priority: { type: "string", minLength: 1 },

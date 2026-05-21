@@ -4,11 +4,10 @@
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - StatusPill nutzt domänenspezifische Farbtöne pro Status-Katalog.
- * - Geschlossene Katalogeinträge überschreiben die statische Farbzuordnung.
+ * - StatusPill nutzt die Farbe des jeweiligen Status-Katalogeintrags.
  *
  * Fehlerfälle:
- * - Unbekannte offene Status dürfen nicht fehlschlagen und fallen auf den offenen Standardton zurück.
+ * - Unbekannte Status dürfen nicht fehlschlagen und fallen auf den Standardton zurück.
  *
  * Ziel:
  * Die visuelle Status-Semantik gegen Regressionen bei Katalog- und Fallback-Status absichern.
@@ -30,6 +29,7 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
         (entry) => entry.kind === "featureStatus",
       ),
       priorities: [],
+      ticketTypes: [],
       loading: false,
       error: null,
       reload: async () => undefined,
@@ -45,6 +45,7 @@ function catalogEntry(
   label: string,
   isClosed = false,
   kind: CatalogEntry["kind"] = "workStatus",
+  color = "var(--color-fern)",
 ): CatalogEntry {
   return {
     id: entries.length + 1,
@@ -53,6 +54,7 @@ function catalogEntry(
     label,
     sortOrder: entries.length + 1,
     isClosed,
+    color,
     version: 1,
     createdAt: "2026-05-21T08:00:00.000Z",
     updatedAt: "2026-05-21T08:00:00.000Z",
@@ -65,41 +67,41 @@ afterEach(() => {
 });
 
 describe("StatusPill", () => {
-  it("rendert in_progress als orangefarbenen Arbeitsstatus", () => {
-    entries = [catalogEntry("in_progress", "In Arbeit")];
+  it("rendert in_progress mit der Katalogfarbe", () => {
+    entries = [catalogEntry("in_progress", "In Arbeit", false, "workStatus", "var(--color-tangerine)")];
 
     render(<StatusPill kind="workStatus" value="in_progress" />);
 
-    expect(screen.getByText("In Arbeit")).toHaveClass("bg-tangerine");
+    expect(screen.getByText("In Arbeit").getAttribute("style")).toContain("var(--color-tangerine)");
   });
 
-  it("rendert in_review als gelben Arbeitsstatus", () => {
-    entries = [catalogEntry("in_review", "In Prüfung")];
+  it("rendert in_review mit der Katalogfarbe", () => {
+    entries = [catalogEntry("in_review", "In Prüfung", false, "workStatus", "var(--color-mustard)")];
 
     render(<StatusPill kind="workStatus" value="in_review" />);
 
-    expect(screen.getByText("In Prüfung")).toHaveClass("bg-mustard");
+    expect(screen.getByText("In Prüfung").getAttribute("style")).toContain("var(--color-mustard)");
   });
 
-  it("priorisiert geschlossene Katalogeinträge vor statischen Farbtönen", () => {
-    entries = [catalogEntry("open", "Offen geschlossen", true)];
+  it("nutzt auch für geschlossene Katalogeinträge deren gespeicherte Farbe", () => {
+    entries = [catalogEntry("open", "Offen geschlossen", true, "workStatus", "var(--color-steel-500)")];
 
     render(<StatusPill kind="workStatus" value="open" />);
 
-    expect(screen.getByText("Offen geschlossen")).toHaveClass("bg-steel-500");
+    expect(screen.getByText("Offen geschlossen").getAttribute("style")).toContain("var(--color-steel-500)");
   });
 
   it("unterscheidet active nach Katalogart", () => {
-    entries = [catalogEntry("active", "Aktiv", false, "featureStatus")];
+    entries = [catalogEntry("active", "Aktiv", false, "featureStatus", "var(--color-tangerine)")];
 
     render(<StatusPill kind="featureStatus" value="active" />);
 
-    expect(screen.getByText("Aktiv")).toHaveClass("bg-tangerine");
+    expect(screen.getByText("Aktiv").getAttribute("style")).toContain("var(--color-tangerine)");
   });
 
-  it("fällt für unbekannte offene Status auf Grün zurück", () => {
+  it("fällt für unbekannte Status auf den Standardton zurück", () => {
     render(<StatusPill kind="workStatus" value="custom_status" />);
 
-    expect(screen.getByText("custom_status")).toHaveClass("bg-fern");
+    expect(screen.getByText("custom_status")).toHaveClass("bg-steel-500");
   });
 });

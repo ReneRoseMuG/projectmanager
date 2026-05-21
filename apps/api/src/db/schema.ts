@@ -9,11 +9,10 @@ export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export const FEATURE_STATUSES = ["draft", "active", "done", "archived"] as const;
 export const FEATURE_RELATION_TYPES = ["related", "depends_on", "consumed_by"] as const;
 export const BACKLOG_STATUSES = WORK_STATUSES;
-export const TICKET_TYPES = ["bug", "improvement", "question", "task"] as const;
 export const TICKET_STATUSES = WORK_STATUSES;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
-export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority"] as const;
+export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority", "ticketType"] as const;
 export const SETTING_SCOPE_TYPES = ["GLOBAL", "ROLE", "USER"] as const;
 export const JOURNAL_OBJECT_TYPES = [
   "project",
@@ -163,6 +162,7 @@ export const catalogEntries = sqliteTable(
     label: text("label").notNull(),
     sortOrder: real("sort_order").notNull().default(0),
     isClosed: integer("is_closed", { mode: "boolean" }).notNull().default(false),
+    color: text("color").notNull().default("var(--color-steel-700)"),
     version: integer("version").notNull().default(1),
     createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
     updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -747,7 +747,7 @@ export const useCaseTasks = sqliteTable(
 export const tickets = sqliteTable("tickets", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   parentId: integer("parent_id").references((): AnySQLiteColumn => tickets.id, { onDelete: "cascade" }),
-  type: text("type", { enum: TICKET_TYPES }).notNull().default("bug"),
+  type: text("type").notNull().default("bug"),
   title: text("title").notNull(),
   description: text("description"),
   status: text("status").notNull().default("open"),

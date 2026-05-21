@@ -8,6 +8,43 @@ import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
 
 const keyPattern = /^[a-z][a-z0-9_]*$/;
+const hexColorPattern = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const themeColorPattern = /^var\(--color-[a-z0-9-]+\)$/;
+
+const defaultCatalogColors: Record<CatalogKind, Record<string, string>> = {
+  workStatus: {
+    active: "var(--color-fern)",
+    todo: "var(--color-fern)",
+    open: "var(--color-fern)",
+    in_progress: "var(--color-tangerine)",
+    in_review: "var(--color-mustard)",
+    on_hold: "var(--color-steel-500)",
+    completed: "var(--color-steel-500)",
+    archived: "var(--color-steel-500)",
+    done: "var(--color-steel-500)",
+    resolved: "var(--color-steel-500)",
+    closed: "var(--color-steel-500)",
+    rejected: "var(--color-steel-500)"
+  },
+  featureStatus: {
+    draft: "var(--color-violet)",
+    active: "var(--color-tangerine)",
+    done: "var(--color-steel-500)",
+    archived: "var(--color-steel-500)"
+  },
+  priority: {
+    low: "var(--color-steel-400)",
+    medium: "var(--color-mustard)",
+    high: "var(--color-tangerine)",
+    urgent: "var(--color-crimson)"
+  },
+  ticketType: {
+    bug: "var(--color-crimson)",
+    improvement: "var(--color-teal)",
+    question: "var(--color-violet)",
+    task: "var(--color-steel-500)"
+  }
+};
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -21,10 +58,27 @@ function mapCatalogEntry(record: CatalogEntryRecord): CatalogEntry {
     label: record.label,
     sortOrder: record.sortOrder,
     isClosed: record.isClosed,
+    color: record.color,
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
   };
+}
+
+function isStatusCatalog(kind: CatalogKind): boolean {
+  return kind === "workStatus" || kind === "featureStatus";
+}
+
+function defaultCatalogColor(kind: CatalogKind, key: string): string {
+  return defaultCatalogColors[kind][key] ?? "var(--color-steel-700)";
+}
+
+function normalizeCatalogColor(value: string | undefined, kind: CatalogKind, key: string): string {
+  const color = value?.trim() || defaultCatalogColor(kind, key);
+  if (!hexColorPattern.test(color) && !themeColorPattern.test(color)) {
+    throw badRequest("Catalog color must be a hex color or a var(--color-...) theme token");
+  }
+  return color;
 }
 
 function normalizeCatalogKey(value: string | undefined): string {
@@ -80,6 +134,11 @@ function setPriorityFallback(database: DbSession, fromKey: string, fallback: Cat
   database.update(tickets).set({ priority: fallback.key, updatedAt: now, version: sql`${tickets.version} + 1` }).where(eq(tickets.priority, fromKey)).run();
 }
 
+function setTicketTypeFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): void {
+  const now = nowIso();
+  database.update(tickets).set({ type: fallback.key, updatedAt: now, version: sql`${tickets.version} + 1` }).where(eq(tickets.type, fromKey)).run();
+}
+
 export function listCatalogEntries(database: DbClient, kind?: string): CatalogEntry[] {
   if (kind !== undefined) {
     assertCatalogKind(kind);
@@ -123,7 +182,8 @@ export function createCatalogEntry(database: DbClient, kind: string, input: Cata
     key,
     label,
     sortOrder: resolveSortOrder(database, kind, input.sortOrder),
-    isClosed: kind === "priority" ? false : input.isClosed ?? false
+    isClosed: isStatusCatalog(kind) ? input.isClosed ?? false : false,
+    color: normalizeCatalogColor(input.color, kind, key)
   });
 
   return mapCatalogEntry(created);
@@ -143,8 +203,11 @@ export function updateCatalogEntry(database: DbClient, kind: string, id: number,
   if (input.sortOrder !== undefined) {
     values.sortOrder = input.sortOrder;
   }
-  if (input.isClosed !== undefined && kind !== "priority") {
+  if (input.isClosed !== undefined && isStatusCatalog(kind)) {
     values.isClosed = input.isClosed;
+  }
+  if (input.color !== undefined) {
+    values.color = normalizeCatalogColor(input.color, kind, current.key);
   }
 
   if (Object.keys(values).length === 0) {
@@ -175,8 +238,10 @@ export function deleteCatalogEntry(database: DbClient, kind: string, id: number)
       setWorkStatusFallback(tx, entry.key, fallback);
     } else if (kind === "featureStatus") {
       setFeatureStatusFallback(tx, entry.key, fallback);
-    } else {
+    } else if (kind === "priority") {
       setPriorityFallback(tx, entry.key, fallback);
+    } else {
+      setTicketTypeFallback(tx, entry.key, fallback);
     }
     catalogRepository.delete(tx, id);
   });

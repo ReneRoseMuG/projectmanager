@@ -9,6 +9,7 @@ import type {
   Project,
   Task,
   Ticket,
+  TicketDetail,
   UseCase
 } from "@taskmanager/shared-types";
 import { fireEvent, screen } from "@testing-library/dom";
@@ -23,6 +24,7 @@ const ownerFormMocks = vi.hoisted(() => ({
   createUseCase: vi.fn(),
   updateUseCase: vi.fn(),
   createSubtask: vi.fn(),
+  createSubTicket: vi.fn(),
   uploadAttachment: vi.fn(),
   createNote: vi.fn(),
   updateNote: vi.fn(),
@@ -33,6 +35,8 @@ const ownerFormMocks = vi.hoisted(() => ({
   removeProjectFromFeature: vi.fn(),
   createComment: vi.fn(),
   removeComment: vi.fn(),
+  addTicketRelation: vi.fn(),
+  removeTicketRelation: vi.fn(),
   removeMilestone: vi.fn(),
   createBacklogItem: vi.fn(),
   updateBacklogItem: vi.fn(),
@@ -180,8 +184,22 @@ const fixtures = vi.hoisted(() => {
     notes: [note],
     attachments: [attachment]
   };
+  const relatedTicket = {
+    ...ticket,
+    id: 51,
+    title: "Ticket Bravo",
+    subTicketCount: 0
+  };
+  const ticketDetail = {
+    ...ticket,
+    comments: [comment],
+    notes: [note],
+    attachments: [attachment],
+    relations: [{ id: 91, relationType: "related", direction: "outgoing", ticket: relatedTicket }],
+    subTickets: [{ ...ticket, id: 52, parentId: ticket.id, title: "Sub-Ticket Alpha", subTicketCount: 0 }]
+  };
 
-  return { attachment, comment, feature, milestone, note, project, task, taskDetail, ticket, useCase };
+  return { attachment, comment, feature, milestone, note, project, task, taskDetail, ticket, ticketDetail, useCase };
 });
 
 export const feature = fixtures.feature as Feature;
@@ -190,6 +208,7 @@ export const project = fixtures.project as Project;
 export const milestone = fixtures.milestone as Milestone;
 export const task = fixtures.task as Task;
 export const ticket = fixtures.ticket as Ticket;
+export const ticketDetail = fixtures.ticketDetail as TicketDetail;
 
 vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
   RichTextInlineField({
@@ -363,6 +382,26 @@ vi.mock("../../../../../apps/web/src/hooks/useTaskDetail", () => ({
   }
 }));
 
+vi.mock("../../../../../apps/web/src/hooks/useTicketDetail", () => ({
+  useTicketDetail(ticketId: number | null) {
+    return {
+      ticket: ticketId ? fixtures.ticketDetail : null,
+      loading: false,
+      error: null,
+      reload: vi.fn().mockResolvedValue(undefined),
+      updateTicket: vi.fn().mockResolvedValue(fixtures.ticket),
+      updateTags: vi.fn().mockResolvedValue([]),
+      createSubTicket: ownerFormMocks.createSubTicket,
+      updateSubTicket: vi.fn().mockResolvedValue(fixtures.ticket),
+      removeSubTicket: vi.fn().mockResolvedValue(undefined),
+      addRelation: ownerFormMocks.addTicketRelation,
+      removeRelation: ownerFormMocks.removeTicketRelation,
+      createComment: ownerFormMocks.createComment,
+      removeComment: ownerFormMocks.removeComment
+    };
+  }
+}));
+
 vi.mock("../../../../../apps/web/src/hooks/useTasks", () => ({
   useTasks() {
     return {
@@ -486,22 +525,25 @@ vi.mock("../../../../../apps/web/src/hooks/useBacklog", () => ({
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
     const entries = [
-      { id: 1, kind: "workStatus", key: "active", label: "Aktiv", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 2, kind: "workStatus", key: "open", label: "Offen", sortOrder: 200, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 3, kind: "workStatus", key: "todo", label: "Offen", sortOrder: 300, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 4, kind: "workStatus", key: "in_progress", label: "In Arbeit", sortOrder: 350, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 5, kind: "workStatus", key: "done", label: "Erledigt", sortOrder: 400, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
-      { id: 6, kind: "workStatus", key: "closed", label: "Geschlossen", sortOrder: 500, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
-      { id: 7, kind: "featureStatus", key: "draft", label: "Entwurf", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 8, kind: "featureStatus", key: "active", label: "Aktiv", sortOrder: 200, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 9, kind: "featureStatus", key: "done", label: "Erledigt", sortOrder: 300, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
-      { id: 10, kind: "priority", key: "medium", label: "Mittel", sortOrder: 200, isClosed: false, version: 1, createdAt: "", updatedAt: "" }
+      { id: 1, kind: "workStatus", key: "active", label: "Aktiv", sortOrder: 100, isClosed: false, color: "var(--color-fern)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 2, kind: "workStatus", key: "open", label: "Offen", sortOrder: 200, isClosed: false, color: "var(--color-fern)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 3, kind: "workStatus", key: "todo", label: "Offen", sortOrder: 300, isClosed: false, color: "var(--color-fern)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 4, kind: "workStatus", key: "in_progress", label: "In Arbeit", sortOrder: 350, isClosed: false, color: "var(--color-tangerine)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 5, kind: "workStatus", key: "done", label: "Erledigt", sortOrder: 400, isClosed: true, color: "var(--color-steel-500)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 6, kind: "workStatus", key: "closed", label: "Geschlossen", sortOrder: 500, isClosed: true, color: "var(--color-steel-500)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 7, kind: "featureStatus", key: "draft", label: "Entwurf", sortOrder: 100, isClosed: false, color: "var(--color-violet)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 8, kind: "featureStatus", key: "active", label: "Aktiv", sortOrder: 200, isClosed: false, color: "var(--color-tangerine)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 9, kind: "featureStatus", key: "done", label: "Erledigt", sortOrder: 300, isClosed: true, color: "var(--color-steel-500)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 10, kind: "priority", key: "medium", label: "Mittel", sortOrder: 200, isClosed: false, color: "var(--color-mustard)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 11, kind: "ticketType", key: "bug", label: "Bug", sortOrder: 100, isClosed: false, color: "var(--color-crimson)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 12, kind: "ticketType", key: "question", label: "Frage", sortOrder: 200, isClosed: false, color: "var(--color-violet)", version: 1, createdAt: "", updatedAt: "" }
     ];
     return {
       entries,
       workStatuses: entries.filter((entry) => entry.kind === "workStatus"),
       featureStatuses: entries.filter((entry) => entry.kind === "featureStatus"),
       priorities: entries.filter((entry) => entry.kind === "priority"),
+      ticketTypes: entries.filter((entry) => entry.kind === "ticketType"),
       loading: false,
       error: null,
       createEntry: vi.fn(),
@@ -532,6 +574,7 @@ beforeEach(() => {
   ownerFormMocks.createUseCase.mockResolvedValue(fixtures.useCase);
   ownerFormMocks.updateUseCase.mockResolvedValue(fixtures.useCase);
   ownerFormMocks.createSubtask.mockResolvedValue(fixtures.task);
+  ownerFormMocks.createSubTicket.mockResolvedValue(fixtures.ticket);
   ownerFormMocks.uploadAttachment.mockResolvedValue(fixtures.attachment);
   ownerFormMocks.createNote.mockResolvedValue(fixtures.note);
   ownerFormMocks.updateNote.mockResolvedValue(fixtures.note);
@@ -542,6 +585,8 @@ beforeEach(() => {
   ownerFormMocks.removeProjectFromFeature.mockResolvedValue(undefined);
   ownerFormMocks.createComment.mockResolvedValue(fixtures.comment);
   ownerFormMocks.removeComment.mockResolvedValue(undefined);
+  ownerFormMocks.addTicketRelation.mockResolvedValue(undefined);
+  ownerFormMocks.removeTicketRelation.mockResolvedValue(undefined);
   ownerFormMocks.removeMilestone.mockResolvedValue(undefined);
   ownerFormMocks.createBacklogItem.mockResolvedValue(undefined);
   ownerFormMocks.updateBacklogItem.mockResolvedValue(undefined);

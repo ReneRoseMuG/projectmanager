@@ -5,12 +5,11 @@ export const FEATURE_STATUSES = ["draft", "active", "done", "archived"] as const
 export const FEATURE_RELATION_TYPES = ["related", "depends_on", "consumed_by"] as const;
 export const BACKLOG_STATUSES = WORK_STATUSES;
 export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
-export const TICKET_TYPES = ["bug", "improvement", "question", "task"] as const;
 export const TICKET_STATUSES = WORK_STATUSES;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
 export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "milestone", "useCase", "backlogItem", "wikiPage", "ticket"] as const;
-export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority"] as const;
+export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority", "ticketType"] as const;
 export const STATUS_CATALOG_KINDS = ["workStatus", "featureStatus"] as const;
 
 export type WorkStatus = string;
@@ -20,7 +19,7 @@ export type FeatureStatus = string;
 export type FeatureRelationType = (typeof FEATURE_RELATION_TYPES)[number];
 export type BacklogStatus = WorkStatus;
 export type Priority = string;
-export type TicketType = (typeof TICKET_TYPES)[number];
+export type TicketType = string;
 export type TicketStatus = WorkStatus;
 export type TicketResolution = (typeof TICKET_RESOLUTIONS)[number];
 export type TicketRelationType = (typeof TICKET_RELATION_TYPES)[number];
@@ -250,6 +249,7 @@ export interface CatalogEntry {
   label: string;
   sortOrder: number;
   isClosed: boolean;
+  color: string;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -260,6 +260,7 @@ export interface CatalogEntryInput {
   label: string;
   sortOrder?: number;
   isClosed?: boolean;
+  color?: string;
 }
 
 export type CatalogEntryUpdate = WithExpectedVersion<Partial<Omit<CatalogEntryInput, "key">>>;

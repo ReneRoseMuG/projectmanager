@@ -1,5 +1,7 @@
 import type { Feature } from "@taskmanager/shared-types";
 import { ArrowRight, FileText } from "lucide-react";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { ItemCard } from "../ui/ItemCard";
 import { StatusPill } from "../ui/StatusPill";
@@ -12,12 +14,13 @@ interface FeatureCardProps {
 
 /** Feature card based on the shared ItemCard surface. */
 export function FeatureCard({ feature, onOpen, onDelete }: FeatureCardProps) {
+  const catalogs = useCatalogs();
   const open = () => onOpen(feature);
   const description = richTextToPlainText(feature.description);
 
   return (
     <ItemCard
-      accentColor="var(--color-steel-600)"
+      accentColor={catalogColor(catalogs.entries, "featureStatus", feature.status)}
       onOpen={open}
       onEdit={open}
       onDelete={() => onDelete(feature)}

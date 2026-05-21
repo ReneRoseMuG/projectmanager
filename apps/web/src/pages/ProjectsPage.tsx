@@ -27,6 +27,7 @@ export function ProjectsPage() {
       catalogEntriesByKind(catalogs.entries, "workStatus").map((entry) => ({
         value: entry.key,
         label: entry.label,
+        color: entry.color,
         count: projects.filter((project) => project.status === entry.key)
           .length,
       })),

@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import { catalogFillStyle } from "../../utils/catalogs";
 
 export type BadgeTone = "crimson" | "tangerine" | "mustard" | "fern" | "teal" | "violet" | "magenta" | "steel" | "mute";
 
 interface BadgeProps {
   children: ReactNode;
   color?: string | null;
+  filled?: boolean;
   muted?: boolean;
   tone?: BadgeTone;
 }
@@ -22,9 +24,11 @@ const toneClasses: Record<BadgeTone, string> = {
 };
 
 /** Compact label for metadata, statuses and custom color tags. */
-export function Badge({ children, color, muted = false, tone }: BadgeProps) {
+export function Badge({ children, color, filled = false, muted = false, tone }: BadgeProps) {
   const style = color
-    ? {
+    ? filled
+      ? catalogFillStyle(color)
+      : {
         borderColor: color,
         color,
         backgroundColor: `${color}14`

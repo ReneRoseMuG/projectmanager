@@ -46,12 +46,13 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
   const catalogs = useCatalogs();
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState<Task["status"] | "all">("all");
-  const statusColumns = useMemo(() => catalogEntriesByKind(catalogs.entries, "workStatus").map((entry) => ({ value: entry.key, label: entry.label, sortOrder: entry.sortOrder, isClosed: entry.isClosed })), [catalogs.entries]);
+  const statusColumns = useMemo(() => catalogEntriesByKind(catalogs.entries, "workStatus").map((entry) => ({ value: entry.key, label: entry.label, sortOrder: entry.sortOrder, isClosed: entry.isClosed, color: entry.color })), [catalogs.entries]);
   const filteredTasks = useMemo(() => tasks.filter((task) => statusFilter === "all" || task.status === statusFilter), [statusFilter, tasks]);
   const visibleTasks = useMemo(() => filteredTasks.filter((task) => matchesSearch(task, searchValue)), [filteredTasks, searchValue]);
   const filterOptions = statusColumns.map((column) => ({
     value: column.value as Task["status"],
     label: column.label,
+    color: column.color,
     count: tasks.filter((task) => task.status === column.value).length
   }));
 

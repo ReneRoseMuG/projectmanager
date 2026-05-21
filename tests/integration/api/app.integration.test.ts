@@ -84,7 +84,7 @@ describe("Projekt Manager API integration", () => {
       }
       await api
         .post(`/api/catalogs/${entry.kind}`)
-        .send({ key: entry.key, label: entry.label, sortOrder: entry.sortOrder, isClosed: entry.isClosed })
+        .send({ key: entry.key, label: entry.label, sortOrder: entry.sortOrder, isClosed: entry.isClosed, color: entry.color })
         .expect(201);
     }
   }
@@ -97,6 +97,7 @@ describe("Projekt Manager API integration", () => {
       removedEntries.push(...(await trimCatalog("workStatus", ["active"])));
       removedEntries.push(...(await trimCatalog("featureStatus", ["active"])));
       removedEntries.push(...(await trimCatalog("priority", ["low"])));
+      removedEntries.push(...(await trimCatalog("ticketType", ["question"])));
 
       const project = (await api.post("/api/projects").send({ name: "Trimmed catalogs project" }).expect(201)).body as Project;
       createdIds.project = project.id;
@@ -123,6 +124,7 @@ describe("Projekt Manager API integration", () => {
       createdIds.ticket = ticket.id;
       expect(ticket.status).toBe("active");
       expect(ticket.priority).toBe("low");
+      expect(ticket.type).toBe("question");
 
       const backlog = (await api.post(`/api/projects/${project.id}/backlog`).send({ title: "Trimmed catalogs backlog" }).expect(201)).body as BacklogItem;
       createdIds.backlog = backlog.id;

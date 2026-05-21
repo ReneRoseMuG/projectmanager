@@ -2,7 +2,7 @@ import type { BacklogItem, BacklogStatus, Feature } from "@taskmanager/shared-ty
 import { Edit3, Inbox, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
-import { catalogEntriesByKind, isCatalogStatusClosed } from "../../utils/catalogs";
+import { catalogColor, catalogEntriesByKind, isCatalogStatusClosed } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
 import { Badge } from "../ui/Badge";
@@ -44,7 +44,7 @@ export function BacklogListBoardView({ items, features, statusFilter, onStatusFi
     [featureNames, filteredItems, searchValue]
   );
   const statusColumns = useMemo(
-    () => catalogEntriesByKind(catalogs.entries, "workStatus").map((option) => ({ value: option.key, label: option.label, sortOrder: option.sortOrder, isClosed: option.isClosed })),
+    () => catalogEntriesByKind(catalogs.entries, "workStatus").map((option) => ({ value: option.key, label: option.label, sortOrder: option.sortOrder, isClosed: option.isClosed, color: option.color })),
     [catalogs.entries]
   );
   const filterOptions = useMemo(
@@ -52,6 +52,7 @@ export function BacklogListBoardView({ items, features, statusFilter, onStatusFi
       statusColumns.map((option) => ({
         value: option.value,
         label: option.label,
+        color: option.color,
         count: items.filter((item) => item.status === option.value).length
       })),
     [items, statusColumns]
@@ -82,10 +83,11 @@ function BacklogItemCard({ item, featureName, onEdit, onDelete }: { item: Backlo
   const description = richTextToPlainText(item.description);
   const catalogs = useCatalogs();
   const closed = isCatalogStatusClosed(catalogs.entries, "workStatus", item.status);
+  const statusColor = catalogColor(catalogs.entries, "workStatus", item.status);
 
   return (
     <ItemCard
-      accentColor={closed ? "var(--color-steel-400)" : "var(--color-fern)"}
+      accentColor={statusColor}
       header={
         <div className="grid gap-2">
           <h3 className={`line-clamp-2 text-sm font-semibold ${closed ? "text-slate-500 line-through" : "text-ink"}`}>{item.title}</h3>
@@ -108,10 +110,11 @@ function BacklogItemRow({ item, featureName, onEdit, onDelete }: { item: Backlog
   const description = richTextToPlainText(item.description);
   const catalogs = useCatalogs();
   const closed = isCatalogStatusClosed(catalogs.entries, "workStatus", item.status);
+  const statusColor = catalogColor(catalogs.entries, "workStatus", item.status);
 
   return (
     <ItemRow
-      accentColor={closed ? "var(--color-steel-400)" : "var(--color-fern)"}
+      accentColor={statusColor}
       statusIndicator={<StatusPill kind="workStatus" value={item.status} />}
       title={item.title}
       description={description}

@@ -1,91 +1,36 @@
 // @vitest-environment jsdom
 
 /**
- * Test Scope:
+ * Test Scope: TicketForm
  *
  * Abgedeckte Regeln:
- * - TicketForm bindet das RichTextInlineField an den Formular-State.
+ * - TicketForm rendert die Detail-Tabs analog zu anderen Detailformularen.
+ * - Create-Modus sammelt Sub-Tickets, Relationen, Kommentare, Notizen und Dateien lokal.
+ * - Edit-Modus zeigt geladene Detaildaten in den jeweiligen Tabs.
  *
  * Fehlerfälle:
- * - Aktualisierte Beschreibung muss im Submit-Payload landen.
+ * - Pending-Daten dürfen vor dem Submit nicht verloren gehen.
+ * - Detaildaten dürfen nicht im reinen Basisformular versteckt bleiben.
  *
  * Ziel:
- * Die Rich-Text-Integration im Ticketformular absichern.
+ * Die tabfähige Ticket-Detailform gegen Regressionen in Create- und Edit-Flows absichern.
  */
-import "@testing-library/jest-dom/vitest";
-import type { Ticket } from "@taskmanager/shared-types";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { addPendingComment, changeInput, clickTab, getFileInput, renderWithProviders, ticket } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { TicketForm } from "../../../../../apps/web/src/components/tickets/TicketForm";
 
-vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
-  RichTextInlineField({ value, onChange, placeholder, testIdPrefix }: { value: string | null | undefined; onChange: (value: string) => void; placeholder?: string; testIdPrefix?: string }) {
-    return <textarea aria-label={placeholder ?? "Rich Text"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
-  }
-}));
-
-vi.mock("../../../../../apps/web/src/components/tags/TagPicker", () => ({
-  TagPicker() {
-    return <div data-testid="tag-picker" />;
-  }
-}));
-
-vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
-  useCatalogs() {
-    const entries = [
-      { id: 1, kind: "workStatus", key: "open", label: "Offen", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 2, kind: "workStatus", key: "in_progress", label: "In Arbeit", sortOrder: 200, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 3, kind: "workStatus", key: "closed", label: "Geschlossen", sortOrder: 300, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
-      { id: 4, kind: "priority", key: "medium", label: "Mittel", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" }
-    ];
-    return {
-      entries,
-      workStatuses: entries.filter((entry) => entry.kind === "workStatus"),
-      featureStatuses: [],
-      priorities: entries.filter((entry) => entry.kind === "priority"),
-      loading: false,
-      error: null,
-      createEntry: vi.fn(),
-      updateEntry: vi.fn(),
-      deleteEntry: vi.fn(),
-      reload: vi.fn()
-    };
-  }
-}));
-
-const ticket: Ticket = {
-  id: 50,
-  parentId: null,
-  type: "bug",
-  title: "Ticket Alpha",
-  description: "<p>Ticket Beschreibung</p>",
-  status: "open",
-  priority: "medium",
-  resolution: null,
-  reporter: null,
-  assignee: null,
-  environment: null,
-  affectedVersion: null,
-  dueDate: null,
-  resolvedAt: null,
-  position: 1024,
-  version: 1,
-  createdAt: "2026-05-19T08:00:00.000Z",
-  updatedAt: "2026-05-19T09:00:00.000Z",
-  tags: [],
-  subTicketCount: 0
-};
-
-afterEach(() => {
-  cleanup();
-  vi.clearAllMocks();
-});
+function changeLastInput(value: string) {
+  const inputs = document.body.querySelectorAll("input");
+  const input = inputs[inputs.length - 1];
+  expect(input).toBeDefined();
+  fireEvent.change(input as HTMLInputElement, { target: { value } });
+}
 
 describe("TicketForm", () => {
   it("bindet RichTextInlineField an die Beschreibung", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<TicketForm open ticket={ticket} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
+    renderWithProviders(<TicketForm open ticket={ticket} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
 
     expect(screen.getByTestId("ticket-description-view")).toHaveValue(ticket.description);
     fireEvent.change(screen.getByTestId("ticket-description-view"), { target: { value: "<p>Ticket aktualisiert</p>" } });
@@ -94,14 +39,100 @@ describe("TicketForm", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Ticket aktualisiert</p>" })));
   });
 
+  it("zeigt im Create-Modus alle erwarteten Detail-Tabs ohne Journal", () => {
+    renderWithProviders(<TicketForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Sub-Tickets/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Relationen/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Kommentare/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Notizen/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Dateien/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Journal/ })).not.toBeInTheDocument();
+  });
+
+  it("zeigt im Create-Modus Pending-Listen in Verwaltungs-Tabs", () => {
+    renderWithProviders(<TicketForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    clickTab("Sub-Tickets");
+    expect(screen.getByText("Keine Sub-Tickets vorgemerkt")).toBeInTheDocument();
+    clickTab("Relationen");
+    expect(screen.getByText("Keine Relationen vorgemerkt")).toBeInTheDocument();
+    clickTab("Kommentare");
+    expect(screen.getByText("Keine Kommentare vorgemerkt")).toBeInTheDocument();
+    clickTab("Notizen");
+    expect(screen.getByText("Keine Notizen vorgemerkt")).toBeInTheDocument();
+    clickTab("Dateien");
+    expect(screen.getByText("Keine Dateien vorgemerkt")).toBeInTheDocument();
+  });
+
+  it("übergibt alle Pending-Daten im Create-Submit", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(ticket);
+    const file = new File(["ticket"], "ticket.txt", { type: "text/plain" });
+    const { container } = renderWithProviders(<TicketForm open initialStatus="open" onSubmit={onSubmit} onClose={vi.fn()} />);
+
+    changeInput(0, "Neues Ticket");
+    clickTab("Sub-Tickets");
+    fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
+    changeLastInput("Sub-Ticket Pending");
+    fireEvent.click(screen.getByRole("button", { name: "Vormerken" }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Sub-Ticket vormerken" })).not.toBeInTheDocument());
+
+    clickTab("Relationen");
+    fireEvent.click(screen.getByRole("button", { name: "Relation hinzufügen" }));
+    const selects = document.body.querySelectorAll("select");
+    fireEvent.change(selects[0] as HTMLSelectElement, { target: { value: String(ticket.id) } });
+    fireEvent.click(screen.getByRole("button", { name: /Hinzuf/ }));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Relation vormerken" })).not.toBeInTheDocument());
+
+    clickTab("Kommentare");
+    addPendingComment("Ticket-Kommentar");
+    clickTab("Notizen");
+    fireEvent.click(screen.getByRole("button", { name: "Neue Notiz" }));
+    changeLastInput("Ticket-Notiz");
+    fireEvent.click(screen.getByRole("button", { name: /Hinzuf/ }));
+    clickTab("Dateien");
+    fireEvent.change(getFileInput(container), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Ticket anlegen" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Neues Ticket",
+          pendingSubTickets: [{ title: "Sub-Ticket Pending", type: "bug", status: "open", priority: "medium" }],
+          pendingRelations: [{ ticket, relationType: "related" }],
+          pendingComments: [{ text: "Ticket-Kommentar" }],
+          pendingNotes: [{ title: "Ticket-Notiz", contentJson: {} }],
+          pendingFiles: [{ file, previewUrl: undefined }]
+        })
+      )
+    );
+  });
+
+  it("zeigt im Edit-Modus geladene Detaildaten in den Tabs", () => {
+    renderWithProviders(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    clickTab("Sub-Tickets");
+    expect(screen.getAllByText("Sub-Ticket Alpha").length).toBeGreaterThan(0);
+    clickTab("Relationen");
+    expect(screen.getAllByText("Ticket Bravo").length).toBeGreaterThan(0);
+    clickTab("Kommentare");
+    expect(screen.getByTestId("comment-thread")).toHaveTextContent("Ticket:1");
+    clickTab("Notizen");
+    expect(screen.getByTestId("note-list")).toHaveTextContent("1");
+    clickTab("Dateien");
+    expect(screen.getByTestId("attachment-uploader")).toBeInTheDocument();
+    expect(screen.getByTestId("attachment-list")).toHaveTextContent("1");
+  });
+
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {
-    render(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} variant="page" />);
+    renderWithProviders(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} variant="page" />);
 
     expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
   });
 
   it("zeigt im Edit-Modus keinen 'In neuem Tab öffnen'-Button, wenn onOpenInTab fehlt", () => {
-    render(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+    renderWithProviders(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
     expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
   });

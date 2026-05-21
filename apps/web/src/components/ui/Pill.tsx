@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
+import { catalogFillStyle } from "../../utils/catalogs";
 
 export type PillTone = "fern" | "tangerine" | "violet" | "crimson" | "steel" | "mustard";
 
 /** High-emphasis status pill for compact domain labels. */
-export function Pill({ tone, children }: { tone: PillTone; children: ReactNode }) {
+export function Pill({ tone = "steel", color, children }: { tone?: PillTone; color?: string | null; children: ReactNode }) {
   const map: Record<PillTone, string> = {
     fern: "bg-fern",
     tangerine: "bg-tangerine",
@@ -12,6 +13,8 @@ export function Pill({ tone, children }: { tone: PillTone; children: ReactNode }
     steel: "bg-steel-500",
     mustard: "bg-mustard"
   };
+  const style = color ? catalogFillStyle(color) : undefined;
+  const toneClass = color ? "" : map[tone];
 
-  return <span className={`${map[tone]} inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white`}>{children}</span>;
+  return <span className={`${toneClass} inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white`} style={style}>{children}</span>;
 }

@@ -150,6 +150,11 @@ describe("Auth API", () => {
     await reader.post("/api/auth/login").send({ email: "reader@example.test", password: "password123" }).expect(200);
     await reader.get("/api/projects").expect(200);
     await reader.post("/api/projects").send({ name: "Nicht erlaubt" }).expect(403);
+    await reader.get("/api/catalogs").expect(200);
+    const ticketTypes = await admin.get("/api/catalogs/ticketType").expect(200);
+    const bugType = ticketTypes.body.find((entry: { key: string }) => entry.key === "bug") as { id: number };
+    await reader.post("/api/catalogs/ticketType").send({ key: "reader_blocked", label: "Reader Blocked" }).expect(403);
+    await reader.delete(`/api/catalogs/ticketType/${bugType.id}`).expect(403);
     await reader.get("/api/admin/users").expect(403);
   });
 

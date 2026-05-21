@@ -3,7 +3,10 @@ import { Check, ListChecks, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { errorMessage } from "../../hooks/errors";
 import { useCatalogs } from "../../hooks/useCatalogs";
+import { useHasPermission } from "../../hooks/usePermissions";
+import { defaultCatalogColor } from "../../utils/catalogs";
 import { Button } from "../ui/Button";
+import { ColorPicker } from "../ui/ColorPicker";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
 import { Input } from "../ui/Input";
@@ -27,6 +30,11 @@ const groups: Array<{ kind: CatalogKind; title: string; createLabel: string }> =
       title: "Prioritäten: Aufgaben und Tickets",
       createLabel: "Neue Priorität",
     },
+    {
+      kind: "ticketType",
+      title: "Ticket-Typen",
+      createLabel: "Neuer Ticket-Typ",
+    },
   ];
 
 interface CatalogGroupProps {
@@ -34,6 +42,8 @@ interface CatalogGroupProps {
   title: string;
   createLabel: string;
   entries: CatalogEntry[];
+  canWrite: boolean;
+  canDelete: boolean;
   onCreate: (
     kind: CatalogKind,
     input: {
@@ -41,12 +51,13 @@ interface CatalogGroupProps {
       label: string;
       sortOrder?: number;
       isClosed?: boolean;
+      color?: string;
     },
   ) => Promise<void>;
   onUpdate: (
     kind: CatalogKind,
     entry: CatalogEntry,
-    input: { label: string; sortOrder: number; isClosed: boolean },
+    input: { label: string; sortOrder: number; isClosed: boolean; color: string },
   ) => Promise<void>;
   onDelete: (kind: CatalogKind, entry: CatalogEntry) => Promise<void>;
 }
@@ -56,6 +67,8 @@ function CatalogGroup({
   title,
   createLabel,
   entries,
+  canWrite,
+  canDelete,
   onCreate,
   onUpdate,
   onDelete,
@@ -64,7 +77,8 @@ function CatalogGroup({
   const [label, setLabel] = useState("");
   const [sortOrder, setSortOrder] = useState("");
   const [isClosed, setIsClosed] = useState(false);
-  const canMarkClosed = kind !== "priority";
+  const [color, setColor] = useState(defaultCatalogColor(kind, ""));
+  const canMarkClosed = kind === "workStatus" || kind === "featureStatus";
   const trimmedKey = key.trim();
   const trimmedLabel = label.trim();
 
@@ -77,17 +91,19 @@ function CatalogGroup({
       label: trimmedLabel,
       sortOrder: sortOrder === "" ? undefined : Number(sortOrder),
       isClosed: canMarkClosed ? isClosed : false,
+      color,
     });
     setKey("");
     setLabel("");
     setSortOrder("");
     setIsClosed(false);
+    setColor(defaultCatalogColor(kind, ""));
   };
 
   return (
     <Section title={title}>
       <div className="grid gap-3">
-        <div className="grid gap-3 md:grid-cols-[minmax(8rem,0.7fr)_minmax(10rem,1fr)_8rem_auto_auto] md:items-end">
+        <div className="grid gap-3 md:grid-cols-[minmax(8rem,0.7fr)_minmax(10rem,1fr)_8rem_minmax(13rem,1fr)_auto_auto] md:items-end">
           <FormField label="Schlüssel" required>
             <Input
               value={key}
@@ -109,6 +125,9 @@ function CatalogGroup({
               onChange={(event) => setSortOrder(event.target.value)}
             />
           </FormField>
+          <FormField label="Farbe">
+            <ColorPicker value={color} onChange={setColor} />
+          </FormField>
           {canMarkClosed ? (
             <label className="flex h-11 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-slate-700">
               <input
@@ -124,17 +143,18 @@ function CatalogGroup({
           <Button
             variant="primary"
             icon={<Plus size={16} />}
-            disabled={!trimmedKey || !trimmedLabel}
+            disabled={!canWrite || !trimmedKey || !trimmedLabel}
             onClick={() => void submit()}
           >
             Anlegen
           </Button>
         </div>
 
-        <div className="hidden grid-cols-[minmax(8rem,0.7fr)_minmax(10rem,1fr)_8rem_8rem_auto] gap-3 border-b border-line pb-2 text-xs font-bold uppercase text-slate-500 md:grid">
+        <div className="hidden grid-cols-[minmax(8rem,0.7fr)_minmax(10rem,1fr)_8rem_minmax(13rem,1fr)_8rem_auto] gap-3 border-b border-line pb-2 text-xs font-bold uppercase text-slate-500 md:grid">
           <span>Schlüssel</span>
           <span>Label</span>
           <span>Sortierung</span>
+          <span>Farbe</span>
           <span>Status</span>
           <span className="text-right">Aktionen</span>
         </div>
@@ -143,6 +163,8 @@ function CatalogGroup({
             key={entry.id}
             entry={entry}
             canMarkClosed={canMarkClosed}
+            canWrite={canWrite}
+            canDelete={canDelete}
             onUpdate={(input) => onUpdate(kind, entry, input)}
             onDelete={() => onDelete(kind, entry)}
           />
@@ -155,15 +177,20 @@ function CatalogGroup({
 function CatalogRow({
   entry,
   canMarkClosed,
+  canWrite,
+  canDelete,
   onUpdate,
   onDelete,
 }: {
   entry: CatalogEntry;
   canMarkClosed: boolean;
+  canWrite: boolean;
+  canDelete: boolean;
   onUpdate: (input: {
     label: string;
     sortOrder: number;
     isClosed: boolean;
+    color: string;
   }) => Promise<void>;
   onDelete: () => Promise<void>;
 }) {
@@ -171,21 +198,23 @@ function CatalogRow({
   const [label, setLabel] = useState(entry.label);
   const [sortOrder, setSortOrder] = useState(String(entry.sortOrder));
   const [isClosed, setIsClosed] = useState(entry.isClosed);
+  const [color, setColor] = useState(entry.color);
 
   const cancel = () => {
     setLabel(entry.label);
     setSortOrder(String(entry.sortOrder));
     setIsClosed(entry.isClosed);
+    setColor(entry.color);
     setEditing(false);
   };
 
   const save = async () => {
-    await onUpdate({ label, sortOrder: Number(sortOrder), isClosed });
+    await onUpdate({ label, sortOrder: Number(sortOrder), isClosed, color });
     setEditing(false);
   };
 
   return (
-    <div className="grid gap-3 border-b border-line py-3 text-sm md:grid-cols-[minmax(8rem,0.7fr)_minmax(10rem,1fr)_8rem_8rem_auto] md:items-center">
+    <div className="grid gap-3 border-b border-line py-3 text-sm md:grid-cols-[minmax(8rem,0.7fr)_minmax(10rem,1fr)_8rem_minmax(13rem,1fr)_8rem_auto] md:items-center">
       <span className="truncate font-mono text-xs font-semibold text-slate-500">
         {entry.key}
       </span>
@@ -207,6 +236,14 @@ function CatalogRow({
         />
       ) : (
         <span className="text-slate-600">{entry.sortOrder}</span>
+      )}
+      {editing ? (
+        <ColorPicker value={color} onChange={setColor} />
+      ) : (
+        <span className="flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-600">
+          <span className="h-6 w-6 shrink-0 rounded-full border border-white shadow-sm" style={{ backgroundColor: entry.color }} />
+          <span className="truncate">{entry.color}</span>
+        </span>
       )}
       {canMarkClosed ? (
         editing ? (
@@ -249,6 +286,7 @@ function CatalogRow({
           </>
         ) : (
           <>
+            {canWrite ? (
             <Button
               aria-label="Bearbeiten"
               title="Bearbeiten"
@@ -257,6 +295,8 @@ function CatalogRow({
               className="h-10 w-10"
               onClick={() => setEditing(true)}
             />
+            ) : null}
+            {canDelete ? (
             <Button
               aria-label="Löschen"
               title="Löschen"
@@ -265,6 +305,7 @@ function CatalogRow({
               className="h-10 w-10 text-crimson hover:bg-crimson/10"
               onClick={() => void onDelete()}
             />
+            ) : null}
           </>
         )}
       </div>
@@ -276,6 +317,8 @@ export function CatalogManager() {
   const catalogs = useCatalogs();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const canWrite = useHasPermission("catalogs", "write");
+  const canDelete = useHasPermission("catalogs", "delete");
   const grouped = useMemo(
     () =>
       groups.map((group) => ({
@@ -298,6 +341,7 @@ export function CatalogManager() {
       label: string;
       sortOrder?: number;
       isClosed?: boolean;
+      color?: string;
     },
   ) => {
     try {
@@ -315,7 +359,7 @@ export function CatalogManager() {
   const updateEntry = async (
     kind: CatalogKind,
     entry: CatalogEntry,
-    input: { label: string; sortOrder: number; isClosed: boolean },
+    input: { label: string; sortOrder: number; isClosed: boolean; color: string },
   ) => {
     try {
       await catalogs.updateEntry(kind, entry.id, {
@@ -391,6 +435,8 @@ export function CatalogManager() {
                   title={group.title}
                   createLabel={group.createLabel}
                   entries={group.entries}
+                  canWrite={canWrite}
+                  canDelete={canDelete}
                   onCreate={createEntry}
                   onUpdate={updateEntry}
                   onDelete={deleteEntry}

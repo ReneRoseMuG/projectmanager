@@ -1,7 +1,8 @@
 import type { Ticket } from "@taskmanager/shared-types";
 import { CalendarClock, Edit3, GitBranch, Trash2 } from "lucide-react";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { catalogColor } from "../../utils/catalogs";
 import { formatHumanDate, isOverdue } from "../../utils/date";
-import { ticketTypeLabels, ticketTypeTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
 import { Avatar } from "../ui/Avatar";
@@ -10,6 +11,7 @@ import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
 import { PriorityBadge } from "../ui/PriorityBadge";
 import { StatusPill } from "../ui/StatusPill";
+import { TicketTypeBadge } from "../ui/TicketTypeBadge";
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -19,25 +21,13 @@ interface TicketCardProps {
   onDelete?: (ticket: Ticket) => void;
 }
 
-const priorityAccent: Record<string, string> = {
-  urgent: "var(--color-crimson)",
-  high: "var(--color-tangerine)",
-  medium: "var(--color-mustard)",
-  low: "var(--color-steel-400)"
-};
-
-const statusDot: Record<string, string> = {
-  open: "bg-steel-400",
-  in_progress: "bg-tangerine",
-  in_review: "bg-mustard",
-  resolved: "bg-fern",
-  closed: "bg-violet"
-};
-
 const tagTones = ["violet", "teal", "magenta", "fern", "steel"] as const;
 
 export function TicketCard({ ticket, compact = false, variant = "card", onOpen, onDelete }: TicketCardProps) {
+  const catalogs = useCatalogs();
   const description = richTextToPlainText(ticket.description);
+  const priorityColor = catalogColor(catalogs.entries, "priority", ticket.priority);
+  const statusColor = catalogColor(catalogs.entries, "workStatus", ticket.status);
 
   if (variant === "row") {
     return (
@@ -45,14 +35,14 @@ export function TicketCard({ ticket, compact = false, variant = "card", onOpen, 
         <div className="md:hidden">
           <TicketCard ticket={ticket} compact={compact} onOpen={onOpen} onDelete={onDelete} />
         </div>
-        <TicketRow ticket={ticket} description={description} onOpen={onOpen} onDelete={onDelete} />
+        <TicketRow ticket={ticket} description={description} priorityColor={priorityColor} statusColor={statusColor} onOpen={onOpen} onDelete={onDelete} />
       </>
     );
   }
 
   return (
     <ItemCard
-      accentColor={priorityAccent[ticket.priority] ?? "var(--color-steel-400)"}
+      accentColor={priorityColor}
       header={<TicketCardHeader ticket={ticket} />}
       body={<TicketCardBody description={description} />}
       footer={<TicketCardFooter ticket={ticket} />}
@@ -70,7 +60,7 @@ function TicketCardHeader({ ticket }: { ticket: Ticket }) {
       <h3 className="line-clamp-2 text-sm font-semibold text-ink">{ticket.title}</h3>
       <div className="flex flex-wrap items-center gap-2">
         <StatusPill kind="workStatus" value={ticket.status} />
-        <Badge tone={ticketTypeTones[ticket.type]}>{ticketTypeLabels[ticket.type]}</Badge>
+        <TicketTypeBadge value={ticket.type} />
       </div>
     </div>
   );
@@ -115,20 +105,20 @@ function TicketCardFooter({ ticket }: { ticket: Ticket }) {
   );
 }
 
-function TicketRow({ ticket, description, onOpen, onDelete }: { ticket: Ticket; description: string; onOpen: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void }) {
+function TicketRow({ ticket, description, priorityColor, statusColor, onOpen, onDelete }: { ticket: Ticket; description: string; priorityColor: string; statusColor: string; onOpen: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void }) {
   const overdue = ticket.status !== "resolved" && ticket.status !== "closed" && isOverdue(ticket.dueDate);
 
   return (
     <div className="hidden md:block">
       <ItemRow
-        accentColor={priorityAccent[ticket.priority] ?? "var(--color-steel-400)"}
-        statusIndicator={<span className={`block h-3 w-3 rounded-full ${statusDot[ticket.status] ?? "bg-steel-400"}`} aria-hidden="true" />}
+        accentColor={priorityColor}
+        statusIndicator={<span className="block h-3 w-3 rounded-full" style={{ backgroundColor: statusColor }} aria-hidden="true" />}
         title={ticket.title}
         description={description}
         pills={
           <>
             <StatusPill kind="workStatus" value={ticket.status} />
-            <Badge tone={ticketTypeTones[ticket.type]}>{ticketTypeLabels[ticket.type]}</Badge>
+            <TicketTypeBadge value={ticket.type} />
             <PriorityBadge value={ticket.priority} />
           </>
         }

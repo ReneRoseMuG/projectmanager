@@ -1,5 +1,7 @@
 import type { Task } from "@taskmanager/shared-types";
 import { CalendarClock, CheckCircle2, Edit3, Trash2 } from "lucide-react";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { catalogColor } from "../../utils/catalogs";
 import { formatHumanDate, isOverdue } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
@@ -17,17 +19,12 @@ interface TaskCardProps {
   onDelete?: (task: Task) => void;
 }
 
-const priorityAccent: Record<string, string> = {
-  urgent: "var(--color-crimson)",
-  high: "var(--color-tangerine)",
-  medium: "var(--color-mustard)",
-  low: "var(--color-steel-400)"
-};
-
 const tagTones: Array<"violet" | "teal" | "magenta" | "fern" | "steel"> = ["violet", "teal", "magenta", "fern", "steel"];
 
 export function TaskCard({ task, compact = false, variant = "card", onOpen, onDelete }: TaskCardProps) {
+  const catalogs = useCatalogs();
   const description = richTextToPlainText(task.description);
+  const priorityColor = catalogColor(catalogs.entries, "priority", task.priority);
 
   if (variant === "row") {
     return (
@@ -35,14 +32,14 @@ export function TaskCard({ task, compact = false, variant = "card", onOpen, onDe
         <div className="md:hidden">
           <TaskCard task={task} compact={compact} onOpen={onOpen} onDelete={onDelete} />
         </div>
-        <TaskRow task={task} description={description} onOpen={onOpen} onDelete={onDelete} />
+        <TaskRow task={task} description={description} priorityColor={priorityColor} onOpen={onOpen} onDelete={onDelete} />
       </>
     );
   }
 
   return (
     <ItemCard
-      accentColor={priorityAccent[task.priority] ?? "var(--color-steel-400)"}
+      accentColor={priorityColor}
       header={<TaskCardHeader task={task} />}
       body={<TaskCardBody description={description} />}
       footer={<TaskCardFooter task={task} />}
@@ -105,14 +102,14 @@ function TaskCardFooter({ task }: { task: Task }) {
   );
 }
 
-function TaskRow({ task, description, onOpen, onDelete }: { task: Task; description: string; onOpen: (task: Task) => void; onDelete?: (task: Task) => void }) {
+function TaskRow({ task, description, priorityColor, onOpen, onDelete }: { task: Task; description: string; priorityColor: string; onOpen: (task: Task) => void; onDelete?: (task: Task) => void }) {
   const overdue = task.status !== "done" && isOverdue(task.dueDate);
   const primaryTag = task.tags[0];
 
   return (
     <div className="hidden md:block">
       <ItemRow
-        accentColor={priorityAccent[task.priority] ?? "var(--color-steel-400)"}
+        accentColor={priorityColor}
         title={task.title}
         description={description}
         pills={

@@ -23,7 +23,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { errorMessage } from "../../hooks/errors";
@@ -36,13 +36,12 @@ import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useUseCases } from "../../hooks/useUseCases";
 import {
+  catalogEntriesByKind,
+  catalogColor,
   catalogLabel,
   countOpenStatusItems,
-  isCatalogStatusClosed,
   resolveCatalogEntryKey,
 } from "../../utils/catalogs";
-import { ticketTypeLabels } from "../../utils/domainLabels";
-import { statusToneForKey } from "../../utils/statusTones";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { JournalPanel } from "../journal/JournalPanel";
@@ -146,6 +145,17 @@ function priorityValue(
 ) {
   return (
     resolveCatalogEntryKey(entries, "priority", value, preferredKey) ??
+    preferredKey
+  );
+}
+
+function ticketTypeValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "bug",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "ticketType", value, preferredKey) ??
     preferredKey
   );
 }
@@ -545,14 +555,10 @@ export function FeatureForm({
                             "workStatus",
                             item.task.status,
                           ),
-                          statusTone: statusToneForKey(
+                          statusColor: catalogColor(
+                            catalogs.entries,
                             "workStatus",
                             item.task.status,
-                            isCatalogStatusClosed(
-                              catalogs.entries,
-                              "workStatus",
-                              item.task.status,
-                            ),
                           ),
                         },
                       ]
@@ -599,14 +605,10 @@ export function FeatureForm({
                             "workStatus",
                             item.ticket.status,
                           ),
-                          statusTone: statusToneForKey(
+                          statusColor: catalogColor(
+                            catalogs.entries,
                             "workStatus",
                             item.ticket.status,
-                            isCatalogStatusClosed(
-                              catalogs.entries,
-                              "workStatus",
-                              item.ticket.status,
-                            ),
                           ),
                         },
                       ]
@@ -1076,6 +1078,13 @@ function TicketDraftDialog({
   const [status, setStatus] = useState<TicketStatus>("open");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
+  const ticketTypeOptions = useMemo(() => catalogEntriesByKind(catalogs.entries, "ticketType"), [catalogs.entries]);
+
+  useEffect(() => {
+    if (open) {
+      setType((currentType) => ticketTypeValue(catalogs.entries, currentType));
+    }
+  }, [catalogs.entries, open]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
@@ -1085,7 +1094,7 @@ function TicketDraftDialog({
     }
     onCreate({
       title: trimmedTitle,
-      type,
+      type: ticketTypeValue(catalogs.entries, type),
       status: resolveCatalogEntryKey(
         catalogs.entries,
         "workStatus",
@@ -1100,7 +1109,7 @@ function TicketDraftDialog({
       ),
     });
     setTitle("");
-    setType("bug");
+    setType(ticketTypeValue(catalogs.entries, "bug"));
     setStatus(workStatusValue(catalogs.entries, "open", "open"));
     setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
@@ -1122,10 +1131,11 @@ function TicketDraftDialog({
           value={type}
           onChange={(event) => setType(event.target.value as TicketType)}
         >
-          <option value="bug">{ticketTypeLabels.bug}</option>
-          <option value="improvement">{ticketTypeLabels.improvement}</option>
-          <option value="question">{ticketTypeLabels.question}</option>
-          <option value="task">{ticketTypeLabels.task}</option>
+          {ticketTypeOptions.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
         </Select>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">

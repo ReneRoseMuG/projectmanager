@@ -10,26 +10,30 @@ import { assertSafeTestDatabasePath, vitestRuntimeRoot } from "../../../apps/api
 export type TestDb = ReturnType<typeof createTestDb>;
 
 const defaultCatalogEntries = [
-  ["workStatus", "active", "Aktiv", 100, 0],
-  ["workStatus", "on_hold", "Pausiert", 200, 0],
-  ["workStatus", "completed", "Abgeschlossen", 300, 1],
-  ["workStatus", "archived", "Archiviert", 400, 1],
-  ["workStatus", "todo", "Offen", 500, 0],
-  ["workStatus", "open", "Offen", 600, 0],
-  ["workStatus", "in_progress", "In Arbeit", 700, 0],
-  ["workStatus", "in_review", "In Prüfung", 800, 0],
-  ["workStatus", "done", "Erledigt", 900, 1],
-  ["workStatus", "resolved", "Gelöst", 1000, 1],
-  ["workStatus", "closed", "Geschlossen", 1100, 1],
-  ["workStatus", "rejected", "Verworfen", 1200, 1],
-  ["featureStatus", "draft", "Entwurf", 100, 0],
-  ["featureStatus", "active", "Aktiv", 200, 0],
-  ["featureStatus", "done", "Erledigt", 300, 1],
-  ["featureStatus", "archived", "Archiviert", 400, 1],
-  ["priority", "low", "Niedrig", 100, 0],
-  ["priority", "medium", "Mittel", 200, 0],
-  ["priority", "high", "Hoch", 300, 0],
-  ["priority", "urgent", "Dringend", 400, 0]
+  ["workStatus", "active", "Aktiv", 100, 0, "var(--color-fern)"],
+  ["workStatus", "on_hold", "Pausiert", 200, 0, "var(--color-steel-500)"],
+  ["workStatus", "completed", "Abgeschlossen", 300, 1, "var(--color-steel-500)"],
+  ["workStatus", "archived", "Archiviert", 400, 1, "var(--color-steel-500)"],
+  ["workStatus", "todo", "Offen", 500, 0, "var(--color-fern)"],
+  ["workStatus", "open", "Offen", 600, 0, "var(--color-fern)"],
+  ["workStatus", "in_progress", "In Arbeit", 700, 0, "var(--color-tangerine)"],
+  ["workStatus", "in_review", "In Prüfung", 800, 0, "var(--color-mustard)"],
+  ["workStatus", "done", "Erledigt", 900, 1, "var(--color-steel-500)"],
+  ["workStatus", "resolved", "Gelöst", 1000, 1, "var(--color-steel-500)"],
+  ["workStatus", "closed", "Geschlossen", 1100, 1, "var(--color-steel-500)"],
+  ["workStatus", "rejected", "Verworfen", 1200, 1, "var(--color-steel-500)"],
+  ["featureStatus", "draft", "Entwurf", 100, 0, "var(--color-violet)"],
+  ["featureStatus", "active", "Aktiv", 200, 0, "var(--color-tangerine)"],
+  ["featureStatus", "done", "Erledigt", 300, 1, "var(--color-steel-500)"],
+  ["featureStatus", "archived", "Archiviert", 400, 1, "var(--color-steel-500)"],
+  ["priority", "low", "Niedrig", 100, 0, "var(--color-steel-400)"],
+  ["priority", "medium", "Mittel", 200, 0, "var(--color-mustard)"],
+  ["priority", "high", "Hoch", 300, 0, "var(--color-tangerine)"],
+  ["priority", "urgent", "Dringend", 400, 0, "var(--color-crimson)"],
+  ["ticketType", "bug", "Bug", 100, 0, "var(--color-crimson)"],
+  ["ticketType", "improvement", "Verbesserung", 200, 0, "var(--color-teal)"],
+  ["ticketType", "question", "Frage", 300, 0, "var(--color-violet)"],
+  ["ticketType", "task", "Aufgabe", 400, 0, "var(--color-steel-500)"]
 ] as const;
 
 interface DrizzleJournalEntry {
@@ -43,7 +47,7 @@ interface DrizzleJournal {
 }
 
 function seedDefaultCatalogEntries(sqlite: Database.Database): void {
-  const insert = sqlite.prepare("INSERT INTO catalog_entries (kind, key, label, sort_order, is_closed, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))");
+  const insert = sqlite.prepare("INSERT INTO catalog_entries (kind, key, label, sort_order, is_closed, color, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))");
   for (const entry of defaultCatalogEntries) {
     insert.run(...entry);
   }

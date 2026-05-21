@@ -28,6 +28,7 @@ export function FeaturesPage() {
       catalogEntriesByKind(catalogs.entries, "featureStatus").map((entry) => ({
         value: entry.key,
         label: entry.label,
+        color: entry.color,
         count: features.features.filter(
           (feature) => feature.status === entry.key,
         ).length,

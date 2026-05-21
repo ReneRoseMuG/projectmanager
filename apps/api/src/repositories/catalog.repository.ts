@@ -6,7 +6,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type CatalogEntryRecord = typeof catalogEntries.$inferSelect;
 export type CatalogEntryCreateData = Omit<typeof catalogEntries.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type CatalogEntryUpdateData = Partial<Pick<CatalogEntryCreateData, "label" | "sortOrder" | "isClosed">>;
+export type CatalogEntryUpdateData = Partial<Pick<CatalogEntryCreateData, "label" | "sortOrder" | "isClosed" | "color">>;
 
 function nowIso(): string {
   return new Date().toISOString();

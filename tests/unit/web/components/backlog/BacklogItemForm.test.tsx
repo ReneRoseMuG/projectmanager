@@ -44,15 +44,16 @@ vi.mock("../../../../../apps/web/src/hooks/useEntityComments", () => ({
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
     const entries = [
-      { id: 1, kind: "workStatus", key: "open", label: "Offen", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" },
-      { id: 2, kind: "workStatus", key: "done", label: "Erledigt", sortOrder: 200, isClosed: true, version: 1, createdAt: "", updatedAt: "" },
-      { id: 3, kind: "priority", key: "medium", label: "Mittel", sortOrder: 100, isClosed: false, version: 1, createdAt: "", updatedAt: "" }
+      { id: 1, kind: "workStatus", key: "open", label: "Offen", sortOrder: 100, isClosed: false, color: "var(--color-fern)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 2, kind: "workStatus", key: "done", label: "Erledigt", sortOrder: 200, isClosed: true, color: "var(--color-steel-500)", version: 1, createdAt: "", updatedAt: "" },
+      { id: 3, kind: "priority", key: "medium", label: "Mittel", sortOrder: 100, isClosed: false, color: "var(--color-mustard)", version: 1, createdAt: "", updatedAt: "" }
     ];
     return {
       entries,
       workStatuses: entries.filter((entry) => entry.kind === "workStatus"),
       featureStatuses: [],
       priorities: entries.filter((entry) => entry.kind === "priority"),
+      ticketTypes: [],
       loading: false,
       error: null,
       createEntry: vi.fn(),

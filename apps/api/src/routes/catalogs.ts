@@ -31,7 +31,8 @@ const catalogEntryBodySchema = {
     key: { type: "string", minLength: 1 },
     label: { type: "string", minLength: 1 },
     sortOrder: { type: "number" },
-    isClosed: { type: "boolean" }
+    isClosed: { type: "boolean" },
+    color: { type: "string", minLength: 1 }
   }
 } as const;
 
@@ -43,6 +44,7 @@ const catalogEntryPatchSchema = {
     label: { type: "string", minLength: 1 },
     sortOrder: { type: "number" },
     isClosed: { type: "boolean" },
+    color: { type: "string", minLength: 1 },
     ...expectedVersionPropertySchema
   }
 } as const;

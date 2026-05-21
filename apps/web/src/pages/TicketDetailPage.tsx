@@ -1,6 +1,14 @@
 import type { TicketStatus } from "@taskmanager/shared-types";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { setTicketTags, type TicketOwner } from "../api/tickets";
+import {
+  addTicketRelation,
+  createSubTicket,
+  createTicketNote,
+  setTicketTags,
+  type TicketOwner,
+  uploadTicketAttachment,
+} from "../api/tickets";
+import { createEntityComment } from "../api/comments";
 import {
   TicketForm,
   type TicketFormInput,
@@ -47,6 +55,9 @@ export function TicketDetailPage() {
     !isCreateMode && Number.isFinite(ticketId) ? ticketId : null,
   );
   const returnTo = searchParams.get("returnTo") ?? "/tickets";
+  const currentRoute = !isCreateMode && ticketId !== null && Number.isFinite(ticketId)
+    ? `/tickets/${ticketId}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+    : "/tickets";
 
   const closePage = () => navigate(returnTo);
   const openInTab =
@@ -58,18 +69,58 @@ export function TicketDetailPage() {
       : undefined;
 
   const createTicket = async (input: TicketFormInput) => {
-    const { tagIds, ...ticketInput } = input;
+    const { tagIds, pendingSubTickets, pendingRelations, pendingComments, pendingNotes, pendingFiles } = input;
+    const ticketInput = {
+      title: input.title,
+      type: input.type,
+      description: input.description,
+      status: input.status,
+      priority: input.priority,
+      reporter: input.reporter,
+      assignee: input.assignee,
+      environment: input.environment,
+      affectedVersion: input.affectedVersion,
+      dueDate: input.dueDate,
+    };
+    let created: Awaited<ReturnType<typeof tickets.createTicket>> | null = null;
     try {
-      const created = await tickets.createTicket(ticketInput);
+      created = await tickets.createTicket(ticketInput);
+      if (!created) {
+        throw new Error("Ticket konnte nicht erstellt werden");
+      }
       if (created && tagIds.length > 0) {
         await setTicketTags(created.id, tagIds);
+      }
+      for (const subTicket of pendingSubTickets) {
+        await createSubTicket(created.id, subTicket);
+      }
+      for (const relation of pendingRelations) {
+        await addTicketRelation(created.id, {
+          targetTicketId: relation.ticket.id,
+          relationType: relation.relationType,
+        });
+      }
+      for (const comment of pendingComments) {
+        await createEntityComment("ticket", created.id, { body: comment.text });
+      }
+      for (const note of pendingNotes) {
+        await createTicketNote(created.id, note);
+      }
+      for (let index = 0; index < pendingFiles.length; index += 1) {
+        const file = pendingFiles[index];
+        if (!file) {
+          continue;
+        }
+        await uploadTicketAttachment(created.id, file.file);
       }
       await tickets.reload();
       showToast({ tone: "success", title: "Ticket erstellt" });
     } catch (ticketError) {
       showToast({
         tone: "error",
-        title: "Ticket konnte nicht erstellt werden",
+        title: created
+          ? "Ticket wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Ticket konnte nicht erstellt werden",
         message: await errorMessageAsync(ticketError),
       });
       throw ticketError;
@@ -81,7 +132,20 @@ export function TicketDetailPage() {
     if (!ticket) {
       return;
     }
-    const { tagIds, ...ticketInput } = input;
+    const tagIds = input.tagIds;
+    const ticketInput = {
+      title: input.title,
+      type: input.type,
+      description: input.description,
+      status: input.status,
+      priority: input.priority,
+      resolution: input.resolution,
+      reporter: input.reporter,
+      assignee: input.assignee,
+      environment: input.environment,
+      affectedVersion: input.affectedVersion,
+      dueDate: input.dueDate,
+    };
     try {
       await detail.updateTicket({
         ...ticketInput,
@@ -143,7 +207,11 @@ export function TicketDetailPage() {
         variant="page"
         onSubmit={saveTicket}
         onClose={closePage}
+        onChanged={detail.reload}
         onOpenInTab={openInTab}
+        onOpenTicket={(targetTicket) => {
+          navigate(`/tickets/${targetTicket.id}?returnTo=${encodeURIComponent(currentRoute)}`);
+        }}
       />
     </div>
   );

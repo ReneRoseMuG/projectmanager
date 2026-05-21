@@ -41,12 +41,8 @@ import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useWikiImport } from "../../hooks/useWikiImport";
 import {
-  taskStatusLabels,
-  taskStatusTones,
-  ticketStatusLabels,
-  ticketStatusTones,
-} from "../../utils/domainLabels";
-import {
+  catalogColor,
+  catalogLabel,
   countOpenStatusItems,
   resolveCatalogEntryKey,
 } from "../../utils/catalogs";
@@ -733,8 +729,16 @@ export function ProjectForm({
                         {
                           id: item.task.id,
                           title: item.task.title,
-                          statusLabel: taskStatusLabels[item.task.status],
-                          statusTone: taskStatusTones[item.task.status],
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.task.status,
+                          ),
+                          statusColor: catalogColor(
+                            catalogs.entries,
+                            "workStatus",
+                            item.task.status,
+                          ),
                         },
                       ]
                     : [],
@@ -775,8 +779,16 @@ export function ProjectForm({
                         {
                           id: item.ticket.id,
                           title: item.ticket.title,
-                          statusLabel: ticketStatusLabels[item.ticket.status],
-                          statusTone: ticketStatusTones[item.ticket.status],
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.ticket.status,
+                          ),
+                          statusColor: catalogColor(
+                            catalogs.entries,
+                            "workStatus",
+                            item.ticket.status,
+                          ),
                         },
                       ]
                     : [],

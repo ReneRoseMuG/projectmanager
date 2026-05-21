@@ -183,6 +183,13 @@
       "when": 1779346924599,
       "tag": "0025_spicy_slipstream",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1779377398066,
+      "tag": "0026_ticket_type_catalog_colors",
+      "breakpoints": true
     }
   ]
 }

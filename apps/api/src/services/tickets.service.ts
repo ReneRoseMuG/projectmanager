@@ -313,15 +313,17 @@ function relationEntryId(sourceTicketId: number, targetTicketId: number, relatio
 
 function insertTicketRecord(database: DbClient, input: TicketInput, parentId: number | null = null, actor?: JournalActor | null): TicketRecord {
   const title = requireNonEmpty(input.title, "title");
+  const type = input.type ?? resolveDefaultCatalogEntryKey(database, "ticketType", "bug");
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "open");
   const priority = input.priority ?? resolveDefaultCatalogEntryKey(database, "priority", "medium");
+  ensureCatalogEntryExists(database, "ticketType", type);
   ensureCatalogEntryExists(database, "workStatus", status);
   ensureCatalogEntryExists(database, "priority", priority);
   return ticketRepository.create(
     database,
     {
       parentId,
-      type: input.type ?? "bug",
+      type,
       title,
       description: cleanNullable(input.description) ?? null,
       status,
@@ -578,6 +580,7 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
     values.title = requireNonEmpty(input.title, "title");
   }
   if (input.type !== undefined) {
+    ensureCatalogEntryExists(database, "ticketType", input.type);
     values.type = input.type;
   }
   if (input.description !== undefined) {

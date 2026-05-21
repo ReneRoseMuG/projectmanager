@@ -14,19 +14,18 @@ import type {
 } from "@taskmanager/shared-types";
 import { ClipboardList, ListChecks, Paperclip, StickyNote } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DraftFile } from "../../types";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTickets } from "../../hooks/useTickets";
 import {
+  catalogColor,
+  catalogEntriesByKind,
   catalogLabel,
   countOpenStatusItems,
-  isCatalogStatusClosed,
   resolveCatalogEntryKey,
 } from "../../utils/catalogs";
 import { toDateInput } from "../../utils/date";
-import { priorityPillTones, ticketTypeLabels } from "../../utils/domainLabels";
-import { statusToneForKey } from "../../utils/statusTones";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useNotes } from "../../hooks/useNotes";
@@ -127,6 +126,13 @@ function priorityValue(
   return (
     resolveCatalogEntryKey(entries, "priority", value, "medium") ?? "medium"
   );
+}
+
+function ticketTypeValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: TicketType,
+): TicketType {
+  return resolveCatalogEntryKey(entries, "ticketType", value, "bug") ?? "bug";
 }
 
 export function TaskForm({
@@ -370,7 +376,7 @@ export function TaskForm({
         headerMeta={
           <div className="flex flex-wrap gap-2">
             <StatusPill kind="workStatus" value={status} />
-            <Pill tone={priorityPillTones[priority] ?? "steel"}>
+            <Pill color={catalogColor(catalogs.entries, "priority", priority)}>
               {catalogLabel(catalogs.entries, "priority", priority)}
             </Pill>
           </div>
@@ -529,14 +535,10 @@ export function TaskForm({
                             "workStatus",
                             item.ticket.status,
                           ),
-                          statusTone: statusToneForKey(
+                          statusColor: catalogColor(
+                            catalogs.entries,
                             "workStatus",
                             item.ticket.status,
-                            isCatalogStatusClosed(
-                              catalogs.entries,
-                              "workStatus",
-                              item.ticket.status,
-                            ),
                           ),
                         },
                       ]
@@ -882,6 +884,13 @@ function TicketDraftDialog({
   const [status, setStatus] = useState<TicketStatus>("open");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
+  const ticketTypeOptions = useMemo(() => catalogEntriesByKind(catalogs.entries, "ticketType"), [catalogs.entries]);
+
+  useEffect(() => {
+    if (open) {
+      setType((currentType) => ticketTypeValue(catalogs.entries, currentType));
+    }
+  }, [catalogs.entries, open]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
@@ -903,12 +912,12 @@ function TicketDraftDialog({
     );
     onCreate({
       title: trimmedTitle,
-      type,
+      type: ticketTypeValue(catalogs.entries, type),
       status: nextStatus,
       priority: nextPriority,
     });
     setTitle("");
-    setType("bug");
+    setType(ticketTypeValue(catalogs.entries, "bug"));
     setStatus(ticketStatusValue(catalogs.entries, "open"));
     setPriority(priorityValue(catalogs.entries, "medium"));
     onClose();
@@ -939,10 +948,11 @@ function TicketDraftDialog({
             value={type}
             onChange={(event) => setType(event.target.value as TicketType)}
           >
-            <option value="bug">{ticketTypeLabels.bug}</option>
-            <option value="improvement">{ticketTypeLabels.improvement}</option>
-            <option value="question">{ticketTypeLabels.question}</option>
-            <option value="task">{ticketTypeLabels.task}</option>
+            {ticketTypeOptions.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
           </Select>
         </div>
       </Section>

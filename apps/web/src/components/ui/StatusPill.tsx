@@ -1,7 +1,6 @@
 import type { StatusCatalogKind } from "@taskmanager/shared-types";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { catalogEntriesByKind } from "../../utils/catalogs";
-import { statusToneForKey } from "../../utils/statusTones";
 import { Pill } from "./Pill";
 
 interface StatusPillProps {
@@ -16,7 +15,7 @@ export function StatusPill({ kind, value }: StatusPillProps) {
     (item) => item.key === value,
   );
   return (
-    <Pill tone={statusToneForKey(kind, value, entry?.isClosed)}>
+    <Pill color={entry?.color}>
       {entry?.label ?? value}
     </Pill>
   );

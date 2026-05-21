@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { useMemo, type ReactNode } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import type { ViewMode } from "../../types";
-import { catalogEntriesByKind } from "../../utils/catalogs";
+import { catalogEntriesByKind, catalogFillStyle, catalogSoftStyle } from "../../utils/catalogs";
 import { Button } from "./Button";
 import { CardGrid } from "./CardGrid";
 import { SearchInput } from "./SearchInput";
@@ -20,6 +20,7 @@ interface StatusColumn {
   label: string;
   sortOrder?: number;
   isClosed?: boolean;
+  color?: string;
 }
 
 interface StatusGroup<T> {
@@ -65,6 +66,7 @@ function catalogColumns(
     label: entry.label,
     sortOrder: entry.sortOrder,
     isClosed: entry.isClosed,
+    color: entry.color,
   }));
 }
 
@@ -140,6 +142,10 @@ function groupItemsByStatus<T>(
 }
 
 function statusGroupClass(column: StatusColumn): string {
+  if (column.color) {
+    return "";
+  }
+
   if (column.value === "__without_status") {
     return "border-dashed border-steel-300 bg-white/70";
   }
@@ -149,6 +155,14 @@ function statusGroupClass(column: StatusColumn): string {
   }
 
   return "border-line bg-shell/70";
+}
+
+function statusGroupStyle(column: StatusColumn) {
+  return column.color ? catalogSoftStyle(column.color) : undefined;
+}
+
+function statusHeaderStyle(column: StatusColumn) {
+  return column.color ? catalogFillStyle(column.color) : undefined;
 }
 
 function isKnownColumn(
@@ -314,9 +328,10 @@ function ListBoardViewContent<T>({
               <section
                 key={group.column.value}
                 className={`grid min-w-0 gap-0 rounded-lg border p-0 ${statusGroupClass(group.column)}`}
+                style={statusGroupStyle(group.column)}
               >
-                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2">
-                  <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
+                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2" style={statusHeaderStyle(group.column)}>
+                  <h2 className="min-w-0 truncate text-sm font-semibold">
                     {group.column.label}
                   </h2>
                   <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">
@@ -347,9 +362,10 @@ function ListBoardViewContent<T>({
               <section
                 key={group.column.value}
                 className={`grid h-full min-h-full min-w-0 content-start gap-0 rounded-lg border p-0 ${statusGroupClass(group.column)}`}
+                style={statusGroupStyle(group.column)}
               >
-                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2">
-                  <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
+                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2" style={statusHeaderStyle(group.column)}>
+                  <h2 className="min-w-0 truncate text-sm font-semibold">
                     {group.column.label}
                   </h2>
                   <div className="flex items-center gap-2">
