@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+import type { DbSession } from "../db/client.js";
 import { comments } from "../db/schema.js";
 
 export type CommentRecord = typeof comments.$inferSelect;
@@ -10,11 +10,11 @@ function nowIso(): string {
 }
 
 export const commentRepository = {
-  findById(database: DbClient, id: number): CommentRecord | undefined {
+  findById(database: DbSession, id: number): CommentRecord | undefined {
     return database.select().from(comments).where(eq(comments.id, id)).get();
   },
 
-  create(database: DbClient, data: CommentCreateData, userId?: number): CommentRecord {
+  create(database: DbSession, data: CommentCreateData, userId?: number): CommentRecord {
     const now = nowIso();
     return database
       .insert(comments)
@@ -30,7 +30,7 @@ export const commentRepository = {
       .get();
   },
 
-  delete(database: DbClient, id: number): number {
+  delete(database: DbSession, id: number): number {
     return database.delete(comments).where(eq(comments.id, id)).run().changes;
   }
 };

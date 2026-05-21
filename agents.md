@@ -353,6 +353,13 @@ taskmanager/
 ├── agents.md                          ← diese Datei
 ├── logs/                              ← Schritt-Logs (automatisch, Abschnitt 5)
 │   └── README.md
+├── tests/                             ← zentrale Testhierarchie
+│   ├── unit/                          ← Unit-Tests nach App (`api/`, `web/`)
+│   ├── integration/                   ← Integrationstests nach App (`api/`, `web/`)
+│   ├── browser/                       ← Browser-/E2E-Tests nach App (`web/`)
+│   ├── fixtures/                      ← Test-Fixtures und Test-Helper
+│   ├── setup/                         ← Test-Setups
+│   └── .runtime/                      ← generierte Testlaufdaten (ignoriert)
 ├── skills/                            ← versionierte Codex-Skills für dieses Repo
 │   └── projekt-manager-planungsleitplanken/
 ├── docs/
@@ -472,13 +479,15 @@ npm run dev -w apps/web   # nur Frontend (Port 5173)
 
 **Integration** — reale SQLite-Datei (In-Memory oder Temp-Datei), echte Fastify-App, Supertest für HTTP-Requests.
 
-**E2E** — wird später ergänzt (Playwright), sobald das Frontend stabil ist.
+**E2E** — Playwright-Browsertests unter `tests/browser/web/`.
 
 ### Bekannte Kommandos (wachsen mit dem Projekt)
 
 ```bash
 npm run test              # alle Tests (root, delegiert an workspaces)
 npm run test -w apps/api  # nur API-Tests
+npm run test -w apps/web  # nur Web-Unit-/Integrationstests
+npm run e2e -w apps/web   # Web-Browser-/E2E-Tests
 ```
 
 ### Grundregeln
@@ -488,8 +497,8 @@ npm run test -w apps/api  # nur API-Tests
 - Wenn ein Test noch nicht sicher implementierbar ist, wird kein leeres Testgerüst committed. Stattdessen wird die fehlende Testabdeckung als offener Punkt im Log dokumentiert.
 - Neue oder geänderte geschützte Workflows müssen Rollen- und Berechtigungstests enthalten. Mindestens ein positiver Fall mit passender Permission und ein negativer Fall ohne passende Permission sind Pflicht; bei UI-Flows wird zusätzlich geprüft, dass unzulässige Aktionen nicht angeboten oder mit Forbidden behandelt werden.
 - Keine Direktzugriffe auf die Produktions-SQLite-Datei in Tests
-- Alle Tests mit DB-Bezug verwenden ausschließlich In-Memory-, Temp- oder `.test-runtime`-Datenbanken; Testläufe dürfen nie `apps/api/data/` verwenden.
-- Alle Tests mit Dateisystembezug verwenden ausschließlich Temp- oder `.test-runtime`-Verzeichnisse; Testläufe dürfen nie `apps/api/uploads/`, `apps/api/content/` oder `apps/api/backups/` verwenden.
+- Alle Tests mit DB-Bezug verwenden ausschließlich In-Memory-, Temp- oder `tests/.runtime`-Datenbanken; Testläufe dürfen nie `apps/api/data/` verwenden.
+- Alle Tests mit Dateisystembezug verwenden ausschließlich Temp- oder `tests/.runtime`-Verzeichnisse; Testläufe dürfen nie `apps/api/uploads/`, `apps/api/content/` oder `apps/api/backups/` verwenden.
 - Integrationstests verwenden eine eigene Temp-DB, die vor/nach dem Test angelegt und gelöscht wird
 - Integrationstests für Update-Endpunkte versionierter Objekte verwenden die aktuelle `version` aus Create- oder GET-Antworten und senden `expectedVersion` explizit mit.
 - Neue Anwendungstabellen müssen in Test-Fixtures, `truncateAll` und Dump-Roundtrip-Tests berücksichtigt werden, sobald sie Teil des produktiven DB-Schemas sind.
@@ -708,8 +717,8 @@ Jede neue Anwendungstabelle muss in `apps/api/src/services/dump.service.ts` in `
 
 Zusätzlich müssen aktualisiert werden:
 
-1. `apps/api/tests/helpers/db.ts` — `truncateAll` um die Tabelle ergänzen.
-2. `apps/api/tests/integration/dumps-drive.test.ts` — Tabellenvertrag unverändert lassen und Roundtrip-Seed um repräsentative Daten ergänzen, wenn die Tabelle fachliche Daten hält.
+1. `tests/fixtures/api/db.ts` — `truncateAll` um die Tabelle ergänzen.
+2. `tests/integration/api/dumps-local.test.ts` — Tabellenvertrag unverändert lassen und Roundtrip-Seed um repräsentative Daten ergänzen, wenn die Tabelle fachliche Daten hält.
 3. Bei strukturellen Dump-Formatänderungen bewusst entscheiden, ob `DUMP_FORMAT_VERSION` erhöht werden muss. Neue Tabellen allein erhöhen die Formatversion nicht automatisch, weil die Schema-Revision bereits geprüft wird.
 
 Der Tabellenvertrag im Dump-Test darf nicht abgeschwächt werden. Wenn er rot wird, fehlt in der Regel eine Registry-, Truncation- oder Seed-Ergänzung.

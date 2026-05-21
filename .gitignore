@@ -9,6 +9,7 @@ dist/
 *.sqlite-wal
 apps/api/data/
 apps/api/.test-runtime/
+tests/.runtime/
 apps/api/uploads/*
 !apps/api/uploads/.gitkeep
 apps/api/previews/*

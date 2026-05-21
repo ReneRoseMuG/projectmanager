@@ -1,5 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+import type { DbSession } from "../db/client.js";
 import { attachments } from "../db/schema.js";
 
 export type AttachmentRecord = typeof attachments.$inferSelect;
@@ -10,11 +10,11 @@ function nowIso(): string {
 }
 
 export const attachmentRepository = {
-  findById(database: DbClient, id: number): AttachmentRecord | undefined {
+  findById(database: DbSession, id: number): AttachmentRecord | undefined {
     return database.select().from(attachments).where(eq(attachments.id, id)).get();
   },
 
-  findCleanupRecords(database: DbClient, ids: number[]): Array<Pick<AttachmentRecord, "id" | "filename">> {
+  findCleanupRecords(database: DbSession, ids: number[]): Array<Pick<AttachmentRecord, "id" | "filename">> {
     const uniqueIds = [...new Set(ids)];
     if (uniqueIds.length === 0) {
       return [];
@@ -22,7 +22,7 @@ export const attachmentRepository = {
     return database.select({ id: attachments.id, filename: attachments.filename }).from(attachments).where(inArray(attachments.id, uniqueIds)).all();
   },
 
-  create(database: DbClient, data: AttachmentCreateData, userId?: number): AttachmentRecord {
+  create(database: DbSession, data: AttachmentCreateData, userId?: number): AttachmentRecord {
     const now = nowIso();
     return database
       .insert(attachments)
@@ -38,7 +38,7 @@ export const attachmentRepository = {
       .get();
   },
 
-  deleteByIds(database: DbClient, ids: number[]): number {
+  deleteByIds(database: DbSession, ids: number[]): number {
     const uniqueIds = [...new Set(ids)];
     if (uniqueIds.length === 0) {
       return 0;

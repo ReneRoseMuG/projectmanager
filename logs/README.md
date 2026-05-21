@@ -2,6 +2,12 @@
 
 | Datum | Schritt | Kurztitel | Status |
 |---|---|---|---|
+| 21.05.26 | 4 | Dev-Tooling Audit Cluster | ✅ |
+| 21.05.26 | 3 | tldraw TipTap Audit Cluster | ✅ |
+| 21.05.26 | 2 | Drizzle Audit Cluster | ✅ |
+| 21.05.26 | 1 | Fastify Audit Cluster | ✅ |
+| 21.05.26 | Feature | Root-Testhierarchie | ⚠️ |
+| 21.05.26 | Fix | npm audit dev start | ✅ |
 | 20.05.26 | Fix | Formular Save-Close Create | ✅ |
 | 20.05.26 | Fix | Backup Pfad Root | ✅ |
 | 20.05.26 | Feature | Lokale Backups | ✅ |

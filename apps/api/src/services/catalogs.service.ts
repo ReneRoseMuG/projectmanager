@@ -1,7 +1,7 @@
 import type { CatalogEntry, CatalogEntryInput, CatalogEntryUpdate, CatalogKind } from "@taskmanager/shared-types";
 import { CATALOG_KINDS } from "@taskmanager/shared-types";
 import { eq, sql } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+import type { DbClient, DbSession } from "../db/client.js";
 import { backlogItems, features, milestones, projects, tasks, tickets, useCases } from "../db/schema.js";
 import { catalogRepository, type CatalogEntryRecord, type CatalogEntryUpdateData } from "../repositories/catalog.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
@@ -50,7 +50,7 @@ function resolveSortOrder(database: DbClient, kind: CatalogKind, sortOrder: numb
   return highest + 100;
 }
 
-function setWorkStatusFallback(database: DbClient, fromKey: string, fallback: CatalogEntryRecord): void {
+function setWorkStatusFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): void {
   const now = nowIso();
   database.update(projects).set({ status: fallback.key, updatedAt: now, version: sql`${projects.version} + 1` }).where(eq(projects.status, fromKey)).run();
   database.update(milestones).set({ status: fallback.key, updatedAt: now, version: sql`${milestones.version} + 1` }).where(eq(milestones.status, fromKey)).run();
@@ -68,13 +68,13 @@ function setWorkStatusFallback(database: DbClient, fromKey: string, fallback: Ca
     .run();
 }
 
-function setFeatureStatusFallback(database: DbClient, fromKey: string, fallback: CatalogEntryRecord): void {
+function setFeatureStatusFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): void {
   const now = nowIso();
   database.update(features).set({ status: fallback.key, updatedAt: now, version: sql`${features.version} + 1` }).where(eq(features.status, fromKey)).run();
   database.update(useCases).set({ status: fallback.key, updatedAt: now, version: sql`${useCases.version} + 1` }).where(eq(useCases.status, fromKey)).run();
 }
 
-function setPriorityFallback(database: DbClient, fromKey: string, fallback: CatalogEntryRecord): void {
+function setPriorityFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): void {
   const now = nowIso();
   database.update(tasks).set({ priority: fallback.key, updatedAt: now, version: sql`${tasks.version} + 1` }).where(eq(tasks.priority, fromKey)).run();
   database.update(tickets).set({ priority: fallback.key, updatedAt: now, version: sql`${tickets.version} + 1` }).where(eq(tickets.priority, fromKey)).run();

@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
-const e2eRuntimeRoot = fileURLToPath(new URL("../api/.test-runtime/e2e", import.meta.url));
+const e2eRuntimeRoot = fileURLToPath(new URL("../../tests/.runtime/e2e", import.meta.url));
 const apiPort = 3101;
 const webPort = 5174;
 const apiBaseUrl = `http://127.0.0.1:${apiPort}/api`;
@@ -12,7 +12,7 @@ const webBaseUrl = `http://127.0.0.1:${webPort}`;
 process.env.PLAYWRIGHT_API_BASE_URL = apiBaseUrl;
 
 export default defineConfig({
-  testDir: "./e2e",
+  testDir: "../../tests/browser/web",
   timeout: 30_000,
   workers: 1,
   expect: {

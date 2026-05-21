@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { config } from "../config.js";
-import type { DbClient } from "../db/client.js";
+import type { DbClient, DbSession } from "../db/client.js";
 import { attachments, featureAttachments, features, milestoneAttachments, milestones, projectAttachments, projects, taskAttachments, tasks, ticketAttachments, tickets } from "../db/schema.js";
 import { attachmentRepository, type AttachmentRecord } from "../repositories/attachment.repository.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
@@ -142,7 +142,7 @@ function listAttachmentOwners(database: DbClient, attachmentId: number): Attachm
   ];
 }
 
-function insertAttachmentLink(database: DbClient, owner: AttachmentOwner, attachmentId: number): void {
+function insertAttachmentLink(database: DbSession, owner: AttachmentOwner, attachmentId: number): void {
   if (owner.type === "project") {
     database.insert(projectAttachments).values({ projectId: owner.id, attachmentId }).onConflictDoNothing().run();
     return;
@@ -226,7 +226,7 @@ async function persistAttachment(values: {
   await fs.writeFile(diskPath, values.upload.buffer);
 
   const created = values.database.transaction((tx) => {
-    const attachment = attachmentRepository.create(tx as unknown as DbClient, {
+    const attachment = attachmentRepository.create(tx, {
       originalName: values.upload.originalName,
       filename,
       mimetype: values.upload.mimetype,

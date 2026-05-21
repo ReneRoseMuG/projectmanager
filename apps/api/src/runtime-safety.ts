@@ -14,7 +14,7 @@ const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 export const apiRoot = path.resolve(moduleDir, "..");
 export const repoRoot = path.resolve(apiRoot, "..", "..");
-export const testRuntimeRoot = path.resolve(apiRoot, ".test-runtime");
+export const testRuntimeRoot = path.resolve(repoRoot, "tests", ".runtime");
 export const vitestRuntimeRoot = path.resolve(testRuntimeRoot, "vitest");
 export const protectedDataRoot = path.resolve(apiRoot, "data");
 export const protectedDatabasePath = path.resolve(protectedDataRoot, "taskmanager.sqlite");
@@ -56,7 +56,7 @@ export function assertSafeTestDatabasePath(databasePath: string, context = "DATA
     throw new Error(`${context} must not point to the application data directory while tests are running: ${resolvedPath}`);
   }
   if (!isAllowedTestPath(resolvedPath)) {
-    throw new Error(`${context} must point to os.tmpdir() or apps/api/.test-runtime while tests are running: ${resolvedPath}`);
+    throw new Error(`${context} must point to os.tmpdir() or tests/.runtime while tests are running: ${resolvedPath}`);
   }
 }
 
@@ -72,7 +72,7 @@ export function assertSafeTestDirectoryPath(directoryPath: string, context: "UPL
     throw new Error(`${context} must not point to the application filesystem while tests are running: ${resolvedPath}`);
   }
   if (!isAllowedTestPath(resolvedPath)) {
-    throw new Error(`${context} must point to os.tmpdir() or apps/api/.test-runtime while tests are running: ${resolvedPath}`);
+    throw new Error(`${context} must point to os.tmpdir() or tests/.runtime while tests are running: ${resolvedPath}`);
   }
 }
 

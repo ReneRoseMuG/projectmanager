@@ -1,6 +1,6 @@
 import type { ReactNodeViewProps } from "@tiptap/react";
 import * as TiptapReact from "@tiptap/react";
-import { exportToBlob, Tldraw, type Editor, type TLEditorSnapshot } from "@tldraw/tldraw";
+import { Tldraw, type Editor, type TLEditorSnapshot } from "@tldraw/tldraw";
 import { Loader2, PenLine } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -66,12 +66,12 @@ export function TldrawNodeView({ node, updateAttributes, selected }: ReactNodeVi
       updateAttributes({ snapshot: JSON.stringify(editor.getSnapshot()) });
 
       try {
-        const svgBlob = await exportToBlob({
-          editor,
-          ids: shapeIds,
-          format: "svg",
-          opts: { background: false }
-        });
+        const svgExport = await editor.getSvgString(shapeIds, { background: false });
+        if (!svgExport) {
+          replacePreviewSvg(null);
+          return;
+        }
+        const svgBlob = new Blob([svgExport.svg], { type: "image/svg+xml" });
         replacePreviewSvg(URL.createObjectURL(svgBlob));
       } catch {
         replacePreviewSvg(null);

@@ -1,0 +1,174 @@
+/**
+ * Test Scope:
+ *
+ * Abgedeckte Regeln:
+ * - Auth-Migration legt Rollen, Permissions und `full_name` als generierte Spalte an.
+ * - Login, Session-Cookie, `/auth/me`, globale Guards und Admin-Guards funktionieren.
+ * - Admin-Benutzer und Rollen werden versioniert verwaltet und Passwörter gehasht.
+ *
+ * Fehlerfälle:
+ * - Falsches Passwort, inaktiver Benutzer, fehlende Session, fehlende Rechte, Self-Delete und letzter aktiver Admin.
+ *
+ * Ziel:
+ * Das Auth-, Rollen- und Benutzerverwaltungssystem gegen zentrale Sicherheits- und Regressionsfälle absichern.
+ */
+
+import type { FastifyInstance } from "fastify";
+import bcrypt from "bcryptjs";
+import supertest from "supertest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
+
+async function loginAdmin(app: FastifyInstance) {
+  const agent = supertest.agent(app.server);
+  await agent.post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
+  return agent;
+}
+
+describe("Auth API", () => {
+  let testDb: TestDb;
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    testDb = createTestDb();
+    app = await buildTestApp(testDb, { enableAuth: true });
+  });
+
+  beforeEach(() => truncateAll(testDb.sqlite));
+
+  afterAll(async () => {
+    await app.close();
+    testDb.sqlite.close();
+  });
+
+  it("legt Rollen, Rechte und full_name als generierte User-Spalte an", () => {
+    const roles = testDb.sqlite.prepare("SELECT key FROM roles ORDER BY key").all() as Array<{ key: string }>;
+    expect(roles.map((role) => role.key)).toEqual(["admin", "editor", "reader"]);
+
+    const readerRole = testDb.sqlite.prepare("SELECT id FROM roles WHERE key = 'reader'").get() as { id: number };
+    const result = testDb.sqlite
+      .prepare("INSERT INTO users (name, first_name, last_name, email, role_id, is_active) VALUES ('', 'Ada', 'Lovelace', 'ada@example.test', ?, 1)")
+      .run(readerRole.id);
+    const user = testDb.sqlite.prepare("SELECT full_name FROM users WHERE id = ?").get(result.lastInsertRowid) as { full_name: string };
+    expect(user.full_name).toBe("Lovelace, Ada");
+
+    expect(() =>
+      testDb.sqlite
+        .prepare("INSERT INTO users (name, first_name, last_name, full_name, email, role_id, is_active) VALUES ('', 'Grace', 'Hopper', 'manual', 'grace@example.test', ?, 1)")
+        .run(readerRole.id)
+    ).toThrow();
+  });
+
+  it("authentifiziert Admins per Cookie-Session und liefert /auth/me", async () => {
+    const agent = await loginAdmin(app);
+
+    const me = await agent.get("/api/auth/me").expect(200);
+
+    expect(me.body).toMatchObject({
+      email: "admin@local",
+      role: { key: "admin" },
+      requiresPasswordSetup: false
+    });
+    const renewedCookie = me.headers["set-cookie"] as unknown as string[] | undefined;
+    if (renewedCookie) {
+      expect(renewedCookie.join(";")).toContain("HttpOnly");
+    }
+  });
+
+  it("blockiert falsches Passwort, inaktive Benutzer und anonyme Domain-Routen", async () => {
+    await supertest(app.server).post("/api/auth/login").send({ email: "admin@local", password: "wrong-password" }).expect(401);
+    await supertest(app.server).get("/api/projects").expect(401);
+
+    const admin = await loginAdmin(app);
+    const roles = await admin.get("/api/admin/roles").expect(200);
+    const readerRole = roles.body.find((role: { key: string }) => role.key === "reader") as { id: number };
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Inactive", lastName: "User", email: "inactive@example.test", roleId: readerRole.id, password: "password123", isActive: false })
+      .expect(201);
+
+    await supertest(app.server).post("/api/auth/login").send({ email: "inactive@example.test", password: "password123" }).expect(403);
+  });
+
+  it("erzwingt den First-Login-Passwortflow bis zum Passwortsatz", async () => {
+    testDb.sqlite.prepare("UPDATE users SET password_hash = NULL WHERE email = 'admin@local'").run();
+    testDb.sqlite.prepare("UPDATE app_settings SET value = 'false' WHERE key = 'admin_setup_done'").run();
+
+    const agent = supertest.agent(app.server);
+    const login = await agent.post("/api/auth/login").send({ email: "admin@local" }).expect(200);
+    expect(login.body.requiresPasswordSetup).toBe(true);
+    await agent.get("/api/projects").expect(403);
+
+    const setup = await agent.post("/api/auth/set-password").send({ password: "password123" }).expect(200);
+    expect(setup.body.requiresPasswordSetup).toBe(false);
+    await agent.get("/api/projects").expect(200);
+    expect((testDb.sqlite.prepare("SELECT value FROM app_settings WHERE key = 'admin_setup_done'").get() as { value: string }).value).toBe("true");
+  });
+
+  it("legt Benutzer an, speichert Passwörter gehasht und schützt Admin-Routen vor Nicht-Admins", async () => {
+    const admin = await loginAdmin(app);
+    const roles = await admin.get("/api/admin/roles").expect(200);
+    const readerRole = roles.body.find((role: { key: string }) => role.key === "reader") as { id: number };
+
+    const created = await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Read", lastName: "Only", email: "reader@example.test", roleId: readerRole.id, password: "password123", isActive: true })
+      .expect(201);
+
+    expect(created.body.passwordHash).toBeUndefined();
+    const stored = testDb.sqlite.prepare("SELECT password_hash FROM users WHERE email = ?").get("reader@example.test") as { password_hash: string };
+    expect(stored.password_hash).not.toBe("password123");
+    expect(await bcrypt.compare("password123", stored.password_hash)).toBe(true);
+
+    const reader = supertest.agent(app.server);
+    await reader.post("/api/auth/login").send({ email: "reader@example.test", password: "password123" }).expect(200);
+    await reader.get("/api/projects").expect(200);
+    await reader.post("/api/projects").send({ name: "Nicht erlaubt" }).expect(403);
+    await reader.get("/api/admin/users").expect(403);
+  });
+
+  it("verhindert Self-Delete und das Entfernen des letzten aktiven Admins", async () => {
+    const admin = await loginAdmin(app);
+    const users = await admin.get("/api/admin/users").expect(200);
+    const currentAdmin = users.body.find((user: { email: string }) => user.email === "admin@local") as { id: number; version: number };
+
+    await admin.delete(`/api/admin/users/${currentAdmin.id}`).expect(400);
+    await admin.put(`/api/admin/users/${currentAdmin.id}`).send({ isActive: false, expectedVersion: currentAdmin.version }).expect(409);
+  });
+
+  it("verwaltet Rollen versioniert und wertet benutzerdefinierte Permissions aus", async () => {
+    const admin = await loginAdmin(app);
+    const catalog = await admin.get("/api/admin/permissions/catalog").expect(200);
+    expect(catalog.body.resources).toContain("projects");
+    expect(catalog.body.actions).toContain("read");
+
+    const role = await admin
+      .post("/api/admin/roles")
+      .send({ key: "project_reader", label: "Project Reader", permissions: [{ resource: "projects", action: "read" }] })
+      .expect(201);
+
+    const updated = await admin
+      .put(`/api/admin/roles/${role.body.id}`)
+      .send({
+        label: "Project Reader Plus",
+        permissions: [
+          { resource: "projects", action: "read" },
+          { resource: "tickets", action: "read" }
+        ],
+        expectedVersion: role.body.version
+      })
+      .expect(200);
+    expect(updated.body.version).toBe(role.body.version + 1);
+
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Custom", lastName: "Role", email: "custom@example.test", roleId: updated.body.id, password: "password123", isActive: true })
+      .expect(201);
+
+    const custom = supertest.agent(app.server);
+    await custom.post("/api/auth/login").send({ email: "custom@example.test", password: "password123" }).expect(200);
+    await custom.get("/api/projects").expect(200);
+    await custom.get("/api/tickets").expect(200);
+    await custom.post("/api/projects").send({ name: "Nicht erlaubt" }).expect(403);
+  });
+});

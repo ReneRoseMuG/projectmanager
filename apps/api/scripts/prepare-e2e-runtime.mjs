@@ -4,9 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const defaultRuntimeRoot = path.join(apiRoot, ".test-runtime", "e2e");
+const repoRoot = path.resolve(apiRoot, "..", "..");
+const defaultRuntimeRoot = path.join(repoRoot, "tests", ".runtime", "e2e");
 const runtimeRoot = path.resolve(process.env.TASKMANAGER_TEST_RUNTIME_ROOT ?? defaultRuntimeRoot);
-const allowedRoots = [path.join(apiRoot, ".test-runtime"), os.tmpdir()].map((root) => path.resolve(root).toLowerCase());
+const allowedRoots = [path.join(repoRoot, "tests", ".runtime"), os.tmpdir()].map((root) => path.resolve(root).toLowerCase());
 
 function isSameOrInside(targetPath, rootPath) {
   const target = path.resolve(targetPath).toLowerCase();

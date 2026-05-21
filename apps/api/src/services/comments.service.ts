@@ -1,6 +1,6 @@
 import type { Comment, CommentEntityType, CommentInput, CommentOwner } from "@taskmanager/shared-types";
 import { and, eq } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+import type { DbClient, DbSession } from "../db/client.js";
 import {
   backlogItemComments,
   backlogItems,
@@ -156,7 +156,7 @@ function listCommentOwners(database: DbClient, commentId: number): CommentOwner[
   ];
 }
 
-function insertCommentLink(database: DbClient, owner: CommentOwner, commentId: number): void {
+function insertCommentLink(database: DbSession, owner: CommentOwner, commentId: number): void {
   if (owner.type === "project") {
     database.insert(projectComments).values({ projectId: owner.id, commentId }).onConflictDoNothing().run();
     return;
@@ -297,7 +297,7 @@ export function createEntityComment(database: DbClient, entityType: CommentEntit
   ensureOwnerExists(database, owner);
   const body = requireNonEmpty(input.body, "body");
   const created = database.transaction((tx) => {
-    const comment = commentRepository.create(tx as unknown as DbClient, {
+    const comment = commentRepository.create(tx, {
       body
     });
     insertCommentLink(tx, owner, comment.id);
