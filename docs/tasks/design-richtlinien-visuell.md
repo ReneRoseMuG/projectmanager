@@ -1,6 +1,6 @@
 # Visuelle Design-Richtlinien – Projekt Manager
 
-> Version 1.1 · Mai 2026  
+> Version 1.2 · Mai 2026  
 > Verbindliche Grundlage für das gesamte Frontend (`apps/web`).  
 > Codex liest dieses Dokument, macht eine Bestandsaufnahme der Codebase gegen diese Regeln und setzt Abweichungen eigenständig um.
 
@@ -30,6 +30,7 @@ Einzige Ausnahme: `white` (= `var(--color-white)`) und explizit im Token-System 
 |---|---|
 | Primärer Text | `text-ink` |
 | Sekundärer / Hilfstext | `text-steel-400` bis `text-steel-600` je nach Betonung |
+| Untertitel / Metazeile | `text-steel-500` |
 | Deaktiviert / Placeholder | `text-steel-400` |
 | Hintergrund Seite | `bg-shell` |
 | Hintergrund Karten / Eingaben | `bg-white` |
@@ -43,6 +44,16 @@ Einzige Ausnahme: `white` (= `var(--color-white)`) und explizit im Token-System 
 ### 2.3 Akzentfarben
 
 Werden ausschließlich für **semantische Zustände** eingesetzt (Status, Priorität, Typ, Kategorie). Niemals für allgemeine Layoutgestaltung oder Dekoration.
+
+### 2.4 Inline-Styles
+
+Inline-Styles sind nur in folgenden Kategorien erlaubt:
+
+- **Datengetriebene Katalogfarben:** Badge, Pill, FilterChips, ItemCard, StatusPill, TagManager, CatalogManager — wenn die Farbe aus einem Datensatz stammt und kein Token existiert.
+- **Technische Layoutwerte:** DnD-Transforms, Grid-Order, Baum-Einrückung.
+- **Laufzeitwerte:** ProgressBar-Breite, Toast-Dauer, Animationsparameter.
+
+Inline-Styles für strukturelle Design-Entscheidungen (Hintergrundfarben, Textfarben ohne Datenbezug) sind verboten. Diese gehören in Tokens und Tailwind-Klassen.
 
 ---
 
@@ -67,6 +78,7 @@ Werden ausschließlich für **semantische Zustände** eingesetzt (Status, Priori
 - **Uppercase + tracking** nur in Label-Positionen (Navigationsabschnitte, Label-Varianten). Niemals in Fließtext, Titeln oder Buttons.
 - **`font-bold`** nur für Überschriften und EmptyState-Titel. Buttons und Labels verwenden `font-semibold` oder `font-medium`.
 - Keine Texte kleiner als `text-xs` außer in explizit definierten Ausnahmen (Navigations-Sections: `text-[10px]`).
+- Arbitrary Textgrößen (`text-[...]`) sind begründungspflichtig. Neue Werte nur wenn die Hierarchie aus 3.1 nicht ausreicht.
 
 ---
 
@@ -100,13 +112,13 @@ Dies ist die zentrale gestalterische Regel. Die Anwendung folgt einem **einheitl
 | 6 px | `rounded-md` | Schaltflächen (Button), Eingabefelder (Input, Select), Inline-Labels (Badge, Pill), FilterChips, SearchInput |
 | 8 px | `rounded-lg` | Karten (ItemCard), List-Rows (ItemRow), Modals, Dialoge, Dropdowns / Menüs, Section-Container, EmptyState |
 | 12 px | `rounded-xl` | Großer Hintergrund-Container (SegmentedControl-Wrapper), Dekorationselemente im Detail-Header |
-| 9999 px | `rounded-full` | Nur: Avatar (Benutzerbild), ProgressBar-Leiste und -Füllung, Dekorations-Blob im Detail-Header-Hintergrund |
+| 9999 px | `rounded-full` | Nur: Avatar, ProgressBar, Farbswatches, kleine Statuspunkte, Dekorations-Elemente im Detail-Header |
 
 ### 5.2 Verbotene Verwendungen
 
 - `rounded-2xl` und `rounded-3xl` sind **nicht erlaubt**. Keine Ausnahmen.
 - `rounded-full` für Labels (Badge, Pill), Karten, Rows, Modals oder Schaltflächen ist **verboten**.
-- `rounded-full` für Icon-Only-Schaltflächen auf **weißem Hintergrund** ist verboten — `rounded-md` verwenden. Ausnahme: Icon-Buttons innerhalb des steel-farbigen Detail-Headers (dort: `rounded-full` als kontextuelles Gegenstück zur hellen Fläche erlaubt).
+- `rounded-full` für Icon-Only-Schaltflächen auf **weißem Hintergrund** ist verboten — `rounded-md` verwenden. Ausnahme: Icon-Buttons innerhalb des steel-farbigen Detail-Headers.
 
 ### 5.3 Begründung
 
@@ -125,8 +137,9 @@ Schatten signalisieren Ebene und Interaktivität. Sie werden sparsam eingesetzt.
 | `shadow-modal` | Modals und Dialoge |
 | `shadow-steel` | EmptyState first-run, Sonder-Hervorhebungen |
 | `shadow-card` | Alternative für leichte Card-Schatten |
+| `shadow-steel-icon` | Icon-Avatare im Detail-Header, Logo-Badge in der Sidebar |
 
-Kein `shadow-lg`, `shadow-xl` oder andere raw-Tailwind-Schatten. Nur Token verwenden.
+Kein `shadow`, `shadow-md`, `shadow-lg`, `shadow-xl` oder andere raw-Tailwind-Schatten. Ausschließlich Token verwenden.
 
 ---
 
@@ -222,7 +235,7 @@ Kein `rounded-2xl`.
 ### 8.10 ItemRow (Liste)
 
 Container: `rounded-lg border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm hover:shadow-panel`.  
-Linker farbiger Akzentrand als Status-Signal (ersetzt Pill in der Listenansicht).  
+Linker farbiger Akzentrand als Status-Signal.  
 Kein `rounded-xl`.
 
 ### 8.11 Modal
@@ -242,10 +255,10 @@ Icon-Container im Header: `rounded-md` (kein `rounded-xl`).
 ### 8.13 FormModal / DetailModal (Detail-Header)
 
 Der Detail-Header (steel-Gradient) ist eine Sonderzone. Hier gelten eigene Regeln:  
-- Schließen/Öffnen-Buttons: `rounded-full` ist hier erlaubt (kontextuell, auf farbigem Hintergrund).
-- Dekorations-Blob: `rounded-full` ist erlaubt (rein dekorativ, kein funktionales Element).
-- Icon-Container im Header: `rounded-xl` (als Kontrapunkt zur Hintergrundfläche).  
-- Subtitle-Badge im Detail-Header: `rounded-md border border-white/15 bg-white/10`.
+- Schließen/Öffnen-Buttons: `rounded-full` erlaubt (auf farbigem Hintergrund).
+- Dekorations-Blob: `rounded-full` erlaubt (rein dekorativ).
+- Icon-Container im Header: `rounded-xl`.
+- Subtitle-Badge: `rounded-md border border-white/15 bg-white/10`.
 
 ### 8.14 Section
 
@@ -275,7 +288,8 @@ Track und Füllung bleiben `rounded-full` — bar-typische Rundung an den Enden.
 ### 8.19 SearchInput
 
 Form: `h-10 rounded-md bg-steel-100 px-3` (kein Rahmen, kein `bg-white`).  
-Nur in Toolbar-Kontexten. Kein Einsatz als reguläres Formularfeld.
+Nur in Toolbar-Kontexten. Kein Einsatz als reguläres Formularfeld.  
+Der Wrapper `<label>` ist hier als semantischer Wrapper erlaubt — nicht als Formularfeld-Label.
 
 ---
 
@@ -283,7 +297,7 @@ Nur in Toolbar-Kontexten. Kein Einsatz als reguläres Formularfeld.
 
 Hintergrund: `bg-gradient-to-b from-steel-700 to-steel-800`.  
 NavLinks: `h-10 rounded-lg px-3 text-sm font-medium`.  
-Aktiv: `bg-white text-steel-700 font-semibold shadow-md`.  
+Aktiv: `bg-white text-steel-700 font-semibold shadow-panel`.  
 Inaktiv: `text-white/75 hover:bg-white/5 hover:text-white`.  
 Abschnittsüberschriften: `text-[10px] font-semibold uppercase tracking-widest text-steel-400`.
 
@@ -294,7 +308,7 @@ Abschnittsüberschriften: `text-[10px] font-semibold uppercase tracking-widest t
 ### 10.1 Hover
 
 - Karten: `-translate-y-0.5 shadow-panel` (leichtes Anheben).
-- Rows: `border-steel-300 shadow-md` (Rahmen-Betonung).
+- Rows: `border-steel-300 shadow-panel` (Rahmen-Betonung).
 - Buttons: Helligkeits- oder Farbwert-Verschiebung gemäß Variant.
 - Nav-Items: `hover:bg-white/5 hover:text-white` (Sidebar) / `hover:text-ink` (TabBar).
 
@@ -317,7 +331,7 @@ Immer: `disabled:opacity-50 disabled:cursor-not-allowed`.
 | ViewToggle | Gefüllter Hintergrund (`bg-steel-700 text-white`) |
 | Sidebar NavLink | Weißer Hintergrund auf dark (`bg-white text-steel-700`) |
 
-Jede Selektor-Komponente verwendet **ein** Aktiv-Signal konsistent. Kein Mischen (z.B. kein Unterstrich + Füllung gleichzeitig).
+Jede Selektor-Komponente verwendet **ein** Aktiv-Signal konsistent.
 
 ---
 
@@ -328,101 +342,55 @@ Jede Selektor-Komponente verwendet **ein** Aktiv-Signal konsistent. Kein Mischen
 | `text-slate-*`, `text-gray-*` | Außerhalb des Token-Systems | `text-steel-*` |
 | `bg-slate-*`, `bg-gray-*` | Außerhalb des Token-Systems | `bg-steel-*`, `bg-shell` |
 | `border-gray-*` | Außerhalb des Token-Systems | `border-line`, `border-steel-*` |
+| `text-muted` | Nicht im Token-System definiert — Tailwind erzeugt die Klasse nicht | `text-steel-500` |
 | `rounded-2xl`, `rounded-3xl` | Zu extrem für dieses Interface | `rounded-lg` |
 | `rounded-full` auf Badge, Pill, Button, Card, Row, Modal | Nicht kohärent mit Seitenlayout | `rounded-md` (Label), `rounded-lg` (Container) |
-| `shadow-lg`, `shadow-xl` | Nicht im Token-System | Token-Schatten verwenden |
+| `shadow`, `shadow-md`, `shadow-lg`, `shadow-xl` | Nicht im Token-System | Token-Schatten verwenden |
 | `window.confirm()` | Kein Design-Kontext | `useConfirm()` |
-| Raw `<label>` ohne `<Label>`-Komponente | Inkonsistentes Styling | `<FormField>` + `<Label>` |
+| Raw `<label>` für Formularfelder | Inkonsistentes Styling | `<FormField>` + `<Label>` |
 | Button-Farb-Override via `className` | Umgeht Variant-System | Neuen Variant definieren |
 | Inline `style={{ color }}` für strukturelles Styling | Nicht überschreibbar | Tailwind-Klassen / Token |
-| `border-2` als Aktiv-Signal (ViewToggle) | Inkonsistent mit anderen Selektoren | Gefüllter Hintergrund |
+| `border-2` als Aktiv-Signal | Inkonsistent mit anderen Selektoren | Gefüllter Hintergrund |
 
 ---
 
 ## 12. Ausnahmen (explizit erlaubt)
 
-Diese Muster weichen vom Standardvokabular ab und sind bewusst so:
-
 | Element | Abweichung | Begründung |
 |---|---|---|
 | `Avatar` | `rounded-full` | Kreisform ist semantisch für Benutzeravatare |
 | `ProgressBar` | `rounded-full` | Bar-typische Endkappen |
-| Schließen-Button im steel-Header | `rounded-full` | Kontextuell auf farbigem Hintergrund, kein weißer Kontrast |
-| Dekorations-Blob im Detail-Header | `rounded-full` | Rein dekorativ, kein funktionales Element |
-| `ApiBadge` im TopBar | `rounded-full` | Isoliertes Status-Pill, kein Label in einer Gruppe |
-| Sidebar-Logo-Badge | `rounded-md` auf `bg-gradient` | Marken-Element, intentional |
+| Farbswatches (TagManager, CatalogManager, ColorPicker) | `rounded-full` + Inline-Style | Echte Farbauswahlobjekte — nicht auf andere Elemente übertragen |
+| Kleine Statuspunkte (Sidebar, ListBoardView) | `rounded-full` | Punktindikator, kein Label |
+| Schließen-Button im steel-Header | `rounded-full` | Auf farbigem Hintergrund, kein weißer Kontrast |
+| Dekorations-Blob im Detail-Header | `rounded-full` | Rein dekorativ |
+| `ApiBadge` im TopBar | `rounded-full` | Isoliertes Status-Signal, kein Label in einer Gruppe |
+| Sidebar Logo-Badge | `shadow-steel-icon` | Marken-Element, intentional |
+| SearchInput `<label>`-Wrapper | rohes `<label>` | Semantischer Wrapper, kein Formularfeld-Label |
+| FullCalendar, TLDraw, ProseMirror | eigene Klassen und `!important` | Drittanbieter-Overrides, soweit technisch nötig |
+| Inline-Styles für Katalogfarben, DnD, ProgressBar, Toast | Inline-Style | Datengetrieben oder technisch notwendig (siehe Abschnitt 2.4) |
 
 ---
 
 ## 13. Bekannte Abweichungen im Ist-Zustand (priorisiert)
 
-Codex liest diesen Abschnitt, sucht die genannten Muster in der Codebase und korrigiert sie gemäß den Regeln in den Abschnitten 2–12.
+### ❶ `text-slate-*` — Priorität: Hoch
+186 Vorkommen. Alle durch `text-steel-*` ersetzen.
 
----
+### ❷ `text-muted` — Priorität: Hoch
+15 Vorkommen. Nicht im Token-System — Tailwind erzeugt die Klasse nicht. Pro Stelle entscheiden: `text-steel-500` oder Element entfernen.
 
-### ❶ `text-slate-*` statt Design-Tokens — Priorität: Hoch
+### ❸ `rounded-2xl` und `rounded-t-2xl` — Priorität: Hoch
+12 Vorkommen. Alle durch `rounded-lg` bzw. `rounded-t-lg` ersetzen.
 
-**Problem:** Sekundärtext verwendet in vielen Komponenten `text-slate-400/500/600/700` — eine Raw-Tailwind-Farbe außerhalb des Token-Systems. Designänderungen am Steel-System wirken sich nicht auf Slate-Klassen aus.
+### ❹ Badge / Pill `rounded-full` — Priorität: Hoch
+Alle durch `rounded-md` ersetzen. TabBar Count-Badge durch `rounded`.
 
-**Ersatzregel:**
-- `slate-400` → `steel-400`
-- `slate-500` → `steel-500`
-- `slate-600` → `steel-600`
-- `slate-700` → `steel-700`
+### ❺ Input `rounded-lg` — Priorität: Mittel
+Auf `rounded-md` angleichen (wie Select).
 
-**Typische Fundstellen:** Sekundärtext in Karten, Rows, Modals, Sidebar, TabBar, SegmentedControl, FilterChips, PlanningItemCard.
+### ❻ Raw Schatten-Klassen — Priorität: Mittel
+`shadow`, `shadow-md`, `shadow-lg` durch Token-Schatten ersetzen.
 
----
-
-### ❷ `rounded-full` auf Labels und Karten — Priorität: Hoch
-
-**Problem:** Badge, Pill und ItemCard verwenden `rounded-full` bzw. `rounded-2xl`. Das widerspricht dem Radius-System (Abschnitt 5).
-
-**Ersatzregel:**
-- Badge, Pill, FilterChips: `rounded-full` → `rounded-md`
-- ItemCard: `rounded-2xl` → `rounded-lg`, Akzentstreifen: `rounded-t-2xl` → `rounded-t-lg`
-- ItemRow: `rounded-xl` → `rounded-lg`
-- ConfirmDialog Icon-Container: `rounded-xl` → `rounded-md`
-- Section (nicht-fill): `rounded-xl` → `rounded-lg`
-- EmptyState Icon-Container: `rounded-2xl` → `rounded-lg`
-- Modal / ConfirmDialog Container: `rounded-2xl` → `rounded-lg`
-
----
-
-### ❸ Input `rounded-lg` vs. Select `rounded-md` — Priorität: Mittel
-
-**Problem:** `Input` und `Select` sind visuell gleichwertige Eingabeelemente mit unterschiedlichem Radius.
-
-**Ersatzregel:** Beide auf `rounded-md` vereinheitlichen (gemäß Abschnitt 8.2).
-
----
-
-### ❹ Button-Overrides in `EmptyState` first-run — Priorität: Mittel
-
-**Problem:** Im `first-run`-Variant von `EmptyState` werden Button-Farben direkt per `className`-Override gesetzt statt über das Variant-System.
-
-**Ersatzregel:** Neuen Button-Variant `"inverted"` definieren (weiße Füllung, steel-Text — für Einsatz auf dunklem Hintergrund) und in `EmptyState` verwenden.
-
----
-
-### ❺ ViewToggle Aktiv-Zustand `border-2` — Priorität: Mittel
-
-**Problem:** ViewToggle signalisiert den aktiven Zustand über `border-2 border-ink` statt über gefüllten Hintergrund wie alle anderen Selektoren.
-
-**Ersatzregel:** Aktiv: `bg-steel-700 text-white border-steel-700` (gemäß Abschnitt 8.8).
-
----
-
-### ❻ Sidebar NavLink — Code-Duplizierung — Priorität: Niedrig
-
-**Problem:** Das Aktiv/Inaktiv-Klassenset für NavLinks in der Sidebar wird dreimal identisch wiederholt (Navigation, Einstellungen, Administration).
-
-**Ersatzregel:** Lokale Hilfsfunktion `navLinkClass(isActive: boolean): string` extrahieren.
-
----
-
-### ❼ Fehlende `PageHeader`-Komponente — Priorität: Niedrig
-
-**Problem:** Alle Übersichtsseiten duplizieren denselben `<header>`-Block mit `h1` + `p` manuell.
-
-**Ersatzregel:** Neue Komponente `PageHeader` mit Props `title`, `subtitle` und `actions` erstellen und auf allen Übersichtsseiten einsetzen.
+### ❼ ViewToggle `border-2 border-ink` — Priorität: Mittel
+Durch `bg-steel-700 text-white border-steel-700` ersetzen.
