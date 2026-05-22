@@ -5,13 +5,12 @@ import { features } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { useCaseRepository, type UseCaseRecord, type UseCaseUpdateData } from "../repositories/use-case.repository.js";
-import { badRequest, conflict, notFound } from "../utils/errors.js";
+import { badRequest, notFound } from "../utils/errors.js";
 import {
   buildFilename,
   buildStoredContentPath,
   deleteContent,
   readContent,
-  renameContent,
   resolveContentPath,
   resolveStoredContentPath,
   writeContent
@@ -36,7 +35,6 @@ type UseCaseStatus = UseCaseRecord["status"];
 export interface UseCaseInput {
   featureId?: number;
   title?: string;
-  slug?: string;
   status?: UseCaseStatus;
   description?: string | null;
   content?: string;
@@ -48,7 +46,6 @@ export interface UseCaseDto {
   id: number;
   featureId: number;
   title: string;
-  slug: string;
   status: UseCaseStatus;
   description: string | null;
   content?: string;
@@ -61,14 +58,13 @@ export interface UseCaseDto {
 
 const useCaseJournalFields: Array<JournalFieldDefinition<UseCaseRecord>> = [
   { key: "title", label: "Titel" },
-  { key: "slug", label: "Slug" },
   { key: "status", label: "Status" },
   { key: "description", label: "Beschreibung" },
   { key: "sortOrder", label: "Sortierung" }
 ];
 
-function contentFilename(id: number, slug: string): string {
-  return buildFilename("usecase", id, slug);
+function contentFilename(id: number): string {
+  return buildFilename("usecase", id);
 }
 
 function mapUseCase(record: UseCaseRecord, content?: string): UseCaseDto {
@@ -76,7 +72,6 @@ function mapUseCase(record: UseCaseRecord, content?: string): UseCaseDto {
     id: record.id,
     featureId: record.featureId,
     title: record.title,
-    slug: record.slug,
     status: record.status,
     description: record.description,
     content,
@@ -109,13 +104,6 @@ function getUseCaseRecord(database: DbClient, id: number): UseCaseRecord {
     throw notFound(`Use case with id ${id} not found`);
   }
   return useCase;
-}
-
-function ensureSlugIsUnique(database: DbClient, slug: string, exceptId?: number): void {
-  const existing = useCaseRepository.findBySlug(database, slug).find((row) => row.id !== exceptId);
-  if (existing) {
-    throw conflict(`Use case slug "${slug}" already exists`);
-  }
 }
 
 function readUseCaseContent(record: UseCaseRecord): string {
@@ -167,8 +155,6 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
   const targetFeatureId = input.featureId ?? featureId;
   const featureObject = getFeatureJournalObject(database, targetFeatureId);
   const title = requireNonEmpty(input.title, "title");
-  const slug = requireNonEmpty(input.slug, "slug");
-  ensureSlugIsUnique(database, slug);
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
   ensureCatalogEntryExists(database, "featureStatus", status);
 
@@ -177,7 +163,6 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
     {
       featureId: targetFeatureId,
       title,
-      slug,
       status,
       description: cleanNullable(input.description) ?? null,
       contentPath: null,
@@ -186,7 +171,7 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
     actor?.actorUserId ?? undefined
   );
 
-  const filename = contentFilename(created.id, slug);
+  const filename = contentFilename(created.id);
   const absolutePath = resolveContentPath("usecases", filename);
   const storedPath = buildStoredContentPath("usecases", filename);
 
@@ -233,10 +218,6 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
     ensureFeatureExists(database, input.featureId);
     values.featureId = input.featureId;
   }
-  if (input.slug !== undefined) {
-    values.slug = requireNonEmpty(input.slug, "slug");
-    ensureSlugIsUnique(database, values.slug, id);
-  }
   if (input.status !== undefined) {
     ensureCatalogEntryExists(database, "featureStatus", input.status);
     values.status = input.status;
@@ -252,18 +233,12 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
     throw badRequest("No use case fields provided");
   }
 
-  const nextSlug = values.slug ?? current.slug;
-  if (nextSlug !== current.slug || !contentPath) {
-    const nextFilename = contentFilename(id, nextSlug);
+  if (!contentPath) {
+    const nextFilename = contentFilename(id);
     const nextAbsolutePath = resolveContentPath("usecases", nextFilename);
     const nextStoredPath = buildStoredContentPath("usecases", nextFilename);
 
-    if (contentPath) {
-      renameContent(resolveStoredContentPath(contentPath), nextAbsolutePath);
-    } else {
-      writeContent(nextAbsolutePath, "");
-    }
-
+    writeContent(nextAbsolutePath, "");
     contentPath = nextStoredPath;
     values.contentPath = nextStoredPath;
   }

@@ -33,7 +33,7 @@ interface ParsedWiki {
 
 interface ParsedFeature {
   title: string;
-  slug: string;
+  sourceKey: string;
   description: string | null;
   content: string;
   sortOrder: number;
@@ -43,7 +43,7 @@ interface ParsedFeature {
 }
 
 interface ParsedFeatureRelation {
-  targetSlug: string;
+  targetFeatureKey: string;
   targetCode: string;
   relationType: FeatureRelationType;
   description: string | null;
@@ -52,7 +52,7 @@ interface ParsedFeatureRelation {
 type BacklogStatus = typeof backlogItems.$inferSelect["status"];
 
 interface ParsedBacklogItem {
-  featureSlug: string;
+  featureKey: string;
   title: string;
   description: string | null;
   status: BacklogStatus;
@@ -62,9 +62,9 @@ interface ParsedBacklogItem {
 }
 
 interface ParsedUseCase {
-  featureSlug: string;
+  featureKey: string;
   title: string;
-  slug: string;
+  sourceKey: string;
   description: string | null;
   content: string;
   sortOrder: number;
@@ -77,20 +77,20 @@ interface ParsedTask {
   description: string;
   priority: Priority;
   sourcePath: string;
-  featureSlugs: string[];
-  useCaseSlugs: string[];
+  featureKeys: string[];
+  useCaseKeys: string[];
 }
 
 interface StoredFeature {
   id: number;
-  slug: string;
+  title: string;
   contentPath: string | null;
 }
 
 interface StoredUseCase {
   id: number;
   featureId: number;
-  slug: string;
+  title: string;
   contentPath: string | null;
 }
 
@@ -300,8 +300,8 @@ function featureCoreContent(content: string): string {
   return contentBeforeHeading(content, /^##\s+Use Cases\s*$/i);
 }
 
-function numberFromSlug(slug: string): number {
-  const match = slug.match(/^(?:ft|uc)-(\d+)(?:-(\d+))?/i);
+function numberFromSourceKey(sourceKey: string): number {
+  const match = sourceKey.match(/^(?:ft|uc)-(\d+)(?:-(\d+))?/i);
   if (!match) {
     return 0;
   }
@@ -311,8 +311,8 @@ function numberFromSlug(slug: string): number {
   return Number.isFinite(major) ? major * 100 + minor : 0;
 }
 
-function featureCodeFromSlug(slug: string): string | null {
-  const match = slug.match(/^ft-(\d+)/i);
+function featureCodeFromSourceKey(sourceKey: string): string | null {
+  const match = sourceKey.match(/^ft-(\d+)/i);
   return match ? `ft-${(match[1] ?? "").padStart(2, "0")}` : null;
 }
 
@@ -346,8 +346,8 @@ function relationTypeFromContext(context: string): FeatureRelationType {
 
 function parseFeatureRelations(
   content: string,
-  sourceSlug: string,
-  featureCodeToSlug: Map<string, string>,
+  sourceKey: string,
+  featureCodeToKey: Map<string, string>,
   sourcePath: string,
   warnings: WikiImportItemResult[]
 ): ParsedFeatureRelation[] {
@@ -386,25 +386,25 @@ function parseFeatureRelations(
     }
 
     for (const targetCode of featureCodesFromText(line)) {
-      const targetSlug = featureCodeToSlug.get(targetCode);
-      if (!targetSlug) {
+      const targetFeatureKey = featureCodeToKey.get(targetCode);
+      if (!targetFeatureKey) {
         warnings.push({
           type: "featureRelation",
           action: "warning",
-          title: sourceSlug,
-          slug: sourceSlug,
+          title: sourceKey,
+          importKey: sourceKey,
           sourcePath,
           message: `Feature reference "${targetCode.toUpperCase()}" is not part of the import source`
         });
         continue;
       }
-      if (targetSlug === sourceSlug) {
+      if (targetFeatureKey === sourceKey) {
         continue;
       }
 
       const relationType = relationTypeFromContext(context);
-      relations.set(`${targetSlug}:${relationType}`, {
-        targetSlug,
+      relations.set(`${targetFeatureKey}:${relationType}`, {
+        targetFeatureKey,
         targetCode,
         relationType,
         description: cleanNullable(line.replace(/^\s*-\s*/, "")) ?? null
@@ -412,7 +412,7 @@ function parseFeatureRelations(
     }
   }
 
-  return [...relations.values()].sort((first, second) => first.targetSlug.localeCompare(second.targetSlug) || first.relationType.localeCompare(second.relationType));
+  return [...relations.values()].sort((first, second) => first.targetFeatureKey.localeCompare(second.targetFeatureKey) || first.relationType.localeCompare(second.relationType));
 }
 
 function parsePriority(content: string): Priority {
@@ -492,7 +492,7 @@ function markdownH2Sections(content: string): Array<{ title: string; body: strin
   return sections;
 }
 
-function parseBacklogItems(featureSlug: string, backlogDir: string, sourcePath: string): ParsedBacklogItem[] {
+function parseBacklogItems(featureKey: string, backlogDir: string, sourcePath: string): ParsedBacklogItem[] {
   const parsedBacklogItems: ParsedBacklogItem[] = [];
   for (const backlogFile of listMarkdownFiles(backlogDir)) {
     const content = readMarkdown(backlogFile);
@@ -501,11 +501,11 @@ function parseBacklogItems(featureSlug: string, backlogDir: string, sourcePath: 
     for (const section of markdownH2Sections(content)) {
       const description = cleanNullable(section.body);
       parsedBacklogItems.push({
-        featureSlug,
+        featureKey,
         title: section.title,
         description: description ? markdownToHtml(description) : null,
         status: parseBacklogStatus(section.body),
-        sortOrder: numberFromSlug(featureSlug) + section.index,
+        sortOrder: numberFromSourceKey(featureKey) + section.index,
         importKey: `wiki:${sourceRelativePath.toLowerCase()}#${normalizePathSegment(section.title)}`,
         sourcePath: sourceRelativePath
       });
@@ -528,37 +528,37 @@ function parseLinkTargets(content: string): string[] {
   return targets;
 }
 
-function parseTaskRelations(content: string, featureCodeToSlug: Map<string, string>, useCaseSlugToFeatureSlug: Map<string, string>) {
-  const featureSlugs = new Set<string>();
-  const useCaseSlugs = new Set<string>();
+function parseTaskRelations(content: string, featureCodeToKey: Map<string, string>, useCaseKeyToFeatureKey: Map<string, string>) {
+  const featureKeys = new Set<string>();
+  const useCaseKeys = new Set<string>();
 
   for (const target of parseLinkTargets(content)) {
     const featureMatch = target.match(/features\/(ft-[^/]+)/i);
     if (featureMatch) {
-      featureSlugs.add(normalizePathSegment(featureMatch[1] ?? ""));
+      featureKeys.add(normalizePathSegment(featureMatch[1] ?? ""));
     }
 
     const useCaseMatch = target.match(/features\/[^/]+\/use-cases\/(uc-[^/#)]+)\.md/i);
     if (useCaseMatch) {
-      const useCaseSlug = normalizePathSegment(useCaseMatch[1] ?? "");
-      useCaseSlugs.add(useCaseSlug);
-      const featureSlug = useCaseSlugToFeatureSlug.get(useCaseSlug);
-      if (featureSlug) {
-        featureSlugs.add(featureSlug);
+      const useCaseKey = normalizePathSegment(useCaseMatch[1] ?? "");
+      useCaseKeys.add(useCaseKey);
+      const featureKey = useCaseKeyToFeatureKey.get(useCaseKey);
+      if (featureKey) {
+        featureKeys.add(featureKey);
       }
     }
   }
 
   for (const match of content.matchAll(/\bFT\s*\(?\s*(\d{1,2})\s*\)?/gi)) {
-    const featureSlug = featureCodeToSlug.get(`ft-${(match[1] ?? "").padStart(2, "0")}`);
-    if (featureSlug) {
-      featureSlugs.add(featureSlug);
+    const featureKey = featureCodeToKey.get(`ft-${(match[1] ?? "").padStart(2, "0")}`);
+    if (featureKey) {
+      featureKeys.add(featureKey);
     }
   }
 
   return {
-    featureSlugs: [...featureSlugs].sort(),
-    useCaseSlugs: [...useCaseSlugs].sort()
+    featureKeys: [...featureKeys].sort(),
+    useCaseKeys: [...useCaseKeys].sort()
   };
 }
 
@@ -601,8 +601,8 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
   const parsedFeatures: ParsedFeature[] = [];
   const parsedUseCases: ParsedUseCase[] = [];
   const parsedBacklogItems: ParsedBacklogItem[] = [];
-  const featureCodeToSlug = new Map<string, string>();
-  const useCaseSlugToFeatureSlug = new Map<string, string>();
+  const featureCodeToKey = new Map<string, string>();
+  const useCaseKeyToFeatureKey = new Map<string, string>();
 
   const featureDirs = fs
     .readdirSync(featuresDir, { withFileTypes: true })
@@ -611,61 +611,61 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
     .sort((first, second) => first.localeCompare(second));
 
   for (const featureDir of featureDirs) {
-    const featureSlug = normalizePathSegment(path.basename(featureDir));
-    const featureCode = featureCodeFromSlug(featureSlug);
+    const featureKey = normalizePathSegment(path.basename(featureDir));
+    const featureCode = featureCodeFromSourceKey(featureKey);
     if (featureCode) {
-      featureCodeToSlug.set(featureCode, featureSlug);
+      featureCodeToKey.set(featureCode, featureKey);
     }
   }
 
   for (const featureDir of featureDirs) {
-    const featureSlug = normalizePathSegment(path.basename(featureDir));
+    const featureKey = normalizePathSegment(path.basename(featureDir));
     const featureDoc =
-      listMarkdownFiles(featureDir).find((filePath) => normalizePathSegment(path.basename(filePath, ".md")) === featureSlug) ??
+      listMarkdownFiles(featureDir).find((filePath) => normalizePathSegment(path.basename(filePath, ".md")) === featureKey) ??
       listMarkdownFiles(featureDir).find((filePath) => /^ft-\d+/i.test(path.basename(filePath)));
 
     if (!featureDoc) {
       warnings.push({
         type: "feature",
         action: "warning",
-        title: featureSlug,
-        slug: featureSlug,
+        title: featureKey,
+        importKey: featureKey,
         sourcePath: relativeSourcePath(sourcePath, featureDir),
         message: "Feature directory has no direct feature markdown file"
       });
       continue;
     }
 
-    const featureCode = featureCodeFromSlug(featureSlug);
+    const featureCode = featureCodeFromSourceKey(featureKey);
     const sourceRelativePath = relativeSourcePath(sourcePath, featureDoc);
     const content = readMarkdown(featureDoc);
     const coreContent = featureCoreContent(content);
 
     parsedFeatures.push({
-      title: markdownTitle(content, featureSlug),
-      slug: featureSlug,
+      title: markdownTitle(content, featureKey),
+      sourceKey: featureKey,
       description: descriptionFromSection(coreContent, ["Ziel / Zweck", "Fachliche Beschreibung"]),
       content: markdownToHtml(coreContent),
-      sortOrder: numberFromSlug(featureSlug),
+      sortOrder: numberFromSourceKey(featureKey),
       sourcePath: sourceRelativePath,
       featureCode,
-      relations: parseFeatureRelations(content, featureSlug, featureCodeToSlug, sourceRelativePath, warnings)
+      relations: parseFeatureRelations(content, featureKey, featureCodeToKey, sourceRelativePath, warnings)
     });
 
-    parsedBacklogItems.push(...parseBacklogItems(featureSlug, path.join(featureDir, "backlog"), sourcePath));
+    parsedBacklogItems.push(...parseBacklogItems(featureKey, path.join(featureDir, "backlog"), sourcePath));
 
     const useCaseDir = path.join(featureDir, "use-cases");
     for (const useCaseFile of listMarkdownFiles(useCaseDir).filter((filePath) => /^uc-\d+/i.test(path.basename(filePath)))) {
-      const useCaseSlug = normalizePathSegment(path.basename(useCaseFile, ".md"));
+      const useCaseKey = normalizePathSegment(path.basename(useCaseFile, ".md"));
       const useCaseContent = readMarkdown(useCaseFile);
-      useCaseSlugToFeatureSlug.set(useCaseSlug, featureSlug);
+      useCaseKeyToFeatureKey.set(useCaseKey, featureKey);
       parsedUseCases.push({
-        featureSlug,
-        title: markdownTitle(useCaseContent, useCaseSlug),
-        slug: useCaseSlug,
+        featureKey,
+        title: markdownTitle(useCaseContent, useCaseKey),
+        sourceKey: useCaseKey,
         description: descriptionFromSection(useCaseContent, ["Ziel", "Beschreibung"]),
         content: markdownToHtml(useCaseContent),
-        sortOrder: numberFromSlug(useCaseSlug),
+        sortOrder: numberFromSourceKey(useCaseKey),
         sourcePath: relativeSourcePath(sourcePath, useCaseFile)
       });
     }
@@ -679,7 +679,7 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
         })
         .map((filePath) => {
           const content = readMarkdown(filePath);
-          const relations = parseTaskRelations(content, featureCodeToSlug, useCaseSlugToFeatureSlug);
+          const relations = parseTaskRelations(content, featureCodeToKey, useCaseKeyToFeatureKey);
           const sourceRelativePath = relativeSourcePath(sourcePath, filePath);
           return {
             title: markdownTitle(content, path.basename(filePath, ".md")),
@@ -687,8 +687,8 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
             description: markdownToHtml(content),
             priority: parsePriority(content),
             sourcePath: sourceRelativePath,
-            featureSlugs: relations.featureSlugs,
-            useCaseSlugs: relations.useCaseSlugs
+            featureKeys: relations.featureKeys,
+            useCaseKeys: relations.useCaseKeys
           };
         })
     : [];
@@ -710,19 +710,19 @@ function ensureProjectExists(database: DbClient, projectId: number): void {
   }
 }
 
-function getFeatureBySlug(database: DbClient, slug: string): StoredFeature | undefined {
+function getFeatureByTitle(database: DbClient, title: string): StoredFeature | undefined {
   return database
-    .select({ id: features.id, slug: features.slug, contentPath: features.contentPath })
+    .select({ id: features.id, title: features.title, contentPath: features.contentPath })
     .from(features)
-    .where(eq(features.slug, slug))
+    .where(eq(features.title, title))
     .get();
 }
 
-function getUseCaseBySlug(database: DbClient, slug: string): StoredUseCase | undefined {
+function getUseCaseByFeatureAndTitle(database: DbClient, featureId: number, title: string): StoredUseCase | undefined {
   return database
-    .select({ id: useCases.id, featureId: useCases.featureId, slug: useCases.slug, contentPath: useCases.contentPath })
+    .select({ id: useCases.id, featureId: useCases.featureId, title: useCases.title, contentPath: useCases.contentPath })
     .from(useCases)
-    .where(eq(useCases.slug, slug))
+    .where(and(eq(useCases.featureId, featureId), eq(useCases.title, title)))
     .get();
 }
 
@@ -766,12 +766,12 @@ function getFeatureRelation(
     .get();
 }
 
-function featureContentPath(featureId: number, slug: string): string {
-  return buildStoredContentPath("features", buildFilename("feature", featureId, slug));
+function featureContentPath(featureId: number): string {
+  return buildStoredContentPath("features", buildFilename("feature", featureId));
 }
 
-function makeUseCaseContentPath(useCaseId: number, slug: string): string {
-  return buildStoredContentPath("usecases", buildFilename("usecase", useCaseId, slug));
+function makeUseCaseContentPath(useCaseId: number): string {
+  return buildStoredContentPath("usecases", buildFilename("usecase", useCaseId));
 }
 
 function writeStoredContent(contentPath: string, content: string): void {
@@ -824,8 +824,7 @@ function reportProjectFeatureLink(report: WikiImportReport, database: DbClient, 
     addResult(report, {
       type: "projectFeature",
       action: "created",
-      title: feature.slug,
-      slug: feature.slug,
+      title: feature.title,
       message: "Feature will be linked to project"
     });
     return;
@@ -835,8 +834,7 @@ function reportProjectFeatureLink(report: WikiImportReport, database: DbClient, 
     addResult(report, {
       type: "projectFeature",
       action: "skipped",
-      title: feature.slug,
-      slug: feature.slug,
+      title: feature.title,
       message: "Feature is already linked to project"
     });
     return;
@@ -849,20 +847,19 @@ function reportProjectFeatureLink(report: WikiImportReport, database: DbClient, 
   addResult(report, {
     type: "projectFeature",
     action: "created",
-    title: feature.slug,
-    slug: feature.slug,
+    title: feature.title,
     message: "Feature linked to project"
   });
 }
 
 function upsertFeature(database: DbClient, feature: ParsedFeature, execute: boolean, now: string): { record?: StoredFeature; action: WikiImportAction } {
-  const existing = getFeatureBySlug(database, feature.slug);
+  const existing = getFeatureByTitle(database, feature.title);
   if (!execute) {
     return { record: existing, action: existing ? "updated" : "created" };
   }
 
   if (existing) {
-    const contentPath = existing.contentPath ?? featureContentPath(existing.id, existing.slug);
+    const contentPath = existing.contentPath ?? featureContentPath(existing.id);
     database
       .update(features)
       .set({
@@ -882,7 +879,6 @@ function upsertFeature(database: DbClient, feature: ParsedFeature, execute: bool
     .insert(features)
     .values({
       title: feature.title,
-      slug: feature.slug,
       status: "active",
       description: feature.description,
       contentPath: null,
@@ -890,9 +886,9 @@ function upsertFeature(database: DbClient, feature: ParsedFeature, execute: bool
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: features.id, slug: features.slug, contentPath: features.contentPath })
+    .returning({ id: features.id, title: features.title, contentPath: features.contentPath })
     .get();
-  const contentPath = featureContentPath(created.id, created.slug);
+  const contentPath = featureContentPath(created.id);
   writeContent(resolveContentPath("features", path.basename(contentPath)), feature.content);
   database.update(features).set({ contentPath, updatedAt: now }).where(eq(features.id, created.id)).run();
 
@@ -906,13 +902,13 @@ function upsertUseCase(
   execute: boolean,
   now: string
 ): { record?: StoredUseCase; action: WikiImportAction } {
-  const existing = getUseCaseBySlug(database, useCase.slug);
+  const existing = getUseCaseByFeatureAndTitle(database, featureId, useCase.title);
   if (!execute) {
     return { record: existing, action: existing ? "updated" : "created" };
   }
 
   if (existing) {
-    const contentPath = existing.contentPath ?? makeUseCaseContentPath(existing.id, existing.slug);
+    const contentPath = existing.contentPath ?? makeUseCaseContentPath(existing.id);
     database
       .update(useCases)
       .set({
@@ -934,7 +930,6 @@ function upsertUseCase(
     .values({
       featureId,
       title: useCase.title,
-      slug: useCase.slug,
       status: "active",
       description: useCase.description,
       contentPath: null,
@@ -942,9 +937,9 @@ function upsertUseCase(
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: useCases.id, featureId: useCases.featureId, slug: useCases.slug, contentPath: useCases.contentPath })
+    .returning({ id: useCases.id, featureId: useCases.featureId, title: useCases.title, contentPath: useCases.contentPath })
     .get();
-  const contentPath = makeUseCaseContentPath(created.id, created.slug);
+  const contentPath = makeUseCaseContentPath(created.id);
   writeContent(resolveContentPath("usecases", path.basename(contentPath)), useCase.content);
   database.update(useCases).set({ contentPath, updatedAt: now }).where(eq(useCases.id, created.id)).run();
 
@@ -1100,8 +1095,7 @@ function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, tas
     addResult(report, {
       type: "taskFeature",
       action: "created",
-      title: feature.slug,
-      slug: feature.slug,
+      title: feature.title,
       message: "Feature will be linked to task"
     });
     return;
@@ -1111,8 +1105,7 @@ function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, tas
     addResult(report, {
       type: "taskFeature",
       action: "skipped",
-      title: feature.slug,
-      slug: feature.slug,
+      title: feature.title,
       message: "Task already has feature link"
     });
     return;
@@ -1125,8 +1118,7 @@ function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, tas
   addResult(report, {
     type: "taskFeature",
     action: "created",
-    title: feature.slug,
-    slug: feature.slug,
+    title: feature.title,
     message: "Feature linked to task"
   });
 }
@@ -1136,8 +1128,7 @@ function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, tas
     addResult(report, {
       type: "taskUseCase",
       action: "created",
-      title: useCase.slug,
-      slug: useCase.slug,
+      title: useCase.title,
       message: "Use case will be linked to task"
     });
     return;
@@ -1147,8 +1138,7 @@ function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, tas
     addResult(report, {
       type: "taskUseCase",
       action: "skipped",
-      title: useCase.slug,
-      slug: useCase.slug,
+      title: useCase.title,
       message: "Task already has use case link"
     });
     return;
@@ -1161,8 +1151,7 @@ function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, tas
   addResult(report, {
     type: "taskUseCase",
     action: "created",
-    title: useCase.slug,
-    slug: useCase.slug,
+    title: useCase.title,
     message: "Use case linked to task"
   });
 }
@@ -1176,8 +1165,8 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
     items: []
   };
   const now = nowIso();
-  const featureRecordsBySlug = new Map<string, StoredFeature>();
-  const useCaseRecordsBySlug = new Map<string, StoredUseCase>();
+  const featureRecordsByKey = new Map<string, StoredFeature>();
+  const useCaseRecordsByKey = new Map<string, StoredUseCase>();
   let previewFeatureId = -1;
   let previewUseCaseId = -1;
 
@@ -1187,34 +1176,34 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
 
   for (const feature of parsed.features) {
     const result = upsertFeature(database, feature, execute, now);
-    const record = result.record ?? getFeatureBySlug(database, feature.slug) ?? (!execute ? { id: previewFeatureId--, slug: feature.slug, contentPath: null } : undefined);
+    const record = result.record ?? getFeatureByTitle(database, feature.title) ?? (!execute ? { id: previewFeatureId--, title: feature.title, contentPath: null } : undefined);
     if (record) {
-      featureRecordsBySlug.set(feature.slug, record);
+      featureRecordsByKey.set(feature.sourceKey, record);
       reportProjectFeatureLink(report, database, projectId, record, execute);
     }
     addResult(report, {
       type: "feature",
       action: result.action,
       title: feature.title,
-      slug: feature.slug,
+      importKey: feature.sourceKey,
       sourcePath: feature.sourcePath
     });
   }
 
   for (const feature of parsed.features) {
-    const sourceFeature = featureRecordsBySlug.get(feature.slug) ?? getFeatureBySlug(database, feature.slug);
+    const sourceFeature = featureRecordsByKey.get(feature.sourceKey) ?? getFeatureByTitle(database, feature.title);
     if (!sourceFeature) {
       continue;
     }
 
     for (const relation of feature.relations) {
-      const targetFeature = featureRecordsBySlug.get(relation.targetSlug) ?? getFeatureBySlug(database, relation.targetSlug);
+      const targetFeature = featureRecordsByKey.get(relation.targetFeatureKey);
       if (!targetFeature) {
         addResult(report, {
           type: "featureRelation",
           action: "warning",
-          title: feature.slug,
-          slug: feature.slug,
+          title: feature.title,
+          importKey: feature.sourceKey,
           sourcePath: feature.sourcePath,
           message: `Feature "${relation.targetCode.toUpperCase()}" is missing`
         });
@@ -1225,8 +1214,8 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
       addResult(report, {
         type: "featureRelation",
         action,
-        title: `${feature.slug} -> ${relation.targetSlug}`,
-        slug: relation.targetSlug,
+        title: `${feature.sourceKey} -> ${relation.targetFeatureKey}`,
+        importKey: relation.targetFeatureKey,
         sourcePath: feature.sourcePath,
         message: `${relation.relationType} relation ${action}`
       });
@@ -1234,35 +1223,35 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
   }
 
   for (const useCase of parsed.useCases) {
-    const feature = featureRecordsBySlug.get(useCase.featureSlug) ?? getFeatureBySlug(database, useCase.featureSlug);
+    const feature = featureRecordsByKey.get(useCase.featureKey);
     if (!feature) {
       addResult(report, {
         type: "useCase",
         action: "error",
         title: useCase.title,
-        slug: useCase.slug,
+        importKey: useCase.sourceKey,
         sourcePath: useCase.sourcePath,
-        message: `Feature "${useCase.featureSlug}" is missing`
+        message: `Feature "${useCase.featureKey}" is missing`
       });
       continue;
     }
 
     const result = upsertUseCase(database, useCase, feature.id, execute, now);
-    const record = result.record ?? getUseCaseBySlug(database, useCase.slug) ?? (!execute ? { id: previewUseCaseId--, featureId: feature.id, slug: useCase.slug, contentPath: null } : undefined);
+    const record = result.record ?? getUseCaseByFeatureAndTitle(database, feature.id, useCase.title) ?? (!execute ? { id: previewUseCaseId--, featureId: feature.id, title: useCase.title, contentPath: null } : undefined);
     if (record) {
-      useCaseRecordsBySlug.set(useCase.slug, record);
+      useCaseRecordsByKey.set(useCase.sourceKey, record);
     }
     addResult(report, {
       type: "useCase",
       action: result.action,
       title: useCase.title,
-      slug: useCase.slug,
+      importKey: useCase.sourceKey,
       sourcePath: useCase.sourcePath
     });
   }
 
   for (const backlogItem of parsed.backlogItems) {
-    const feature = featureRecordsBySlug.get(backlogItem.featureSlug) ?? getFeatureBySlug(database, backlogItem.featureSlug);
+    const feature = featureRecordsByKey.get(backlogItem.featureKey);
     if (!feature) {
       addResult(report, {
         type: "backlogItem",
@@ -1270,7 +1259,7 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
         title: backlogItem.title,
         importKey: backlogItem.importKey,
         sourcePath: backlogItem.sourcePath,
-        message: `Feature "${backlogItem.featureSlug}" is missing`
+        message: `Feature "${backlogItem.featureKey}" is missing`
       });
       continue;
     }
@@ -1301,19 +1290,19 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
     }
 
     const linkedFeatureIds = new Set<number>();
-    for (const featureSlug of task.featureSlugs) {
-      const feature = featureRecordsBySlug.get(featureSlug) ?? getFeatureBySlug(database, featureSlug);
+    for (const featureKey of task.featureKeys) {
+      const feature = featureRecordsByKey.get(featureKey);
       if (feature && !linkedFeatureIds.has(feature.id)) {
         linkedFeatureIds.add(feature.id);
         reportTaskFeatureLink(report, database, record.id, feature, execute);
       }
     }
 
-    for (const useCaseSlug of task.useCaseSlugs) {
-      const useCase = useCaseRecordsBySlug.get(useCaseSlug) ?? getUseCaseBySlug(database, useCaseSlug);
+    for (const useCaseKey of task.useCaseKeys) {
+      const useCase = useCaseRecordsByKey.get(useCaseKey);
       if (useCase) {
         reportTaskUseCaseLink(report, database, record.id, useCase, execute);
-        const feature = [...featureRecordsBySlug.values()].find((candidate) => candidate.id === useCase.featureId) ?? getFeatureBySlug(database, task.featureSlugs.find((slug) => featureRecordsBySlug.get(slug)?.id === useCase.featureId) ?? "");
+        const feature = [...featureRecordsByKey.values()].find((candidate) => candidate.id === useCase.featureId);
         if (feature && !linkedFeatureIds.has(feature.id)) {
           linkedFeatureIds.add(feature.id);
           reportTaskFeatureLink(report, database, record.id, feature, execute);

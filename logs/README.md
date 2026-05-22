@@ -2,6 +2,13 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 22.05.26 | Fix           | Katalog Farbfeld Anzeige                     | ✅     |
+| 22.05.26 | Feature       | Slug und Projekt-Kürzel entfernt             | ✅     |
+| 22.05.26 | Fix           | Katalog Colorpicker                          | ✅     |
+| 22.05.26 | Feature       | Ticket-User-Auswahl                          | ✅     |
+| 22.05.26 | Fix           | Ticket-Priorität UI                          | ✅     |
+| 22.05.26 | Fix           | Remote Backup Timeout                        | ✅     |
+| 22.05.26 | Fix           | SFTP Env-Konfiguration                       | ✅     |
 | 21.05.26 | Feature       | Ticket-Typen als farbige Katalogeinträge    | ⚠️     |
 | 21.05.26 | Fix           | SFTP Backup Timeout                          | ✅     |
 | 21.05.26 | Feature       | Ticket-Detailformular Tabs                   | ✅     |

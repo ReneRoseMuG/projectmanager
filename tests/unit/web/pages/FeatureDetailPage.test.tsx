@@ -60,7 +60,6 @@ vi.mock("../../../../apps/web/src/hooks/useFeatures", () => ({
       ? {
           id: 10,
           title: "Feature Alpha",
-          slug: "feature-alpha",
           status: "active",
           description: null,
           content: null,

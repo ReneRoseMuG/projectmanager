@@ -46,7 +46,6 @@ const wikiPage: WikiPage = {
   projectId: null,
   parentId: null,
   title: "Wiki Detail",
-  slug: "wiki-detail",
   content: "<p>Wiki Detail Inhalt</p>",
   contentPath: null,
   sortOrder: 0,

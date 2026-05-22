@@ -7,7 +7,7 @@
  *
  * Fehlerfälle:
  * - Enge Kartenfooter dürfen keine separaten Aufgaben-/Ticket-/Feature-Badges rendern.
- * - Listenmodus darf keine technischen Kürzel- oder Slug-Metadaten erzwingen.
+ * - Listenmodus darf keine technischen Metadaten erzwingen.
  *
  * Ziel:
  * Die Meilenstein-Darstellung gegen Layout- und Aufgabenfortschritts-Regressionen absichern.

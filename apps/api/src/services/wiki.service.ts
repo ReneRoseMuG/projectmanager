@@ -7,10 +7,10 @@ import type { JournalChangeCreateData } from "../repositories/journal.repository
 import { wikiPageRepository, type WikiPageRecord, type WikiPageUpdateData } from "../repositories/wiki-page.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import {
+  buildFilename,
   buildStoredContentPath,
   deleteContent,
   readContent,
-  renameContent,
   resolveContentPath,
   resolveStoredContentPath,
   writeContent
@@ -33,7 +33,6 @@ export interface WikiPageInput {
   parentId?: number | null;
   projectId?: number | null;
   title?: string;
-  slug?: string;
   content?: string;
   sortOrder?: number;
   expectedVersion?: number;
@@ -44,7 +43,6 @@ export interface WikiPageDto {
   parentId: number | null;
   projectId: number | null;
   title: string;
-  slug: string;
   content?: string;
   contentPath: string | null;
   sortOrder: number;
@@ -57,12 +55,10 @@ export interface WikiPageDto {
 export interface WikiBreadcrumbDto {
   id: number;
   title: string;
-  slug: string;
 }
 
 const wikiJournalFields: Array<JournalFieldDefinition<WikiPageRecord>> = [
   { key: "title", label: "Titel" },
-  { key: "slug", label: "Slug" },
   { key: "sortOrder", label: "Sortierung" }
 ];
 
@@ -72,7 +68,6 @@ function mapWikiPage(record: WikiPageRecord, childCount: number, content?: strin
     parentId: record.parentId,
     projectId: record.projectId,
     title: record.title,
-    slug: record.slug,
     content,
     contentPath: record.contentPath,
     sortOrder: record.sortOrder,
@@ -83,10 +78,8 @@ function mapWikiPage(record: WikiPageRecord, childCount: number, content?: strin
   };
 }
 
-function wikiFilename(slug: string): string {
-  const segments = slug.split("/").map((segment) => requireNonEmpty(segment, "slug"));
-  const file = `${segments.pop()}.md`;
-  return [...segments, file].join("/");
+function wikiFilename(id: number): string {
+  return buildFilename("wiki-page", id);
 }
 
 function getWikiPageRecord(database: DbClient, id: number): WikiPageRecord {
@@ -99,13 +92,6 @@ function getWikiPageRecord(database: DbClient, id: number): WikiPageRecord {
 
 function childCount(database: DbClient, id: number): number {
   return wikiPageRepository.findChildren(database, id).length;
-}
-
-function ensureSlugIsUnique(database: DbClient, slug: string, exceptId?: number): void {
-  const existing = wikiPageRepository.findBySlug(database, slug).find((row) => row.id !== exceptId);
-  if (existing) {
-    throw conflict(`Wiki slug "${slug}" already exists`);
-  }
 }
 
 function ensureParentExists(database: DbClient, parentId: number | null | undefined, pageId?: number): void {
@@ -195,14 +181,8 @@ export function getWikiPage(database: DbClient, id: number): WikiPageDto {
 
 export function createWikiPage(database: DbClient, input: WikiPageInput, actor?: JournalActor | null): WikiPageDto {
   const title = requireNonEmpty(input.title, "title");
-  const slug = requireNonEmpty(input.slug, "slug");
-  ensureSlugIsUnique(database, slug);
   ensureParentExists(database, input.parentId);
   ensureProjectExists(database, input.projectId);
-
-  const filename = wikiFilename(slug);
-  const absolutePath = resolveContentPath("wiki", filename);
-  const storedPath = buildStoredContentPath("wiki", filename);
 
   const created = wikiPageRepository.create(
     database,
@@ -210,24 +190,37 @@ export function createWikiPage(database: DbClient, input: WikiPageInput, actor?:
       parentId: input.parentId ?? null,
       projectId: input.projectId ?? null,
       title,
-      slug,
-      contentPath: storedPath,
+      contentPath: null,
       sortOrder: input.sortOrder ?? 0
     },
     actor?.actorUserId ?? undefined
   );
 
+  const filename = wikiFilename(created.id);
+  const absolutePath = resolveContentPath("wiki", filename);
+  const storedPath = buildStoredContentPath("wiki", filename);
+
   try {
     writeContent(absolutePath, input.content ?? "");
-    const journalObject = wikiJournalObject(created);
-    recordJournalEntry(database, {
-      operation: "create",
-      object: journalObject,
-      summary: buildCreateSummary(journalObject),
-      actor,
-      contexts: wikiContexts(database, created)
+    const updated = database.transaction((tx) => {
+      const page = wikiPageRepository.setContentPath(tx, created.id, storedPath);
+      if (!page) {
+        throw notFound(`Wiki page with id ${created.id} not found`);
+      }
+      const journalObject = wikiJournalObject(page);
+      recordJournalEntry(tx, {
+        operation: "create",
+        object: journalObject,
+        summary: buildCreateSummary(journalObject),
+        actor,
+        contexts: wikiContexts(database, page)
+      });
+      return page;
     });
-    return mapWikiPage(created, 0, input.content ?? "");
+    if (!updated) {
+      throw notFound(`Wiki page with id ${created.id} not found`);
+    }
+    return mapWikiPage(updated, 0, input.content ?? "");
   } catch (error) {
     wikiPageRepository.delete(database, created.id);
     deleteContent(absolutePath);
@@ -245,10 +238,6 @@ export function updateWikiPage(database: DbClient, id: number, input: WikiPageIn
   if (input.title !== undefined) {
     values.title = requireNonEmpty(input.title, "title");
   }
-  if (input.slug !== undefined) {
-    values.slug = requireNonEmpty(input.slug, "slug");
-    ensureSlugIsUnique(database, values.slug, id);
-  }
   if (input.parentId !== undefined) {
     ensureParentExists(database, input.parentId, id);
     values.parentId = input.parentId;
@@ -265,18 +254,12 @@ export function updateWikiPage(database: DbClient, id: number, input: WikiPageIn
     throw badRequest("No wiki page fields provided");
   }
 
-  const nextSlug = values.slug ?? current.slug;
-  if (nextSlug !== current.slug || !contentPath) {
-    const nextFilename = wikiFilename(nextSlug);
+  if (!contentPath) {
+    const nextFilename = wikiFilename(id);
     const nextAbsolutePath = resolveContentPath("wiki", nextFilename);
     const nextStoredPath = buildStoredContentPath("wiki", nextFilename);
 
-    if (contentPath) {
-      renameContent(resolveStoredContentPath(contentPath), nextAbsolutePath);
-    } else {
-      writeContent(nextAbsolutePath, "");
-    }
-
+    writeContent(nextAbsolutePath, "");
     contentPath = nextStoredPath;
     values.contentPath = nextStoredPath;
   }
@@ -357,7 +340,7 @@ export function getWikiBreadcrumb(database: DbClient, id: number): WikiBreadcrum
       throw badRequest("Wiki parent chain contains a cycle");
     }
     visited.add(current.id);
-    breadcrumb.unshift({ id: current.id, title: current.title, slug: current.slug });
+    breadcrumb.unshift({ id: current.id, title: current.title });
     current = current.parentId === null ? undefined : getWikiPageRecord(database, current.parentId);
   }
 

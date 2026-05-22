@@ -39,7 +39,6 @@ vi.mock("../../../../apps/web/src/api/use-cases", () => ({
     id: 10,
     featureId: 1,
     title: "Use Case Alpha",
-    slug: "use-case-alpha",
     status: "active",
     description: null,
     content: null,

@@ -33,7 +33,7 @@ function matchesSearch(useCase: UseCase, searchValue: string) {
     return true;
   }
 
-  const values = [useCase.title, useCase.slug, richTextToPlainText(useCase.description), useCase.status];
+  const values = [useCase.title, richTextToPlainText(useCase.description), useCase.status];
   return values.some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
 }
 

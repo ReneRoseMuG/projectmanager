@@ -122,7 +122,6 @@ describe("FeatureForm", () => {
     clickTab("Use Cases");
     fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
     changeInput(0, "Use Case Pending");
-    changeInput(1, "use-case-pending");
     fireEvent.click(screen.getByRole("button", { name: "Vormerken" }));
     expect(screen.getByText("Use Case Pending")).toBeInTheDocument();
 
@@ -131,7 +130,7 @@ describe("FeatureForm", () => {
   });
 
   it("übergibt alle Pending-Daten nach Create an onPostCreate", async () => {
-    const createdFeature = { ...feature, id: 111, title: "Neues Feature", slug: "neues-feature" };
+    const createdFeature = { ...feature, id: 111, title: "Neues Feature" };
     const onSubmit = vi.fn().mockResolvedValue(createdFeature);
     const onPostCreate = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
@@ -139,11 +138,9 @@ describe("FeatureForm", () => {
     const { container } = renderWithProviders(<FeatureForm open onSubmit={onSubmit} onPostCreate={onPostCreate} onClose={onClose} />);
 
     changeInput(0, "Neues Feature");
-    changeInput(1, "neues-feature");
     clickTab("Use Cases");
     fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
     changeInput(0, "Use Case Pending");
-    changeInput(1, "use-case-pending");
     fireEvent.click(screen.getByRole("button", { name: "Vormerken" }));
     clickTab("Aufgaben");
     fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
@@ -160,11 +157,11 @@ describe("FeatureForm", () => {
     fireEvent.change(getFileInput(container), { target: { files: [file] } });
     fireEvent.click(screen.getByRole("button", { name: "Feature anlegen" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: "Neues Feature", slug: "neues-feature" })));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: "Neues Feature" })));
     expect(onPostCreate).toHaveBeenCalledWith(
       createdFeature.id,
       expect.objectContaining({
-        useCases: [{ kind: "new", draft: { title: "Use Case Pending", slug: "use-case-pending", status: "draft" } }],
+        useCases: [{ kind: "new", draft: { title: "Use Case Pending", status: "draft" } }],
         tasks: [{ kind: "existing", task }],
         tickets: [{ kind: "existing", ticket }],
         projectIds: [project.id],

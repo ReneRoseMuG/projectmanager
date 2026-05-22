@@ -32,7 +32,6 @@ const wikiPage: WikiPage = {
   projectId: null,
   parentId: null,
   title: "Wiki Alpha",
-  slug: "wiki-alpha",
   content: "<p>Wiki Inhalt</p>",
   contentPath: null,
   sortOrder: 0,

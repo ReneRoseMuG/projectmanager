@@ -1,4 +1,4 @@
-import type { AdminUser, AdminUserInput, AdminUserUpdate, Role } from "@taskmanager/shared-types";
+import type { AdminUser, AdminUserInput, AdminUserUpdate, Role, UserOption } from "@taskmanager/shared-types";
 import bcrypt from "bcryptjs";
 import type { DbClient } from "../db/client.js";
 import { roleRepository } from "../repositories/role.repository.js";
@@ -63,6 +63,20 @@ export function mapAdminUser(database: DbClient, record: UserRecord): AdminUser 
 
 export function listAdminUsers(database: DbClient): AdminUser[] {
   return userRepository.findAll(database).map((user) => mapAdminUser(database, user));
+}
+
+function mapUserOption(record: UserRecord): UserOption {
+  return {
+    id: record.id,
+    firstName: record.firstName,
+    lastName: record.lastName,
+    fullName: record.fullName,
+    email: record.email
+  };
+}
+
+export function listUserOptions(database: DbClient): UserOption[] {
+  return userRepository.findActive(database).map(mapUserOption);
 }
 
 export function getAdminUser(database: DbClient, id: number): AdminUser {

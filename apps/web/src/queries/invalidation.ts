@@ -17,11 +17,11 @@ export async function invalidateAuth(queryClient: QueryClient): Promise<void> {
 }
 
 export async function invalidateAdminUsers(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.adminUsers.root, queryKeys.auth.root]);
+  await invalidateMany(queryClient, [queryKeys.adminUsers.root, queryKeys.users.root, queryKeys.auth.root]);
 }
 
 export async function invalidateAdminRoles(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.adminRoles.root, queryKeys.adminUsers.root, queryKeys.auth.root]);
+  await invalidateMany(queryClient, [queryKeys.adminRoles.root, queryKeys.adminUsers.root, queryKeys.users.root, queryKeys.auth.root]);
 }
 
 export async function invalidateMilestones(queryClient: QueryClient): Promise<void> {
@@ -190,6 +190,7 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.journal.root,
     queryKeys.auth.root,
     queryKeys.adminUsers.root,
+    queryKeys.users.root,
     queryKeys.adminRoles.root,
     queryKeys.globalSearch.root
   ]);

@@ -8,7 +8,7 @@ import {
   fillRichText,
   formPage,
   itemCard,
-  slugify,
+  safeFilename,
   uniqueTitle,
   type TicketFixture,
 } from "./domain-test-utils";
@@ -61,7 +61,7 @@ test("Ticket-Detailformular zeigt Tabs und echte Neben-Collections", async ({ pa
   const noteTitle = uniqueTitle("E2E Ticket Note");
   const initialComment = uniqueTitle("E2E Ticket Kommentar");
   const liveComment = uniqueTitle("E2E Ticket Live Kommentar");
-  const attachmentName = `${slugify(uniqueTitle("ticket attachment"))}.txt`;
+  const attachmentName = `${safeFilename(uniqueTitle("ticket attachment"))}.txt`;
   let subTicket: TicketFixture | null = null;
 
   try {

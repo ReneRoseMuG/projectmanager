@@ -14,7 +14,6 @@ import {
   formPage,
   itemCard,
   linkProjectFeature,
-  slugify,
   uniqueTitle,
 } from "./domain-test-utils";
 
@@ -259,9 +258,6 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expect(featureForm.locator("input[required]").nth(0)).toHaveValue(
         feature.title,
       );
-      await expect(featureForm.locator("input[required]").nth(1)).toHaveValue(
-        feature.slug,
-      );
       await expectRichText(
         featureForm,
         "E2E Feature-Kurzbeschreibung vollständig",
@@ -398,7 +394,6 @@ test.describe("Projekt-Routen und Detailformular", () => {
     );
     let featureId: number | null = null;
     const featureTitle = uniqueTitle("E2E Project Created Feature Route");
-    const featureSlug = slugify(featureTitle);
 
     try {
       await authenticatedGoto(page, `/projects/${project.id}`);
@@ -409,7 +404,6 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expect(page).toHaveURL(/\/features\/new\?/);
       const featureForm = formPage(page, "Neues Feature");
       await featureForm.locator("input[required]").nth(0).fill(featureTitle);
-      await featureForm.locator("input[required]").nth(1).fill(featureSlug);
       await fillRichText(
         featureForm,
         "feature-form-description",

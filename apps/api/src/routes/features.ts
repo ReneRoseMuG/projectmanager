@@ -5,11 +5,10 @@ import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, obje
 
 const featureBodySchema = {
   type: "object",
-  required: ["title", "slug"],
+  required: ["title"],
   additionalProperties: false,
   properties: {
     title: { type: "string", minLength: 1 },
-    slug: { type: "string", minLength: 1 },
     status: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
     content: { type: "string" },

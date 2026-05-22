@@ -14,6 +14,10 @@ export const queryKeys = {
     list: () => [...queryKeys.adminUsers.root, "list"] as const,
     detail: (userId: number) => [...queryKeys.adminUsers.root, "detail", userId] as const
   },
+  users: {
+    root: ["users"] as const,
+    list: () => [...queryKeys.users.root, "list"] as const
+  },
   adminRoles: {
     root: ["adminRoles"] as const,
     list: () => [...queryKeys.adminRoles.root, "list"] as const,

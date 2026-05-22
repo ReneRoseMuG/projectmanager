@@ -3,11 +3,11 @@
  *
  * Abgedeckte Regeln:
  * - Wiki-Seiten können als Root- und Unterseiten angelegt werden.
- * - Breadcrumb-Reihenfolge und slug-basierte Dateipfade stimmen.
+ * - Breadcrumb-Reihenfolge und ID-basierte Dateipfade stimmen.
  * - Seiten mit Unterseiten sind vor direktem Löschen geschützt.
  *
  * Fehlerfälle:
- * - Doppelter Slug liefert 409.
+ * - Fehlende oder unbekannte Parent-Seiten liefern Fehler.
  * - Löschen einer Seite mit Kindern liefert 409.
  *
  * Ziel:
@@ -48,28 +48,30 @@ describe("Wiki API", () => {
   });
 
   it("Root-Seite anlegen", async () => {
-    const res = await supertest(app.server).post("/api/wiki").send({ title: "Einführung", slug: "einfuehrung", content: "# Einführung" }).expect(201);
+    const res = await supertest(app.server).post("/api/wiki").send({ title: "Einführung", content: "# Einführung" }).expect(201);
 
     expect(res.body.parentId).toBeNull();
+    expect(res.body).not.toHaveProperty("slug");
+    expect(res.body.contentPath).toMatch(/content\/wiki\/wiki-page-\d+\.md/);
     expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# Einführung");
   });
 
-  it("Sub-Seite anlegen mit parentId und Slug-Struktur", async () => {
-    const root = await createWikiPage(app, { title: "Einführung", slug: "einfuehrung" });
+  it("Sub-Seite anlegen mit parentId", async () => {
+    const root = await createWikiPage(app, { title: "Einführung" });
 
     const res = await supertest(app.server)
       .post("/api/wiki")
-      .send({ title: "Installation", slug: "einfuehrung/installation", parentId: root.id, content: "# Installation" })
+      .send({ title: "Installation", parentId: root.id, content: "# Installation" })
       .expect(201);
 
     expect(res.body.parentId).toBe(root.id);
-    expect(res.body.contentPath).toBe("content/wiki/einfuehrung/installation.md");
+    expect(res.body.contentPath).toMatch(/content\/wiki\/wiki-page-\d+\.md/);
     expect(fs.existsSync(resolveStoredContentPath(res.body.contentPath))).toBe(true);
   });
 
   it("GET Children gibt direkte Unterseiten zurück", async () => {
-    const root = await createWikiPage(app, { slug: "root-children" });
-    const child = await createWikiPage(app, { slug: "root-children/child", parentId: root.id });
+    const root = await createWikiPage(app, { title: "Root Children" });
+    const child = await createWikiPage(app, { title: "Child", parentId: root.id });
 
     const res = await supertest(app.server).get(`/api/wiki/${root.id}/children`).expect(200);
 
@@ -78,7 +80,7 @@ describe("Wiki API", () => {
   });
 
   it("GET Detail enthält Content", async () => {
-    const page = await createWikiPage(app, { slug: "wiki-detail", content: "# Detail" });
+    const page = await createWikiPage(app, { title: "Wiki Detail", content: "# Detail" });
 
     const res = await supertest(app.server).get(`/api/wiki/${page.id}`).expect(200);
 
@@ -86,34 +88,34 @@ describe("Wiki API", () => {
   });
 
   it("Breadcrumb-Reihenfolge ist Root zuerst", async () => {
-    const root = await createWikiPage(app, { title: "Root", slug: "root" });
-    const child = await createWikiPage(app, { title: "Child", slug: "root/child", parentId: root.id });
+    const root = await createWikiPage(app, { title: "Root" });
+    const child = await createWikiPage(app, { title: "Child", parentId: root.id });
 
     const res = await supertest(app.server).get(`/api/wiki/${child.id}/breadcrumb`).expect(200);
 
     expect(res.body).toEqual([
-      { id: root.id, title: "Root", slug: "root" },
-      { id: child.id, title: "Child", slug: "root/child" }
+      { id: root.id, title: "Root" },
+      { id: child.id, title: "Child" }
     ]);
   });
 
   it("Root-Seite mit Sub-Seiten ist nicht löschbar", async () => {
-    const root = await createWikiPage(app, { slug: "root-delete" });
-    await createWikiPage(app, { slug: "root-delete/child", parentId: root.id });
+    const root = await createWikiPage(app, { title: "Root Delete" });
+    await createWikiPage(app, { title: "Child Delete", parentId: root.id });
 
     await supertest(app.server).delete(`/api/wiki/${root.id}`).expect(409);
   });
 
   it("Sub-Seite löschen, dann Root löschen", async () => {
-    const root = await createWikiPage(app, { slug: "root-clean" });
-    const child = await createWikiPage(app, { slug: "root-clean/child", parentId: root.id });
+    const root = await createWikiPage(app, { title: "Root Clean" });
+    const child = await createWikiPage(app, { title: "Child Clean", parentId: root.id });
 
     await supertest(app.server).delete(`/api/wiki/${child.id}`).expect(204);
     await supertest(app.server).delete(`/api/wiki/${root.id}`).expect(204);
   });
 
   it("PATCH aktualisiert Content und Datei", async () => {
-    const page = await createWikiPage(app, { slug: "wiki-patch", content: "# Alt" });
+    const page = await createWikiPage(app, { title: "Wiki Patch", content: "# Alt" });
 
     const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ content: "# Neu", expectedVersion: page.version }).expect(200);
 
@@ -121,20 +123,20 @@ describe("Wiki API", () => {
     expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# Neu");
   });
 
-  it("PATCH mit neuem Slug benennt Datei um", async () => {
-    const page = await createWikiPage(app, { slug: "wiki-old" });
+  it("PATCH mit neuem Titel behält Datei", async () => {
+    const page = await createWikiPage(app, { title: "Wiki Old" });
     const oldPath = resolveStoredContentPath(page.contentPath ?? "");
 
-    const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ slug: "wiki-new", expectedVersion: page.version }).expect(200);
+    const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ title: "Wiki New", expectedVersion: page.version }).expect(200);
 
-    expect(res.body.contentPath).toBe("content/wiki/wiki-new.md");
-    expect(fs.existsSync(oldPath)).toBe(false);
+    expect(res.body.contentPath).toBe(page.contentPath);
+    expect(fs.existsSync(oldPath)).toBe(true);
     expect(fs.existsSync(resolveStoredContentPath(res.body.contentPath))).toBe(true);
   });
 
   it("GET /api/wiki gibt Root-Seiten und ChildCount zurück", async () => {
-    const root = await createWikiPage(app, { slug: "root-list" });
-    await createWikiPage(app, { slug: "root-list/child", parentId: root.id });
+    const root = await createWikiPage(app, { title: "Root List" });
+    await createWikiPage(app, { title: "Child List", parentId: root.id });
 
     const res = await supertest(app.server).get("/api/wiki").expect(200);
 
@@ -143,13 +145,7 @@ describe("Wiki API", () => {
     expect(res.body[0].content).toBeUndefined();
   });
 
-  it("Doppelter Slug liefert 409", async () => {
-    await createWikiPage(app, { slug: "wiki-duplicate" });
-
-    await supertest(app.server).post("/api/wiki").send({ title: "Doppelt", slug: "wiki-duplicate" }).expect(409);
-  });
-
   it("Unbekannte Parent-Seite liefert 404", async () => {
-    await supertest(app.server).post("/api/wiki").send({ title: "Kind", slug: "missing/child", parentId: 9999 }).expect(404);
+    await supertest(app.server).post("/api/wiki").send({ title: "Kind", parentId: 9999 }).expect(404);
   });
 });

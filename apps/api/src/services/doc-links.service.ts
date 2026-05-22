@@ -16,7 +16,7 @@ import {
 
 type MappableFeatureRecord = Pick<
   typeof features.$inferSelect,
-  "id" | "title" | "slug" | "status" | "description" | "contentPath" | "sortOrder" | "version" | "createdAt" | "updatedAt"
+  "id" | "title" | "status" | "description" | "contentPath" | "sortOrder" | "version" | "createdAt" | "updatedAt"
 >;
 
 type FeatureReference = Pick<typeof features.$inferSelect, "id" | "title">;
@@ -25,7 +25,6 @@ function mapFeature(row: MappableFeatureRecord, useCaseCount = 0): FeatureDto {
   return {
     id: row.id,
     title: row.title,
-    slug: row.slug,
     status: row.status,
     description: row.description,
     contentPath: row.contentPath,
@@ -226,7 +225,6 @@ export function listProjectFeatures(database: DbClient, projectId: number): Feat
     .select({
       id: features.id,
       title: features.title,
-      slug: features.slug,
       status: features.status,
       description: features.description,
       contentPath: features.contentPath,
@@ -275,7 +273,6 @@ export function listMilestoneFeatures(database: DbClient, milestoneId: number): 
     .select({
       id: features.id,
       title: features.title,
-      slug: features.slug,
       status: features.status,
       description: features.description,
       contentPath: features.contentPath,
@@ -330,7 +327,6 @@ export function listFeatureRelations(database: DbClient, featureId: number): Fea
       updatedAt: featureRelations.updatedAt,
       targetId: features.id,
       targetTitle: features.title,
-      targetSlug: features.slug,
       targetStatus: features.status,
       targetDescription: features.description,
       targetContentPath: features.contentPath,
@@ -356,11 +352,10 @@ export function listFeatureRelations(database: DbClient, featureId: number): Fea
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     targetFeature: mapFeature(
-      {
-        id: row.targetId,
-        title: row.targetTitle,
-        slug: row.targetSlug,
-        status: row.targetStatus,
+        {
+          id: row.targetId,
+          title: row.targetTitle,
+          status: row.targetStatus,
         description: row.targetDescription,
         contentPath: row.targetContentPath,
         sortOrder: row.targetSortOrder,

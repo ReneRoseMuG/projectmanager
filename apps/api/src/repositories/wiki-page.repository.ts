@@ -5,7 +5,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type WikiPageRecord = typeof wikiPages.$inferSelect;
 export type WikiPageCreateData = Omit<typeof wikiPages.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type WikiPageUpdateData = Partial<Pick<WikiPageCreateData, "parentId" | "projectId" | "title" | "slug" | "contentPath" | "sortOrder">>;
+export type WikiPageUpdateData = Partial<Pick<WikiPageCreateData, "parentId" | "projectId" | "title" | "contentPath" | "sortOrder">>;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -22,10 +22,6 @@ export const wikiPageRepository = {
 
   findChildren(database: DbClient, id: number): WikiPageRecord[] {
     return database.select().from(wikiPages).where(eq(wikiPages.parentId, id)).orderBy(wikiPages.sortOrder, wikiPages.title).all();
-  },
-
-  findBySlug(database: DbClient, slug: string): WikiPageRecord[] {
-    return database.select().from(wikiPages).where(eq(wikiPages.slug, slug)).all();
   },
 
   create(database: DbClient, data: WikiPageCreateData, userId?: number): WikiPageRecord {
@@ -61,6 +57,10 @@ export const wikiPageRepository = {
       .where(eq(wikiPages.id, id))
       .returning()
       .get();
+  },
+
+  setContentPath(database: DbClient, id: number, contentPath: string): WikiPageRecord | undefined {
+    return database.update(wikiPages).set({ contentPath, updatedAt: nowIso() }).where(eq(wikiPages.id, id)).returning().get();
   },
 
   delete(database: DbClient, id: number): number {

@@ -25,7 +25,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { errorMessage } from "../../hooks/errors";
@@ -147,16 +147,6 @@ const swatches = [
   "var(--color-ink)",
 ];
 
-function projectCode(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 5)
-    .toUpperCase();
-}
-
 function workStatusValue(
   entries: Parameters<typeof resolveCatalogEntryKey>[0],
   value: string,
@@ -241,7 +231,6 @@ export function ProjectForm({
   const [taskDraftOpen, setTaskDraftOpen] = useState(false);
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
-  const code = useMemo(() => projectCode(name), [name]);
 
   useEffect(() => {
     if (!open) {
@@ -576,21 +565,12 @@ export function ProjectForm({
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
+              <div className="grid gap-4">
                 <FormField label="Projektname" required className="min-w-0">
                   <Input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     required
-                  />
-                </FormField>
-                <FormField label="Kürzel" className="min-w-0">
-                  <Input
-                    value={code}
-                    readOnly
-                    maxLength={5}
-                    variant="mono"
-                    className="uppercase text-slate-600"
                   />
                 </FormField>
               </div>

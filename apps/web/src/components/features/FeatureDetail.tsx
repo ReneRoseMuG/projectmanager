@@ -1,5 +1,5 @@
 import type { Feature, FeatureStatus, FeatureUpdate } from "@taskmanager/shared-types";
-import { LinkIcon, RotateCcw, Save, Trash2 } from "lucide-react";
+import { RotateCcw, Save, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
@@ -16,7 +16,6 @@ interface FeatureDetailProps {
 
 export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps) {
   const [title, setTitle] = useState(feature.title);
-  const [slug, setSlug] = useState(feature.slug);
   const [status, setStatus] = useState<FeatureStatus>(feature.status);
   const [description, setDescription] = useState(feature.description ?? "");
   const [sortOrder, setSortOrder] = useState(feature.sortOrder);
@@ -25,7 +24,6 @@ export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps)
 
   useEffect(() => {
     setTitle(feature.title);
-    setSlug(feature.slug);
     setStatus(feature.status);
     setDescription(feature.description ?? "");
     setSortOrder(feature.sortOrder);
@@ -36,7 +34,7 @@ export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps)
     event.preventDefault();
     setSaving(true);
     try {
-      await onSave(feature.id, { title, slug, status, description, sortOrder, content, expectedVersion: feature.version });
+      await onSave(feature.id, { title, status, description, sortOrder, content, expectedVersion: feature.version });
     } finally {
       setSaving(false);
     }
@@ -44,7 +42,6 @@ export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps)
 
   const resetFields = () => {
     setTitle(feature.title);
-    setSlug(feature.slug);
     setStatus(feature.status);
     setDescription(feature.description ?? "");
     setSortOrder(feature.sortOrder);
@@ -54,17 +51,9 @@ export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps)
   return (
     <form id="feature-detail-form" className="grid gap-4" onSubmit={submit}>
       <Section title="Stammdaten">
-        <div className="grid gap-4 md:grid-cols-2">
         <FormField label="Titel" required className="min-w-0">
           <input className="h-11 w-full min-w-0 rounded-lg border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" value={title} onChange={(event) => setTitle(event.target.value)} required />
         </FormField>
-        <FormField label="Slug" required className="min-w-0">
-          <span className="relative min-w-0">
-            <LinkIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-steel-400" size={16} />
-            <input className="h-11 w-full min-w-0 rounded-lg border border-line pl-9 pr-3 font-mono text-sm outline-none transition focus:border-steel-600 focus:ring-4 focus:ring-steel-600/10" value={slug} onChange={(event) => setSlug(event.target.value)} required />
-          </span>
-        </FormField>
-        </div>
       </Section>
 
       <Section title="Status & Sortierung">

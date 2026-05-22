@@ -72,7 +72,6 @@ function featureFixture(overrides: Partial<Feature> = {}): Feature {
   return {
     id: featureId,
     title: "Aktuelles Feature",
-    slug: "aktuelles-feature",
     status: "active",
     description: null,
     contentPath: null,

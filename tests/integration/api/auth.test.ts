@@ -5,9 +5,10 @@
  * - Auth-Migration legt Rollen, Permissions und `full_name` als generierte Spalte an.
  * - Login, Session-Cookie, `/auth/me`, globale Guards und Admin-Guards funktionieren.
  * - Admin-Benutzer und Rollen werden versioniert verwaltet und Passwörter gehasht.
+ * - Die geschützte User-Auswahlliste liefert aktive Benutzer ohne Admin-Route.
  *
  * Fehlerfälle:
- * - Falsches Passwort, inaktiver Benutzer, fehlende Session, fehlende Rechte, Self-Delete und letzter aktiver Admin.
+ * - Falsches Passwort, inaktiver Benutzer, fehlende Session, fehlende Rechte, Self-Delete, letzter aktiver Admin und fehlendes `users:read`.
  *
  * Ziel:
  * Das Auth-, Rollen- und Benutzerverwaltungssystem gegen zentrale Sicherheits- und Regressionsfälle absichern.
@@ -156,6 +157,50 @@ describe("Auth API", () => {
     await reader.post("/api/catalogs/ticketType").send({ key: "reader_blocked", label: "Reader Blocked" }).expect(403);
     await reader.delete(`/api/catalogs/ticketType/${bugType.id}`).expect(403);
     await reader.get("/api/admin/users").expect(403);
+  });
+
+  it("liefert aktive User-Auswahl für users:read und blockiert fehlende Rechte", async () => {
+    const admin = await loginAdmin(app);
+    const roles = await admin.get("/api/admin/roles").expect(200);
+    const readerRole = roles.body.find((role: { key: string }) => role.key === "reader") as { id: number };
+
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Active", lastName: "Person", email: "active@example.test", roleId: readerRole.id, password: "password123", isActive: true })
+      .expect(201);
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Inactive", lastName: "Person", email: "inactive-user@example.test", roleId: readerRole.id, password: "password123", isActive: false })
+      .expect(201);
+
+    await supertest(app.server).get("/api/users").expect(401);
+
+    const reader = supertest.agent(app.server);
+    await reader.post("/api/auth/login").send({ email: "active@example.test", password: "password123" }).expect(200);
+    const users = await reader.get("/api/users").expect(200);
+
+    expect(users.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ email: "admin@local", fullName: "Admin, Test" }),
+        expect.objectContaining({ email: "active@example.test", fullName: "Person, Active" })
+      ])
+    );
+    expect(users.body.some((user: { email: string }) => user.email === "inactive-user@example.test")).toBe(false);
+    expect(users.body[0]).not.toHaveProperty("role");
+    expect(users.body[0]).not.toHaveProperty("address");
+
+    const limitedRole = await admin
+      .post("/api/admin/roles")
+      .send({ key: "ticket_only", label: "Ticket Only", permissions: [{ resource: "tickets", action: "read" }] })
+      .expect(201);
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Limited", lastName: "Person", email: "limited@example.test", roleId: limitedRole.body.id, password: "password123", isActive: true })
+      .expect(201);
+
+    const limited = supertest.agent(app.server);
+    await limited.post("/api/auth/login").send({ email: "limited@example.test", password: "password123" }).expect(200);
+    await limited.get("/api/users").expect(403);
   });
 
   it("verhindert Self-Delete und das Entfernen des letzten aktiven Admins", async () => {

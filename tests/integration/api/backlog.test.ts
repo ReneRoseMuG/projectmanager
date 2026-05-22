@@ -49,7 +49,7 @@ describe("Backlog API", () => {
 
   it("Item anlegen mit projectId und Feature", async () => {
     const project = await createProject(app);
-    const feature = await createFeature(app, { slug: "ft-backlog-create" });
+    const feature = await createFeature(app, { title: "Backlog Feature Create" });
 
     const res = await supertest(app.server).post(`/api/projects/${project.id}/backlog`).send({ title: "Item 1", featureId: feature.id }).expect(201);
 
@@ -74,8 +74,8 @@ describe("Backlog API", () => {
 
   it("Filter nach featureId, useCaseId und status", async () => {
     const project = await createProject(app);
-    const feature = await createFeature(app, { slug: "ft-backlog-filter" });
-    const useCase = await createUseCase(app, feature.id, { slug: "uc-backlog-filter" });
+    const feature = await createFeature(app, { title: "Backlog Feature Filter" });
+    const useCase = await createUseCase(app, feature.id, { title: "Backlog Use Case Filter" });
     await createBacklogItem(app, project.id, { title: "Match", featureId: feature.id, useCaseId: useCase.id });
     await createBacklogItem(app, project.id, { title: "Other", status: "rejected" });
 

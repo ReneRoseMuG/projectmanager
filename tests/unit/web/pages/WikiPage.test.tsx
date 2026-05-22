@@ -74,7 +74,6 @@ vi.mock("../../../../apps/web/src/hooks/useWiki", () => ({
           projectId: null,
           parentId: null,
           title: "Wiki Alpha",
-          slug: "wiki-alpha",
           content: null,
           contentPath: null,
           sortOrder: 0,

@@ -16,6 +16,32 @@ const defaultSwatches = [
   "var(--color-ink)",
 ];
 
+function normalizeHexColor(color: string): string | undefined {
+  const value = color.trim();
+  if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+    return `#${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}`.toLowerCase();
+  }
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+    return value.toLowerCase();
+  }
+  return undefined;
+}
+
+function resolveCssVariableColor(color: string): string | undefined {
+  const match = /^var\(\s*(--[\w-]+)\s*\)$/.exec(color.trim());
+  const variableName = match?.[1];
+  if (!variableName || typeof document === "undefined") {
+    return undefined;
+  }
+  return normalizeHexColor(
+    getComputedStyle(document.documentElement).getPropertyValue(variableName),
+  );
+}
+
+function colorInputValue(color: string): string {
+  return normalizeHexColor(color) ?? resolveCssVariableColor(color) ?? "#000000";
+}
+
 function ColorSwatch({
   color,
   selected,
@@ -57,6 +83,7 @@ export function ColorPicker({
         <input
           className="h-6 w-8 border-0 bg-transparent p-0"
           type="color"
+          value={colorInputValue(value)}
           onChange={(event) => onChange(event.target.value)}
         />
       </label>

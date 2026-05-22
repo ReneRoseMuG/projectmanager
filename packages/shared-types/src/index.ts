@@ -201,6 +201,14 @@ export interface AdminUser {
   updatedAt: string;
 }
 
+export interface UserOption {
+  id: number;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+}
+
 export interface AdminUserInput {
   firstName: string;
   lastName: string;
@@ -703,7 +711,6 @@ export type EventUpdate = WithExpectedVersion<Partial<EventInput>>;
 export interface Feature {
   id: number;
   title: string;
-  slug: string;
   status: FeatureStatus;
   description: string | null;
   content?: string;
@@ -717,7 +724,6 @@ export interface Feature {
 
 export interface FeatureInput {
   title: string;
-  slug: string;
   status?: FeatureStatus;
   description?: string | null;
   content?: string;
@@ -746,7 +752,6 @@ export interface UseCase {
   id: number;
   featureId: number;
   title: string;
-  slug: string;
   status: FeatureStatus;
   description: string | null;
   content?: string;
@@ -760,7 +765,6 @@ export interface UseCase {
 export interface UseCaseInput {
   featureId?: number;
   title: string;
-  slug: string;
   status?: FeatureStatus;
   description?: string | null;
   content?: string;
@@ -777,7 +781,7 @@ export type DraftTicket =
   | { kind: "new"; draft: Pick<TicketInput, "title" | "type" | "status" | "priority"> }
   | { kind: "existing"; ticket: Ticket };
 
-export type DraftUseCase = { kind: "new"; draft: Pick<UseCaseInput, "title" | "slug" | "status"> } | { kind: "existing"; useCase: UseCase };
+export type DraftUseCase = { kind: "new"; draft: Pick<UseCaseInput, "title" | "status"> } | { kind: "existing"; useCase: UseCase };
 
 export type DraftSubtask = {
   title: string;
@@ -799,7 +803,6 @@ export interface WikiPage {
   parentId: number | null;
   projectId: number | null;
   title: string;
-  slug: string;
   content?: string;
   contentPath: string | null;
   sortOrder: number;
@@ -812,12 +815,10 @@ export interface WikiPage {
 export interface WikiBreadcrumb {
   id: number;
   title: string;
-  slug: string;
 }
 
 export interface WikiPageInput {
   title: string;
-  slug: string;
   parentId?: number | null;
   projectId?: number | null;
   content?: string;
@@ -882,7 +883,6 @@ export interface WikiImportItemResult {
   type: WikiImportItemType;
   action: WikiImportAction;
   title: string;
-  slug?: string;
   importKey?: string;
   sourcePath?: string;
   message?: string;

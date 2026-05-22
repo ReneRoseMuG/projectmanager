@@ -23,7 +23,6 @@ export interface ProjectFixture {
 export interface FeatureFixture {
   id: number;
   title: string;
-  slug: string;
 }
 
 export interface MilestoneFixture {
@@ -36,7 +35,6 @@ export interface MilestoneFixture {
 export interface UseCaseFixture {
   id: number;
   title: string;
-  slug: string;
   featureId: number;
 }
 
@@ -76,7 +74,7 @@ export function uniqueTitle(prefix: string) {
   return `${prefix} ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function slugify(value: string) {
+export function safeFilename(value: string) {
   return value
     .toLocaleLowerCase("de-DE")
     .replace(/[^a-z0-9]+/g, "-")
@@ -213,7 +211,6 @@ export async function createFeature(
   const response = await request.post(`${apiBaseUrl}/features`, {
     data: {
       title,
-      slug: slugify(title),
       ...(input.status !== undefined ? { status: input.status } : {}),
       description:
         input.description ?? "<p>E2E Feature-Kurzbeschreibung vollständig</p>",
@@ -256,7 +253,6 @@ export async function createUseCase(
     {
       data: {
         title,
-        slug: slugify(title),
         ...(input.status !== undefined ? { status: input.status } : {}),
         description:
           input.description ?? "<p>E2E Use-Case-Beschreibung vollständig</p>",

@@ -13,12 +13,11 @@ const featureIdParamSchema = {
 
 const useCaseBodySchema = {
   type: "object",
-  required: ["title", "slug"],
+  required: ["title"],
   additionalProperties: false,
   properties: {
     featureId: { type: "integer", minimum: 1 },
     title: { type: "string", minLength: 1 },
-    slug: { type: "string", minLength: 1 },
     status: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
     content: { type: "string" },

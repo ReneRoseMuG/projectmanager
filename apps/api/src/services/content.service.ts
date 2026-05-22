@@ -59,8 +59,8 @@ export function resolveStoredContentPath(contentPath: string): string {
   return resolveContentPath(subdir, filenameParts.join("/"));
 }
 
-export function buildFilename(prefix: string, id: number, slug: string): string {
-  return `${sanitizeSegment(prefix)}-${id}-${sanitizeSegment(slug)}.md`;
+export function buildFilename(prefix: string, id: number): string {
+  return `${sanitizeSegment(prefix)}-${id}.md`;
 }
 
 export function writeContent(absolutePath: string, markdown: string): void {

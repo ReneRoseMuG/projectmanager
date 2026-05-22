@@ -107,11 +107,11 @@ describe("Projekt Manager API integration", () => {
       createdIds.milestone = milestone.id;
       expect(milestone.status).toBe("active");
 
-      const feature = (await api.post("/api/features").send({ title: "Trimmed catalogs feature", slug: "trimmed-catalogs-feature" }).expect(201)).body as Feature;
+      const feature = (await api.post("/api/features").send({ title: "Trimmed catalogs feature" }).expect(201)).body as Feature;
       createdIds.feature = feature.id;
       expect(feature.status).toBe("active");
 
-      const useCase = (await api.post(`/api/features/${feature.id}/use-cases`).send({ title: "Trimmed catalogs use case", slug: "trimmed-catalogs-use-case" }).expect(201)).body as UseCase;
+      const useCase = (await api.post(`/api/features/${feature.id}/use-cases`).send({ title: "Trimmed catalogs use case" }).expect(201)).body as UseCase;
       createdIds.useCase = useCase.id;
       expect(useCase.status).toBe("active");
 
@@ -406,8 +406,8 @@ describe("Projekt Manager API integration", () => {
     await api.post(`/api/projects/${project.id}/import/wiki/run`).send({ sourcePath: featuresRoot }).expect(200);
 
     const features = (await api.get("/api/features").expect(200)).body as Feature[];
-    const alpha = features.find((feature) => feature.slug === "ft-01-alpha");
-    const beta = features.find((feature) => feature.slug === "ft-02-beta");
+    const alpha = features.find((feature) => feature.title === "FT (01): Alpha");
+    const beta = features.find((feature) => feature.title === "FT (02): Beta");
     expect(alpha).toBeDefined();
     expect(beta).toBeDefined();
 
@@ -441,7 +441,7 @@ describe("Projekt Manager API integration", () => {
     expect(importedTask).toBeDefined();
     const alphaTasks = (await api.get(`/api/features/${alpha?.id}/tasks`).expect(200)).body as TaskBoardItem[];
     const useCases = (await api.get(`/api/features/${alpha?.id}/use-cases`).expect(200)).body as UseCase[];
-    const alphaUseCase = useCases.find((useCase) => useCase.slug === "uc-01-01-alpha-start");
+    const alphaUseCase = useCases.find((useCase) => useCase.title === "UC 01/01 Alpha start");
     expect(alphaTasks.map((task) => task.id)).toContain(importedTask?.id);
     expect(alphaUseCase).toBeDefined();
     const useCaseTasks = (await api.get(`/api/use-cases/${alphaUseCase?.id}/tasks`).expect(200)).body as TaskBoardItem[];

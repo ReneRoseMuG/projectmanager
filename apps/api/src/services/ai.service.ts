@@ -564,7 +564,6 @@ function ticketInput(payload: JsonObject): TicketInput {
 function featureInput(payload: JsonObject): FeatureInput {
   return {
     title: requiredText(payload, "title"),
-    slug: requiredText(payload, "slug"),
     status: enumField(payload, "status", FEATURE_STATUSES),
     description: nullableTextField(payload, "description"),
     content: textField(payload, "content"),
@@ -576,7 +575,6 @@ function useCaseInput(payload: JsonObject): UseCaseInput {
   return {
     featureId: numberField(payload, "featureId"),
     title: requiredText(payload, "title"),
-    slug: requiredText(payload, "slug"),
     status: enumField(payload, "status", FEATURE_STATUSES),
     description: nullableTextField(payload, "description"),
     content: textField(payload, "content"),
@@ -587,7 +585,6 @@ function useCaseInput(payload: JsonObject): UseCaseInput {
 function wikiPageInput(payload: JsonObject): WikiPageInput {
   return {
     title: requiredText(payload, "title"),
-    slug: requiredText(payload, "slug"),
     parentId: numberField(payload, "parentId") ?? null,
     projectId: numberField(payload, "projectId") ?? null,
     content: textField(payload, "content"),

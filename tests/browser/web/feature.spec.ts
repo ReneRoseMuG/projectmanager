@@ -12,7 +12,6 @@ import {
   formPage,
   itemCard,
   linkProjectFeature,
-  slugify,
   uniqueTitle,
 } from "./domain-test-utils";
 
@@ -41,7 +40,7 @@ async function openFeatureList(page: Page) {
 
 async function expectFeatureFormData(
   page: Page,
-  feature: { title: string; slug: string },
+  feature: { title: string },
   descriptionText = "E2E Feature-Kurzbeschreibung vollständig",
   contentText = "E2E Feature-Inhalt vollständig",
 ) {
@@ -49,9 +48,6 @@ async function expectFeatureFormData(
   await expect(form).toBeVisible();
   await expect(form.locator("input[required]").nth(0)).toHaveValue(
     feature.title,
-  );
-  await expect(form.locator("input[required]").nth(1)).toHaveValue(
-    feature.slug,
   );
   await expect(form.locator('input[type="number"]').first()).toHaveValue("7");
   await expectRichText(form, descriptionText, 0);
@@ -65,7 +61,6 @@ test.describe("Feature-Routen und Detailformular", () => {
   }) => {
     let featureId: number | null = null;
     const title = uniqueTitle("E2E Feature Create Route");
-    const slug = slugify(title);
 
     try {
       await openFeatureList(page);
@@ -74,7 +69,6 @@ test.describe("Feature-Routen und Detailformular", () => {
       await expect(page).toHaveURL(/\/features\/new$/);
       const form = formPage(page, "Neues Feature");
       await form.locator("input[required]").nth(0).fill(title);
-      await form.locator("input[required]").nth(1).fill(slug);
       await form.locator('input[type="number"]').first().fill("7");
       await fillRichText(
         form,
@@ -224,9 +218,6 @@ test.describe("Feature-Routen und Detailformular", () => {
       const useCaseForm = formPage(page, "Use Case bearbeiten");
       await expect(useCaseForm.locator("input[required]").nth(0)).toHaveValue(
         useCase.title,
-      );
-      await expect(useCaseForm.locator("input[required]").nth(1)).toHaveValue(
-        useCase.slug,
       );
       await expectRichText(
         useCaseForm,

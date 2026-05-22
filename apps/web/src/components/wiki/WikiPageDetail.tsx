@@ -50,7 +50,6 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
       <div className="flex flex-wrap items-start justify-between gap-3 p-5">
         <div>
           <h1 className="text-2xl font-semibold text-ink">{page.title}</h1>
-          <p className="text-sm text-slate-600">{page.slug}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" icon={<Edit3 size={16} />} onClick={onEditMetadata}>

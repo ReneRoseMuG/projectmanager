@@ -11,7 +11,7 @@ import type {
   UseCase,
   UseCaseInput,
 } from "@taskmanager/shared-types";
-import { BookOpen, Bug, LinkIcon, ListTodo, Trash2 } from "lucide-react";
+import { BookOpen, Bug, ListTodo, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
@@ -146,7 +146,6 @@ export function UseCaseForm({
   const canReadJournal = useHasPermission("journal", "read");
   const [activeTab, setActiveTab] = useState<UseCaseFormTab>("details");
   const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
   const [status, setStatus] = useState<FeatureStatus>("draft");
   const [description, setDescription] = useState("");
   const [sortOrder, setSortOrder] = useState(0);
@@ -175,7 +174,6 @@ export function UseCaseForm({
     }
 
     setTitle(useCase?.title ?? "");
-    setSlug(useCase?.slug ?? "");
     setStatus(useCase?.status ?? "draft");
     setDescription(useCase?.description ?? "");
     setSortOrder(useCase?.sortOrder ?? 0);
@@ -199,7 +197,6 @@ export function UseCaseForm({
       const created = await onSubmit({
         featureId: selectedFeatureId ? Number(selectedFeatureId) : undefined,
         title,
-        slug,
         status: resolveCatalogEntryKey(
           catalogs.entries,
           "featureStatus",
@@ -327,25 +324,14 @@ export function UseCaseForm({
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField label="Titel" required className="min-w-0">
-                  <Input
-                    autoFocus
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    required
-                  />
-                </FormField>
-                <FormField label="Slug" required className="min-w-0">
-                  <Input
-                    iconLeft={<LinkIcon size={16} />}
-                    value={slug}
-                    onChange={(event) => setSlug(event.target.value)}
-                    required
-                    variant="mono"
-                  />
-                </FormField>
-              </div>
+              <FormField label="Titel" required className="min-w-0">
+                <Input
+                  autoFocus
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  required
+                />
+              </FormField>
             </Section>
 
             <Section title="Zuordnung">

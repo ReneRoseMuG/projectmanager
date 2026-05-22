@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import type { CatalogEntry, CatalogKind } from "@taskmanager/shared-types";
-import { apiBaseUrl, authenticatedGoto, deleteFeature, deleteMilestone, deleteProject, deleteTask, deleteTicket, ensureApiAuth, fillRichText, formPage, slugify, uniqueTitle } from "./domain-test-utils";
+import { apiBaseUrl, authenticatedGoto, deleteFeature, deleteMilestone, deleteProject, deleteTask, deleteTicket, ensureApiAuth, fillRichText, formPage, uniqueTitle } from "./domain-test-utils";
 
 /**
  * Test Scope:
@@ -82,7 +82,6 @@ test.describe("Kataloggekürzte Create-Flows", () => {
       await authenticatedGoto(page, "/features/new");
       const featureForm = formPage(page, "Neues Feature");
       await featureForm.locator("input[required]").nth(0).fill(featureTitle);
-      await featureForm.locator("input[required]").nth(1).fill(slugify(featureTitle));
       const featureResponsePromise = page.waitForResponse((response) => response.url().includes("/api/features") && response.request().method() === "POST");
       await featureForm.getByRole("button", { name: "Feature anlegen" }).click();
       const feature = (await (await featureResponsePromise).json()) as { id: number; status: string };
@@ -93,7 +92,6 @@ test.describe("Kataloggekürzte Create-Flows", () => {
       await authenticatedGoto(page, `/use-cases/new?featureId=${feature.id}&returnTo=${encodeURIComponent(`/features/${feature.id}`)}`);
       const useCaseForm = formPage(page, "Use Case anlegen");
       await useCaseForm.locator("input[required]").nth(0).fill(useCaseTitle);
-      await useCaseForm.locator("input[required]").nth(1).fill(slugify(useCaseTitle));
       const useCaseResponsePromise = page.waitForResponse((response) => response.url().includes(`/api/features/${feature.id}/use-cases`) && response.request().method() === "POST");
       await useCaseForm.getByRole("button", { name: "Speichern" }).click();
       const useCase = (await (await useCaseResponsePromise).json()) as { id: number; status: string };

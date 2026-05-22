@@ -4,11 +4,11 @@
  * Abgedeckte Regeln:
  * - Use Cases werden unter Features angelegt und verwalten eigene Markdown-Dateien.
  * - Feature-Löschung entfernt Use Cases und deren Dateien.
- * - Slugs sind global eindeutig.
+ * - Content-Pfade sind ID-basiert.
  *
  * Fehlerfälle:
  * - Use Case zu unbekanntem Feature liefert 404.
- * - Doppelter Use-Case-Slug liefert 409.
+ * - Use Case zu unbekanntem Feature liefert 404.
  *
  * Ziel:
  * Use-Case-API und Dateisystem-Cleanup isoliert absichern.
@@ -48,20 +48,22 @@ describe("Use Cases API", () => {
   });
 
   it("POST erstellt Use Case und Markdown-Datei", async () => {
-    const feature = await createFeature(app, { slug: "ft-uc-create" });
+    const feature = await createFeature(app, { title: "Feature fuer Use Case" });
 
     const res = await supertest(app.server)
       .post(`/api/features/${feature.id}/use-cases`)
-      .send({ title: "UC-01", slug: "uc-01", content: "# UC-01" })
+      .send({ title: "UC-01", content: "# UC-01" })
       .expect(201);
 
     expect(res.body.featureId).toBe(feature.id);
+    expect(res.body).not.toHaveProperty("slug");
+    expect(res.body.contentPath).toMatch(/content\/usecases\/usecase-\d+\.md/);
     expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# UC-01");
   });
 
   it("GET Liste gibt Use Cases ohne Content zurück", async () => {
-    const feature = await createFeature(app, { slug: "ft-uc-list" });
-    await createUseCase(app, feature.id, { slug: "uc-list", content: "# Liste" });
+    const feature = await createFeature(app, { title: "Feature fuer Liste" });
+    await createUseCase(app, feature.id, { title: "Listen-Use-Case", content: "# Liste" });
 
     const res = await supertest(app.server).get(`/api/features/${feature.id}/use-cases`).expect(200);
 
@@ -70,7 +72,7 @@ describe("Use Cases API", () => {
   });
 
   it("Use Case zu unbekanntem Feature liefert 404", async () => {
-    await supertest(app.server).post("/api/features/9999/use-cases").send({ title: "UC", slug: "uc-missing" }).expect(404);
+    await supertest(app.server).post("/api/features/9999/use-cases").send({ title: "UC" }).expect(404);
   });
 
   it("GET unbekannter Use Case liefert 404", async () => {
@@ -78,8 +80,8 @@ describe("Use Cases API", () => {
   });
 
   it("Feature-DELETE entfernt Use Cases per Cascade und Dateien per Service-Logik", async () => {
-    const feature = await createFeature(app, { slug: "ft-cascade" });
-    const useCase = await createUseCase(app, feature.id, { slug: "uc-cascade" });
+    const feature = await createFeature(app, { title: "Cascade-Feature" });
+    const useCase = await createUseCase(app, feature.id, { title: "Cascade-Use-Case" });
     const useCasePath = resolveStoredContentPath(useCase.contentPath ?? "");
 
     await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
@@ -88,29 +90,21 @@ describe("Use Cases API", () => {
     await supertest(app.server).get(`/api/use-cases/${useCase.id}`).expect(404);
   });
 
-  it("Use-Case-Slug ist global eindeutig", async () => {
-    const feature = await createFeature(app, { slug: "ft-unique-a" });
-    const secondFeature = await createFeature(app, { slug: "ft-unique-b" });
-    await createUseCase(app, feature.id, { slug: "uc-global" });
-
-    await supertest(app.server).post(`/api/features/${secondFeature.id}/use-cases`).send({ title: "Doppelt", slug: "uc-global" }).expect(409);
-  });
-
-  it("PATCH mit neuem Slug benennt Datei um", async () => {
-    const feature = await createFeature(app, { slug: "ft-uc-rename" });
-    const useCase = await createUseCase(app, feature.id, { slug: "uc-old" });
+  it("PATCH mit neuem Titel behÃ¤lt Datei", async () => {
+    const feature = await createFeature(app, { title: "Rename-Feature" });
+    const useCase = await createUseCase(app, feature.id, { title: "Alter Use Case" });
     const oldPath = resolveStoredContentPath(useCase.contentPath ?? "");
 
-    const res = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ slug: "uc-new", expectedVersion: useCase.version }).expect(200);
+    const res = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ title: "Neuer Use Case", expectedVersion: useCase.version }).expect(200);
 
-    expect(res.body.contentPath).toContain("uc-new");
-    expect(fs.existsSync(oldPath)).toBe(false);
+    expect(res.body.contentPath).toBe(useCase.contentPath);
+    expect(fs.existsSync(oldPath)).toBe(true);
     expect(fs.existsSync(resolveStoredContentPath(res.body.contentPath))).toBe(true);
   });
 
   it("PATCH aktualisiert Metadaten", async () => {
-    const feature = await createFeature(app, { slug: "ft-uc-meta" });
-    const useCase = await createUseCase(app, feature.id, { slug: "uc-meta" });
+    const feature = await createFeature(app, { title: "Meta-Feature" });
+    const useCase = await createUseCase(app, feature.id, { title: "Meta-Use-Case" });
 
     const res = await supertest(app.server)
       .patch(`/api/use-cases/${useCase.id}`)
@@ -121,8 +115,8 @@ describe("Use Cases API", () => {
   });
 
   it("DELETE entfernt Use Case und Datei", async () => {
-    const feature = await createFeature(app, { slug: "ft-uc-delete" });
-    const useCase = await createUseCase(app, feature.id, { slug: "uc-delete" });
+    const feature = await createFeature(app, { title: "Delete-Feature" });
+    const useCase = await createUseCase(app, feature.id, { title: "Delete-Use-Case" });
     const contentPath = resolveStoredContentPath(useCase.contentPath ?? "");
 
     await supertest(app.server).delete(`/api/use-cases/${useCase.id}`).expect(204);
@@ -132,8 +126,8 @@ describe("Use Cases API", () => {
   });
 
   it("GET und PATCH laden und speichern Content", async () => {
-    const feature = await createFeature(app, { slug: "ft-content" });
-    const useCase = await createUseCase(app, feature.id, { slug: "uc-content", content: "# Alt" });
+    const feature = await createFeature(app, { title: "Content-Feature" });
+    const useCase = await createUseCase(app, feature.id, { title: "Content-Use-Case", content: "# Alt" });
 
     const detail = await supertest(app.server).get(`/api/use-cases/${useCase.id}`).expect(200);
     expect(detail.body.content).toBe("# Alt");

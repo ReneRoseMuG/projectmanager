@@ -168,7 +168,6 @@ describe("ProjectFeaturePanel", () => {
     const feature = buildFeature({
       id: 99,
       title: "Feature ohne Metadaten",
-      slug: undefined as unknown as string,
       useCaseCount: undefined as unknown as number,
     });
 

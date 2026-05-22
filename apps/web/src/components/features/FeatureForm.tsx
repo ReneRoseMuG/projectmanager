@@ -17,7 +17,6 @@ import {
   Bug,
   FileText,
   FolderKanban,
-  LinkIcon,
   ListTodo,
   Paperclip,
   Trash2,
@@ -194,7 +193,6 @@ export function FeatureForm({
   );
   const [activeTab, setActiveTab] = useState<FeatureFormTab>("details");
   const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
   const [status, setStatus] = useState<FeatureStatus>("draft");
   const [description, setDescription] = useState("");
   const [sortOrder, setSortOrder] = useState(0);
@@ -233,7 +231,6 @@ export function FeatureForm({
       return;
     }
     setTitle(feature?.title ?? "");
-    setSlug(feature?.slug ?? "");
     setStatus(feature?.status ?? "draft");
     setDescription(feature?.description ?? "");
     setSortOrder(feature?.sortOrder ?? 0);
@@ -255,7 +252,6 @@ export function FeatureForm({
     try {
       const created = await onSubmit({
         title,
-        slug,
         status: resolveCatalogEntryKey(
           catalogs.entries,
           "featureStatus",
@@ -437,21 +433,12 @@ export function FeatureForm({
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem]">
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
                 <FormField label="Titel" required className="min-w-0">
                   <Input
                     autoFocus={!feature}
                     value={title}
                     onChange={(event) => setTitle(event.target.value)}
-                    required
-                  />
-                </FormField>
-                <FormField label="Slug" required className="min-w-0">
-                  <Input
-                    iconLeft={<LinkIcon size={16} />}
-                    variant="mono"
-                    value={slug}
-                    onChange={(event) => setSlug(event.target.value)}
                     required
                   />
                 </FormField>
@@ -918,21 +905,18 @@ function UseCaseDraftDialog({
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
   const catalogs = useCatalogs();
   const [status, setStatus] = useState<FeatureStatus>("draft");
   const trimmedTitle = title.trim();
-  const trimmedSlug = slug.trim();
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
     event.preventDefault();
-    if (!trimmedTitle || !trimmedSlug) {
+    if (!trimmedTitle) {
       return;
     }
     onCreate({
       title: trimmedTitle,
-      slug: trimmedSlug,
       status: resolveCatalogEntryKey(
         catalogs.entries,
         "featureStatus",
@@ -941,7 +925,6 @@ function UseCaseDraftDialog({
       ),
     });
     setTitle("");
-    setSlug("");
     setStatus(featureStatusValue(catalogs.entries, "draft", "draft"));
     onClose();
   };
@@ -957,14 +940,6 @@ function UseCaseDraftDialog({
             required
           />
         </FormField>
-        <FormField label="Slug" required>
-          <Input
-            value={slug}
-            onChange={(event) => setSlug(event.target.value)}
-            required
-            variant="mono"
-          />
-        </FormField>
         <FormField label="Status">
           <StatusToggle
             kind="featureStatus"
@@ -977,7 +952,7 @@ function UseCaseDraftDialog({
           <Button
             type="submit"
             variant="primary"
-            disabled={!trimmedTitle || !trimmedSlug}
+            disabled={!trimmedTitle}
           >
             Vormerken
           </Button>

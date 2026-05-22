@@ -5,13 +5,12 @@ import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, obje
 
 const wikiBodySchema = {
   type: "object",
-  required: ["title", "slug"],
+  required: ["title"],
   additionalProperties: false,
   properties: {
     parentId: { type: ["integer", "null"], minimum: 1 },
     projectId: { type: ["integer", "null"], minimum: 1 },
     title: { type: "string", minLength: 1 },
-    slug: { type: "string", minLength: 1 },
     content: { type: "string" },
     sortOrder: { type: "integer" }
   }

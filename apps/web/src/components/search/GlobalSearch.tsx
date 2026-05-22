@@ -42,8 +42,8 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
       .filter((milestone) => !normalized || milestone.name.toLowerCase().includes(normalized) || richTextToPlainText(milestone.description).toLowerCase().includes(normalized))
       .map((milestone) => ({ id: `milestone-${milestone.id}`, type: "Meilensteine", title: milestone.name, meta: `MILESTONE-${milestone.id}`, to: `/milestones/${milestone.id}`, icon: <Flag size={17} /> }));
     const featureResults = features
-      .filter((feature) => !normalized || feature.title.toLowerCase().includes(normalized) || feature.slug.toLowerCase().includes(normalized))
-      .map((feature) => ({ id: `feature-${feature.id}`, type: "Features", title: feature.title, meta: feature.slug, to: `/features/${feature.id}`, icon: <BookOpen size={17} /> }));
+      .filter((feature) => !normalized || feature.title.toLowerCase().includes(normalized))
+      .map((feature) => ({ id: `feature-${feature.id}`, type: "Features", title: feature.title, meta: `FEATURE-${feature.id}`, to: `/features/${feature.id}`, icon: <BookOpen size={17} /> }));
     const taskResults = tasks
       .filter((task) => !normalized || task.title.toLowerCase().includes(normalized) || richTextToPlainText(task.description).toLowerCase().includes(normalized))
       .map((task) => ({ id: `task-${task.id}`, type: "Aufgaben", title: task.title, meta: `TASK-${task.id}`, to: "/projects", icon: <ListTodo size={17} /> }));
@@ -54,8 +54,8 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
       .filter((note) => !normalized || note.title.toLowerCase().includes(normalized))
       .map((note) => ({ id: `note-${note.id}`, type: "Notizen", title: note.title, meta: `NOTE-${note.id}`, to: "/projects", icon: <StickyNote size={17} /> }));
     const wikiResults = wikiPages
-      .filter((page) => !normalized || page.title.toLowerCase().includes(normalized) || page.slug.toLowerCase().includes(normalized))
-      .map((page) => ({ id: `wiki-${page.id}`, type: "Wiki", title: page.title, meta: page.slug, to: `/wiki/${page.id}`, icon: <FileText size={17} /> }));
+      .filter((page) => !normalized || page.title.toLowerCase().includes(normalized))
+      .map((page) => ({ id: `wiki-${page.id}`, type: "Wiki", title: page.title, meta: `WIKI-${page.id}`, to: `/wiki/${page.id}`, icon: <FileText size={17} /> }));
     const fileResults = attachments
       .filter((attachment) => !normalized || attachment.originalName.toLowerCase().includes(normalized))
       .map((attachment) => ({ id: `file-${attachment.id}`, type: "Dateien", title: attachment.originalName, meta: attachment.mimetype, to: "/projects", icon: <Paperclip size={17} /> }));

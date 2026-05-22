@@ -61,6 +61,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerSettingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
   const { registerNotesRoutes } = await import("../../../apps/api/src/routes/notes.js");
   const { registerTicketsRoutes } = await import("../../../apps/api/src/routes/tickets.js");
+  const { registerUserRoutes } = await import("../../../apps/api/src/routes/users.js");
   const { registerMultipart } = await import("../../../apps/api/src/plugins/multipart.js");
   const { registerEventsRoutes } = await import("../../../apps/api/src/routes/events.js");
   const { registerFeaturesRoutes } = await import("../../../apps/api/src/routes/features.js");
@@ -110,6 +111,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
     await app.register(registerAttachmentsRoutes, { prefix: "/api" });
   }
   await app.register(registerTicketsRoutes, { prefix: "/api" });
+  await app.register(registerUserRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
   if (!options.enableAuth) {
     await app.register(registerHealthRoutes, { prefix: "/api" });

@@ -11,7 +11,7 @@ import {
   fillRichText,
   formPage,
   itemCard,
-  slugify,
+  safeFilename,
   uniqueTitle,
 } from "./domain-test-utils";
 
@@ -365,7 +365,7 @@ test.describe("Globale UI-Aktualität", () => {
   }) => {
     const project = await createProject(request, "E2E Fresh Side Collections");
     const commentText = uniqueTitle("E2E Fresh Kommentar");
-    const attachmentName = `${slugify(uniqueTitle("fresh attachment"))}.txt`;
+    const attachmentName = `${safeFilename(uniqueTitle("fresh attachment"))}.txt`;
 
     try {
       await openProjectDetail(page, project.id);

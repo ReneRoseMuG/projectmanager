@@ -27,7 +27,6 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOp
   const { confirm } = useConfirm();
   const pages = useMemo(() => flattenTree(tree).filter((item) => item.id !== page?.id), [page?.id, tree]);
   const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
   const [parentId, setParentId] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState(0);
   const [content, setContent] = useState("");
@@ -41,7 +40,6 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOp
       return;
     }
     setTitle(page?.title ?? "");
-    setSlug(page?.slug ?? (parent ? `${parent.slug}/` : ""));
     setParentId(page?.parentId ?? parent?.id ?? null);
     setSortOrder(page?.sortOrder ?? 0);
     setContent(page?.content ?? "");
@@ -54,7 +52,7 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOp
     event.preventDefault();
     setSaving(true);
     try {
-      await onSubmit({ title, slug, parentId, sortOrder, content });
+      await onSubmit({ title, parentId, sortOrder, content });
       setDirty(false);
       onClose();
     } catch {
@@ -127,19 +125,12 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOp
                   <option value="">Root-Seite</option>
                   {pages.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.slug}
+                      {item.title}
                     </option>
                   ))}
                 </select>
               </label>
             </div>
-            <label className="mt-4 grid gap-1 text-sm font-semibold text-ink">
-              Slug
-              <span className="grid grid-cols-[auto_minmax(0,1fr)] overflow-hidden rounded-md border border-line bg-white focus-within:border-teal focus-within:ring-2 focus-within:ring-teal/15">
-                <span className="flex h-11 items-center border-r border-line bg-shell px-3 font-mono text-xs text-slate-500">/wiki/</span>
-                <input className="h-11 min-w-0 px-3 font-mono text-sm outline-none" value={slug} onChange={(event) => { setSlug(event.target.value); setDirty(true); }} required />
-              </span>
-            </label>
             <div className="mt-4 grid gap-2 md:grid-cols-2">
               <label className="flex items-center justify-between gap-3 rounded-lg border border-line bg-shell/60 p-3 text-sm font-semibold text-ink">
                 In Navigation anzeigen

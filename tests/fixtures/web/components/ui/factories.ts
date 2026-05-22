@@ -114,7 +114,6 @@ export function buildFeature(overrides: Partial<Feature> = {}): Feature {
   return {
     id: 1,
     title: "Feature Aktiv",
-    slug: "feature-login",
     status: "active",
     description: "Ermöglicht die Benutzeranmeldung",
     content: "Ausführliche Beschreibung des Login-Features.",
@@ -133,7 +132,6 @@ export function buildUseCase(overrides: Partial<UseCase> = {}): UseCase {
     id: 1,
     featureId: 1,
     title: "Use Case Anmeldung erfolgreich",
-    slug: "uc-login-success",
     status: "active",
     description: "Normaler Anmeldeablauf",
     content: "Der Nutzer meldet sich mit gültigen Zugangsdaten an.",
@@ -205,7 +203,6 @@ export function buildFeatureSet(): Feature[] {
     buildFeature({
       id: index + 1,
       title: `Feature ${featureStatusLabels[status]}`,
-      slug: `feature-${status.replace("_", "-")}`,
       status,
       sortOrder: index + 1
     })

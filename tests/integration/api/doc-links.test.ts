@@ -48,7 +48,7 @@ describe("Doc Link APIs", () => {
 
   it("PUT /projects/:id/features weist Features zu", async () => {
     const project = await createProject(app);
-    const feature = await createFeature(app, { slug: "ft-project-link" });
+    const feature = await createFeature(app, { title: "Project Link Feature" });
 
     const res = await supertest(app.server).put(`/api/projects/${project.id}/features`).send({ featureIds: [feature.id] }).expect(200);
 
@@ -58,8 +58,8 @@ describe("Doc Link APIs", () => {
 
   it("PUT ersetzt vollständig und leeres Array entfernt alle Projekt-Feature-Links", async () => {
     const project = await createProject(app);
-    const first = await createFeature(app, { slug: "ft-replace-a" });
-    const second = await createFeature(app, { slug: "ft-replace-b" });
+    const first = await createFeature(app, { title: "Replace Feature A" });
+    const second = await createFeature(app, { title: "Replace Feature B" });
 
     await supertest(app.server).put(`/api/projects/${project.id}/features`).send({ featureIds: [first.id] }).expect(200);
     const replaced = await supertest(app.server).put(`/api/projects/${project.id}/features`).send({ featureIds: [second.id] }).expect(200);
@@ -76,7 +76,7 @@ describe("Doc Link APIs", () => {
   });
 
   it("Unbekanntes Projekt liefert 404", async () => {
-    const feature = await createFeature(app, { slug: "ft-missing-project" });
+    const feature = await createFeature(app, { title: "Missing Project Feature" });
 
     await supertest(app.server).put("/api/projects/9999/features").send({ featureIds: [feature.id] }).expect(404);
   });
@@ -84,7 +84,7 @@ describe("Doc Link APIs", () => {
   it("POST /features/:id/tasks/:taskId und GET geben verknüpfte Aufgaben zurück", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
-    const feature = await createFeature(app, { slug: "ft-task-link" });
+    const feature = await createFeature(app, { title: "Task Link Feature" });
 
     await supertest(app.server).post(`/api/features/${feature.id}/tasks/${task.id}`).expect(200);
     const res = await supertest(app.server).get(`/api/features/${feature.id}/tasks`).expect(200);
@@ -96,7 +96,7 @@ describe("Doc Link APIs", () => {
   it("DELETE /features/:id/tasks/:taskId entfernt nur den Link", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
-    const feature = await createFeature(app, { slug: "ft-task-unlink" });
+    const feature = await createFeature(app, { title: "Task Unlink Feature" });
 
     await supertest(app.server).post(`/api/features/${feature.id}/tasks/${task.id}`).expect(200);
     await supertest(app.server).delete(`/api/features/${feature.id}/tasks/${task.id}`).expect(204);
@@ -109,8 +109,8 @@ describe("Doc Link APIs", () => {
   it("POST /use-cases/:id/tasks/:taskId und GET geben verknüpfte Aufgaben zurück", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
-    const feature = await createFeature(app, { slug: "ft-uc-link" });
-    const useCase = await createUseCase(app, feature.id, { slug: "uc-task-link" });
+    const feature = await createFeature(app, { title: "Use Case Link Feature" });
+    const useCase = await createUseCase(app, feature.id, { title: "Task Link Use Case" });
 
     await supertest(app.server).post(`/api/use-cases/${useCase.id}/tasks/${task.id}`).expect(200);
     const res = await supertest(app.server).get(`/api/use-cases/${useCase.id}/tasks`).expect(200);

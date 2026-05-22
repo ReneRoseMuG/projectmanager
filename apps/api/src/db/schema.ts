@@ -572,7 +572,6 @@ export const milestoneEvents = sqliteTable(
 export const features = sqliteTable("features", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
-  slug: text("slug").notNull().unique(),
   status: text("status").notNull().default("draft"),
   description: text("description"),
   contentPath: text("content_path"),
@@ -590,7 +589,6 @@ export const useCases = sqliteTable("use_cases", {
     .notNull()
     .references(() => features.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
-  slug: text("slug").notNull().unique(),
   status: text("status").notNull().default("draft"),
   description: text("description"),
   contentPath: text("content_path"),
@@ -627,7 +625,6 @@ export const wikiPages = sqliteTable("wiki_pages", {
   parentId: integer("parent_id").references((): AnySQLiteColumn => wikiPages.id, { onDelete: "restrict" }),
   projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
   title: text("title").notNull(),
-  slug: text("slug").notNull().unique(),
   contentPath: text("content_path"),
   sortOrder: integer("sort_order").notNull().default(0),
   version: integer("version").notNull().default(1),

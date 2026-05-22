@@ -6,7 +6,7 @@ import { assertVersion } from "../repositories/base.repository.js";
 import { featureRepository, type FeatureRecord, type FeatureUpdateData } from "../repositories/feature.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { useCaseRepository } from "../repositories/use-case.repository.js";
-import { badRequest, conflict, notFound } from "../utils/errors.js";
+import { badRequest, notFound } from "../utils/errors.js";
 import { deleteFeatureAttachmentsForIds } from "./attachments.service.js";
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import {
@@ -14,7 +14,6 @@ import {
   buildStoredContentPath,
   deleteContent,
   readContent,
-  renameContent,
   resolveContentPath,
   resolveStoredContentPath,
   writeContent
@@ -36,7 +35,6 @@ type FeatureStatus = FeatureRecord["status"];
 
 export interface FeatureInput {
   title?: string;
-  slug?: string;
   status?: FeatureStatus;
   description?: string | null;
   content?: string;
@@ -47,7 +45,6 @@ export interface FeatureInput {
 export interface FeatureDto {
   id: number;
   title: string;
-  slug: string;
   status: FeatureStatus;
   description: string | null;
   content?: string;
@@ -61,21 +58,19 @@ export interface FeatureDto {
 
 const featureJournalFields: Array<JournalFieldDefinition<FeatureRecord>> = [
   { key: "title", label: "Titel" },
-  { key: "slug", label: "Slug" },
   { key: "status", label: "Status" },
   { key: "description", label: "Beschreibung" },
   { key: "sortOrder", label: "Sortierung" }
 ];
 
-function contentFilename(id: number, slug: string): string {
-  return buildFilename("feature", id, slug);
+function contentFilename(id: number): string {
+  return buildFilename("feature", id);
 }
 
 function mapFeature(record: FeatureRecord, useCaseCount: number, content?: string): FeatureDto {
   return {
     id: record.id,
     title: record.title,
-    slug: record.slug,
     status: record.status,
     description: record.description,
     content,
@@ -109,14 +104,6 @@ function getFeatureRecord(database: DbClient, id: number): FeatureRecord {
     throw notFound(`Feature with id ${id} not found`);
   }
   return feature;
-}
-
-function ensureSlugIsUnique(database: DbClient, slug: string, exceptId?: number): void {
-  const existing = featureRepository.findBySlug(database, slug).find((row) => row.id !== exceptId);
-
-  if (existing) {
-    throw conflict(`Feature slug "${slug}" already exists`);
-  }
 }
 
 function readFeatureContent(record: FeatureRecord): string {
@@ -168,8 +155,6 @@ export function getFeature(database: DbClient, id: number): FeatureDto {
 
 export function createFeature(database: DbClient, input: FeatureInput, actor?: JournalActor | null): FeatureDto {
   const title = requireNonEmpty(input.title, "title");
-  const slug = requireNonEmpty(input.slug, "slug");
-  ensureSlugIsUnique(database, slug);
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
   ensureCatalogEntryExists(database, "featureStatus", status);
 
@@ -177,7 +162,6 @@ export function createFeature(database: DbClient, input: FeatureInput, actor?: J
     database,
     {
       title,
-      slug,
       status,
       description: cleanNullable(input.description) ?? null,
       contentPath: null,
@@ -186,7 +170,7 @@ export function createFeature(database: DbClient, input: FeatureInput, actor?: J
     actor?.actorUserId ?? undefined
   );
 
-  const filename = contentFilename(created.id, slug);
+  const filename = contentFilename(created.id);
   const absolutePath = resolveContentPath("features", filename);
   const storedPath = buildStoredContentPath("features", filename);
 
@@ -229,11 +213,6 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
     values.title = requireNonEmpty(input.title, "title");
   }
 
-  if (input.slug !== undefined) {
-    values.slug = requireNonEmpty(input.slug, "slug");
-    ensureSlugIsUnique(database, values.slug, id);
-  }
-
   if (input.status !== undefined) {
     ensureCatalogEntryExists(database, "featureStatus", input.status);
     values.status = input.status;
@@ -251,18 +230,12 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
     throw badRequest("No feature fields provided");
   }
 
-  const nextSlug = values.slug ?? current.slug;
-  if (nextSlug !== current.slug || !contentPath) {
-    const nextFilename = contentFilename(id, nextSlug);
+  if (!contentPath) {
+    const nextFilename = contentFilename(id);
     const nextAbsolutePath = resolveContentPath("features", nextFilename);
     const nextStoredPath = buildStoredContentPath("features", nextFilename);
 
-    if (contentPath) {
-      renameContent(resolveStoredContentPath(contentPath), nextAbsolutePath);
-    } else {
-      writeContent(nextAbsolutePath, "");
-    }
-
+    writeContent(nextAbsolutePath, "");
     contentPath = nextStoredPath;
     values.contentPath = nextStoredPath;
   }

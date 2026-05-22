@@ -45,7 +45,6 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
 const feature: Feature = {
   id: 10,
   title: "Feature Alpha",
-  slug: "feature-alpha",
   status: "active",
   description: "<p>Feature Beschreibung</p>",
   content: "<p>Feature Inhalt</p>",

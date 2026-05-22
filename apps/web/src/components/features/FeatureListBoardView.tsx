@@ -22,7 +22,6 @@ function matchesSearch(feature: Feature, searchValue: string) {
   }
   return [
     feature.title,
-    feature.slug,
     richTextToPlainText(feature.description),
   ].some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
 }

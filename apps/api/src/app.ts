@@ -27,6 +27,7 @@ import { registerSubtasksRoutes } from "./routes/subtasks.js";
 import { registerTagsRoutes } from "./routes/tags.js";
 import { registerTasksRoutes } from "./routes/tasks.js";
 import { registerTicketsRoutes } from "./routes/tickets.js";
+import { registerUserRoutes } from "./routes/users.js";
 import { registerUseCasesRoutes } from "./routes/use-cases.js";
 import { registerWikiRoutes } from "./routes/wiki.js";
 import { config } from "./config.js";
@@ -72,6 +73,7 @@ export async function buildApp(
   await app.register(registerTasksRoutes, { prefix: "/api" });
   await app.register(registerSubtasksRoutes, { prefix: "/api" });
   await app.register(registerTicketsRoutes, { prefix: "/api" });
+  await app.register(registerUserRoutes, { prefix: "/api" });
   await app.register(registerCommentsRoutes, { prefix: "/api" });
   await app.register(registerCatalogRoutes, { prefix: "/api" });
   await app.register(registerTagsRoutes, { prefix: "/api" });

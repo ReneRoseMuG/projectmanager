@@ -5,7 +5,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type UseCaseRecord = typeof useCases.$inferSelect;
 export type UseCaseCreateData = Omit<typeof useCases.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type UseCaseUpdateData = Partial<Pick<UseCaseCreateData, "featureId" | "title" | "slug" | "status" | "description" | "contentPath" | "sortOrder">>;
+export type UseCaseUpdateData = Partial<Pick<UseCaseCreateData, "featureId" | "title" | "status" | "description" | "contentPath" | "sortOrder">>;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -18,10 +18,6 @@ export const useCaseRepository = {
 
   findByFeatureId(database: DbClient, featureId: number): UseCaseRecord[] {
     return database.select().from(useCases).where(eq(useCases.featureId, featureId)).orderBy(useCases.sortOrder, useCases.title).all();
-  },
-
-  findBySlug(database: DbClient, slug: string): UseCaseRecord[] {
-    return database.select().from(useCases).where(eq(useCases.slug, slug)).all();
   },
 
   create(database: DbClient, data: UseCaseCreateData, userId?: number): UseCaseRecord {

@@ -47,7 +47,7 @@ export function FeatureRelationPanel({
       onSave={onSave}
       saving={saving}
       title={title}
-      searchKeys={["title", "slug", "description"]}
+      searchKeys={["title", "description"]}
       emptyAvailable={emptyAvailable}
       emptySelected={emptySelected}
       showSave={showSave}

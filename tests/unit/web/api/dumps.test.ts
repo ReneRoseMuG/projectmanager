@@ -3,13 +3,13 @@
  * Dump API client
  *
  * Abgedeckte Regeln:
- * - Die lokale Sicherung wartet länger als der globale API-Timeout auf SFTP-Uploads.
+ * - Langlaufende Backup-Operationen warten länger als der globale API-Timeout.
  *
  * Fehlerfälle:
- * - Ein zu kurzer Client-Timeout würde langsame SFTP-Sicherungen abbrechen.
+ * - Ein zu kurzer Client-Timeout würde langsame SFTP-Sicherungen oder Remote-Importe abbrechen.
  *
  * Ziel:
- * Den spezialisierten Timeout des Backup-Sichern-Aufrufs ohne echten HTTP-Request absichern.
+ * Den spezialisierten Timeout der Backup-Operationen ohne echten HTTP-Request absichern.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -27,7 +27,7 @@ vi.mock("../../../../apps/web/src/api/client", () => ({
   }
 }));
 
-import { saveLocalDump } from "../../../../apps/web/src/api/dumps";
+import { applyRemoteDump, previewRemoteDump, saveLocalDump } from "../../../../apps/web/src/api/dumps";
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -40,6 +40,27 @@ describe("dump api client", () => {
     await saveLocalDump();
 
     expect(apiMocks.post).toHaveBeenCalledWith("dumps/local/save", { timeout: 600000 });
+    expect(apiMocks.json).toHaveBeenCalledTimes(1);
+  });
+
+  it("nutzt für Remote-Import-Prüfungen einen längeren Timeout", async () => {
+    apiMocks.json.mockResolvedValue({});
+
+    await previewRemoteDump({ fileId: "remote.zip" });
+
+    expect(apiMocks.post).toHaveBeenCalledWith("dumps/remote/preview", { json: { fileId: "remote.zip" }, timeout: 600000 });
+    expect(apiMocks.json).toHaveBeenCalledTimes(1);
+  });
+
+  it("nutzt für Remote-Importe einen längeren Timeout", async () => {
+    apiMocks.json.mockResolvedValue({});
+
+    await applyRemoteDump({ fileId: "remote.zip", fileHash: "abc123", confirmed: true });
+
+    expect(apiMocks.post).toHaveBeenCalledWith("dumps/remote/apply", {
+      json: { fileId: "remote.zip", fileHash: "abc123", confirmed: true },
+      timeout: 600000
+    });
     expect(apiMocks.json).toHaveBeenCalledTimes(1);
   });
 });

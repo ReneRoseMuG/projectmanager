@@ -114,7 +114,7 @@ describe("UseCaseForm", () => {
   });
 
   it("übergibt Pending-Daten nach Create an onPostCreate", async () => {
-    const createdUseCase = { ...useCase, id: 101, title: "Neuer Use Case", slug: "neuer-use-case" };
+    const createdUseCase = { ...useCase, id: 101, title: "Neuer Use Case" };
     const onSubmit = vi.fn().mockResolvedValue(createdUseCase);
     const onPostCreate = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
@@ -122,7 +122,6 @@ describe("UseCaseForm", () => {
     renderWithProviders(<UseCaseForm open currentFeatureId={feature.id} features={[feature]} onSubmit={onSubmit} onPostCreate={onPostCreate} onClose={onClose} />);
 
     changeInput(0, "Neuer Use Case");
-    changeInput(1, "neuer-use-case");
     clickTab("Aufgaben");
     fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe wählen" }));
@@ -133,7 +132,7 @@ describe("UseCaseForm", () => {
     addPendingComment("  Kommentar im Create  ");
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: "Neuer Use Case", slug: "neuer-use-case", featureId: feature.id })));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ title: "Neuer Use Case", featureId: feature.id })));
     expect(onPostCreate).toHaveBeenCalledWith(
       createdUseCase.id,
       expect.objectContaining({

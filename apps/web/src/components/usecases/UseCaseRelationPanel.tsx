@@ -39,7 +39,7 @@ export function UseCaseRelationPanel({
       onSave={onSave}
       saving={saving}
       title={title}
-      searchKeys={["title", "slug", "description"]}
+      searchKeys={["title", "description"]}
       groupBy="featureId"
       groupLabel={groupLabel}
       emptyAvailable={emptyAvailable}

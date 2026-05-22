@@ -456,6 +456,10 @@ npm run dev -w apps/api   # nur Backend (Port 3001)
 npm run dev -w apps/web   # nur Frontend (Port 5173)
 ```
 
+### Dev-Server-Nutzung durch Codex
+
+Codex startet keinen Web-Dev-Server als Abschluss-Service, nur damit der Nutzer Änderungen testen kann. Für eigene Prüfungen darf Codex einen Dev-Server starten, wenn dies fachlich nötig ist; jeder dadurch gestartete Prozess muss vor der Abschlussantwort wieder beendet werden. In der Abschlussantwort wird kein laufender localhost-Server angeboten oder gemeldet, außer der Nutzer fragt ausdrücklich danach.
+
 ### Umgebungsvariablen
 
 - Backend: `.env` in `apps/api/` (wird nicht ins Repo eingecheckt, `.env.example` liegt vor)

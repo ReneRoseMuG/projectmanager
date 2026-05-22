@@ -4,7 +4,7 @@
  * Abgedeckte Regeln:
  * - Wiki-Import-Vorschau liest Features, Use Cases und offene Aufgaben ohne Datenmutation.
  * - Wiki-Import-Lauf legt Projekt-Features, Use Cases, Aufgaben und ableitbare Verknüpfungen an.
- * - Wiederholte Importe nutzen Slugs und Task-Import-Keys statt Duplikate zu erzeugen.
+ * - Wiederholte Importe nutzen Titel und Task-Import-Keys statt Duplikate zu erzeugen.
  *
  * Fehlerfälle:
  * - Fehlender Quellordner liefert 400.
@@ -76,14 +76,16 @@ describe("Wiki Import API", () => {
 
     const features = await supertest(app.server).get("/api/features").expect(200);
     expect(features.body).toHaveLength(1);
-    expect(features.body[0]).toMatchObject({ slug: "ft-01-kalendertermine", status: "active" });
+    expect(features.body[0]).toMatchObject({ title: "FT (01): Kalendertermine", status: "active" });
+    expect(features.body[0]).not.toHaveProperty("slug");
 
     const projectFeatures = await supertest(app.server).get(`/api/projects/${project.id}/features`).expect(200);
-    expect(projectFeatures.body.map((feature: { slug: string }) => feature.slug)).toEqual(["ft-01-kalendertermine"]);
+    expect(projectFeatures.body.map((feature: { title: string }) => feature.title)).toEqual(["FT (01): Kalendertermine"]);
 
     const useCases = await supertest(app.server).get(`/api/features/${features.body[0].id}/use-cases`).expect(200);
     expect(useCases.body).toHaveLength(1);
-    expect(useCases.body[0]).toMatchObject({ slug: "uc-01-01-termin-anlegen", status: "active" });
+    expect(useCases.body[0]).toMatchObject({ title: "UC 01/01: Termin anlegen", status: "active" });
+    expect(useCases.body[0]).not.toHaveProperty("slug");
 
     const tasks = await supertest(app.server).get(`/api/projects/${project.id}/tasks`).expect(200);
     expect(tasks.body).toHaveLength(1);
@@ -96,10 +98,10 @@ describe("Wiki Import API", () => {
     expect(useCaseTasks.body.map((task: { id: number }) => task.id)).toEqual([tasks.body[0].id]);
   });
 
-  it("POST run kann wiederholt werden und aktualisiert per Slug und Import-Key", async () => {
+  it("POST run kann wiederholt werden und aktualisiert per Titel und Import-Key", async () => {
     const project = await createProject(app);
     await supertest(app.server).post(`/api/projects/${project.id}/import/wiki/run`).send({ sourcePath: tmpWikiRoot }).expect(200);
-    writeWikiFixture(tmpWikiRoot, { featureTitle: "FT (01): Kalendertermine aktualisiert", taskTitle: "Importierte Aufgabe aktualisiert" });
+    writeWikiFixture(tmpWikiRoot, { taskTitle: "Importierte Aufgabe aktualisiert" });
 
     const secondRun = await supertest(app.server).post(`/api/projects/${project.id}/import/wiki/run`).send({ sourcePath: tmpWikiRoot }).expect(200);
     expect(secondRun.body.items.some((item: { type: string; action: string }) => item.type === "feature" && item.action === "updated")).toBe(true);
@@ -107,7 +109,7 @@ describe("Wiki Import API", () => {
 
     const features = await supertest(app.server).get("/api/features").expect(200);
     expect(features.body).toHaveLength(1);
-    expect(features.body[0].title).toBe("FT (01): Kalendertermine aktualisiert");
+    expect(features.body[0].title).toBe("FT (01): Kalendertermine");
 
     const tasks = await supertest(app.server).get(`/api/projects/${project.id}/tasks`).expect(200);
     expect(tasks.body).toHaveLength(1);

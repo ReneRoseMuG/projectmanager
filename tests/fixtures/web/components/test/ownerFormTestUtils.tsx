@@ -49,7 +49,6 @@ const fixtures = vi.hoisted(() => {
   const feature = {
     id: 10,
     title: "Feature Alpha",
-    slug: "feature-alpha",
     status: "active",
     description: "<p>Beschreibung</p>",
     content: "<p>Inhalt</p>",
@@ -64,7 +63,6 @@ const fixtures = vi.hoisted(() => {
     id: 20,
     featureId: feature.id,
     title: "Use Case Alpha",
-    slug: "use-case-alpha",
     status: "active",
     description: "<p>Beschreibung</p>",
     content: "<p>Inhalt</p>",

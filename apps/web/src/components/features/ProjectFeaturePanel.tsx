@@ -44,7 +44,6 @@ function matchesSearch(feature: Feature, searchValue: string, statusLabel: strin
 
   const values = [
     feature.title,
-    feature.slug,
     statusLabel,
     richTextToPlainText(feature.description),
     String(getUseCaseCount(feature)),

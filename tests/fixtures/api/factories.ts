@@ -113,7 +113,6 @@ export interface TestFeature {
   id: number;
   version: number;
   title: string;
-  slug: string;
   status: string;
   description: string | null;
   content?: string;
@@ -129,7 +128,6 @@ export interface TestUseCase {
   version: number;
   featureId: number;
   title: string;
-  slug: string;
   status: string;
   description: string | null;
   content?: string;
@@ -145,7 +143,6 @@ export interface TestWikiPage {
   parentId: number | null;
   projectId: number | null;
   title: string;
-  slug: string;
   content?: string;
   contentPath: string | null;
   sortOrder: number;
@@ -381,11 +378,10 @@ export async function createEvent(
 
 export async function createFeature(
   app: FastifyInstance,
-  overrides: Partial<{ title: string; slug: string; status: string; description: string | null; content: string }> = {}
+  overrides: Partial<{ title: string; status: string; description: string | null; content: string }> = {}
 ): Promise<TestFeature> {
   const body = {
-    title: "Testfeature",
-    slug: `feature-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title: `Testfeature ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`,
     status: "draft",
     content: "# Testfeature",
     ...overrides
@@ -398,11 +394,10 @@ export async function createFeature(
 export async function createUseCase(
   app: FastifyInstance,
   featureId: number,
-  overrides: Partial<{ title: string; slug: string; status: string; description: string | null; content: string }> = {}
+  overrides: Partial<{ title: string; status: string; description: string | null; content: string }> = {}
 ): Promise<TestUseCase> {
   const body = {
-    title: "Test Use Case",
-    slug: `usecase-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title: `Test Use Case ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`,
     status: "draft",
     content: "# Test Use Case",
     ...overrides
@@ -414,11 +409,10 @@ export async function createUseCase(
 
 export async function createWikiPage(
   app: FastifyInstance,
-  overrides: Partial<{ title: string; slug: string; parentId: number | null; projectId: number | null; content: string }> = {}
+  overrides: Partial<{ title: string; parentId: number | null; projectId: number | null; content: string }> = {}
 ): Promise<TestWikiPage> {
   const body = {
-    title: "Test Wiki",
-    slug: `wiki-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title: `Test Wiki ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`,
     content: "# Test Wiki",
     ...overrides
   };

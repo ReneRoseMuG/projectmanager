@@ -51,7 +51,6 @@ function buildUseCases(): UseCase[] {
     buildUseCase({
       id: 2,
       title: "Use Case Passwort vergessen",
-      slug: "uc-password-reset",
       sortOrder: 2,
     }),
   ];

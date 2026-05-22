@@ -19,6 +19,10 @@ export const userRepository = {
     return database.select().from(users).orderBy(asc(users.lastName), asc(users.firstName), asc(users.email)).all();
   },
 
+  findActive(database: DbClient): UserRecord[] {
+    return database.select().from(users).where(eq(users.isActive, true)).orderBy(asc(users.lastName), asc(users.firstName), asc(users.email)).all();
+  },
+
   findById(database: DbClient, id: number): UserRecord | undefined {
     return database.select().from(users).where(eq(users.id, id)).get();
   },

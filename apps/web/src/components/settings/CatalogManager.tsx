@@ -126,7 +126,7 @@ function CatalogGroup({
             />
           </FormField>
           <FormField label="Farbe">
-            <ColorPicker value={color} onChange={setColor} />
+            <ColorPicker value={color} onChange={setColor} swatches={[]} />
           </FormField>
           {canMarkClosed ? (
             <label className="flex h-11 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-slate-700">
@@ -238,11 +238,10 @@ function CatalogRow({
         <span className="text-slate-600">{entry.sortOrder}</span>
       )}
       {editing ? (
-        <ColorPicker value={color} onChange={setColor} />
+        <ColorPicker value={color} onChange={setColor} swatches={[]} />
       ) : (
-        <span className="flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-600">
+        <span className="flex min-w-0 items-center" aria-label="Farbe">
           <span className="h-6 w-6 shrink-0 rounded-full border border-white shadow-sm" style={{ backgroundColor: entry.color }} />
-          <span className="truncate">{entry.color}</span>
         </span>
       )}
       {canMarkClosed ? (

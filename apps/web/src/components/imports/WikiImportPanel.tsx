@@ -76,7 +76,7 @@ export function WikiImportPanel({ sourcePath, report, loading, error, onSourcePa
               </thead>
               <tbody className="divide-y divide-line">
                 {visibleItems.map((item, index) => (
-                  <ImportRow key={`${item.type}-${item.slug ?? item.importKey ?? item.title}-${index}`} item={item} />
+                  <ImportRow key={`${item.type}-${item.importKey ?? item.title}-${index}`} item={item} />
                 ))}
               </tbody>
             </table>
@@ -108,7 +108,7 @@ function ImportRow({ item }: { item: WikiImportItemResult }) {
         <div className="font-medium text-ink">{item.title}</div>
         {item.message ? <div className="mt-1 text-xs text-slate-500">{item.message}</div> : null}
       </td>
-      <td className="max-w-[360px] truncate px-3 py-2 text-xs text-slate-500">{item.sourcePath ?? item.slug ?? item.importKey ?? ""}</td>
+      <td className="max-w-[360px] truncate px-3 py-2 text-xs text-slate-500">{item.sourcePath ?? item.importKey ?? ""}</td>
     </tr>
   );
 }
