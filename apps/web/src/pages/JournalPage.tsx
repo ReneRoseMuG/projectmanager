@@ -1,15 +1,19 @@
 import { JOURNAL_OBJECT_TYPES, JOURNAL_OPERATIONS, type JournalObjectType, type JournalOperation } from "@taskmanager/shared-types";
 import { useMemo, useState } from "react";
 import { JournalEntryList, journalObjectLabels, journalOperationLabels } from "../components/journal/JournalPanel";
+import { PageHeader } from "../components/ui/PageHeader";
 import { SearchInput } from "../components/ui/SearchInput";
 import { Select } from "../components/ui/Select";
 import { useJournalEntries } from "../hooks/useJournal";
+import { useStandaloneView } from "../hooks/useStandaloneView";
 import { ForbiddenPage } from "./ForbiddenPage";
 
 export function JournalPage() {
   const [query, setQuery] = useState("");
   const [objectType, setObjectType] = useState<JournalObjectType | "">("");
   const [operation, setOperation] = useState<JournalOperation | "">("");
+  const [refreshing, setRefreshing] = useState(false);
+  const standalone = useStandaloneView();
 
   const filters = useMemo(
     () => ({
@@ -26,13 +30,22 @@ export function JournalPage() {
     return <ForbiddenPage />;
   }
 
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await journal.reload();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="grid gap-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-normal text-ink">Journal</h1>
-        </div>
-      </header>
+      <PageHeader
+        title="Journal"
+        onRefresh={standalone ? refresh : undefined}
+        refreshing={refreshing}
+      />
 
       <section className="grid gap-3 rounded-md border border-line bg-white p-4 md:grid-cols-[minmax(16rem,1fr)_14rem_14rem]">
         <SearchInput value={query} placeholder="Journal durchsuchen" onChange={setQuery} />

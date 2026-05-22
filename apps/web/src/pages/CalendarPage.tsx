@@ -5,6 +5,7 @@ import { CalendarView } from "../components/calendar/CalendarView";
 import { EventForm } from "../components/calendar/EventForm";
 import { UpcomingEvents } from "../components/calendar/UpcomingEvents";
 import { Button } from "../components/ui/Button";
+import { PageHeader } from "../components/ui/PageHeader";
 import { CalendarSkeleton } from "../components/calendar/CalendarSkeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
@@ -12,18 +13,23 @@ import { useCalendarTasks } from "../hooks/useCalendarTasks";
 import { useEvents } from "../hooks/useEvents";
 import { useMilestones } from "../hooks/useMilestones";
 import { useProjects } from "../hooks/useProjects";
+import { useStandaloneView } from "../hooks/useStandaloneView";
 
 export function CalendarPage() {
   const { showToast } = useToast();
-  const { projects, loading: projectsLoading } = useProjects();
-  const { milestones, loading: milestonesLoading } = useMilestones();
+  const projectController = useProjects();
+  const { projects, loading: projectsLoading } = projectController;
+  const milestoneController = useMilestones();
+  const { milestones, loading: milestonesLoading } = milestoneController;
   const calendarTasks = useCalendarTasks();
   const events = useEvents();
+  const standalone = useStandaloneView();
   const [formOpen, setFormOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
   );
   const [initialDate, setInitialDate] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const openCreate = (date?: string) => {
     setSelectedEvent(null);
@@ -55,23 +61,35 @@ export function CalendarPage() {
     }
   };
 
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await projectController.reload();
+      await milestoneController.reload();
+      await calendarTasks.reload();
+      await events.reload();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">Kalender</h1>
-          <p className="text-sm text-slate-500">
-            {events.events.length} Termine
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          icon={<Plus size={17} />}
-          onClick={() => openCreate()}
-        >
-          Neuer Termin
-        </Button>
-      </header>
+      <PageHeader
+        title="Kalender"
+        subtitle={`${events.events.length} Termine`}
+        onRefresh={standalone ? refresh : undefined}
+        refreshing={refreshing}
+        actions={
+          <Button
+            variant="primary"
+            icon={<Plus size={17} />}
+            onClick={() => openCreate()}
+          >
+            Neuer Termin
+          </Button>
+        }
+      />
 
       {events.error || calendarTasks.error ? (
         <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">

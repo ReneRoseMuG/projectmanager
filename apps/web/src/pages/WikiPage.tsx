@@ -9,6 +9,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../components/ui/Button";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { EmptyState } from "../components/ui/EmptyState";
+import { PageHeader } from "../components/ui/PageHeader";
 import { TaskListSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { WikiBreadcrumb } from "../components/wiki/WikiBreadcrumb";
@@ -16,7 +17,9 @@ import { WikiPageDetail } from "../components/wiki/WikiPageDetail";
 import { WikiPageForm } from "../components/wiki/WikiPageForm";
 import { WikiTree } from "../components/wiki/WikiTree";
 import { errorMessage } from "../hooks/errors";
+import { useStandaloneView } from "../hooks/useStandaloneView";
 import { useWiki, type WikiTreeNode } from "../hooks/useWiki";
+import { withStandaloneView } from "../utils/standalone";
 
 function countPages(nodes: WikiTreeNode[]): number {
   return nodes.reduce((sum, node) => sum + 1 + countPages(node.children), 0);
@@ -33,6 +36,8 @@ export function WikiPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [formParent, setFormParent] = useState<WikiPageType | null>(null);
   const [editingPage, setEditingPage] = useState<WikiPageType | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const standalone = useStandaloneView();
 
   const openCreate = (parent: WikiTreeNode | null) => {
     setEditingPage(null);
@@ -48,8 +53,8 @@ export function WikiPage() {
 
   const openInTab = editingPage
     ? () => {
-        window.open(`/wiki/${editingPage.id}`, "_blank");
-        navigate("/wiki");
+        window.open(withStandaloneView(`/wiki/${editingPage.id}`), "_blank");
+        navigate(standalone ? withStandaloneView("/wiki") : "/wiki");
         setFormOpen(false);
         setFormParent(null);
         setEditingPage(null);
@@ -83,7 +88,7 @@ export function WikiPage() {
       } else {
         const created = await wiki.createWikiPage(input);
         showToast({ tone: "success", title: "Wiki-Seite erstellt" });
-        navigate(`/wiki/${created.id}`);
+        navigate(standalone ? withStandaloneView(`/wiki/${created.id}`) : `/wiki/${created.id}`);
       }
     } catch (wikiError) {
       showToast({
@@ -108,7 +113,7 @@ export function WikiPage() {
     try {
       await wiki.removeWikiPage(page.id);
       showToast({ tone: "success", title: "Wiki-Seite gelöscht" });
-      navigate("/wiki");
+      navigate(standalone ? withStandaloneView("/wiki") : "/wiki");
     } catch (wikiError) {
       showToast({
         tone: "error",
@@ -118,23 +123,32 @@ export function WikiPage() {
     }
   };
 
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await wiki.reload();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">Wiki</h1>
-          <p className="text-sm text-slate-500">
-            {wiki.loading ? "" : `${countPages(wiki.tree)} Seiten`}
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          icon={<Plus size={17} />}
-          onClick={() => openCreate(null)}
-        >
-          Neue Seite
-        </Button>
-      </header>
+      <PageHeader
+        title="Wiki"
+        subtitle={wiki.loading ? "" : `${countPages(wiki.tree)} Seiten`}
+        onRefresh={standalone ? refresh : undefined}
+        refreshing={refreshing}
+        actions={
+          <Button
+            variant="primary"
+            icon={<Plus size={17} />}
+            onClick={() => openCreate(null)}
+          >
+            Neue Seite
+          </Button>
+        }
+      />
 
       {wiki.loading ? (
         <TaskListSkeleton />

@@ -19,6 +19,7 @@ import { errorMessage } from "../hooks/errors";
 import { useTaskDetail } from "../hooks/useTaskDetail";
 import { useTasks } from "../hooks/useTasks";
 import { invalidateTags } from "../queries/invalidation";
+import { withStandaloneView } from "../utils/standalone";
 
 function parseTaskOwner(searchParams: URLSearchParams): TaskOwner | undefined {
   const ownerType = searchParams.get("ownerType");
@@ -56,7 +57,9 @@ export function TaskDetailPage() {
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
   const returnTo =
     searchParams.get("returnTo") ??
-    (owner
+    (searchParams.get("standalone") === "1"
+      ? withStandaloneView("/tasks")
+      : owner
       ? `/${owner.type === "useCase" ? "use-cases" : `${owner.type}s`}/${owner.id}`
       : "/projects");
 
@@ -64,7 +67,7 @@ export function TaskDetailPage() {
   const openInTab =
     !isCreateMode && taskId !== null && Number.isFinite(taskId)
       ? () => {
-          window.open(`/tasks/${taskId}`, "_blank");
+          window.open(withStandaloneView(`/tasks/${taskId}`), "_blank");
           navigate(returnTo);
         }
       : undefined;

@@ -121,7 +121,7 @@ describe("FeatureDetailPage openInTab", () => {
       screen.getByRole("button", { name: "In neuem Tab öffnen" }),
     );
 
-    expect(window.open).toHaveBeenCalledWith("/features/10", "_blank");
+    expect(window.open).toHaveBeenCalledWith("/features/10?standalone=1", "_blank");
     expect(router.navigate).toHaveBeenCalledWith("/features");
   });
 

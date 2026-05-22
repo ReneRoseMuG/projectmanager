@@ -87,7 +87,7 @@ describe("ContentService", () => {
   });
 
   it("buildFilename generiert korrekten Dateinamen", () => {
-    expect(buildFilename("feature", 42, "ft-01-projektanlage")).toBe("feature-42-ft-01-projektanlage.md");
+    expect(buildFilename("feature", 42)).toBe("feature-42.md");
   });
 
   it("writeContent erstellt Verzeichnisse automatisch", () => {

@@ -1,24 +1,37 @@
 import type { Project, ProjectStatus } from "@taskmanager/shared-types";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ProjectListBoardView } from "../components/projects/ProjectListBoardView";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
+import { PageHeader } from "../components/ui/PageHeader";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useCatalogs } from "../hooks/useCatalogs";
 import { useProjects } from "../hooks/useProjects";
+import { useStandaloneView } from "../hooks/useStandaloneView";
 import { catalogEntriesByKind } from "../utils/catalogs";
+import { withStandaloneView } from "../utils/standalone";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
-  const { projects, loading, error, updateProject, removeProject } = useProjects();
+  const location = useLocation();
+  const { projects, loading, error, reload, updateProject, removeProject } = useProjects();
   const catalogs = useCatalogs();
+  const standalone = useStandaloneView();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">(
     "all",
   );
+  const currentReturnTo = `${location.pathname}${location.search}`;
+
+  const targetForMode = (to: string) => (standalone ? withStandaloneView(to) : to);
+  const projectTarget = (path: string) => {
+    const params = new URLSearchParams({ returnTo: currentReturnTo });
+    return targetForMode(`${path}?${params.toString()}`);
+  };
 
   const statusOptions = useMemo(
     () =>
@@ -37,6 +50,16 @@ export function ProjectsPage() {
       (project) => statusFilter === "all" || project.status === statusFilter,
     );
   }, [projects, statusFilter]);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await reload();
+      await catalogs.reload();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const deleteProject = async (project: Project) => {
     const approved = await confirm({
@@ -71,12 +94,12 @@ export function ProjectsPage() {
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
-      <header>
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">Projekte</h1>
-          <p className="text-sm text-slate-500">{projects.length} Einträge</p>
-        </div>
-      </header>
+      <PageHeader
+        title="Projekte"
+        subtitle={`${projects.length} Einträge`}
+        onRefresh={standalone ? refresh : undefined}
+        refreshing={refreshing}
+      />
 
       {error ? (
         <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
@@ -86,8 +109,8 @@ export function ProjectsPage() {
       <ProjectListBoardView
         projects={filteredProjects}
         loading={loading}
-        onCreate={() => navigate("/projects/new")}
-        onEdit={(project) => navigate(`/projects/${project.id}`)}
+        onCreate={() => navigate(projectTarget("/projects/new"))}
+        onEdit={(project) => navigate(projectTarget(`/projects/${project.id}`))}
         onDelete={(project) => void deleteProject(project)}
         onStatusChange={updateProjectStatus}
         filters={

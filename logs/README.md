@@ -2,6 +2,10 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 22.05.26 | Fix           | Meilenstein-Statusfilter                     | ✅     |
+| 22.05.26 | Fix           | Board-Toolbar Statusfilter                   | ✅     |
+| 22.05.26 | Fix           | API-Test-Erwartungen                         | ✅     |
+| 22.05.26 | Feature       | Navigation und Standalone-Tabs               | ⚠️     |
 | 22.05.26 | Fix           | DnD Status Views                             | ✅     |
 | 22.05.26 | Fix           | Action Menu Sichtbarkeit                     | ✅     |
 | 22.05.26 | Fix           | Board-Spaltenhöhe                            | ✅     |

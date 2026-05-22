@@ -46,6 +46,7 @@ function renderListBoardView({
   onModeChange = vi.fn(),
   onAdd = vi.fn(),
   onSearchChange = vi.fn(),
+  toolbarFilters,
   filters,
 }: {
   mode?: ListBoardMode;
@@ -54,6 +55,7 @@ function renderListBoardView({
   onModeChange?: (mode: ListBoardMode) => void;
   onAdd?: () => void;
   onSearchChange?: (value: string) => void;
+  toolbarFilters?: ReactNode;
   filters?: ReactNode;
 } = {}) {
   return render(
@@ -65,6 +67,7 @@ function renderListBoardView({
       addLabel="Anlegen"
       searchValue=""
       onSearchChange={onSearchChange}
+      toolbarFilters={toolbarFilters}
       filters={filters}
       emptyState={<div>Keine Einträge</div>}
       loading={loading}
@@ -86,13 +89,14 @@ afterEach(() => {
 });
 
 describe("ListBoardView", () => {
-  it("rendert die Toolbar als drei Spalten mit Suche, Filtern und Aktionen", () => {
+  it("rendert Toolbar-Filter in derselben Zeile wie Suche und Aktionen", () => {
     const { container } = renderListBoardView({
-      filters: <div data-testid="status-filters">Statusfilter</div>,
+      toolbarFilters: <div data-testid="status-filters">Statusfilter</div>,
     });
 
-    const toolbar = screen.getByTestId("list-board-view")
+    const toolbarRoot = screen.getByTestId("list-board-view")
       .firstElementChild as HTMLElement;
+    const toolbar = toolbarRoot.firstElementChild as HTMLElement;
     expect(toolbar).toHaveClass("grid");
     expect(toolbar.className).toContain(
       "md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]",
@@ -110,6 +114,20 @@ describe("ListBoardView", () => {
       screen.getByRole("button", { name: "Anlegen" }),
     );
     expect(container.querySelector("[data-testid='list-board-view']")).toBeInTheDocument();
+  });
+
+  it("rendert optionale Seitenfilter unter der Toolbar", () => {
+    renderListBoardView({
+      toolbarFilters: <div data-testid="status-filters">Statusfilter</div>,
+      filters: <div data-testid="scope-filters">Projektfilter</div>,
+    });
+
+    const toolbarRoot = screen.getByTestId("list-board-view")
+      .firstElementChild as HTMLElement;
+    const [toolbar, filterRow] = Array.from(toolbarRoot.children) as HTMLElement[];
+    expect(toolbar).toContainElement(screen.getByTestId("status-filters"));
+    expect(filterRow).toHaveClass("justify-center");
+    expect(filterRow).toContainElement(screen.getByTestId("scope-filters"));
   });
 
   it("begrenzt das Suchfeld auf 15 Zeichen und eine schmale Breite", () => {

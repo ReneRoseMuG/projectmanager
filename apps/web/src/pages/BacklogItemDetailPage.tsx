@@ -8,6 +8,7 @@ import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useBacklog } from "../hooks/useBacklog";
 import { useFeatures } from "../hooks/useFeatures";
+import { withStandaloneView } from "../utils/standalone";
 
 export function BacklogItemDetailPage() {
   const params = useParams();
@@ -31,11 +32,13 @@ export function BacklogItemDetailPage() {
   const features = useFeatures();
   const returnTo =
     searchParams.get("returnTo") ??
-    (projectId ? `/projects/${projectId}` : "/projects");
+    (searchParams.get("standalone") === "1"
+      ? withStandaloneView(projectId ? `/projects/${projectId}` : "/projects")
+      : projectId ? `/projects/${projectId}` : "/projects");
   const openInTab =
     !isCreateMode && itemId !== null && Number.isFinite(itemId)
       ? () => {
-          window.open(`/backlog/${itemId}`, "_blank");
+          window.open(withStandaloneView(`/backlog/${itemId}`), "_blank");
           navigate(returnTo);
         }
       : undefined;

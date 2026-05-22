@@ -72,7 +72,7 @@ export function BacklogListBoardView({ items, features, statusFilter, onStatusFi
       onItemStatusChange={onStatusChange ? (item, status) => onStatusChange(item, status as BacklogItem["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
-      filters={<FilterChips value={statusFilter} onChange={onStatusFilterChange} options={filterOptions} allCount={items.length} />}
+      toolbarFilters={<FilterChips value={statusFilter} onChange={onStatusFilterChange} options={filterOptions} allCount={items.length} />}
       emptyState={<EmptyState icon={<Inbox size={22} />} title="Keine Backlog-Items" body="Sammle Ideen und spätere Aufgaben hier, bevor sie umgesetzt werden." tone="tangerine" variant="tinted" />}
       renderCard={(item) => <BacklogItemCard item={item} featureName={item.featureId ? featureNames.get(item.featureId) : undefined} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} />}
       renderRow={(item) => <BacklogItemRow item={item} featureName={item.featureId ? featureNames.get(item.featureId) : undefined} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} />}

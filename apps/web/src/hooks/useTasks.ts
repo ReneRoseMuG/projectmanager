@@ -6,6 +6,7 @@ import {
   createOwnerTask as createOwnerTaskRequest,
   deleteTask as deleteTaskRequest,
   getOwnerTasks,
+  getTasks,
   linkOwnerTask as linkOwnerTaskRequest,
   type TaskOwner,
   unlinkOwnerTask as unlinkOwnerTaskRequest,
@@ -45,7 +46,51 @@ async function invalidateOwner(queryClient: QueryClient, owner?: TaskOwner, task
   await invalidateTaskScope(queryClient, taskId);
 }
 
-export function useTasks(owner?: TaskOwner) {
+function toGlobalTaskBoardItems(tasks: TaskBoardItem[]): TaskBoardItem[] {
+  return tasks.map((task, index) => ({
+    ...task,
+    boardPosition: task.boardPosition ?? (index + 1) * 1024
+  }));
+}
+
+export function useGlobalTasks(enabled = true) {
+  const queryClient = useQueryClient();
+
+  const tasksQuery = useQuery({
+    queryKey: queryKeys.tasks.list(),
+    queryFn: async () => toGlobalTaskBoardItems((await getTasks()) as TaskBoardItem[]),
+    enabled
+  });
+
+  const reload = useCallback(async () => {
+    await tasksQuery.refetch();
+  }, [tasksQuery]);
+
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: TaskUpdate }) => updateTaskRequest(id, input),
+    onSuccess: async (updated) => {
+      await invalidateTaskScope(queryClient, updated.id);
+    }
+  });
+
+  const removeTaskMutation = useMutation({
+    mutationFn: deleteTaskRequest,
+    onSuccess: async (_result, id) => {
+      await invalidateTaskScope(queryClient, id);
+    }
+  });
+
+  return {
+    tasks: tasksQuery.data ?? [],
+    loading: tasksQuery.isLoading,
+    error: toQueryError(tasksQuery.error),
+    reload,
+    updateTask: (id: number, input: TaskUpdate) => updateTaskMutation.mutateAsync({ id, input }),
+    removeTask: (id: number) => removeTaskMutation.mutateAsync(id)
+  };
+}
+
+export function useTasks(owner?: TaskOwner | null) {
   const queryClient = useQueryClient();
   const validOwner = owner && Number.isFinite(owner.id) ? owner : undefined;
 

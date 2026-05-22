@@ -18,6 +18,7 @@ import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useFeatures } from "../hooks/useFeatures";
 import { useUseCases } from "../hooks/useUseCases";
+import { withStandaloneView } from "../utils/standalone";
 
 export function UseCaseDetailPage() {
   const params = useParams();
@@ -41,11 +42,13 @@ export function UseCaseDetailPage() {
   const [loading, setLoading] = useState(false);
   const returnTo =
     searchParams.get("returnTo") ??
-    (useCase ? `/features/${useCase.featureId}` : "/features");
+    (searchParams.get("standalone") === "1"
+      ? withStandaloneView(useCase ? `/features/${useCase.featureId}` : "/features")
+      : useCase ? `/features/${useCase.featureId}` : "/features");
   const openInTab =
     !isCreateMode && useCaseId !== null && Number.isFinite(useCaseId)
       ? () => {
-          window.open(`/use-cases/${useCaseId}`, "_blank");
+          window.open(withStandaloneView(`/use-cases/${useCaseId}`), "_blank");
           navigate(returnTo);
         }
       : undefined;

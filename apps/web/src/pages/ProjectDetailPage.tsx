@@ -20,6 +20,7 @@ import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useProjects } from "../hooks/useProjects";
+import { withStandaloneView } from "../utils/standalone";
 import type { DraftFile } from "../types";
 
 export function ProjectDetailPage() {
@@ -34,12 +35,12 @@ export function ProjectDetailPage() {
     useProjects(projectId);
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
 
-  const returnTo = searchParams.get("returnTo") ?? "/projects";
+  const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/projects") : "/projects");
   const closePage = () => navigate(returnTo);
   const openInTab =
     !isCreateMode && projectId !== undefined && Number.isFinite(projectId)
       ? () => {
-          window.open(`/projects/${projectId}`, "_blank");
+          window.open(withStandaloneView(`/projects/${projectId}`), "_blank");
           navigate(returnTo);
         }
       : undefined;

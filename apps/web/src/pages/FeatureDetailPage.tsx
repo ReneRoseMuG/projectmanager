@@ -20,6 +20,7 @@ import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useFeatures } from "../hooks/useFeatures";
+import { withStandaloneView } from "../utils/standalone";
 import type { DraftFile } from "../types";
 
 export function FeatureDetailPage() {
@@ -37,12 +38,12 @@ export function FeatureDetailPage() {
   const features = useFeatures(featureId);
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
 
-  const returnTo = searchParams.get("returnTo") ?? "/features";
+  const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/features") : "/features");
   const closePage = () => navigate(returnTo);
   const openInTab =
     !isCreateMode && featureId !== undefined && Number.isFinite(featureId)
       ? () => {
-          window.open(`/features/${featureId}`, "_blank");
+          window.open(withStandaloneView(`/features/${featureId}`), "_blank");
           navigate(returnTo);
         }
       : undefined;

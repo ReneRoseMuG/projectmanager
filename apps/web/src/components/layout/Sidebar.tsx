@@ -1,76 +1,94 @@
-import type { CurrentUser } from "@taskmanager/shared-types";
-import { BookOpen, Bug, CalendarDays, DatabaseBackup, ExternalLink, FolderKanban, History, Library, ListChecks, LogOut, Tags, UsersRound, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import type { AuthResource, CurrentUser } from "@taskmanager/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  BookOpen,
+  Bug,
+  CalendarDays,
+  ExternalLink,
+  Flag,
+  FolderKanban,
+  History,
+  Library,
+  ListTodo,
+  LogOut,
+  RefreshCw,
+  ShieldCheck,
+  SlidersHorizontal,
+  type LucideIcon,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { hasPermission } from "../../hooks/usePermissions";
+import { invalidateWikiImportData } from "../../queries/invalidation";
+import { withStandaloneView } from "../../utils/standalone";
 
-const items = [
-  { to: "/projects", label: "Projekte", icon: FolderKanban },
-  { to: "/tickets", label: "Tickets", icon: Bug },
-  { to: "/features", label: "Features", icon: BookOpen },
-  { to: "/wiki", label: "Wiki", icon: Library },
-  { to: "/calendar", label: "Kalender", icon: CalendarDays },
-  { to: "/journal", label: "Journal", icon: History, resource: "journal" as const }
+interface NavigationItem {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  resource?: AuthResource;
+}
+
+const projectManagementItems: NavigationItem[] = [
+  { to: "/projects", label: "Projekte", icon: FolderKanban, resource: "projects" },
+  { to: "/milestones", label: "Meilensteine", icon: Flag, resource: "milestones" },
+  { to: "/tasks", label: "Aufgaben", icon: ListTodo, resource: "tasks" },
+  { to: "/tickets", label: "Tickets", icon: Bug, resource: "tickets" },
 ];
 
-const settingsItems = [
-  { to: "/settings/preferences", label: "Präferenzen", icon: SlidersHorizontal, resource: "settings" as const },
-  { to: "/settings/catalogs", label: "Kataloge", icon: ListChecks, resource: "catalogs" as const },
-  { to: "/settings/tags", label: "Tags", icon: Tags, resource: "tags" as const },
-  { to: "/settings/backup", label: "Sicherung", icon: DatabaseBackup, resource: "dumps" as const }
+const documentationItems: NavigationItem[] = [
+  { to: "/features", label: "Features", icon: BookOpen, resource: "features" },
+  { to: "/wiki", label: "Wiki", icon: Library, resource: "wiki" },
 ];
 
-const adminItems = [
-  { to: "/admin/users", label: "Benutzer", icon: UsersRound },
-  { to: "/admin/roles", label: "Rollen", icon: ShieldCheck }
+const informationItems: NavigationItem[] = [
+  { to: "/calendar", label: "Kalender", icon: CalendarDays, resource: "events" },
+  { to: "/journal", label: "Journal", icon: History, resource: "journal" },
 ];
 
 function NavSection({ children }: { children: string }) {
   return <div className="mb-2 mt-5 px-1.5 text-[10px] font-semibold uppercase tracking-widest text-steel-400">{children}</div>;
 }
 
-function canAdministerUsers(user: CurrentUser | null | undefined): boolean {
-  return Boolean(user?.permissions.some((permission) => (permission.resource === "*" || permission.resource === "users") && (permission.action === "*" || permission.action === "admin")));
+function hasAdminAccess(user: CurrentUser | null | undefined): boolean {
+  return Boolean(
+    user?.permissions.some(
+      (permission) =>
+        (permission.resource === "*" || permission.resource === "users" || permission.resource === "roles") &&
+        (permission.action === "*" || permission.action === "admin"),
+    ),
+  );
 }
 
-function canReadItem(user: CurrentUser | null | undefined, item: (typeof items)[number]): boolean {
-  return item.resource === undefined || hasPermission(user, item.resource, "read");
+function canReadItem(user: CurrentUser | null | undefined, item: NavigationItem): boolean {
+  return user === undefined || item.resource === undefined || hasPermission(user, item.resource, "read");
 }
 
-function canReadSettingsItem(user: CurrentUser | null | undefined, item: (typeof settingsItems)[number]): boolean {
-  return hasPermission(user, item.resource, "read");
+function navLinkClass(isActive: boolean): string {
+  return `group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-md" : "text-white/75 hover:bg-white/5 hover:text-white"}`;
 }
 
-interface SidebarProps {
+function NavigationLinks({
+  currentUser,
+  items,
+  allowStandalone,
+}: {
   currentUser?: CurrentUser | null;
-  onLogout?: () => void;
-}
-
-export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
-  const showAdmin = canAdministerUsers(currentUser);
-
+  items: NavigationItem[];
+  allowStandalone: boolean;
+}) {
   return (
-    <aside className="hidden w-64 shrink-0 overflow-y-auto bg-gradient-to-b from-steel-700 to-steel-800 p-4 text-white md:block">
-      <div className="mb-8 flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-steel-700 shadow-lg">PM</span>
-        <div>
-          <strong className="block text-sm font-bold text-white">Projekt Manager</strong>
-          <span className="text-[11px] uppercase tracking-widest text-steel-300">Lokal</span>
-        </div>
-      </div>
-      <NavSection>Navigation</NavSection>
-      <nav className="grid gap-1">
-        {items.filter((item) => canReadItem(currentUser, item)).map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-md" : "text-white/75 hover:bg-white/5 hover:text-white"}`
-              }
-            >
-              <Icon size={17} />
-              {item.label}
+    <nav className="grid gap-1">
+      {items.filter((item) => canReadItem(currentUser, item)).map((item) => {
+        const Icon = item.icon;
+        return (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) => navLinkClass(isActive)}
+          >
+            <Icon size={17} />
+            {item.label}
+            {allowStandalone ? (
               <button
                 type="button"
                 className="ml-auto flex h-6 w-6 items-center justify-center rounded opacity-0 transition hover:bg-white/20 group-hover:opacity-100"
@@ -79,55 +97,58 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  window.open(item.to, "_blank");
+                  window.open(withStandaloneView(item.to), "_blank");
                 }}
               >
                 <ExternalLink size={13} />
               </button>
-            </NavLink>
-          );
-        })}
-      </nav>
+            ) : null}
+          </NavLink>
+        );
+      })}
+    </nav>
+  );
+}
+
+interface SidebarProps {
+  currentUser?: CurrentUser | null;
+  onLogout?: () => void;
+}
+
+export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
+  const queryClient = useQueryClient();
+  const showAdmin = hasAdminAccess(currentUser);
+  const settingsItems: NavigationItem[] = showAdmin
+    ? [{ to: "/admin", label: "Administration", icon: ShieldCheck }]
+    : [
+        {
+          to: "/settings/preferences",
+          label: "Meine Einstellungen",
+          icon: SlidersHorizontal,
+          resource: "settings",
+        },
+      ];
+
+  return (
+    <aside className="hidden w-64 shrink-0 overflow-y-auto bg-gradient-to-b from-steel-700 to-steel-800 p-4 text-white md:block">
+      <button
+        type="button"
+        className="mb-8 flex w-full items-center gap-3 rounded-lg p-1 text-left transition hover:bg-white/5"
+        title="Aktualisieren"
+        onClick={() => void invalidateWikiImportData(queryClient)}
+      >
+        <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-steel-700 shadow-lg">PM</span>
+        <span className="flex min-h-10 items-center text-sm font-bold text-white">Projekt Manager</span>
+        <RefreshCw size={14} className="ml-auto text-white/55" />
+      </button>
+      <NavSection>Projekt Management</NavSection>
+      <NavigationLinks currentUser={currentUser} items={projectManagementItems} allowStandalone />
+      <NavSection>Projekt Dokumentation</NavSection>
+      <NavigationLinks currentUser={currentUser} items={documentationItems} allowStandalone />
+      <NavSection>Information</NavSection>
+      <NavigationLinks currentUser={currentUser} items={informationItems} allowStandalone />
       <NavSection>Einstellungen</NavSection>
-      <nav className="grid gap-1">
-        {settingsItems.filter((item) => canReadSettingsItem(currentUser, item)).map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-md" : "text-white/75 hover:bg-white/5 hover:text-white"}`
-              }
-            >
-              <Icon size={17} />
-              {item.label}
-            </NavLink>
-          );
-        })}
-      </nav>
-      {showAdmin ? (
-        <>
-          <NavSection>Administration</NavSection>
-          <nav className="grid gap-1">
-            {adminItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-md" : "text-white/75 hover:bg-white/5 hover:text-white"}`
-                  }
-                >
-                  <Icon size={17} />
-                  {item.label}
-                </NavLink>
-              );
-            })}
-          </nav>
-        </>
-      ) : null}
+      <NavigationLinks currentUser={currentUser} items={settingsItems} allowStandalone={false} />
       {currentUser ? (
         <div className="mt-6 border-t border-white/10 pt-4">
           <div className="mb-3 px-3 text-xs text-white/70">

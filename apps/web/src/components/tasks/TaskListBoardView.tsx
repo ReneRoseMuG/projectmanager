@@ -21,6 +21,8 @@ interface TaskListBoardViewProps {
   onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>;
   onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>;
   linkAction?: ReactNode;
+  filters?: ReactNode;
+  showCreateActions?: boolean;
   loading?: boolean;
 }
 
@@ -42,7 +44,7 @@ function matchesSearch(task: Task, searchValue: string) {
 }
 
 /** Task-specific ListBoardView adapter with status Kanban columns. */
-export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, onStatusChange, onDueDateChange, linkAction, loading = false }: TaskListBoardViewProps) {
+export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, onStatusChange, onDueDateChange, linkAction, filters, showCreateActions = true, loading = false }: TaskListBoardViewProps) {
   const catalogs = useCatalogs();
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState<Task["status"] | "all">("all");
@@ -62,8 +64,9 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
       mode={toListBoardMode(viewMode)}
       onModeChange={(mode) => onViewModeChange(toViewMode(mode))}
       onAdd={onAdd}
-      onAddToColumn={(columnStatus) => (onAddStatus ? onAddStatus(columnStatus as Task["status"]) : onAdd())}
+      onAddToColumn={showCreateActions ? (columnStatus) => (onAddStatus ? onAddStatus(columnStatus as Task["status"]) : onAdd()) : undefined}
       addLabel="Neue Aufgabe"
+      showToolbarAdd={showCreateActions}
       secondaryAction={linkAction}
       statusKey="status"
       statusCatalogKind="workStatus"
@@ -71,8 +74,10 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
       onItemStatusChange={onStatusChange}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
-      filters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={tasks.length} />}
+      toolbarFilters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={tasks.length} />}
+      filters={filters}
       loading={loading}
+      showGroupedEmptyState={false}
       emptyState={<EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben" body="Für diesen Kontext sind noch keine Aufgaben vorhanden." tone="fern" variant="tinted" />}
       renderCard={(task) => <TaskCard task={task} onOpen={onOpen} onDelete={task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />}
       renderRow={(task) => <TaskCard task={task} variant="row" onOpen={onOpen} onDelete={task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />}
