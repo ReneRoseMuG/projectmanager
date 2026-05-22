@@ -302,6 +302,44 @@ describe("ListBoardView", () => {
     expect(onAddToColumn).toHaveBeenCalledWith("todo");
   });
 
+  it("verwendet im Board-Modus eine mitwachsende Mindesthöhe", () => {
+    const { container } = render(
+      <ListBoardView
+        items={items}
+        mode="board"
+        onModeChange={vi.fn()}
+        onAdd={vi.fn()}
+        statusKey="status"
+        statusColumns={[
+          { value: "todo", label: "Offen" },
+          { value: "done", label: "Erledigt", isClosed: true },
+        ]}
+        renderCard={(item) => (
+          <ItemCard
+            header={<h3>Card {item.title}</h3>}
+            body={<p>{item.description}</p>}
+          />
+        )}
+        renderRow={(item) => (
+          <ItemRow title={`Row ${item.title}`} description={item.description} />
+        )}
+      />,
+    );
+
+    const boardGrid = container.querySelector(".grid-flow-col") as HTMLElement;
+    expect(boardGrid).toHaveStyle({ minHeight: "max(30rem, 100%)" });
+    expect(boardGrid).not.toHaveClass("h-full");
+    expect(boardGrid).not.toHaveClass("flex-1");
+    expect(boardGrid).not.toHaveClass("items-start");
+
+    const sections = container.querySelectorAll("section.rounded-lg");
+    expect(sections).toHaveLength(2);
+    sections.forEach((section) => {
+      expect(section).toHaveClass("h-fit", "min-h-full", "content-start");
+      expect(section).not.toHaveClass("h-full");
+    });
+  });
+
   it("setzt für sichtbare Items eine einheitliche Mindesthöhe", () => {
     const originalMeasure = HTMLElement.prototype.getBoundingClientRect;
     HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {

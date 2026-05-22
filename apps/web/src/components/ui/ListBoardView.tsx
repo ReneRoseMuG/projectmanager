@@ -1,9 +1,23 @@
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+  type UniqueIdentifier,
+} from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type {
   CatalogEntry,
   StatusCatalogKind,
 } from "@taskmanager/shared-types";
 import { Plus } from "lucide-react";
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import type { ViewMode } from "../../types";
 import { catalogEntriesByKind, catalogFillStyle, catalogSoftStyle } from "../../utils/catalogs";
@@ -40,6 +54,8 @@ interface ListBoardViewProps<T> {
   statusKey?: keyof T;
   statusCatalogKind?: StatusCatalogKind;
   statusColumns?: StatusColumn[];
+  itemIdKey?: keyof T;
+  onItemStatusChange?: (item: T, newStatus: string) => void | Promise<unknown>;
   renderCard: (item: T) => ReactNode;
   renderRow: (item: T) => ReactNode;
   searchValue?: string;
@@ -220,6 +236,183 @@ function statusAddButtonStyle(column: StatusColumn) {
   };
 }
 
+function itemIdentifier<T>(
+  item: T,
+  itemIdKey: keyof T,
+): UniqueIdentifier {
+  const value = item[itemIdKey];
+  if (typeof value === "number" || typeof value === "string") {
+    return value;
+  }
+
+  return String(value);
+}
+
+function isKnownStatusGroup<T>(
+  statusColumns: StatusColumn[] | undefined,
+  group: StatusGroup<T>,
+): boolean {
+  return isKnownColumn(statusColumns, group.column.value);
+}
+
+interface StatusSectionProps {
+  column: StatusColumn;
+  itemCount: number;
+  knownColumn: boolean;
+  layout: ListBoardMode;
+  children: ReactNode;
+  renderColumnAddButton: (column: StatusColumn) => ReactNode;
+}
+
+function statusSectionClass(
+  column: StatusColumn,
+  layout: ListBoardMode,
+  isOver = false,
+): string {
+  const layoutClass =
+    layout === "board"
+      ? "grid h-fit min-h-full min-w-0 content-start gap-0 rounded-lg border p-0"
+      : "grid min-w-0 gap-0 rounded-lg border p-0";
+  const overClass = isOver ? " ring-2 ring-fern/40 brightness-[1.02]" : "";
+  return `${layoutClass} ${statusGroupClass(column)}${overClass}`;
+}
+
+function PlainStatusSection({
+  column,
+  itemCount,
+  knownColumn,
+  layout,
+  children,
+  renderColumnAddButton,
+}: StatusSectionProps) {
+  return (
+    <section
+      className={statusSectionClass(column, layout)}
+      style={statusGroupStyle(column)}
+      data-status-column={column.value}
+      data-status-known={knownColumn ? "true" : "false"}
+    >
+      <StatusSectionHeader
+        column={column}
+        itemCount={itemCount}
+        renderColumnAddButton={renderColumnAddButton}
+      />
+      {children}
+    </section>
+  );
+}
+
+function DroppableStatusSection({
+  column,
+  itemCount,
+  knownColumn,
+  layout,
+  children,
+  renderColumnAddButton,
+}: StatusSectionProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: column.value,
+    disabled: !knownColumn,
+  });
+
+  return (
+    <section
+      ref={setNodeRef}
+      className={statusSectionClass(column, layout, isOver)}
+      style={statusGroupStyle(column)}
+      data-dnd-droppable={knownColumn ? "true" : "false"}
+      data-status-column={column.value}
+      data-status-known={knownColumn ? "true" : "false"}
+    >
+      <StatusSectionHeader
+        column={column}
+        itemCount={itemCount}
+        renderColumnAddButton={renderColumnAddButton}
+      />
+      {children}
+    </section>
+  );
+}
+
+function StatusSectionHeader({
+  column,
+  itemCount,
+  renderColumnAddButton,
+}: {
+  column: StatusColumn;
+  itemCount: number;
+  renderColumnAddButton: (column: StatusColumn) => ReactNode;
+}) {
+  return (
+    <header
+      className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2"
+      style={statusHeaderStyle(column)}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
+          {column.label}
+        </h2>
+        <span className="rounded-full bg-steel-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+          {itemCount}
+        </span>
+      </div>
+      {renderColumnAddButton(column)}
+    </header>
+  );
+}
+
+interface ItemWrapperBaseProps {
+  itemId: UniqueIdentifier;
+  className: string;
+  equalItemProps: {
+    "data-equal-item": string;
+    style: { minHeight: number } | undefined;
+  };
+  children: ReactNode;
+}
+
+function PlainItemWrapper({
+  itemId,
+  className,
+  equalItemProps,
+  children,
+}: ItemWrapperBaseProps) {
+  return (
+    <div
+      className={className}
+      data-dnd-item-id={String(itemId)}
+      {...equalItemProps}
+    >
+      {children}
+    </div>
+  );
+}
+
+function DraggableItemWrapper({
+  itemId,
+  className,
+  equalItemProps,
+  children,
+}: ItemWrapperBaseProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: itemId,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`${className}${isDragging ? " opacity-50" : ""}`}
+      data-dnd-draggable="true"
+      data-dnd-item-id={String(itemId)}
+      {...equalItemProps}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </div>
+  );
+}
+
 /** Shared list/board surface with search, filters, view toggle and add button. */
 export function ListBoardView<T>(props: ListBoardViewProps<T>) {
   if (props.statusCatalogKind && props.statusColumns === undefined) {
@@ -257,6 +450,8 @@ function ListBoardViewContent<T>({
   secondaryAction,
   statusKey,
   statusColumns,
+  itemIdKey = "id" as keyof T,
+  onItemStatusChange,
   renderCard,
   renderRow,
   searchValue = "",
@@ -267,6 +462,7 @@ function ListBoardViewContent<T>({
 }: ListBoardViewProps<T>) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [equalItemHeight, setEqualItemHeight] = useState<number | undefined>();
+  const [activeItem, setActiveItem] = useState<T | null>(null);
   const orderedStatusColumns = sortedStatusColumns(statusColumns);
   const hasStatusGrouping =
     statusKey !== undefined &&
@@ -276,7 +472,7 @@ function ListBoardViewContent<T>({
     items,
     statusKey,
     orderedStatusColumns,
-    false,
+    true,
   );
   const boardStatusGroups = groupItemsByStatus(
     items,
@@ -285,11 +481,39 @@ function ListBoardViewContent<T>({
     true,
   );
   const boardByStatus = mode === "board" && hasStatusGrouping;
+  const statusGrouped = hasStatusGrouping && (mode === "board" || mode === "list");
+  const dndEnabled = Boolean(
+    onItemStatusChange && statusGrouped && !loading,
+  );
   const equalItemStyle = equalItemHeight ? { minHeight: equalItemHeight } : undefined;
   const equalItemProps = {
     "data-equal-item": "true",
     style: equalItemStyle,
   };
+  const activeStatusGroups = mode === "board" ? boardStatusGroups : listStatusGroups;
+  const itemByDndId = useMemo(() => {
+    const itemMap = new Map<UniqueIdentifier, T>();
+
+    if (!statusGrouped) {
+      return itemMap;
+    }
+
+    activeStatusGroups.forEach((group) => {
+      group.items.forEach((item) => {
+        itemMap.set(itemIdentifier(item, itemIdKey), item);
+      });
+    });
+
+    return itemMap;
+  }, [activeStatusGroups, itemIdKey, statusGrouped]);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
   const renderColumnAddButton = (column: StatusColumn) =>
     onAddToColumn && isKnownColumn(orderedStatusColumns, column.value) ? (
       <Button
@@ -302,6 +526,108 @@ function ListBoardViewContent<T>({
         onClick={() => onAddToColumn(column.value)}
       />
     ) : null;
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveItem(itemByDndId.get(event.active.id) ?? null);
+  }, [itemByDndId]);
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const item = itemByDndId.get(event.active.id) ?? activeItem;
+    setActiveItem(null);
+
+    if (!item || !event.over || !statusKey || !onItemStatusChange) {
+      return;
+    }
+
+    const newStatus = String(event.over.id);
+    if (!isKnownColumn(orderedStatusColumns, newStatus)) {
+      return;
+    }
+
+    if (statusValue(item, statusKey) === newStatus) {
+      return;
+    }
+
+    void Promise.resolve(onItemStatusChange(item, newStatus)).catch(() => undefined);
+  }, [activeItem, itemByDndId, onItemStatusChange, orderedStatusColumns, statusKey]);
+  const handleDragCancel = useCallback(() => {
+    setActiveItem(null);
+  }, []);
+  const renderStatusGroupedContent = (
+    layout: ListBoardMode,
+    groups: StatusGroup<T>[],
+  ) => {
+    const rootClass =
+      layout === "board"
+        ? "grid w-full min-w-0 grid-flow-col auto-cols-[minmax(17rem,1fr)] gap-4 overflow-x-auto pb-2"
+        : "grid h-full min-h-[30rem] w-full flex-1 content-start gap-4";
+    const itemClass =
+      layout === "board" ? "min-w-0 max-w-full" : "";
+    const groupedContent = (
+      <div
+        className={rootClass}
+        style={layout === "board" ? { minHeight: "max(30rem, 100%)" } : undefined}
+        data-dnd-enabled={dndEnabled ? "true" : undefined}
+      >
+        {groups.map((group) => {
+          const knownColumn = isKnownStatusGroup(orderedStatusColumns, group);
+          const Section =
+            dndEnabled && knownColumn
+              ? DroppableStatusSection
+              : PlainStatusSection;
+
+          return (
+            <Section
+              key={group.column.value}
+              column={group.column}
+              itemCount={group.items.length}
+              knownColumn={knownColumn}
+              layout={layout}
+              renderColumnAddButton={renderColumnAddButton}
+            >
+              <div className="grid gap-3 p-3">
+                {group.items.map((item, index) => {
+                  const itemId = itemIdentifier(item, itemIdKey);
+                  const Wrapper = dndEnabled ? DraggableItemWrapper : PlainItemWrapper;
+
+                  return (
+                    <Wrapper
+                      key={`${String(itemId)}-${index}`}
+                      itemId={itemId}
+                      className={itemClass}
+                      equalItemProps={equalItemProps}
+                    >
+                      {layout === "board" ? renderCard(item) : renderRow(item)}
+                    </Wrapper>
+                  );
+                })}
+              </div>
+            </Section>
+          );
+        })}
+      </div>
+    );
+
+    if (!dndEnabled) {
+      return groupedContent;
+    }
+
+    return (
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        {groupedContent}
+        <DragOverlay>
+          {activeItem ? (
+            <div className={layout === "board" ? "min-w-[17rem] max-w-[22rem]" : "w-full max-w-[48rem]"}>
+              {layout === "board" ? renderCard(activeItem) : renderRow(activeItem)}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    );
+  };
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -359,7 +685,7 @@ function ListBoardViewContent<T>({
 
       <div className="flex h-full min-h-0 w-full flex-1 flex-col">
         {loading ? <TaskListSkeleton /> : null}
-        {!loading && items.length === 0 ? (
+        {!loading && items.length === 0 && !hasStatusGrouping ? (
           <div className="grid h-full min-h-[30rem] w-full flex-1">{emptyState}</div>
         ) : null}
         {!loading &&
@@ -373,35 +699,9 @@ function ListBoardViewContent<T>({
           </div>
         ) : null}
         {!loading &&
-        items.length > 0 &&
         mode === "list" &&
         hasStatusGrouping ? (
-          <div className="grid h-full min-h-[30rem] w-full flex-1 content-start gap-4">
-            {listStatusGroups.map((group) => (
-              <section
-                key={group.column.value}
-                className={`grid min-w-0 gap-0 rounded-lg border p-0 ${statusGroupClass(group.column)}`}
-                style={statusGroupStyle(group.column)}
-              >
-                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2" style={statusHeaderStyle(group.column)}>
-                  <div className="flex min-w-0 items-center gap-2">
-                    <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
-                      {group.column.label}
-                    </h2>
-                    <span className="rounded-full bg-steel-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                      {group.items.length}
-                    </span>
-                  </div>
-                  {renderColumnAddButton(group.column)}
-                </header>
-                <div className="grid gap-3 p-3">
-                  {group.items.map((item, index) => (
-                    <div key={index} {...equalItemProps}>{renderRow(item)}</div>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
+          renderStatusGroupedContent("list", listStatusGroups)
         ) : null}
         {!loading && items.length > 0 && mode === "board" && !boardByStatus ? (
           <CardGrid>
@@ -412,35 +712,8 @@ function ListBoardViewContent<T>({
             ))}
           </CardGrid>
         ) : null}
-        {!loading && items.length > 0 && boardByStatus ? (
-          <div className="grid h-full min-h-[30rem] w-full min-w-0 flex-1 grid-flow-col auto-cols-[minmax(17rem,1fr)] gap-4 overflow-x-auto pb-2">
-            {boardStatusGroups.map((group) => (
-              <section
-                key={group.column.value}
-                className={`grid h-full min-h-full min-w-0 content-start gap-0 rounded-lg border p-0 ${statusGroupClass(group.column)}`}
-                style={statusGroupStyle(group.column)}
-              >
-                <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2" style={statusHeaderStyle(group.column)}>
-                  <div className="flex min-w-0 items-center gap-2">
-                    <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
-                      {group.column.label}
-                    </h2>
-                    <span className="rounded-full bg-steel-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                      {group.items.length}
-                    </span>
-                  </div>
-                  {renderColumnAddButton(group.column)}
-                </header>
-                <div className="grid gap-3 p-3">
-                  {group.items.map((item, index) => (
-                    <div key={index} className="min-w-0 max-w-full" {...equalItemProps}>
-                      {renderCard(item)}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
+        {!loading && boardByStatus ? (
+          renderStatusGroupedContent("board", boardStatusGroups)
         ) : null}
       </div>
     </div>

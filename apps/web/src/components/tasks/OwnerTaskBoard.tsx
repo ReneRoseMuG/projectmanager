@@ -35,7 +35,7 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
 
   const updateTaskStatus = async (task: TaskBoardItem, status: TaskStatus) => {
     try {
-      await taskController.updateTask(task.id, { status, expectedVersion: task.version });
+      await taskController.updateTaskStatus(task.id, status, task.version);
     } catch (taskError) {
       showToast({ tone: "error", title: "Aufgabenstatus konnte nicht geändert werden", message: errorMessage(taskError) });
       throw taskError;

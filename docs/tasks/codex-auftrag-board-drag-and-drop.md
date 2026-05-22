@@ -1,11 +1,14 @@
-# Codex-Auftrag: Drag & Drop im Board-Modus (Status-Spalten)
+# Codex-Auftrag: Drag & Drop im Board- und Listenmodus (Status-Spalten)
 
 ## Ziel
 
-Im Board-Modus (`ListBoardView`, mode = `"board"`) können Karten per Drag & Drop
-zwischen Status-Spalten verschoben werden. Das Loslassen einer Karte in einer anderen
-Spalte aktualisiert den Status der Entität sofort (optimistisch) und persistiert die
-Änderung per API-Mutation. Der Listen-Modus bleibt unberührt.
+Im Board-Modus (`ListBoardView`, mode = `"board"`) und im statusgruppierten
+Listenmodus (`mode = "list"`) können Aufgaben per Drag & Drop zwischen
+Status-Spalten bzw. Status-Panels verschoben werden. Das Loslassen einer Karte oder
+Zeile in einem anderen Statusbereich aktualisiert den Status der Entität sofort
+(optimistisch) und persistiert die Änderung per API-Mutation. Der Listenmodus rendert
+für bekannte Status auch dann Panels, wenn in einem Status aktuell keine Einträge
+vorhanden sind.
 
 Mindestumfang: Aufgaben (Tasks). Die Implementierung erfolgt so, dass alle anderen
 Domain-Views (Tickets, Features, BacklogItems usw.) später mit wenig Aufwand
@@ -19,7 +22,7 @@ nachgerüstet werden können.
 
 | Datei | Rolle |
 |---|---|
-| `apps/web/src/components/ui/ListBoardView.tsx` | Generische Board/List-Oberfläche — enthält das Board-Rendering mit Status-Spalten |
+| `apps/web/src/components/ui/ListBoardView.tsx` | Generische Board/List-Oberfläche — enthält das Statusgruppen-Rendering für Board und Liste |
 | `apps/web/src/components/ui/ItemCard.tsx` | Basis-Karte — wird in allen Board-Karten verwendet |
 | `apps/web/src/components/tasks/TaskListBoardView.tsx` | Task-Adapter über `ListBoardView` |
 | `apps/web/src/components/tasks/OwnerTaskBoard.tsx` | Orchestriert Tasks eines Owners, ruft `TaskListBoardView` auf |
@@ -29,8 +32,9 @@ nachgerüstet werden können.
 ### Ist-Zustand
 
 `ListBoardView` rendert im Board-Modus Spalten als einfache CSS-Grid-Container
-(`grid-flow-col auto-cols-...`). Karten sind statische `<div>`-Elemente ohne
-Drag-Fähigkeit. Es gibt keine `onItemStatusChange`-Callback-Prop.
+(`grid-flow-col auto-cols-...`) und im Listenmodus Statusgruppen als Panels.
+Karten und Zeilen sind statische `<div>`-Elemente ohne Drag-Fähigkeit. Es gibt
+keine `onItemStatusChange`-Callback-Prop.
 
 Der Callback-Pfad für eine Statusänderung existiert noch nicht:
 `ListBoardView` → `TaskListBoardView` → `OwnerTaskBoard` → `useTasks` → API.
@@ -39,9 +43,10 @@ Der Callback-Pfad für eine Statusänderung existiert noch nicht:
 
 ## Aufgabe
 
-### 1. DnD-Bibliothek installieren
+### 1. DnD-Bibliothek prüfen
 
-`@dnd-kit/core` und `@dnd-kit/sortable` installieren (im `apps/web`-Workspace).
+`@dnd-kit/core` und `@dnd-kit/sortable` im `apps/web`-Workspace verwenden bzw.
+installieren, falls sie fehlen.
 Diese Bibliothek ist React-18-kompatibel, zugänglich (ARIA-konform), hat keine
 Peer-Dependency-Konflikte und ist aktiv gepflegt.
 
@@ -54,40 +59,44 @@ Tastatur-Events.
 onItemStatusChange?: (item: T, newStatus: string) => void | Promise<void>
 ```
 
-Dieses Prop wird nur ausgewertet, wenn `mode === "board"` **und** `statusKey`
-und `statusColumns` gesetzt sind.
+Dieses Prop wird nur ausgewertet, wenn `mode === "board"` oder `mode === "list"`
+ist **und** `statusKey` und `statusColumns` gesetzt sind.
 
-Wenn `onItemStatusChange` vorhanden ist, wird das Board-Rendering in einen
-`DndContext` (aus `@dnd-kit/core`) eingebettet. Die `onDragEnd`-Handler-Logik
-prüft:
+Wenn `onItemStatusChange` vorhanden ist, wird das statusgruppierte Board- oder
+Listen-Rendering in einen `DndContext` (aus `@dnd-kit/core`) eingebettet. Die
+`onDragEnd`-Handler-Logik prüft:
 
 - War die Ziel-Spalte eine andere als die Quell-Spalte? Wenn nein: noop.
 - Ist die Ziel-Spalte eine bekannte Spalte (`statusColumns`)? Wenn nein: noop.
 - Sonst: `onItemStatusChange(item, newColumnValue)` aufrufen.
 
-Wenn `onItemStatusChange` fehlt, ändert sich das Board-Rendering gegenüber dem
-Ist-Zustand **nicht** — kein Breaking Change für bestehende Domain-Views.
+Wenn `onItemStatusChange` fehlt, ändert sich das Rendering gegenüber dem
+Ist-Zustand nur durch leere bekannte Listen-Panels — kein DnD und kein Breaking
+Change für bestehende Domain-Views.
 
-### 3. Board-Spalten als Drop-Zonen (`useDroppable`)
+### 3. Status-Spalten und Status-Panels als Drop-Zonen (`useDroppable`)
 
-Jede Status-Spalte im Board erhält eine `useDroppable`-Instanz mit der Spalten-ID
-als `id`. Der visuelle Drop-Indikator (leichter Hintergrundton) wird über den
-`isOver`-State der Droppable-Instanz gesteuert — ein Tailwind-Klassen-Swap reicht
-aus, kein eigenes CSS.
+Jede bekannte Status-Spalte im Board und jedes bekannte Status-Panel im Listenmodus
+erhält eine `useDroppable`-Instanz mit der Spalten-ID als `id`. Der visuelle
+Drop-Indikator (leichter Hintergrundton) wird über den `isOver`-State der
+Droppable-Instanz gesteuert — ein Tailwind-Klassen-Swap reicht aus, kein eigenes CSS.
 
-### 4. Karten als Draggables (`useDraggable`)
+### 4. Karten und Zeilen als Draggables (`useDraggable`)
 
-Die Karten-Wrapper-Divs innerhalb der Spalten werden mit `useDraggable` ausgestattet.
+Die Karten- und Zeilen-Wrapper-Divs innerhalb der Statusbereiche werden mit
+`useDraggable` ausgestattet.
 Die `id` des Draggable-Elements ist die Item-ID (erwartet: `item.id` — Codex prüft
-beim Lesen, wie die generische Typisierung gelöst wird; ein `idKey?: keyof T`-Prop
+beim Lesen, wie die generische Typisierung gelöst wird; ein `itemIdKey?: keyof T`-Prop
 mit Default `"id"` ist eine saubere Option).
 
-`ItemCard` selbst bleibt unverändert. Der `useDraggable`-Wrapper liegt
-**ausschließlich** in `ListBoardView` im Board-Rendering-Zweig, nicht in `ItemCard`.
+`ItemCard`, `ItemRow` und Domain-Karten bleiben unverändert. Der
+`useDraggable`-Wrapper liegt **ausschließlich** in `ListBoardView` im statusgruppierten
+Rendering-Zweig, nicht in `ItemCard` oder `ItemRow`.
 
 Der `DragOverlay` (aus `@dnd-kit/core`) zeigt während des Ziehens eine Kopie der
-Karte an. Das verhindert Layout-Shifts in der Quell-Spalte. Die Kopie wird über
-`renderCard(activeItem)` erzeugt, wobei `activeItem` der im `onDragStart` gemerkten
+Karte oder Zeile an. Das verhindert Layout-Shifts in der Quell-Spalte. Die Kopie
+wird im Board über `renderCard(activeItem)` und in der Liste über
+`renderRow(activeItem)` erzeugt, wobei `activeItem` der im `onDragStart` gemerkten
 Item-Referenz entspricht.
 
 ### 5. Optimistisches Update
@@ -132,7 +141,10 @@ onStatusChange={async (task, newStatus) => {
 
 ## Regeln & Einschränkungen
 
-- DnD nur im **Board-Modus** — im Listen-Modus kein DnD, keine `useDraggable`-Initialisierung.
+- DnD nur im **Board-Modus** und im statusgruppierten **Listen-Modus** — ohne
+  `onItemStatusChange` keine `useDraggable`-Initialisierung.
+- Der statusgruppierte Listenmodus rendert alle bekannten Status-Panels, auch wenn
+  ein Status aktuell keine sichtbaren Einträge hat.
 - DnD nur zwischen bekannten Status-Spalten — Drop auf unbekannte Spalten wird still verworfen.
 - Drop auf die **eigene** Spalte: noop, keine Mutation, kein Fehler.
 - `ItemCard`, `ItemRow`, `TaskCard` und alle anderen Karten-Komponenten bleiben
@@ -158,8 +170,8 @@ onStatusChange={async (task, newStatus) => {
 | Drop außerhalb einer Spalte (fehlgeschlagener Drop) | noop — Karte kehrt an Ursprungsposition zurück (`DragOverlay` verschwindet) |
 | Drop auf unbekannte Spalte | noop |
 | Mutation schlägt fehl (Netzwerkfehler, Versionskonfikt 409) | TanStack Query rollt das optimistische Update zurück; Toast-Fehlermeldung über `useToast` |
-| Board lädt noch (loading = true) | DnD deaktiviert — kein `DndContext` rendern, solange `loading` true ist |
-| `onItemStatusChange` fehlt | Board rendert wie bisher ohne jegliche DnD-Infrastruktur |
+| Board oder Liste lädt noch (loading = true) | DnD deaktiviert — kein `DndContext` rendern, solange `loading` true ist |
+| `onItemStatusChange` fehlt | Board und Liste rendern ohne jegliche DnD-Infrastruktur |
 | Gleichzeitiges Öffnen mehrerer Tabs | Versionskonfikt 409 → Rollback + Toast |
 
 ---
@@ -172,7 +184,7 @@ onStatusChange={async (task, newStatus) => {
   optional, bestehende Aufrufer bleiben kompatibel.
 - `OwnerTaskBoard` übergibt `onStatusChange` — kein Einfluss auf andere Komponenten.
 - `useTasks` bekommt eine neue Mutation — kein Einfluss auf bestehende Mutations.
-- Das Board-DOM ändert sich strukturell: Spalten-Wrapper und Karten-Wrapper erhalten
+- Das Board- und Listen-DOM ändert sich strukturell: Status-Wrapper und Item-Wrapper erhalten
   neue Attribute (`data-dnd-droppable`, ARIA-Attribute von `@dnd-kit`). Bestehende
   Tests, die auf spezifische DOM-Strukturen prüfen, könnten Selektoren anpassen müssen.
 - Kein API-Schema-Change, keine DB-Migration — die Statusänderung nutzt den
@@ -191,13 +203,14 @@ Framework: Vitest + @testing-library/react (Unit), Playwright (Browser/E2E).
 Pflicht-Kommentar:
 ```ts
 /**
- * Test Scope: ListBoardView — Drag & Drop zwischen Status-Spalten
+ * Test Scope: ListBoardView — Drag & Drop zwischen Status-Spalten und Status-Panels
  *
  * Abgedeckte Regeln:
  * - DnD nur aktiv wenn onItemStatusChange übergeben wird
  * - Drop auf eigene Spalte: kein Callback
- * - Drop auf bekannte fremde Spalte: Callback mit item und newStatus
+ * - Drop auf bekannte fremde Spalte oder bekanntes fremdes Panel: Callback mit item und newStatus
  * - Drop auf unbekannte Spalte: kein Callback
+ * - Leere bekannte Status-Panels werden im Listenmodus gerendert
  *
  * Fehlerfälle:
  * - Abgebrochener Drag: kein Callback
@@ -213,16 +226,20 @@ Testfälle (nummeriert):
 2. Board mit `onItemStatusChange` → `DndContext` vorhanden
 3. Drag einer Karte auf andere Spalte → `onItemStatusChange` einmal mit korrektem
    item und `newStatus` aufgerufen
-4. Drag einer Karte auf eigene Spalte → `onItemStatusChange` **nicht** aufgerufen
-5. Drag einer Karte auf unbekannte Spalte → `onItemStatusChange` **nicht** aufgerufen
-6. Abgebrochener Drag (kein `over` im `onDragEnd`) → `onItemStatusChange` **nicht** aufgerufen
+4. Drag einer Zeile im Listenmodus auf anderes Status-Panel → `onItemStatusChange`
+   einmal mit korrektem item und `newStatus` aufgerufen
+5. Drag einer Karte auf eigene Spalte → `onItemStatusChange` **nicht** aufgerufen
+6. Drag einer Karte auf unbekannte Spalte → `onItemStatusChange` **nicht** aufgerufen
+7. Abgebrochener Drag (kein `over` im `onDragEnd`) → `onItemStatusChange` **nicht** aufgerufen
+8. Statusgruppierte Liste ohne Items in einem bekannten Status → leeres Panel mit
+   Zähler `0` wird gerendert
 
 Hinweis: `@dnd-kit` stellt `MockedDndContext` nicht offiziell bereit — der
 `onDragEnd`-Handler kann direkt über die `DndContext`-`onDragEnd`-Prop getriggert
 werden, indem das Event-Objekt manuell gebaut wird. Alternativ kann der Handler
 als pure Funktion extrahiert und isoliert getestet werden.
 
-**Datei:** `tests/unit/web/components/tasks/TaskListBoardView.dnd.test.tsx`
+**Datei:** `tests/unit/web/components/ui/TaskListBoardView.test.tsx`
 
 Testfälle:
 
@@ -237,7 +254,7 @@ sein. Codex prüft nach der Implementierung, welche konkreten Selektoren gebroch
 
 | Testdatei | Mögliche Ursache |
 |---|---|
-| `tests/unit/web/components/ui/ListBoardView.test.tsx` | Neue ARIA-Attribute, Wrapper-Divs im Board-Zweig |
+| `tests/unit/web/components/ui/ListBoardView.test.tsx` | Neue ARIA-Attribute, Wrapper-Divs im Board- und Listen-Zweig |
 | `tests/unit/web/components/tasks/TaskListBoardView.test.tsx` | Neues Prop in Adapter |
 
 Anpassungen beschränken sich auf Selektor-Updates — keine neue Testlogik.
@@ -261,12 +278,14 @@ Schritt-Log dokumentieren und nicht als leere Gerüste einchecken.
 
 - [ ] `@dnd-kit/core` und `@dnd-kit/sortable` sind im `apps/web`-Workspace installiert
 - [ ] Im Board-Modus können Task-Karten zwischen Statusspalten gezogen werden
+- [ ] Im Listenmodus können Task-Zeilen zwischen Status-Panels gezogen werden
+- [ ] Im Listenmodus rendert jeder bekannte Status ein Panel, auch wenn es leer ist
 - [ ] Drop auf eigene Spalte: keine Mutation, keine Fehlermeldung
 - [ ] Drop auf fremde bekannte Spalte: Task-Status ändert sich, Karte wandert in
       neue Spalte ohne Seitenreload
 - [ ] Drop außerhalb einer Spalte: Karte kehrt visuell zur Ausgangsposition zurück
 - [ ] Schlägt die Mutation fehl: Toast-Fehlermeldung, Karte kehrt in Ausgangsspalte zurück
-- [ ] Listen-Modus unverändert: kein DnD, keine neuen DOM-Elemente
+- [ ] Ohne `onItemStatusChange` bleibt DnD in Board und Liste deaktiviert
 - [ ] Alle anderen Domain-Views (Tickets, Features usw.) unverändert und funktionsfähig
 - [ ] Alle neuen Unit-Tests vorhanden und grün
 - [ ] Bestehende Tests grün (`npm run test -w apps/web`)
@@ -277,8 +296,9 @@ Schritt-Log dokumentieren und nicht als leere Gerüste einchecken.
 
 ## Implementierungsreihenfolge
 
-1. **Schritt 1 — Abhängigkeiten installieren**
-   `@dnd-kit/core` und `@dnd-kit/sortable` in `apps/web` installieren.
+1. **Schritt 1 — Abhängigkeiten prüfen**
+   `@dnd-kit/core` und `@dnd-kit/sortable` im `apps/web`-Workspace prüfen und
+   nur installieren, falls sie wider Erwarten fehlen.
    Build prüfen (`npm run build -w apps/web`), sicherstellen, dass keine
    Peer-Dependency-Konflikte entstehen.
 
@@ -289,8 +309,10 @@ Schritt-Log dokumentieren und nicht als leere Gerüste einchecken.
    `updateTaskStatus`-Mutation ergänzen. Invalidierung über `invalidation.ts`.
 
 3. **Schritt 3 — `ListBoardView` erweitern**
-   Prop `onItemStatusChange` ergänzen. Board-Rendering-Zweig in `DndContext` einbetten.
-   Spalten als `useDroppable`, Karten als `useDraggable`. `DragOverlay` einfügen.
+   Prop `onItemStatusChange` und `itemIdKey` ergänzen. Statusgruppierte Board- und
+   Listen-Renderings in `DndContext` einbetten, wenn der Callback vorhanden ist.
+   Statusbereiche als `useDroppable`, Karten und Zeilen als `useDraggable`.
+   `DragOverlay` einfügen.
    `onDragEnd`-Logik mit allen Branching-Fällen implementieren.
    Kein Breaking Change: ohne Prop bleibt alles wie bisher.
 

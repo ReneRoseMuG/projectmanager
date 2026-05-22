@@ -3,10 +3,12 @@
  *
  * Abgedeckte Regeln:
  * - Owner-Task-Hooks refetchen Board-Collections nach Join-Mutationen über TanStack Query.
+ * - Owner-Task-Statuswechsel aktualisieren den Cache optimistisch und rollen bei API-Fehlern zurück.
  * - Projekt-Feature-Join-Änderungen bleiben über Relations-Hooks in der angezeigten UI-Liste sichtbar.
  *
  * Fehlerfälle:
  * - Mutationen dürfen nicht nur die API aufrufen, sondern müssen abhängige Query-Daten sichtbar aktualisieren.
+ * - Fehlgeschlagene optimistische Status-Mutationen dürfen keinen falschen Cache-Zustand behalten.
  *
  * Ziel:
  * Hook-, QueryClient- und API-Schicht im Zusammenspiel gegen stale Collection- und Relationsdaten absichern.
@@ -95,6 +97,17 @@ function renderWithQueryClient(children: ReactNode) {
   return render(<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>);
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, resolve, reject };
+}
+
 function TaskCollectionHarness() {
   const tasks = useTasks(taskOwner);
 
@@ -105,6 +118,8 @@ function TaskCollectionHarness() {
   return (
     <section>
       <output aria-label="Task count">{tasks.tasks.length}</output>
+      <output aria-label="Task status">{tasks.tasks[0]?.status ?? "none"}</output>
+      <output aria-label="Task version">{tasks.tasks[0]?.version ?? "none"}</output>
       {tasks.tasks.map((task) => (
         <p key={task.id}>{task.title}</p>
       ))}
@@ -113,6 +128,17 @@ function TaskCollectionHarness() {
       </button>
       <button type="button" onClick={() => void tasks.linkTask(taskId + 1)}>
         Task verknüpfen
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          const task = tasks.tasks[0];
+          if (task) {
+            void tasks.updateTaskStatus(task.id, "done", task.version).catch(() => undefined);
+          }
+        }}
+      >
+        Status ändern
       </button>
     </section>
   );
@@ -182,6 +208,46 @@ describe("Query hook mutation integration", () => {
     await waitFor(() => expect(screen.getByLabelText("Task count")).toHaveTextContent("1"));
     expect(screen.getByText("Verknüpfte Aufgabe")).toBeInTheDocument();
     expect(taskApi.linkOwnerTask).toHaveBeenCalledWith(taskOwner, linkedTask.id);
+  });
+
+  it("aktualisiert Owner-Task-Status optimistisch und invalidiert nach Erfolg", async () => {
+    const updateDeferred = deferred<TaskBoardItem>();
+    const updatedTask = taskFixture({ status: "done", version: 2 });
+    let ownerTasks = [taskFixture()];
+    taskApi.getOwnerTasks.mockImplementation(async () => ownerTasks);
+    taskApi.updateTask.mockImplementation(async () => updateDeferred.promise);
+
+    renderWithQueryClient(<TaskCollectionHarness />);
+
+    await screen.findByText("Aktuelle Aufgabe");
+    fireEvent.click(screen.getByRole("button", { name: "Status ändern" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Task status")).toHaveTextContent("done"));
+    await waitFor(() => expect(screen.getByLabelText("Task version")).toHaveTextContent("2"));
+    expect(taskApi.updateTask).toHaveBeenCalledWith(taskId, { status: "done", expectedVersion: 1 });
+
+    ownerTasks = [updatedTask];
+    updateDeferred.resolve(updatedTask);
+
+    await waitFor(() => expect(taskApi.getOwnerTasks.mock.calls.length).toBeGreaterThanOrEqual(2));
+  });
+
+  it("rollt den optimistischen Owner-Task-Status bei API-Fehler zurück", async () => {
+    const updateDeferred = deferred<TaskBoardItem>();
+    const originalTask = taskFixture();
+    taskApi.getOwnerTasks.mockImplementation(async () => [originalTask]);
+    taskApi.updateTask.mockImplementation(async () => updateDeferred.promise);
+
+    renderWithQueryClient(<TaskCollectionHarness />);
+
+    await screen.findByText("Aktuelle Aufgabe");
+    fireEvent.click(screen.getByRole("button", { name: "Status ändern" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Task status")).toHaveTextContent("done"));
+    updateDeferred.reject(new Error("Conflict"));
+
+    await waitFor(() => expect(screen.getByLabelText("Task status")).toHaveTextContent("todo"));
+    await waitFor(() => expect(screen.getByLabelText("Task version")).toHaveTextContent("1"));
   });
 
   it("refetcht Projekt-Feature-Join-Daten nach Relation-Mutation", async () => {
