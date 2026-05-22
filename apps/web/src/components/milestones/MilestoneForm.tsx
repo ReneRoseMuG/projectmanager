@@ -43,6 +43,7 @@ import { richTextToPlainText } from "../../utils/richText";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { EventForm } from "../calendar/EventForm";
+import { MilestoneDashboard } from "../dashboard/DashboardView";
 import { JournalPanel } from "../journal/JournalPanel";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
@@ -99,6 +100,7 @@ function workStatusValue(
 }
 
 type MilestoneFormTab =
+  | "overview"
   | "details"
   | "features"
   | "tasks"
@@ -110,6 +112,7 @@ type MilestoneFormTab =
   | "journal";
 
 const tabs: Array<Tab<MilestoneFormTab>> = [
+  { value: "overview", label: "Übersicht" },
   { value: "details", label: "Stammdaten" },
   { value: "features", label: "Features" },
   { value: "tasks", label: "Aufgaben" },
@@ -386,7 +389,7 @@ export function MilestoneForm({
 
   const visibleTabs = milestone
     ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
-    : tabs.filter((tab) => tab.value !== "journal");
+    : tabs.filter((tab) => tab.value !== "overview" && tab.value !== "journal");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
@@ -474,12 +477,16 @@ export function MilestoneForm({
         onClose={onClose}
         variant={variant}
         contentClassName={
-          activeTab === "details" ? "w-full max-w-7xl self-center" : ""
+          activeTab === "details" || activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
         }
         tabBar={
           <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
         }
       >
+        {activeTab === "overview" && milestone ? (
+          <MilestoneDashboard milestoneId={milestone.id} />
+        ) : null}
+
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">

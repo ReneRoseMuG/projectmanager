@@ -81,6 +81,17 @@ export function safeFilename(value: string) {
     .replace(/^-|-$/g, "");
 }
 
+export function pathWithOptionalQuery(path: string) {
+  const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`${escapedPath}(?:\\?.*)?$`);
+}
+
+export async function expectToast(page: Page, text: string) {
+  await expect(page.locator('[role="status"][aria-live="polite"]')).toContainText(
+    text,
+  );
+}
+
 const authenticatedApiRequests = new WeakSet<APIRequestContext>();
 const authenticatedPages = new WeakSet<Page>();
 

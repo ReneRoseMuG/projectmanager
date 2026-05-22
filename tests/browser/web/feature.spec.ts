@@ -12,6 +12,7 @@ import {
   formPage,
   itemCard,
   linkProjectFeature,
+  pathWithOptionalQuery,
   uniqueTitle,
 } from "./domain-test-utils";
 
@@ -66,7 +67,7 @@ test.describe("Feature-Routen und Detailformular", () => {
       await openFeatureList(page);
       await page.getByRole("button", { name: "Neues Feature" }).click();
 
-      await expect(page).toHaveURL(/\/features\/new$/);
+      await expect(page).toHaveURL(pathWithOptionalQuery("/features/new"));
       const form = formPage(page, "Neues Feature");
       await form.locator("input[required]").nth(0).fill(title);
       await form.locator('input[type="number"]').first().fill("7");
@@ -107,18 +108,24 @@ test.describe("Feature-Routen und Detailformular", () => {
     try {
       await openFeatureList(page);
       await itemCard(page, feature.title).dblclick();
-      await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
+      await expect(page).toHaveURL(
+        pathWithOptionalQuery(`/features/${feature.id}`),
+      );
       await expectFeatureFormData(page, feature);
 
       await openFeatureList(page);
       await clickItemAction(page, feature.title, "Bearbeiten");
-      await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
+      await expect(page).toHaveURL(
+        pathWithOptionalQuery(`/features/${feature.id}`),
+      );
       await expectFeatureFormData(page, feature);
 
       await openFeatureList(page);
       await page.getByRole("button", { name: "Liste", exact: true }).click();
       await clickItemAction(page, feature.title, "Bearbeiten");
-      await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
+      await expect(page).toHaveURL(
+        pathWithOptionalQuery(`/features/${feature.id}`),
+      );
       await expectFeatureFormData(page, feature);
     } finally {
       await deleteFeature(request, feature.id);

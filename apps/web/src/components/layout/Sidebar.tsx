@@ -1,7 +1,9 @@
 import type { AuthResource, CurrentUser } from "@taskmanager/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  Activity,
   BookOpen,
+  Bot,
   Bug,
   CalendarDays,
   ExternalLink,
@@ -9,17 +11,23 @@ import {
   FolderKanban,
   History,
   Library,
+  LayoutDashboard,
   ListTodo,
   LogOut,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
   SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
+import { useHealthCheck } from "../../hooks/useHealthCheck";
 import { hasPermission } from "../../hooks/usePermissions";
 import { invalidateWikiImportData } from "../../queries/invalidation";
 import { withStandaloneView } from "../../utils/standalone";
+import { SearchInput } from "../ui/SearchInput";
+import { openAiAgent, openGlobalSearch } from "./ShellOverlays";
 
 interface NavigationItem {
   to: string;
@@ -41,12 +49,65 @@ const documentationItems: NavigationItem[] = [
 ];
 
 const informationItems: NavigationItem[] = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, resource: "dashboards" },
   { to: "/calendar", label: "Kalender", icon: CalendarDays, resource: "events" },
   { to: "/journal", label: "Journal", icon: History, resource: "journal" },
 ];
 
 function NavSection({ children }: { children: string }) {
   return <div className="mb-2 mt-5 px-1.5 text-[10px] font-semibold uppercase tracking-widest text-steel-400">{children}</div>;
+}
+
+function ServerStatus({
+  online,
+  latencyMs,
+  open,
+  onToggle,
+  onRefetch,
+}: {
+  online: boolean;
+  latencyMs: number | null;
+  open: boolean;
+  onToggle: () => void;
+  onRefetch: () => Promise<void>;
+}) {
+  const slow = online && latencyMs !== null && latencyMs > 250;
+  const statusText = online
+    ? `${slow ? "langsam" : "erreichbar"}${latencyMs !== null ? ` - ${latencyMs} ms` : ""}`
+    : "offline";
+  const dotClass = online ? (slow ? "bg-tangerine" : "bg-fern") : "bg-crimson";
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-white/75 transition hover:bg-white/5 hover:text-white"
+        title={latencyMs ? `${latencyMs} ms` : undefined}
+        onClick={onToggle}
+      >
+        <Activity size={17} />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate">Server Status</span>
+          <span className="block truncate text-[11px] font-normal text-white/55">{statusText}</span>
+        </span>
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
+      </button>
+      {open ? (
+        <div className="mt-2 rounded-lg border border-white/10 bg-steel-900 p-3 text-xs text-white/70 shadow-panel">
+          <p className="font-semibold text-white">Server {statusText}</p>
+          <p className="mt-1">Endpoint http://localhost:3001</p>
+          <button
+            type="button"
+            className="mt-3 flex h-8 items-center gap-2 rounded-md bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/15"
+            onClick={() => void onRefetch()}
+          >
+            <RotateCcw size={14} />
+            Erneut prüfen
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function hasAdminAccess(user: CurrentUser | null | undefined): boolean {
@@ -117,6 +178,9 @@ interface SidebarProps {
 
 export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
   const queryClient = useQueryClient();
+  const health = useHealthCheck();
+  const [apiOpen, setApiOpen] = useState(false);
+  const [sidebarSearch, setSidebarSearch] = useState("");
   const showAdmin = hasAdminAccess(currentUser);
   const settingsItems: NavigationItem[] = showAdmin
     ? [{ to: "/admin", label: "Administration", icon: ShieldCheck }]
@@ -133,13 +197,32 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
     <aside className="hidden w-64 shrink-0 overflow-y-auto bg-gradient-to-b from-steel-700 to-steel-800 p-4 text-white md:block">
       <button
         type="button"
-        className="mb-8 flex w-full items-center gap-3 rounded-lg p-1 text-left transition hover:bg-white/5"
+        className="mb-3 flex w-full items-center gap-3 rounded-lg p-1 text-left transition hover:bg-white/5"
         title="Aktualisieren"
         onClick={() => void invalidateWikiImportData(queryClient)}
       >
         <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-steel-700 shadow-lg">PM</span>
         <span className="flex min-h-10 items-center text-sm font-bold text-white">Projekt Manager</span>
         <RefreshCw size={14} className="ml-auto text-white/55" />
+      </button>
+      <div className="mb-2" onClick={() => openGlobalSearch(sidebarSearch)}>
+        <SearchInput
+          value={sidebarSearch}
+          onChange={(value) => {
+            setSidebarSearch(value);
+            openGlobalSearch(value);
+          }}
+          placeholder="Global suchen"
+          hint="Ctrl K"
+        />
+      </div>
+      <button
+        type="button"
+        className="mb-6 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/75 transition hover:bg-white/5 hover:text-white"
+        onClick={openAiAgent}
+      >
+        <Bot size={17} />
+        KI-Agent
       </button>
       <NavSection>Projekt Management</NavSection>
       <NavigationLinks currentUser={currentUser} items={projectManagementItems} allowStandalone />
@@ -149,6 +232,15 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
       <NavigationLinks currentUser={currentUser} items={informationItems} allowStandalone />
       <NavSection>Einstellungen</NavSection>
       <NavigationLinks currentUser={currentUser} items={settingsItems} allowStandalone={false} />
+      {showAdmin ? (
+        <ServerStatus
+          online={health.online}
+          latencyMs={health.latencyMs}
+          open={apiOpen}
+          onToggle={() => setApiOpen((current) => !current)}
+          onRefetch={health.refetch}
+        />
+      ) : null}
       {currentUser ? (
         <div className="mt-6 border-t border-white/10 pt-4">
           <div className="mb-3 px-3 text-xs text-white/70">

@@ -1,11 +1,28 @@
-import type { Attachment, AttachmentOwner } from "@taskmanager/shared-types";
-import { desc, eq, inArray } from "drizzle-orm";
+import type { Attachment, AttachmentOwner, JournalObjectType, RecentAttachment } from "@taskmanager/shared-types";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { config } from "../config.js";
 import type { DbClient, DbSession } from "../db/client.js";
-import { attachments, featureAttachments, features, milestoneAttachments, milestones, projectAttachments, projects, taskAttachments, tasks, ticketAttachments, tickets } from "../db/schema.js";
+import {
+  attachments,
+  featureAttachments,
+  features,
+  milestoneAttachments,
+  milestoneTasks,
+  milestoneTickets,
+  milestones,
+  projectAttachments,
+  projectTasks,
+  projectTickets,
+  projects,
+  taskAttachments,
+  tasks,
+  ticketAttachments,
+  tickets,
+  users
+} from "../db/schema.js";
 import { attachmentRepository, type AttachmentRecord } from "../repositories/attachment.repository.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { badRequest, internalError, notFound } from "../utils/errors.js";
@@ -370,6 +387,244 @@ function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Att
     .where(eq(ticketAttachments.ticketId, owner.id))
     .orderBy(desc(attachments.createdAt))
     .all();
+}
+
+type RecentAttachmentOwner = { type: "project" | "milestone" | "task"; id: number };
+
+interface RecentAttachmentRow {
+  id: number;
+  filename: string;
+  storageFilename: string;
+  mimetype: string;
+  fileSize: number;
+  createdAt: string;
+  authorFullName: string | null;
+  authorEmail: string | null;
+  entityType: JournalObjectType;
+  entityId: number;
+  entityLabel: string;
+}
+
+function attachmentAuthorName(row: Pick<RecentAttachmentRow, "authorFullName" | "authorEmail">): string {
+  const name = row.authorFullName?.trim();
+  return name || row.authorEmail || "System";
+}
+
+function collectAttachmentTaskDescendantIds(database: DbClient, rootIds: number[]): number[] {
+  const result = new Set(rootIds);
+  let frontier = [...new Set(rootIds)];
+  while (frontier.length > 0) {
+    const rows = database.select({ id: tasks.id }).from(tasks).where(inArray(tasks.parentId, frontier)).all();
+    frontier = rows.map((row) => row.id).filter((id) => !result.has(id));
+    for (const id of frontier) {
+      result.add(id);
+    }
+  }
+  return [...result];
+}
+
+function attachmentProjectMilestoneIds(database: DbClient, projectId: number): number[] {
+  return database.select({ id: milestones.id }).from(milestones).where(eq(milestones.projectId, projectId)).all().map((row) => row.id);
+}
+
+function attachmentTaskIdsForOwner(database: DbClient, owner: RecentAttachmentOwner): number[] {
+  if (owner.type === "task") {
+    return [owner.id];
+  }
+  const direct =
+    owner.type === "project"
+      ? database.select({ id: projectTasks.taskId }).from(projectTasks).where(eq(projectTasks.ownerId, owner.id)).all().map((row) => row.id)
+      : database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(eq(milestoneTasks.ownerId, owner.id)).all().map((row) => row.id);
+  if (owner.type === "project") {
+    const milestoneIds = attachmentProjectMilestoneIds(database, owner.id);
+    const milestoneLinked =
+      milestoneIds.length === 0
+        ? []
+        : database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(inArray(milestoneTasks.ownerId, milestoneIds)).all().map((row) => row.id);
+    return collectAttachmentTaskDescendantIds(database, [...direct, ...milestoneLinked]);
+  }
+  return collectAttachmentTaskDescendantIds(database, direct);
+}
+
+function attachmentTicketIdsForOwner(database: DbClient, owner: RecentAttachmentOwner): number[] {
+  if (owner.type === "task") {
+    return [];
+  }
+  const direct =
+    owner.type === "project"
+      ? database.select({ id: projectTickets.ticketId }).from(projectTickets).where(eq(projectTickets.ownerId, owner.id)).all().map((row) => row.id)
+      : database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(eq(milestoneTickets.ownerId, owner.id)).all().map((row) => row.id);
+  if (owner.type === "project") {
+    const milestoneIds = attachmentProjectMilestoneIds(database, owner.id);
+    const milestoneLinked =
+      milestoneIds.length === 0
+        ? []
+        : database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(inArray(milestoneTickets.ownerId, milestoneIds)).all().map((row) => row.id);
+    return [...new Set([...direct, ...milestoneLinked])];
+  }
+  return [...new Set(direct)];
+}
+
+function mapRecentAttachmentRow(row: Omit<RecentAttachmentRow, "entityType">, entityType: JournalObjectType): RecentAttachmentRow {
+  return { ...row, entityType };
+}
+
+function recentProjectAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: attachments.id,
+      filename: attachments.originalName,
+      storageFilename: attachments.filename,
+      mimetype: attachments.mimetype,
+      fileSize: attachments.size,
+      createdAt: attachments.createdAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: projects.id,
+      entityLabel: projects.name
+    })
+    .from(projectAttachments)
+    .innerJoin(attachments, eq(projectAttachments.attachmentId, attachments.id))
+    .innerJoin(projects, eq(projectAttachments.projectId, projects.id))
+    .leftJoin(users, eq(attachments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(projectAttachments.projectId, ids) : and(inArray(projectAttachments.projectId, ids), eq(attachments.createdBy, mineUserId)))
+    .orderBy(desc(attachments.createdAt), desc(attachments.id))
+    .all()
+    .map((row) => mapRecentAttachmentRow(row, "project"));
+}
+
+function recentMilestoneAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: attachments.id,
+      filename: attachments.originalName,
+      storageFilename: attachments.filename,
+      mimetype: attachments.mimetype,
+      fileSize: attachments.size,
+      createdAt: attachments.createdAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: milestones.id,
+      entityLabel: milestones.name
+    })
+    .from(milestoneAttachments)
+    .innerJoin(attachments, eq(milestoneAttachments.attachmentId, attachments.id))
+    .innerJoin(milestones, eq(milestoneAttachments.milestoneId, milestones.id))
+    .leftJoin(users, eq(attachments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(milestoneAttachments.milestoneId, ids) : and(inArray(milestoneAttachments.milestoneId, ids), eq(attachments.createdBy, mineUserId)))
+    .orderBy(desc(attachments.createdAt), desc(attachments.id))
+    .all()
+    .map((row) => mapRecentAttachmentRow(row, "milestone"));
+}
+
+function recentTaskAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: attachments.id,
+      filename: attachments.originalName,
+      storageFilename: attachments.filename,
+      mimetype: attachments.mimetype,
+      fileSize: attachments.size,
+      createdAt: attachments.createdAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: tasks.id,
+      entityLabel: tasks.title
+    })
+    .from(taskAttachments)
+    .innerJoin(attachments, eq(taskAttachments.attachmentId, attachments.id))
+    .innerJoin(tasks, eq(taskAttachments.taskId, tasks.id))
+    .leftJoin(users, eq(attachments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(taskAttachments.taskId, ids) : and(inArray(taskAttachments.taskId, ids), eq(attachments.createdBy, mineUserId)))
+    .orderBy(desc(attachments.createdAt), desc(attachments.id))
+    .all()
+    .map((row) => mapRecentAttachmentRow(row, "task"));
+}
+
+function recentTicketAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: attachments.id,
+      filename: attachments.originalName,
+      storageFilename: attachments.filename,
+      mimetype: attachments.mimetype,
+      fileSize: attachments.size,
+      createdAt: attachments.createdAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: tickets.id,
+      entityLabel: tickets.title
+    })
+    .from(ticketAttachments)
+    .innerJoin(attachments, eq(ticketAttachments.attachmentId, attachments.id))
+    .innerJoin(tickets, eq(ticketAttachments.ticketId, tickets.id))
+    .leftJoin(users, eq(attachments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(ticketAttachments.ticketId, ids) : and(inArray(ticketAttachments.ticketId, ids), eq(attachments.createdBy, mineUserId)))
+    .orderBy(desc(attachments.createdAt), desc(attachments.id))
+    .all()
+    .map((row) => mapRecentAttachmentRow(row, "ticket"));
+}
+
+function recentAttachmentRowsForOwner(database: DbClient, owner: RecentAttachmentOwner): RecentAttachmentRow[] {
+  if (owner.type === "project") {
+    const milestoneIds = attachmentProjectMilestoneIds(database, owner.id);
+    return [
+      ...recentProjectAttachmentRows(database, [owner.id]),
+      ...recentMilestoneAttachmentRows(database, milestoneIds),
+      ...recentTaskAttachmentRows(database, attachmentTaskIdsForOwner(database, owner)),
+      ...recentTicketAttachmentRows(database, attachmentTicketIdsForOwner(database, owner))
+    ];
+  }
+  if (owner.type === "milestone") {
+    return [
+      ...recentMilestoneAttachmentRows(database, [owner.id]),
+      ...recentTaskAttachmentRows(database, attachmentTaskIdsForOwner(database, owner)),
+      ...recentTicketAttachmentRows(database, attachmentTicketIdsForOwner(database, owner))
+    ];
+  }
+  return recentTaskAttachmentRows(database, [owner.id]);
+}
+
+function recentOwnAttachmentRows(database: DbClient, userId: number): RecentAttachmentRow[] {
+  return [
+    ...recentProjectAttachmentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id), userId),
+    ...recentMilestoneAttachmentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id), userId),
+    ...recentTaskAttachmentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id), userId),
+    ...recentTicketAttachmentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id), userId)
+  ];
+}
+
+export function listRecentAttachments(database: DbClient, options: { owner?: RecentAttachmentOwner; currentUserId: number; limit?: number }): RecentAttachment[] {
+  const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
+  const rows = options.owner ? recentAttachmentRowsForOwner(database, options.owner) : recentOwnAttachmentRows(database, options.currentUserId);
+  return rows
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime() || right.id - left.id)
+    .slice(0, limit)
+    .map((row) => ({
+      id: row.id,
+      filename: row.filename,
+      storageFilename: row.storageFilename,
+      mimetype: row.mimetype,
+      fileSize: row.fileSize,
+      url: `/uploads/${row.storageFilename}`,
+      createdAt: row.createdAt,
+      authorName: attachmentAuthorName(row),
+      entityType: row.entityType,
+      entityId: row.entityId,
+      entityLabel: row.entityLabel
+    }));
 }
 
 function listOwnerAttachments(database: DbClient, owner: AttachmentOwner): Attachment[] {

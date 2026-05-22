@@ -17,6 +17,7 @@ import {
   deleteFeature,
   deleteProject,
   deleteTask,
+  expectToast,
   fillRichText,
   formPage,
   itemCard,
@@ -161,9 +162,12 @@ async function linkTaskInBoard(
     0,
   );
   await dialog.getByPlaceholder("Aufgaben suchen").fill(title);
-  await expect(dialog.getByText(title)).toBeVisible();
-  await dialog.getByRole("button", { name: "Verknüpfen" }).last().click();
-  await expect(page.getByRole("status")).toContainText("Aufgabe verknüpft");
+  const candidate = dialog
+    .getByText(title, { exact: true })
+    .locator("xpath=ancestor::div[contains(@class, 'rounded-md')][1]");
+  await expect(candidate).toBeVisible();
+  await candidate.getByRole("button", { name: "Verknüpfen" }).click();
+  await expectToast(page, "Aufgabe verknüpft");
 
   const closeButton = dialog.getByRole("button", { name: "Schließen" });
   if (await closeButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
@@ -185,7 +189,7 @@ async function removeTaskRelationInBoard(
     .getByRole("alertdialog")
     .getByRole("button", { name: "Entfernen" })
     .click();
-  await expect(page.getByRole("status")).toContainText("Zuordnung entfernt");
+  await expectToast(page, "Zuordnung entfernt");
   await expect(itemCard(scope, title)).toHaveCount(0);
   await expectTaskStillExists(request, title);
 }

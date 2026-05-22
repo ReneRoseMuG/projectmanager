@@ -197,6 +197,13 @@
       "when": 1779407831574,
       "tag": "0027_remove_document_slugs",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "5",
+      "when": 1779465600000,
+      "tag": "0028_dashboard_builder",
+      "breakpoints": true
     }
   ]
 }

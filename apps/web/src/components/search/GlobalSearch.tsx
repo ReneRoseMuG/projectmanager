@@ -1,12 +1,13 @@
 import { BookOpen, Bug, CircleHelp, ClipboardList, FileText, Flag, FolderKanban, ListTodo, Paperclip, Search, Sparkles, StickyNote, X } from "lucide-react";
 import type { Ticket } from "@taskmanager/shared-types";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGlobalSearchData } from "../../hooks/useGlobalSearchData";
 import { EmptyState } from "../ui/EmptyState";
 
 interface GlobalSearchProps {
   open: boolean;
+  initialQuery?: string;
   onClose: () => void;
 }
 
@@ -40,12 +41,18 @@ function ticketIcon(ticket: Ticket) {
   return <ClipboardList size={17} />;
 }
 
-export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
+export function GlobalSearch({ open, initialQuery = "", onClose }: GlobalSearchProps) {
   const navigate = useNavigate();
   const searchData = useGlobalSearchData(open);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("all");
   const { projects, milestones, features, wikiPages, tasks, tickets, notes, attachments } = searchData.data;
+
+  useEffect(() => {
+    if (open) {
+      setQuery(initialQuery);
+    }
+  }, [initialQuery, open]);
 
   const resultGroups = useMemo<SearchResultGroups>(() => {
     const normalized = query.trim().toLocaleLowerCase("de-DE");

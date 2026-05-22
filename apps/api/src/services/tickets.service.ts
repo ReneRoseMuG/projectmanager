@@ -7,6 +7,7 @@ import type {
   TicketRelationEntry,
   TicketRelationInput,
   TicketRelationType,
+  TicketStats,
   TicketUpdate,
   VisibleParentContext
 } from "@taskmanager/shared-types";
@@ -38,6 +39,7 @@ import { assertCompatibleProjectContexts, projectContextsAreCompatible, ticketOw
 import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
 
 export type { TicketOwner };
+export type DashboardTicketOwner = { type: "project" | "milestone"; id: number };
 
 type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
 
@@ -504,6 +506,40 @@ export function listSubTickets(database: DbClient, parentId: number): Ticket[] {
   const subTicketCounts = getSubTicketCounts(database, ids);
 
   return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0));
+}
+
+function listDashboardTickets(database: DbClient, owner?: DashboardTicketOwner): Ticket[] {
+  if (!owner) {
+    return listTickets(database);
+  }
+  return listOwnerTickets(database, owner);
+}
+
+function dateKey(value: string): number {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+export function getTicketStats(database: DbClient, owner?: DashboardTicketOwner): TicketStats {
+  const statusCounts: Record<string, number> = {};
+  for (const ticket of listDashboardTickets(database, owner)) {
+    statusCounts[ticket.status] = (statusCounts[ticket.status] ?? 0) + 1;
+  }
+  return {
+    statusCounts,
+    total: Object.values(statusCounts).reduce((sum, count) => sum + count, 0)
+  };
+}
+
+export function listRecentTickets(
+  database: DbClient,
+  options: { owner?: DashboardTicketOwner; limit?: number; sort?: "createdAt" | "updatedAt" } = {}
+): Ticket[] {
+  const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
+  const sort = options.sort ?? "updatedAt";
+  return [...listDashboardTickets(database, options.owner)]
+    .sort((left, right) => dateKey(right[sort]) - dateKey(left[sort]) || right.id - left.id)
+    .slice(0, limit);
 }
 
 export function getTicketDetail(database: DbClient, id: number): TicketDetail {

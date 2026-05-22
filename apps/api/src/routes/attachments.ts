@@ -1,10 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import { requireCurrentUser } from "../plugins/auth.js";
 import {
   createFeatureAttachment,
   createMilestoneAttachment,
   createProjectAttachment,
   createTaskAttachment,
   deleteAttachment,
+  listRecentAttachments,
   listFeatureAttachments,
   listMilestoneAttachments,
   listProjectAttachments,
@@ -38,6 +40,30 @@ const uploadBodySchema = {
   }
 } as const;
 
+const recentAttachmentsQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    ownerType: { type: "string", enum: ["project", "milestone", "task"] },
+    ownerId: { type: "integer", minimum: 1 },
+    mine: { type: "boolean" },
+    limit: { type: "integer", minimum: 1, maximum: 50 }
+  }
+} as const;
+
+function recentAttachmentOwnerFromQuery(query: { ownerType?: "project" | "milestone" | "task"; ownerId?: number; mine?: boolean }) {
+  if (query.ownerType !== undefined || query.ownerId !== undefined) {
+    if (query.ownerType === undefined || query.ownerId === undefined) {
+      throw badRequest("ownerType and ownerId must be provided together");
+    }
+    if (query.mine === true) {
+      throw badRequest("mine cannot be combined with ownerType and ownerId");
+    }
+    return { type: query.ownerType, id: query.ownerId };
+  }
+  return undefined;
+}
+
 async function readUpload(request: FastifyRequest) {
   const file = (request.body as UploadBody | undefined)?.file;
   if (!file || Array.isArray(file) || typeof file.toBuffer !== "function") {
@@ -52,6 +78,15 @@ async function readUpload(request: FastifyRequest) {
 }
 
 export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<void> {
+  app.get<{ Querystring: { ownerType?: "project" | "milestone" | "task"; ownerId?: number; mine?: boolean; limit?: number } }>(
+    "/attachments/recent",
+    { schema: { querystring: recentAttachmentsQuerySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => {
+      const currentUser = requireCurrentUser(request);
+      return listRecentAttachments(app.db, { owner: recentAttachmentOwnerFromQuery(request.query), currentUserId: currentUser.id, limit: request.query.limit });
+    }
+  );
+
   app.get<{ Params: { id: number } }>(
     "/projects/:id/attachments",
     { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },

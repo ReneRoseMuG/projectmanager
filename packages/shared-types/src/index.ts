@@ -138,13 +138,164 @@ export function getSettingDefinition(key: string): SettingDefinition | undefined
 
 export const settingDefinitions = Object.values(settingsRegistry) as SettingDefinition[];
 
+export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task"] as const;
+export const DASHBOARD_OWNER_TYPES = ["project", "milestone", "task"] as const;
+export const DASHBOARD_WIDGET_IDS = [
+  "taskStatusReport",
+  "ticketStatusReport",
+  "taskJournal",
+  "ticketJournal",
+  "globalJournal",
+  "commentJournal",
+  "attachmentJournal",
+  "milestoneProgress",
+  "overdueTasks"
+] as const;
+
+export type DashboardContext = (typeof DASHBOARD_CONTEXTS)[number];
+export type DashboardOwnerType = (typeof DASHBOARD_OWNER_TYPES)[number];
+export type DashboardWidgetId = (typeof DASHBOARD_WIDGET_IDS)[number];
+export type DashboardDefaultScope = "GLOBAL" | "USER";
+
+export interface DashboardOwner {
+  type: DashboardOwnerType;
+  id: number;
+}
+
+export interface DashboardWidgetParams {
+  limit?: number;
+  sort?: "createdAt" | "updatedAt";
+}
+
+export interface DashboardWidgetLayout {
+  widgetId: DashboardWidgetId;
+  col: 0 | 1;
+  row: number;
+  colSpan: 1 | 2;
+  params?: DashboardWidgetParams;
+}
+
+export interface Dashboard {
+  id: number;
+  name: string;
+  context: DashboardContext;
+  isSystem: boolean;
+  templateKey: string | null;
+  ownerId: number | null;
+  widgets: DashboardWidgetLayout[];
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  isGlobalDefault: boolean;
+  isUserDefault: boolean;
+}
+
+export interface DashboardInput {
+  name: string;
+  context: DashboardContext;
+  isSystem?: boolean;
+  widgets: DashboardWidgetLayout[];
+}
+
+export type DashboardUpdate = WithExpectedVersion<DashboardInput>;
+
+export interface DashboardListResponse {
+  dashboards: Dashboard[];
+  globalDefaultDashboardId: number | null;
+  globalDefaultVersion: number;
+  userDefaultDashboardId: number | null;
+  userDefaultVersion: number;
+}
+
+export interface SetDashboardDefaultRequest {
+  scopeType: DashboardDefaultScope;
+  expectedVersion: number;
+}
+
+export interface TaskStats {
+  statusCounts: Record<string, number>;
+  total: number;
+}
+
+export interface TicketStats {
+  statusCounts: Record<string, number>;
+  total: number;
+}
+
+export interface RecentComment {
+  id: number;
+  body: string;
+  createdAt: string;
+  authorName: string;
+  entityType: JournalObjectType;
+  entityId: number;
+  entityLabel: string;
+}
+
+export interface RecentAttachment {
+  id: number;
+  filename: string;
+  storageFilename: string;
+  mimetype: string;
+  fileSize: number;
+  url: string;
+  createdAt: string;
+  authorName: string;
+  entityType: JournalObjectType;
+  entityId: number;
+  entityLabel: string;
+}
+
+export const DASHBOARD_ALLOWED_WIDGETS = {
+  global: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks"],
+  project: ["taskStatusReport", "ticketStatusReport", "milestoneProgress", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "globalJournal", "overdueTasks"],
+  milestone: ["taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal"],
+  task: ["taskStatusReport", "taskJournal", "commentJournal", "attachmentJournal"]
+} as const satisfies Record<DashboardContext, readonly DashboardWidgetId[]>;
+
+export const DEFAULT_DASHBOARD_LAYOUTS = {
+  global: [
+    { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1 },
+    { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 },
+    { widgetId: "globalJournal", col: 0, row: 1, colSpan: 2, params: { limit: 20 } },
+    { widgetId: "taskJournal", col: 0, row: 2, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "ticketJournal", col: 1, row: 2, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "commentJournal", col: 0, row: 3, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "attachmentJournal", col: 1, row: 3, colSpan: 1, params: { limit: 10 } }
+  ],
+  project: [
+    { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1 },
+    { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 },
+    { widgetId: "milestoneProgress", col: 0, row: 1, colSpan: 2, params: { limit: 10 } },
+    { widgetId: "taskJournal", col: 0, row: 2, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "ticketJournal", col: 1, row: 2, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "commentJournal", col: 0, row: 3, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "attachmentJournal", col: 1, row: 3, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "globalJournal", col: 0, row: 4, colSpan: 2, params: { limit: 20 } }
+  ],
+  milestone: [
+    { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1 },
+    { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 },
+    { widgetId: "taskJournal", col: 0, row: 1, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "ticketJournal", col: 1, row: 1, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "commentJournal", col: 0, row: 2, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "attachmentJournal", col: 1, row: 2, colSpan: 1, params: { limit: 10 } }
+  ],
+  task: [
+    { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 2 },
+    { widgetId: "taskJournal", col: 0, row: 1, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "commentJournal", col: 1, row: 1, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "attachmentJournal", col: 0, row: 2, colSpan: 2, params: { limit: 10 } }
+  ]
+} as const satisfies Record<DashboardContext, readonly DashboardWidgetLayout[]>;
+
 export interface ApiErrorPayload {
   error: "NOT_FOUND" | "BAD_REQUEST" | "CONFLICT" | "UNAUTHORIZED" | "FORBIDDEN" | "INTERNAL_ERROR";
   message: string;
   statusCode: number;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "catalogs", "tags", "journal", "dumps", "settings", "ai", "users", "roles"] as const;
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "catalogs", "tags", "journal", "dashboards", "dumps", "settings", "ai", "users", "roles"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";

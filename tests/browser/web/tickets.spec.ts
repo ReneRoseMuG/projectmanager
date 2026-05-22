@@ -13,9 +13,11 @@ import {
   deleteProject,
   deleteTicket,
   expectRichText,
+  expectToast,
   fillRichText,
   formPage,
   itemCard,
+  pathWithOptionalQuery,
   uniqueTitle,
 } from "./domain-test-utils";
 
@@ -132,7 +134,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
       await openTicketList(page);
       await page.getByRole("button", { name: "Neues Ticket" }).click();
 
-      await expect(page).toHaveURL(/\/tickets\/new$/);
+      await expect(page).toHaveURL(pathWithOptionalQuery("/tickets/new"));
       const form = formPage(page, "Ticket");
       await form.locator("input[required]").first().fill(ticketTitle);
       await fillRichText(
@@ -168,18 +170,24 @@ test.describe("Ticket-Routen und Detailformular", () => {
     try {
       await openTicketList(page);
       await itemCard(page, ticket.title).dblclick();
-      await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
+      await expect(page).toHaveURL(
+        pathWithOptionalQuery(`/tickets/${ticket.id}`),
+      );
       await expectTicketFormData(page, ticket);
 
       await openTicketList(page);
       await clickItemAction(page, ticket.title, "Bearbeiten");
-      await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
+      await expect(page).toHaveURL(
+        pathWithOptionalQuery(`/tickets/${ticket.id}`),
+      );
       await expectTicketFormData(page, ticket);
 
       await openTicketList(page);
       await page.getByRole("button", { name: "Liste", exact: true }).click();
       await clickItemAction(page, ticket.title, "Bearbeiten");
-      await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
+      await expect(page).toHaveURL(
+        pathWithOptionalQuery(`/tickets/${ticket.id}`),
+      );
       await expectTicketFormData(page, ticket);
     } finally {
       await deleteTicket(request, ticket.id);
@@ -384,10 +392,8 @@ test.describe("Ticket-Routen und Detailformular", () => {
         .getByRole("button", { name: "Löschen" })
         .click();
 
-      await expect(page.getByRole("status")).toContainText(
-        "Ticket konnte nicht gelöscht werden",
-      );
-      await expect(page.getByRole("status")).toContainText("Beziehungen");
+      await expectToast(page, "Ticket konnte nicht gelöscht werden");
+      await expectToast(page, "Beziehungen");
       await expect(itemCard(page, ticket.title)).toBeVisible();
     } finally {
       await deleteProject(request, project.id);

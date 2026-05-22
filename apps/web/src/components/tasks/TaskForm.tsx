@@ -33,6 +33,7 @@ import { useTaskDetail } from "../../hooks/useTaskDetail";
 import { TagPicker } from "../tags/TagPicker";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
+import { TaskDashboard } from "../dashboard/DashboardView";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { JournalPanel } from "../journal/JournalPanel";
@@ -88,6 +89,7 @@ export interface TaskFormInput extends TaskInput {
 }
 
 type TaskFormTab =
+  | "overview"
   | "details"
   | "subtasks"
   | "tickets"
@@ -97,6 +99,7 @@ type TaskFormTab =
   | "journal";
 
 const tabs: Array<Tab<TaskFormTab>> = [
+  { value: "overview", label: "Übersicht" },
   { value: "details", label: "Details" },
   { value: "subtasks", label: "Subtasks" },
   { value: "tickets", label: "Tickets" },
@@ -197,7 +200,7 @@ export function TaskForm({
       return;
     }
     setActiveTab("details");
-  }, [open]);
+  }, [open, task]);
 
   useEffect(() => {
     if (!open) {
@@ -295,9 +298,10 @@ export function TaskForm({
     }
   };
 
+  const canShowOverview = Boolean(task && ((detail.task?.subtasks.length ?? task.subtaskCount) > 0));
   const visibleTabs = task
-    ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
-    : tabs.filter((tab) => tab.value !== "journal");
+    ? tabs.filter((tab) => (tab.value !== "overview" || canShowOverview) && (tab.value !== "journal" || canReadJournal))
+    : tabs.filter((tab) => tab.value !== "overview" && tab.value !== "journal");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
@@ -374,7 +378,7 @@ export function TaskForm({
         variant={variant}
         onOpenInTab={onOpenInTab}
         contentClassName={
-          activeTab === "details" ? "w-full max-w-7xl self-center" : ""
+          activeTab === "details" || activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
         }
         tabBar={
           <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
@@ -393,6 +397,10 @@ export function TaskForm({
           <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">
             {detail.error}
           </div>
+        ) : null}
+
+        {activeTab === "overview" && task && canShowOverview ? (
+          <TaskDashboard taskId={task.id} />
         ) : null}
 
         {activeTab === "details" ? (

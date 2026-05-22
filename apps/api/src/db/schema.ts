@@ -14,6 +14,8 @@ export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_repro
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
 export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority", "ticketType"] as const;
 export const SETTING_SCOPE_TYPES = ["GLOBAL", "ROLE", "USER"] as const;
+export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task"] as const;
+export const DASHBOARD_DEFAULT_SCOPE_TYPES = ["GLOBAL", "USER"] as const;
 export const JOURNAL_OBJECT_TYPES = [
   "project",
   "milestone",
@@ -150,6 +152,68 @@ export const settingsValues = sqliteTable(
   },
   (table) => ({
     settingsValuesSettingScopeUnique: uniqueIndex("settings_values_setting_scope_unique").on(table.settingKey, table.scopeType, table.scopeId)
+  })
+);
+
+export const dashboards = sqliteTable(
+  "dashboards",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    context: text("context", { enum: DASHBOARD_CONTEXTS }).notNull(),
+    isSystem: integer("is_system", { mode: "boolean" }).notNull().default(false),
+    templateKey: text("template_key").unique(),
+    ownerId: integer("owner_id").references(() => users.id, { onDelete: "cascade" }),
+    version: integer("version").notNull().default(1),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    dashboardsContextOwnerIdx: index("dashboards_context_owner_idx").on(table.context, table.ownerId),
+    dashboardsTemplateKeyIdx: index("dashboards_template_key_idx").on(table.templateKey)
+  })
+);
+
+export const dashboardWidgets = sqliteTable(
+  "dashboard_widgets",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    dashboardId: integer("dashboard_id")
+      .notNull()
+      .references(() => dashboards.id, { onDelete: "cascade" }),
+    widgetId: text("widget_id").notNull(),
+    col: integer("col").notNull().default(0),
+    row: integer("row").notNull().default(0),
+    colSpan: integer("col_span").notNull().default(2),
+    paramsJson: text("params_json")
+  },
+  (table) => ({
+    dashboardWidgetsDashboardIdx: index("dashboard_widgets_dashboard_idx").on(table.dashboardId),
+    dashboardWidgetsDashboardWidgetUnique: uniqueIndex("dashboard_widgets_dashboard_widget_unique").on(table.dashboardId, table.widgetId)
+  })
+);
+
+export const dashboardDefaults = sqliteTable(
+  "dashboard_defaults",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    scopeType: text("scope_type", { enum: DASHBOARD_DEFAULT_SCOPE_TYPES }).notNull(),
+    scopeId: text("scope_id").notNull(),
+    context: text("context", { enum: DASHBOARD_CONTEXTS }).notNull(),
+    dashboardId: integer("dashboard_id")
+      .notNull()
+      .references(() => dashboards.id, { onDelete: "cascade" }),
+    version: integer("version").notNull().default(1),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    dashboardDefaultsScopeContextUnique: uniqueIndex("dashboard_defaults_scope_context_unique").on(table.scopeType, table.scopeId, table.context),
+    dashboardDefaultsDashboardIdx: index("dashboard_defaults_dashboard_idx").on(table.dashboardId)
   })
 );
 

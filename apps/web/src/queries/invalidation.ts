@@ -9,7 +9,11 @@ async function invalidateMany(queryClient: QueryClient, keys: QueryKey[]): Promi
 }
 
 export async function invalidateProjects(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.projects.root, queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.projects.root, queryKeys.dashboards.root, queryKeys.globalSearch.root]);
+}
+
+export async function invalidateDashboards(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.dashboards.root]);
 }
 
 export async function invalidateAuth(queryClient: QueryClient): Promise<void> {
@@ -25,7 +29,7 @@ export async function invalidateAdminRoles(queryClient: QueryClient): Promise<vo
 }
 
 export async function invalidateMilestones(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.milestones.root, queryKeys.projects.root, queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.milestones.root, queryKeys.projects.root, queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateProjectScope(queryClient: QueryClient, projectId?: number): Promise<void> {
@@ -34,6 +38,7 @@ export async function invalidateProjectScope(queryClient: QueryClient, projectId
     queryKeys.milestones.root,
     queryKeys.tasks.root,
     queryKeys.tickets.root,
+    queryKeys.dashboards.root,
     queryKeys.calendarTasks.root,
     queryKeys.events.root,
     queryKeys.globalSearch.root,
@@ -48,6 +53,7 @@ export async function invalidateMilestoneScope(queryClient: QueryClient, milesto
     queryKeys.tasks.root,
     queryKeys.tickets.root,
     queryKeys.features.root,
+    queryKeys.dashboards.root,
     queryKeys.calendarTasks.root,
     queryKeys.events.root,
     queryKeys.globalSearch.root,
@@ -61,6 +67,7 @@ export async function invalidateTaskScope(queryClient: QueryClient, taskId?: num
     queryKeys.projects.root,
     queryKeys.milestones.root,
     queryKeys.tasks.root,
+    queryKeys.dashboards.root,
     queryKeys.calendarTasks.root,
     queryKeys.events.root,
     queryKeys.globalSearch.root,
@@ -74,6 +81,7 @@ export async function invalidateFeatureScope(queryClient: QueryClient, featureId
     queryKeys.projects.root,
     queryKeys.milestones.root,
     queryKeys.tasks.root,
+    queryKeys.dashboards.root,
     queryKeys.globalSearch.root,
     ...(featureId !== undefined ? [queryKeys.features.detail(featureId)] : [])
   ]);
@@ -84,6 +92,7 @@ export async function invalidateUseCaseScope(queryClient: QueryClient, featureId
     queryKeys.useCases.root,
     queryKeys.features.root,
     queryKeys.tasks.root,
+    queryKeys.dashboards.root,
     queryKeys.globalSearch.root,
     ...(featureId !== undefined ? [queryKeys.features.useCases(featureId), queryKeys.features.detail(featureId)] : []),
     ...(useCaseId !== undefined ? [queryKeys.useCases.detail(useCaseId)] : [])
@@ -91,7 +100,7 @@ export async function invalidateUseCaseScope(queryClient: QueryClient, featureId
 }
 
 export async function invalidateBacklogScope(queryClient: QueryClient, projectId: number): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.projects.backlog(projectId), queryKeys.projects.detail(projectId), queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.projects.backlog(projectId), queryKeys.projects.detail(projectId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
 export interface TicketOwnerScope {
@@ -123,6 +132,7 @@ export async function invalidateTicketScope(queryClient: QueryClient, owner?: Ti
     queryKeys.tasks.root,
     queryKeys.features.root,
     queryKeys.useCases.root,
+    queryKeys.dashboards.root,
     queryKeys.globalSearch.root,
     ...(owner !== undefined ? ticketOwnerKeys(owner) : []),
     ...(ticketId !== undefined ? [queryKeys.tickets.detail(ticketId), queryKeys.tickets.relations(ticketId), queryKeys.tickets.subTickets(ticketId)] : [])
@@ -130,7 +140,7 @@ export async function invalidateTicketScope(queryClient: QueryClient, owner?: Ti
 }
 
 export async function invalidateComments(queryClient: QueryClient, entityType: CommentEntityType, entityId: number): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.comments.entity(entityType, entityId), queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.comments.entity(entityType, entityId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateNotes(queryClient: QueryClient, ownerType: NoteOwnerType, ownerId: number): Promise<void> {
@@ -138,11 +148,11 @@ export async function invalidateNotes(queryClient: QueryClient, ownerType: NoteO
 }
 
 export async function invalidateAttachments(queryClient: QueryClient, ownerType: QueryOwnerType, ownerId: number): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.attachments.owner(ownerType, ownerId), queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.attachments.owner(ownerType, ownerId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateTags(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.tags.root, queryKeys.projects.root, queryKeys.milestones.root, queryKeys.tasks.root, queryKeys.tickets.root, queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.tags.root, queryKeys.projects.root, queryKeys.milestones.root, queryKeys.tasks.root, queryKeys.tickets.root, queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateCatalogs(queryClient: QueryClient): Promise<void> {
@@ -154,6 +164,7 @@ export async function invalidateCatalogs(queryClient: QueryClient): Promise<void
     queryKeys.features.root,
     queryKeys.useCases.root,
     queryKeys.tickets.root,
+    queryKeys.dashboards.root,
     queryKeys.globalSearch.root
   ]);
 }
@@ -167,7 +178,7 @@ export async function invalidateWiki(queryClient: QueryClient): Promise<void> {
 }
 
 export async function invalidateEvents(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.events.root]);
+  await invalidateMany(queryClient, [queryKeys.events.root, queryKeys.dashboards.root]);
 }
 
 export async function invalidateWikiImportData(queryClient: QueryClient): Promise<void> {
@@ -185,6 +196,7 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.wiki.root,
     queryKeys.calendarTasks.root,
     queryKeys.tickets.root,
+    queryKeys.dashboards.root,
     queryKeys.settings.root,
     queryKeys.dumps.root,
     queryKeys.journal.root,

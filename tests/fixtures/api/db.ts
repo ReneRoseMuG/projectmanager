@@ -122,6 +122,9 @@ export function truncateAll(sqlite: Database.Database): void {
   const tables = [
     "app_settings",
     "settings_values",
+    "dashboard_defaults",
+    "dashboard_widgets",
+    "dashboards",
     "journal_entry_contexts",
     "journal_entry_changes",
     "journal_entries",
