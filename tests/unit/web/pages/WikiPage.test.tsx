@@ -127,7 +127,7 @@ describe("WikiPage openInTab", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "In neuem Tab öffnen" }));
 
-    expect(window.open).toHaveBeenCalledWith("/wiki/10", "_blank");
+    expect(window.open).toHaveBeenCalledWith("/wiki/10?standalone=1", "_blank");
     expect(router.navigate).toHaveBeenCalledWith("/wiki");
   });
 

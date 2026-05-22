@@ -54,7 +54,7 @@ export function FeatureListBoardView({
       onItemStatusChange={onStatusChange ? (feature, status) => onStatusChange(feature, status as Feature["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
-      filters={filters}
+      toolbarFilters={filters}
       emptyState={
         <EmptyState
           icon={<BookOpen size={22} />}

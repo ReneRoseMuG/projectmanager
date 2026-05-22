@@ -125,7 +125,7 @@ describe("BacklogItemDetailPage openInTab", () => {
       await screen.findByRole("button", { name: "In neuem Tab öffnen" }),
     );
 
-    expect(window.open).toHaveBeenCalledWith("/backlog/10", "_blank");
+    expect(window.open).toHaveBeenCalledWith("/backlog/10?standalone=1", "_blank");
     expect(router.navigate).toHaveBeenCalledWith("/projects");
   });
 

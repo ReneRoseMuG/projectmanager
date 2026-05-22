@@ -63,8 +63,10 @@ interface ListBoardViewProps<T> {
   renderRow: (item: T) => ReactNode;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  toolbarFilters?: ReactNode;
   filters?: ReactNode;
   emptyState?: ReactNode;
+  showGroupedEmptyState?: boolean;
   loading?: boolean;
 }
 
@@ -466,8 +468,10 @@ function ListBoardViewContent<T>({
   renderRow,
   searchValue = "",
   onSearchChange,
+  toolbarFilters,
   filters,
   emptyState,
+  showGroupedEmptyState = true,
   loading = false,
 }: ListBoardViewProps<T>) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -666,37 +670,46 @@ function ListBoardViewContent<T>({
       className="flex h-full min-h-[30rem] w-full min-w-0 flex-1 flex-col gap-4"
       data-testid="list-board-view"
     >
-      <div className="grid w-full grid-cols-1 items-center gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        <div className="flex min-w-0 justify-start">
-          {onSearchChange ? (
-            <SearchInput value={searchValue} onChange={onSearchChange} />
+      <div className="grid w-full gap-3">
+        <div className={`grid w-full grid-cols-1 items-center gap-3 ${toolbarFilters ? "md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]" : "md:grid-cols-[minmax(0,1fr)_auto]"}`}>
+          <div className="flex min-w-0 justify-start">
+            {onSearchChange ? (
+              <SearchInput value={searchValue} onChange={onSearchChange} />
+            ) : null}
+          </div>
+          {toolbarFilters ? (
+            <div className="flex min-w-0 flex-wrap items-center justify-center gap-2">
+              {toolbarFilters}
+            </div>
           ) : null}
-        </div>
-        <div className="flex min-w-0 justify-center">
-          {filters}
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 md:justify-end">
-          {secondaryAction}
-          <ViewToggle
-            value={toViewMode(mode)}
-            onChange={(value) => onModeChange(toListBoardMode(value))}
-          />
-          {showToolbarAdd ? (
-            <Button
-              aria-label={addLabel}
-              title={addLabel}
-              variant="ghost"
-              icon={<Plus size={17} />}
-              className="h-9 w-9 border border-fern bg-transparent text-fern hover:bg-fern/10"
-              onClick={onAdd}
+          <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 md:justify-end">
+            {secondaryAction}
+            <ViewToggle
+              value={toViewMode(mode)}
+              onChange={(value) => onModeChange(toListBoardMode(value))}
             />
-          ) : null}
+            {showToolbarAdd ? (
+              <Button
+                aria-label={addLabel}
+                title={addLabel}
+                variant="ghost"
+                icon={<Plus size={17} />}
+                className="h-9 w-9 border border-fern bg-transparent text-fern hover:bg-fern/10"
+                onClick={onAdd}
+              />
+            ) : null}
+          </div>
         </div>
+        {filters ? (
+          <div className="flex min-w-0 flex-wrap items-center justify-center gap-2">
+            {filters}
+          </div>
+        ) : null}
       </div>
 
       <div className="flex h-full min-h-0 w-full flex-1 flex-col">
         {loading ? <TaskListSkeleton /> : null}
-        {!loading && items.length === 0 && !hasStatusGrouping ? (
+        {!loading && items.length === 0 && (!hasStatusGrouping || showGroupedEmptyState) ? (
           <div className="grid h-full min-h-[30rem] w-full flex-1">{emptyState}</div>
         ) : null}
         {!loading &&
@@ -710,6 +723,7 @@ function ListBoardViewContent<T>({
           </div>
         ) : null}
         {!loading &&
+        !(items.length === 0 && showGroupedEmptyState) &&
         mode === "list" &&
         hasStatusGrouping ? (
           renderStatusGroupedContent("list", listStatusGroups)
@@ -723,7 +737,7 @@ function ListBoardViewContent<T>({
             ))}
           </CardGrid>
         ) : null}
-        {!loading && boardByStatus ? (
+        {!loading && !(items.length === 0 && showGroupedEmptyState) && boardByStatus ? (
           renderStatusGroupedContent("board", boardStatusGroups)
         ) : null}
       </div>

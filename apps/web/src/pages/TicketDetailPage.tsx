@@ -18,6 +18,7 @@ import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage, errorMessageAsync } from "../hooks/errors";
 import { useTicketDetail } from "../hooks/useTicketDetail";
 import { useTickets } from "../hooks/useTickets";
+import { withStandaloneView } from "../utils/standalone";
 
 function parseTicketOwner(
   searchParams: URLSearchParams,
@@ -50,20 +51,22 @@ export function TicketDetailPage() {
   const isCreateMode = params.id === undefined;
   const ticketId = isCreateMode ? null : Number(params.id);
   const owner = parseTicketOwner(searchParams);
+  const standalone = searchParams.get("standalone") === "1";
   const tickets = useTickets(owner);
   const detail = useTicketDetail(
     !isCreateMode && Number.isFinite(ticketId) ? ticketId : null,
   );
-  const returnTo = searchParams.get("returnTo") ?? "/tickets";
+  const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/tickets") : "/tickets");
   const currentRoute = !isCreateMode && ticketId !== null && Number.isFinite(ticketId)
     ? `/tickets/${ticketId}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
     : "/tickets";
+  const targetForMode = (to: string) => (standalone ? withStandaloneView(to) : to);
 
   const closePage = () => navigate(returnTo);
   const openInTab =
     !isCreateMode && ticketId !== null && Number.isFinite(ticketId)
       ? () => {
-          window.open(`/tickets/${ticketId}`, "_blank");
+          window.open(withStandaloneView(`/tickets/${ticketId}`), "_blank");
           navigate(returnTo);
         }
       : undefined;
@@ -212,7 +215,7 @@ export function TicketDetailPage() {
         onChanged={detail.reload}
         onOpenInTab={openInTab}
         onOpenTicket={(targetTicket) => {
-          navigate(`/tickets/${targetTicket.id}?returnTo=${encodeURIComponent(currentRoute)}`);
+          navigate(targetForMode(`/tickets/${targetTicket.id}?returnTo=${encodeURIComponent(currentRoute)}`));
         }}
       />
     </div>

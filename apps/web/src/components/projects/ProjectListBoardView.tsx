@@ -57,7 +57,7 @@ export function ProjectListBoardView({
       onItemStatusChange={onStatusChange ? (project, status) => onStatusChange(project, status as Project["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
-      filters={filters}
+      toolbarFilters={filters}
       loading={loading}
       emptyState={
         <EmptyState

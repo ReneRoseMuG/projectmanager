@@ -7,6 +7,7 @@ import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useMilestones } from "../hooks/useMilestones";
 import { useProjects } from "../hooks/useProjects";
+import { withStandaloneView } from "../utils/standalone";
 
 export function MilestoneDetailPage() {
   const params = useParams();
@@ -36,14 +37,16 @@ export function MilestoneDetailPage() {
 
   const returnTo =
     searchParams.get("returnTo") ??
-    (initialProjectId && Number.isFinite(initialProjectId)
+    (searchParams.get("standalone") === "1"
+      ? withStandaloneView("/milestones")
+      : initialProjectId && Number.isFinite(initialProjectId)
       ? `/projects/${initialProjectId}`
       : "/projects");
   const closePage = () => navigate(returnTo);
   const openInTab =
     !isCreateMode && milestoneId !== undefined && Number.isFinite(milestoneId)
       ? () => {
-          window.open(`/milestones/${milestoneId}`, "_blank");
+          window.open(withStandaloneView(`/milestones/${milestoneId}`), "_blank");
           navigate(returnTo);
         }
       : undefined;

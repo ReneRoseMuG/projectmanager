@@ -97,12 +97,8 @@ export function TicketListBoardView({
       onItemStatusChange={onStatusChange ? (ticket, status) => onStatusChange(ticket, status as Ticket["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
-      filters={
-        <div className="flex flex-wrap justify-center gap-2">
-          <FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={tickets.length} />
-          {filters}
-        </div>
-      }
+      toolbarFilters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={tickets.length} />}
+      filters={filters}
       secondaryAction={linkAction}
       loading={loading}
       emptyState={

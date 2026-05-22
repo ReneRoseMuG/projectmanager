@@ -151,7 +151,7 @@ describe("MilestoneDetailPage openInTab", () => {
       screen.getByRole("button", { name: "In neuem Tab öffnen" }),
     );
 
-    expect(window.open).toHaveBeenCalledWith("/milestones/10", "_blank");
+    expect(window.open).toHaveBeenCalledWith("/milestones/10?standalone=1", "_blank");
     expect(router.navigate).toHaveBeenCalledWith("/projects");
   });
 

@@ -4,6 +4,7 @@
  * Abgedeckte Regeln:
  * - MilestoneListBoardView rendert Meilensteine mit gemeinsamer Projekt-/Meilenstein-Kartenbasis.
  * - Karten und Listenzeilen zeigen den Aufgaben-Fortschritt mit Label Aufgaben.
+ * - Statusfilter werden in der gemeinsamen Toolbar angeboten.
  *
  * Fehlerfälle:
  * - Enge Kartenfooter dürfen keine separaten Aufgaben-/Ticket-/Feature-Badges rendern.
@@ -97,14 +98,30 @@ describe("MilestoneListBoardView", () => {
   });
 
   it("rendert die gemeinsame Toolbar mit icon-only Add", () => {
-    renderMilestoneList();
+    const milestones = buildMilestoneSet();
+    renderMilestoneList({ milestones });
 
     expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: new RegExp(`^Alle\\s*${milestones.length}$`) })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Aktiv\s*1$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
     const addButton = screen.getByRole("button", { name: "Neuer Meilenstein" });
     expect(addButton).toBeInTheDocument();
     expect(addButton).toHaveTextContent("");
+  });
+
+  it("filtert Meilensteine nach Status", () => {
+    const milestones = [
+      buildMilestone({ id: 1, name: "Aktiver Meilenstein", status: "active" }),
+      buildMilestone({ id: 2, name: "Pausierter Meilenstein", status: "on_hold" }),
+    ];
+    renderMilestoneList({ milestones });
+
+    fireEvent.click(screen.getByRole("button", { name: /^Pausiert\s*1$/ }));
+
+    expect(screen.getByText("Pausierter Meilenstein")).toBeInTheDocument();
+    expect(screen.queryByText("Aktiver Meilenstein")).not.toBeInTheDocument();
   });
 
   it("rendert Listenzeilen mit Aufgaben-Meta und öffnet Meilensteine", () => {

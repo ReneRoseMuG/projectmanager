@@ -1,25 +1,37 @@
 import type { Feature, FeatureStatus } from "@taskmanager/shared-types";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { FeatureCardSkeleton } from "../components/features/FeatureCardSkeleton";
 import { FeatureListBoardView } from "../components/features/FeatureListBoardView";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
+import { PageHeader } from "../components/ui/PageHeader";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useCatalogs } from "../hooks/useCatalogs";
 import { useFeatures } from "../hooks/useFeatures";
+import { useStandaloneView } from "../hooks/useStandaloneView";
 import { catalogEntriesByKind } from "../utils/catalogs";
+import { withStandaloneView } from "../utils/standalone";
 
 export function FeaturesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const standalone = useStandaloneView();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const features = useFeatures();
   const catalogs = useCatalogs();
+  const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | "all">(
     "all",
   );
+  const currentReturnTo = `${location.pathname}${location.search}`;
+  const targetForMode = (to: string) => (standalone ? withStandaloneView(to) : to);
+  const featureTarget = (path: string) => {
+    const params = new URLSearchParams({ returnTo: currentReturnTo });
+    return targetForMode(`${path}?${params.toString()}`);
+  };
 
   const statusOptions = useMemo(
     () =>
@@ -41,6 +53,16 @@ export function FeaturesPage() {
       ),
     [features.features, statusFilter],
   );
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await features.reload();
+      await catalogs.reload();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const deleteFeature = async (feature: Feature) => {
     const approved = await confirm({
@@ -80,14 +102,12 @@ export function FeaturesPage() {
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
-      <header>
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">Features</h1>
-          <p className="text-sm text-slate-500">
-            {features.features.length} Einträge
-          </p>
-        </div>
-      </header>
+      <PageHeader
+        title="Features"
+        subtitle={`${features.features.length} Einträge`}
+        onRefresh={standalone ? refresh : undefined}
+        refreshing={refreshing}
+      />
 
       {features.loading ? (
         <FeatureCardSkeleton />
@@ -98,8 +118,8 @@ export function FeaturesPage() {
       ) : (
         <FeatureListBoardView
           features={filteredFeatures}
-          onCreate={() => navigate("/features/new")}
-          onOpen={(feature) => navigate(`/features/${feature.id}`)}
+          onCreate={() => navigate(featureTarget("/features/new"))}
+          onOpen={(feature) => navigate(featureTarget(`/features/${feature.id}`))}
           onStatusChange={updateFeatureStatus}
           filters={
             <FilterChips

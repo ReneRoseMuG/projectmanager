@@ -441,7 +441,7 @@ describe("Projekt Manager API integration", () => {
     expect(importedTask).toBeDefined();
     const alphaTasks = (await api.get(`/api/features/${alpha?.id}/tasks`).expect(200)).body as TaskBoardItem[];
     const useCases = (await api.get(`/api/features/${alpha?.id}/use-cases`).expect(200)).body as UseCase[];
-    const alphaUseCase = useCases.find((useCase) => useCase.title === "UC 01/01 Alpha start");
+    const alphaUseCase = useCases.find((useCase) => useCase.title === "UC 01/01: Alpha start");
     expect(alphaTasks.map((task) => task.id)).toContain(importedTask?.id);
     expect(alphaUseCase).toBeDefined();
     const useCaseTasks = (await api.get(`/api/use-cases/${alphaUseCase?.id}/tasks`).expect(200)).body as TaskBoardItem[];
