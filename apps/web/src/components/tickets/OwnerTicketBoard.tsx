@@ -61,6 +61,7 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
 
       <TicketLinkDialog
         open={linkDialogOpen}
+        owner={owner}
         currentTickets={ticketController.tickets}
         onLink={async (ticket) => {
           try {

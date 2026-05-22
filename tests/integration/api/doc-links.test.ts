@@ -85,6 +85,7 @@ describe("Doc Link APIs", () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
     const feature = await createFeature(app, { title: "Task Link Feature" });
+    await supertest(app.server).put(`/api/projects/${project.id}/features`).send({ featureIds: [feature.id] }).expect(200);
 
     await supertest(app.server).post(`/api/features/${feature.id}/tasks/${task.id}`).expect(200);
     const res = await supertest(app.server).get(`/api/features/${feature.id}/tasks`).expect(200);
@@ -97,6 +98,7 @@ describe("Doc Link APIs", () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
     const feature = await createFeature(app, { title: "Task Unlink Feature" });
+    await supertest(app.server).put(`/api/projects/${project.id}/features`).send({ featureIds: [feature.id] }).expect(200);
 
     await supertest(app.server).post(`/api/features/${feature.id}/tasks/${task.id}`).expect(200);
     await supertest(app.server).delete(`/api/features/${feature.id}/tasks/${task.id}`).expect(204);
@@ -110,6 +112,7 @@ describe("Doc Link APIs", () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
     const feature = await createFeature(app, { title: "Use Case Link Feature" });
+    await supertest(app.server).put(`/api/projects/${project.id}/features`).send({ featureIds: [feature.id] }).expect(200);
     const useCase = await createUseCase(app, feature.id, { title: "Task Link Use Case" });
 
     await supertest(app.server).post(`/api/use-cases/${useCase.id}/tasks/${task.id}`).expect(200);

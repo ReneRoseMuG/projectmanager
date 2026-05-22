@@ -198,6 +198,7 @@ export function TaskDetailPage() {
       <TaskForm
         open
         task={detail.task}
+        owner={owner}
         initialStatus={parseTaskStatus(searchParams.get("status"))}
         variant="page"
         savingLabel={savingLabel}

@@ -44,9 +44,11 @@ import {
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { JournalPanel } from "../journal/JournalPanel";
+import type { TaskOwner } from "../../api/tasks";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
+import type { TicketOwner } from "../../api/tickets";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { UseCaseListBoardView } from "../usecases/UseCaseListBoardView";
 import { Button } from "../ui/Button";
@@ -78,6 +80,7 @@ interface FeatureFormProps {
   onClose: () => void;
   onDelete?: (feature: Feature) => Promise<boolean>;
   savingLabel?: string;
+  initialProjectId?: number;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
   onOpenInTab?: () => void;
@@ -166,6 +169,7 @@ export function FeatureForm({
   onClose,
   onDelete,
   savingLabel,
+  initialProjectId,
   variant = "modal",
   closeOnSubmit = true,
   onOpenInTab,
@@ -174,6 +178,20 @@ export function FeatureForm({
   const navigate = useNavigate();
   const location = useLocation();
   const featureId = feature?.id;
+  const stableInitialProjectId =
+    initialProjectId !== undefined && Number.isFinite(initialProjectId)
+      ? initialProjectId
+      : undefined;
+  const taskCandidateOwner: TaskOwner | null = featureId
+    ? { type: "feature", id: featureId }
+    : stableInitialProjectId !== undefined
+      ? { type: "project", id: stableInitialProjectId }
+      : null;
+  const ticketCandidateOwner: TicketOwner | null = featureId
+    ? { type: "feature", id: featureId }
+    : stableInitialProjectId !== undefined
+      ? { type: "project", id: stableInitialProjectId }
+      : null;
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const canReadJournal = useHasPermission("journal", "read");
@@ -558,6 +576,7 @@ export function FeatureForm({
                 )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Aufgaben vorgemerkt"
+                showLinkExisting={taskCandidateOwner !== null}
                 onLinkExisting={() => setTaskLinkOpen(true)}
                 onCreateNew={() => setTaskDraftOpen(true)}
                 onRemoveExisting={(index) =>
@@ -608,6 +627,7 @@ export function FeatureForm({
                 )}
                 emptyIcon={<Bug size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
+                showLinkExisting={ticketCandidateOwner !== null}
                 onLinkExisting={() => setTicketLinkOpen(true)}
                 onCreateNew={() => setTicketDraftOpen(true)}
                 onRemoveExisting={(index) =>
@@ -758,6 +778,7 @@ export function FeatureForm({
 
       <TaskLinkDialog
         open={taskLinkOpen}
+        owner={taskCandidateOwner}
         currentTasks={pendingTasks.flatMap((item) =>
           item.kind === "existing" ? [item.task] : [],
         )}
@@ -769,6 +790,7 @@ export function FeatureForm({
       />
       <TicketLinkDialog
         open={ticketLinkOpen}
+        owner={ticketCandidateOwner}
         currentTickets={pendingTickets.flatMap((item) =>
           item.kind === "existing" ? [item.ticket] : [],
         )}

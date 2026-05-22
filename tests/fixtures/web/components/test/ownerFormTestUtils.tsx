@@ -14,6 +14,7 @@ import type {
 } from "@taskmanager/shared-types";
 import { fireEvent, screen } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -37,6 +38,8 @@ const ownerFormMocks = vi.hoisted(() => ({
   removeComment: vi.fn(),
   addTicketRelation: vi.fn(),
   removeTicketRelation: vi.fn(),
+  getTicketLinkCandidates: vi.fn(),
+  getTicketRelationCandidates: vi.fn(),
   removeMilestone: vi.fn(),
   createBacklogItem: vi.fn(),
   updateBacklogItem: vi.fn(),
@@ -199,6 +202,11 @@ const fixtures = vi.hoisted(() => {
 
   return { attachment, comment, feature, milestone, note, project, task, taskDetail, ticket, ticketDetail, useCase };
 });
+
+vi.mock("../../../../../apps/web/src/api/tickets", () => ({
+  getTicketLinkCandidates: ownerFormMocks.getTicketLinkCandidates,
+  getTicketRelationCandidates: ownerFormMocks.getTicketRelationCandidates
+}));
 
 export const feature = fixtures.feature as Feature;
 export const useCase = fixtures.useCase as UseCase;
@@ -585,6 +593,8 @@ beforeEach(() => {
   ownerFormMocks.removeComment.mockResolvedValue(undefined);
   ownerFormMocks.addTicketRelation.mockResolvedValue(undefined);
   ownerFormMocks.removeTicketRelation.mockResolvedValue(undefined);
+  ownerFormMocks.getTicketLinkCandidates.mockResolvedValue([fixtures.ticket]);
+  ownerFormMocks.getTicketRelationCandidates.mockResolvedValue([fixtures.ticket]);
   ownerFormMocks.removeMilestone.mockResolvedValue(undefined);
   ownerFormMocks.createBacklogItem.mockResolvedValue(undefined);
   ownerFormMocks.updateBacklogItem.mockResolvedValue(undefined);
@@ -599,11 +609,19 @@ afterEach(() => {
 });
 
 export function renderWithProviders(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false }
+    }
+  });
   const withProviders = (content: ReactElement) => (
     <MemoryRouter>
-      <ToastProvider>
-        <ConfirmDialogProvider>{content}</ConfirmDialogProvider>
-      </ToastProvider>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <ConfirmDialogProvider>{content}</ConfirmDialogProvider>
+        </ToastProvider>
+      </QueryClientProvider>
     </MemoryRouter>
   );
   const result = render(withProviders(ui));

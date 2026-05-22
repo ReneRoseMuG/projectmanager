@@ -2,7 +2,7 @@ import type { Ticket } from "@taskmanager/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import { Bug, LinkIcon } from "lucide-react";
 import { useMemo, useState } from "react";
-import { getTickets } from "../../api/tickets";
+import { getTicketLinkCandidates, type TicketOwner } from "../../api/tickets";
 import { queryKeys } from "../../queries/queryKeys";
 import { richTextToPlainText } from "../../utils/richText";
 import { Button } from "../ui/Button";
@@ -16,19 +16,21 @@ import { TicketTypeBadge } from "../ui/TicketTypeBadge";
 
 interface TicketLinkDialogProps {
   open: boolean;
+  owner?: TicketOwner | null;
   currentTickets: Ticket[];
   excludeIds?: number[];
   onLink: (ticket: Ticket) => Promise<void>;
   onClose: () => void;
 }
 
-export function TicketLinkDialog({ open, currentTickets, excludeIds = [], onLink, onClose }: TicketLinkDialogProps) {
+export function TicketLinkDialog({ open, owner, currentTickets, excludeIds = [], onLink, onClose }: TicketLinkDialogProps) {
   const [searchValue, setSearchValue] = useState("");
   const [linkingTicketId, setLinkingTicketId] = useState<number | null>(null);
+  const validOwner = owner && Number.isFinite(owner.id) ? owner : undefined;
   const allTicketsQuery = useQuery({
-    queryKey: queryKeys.tickets.list(),
-    queryFn: getTickets,
-    enabled: open
+    queryKey: validOwner ? queryKeys.tickets.linkCandidates(validOwner.type, validOwner.id) : queryKeys.tickets.root,
+    queryFn: () => getTicketLinkCandidates(validOwner as TicketOwner),
+    enabled: open && validOwner !== undefined
   });
   const currentTicketIds = useMemo(() => new Set([...currentTickets.map((ticket) => ticket.id), ...excludeIds]), [currentTickets, excludeIds]);
   const availableTickets = useMemo(() => {

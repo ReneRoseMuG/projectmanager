@@ -85,6 +85,19 @@ export function FeatureDetailPage() {
   ) => {
     const owner = { type: "feature" as const, id: featureId };
     try {
+      const projectIds =
+        initialProjectId !== undefined && Number.isFinite(initialProjectId)
+          ? [...new Set([...pending.projectIds, initialProjectId])]
+          : pending.projectIds;
+      for (const projectId of projectIds) {
+        const linkedFeatures = await getProjectFeatures(projectId);
+        await setProjectFeatures(projectId, [
+          ...new Set([
+            ...linkedFeatures.map((feature) => feature.id),
+            featureId,
+          ]),
+        ]);
+      }
       for (const task of pending.tasks) {
         if (task.kind === "existing") {
           await linkOwnerTask(owner, task.task.id);
@@ -103,19 +116,6 @@ export function FeatureDetailPage() {
         if (useCase.kind === "new") {
           await createUseCaseRequest(featureId, useCase.draft);
         }
-      }
-      const projectIds =
-        initialProjectId !== undefined && Number.isFinite(initialProjectId)
-          ? [...new Set([...pending.projectIds, initialProjectId])]
-          : pending.projectIds;
-      for (const projectId of projectIds) {
-        const linkedFeatures = await getProjectFeatures(projectId);
-        await setProjectFeatures(projectId, [
-          ...new Set([
-            ...linkedFeatures.map((feature) => feature.id),
-            featureId,
-          ]),
-        ]);
       }
       for (const comment of pending.comments) {
         await createEntityComment("feature", featureId, { body: comment.text });
@@ -196,6 +196,7 @@ export function FeatureDetailPage() {
         open
         feature={features.feature}
         variant="page"
+        initialProjectId={initialProjectId}
         onSubmit={saveFeature}
         onDelete={deleteFeature}
         savingLabel={savingLabel}

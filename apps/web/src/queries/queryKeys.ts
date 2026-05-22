@@ -2,6 +2,7 @@ import type { CommentEntityType, JournalObjectType } from "@taskmanager/shared-t
 
 export type NoteOwnerType = "project" | "milestone" | "task" | "ticket";
 export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket";
+export type TaskOwnerType = "project" | "milestone" | "feature" | "useCase";
 export type TicketOwnerType = "project" | "milestone" | "task" | "feature" | "useCase";
 
 export const queryKeys = {
@@ -50,6 +51,7 @@ export const queryKeys = {
     root: ["tasks"] as const,
     list: () => [...queryKeys.tasks.root, "list"] as const,
     detail: (taskId: number) => [...queryKeys.tasks.root, "detail", taskId] as const,
+    linkCandidates: (ownerType: TaskOwnerType, ownerId: number) => [...queryKeys.tasks.root, "linkCandidates", ownerType, ownerId] as const,
     tickets: (taskId: number) => [...queryKeys.tasks.detail(taskId), "tickets"] as const,
     features: (taskId: number) => [...queryKeys.tasks.detail(taskId), "features"] as const,
     useCases: (taskId: number) => [...queryKeys.tasks.detail(taskId), "useCases"] as const
@@ -122,8 +124,10 @@ export const queryKeys = {
     list: () => [...queryKeys.tickets.root, "list"] as const,
     detail: (ticketId: number) => [...queryKeys.tickets.root, "detail", ticketId] as const,
     byOwner: (ownerType: TicketOwnerType, ownerId: number) => [...queryKeys.tickets.root, ownerType, ownerId] as const,
+    linkCandidates: (ownerType: TicketOwnerType, ownerId: number) => [...queryKeys.tickets.root, "linkCandidates", ownerType, ownerId] as const,
     byProject: (projectId: number) => queryKeys.projects.tickets(projectId),
     relations: (ticketId: number) => [...queryKeys.tickets.detail(ticketId), "relations"] as const,
+    relationCandidates: (ticketId: number) => [...queryKeys.tickets.detail(ticketId), "relationCandidates"] as const,
     subTickets: (ticketId: number) => [...queryKeys.tickets.detail(ticketId), "subTickets"] as const
   },
   globalSearch: {

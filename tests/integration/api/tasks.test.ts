@@ -10,10 +10,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   buildTestApp,
   createComment,
+  createFeature,
+  createMilestone,
   createProject,
   createSubtask,
   createTask,
   createTestDb,
+  createUseCase,
   truncateAll,
   type TestDb
 } from "../../fixtures/api/index.js";
@@ -155,12 +158,41 @@ describe("Tasks API", () => {
     const firstProject = await createProject(app, { name: "Erstes Projekt" });
     const secondProject = await createProject(app, { name: "Zweites Projekt" });
     const task = await createTask(app, firstProject.id, { title: "Vorhandene Aufgabe" });
+    await supertest(app.server).delete(`/api/projects/${firstProject.id}/tasks/${task.id}`).expect(204);
 
     const link = await supertest(app.server).post(`/api/projects/${secondProject.id}/tasks/${task.id}`).expect(200);
     expect(link.body).toMatchObject({ id: task.id, title: "Vorhandene Aufgabe" });
 
     const secondBoard = await supertest(app.server).get(`/api/projects/${secondProject.id}/tasks`).expect(200);
     expect(secondBoard.body.map((item: { id: number }) => item.id)).toEqual([task.id]);
+  });
+
+  it("weist projektfremde Aufgaben-Links für alle Owner-Typen ab", async () => {
+    const firstProject = await createProject(app, { name: "Erstes Projekt" });
+    const secondProject = await createProject(app, { name: "Zweites Projekt" });
+    const milestone = await createMilestone(app, secondProject.id);
+    const feature = await createFeature(app, { title: "Feature im zweiten Projekt" });
+    await supertest(app.server).put(`/api/projects/${secondProject.id}/features`).send({ featureIds: [feature.id] }).expect(200);
+    const useCase = await createUseCase(app, feature.id, { title: "Use Case im zweiten Projekt" });
+    const task = await createTask(app, firstProject.id, { title: "Projektfremde Aufgabe" });
+
+    await supertest(app.server).post(`/api/projects/${secondProject.id}/tasks/${task.id}`).expect(400);
+    await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks/${task.id}`).expect(400);
+    await supertest(app.server).post(`/api/features/${feature.id}/tasks/${task.id}`).expect(400);
+    await supertest(app.server).post(`/api/use-cases/${useCase.id}/tasks/${task.id}`).expect(400);
+  });
+
+  it("GET /api/tasks/link-candidates liefert nur projektkompatible unverknüpfte Aufgaben", async () => {
+    const firstProject = await createProject(app, { name: "Erstes Projekt" });
+    const secondProject = await createProject(app, { name: "Zweites Projekt" });
+    const foreignTask = await createTask(app, firstProject.id, { title: "Fremde Aufgabe" });
+    const neutralTask = await createTask(app, firstProject.id, { title: "Neutrale Aufgabe" });
+    await supertest(app.server).delete(`/api/projects/${firstProject.id}/tasks/${neutralTask.id}`).expect(204);
+
+    const res = await supertest(app.server).get(`/api/tasks/link-candidates?ownerType=project&ownerId=${secondProject.id}`).expect(200);
+
+    expect(res.body.map((item: { id: number }) => item.id)).toContain(neutralTask.id);
+    expect(res.body.map((item: { id: number }) => item.id)).not.toContain(foreignTask.id);
   });
 
   it("DELETE /api/projects/:id/tasks/:taskId entfernt nur die Zuordnung", async () => {

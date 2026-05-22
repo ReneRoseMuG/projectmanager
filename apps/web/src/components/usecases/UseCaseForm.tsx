@@ -25,10 +25,12 @@ import {
   countOpenStatusItems,
   resolveCatalogEntryKey,
 } from "../../utils/catalogs";
+import type { TaskOwner } from "../../api/tasks";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { JournalPanel } from "../journal/JournalPanel";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
+import type { TicketOwner } from "../../api/tickets";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
@@ -160,6 +162,17 @@ export function UseCaseForm({
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [taskDraftOpen, setTaskDraftOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
+  const candidateFeatureId = useCase?.featureId ?? (typeof selectedFeatureId === "number" ? selectedFeatureId : currentFeatureId);
+  const taskCandidateOwner: TaskOwner | null = useCase
+    ? { type: "useCase", id: useCase.id }
+    : candidateFeatureId !== undefined && Number.isFinite(candidateFeatureId)
+      ? { type: "feature", id: candidateFeatureId }
+      : null;
+  const ticketCandidateOwner: TicketOwner | null = useCase
+    ? { type: "useCase", id: useCase.id }
+    : candidateFeatureId !== undefined && Number.isFinite(candidateFeatureId)
+      ? { type: "feature", id: candidateFeatureId }
+      : null;
 
   useEffect(() => {
     if (!open) {
@@ -437,6 +450,7 @@ export function UseCaseForm({
                 )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Aufgaben vorgemerkt"
+                showLinkExisting={taskCandidateOwner !== null}
                 onLinkExisting={() => setTaskLinkOpen(true)}
                 onCreateNew={() => setTaskDraftOpen(true)}
                 onRemoveExisting={(index) =>
@@ -487,6 +501,7 @@ export function UseCaseForm({
                 )}
                 emptyIcon={<Bug size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
+                showLinkExisting={ticketCandidateOwner !== null}
                 onLinkExisting={() => setTicketLinkOpen(true)}
                 onCreateNew={() => setTicketDraftOpen(true)}
                 onRemoveExisting={(index) =>
@@ -545,6 +560,7 @@ export function UseCaseForm({
 
       <TaskLinkDialog
         open={taskLinkOpen}
+        owner={taskCandidateOwner}
         currentTasks={pendingTasks.flatMap((item) =>
           item.kind === "existing" ? [item.task] : [],
         )}
@@ -556,6 +572,7 @@ export function UseCaseForm({
       />
       <TicketLinkDialog
         open={ticketLinkOpen}
+        owner={ticketCandidateOwner}
         currentTickets={pendingTickets.flatMap((item) =>
           item.kind === "existing" ? [item.ticket] : [],
         )}

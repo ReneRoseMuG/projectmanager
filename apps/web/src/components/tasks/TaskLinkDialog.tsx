@@ -2,7 +2,7 @@ import type { Task } from "@taskmanager/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import { LinkIcon, ListTodo } from "lucide-react";
 import { useMemo, useState } from "react";
-import { getTasks } from "../../api/tasks";
+import { getTaskLinkCandidates, type TaskOwner } from "../../api/tasks";
 import { queryKeys } from "../../queries/queryKeys";
 import { richTextToPlainText } from "../../utils/richText";
 import { Button } from "../ui/Button";
@@ -15,19 +15,21 @@ import { StatusPill } from "../ui/StatusPill";
 
 interface TaskLinkDialogProps {
   open: boolean;
+  owner?: TaskOwner | null;
   currentTasks: Task[];
   excludeIds?: number[];
   onLink: (task: Task) => Promise<void>;
   onClose: () => void;
 }
 
-export function TaskLinkDialog({ open, currentTasks, excludeIds = [], onLink, onClose }: TaskLinkDialogProps) {
+export function TaskLinkDialog({ open, owner, currentTasks, excludeIds = [], onLink, onClose }: TaskLinkDialogProps) {
   const [searchValue, setSearchValue] = useState("");
   const [linkingTaskId, setLinkingTaskId] = useState<number | null>(null);
+  const validOwner = owner && Number.isFinite(owner.id) ? owner : undefined;
   const allTasksQuery = useQuery({
-    queryKey: queryKeys.tasks.list(),
-    queryFn: getTasks,
-    enabled: open
+    queryKey: validOwner ? queryKeys.tasks.linkCandidates(validOwner.type, validOwner.id) : queryKeys.tasks.root,
+    queryFn: () => getTaskLinkCandidates(validOwner as TaskOwner),
+    enabled: open && validOwner !== undefined
   });
   const currentTaskIds = useMemo(() => new Set([...currentTasks.map((task) => task.id), ...excludeIds]), [currentTasks, excludeIds]);
   const availableTasks = useMemo(() => {

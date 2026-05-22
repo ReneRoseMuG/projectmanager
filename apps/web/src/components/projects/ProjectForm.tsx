@@ -730,6 +730,7 @@ export function ProjectForm({
                 )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Aufgaben vorgemerkt"
+                showLinkExisting={false}
                 onLinkExisting={() => setTaskLinkOpen(true)}
                 onCreateNew={() => setTaskDraftOpen(true)}
                 onRemoveExisting={(index) =>
@@ -780,6 +781,7 @@ export function ProjectForm({
                 )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
+                showLinkExisting={false}
                 onLinkExisting={() => setTicketLinkOpen(true)}
                 onCreateNew={() => setTicketDraftOpen(true)}
                 onRemoveExisting={(index) =>
@@ -954,6 +956,7 @@ export function ProjectForm({
       />
       <TaskLinkDialog
         open={taskLinkOpen}
+        owner={null}
         currentTasks={pendingTasks.flatMap((item) =>
           item.kind === "existing" ? [item.task] : [],
         )}
@@ -965,6 +968,7 @@ export function ProjectForm({
       />
       <TicketLinkDialog
         open={ticketLinkOpen}
+        owner={null}
         currentTickets={pendingTickets.flatMap((item) =>
           item.kind === "existing" ? [item.ticket] : [],
         )}

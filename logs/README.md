@@ -2,6 +2,8 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 22.05.26 | Fix           | Testfixes Projektgrenzen Relationen          | ⚠️     |
+| 22.05.26 | Feature       | Projektgrenzen Relationen                    | ⚠️     |
 | 22.05.26 | Fix           | Katalog Farbfeld Anzeige                     | ✅     |
 | 22.05.26 | Feature       | Slug und Projekt-Kürzel entfernt             | ✅     |
 | 22.05.26 | Fix           | Katalog Colorpicker                          | ✅     |

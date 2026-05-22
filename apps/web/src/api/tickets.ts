@@ -6,6 +6,7 @@ import type {
   Ticket,
   TicketDetail,
   TicketInput,
+  TicketOwner,
   TicketPositionInput,
   TicketRelationEntry,
   TicketRelationInput,
@@ -13,7 +14,7 @@ import type {
 } from "@taskmanager/shared-types";
 import { api } from "./client";
 
-export type TicketOwner = { type: "project" | "milestone" | "task" | "feature" | "useCase"; id: number };
+export type { TicketOwner };
 
 function ownerPath(owner: TicketOwner): string {
   if (owner.type === "project") {
@@ -33,6 +34,10 @@ function ownerPath(owner: TicketOwner): string {
 
 export async function getTickets(): Promise<Ticket[]> {
   return api.get("tickets").json<Ticket[]>();
+}
+
+export async function getTicketLinkCandidates(owner: TicketOwner): Promise<Ticket[]> {
+  return api.get("tickets/link-candidates", { searchParams: { ownerType: owner.type, ownerId: owner.id } }).json<Ticket[]>();
 }
 
 export async function getOwnerTickets(owner: TicketOwner): Promise<Ticket[]> {
@@ -85,6 +90,10 @@ export async function createSubTicket(parentId: number, input: TicketInput): Pro
 
 export async function getTicketRelations(id: number): Promise<TicketRelationEntry[]> {
   return api.get(`tickets/${id}/relations`).json<TicketRelationEntry[]>();
+}
+
+export async function getTicketRelationCandidates(id: number): Promise<Ticket[]> {
+  return api.get(`tickets/${id}/relation-candidates`).json<Ticket[]>();
 }
 
 export async function addTicketRelation(id: number, input: TicketRelationInput): Promise<void> {

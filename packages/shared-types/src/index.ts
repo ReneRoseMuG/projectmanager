@@ -537,6 +537,8 @@ export type TaskBoardPositionInput = WithExpectedVersion<{
   position: number;
 }>;
 
+export type TaskOwner = { type: "project" | "milestone" | "feature" | "useCase"; id: number };
+
 export interface Ticket {
   id: number;
   parentId: number | null;
@@ -602,6 +604,8 @@ export interface TicketRelationInput {
   targetTicketId: number;
   relationType: TicketRelationType;
 }
+
+export type TicketOwner = { type: "project" | "milestone" | "task" | "feature" | "useCase"; id: number };
 
 export interface Comment {
   id: number;

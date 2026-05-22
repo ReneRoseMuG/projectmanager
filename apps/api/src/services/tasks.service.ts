@@ -1,4 +1,4 @@
-import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskUpdate } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureTasks, features, milestoneTasks, milestones, projectTasks, projects, tasks, useCases, useCaseTasks } from "../db/schema.js";
@@ -23,9 +23,10 @@ import {
   type JournalObjectRef
 } from "./journal.service.js";
 import { deleteTaskNotesForIds, listTaskNotes } from "./notes.service.js";
+import { assertCompatibleProjectContexts, projectContextsAreCompatible, taskOwnerProjectContext, taskProjectContext } from "./project-context.service.js";
 import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 
-export type TaskOwner = { type: "project" | "milestone" | "feature" | "useCase"; id: number };
+export type { TaskOwner };
 
 type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "version" | "createdAt" | "updatedAt">;
 
@@ -349,6 +350,14 @@ export function listTasks(database: DbClient): Task[] {
   return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
 }
 
+export function listTaskLinkCandidates(database: DbClient, owner: TaskOwner): Task[] {
+  ensureOwnerExists(database, owner);
+  const ownerContext = taskOwnerProjectContext(database, owner);
+  const linkedTaskIds = new Set(selectOwnerTaskRows(database, owner).map((task) => task.id));
+
+  return listTasks(database).filter((task) => !linkedTaskIds.has(task.id) && projectContextsAreCompatible(ownerContext, taskProjectContext(database, task.id)));
+}
+
 export function listSubtasks(database: DbClient, taskId: number): Task[] {
   getTaskRecord(database, taskId);
   const rows = taskRepository.findChildren(database, taskId);
@@ -393,6 +402,8 @@ export function linkOwnerTask(database: DbClient, owner: TaskOwner, taskId: numb
   if (existing) {
     return mapTaskBoardItem(database, existing);
   }
+
+  assertCompatibleProjectContexts(taskOwnerProjectContext(database, owner), taskProjectContext(database, taskId));
 
   const position = nextOwnerPosition(database, owner, task.status);
   database.transaction((tx) => {

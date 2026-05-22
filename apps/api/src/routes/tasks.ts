@@ -5,12 +5,14 @@ import {
   deleteTask,
   getTaskDetail,
   linkOwnerTask,
+  listTaskLinkCandidates,
   listOwnerTasks,
   listTasks,
   unlinkOwnerTask,
   updateOwnerTaskBoard,
   updateTask
 } from "../services/tasks.service.js";
+import type { TaskOwner } from "../services/tasks.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
@@ -58,8 +60,24 @@ const ownerTaskParamSchema = {
   }
 } as const;
 
+const taskLinkCandidatesQuerySchema = {
+  type: "object",
+  required: ["ownerType", "ownerId"],
+  additionalProperties: false,
+  properties: {
+    ownerType: { type: "string", enum: ["project", "milestone", "feature", "useCase"] },
+    ownerId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
 export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
   app.get("/tasks", { schema: { response: { 200: arrayResponseSchema } } }, async () => listTasks(app.db));
+
+  app.get<{ Querystring: { ownerType: TaskOwner["type"]; ownerId: number } }>(
+    "/tasks/link-candidates",
+    { schema: { querystring: taskLinkCandidatesQuerySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listTaskLinkCandidates(app.db, { type: request.query.ownerType, id: request.query.ownerId })
+  );
 
   app.get<{ Params: { id: number } }>(
     "/projects/:id/tasks",

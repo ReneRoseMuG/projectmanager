@@ -14,8 +14,10 @@ import {
   deleteTicket,
   getTicketDetail,
   linkOwnerTicket,
+  listTicketLinkCandidates,
   listOwnerTickets,
   listProjectTickets,
+  listTicketRelationCandidates,
   listSubTickets,
   listTicketRelations,
   listTickets,
@@ -125,6 +127,16 @@ const ownerTicketParamSchema = {
   }
 } as const;
 
+const ticketLinkCandidatesQuerySchema = {
+  type: "object",
+  required: ["ownerType", "ownerId"],
+  additionalProperties: false,
+  properties: {
+    ownerType: { type: "string", enum: ["project", "milestone", "task", "feature", "useCase"] },
+    ownerId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
 const uploadBodySchema = {
   consumes: ["multipart/form-data"],
   body: {
@@ -212,6 +224,12 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     );
   }
 
+  app.get<{ Querystring: { ownerType: TicketOwner["type"]; ownerId: number } }>(
+    "/tickets/link-candidates",
+    { schema: { querystring: ticketLinkCandidatesQuerySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listTicketLinkCandidates(app.db, { type: request.query.ownerType, id: request.query.ownerId })
+  );
+
   app.get<{ Params: { id: number } }>(
     "/tickets/:id",
     { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
@@ -255,6 +273,12 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     "/tickets/:id/relations",
     { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
     async (request) => listTicketRelations(app.db, request.params.id)
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/tickets/:id/relation-candidates",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listTicketRelationCandidates(app.db, request.params.id)
   );
 
   app.post<{ Params: { id: number }; Body: TicketRelationInput }>(
