@@ -7,7 +7,8 @@ import type {
   TicketRelationEntry,
   TicketRelationInput,
   TicketRelationType,
-  TicketUpdate
+  TicketUpdate,
+  VisibleParentContext
 } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
@@ -38,7 +39,7 @@ import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
 
 export type { TicketOwner };
 
-type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number };
+type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
 
 const ticketSelect = {
   id: tickets.id,
@@ -155,6 +156,20 @@ function getOwnerJournalObject(database: DbClient, owner: TicketOwner): JournalO
   return makeJournalObject("useCase", owner.id, useCase?.title ?? `Use Case ${owner.id}`);
 }
 
+function visibleParentForOwner(database: DbClient, owner: TicketOwner, origin: VisibleParentContext["origin"]): VisibleParentContext {
+  const ownerObject = getOwnerJournalObject(database, owner);
+  return {
+    type: owner.type,
+    id: owner.id,
+    label: ownerObject.label,
+    origin
+  };
+}
+
+function withVisibleParent(rows: Array<TicketRecord & { boardPosition: number }>, parent: VisibleParentContext): TicketRecordWithBoardPosition[] {
+  return rows.map((row) => ({ ...row, visibleParent: parent }));
+}
+
 function ticketJournalObject(ticket: Pick<TicketRecord, "id" | "title">): JournalObjectRef {
   return makeJournalObject("ticket", ticket.id, ticket.title);
 }
@@ -260,6 +275,46 @@ function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRe
     .where(and(eq(useCaseTickets.ownerId, owner.id), isNull(tickets.parentId)))
     .orderBy(tickets.status, useCaseTickets.position)
     .all();
+}
+
+function selectProjectMilestoneTicketRows(database: DbClient, projectId: number): TicketRecordWithBoardPosition[] {
+  const milestoneRows = database
+    .select({
+      ...ticketSelect,
+      boardPosition: milestoneTickets.position,
+      milestoneId: milestones.id,
+      milestoneName: milestones.name
+    })
+    .from(milestoneTickets)
+    .innerJoin(milestones, eq(milestoneTickets.ownerId, milestones.id))
+    .innerJoin(tickets, eq(milestoneTickets.ticketId, tickets.id))
+    .where(and(eq(milestones.projectId, projectId), isNull(tickets.parentId)))
+    .orderBy(tickets.status, milestoneTickets.position)
+    .all();
+
+  return milestoneRows.map((row) => {
+    const { milestoneId, milestoneName, ...ticketRow } = row;
+    return {
+      ...ticketRow,
+      visibleParent: {
+        type: "milestone",
+        id: milestoneId,
+        label: milestoneName,
+        origin: "inherited"
+      }
+    };
+  });
+}
+
+function selectVisibleOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRecordWithBoardPosition[] {
+  const directRows = withVisibleParent(selectOwnerTicketRows(database, owner), visibleParentForOwner(database, owner, "direct"));
+  if (owner.type !== "project") {
+    return directRows;
+  }
+
+  const directIds = new Set(directRows.map((row) => row.id));
+  const inheritedRows = selectProjectMilestoneTicketRows(database, owner.id).filter((row) => !directIds.has(row.id));
+  return [...directRows, ...inheritedRows];
 }
 
 function getOwnerTicketRow(database: DbClient, owner: TicketOwner, ticketId: number): TicketRecordWithBoardPosition | undefined {
@@ -382,7 +437,8 @@ export function mapTicket(
   record: TicketRecord,
   tags = getTicketTags(database, record.id),
   subTicketCount = getSubTicketCounts(database, [record.id]).get(record.id) ?? 0,
-  position = record.position
+  position = record.position,
+  visibleParent?: VisibleParentContext | null
 ): Ticket {
   return {
     id: record.id,
@@ -404,7 +460,8 @@ export function mapTicket(
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     tags,
-    subTicketCount
+    subTicketCount,
+    visibleParent
   };
 }
 
@@ -420,19 +477,19 @@ export function listTickets(database: DbClient): Ticket[] {
 export function listTicketLinkCandidates(database: DbClient, owner: TicketOwner): Ticket[] {
   ensureOwnerExists(database, owner);
   const ownerContext = ticketOwnerProjectContext(database, owner);
-  const linkedTicketIds = new Set(selectOwnerTicketRows(database, owner).map((ticket) => ticket.id));
+  const linkedTicketIds = new Set(selectVisibleOwnerTicketRows(database, owner).map((ticket) => ticket.id));
 
   return listTickets(database).filter((ticket) => !linkedTicketIds.has(ticket.id) && projectContextsAreCompatible(ownerContext, ticketProjectContext(database, ticket.id)));
 }
 
 export function listOwnerTickets(database: DbClient, owner: TicketOwner): Ticket[] {
   ensureOwnerExists(database, owner);
-  const rows = selectOwnerTicketRows(database, owner);
+  const rows = selectVisibleOwnerTicketRows(database, owner);
   const ids = rows.map((ticket) => ticket.id);
   const tagsByTicket = getTicketTagsMap(database, ids);
   const subTicketCounts = getSubTicketCounts(database, ids);
 
-  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0, ticket.boardPosition));
+  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0, ticket.boardPosition, ticket.visibleParent));
 }
 
 export function listProjectTickets(database: DbClient, projectId: number): Ticket[] {

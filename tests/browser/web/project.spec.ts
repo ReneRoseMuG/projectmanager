@@ -23,7 +23,7 @@ import {
  * Abgedeckte Regeln:
  * - Projekt-Create läuft über `/projects/new` und schließt nach Speichern zurück zur Übersicht.
  * - Projekt-Edit läuft über die kanonische Route `/projects/:id`.
- * - Einfacher Klick und Bearbeiten-Button in Board- und Listenansicht navigieren auf dieselbe Detailformular-Seite.
+ * - Doppelklick und Bearbeiten-Button in Board- und Listenansicht navigieren auf dieselbe Detailformular-Seite.
  * - Projekt-Tab-Views öffnen verknüpfte Domänenobjekte per Route statt per Overlay.
  *
  * Fehlerfälle:
@@ -100,7 +100,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
     }
   });
 
-  test("Projekt öffnen: Klick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({
+  test("Projekt öffnen: Doppelklick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({
     page,
     request,
   }) => {
@@ -108,7 +108,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
 
     try {
       await openProjectList(page);
-      await itemCard(page, project.name).click();
+      await itemCard(page, project.name).dblclick();
       await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
       await expectProjectFormData(page, project);
 
@@ -237,7 +237,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
     }
   });
 
-  test("Projekt-Features-Tab: Klick und Bearbeiten öffnen das Feature-Detailformular per Route", async ({
+  test("Projekt-Features-Tab: Doppelklick und Bearbeiten öffnen das Feature-Detailformular per Route", async ({
     page,
     request,
   }) => {
@@ -252,7 +252,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await projectForm.getByRole("button", { name: /Features/ }).click();
       await expect(itemCard(projectForm, feature.title)).toBeVisible();
 
-      await itemCard(projectForm, feature.title).click();
+      await itemCard(projectForm, feature.title).dblclick();
       await expect(page).toHaveURL(new RegExp(`/features/${feature.id}`));
       const featureForm = formPage(page, "Feature bearbeiten");
       await expect(featureForm.locator("input[required]").nth(0)).toHaveValue(
@@ -305,7 +305,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       const projectForm = formPage(page, "Projekt bearbeiten");
 
       await projectForm.getByRole("button", { name: /Aufgaben/ }).click();
-      await itemCard(projectForm, task.title).click();
+      await itemCard(projectForm, task.title).dblclick();
       await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}`));
       const taskForm = formPage(page, "Aufgabe bearbeiten");
       await expect(taskForm.locator("input[required]").first()).toHaveValue(
@@ -320,7 +320,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await itemCard(
         formPage(page, "Projekt bearbeiten"),
         backlogItem.title,
-      ).click();
+      ).dblclick();
       await expect(page).toHaveURL(new RegExp(`/backlog/${backlogItem.id}`));
       let backlogForm = formPage(page, "Backlog-Item bearbeiten");
       await expect(backlogForm.locator("input[required]").first()).toHaveValue(

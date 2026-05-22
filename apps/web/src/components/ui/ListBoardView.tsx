@@ -3,7 +3,7 @@ import type {
   StatusCatalogKind,
 } from "@taskmanager/shared-types";
 import { Plus } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import type { ViewMode } from "../../types";
 import { catalogEntriesByKind, catalogFillStyle, catalogSoftStyle } from "../../utils/catalogs";
@@ -162,7 +162,7 @@ function statusGroupStyle(column: StatusColumn) {
 }
 
 function statusHeaderStyle(column: StatusColumn) {
-  return column.color ? catalogFillStyle(column.color) : undefined;
+  return column.color ? { borderBottomColor: `color-mix(in srgb, ${column.color} 42%, white)` } : undefined;
 }
 
 function isKnownColumn(
@@ -207,6 +207,17 @@ function sortedStatusColumns(
       return left.index - right.index;
     })
     .map(({ column }) => column);
+}
+
+function statusAddButtonStyle(column: StatusColumn) {
+  if (!column.color) {
+    return undefined;
+  }
+
+  return {
+    ...catalogFillStyle(column.color),
+    borderColor: "#ffffff",
+  };
 }
 
 /** Shared list/board surface with search, filters, view toggle and add button. */
@@ -254,6 +265,8 @@ function ListBoardViewContent<T>({
   emptyState,
   loading = false,
 }: ListBoardViewProps<T>) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [equalItemHeight, setEqualItemHeight] = useState<number | undefined>();
   const orderedStatusColumns = sortedStatusColumns(statusColumns);
   const hasStatusGrouping =
     statusKey !== undefined &&
@@ -272,20 +285,60 @@ function ListBoardViewContent<T>({
     true,
   );
   const boardByStatus = mode === "board" && hasStatusGrouping;
+  const equalItemStyle = equalItemHeight ? { minHeight: equalItemHeight } : undefined;
+  const equalItemProps = {
+    "data-equal-item": "true",
+    style: equalItemStyle,
+  };
+  const renderColumnAddButton = (column: StatusColumn) =>
+    onAddToColumn && isKnownColumn(orderedStatusColumns, column.value) ? (
+      <Button
+        aria-label={`${column.label} hinzufügen`}
+        title={`${column.label} hinzufügen`}
+        variant="ghost"
+        className="h-7 w-7 border border-white bg-steel-700 px-0 text-white shadow-sm hover:brightness-95"
+        style={statusAddButtonStyle(column)}
+        icon={<Plus size={13} />}
+        onClick={() => onAddToColumn(column.value)}
+      />
+    ) : null;
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root || loading) {
+      setEqualItemHeight(undefined);
+      return;
+    }
+
+    const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-equal-item='true']"));
+    if (nodes.length === 0) {
+      setEqualItemHeight(undefined);
+      return;
+    }
+
+    nodes.forEach((node) => {
+      node.style.minHeight = "";
+    });
+    const maxHeight = Math.ceil(nodes.reduce((current, node) => Math.max(current, node.getBoundingClientRect().height), 0));
+    setEqualItemHeight(maxHeight > 0 ? maxHeight : undefined);
+  }, [boardByStatus, hasStatusGrouping, items, loading, mode]);
 
   return (
     <div
+      ref={rootRef}
       className="flex h-full min-h-[30rem] w-full min-w-0 flex-1 flex-col gap-4"
       data-testid="list-board-view"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {onSearchChange ? (
-          <SearchInput value={searchValue} onChange={onSearchChange} />
-        ) : (
-          <span />
-        )}
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="grid w-full grid-cols-1 items-center gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+        <div className="flex min-w-0 justify-start">
+          {onSearchChange ? (
+            <SearchInput value={searchValue} onChange={onSearchChange} />
+          ) : null}
+        </div>
+        <div className="flex min-w-0 justify-center">
           {filters}
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 md:justify-end">
           {secondaryAction}
           <ViewToggle
             value={toViewMode(mode)}
@@ -295,9 +348,9 @@ function ListBoardViewContent<T>({
             <Button
               aria-label={addLabel}
               title={addLabel}
-              variant="primary"
+              variant="ghost"
               icon={<Plus size={17} />}
-              className="h-9 w-9"
+              className="h-9 w-9 border border-fern bg-transparent text-fern hover:bg-fern/10"
               onClick={onAdd}
             />
           ) : null}
@@ -315,7 +368,7 @@ function ListBoardViewContent<T>({
         !hasStatusGrouping ? (
           <div className="grid h-full min-h-[30rem] w-full flex-1 content-start gap-3">
             {items.map((item, index) => (
-              <div key={index}>{renderRow(item)}</div>
+              <div key={index} {...equalItemProps}>{renderRow(item)}</div>
             ))}
           </div>
         ) : null}
@@ -331,16 +384,19 @@ function ListBoardViewContent<T>({
                 style={statusGroupStyle(group.column)}
               >
                 <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2" style={statusHeaderStyle(group.column)}>
-                  <h2 className="min-w-0 truncate text-sm font-semibold">
-                    {group.column.label}
-                  </h2>
-                  <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                    {group.items.length}
-                  </span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
+                      {group.column.label}
+                    </h2>
+                    <span className="rounded-full bg-steel-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                      {group.items.length}
+                    </span>
+                  </div>
+                  {renderColumnAddButton(group.column)}
                 </header>
                 <div className="grid gap-3 p-3">
                   {group.items.map((item, index) => (
-                    <div key={index}>{renderRow(item)}</div>
+                    <div key={index} {...equalItemProps}>{renderRow(item)}</div>
                   ))}
                 </div>
               </section>
@@ -350,7 +406,7 @@ function ListBoardViewContent<T>({
         {!loading && items.length > 0 && mode === "board" && !boardByStatus ? (
           <CardGrid>
             {items.map((item, index) => (
-              <div key={index} className="min-w-0 max-w-full">
+              <div key={index} className="min-w-0 max-w-full" {...equalItemProps}>
                 {renderCard(item)}
               </div>
             ))}
@@ -365,29 +421,19 @@ function ListBoardViewContent<T>({
                 style={statusGroupStyle(group.column)}
               >
                 <header className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2" style={statusHeaderStyle(group.column)}>
-                  <h2 className="min-w-0 truncate text-sm font-semibold">
-                    {group.column.label}
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
+                      {group.column.label}
+                    </h2>
+                    <span className="rounded-full bg-steel-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                       {group.items.length}
                     </span>
-                    {onAddToColumn &&
-                    isKnownColumn(orderedStatusColumns, group.column.value) ? (
-                      <Button
-                        aria-label={`${group.column.label} hinzufügen`}
-                        title={`${group.column.label} hinzufügen`}
-                        variant="ghost"
-                        className="h-10 w-10 border border-line bg-white text-steel-700 hover:bg-steel-50"
-                        icon={<Plus size={18} />}
-                        onClick={() => onAddToColumn(group.column.value)}
-                      />
-                    ) : null}
                   </div>
+                  {renderColumnAddButton(group.column)}
                 </header>
                 <div className="grid gap-3 p-3">
                   {group.items.map((item, index) => (
-                    <div key={index} className="min-w-0 max-w-full">
+                    <div key={index} className="min-w-0 max-w-full" {...equalItemProps}>
                       {renderCard(item)}
                     </div>
                   ))}

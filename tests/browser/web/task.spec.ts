@@ -20,7 +20,7 @@ import {
  *
  * Abgedeckte Regeln:
  * - Aufgaben werden aus Owner-Tabs heraus über `/tasks/new` erstellt, schließen nach Speichern zurück und werden über `/tasks/:id` bearbeitet.
- * - Einfacher Klick und Bearbeiten-Button im Aufgaben-Board und in der Liste navigieren auf dieselbe Detailformular-Seite.
+ * - Doppelklick und Bearbeiten-Button im Aufgaben-Board und in der Liste navigieren auf dieselbe Detailformular-Seite.
  * - Das Aufgabenformular zeigt echte geladene Daten inklusive Beschreibung und Fälligkeitsdatum vollständig an.
  *
  * Fehlerfälle:
@@ -94,7 +94,7 @@ test.describe("Task-Routen und Detailformular", () => {
       await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
       const reopenedProjectForm = await openProjectTasks(page, project.id);
       await expect(itemCard(reopenedProjectForm, taskTitle)).toBeVisible();
-      await itemCard(reopenedProjectForm, taskTitle).click();
+      await itemCard(reopenedProjectForm, taskTitle).dblclick();
       await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}`));
       await expectTaskFormData(
         page,
@@ -107,7 +107,7 @@ test.describe("Task-Routen und Detailformular", () => {
     }
   });
 
-  test("Task öffnen: Klick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({
+  test("Task öffnen: Doppelklick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({
     page,
     request,
   }) => {
@@ -120,7 +120,7 @@ test.describe("Task-Routen und Detailformular", () => {
 
     try {
       let projectForm = await openProjectTasks(page, project.id);
-      await itemCard(projectForm, task.title).click();
+      await itemCard(projectForm, task.title).dblclick();
       await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}`));
       await expectTaskFormData(page, task);
 

@@ -1,9 +1,7 @@
 import type { Project, ProjectStatus } from "@taskmanager/shared-types";
-import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ProjectListBoardView } from "../components/projects/ProjectListBoardView";
-import { Button } from "../components/ui/Button";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
 import { useToast } from "../components/ui/ToastProvider";
@@ -14,7 +12,7 @@ import { catalogEntriesByKind } from "../utils/catalogs";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
-  const { projects, loading, error, removeProject } = useProjects();
+  const { projects, loading, error, updateProject, removeProject } = useProjects();
   const catalogs = useCatalogs();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -62,20 +60,22 @@ export function ProjectsPage() {
     }
   };
 
+  const updateProjectStatus = async (project: Project, status: ProjectStatus) => {
+    try {
+      await updateProject(project.id, { status, expectedVersion: project.version });
+    } catch (updateError) {
+      showToast({ tone: "error", title: "Projektstatus konnte nicht geändert werden", message: errorMessage(updateError) });
+      throw updateError;
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header>
         <div>
           <h1 className="text-2xl font-semibold text-ink">Projekte</h1>
           <p className="text-sm text-slate-500">{projects.length} Einträge</p>
         </div>
-        <Button
-          variant="primary"
-          icon={<Plus size={17} />}
-          onClick={() => navigate("/projects/new")}
-        >
-          Neues Projekt
-        </Button>
       </header>
 
       {error ? (
@@ -89,6 +89,7 @@ export function ProjectsPage() {
         onCreate={() => navigate("/projects/new")}
         onEdit={(project) => navigate(`/projects/${project.id}`)}
         onDelete={(project) => void deleteProject(project)}
+        onStatusChange={updateProjectStatus}
         filters={
           !loading ? (
             <FilterChips
@@ -99,7 +100,6 @@ export function ProjectsPage() {
             />
           ) : null
         }
-        showToolbarAdd={false}
       />
     </div>
   );

@@ -19,7 +19,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ViewMode } from "../../../../../apps/web/src/types";
 import { TaskListBoardView } from "../../../../../apps/web/src/components/tasks/TaskListBoardView";
-import { buildTask, buildTaskSet } from "../../../../fixtures/web/components/ui/factories";
+import { buildTag, buildTask, buildTaskSet } from "../../../../fixtures/web/components/ui/factories";
 
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
@@ -106,7 +106,9 @@ function expectToolbar() {
   expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Neue Aufgabe" })).toBeInTheDocument();
+  const addButton = screen.getByRole("button", { name: "Neue Aufgabe" });
+  expect(addButton).toBeInTheDocument();
+  expect(addButton).toHaveTextContent("");
 }
 
 function expectItemCardClasses(cards: NodeListOf<Element>) {
@@ -223,5 +225,58 @@ describe("TaskListBoardView", () => {
     expect(screen.getByText("Keine Aufgaben")).toBeInTheDocument();
     expect(container.querySelector("article.rounded-2xl")).not.toBeInTheDocument();
     expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+  });
+
+  it("filtert die Suche ausschließlich nach Aufgaben-Titel", () => {
+    const tasks = [
+      buildTask({
+        id: 1,
+        title: "Suchnadel Aufgabe",
+        description: "Beschreibung ohne Treffer",
+        tags: [buildTag({ id: 1, name: "Neutral" })],
+      }),
+      buildTask({
+        id: 2,
+        title: "Beschreibungstreffer Aufgabe",
+        description: "Suchnadel steht nur in der Beschreibung",
+        tags: [buildTag({ id: 2, name: "Neutral" })],
+      }),
+      buildTask({
+        id: 3,
+        title: "Parenttreffer Aufgabe",
+        description: "Beschreibung ohne Treffer",
+        tags: [buildTag({ id: 3, name: "Neutral" })],
+        visibleParent: {
+          type: "milestone",
+          id: 7,
+          label: "Suchnadel Meilenstein",
+          origin: "inherited",
+        },
+      }),
+      buildTask({
+        id: 4,
+        title: "Tagtreffer Aufgabe",
+        description: "Beschreibung ohne Treffer",
+        tags: [buildTag({ id: 4, name: "Suchnadel Tag" })],
+      }),
+    ];
+    renderTaskList({ tasks });
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "  suchNADEL  " },
+    });
+
+    expect(screen.getByText("Suchnadel Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByText("Beschreibungstreffer Aufgabe")).not.toBeInTheDocument();
+    expect(screen.queryByText("Parenttreffer Aufgabe")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tagtreffer Aufgabe")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "" },
+    });
+
+    tasks.forEach((task) => {
+      expect(screen.getByText(task.title)).toBeInTheDocument();
+    });
   });
 });

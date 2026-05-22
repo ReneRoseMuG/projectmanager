@@ -1,7 +1,6 @@
 import type { Feature } from "@taskmanager/shared-types";
 import { BookOpen } from "lucide-react";
 import { useMemo, useState } from "react";
-import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { FeatureCard } from "./FeatureCard";
@@ -11,6 +10,7 @@ interface FeatureListBoardViewProps {
   onCreate: () => void;
   onOpen: (feature: Feature) => void;
   onDelete: (feature: Feature) => void;
+  onStatusChange?: (feature: Feature, status: Feature["status"]) => void | Promise<unknown>;
   filters?: React.ReactNode;
   showToolbarAdd?: boolean;
 }
@@ -20,10 +20,7 @@ function matchesSearch(feature: Feature, searchValue: string) {
   if (!normalized) {
     return true;
   }
-  return [
-    feature.title,
-    richTextToPlainText(feature.description),
-  ].some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
+  return feature.title.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
 /** Feature-specific ListBoardView adapter with status board columns. */
@@ -32,6 +29,7 @@ export function FeatureListBoardView({
   onCreate,
   onOpen,
   onDelete,
+  onStatusChange,
   filters,
   showToolbarAdd = true,
 }: FeatureListBoardViewProps) {
@@ -66,10 +64,10 @@ export function FeatureListBoardView({
         />
       }
       renderCard={(feature) => (
-        <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} />
+        <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} />
       )}
       renderRow={(feature) => (
-        <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} />
+        <FeatureCard feature={feature} variant="row" onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} />
       )}
     />
   );

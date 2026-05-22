@@ -70,9 +70,14 @@ export function OwnerRelationBoard<TItem extends { id: number }>({
         onOpen: onOpenItem,
         onDelete: (item) => void unlinkItem(item),
         linkAction: (
-          <Button variant="secondary" icon={<Link2 size={17} />} onClick={onLinkItem}>
-            Verknüpfen
-          </Button>
+          <Button
+            aria-label="Verknüpfen"
+            title="Verknüpfen"
+            variant="secondary"
+            icon={<Link2 size={17} />}
+            className="h-9 w-9 bg-transparent px-0"
+            onClick={onLinkItem}
+          />
         )
       })}
     </>

@@ -2,7 +2,6 @@ import type { Milestone } from "@taskmanager/shared-types";
 import { Flag } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
-import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { MilestoneCard } from "./MilestoneCard";
@@ -15,6 +14,8 @@ interface MilestoneListBoardViewProps {
   onCreate: () => void;
   onEdit: (milestone: Milestone) => void;
   onDelete: (milestone: Milestone) => void;
+  onStatusChange?: (milestone: Milestone, status: Milestone["status"]) => void | Promise<unknown>;
+  onDueDateChange?: (milestone: Milestone, dueDate: string | null) => void | Promise<unknown>;
 }
 
 function toListBoardMode(viewMode: ViewMode): ListBoardMode {
@@ -31,11 +32,10 @@ function matchesSearch(milestone: Milestone, searchValue: string) {
     return true;
   }
 
-  const values = [milestone.name, richTextToPlainText(milestone.description), milestone.status, ...milestone.tags.map((tag) => tag.name)];
-  return values.some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
+  return milestone.name.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
-export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onDelete }: MilestoneListBoardViewProps) {
+export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onDelete, onStatusChange, onDueDateChange }: MilestoneListBoardViewProps) {
   const [internalViewMode, setInternalViewMode] = useState<ViewMode>("kanban");
   const [searchValue, setSearchValue] = useState("");
   const currentViewMode = viewMode ?? internalViewMode;
@@ -63,8 +63,8 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
       onSearchChange={setSearchValue}
       loading={loading}
       emptyState={<EmptyState icon={<Flag size={22} />} title="Keine Meilensteine" body="Lege Meilensteine an, um Projektziele und abhängige Arbeit zu bündeln." tone="teal" variant="tinted" />}
-      renderCard={(milestone) => <MilestoneCard milestone={milestone} onEdit={onEdit} onDelete={onDelete} />}
-      renderRow={(milestone) => <MilestoneCard milestone={milestone} variant="row" onEdit={onEdit} onDelete={onDelete} />}
+      renderCard={(milestone) => <MilestoneCard milestone={milestone} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />}
+      renderRow={(milestone) => <MilestoneCard milestone={milestone} variant="row" onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />}
     />
   );
 }

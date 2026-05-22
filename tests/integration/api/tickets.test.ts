@@ -20,6 +20,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import {
   buildTestApp,
   createFeature,
+  createMilestone,
   createProject,
   createSubTicket,
   createTag,
@@ -209,6 +210,26 @@ describe("Tickets API", () => {
     expect(ids).toContain(neutralTicket.id);
     expect(ids).not.toContain(foreignTicket.id);
     expect(ids).not.toContain(linkedTicket.id);
+  });
+
+  it("GET /api/projects/:id/tickets liefert direkte und Meilenstein-Tickets kumulativ", async () => {
+    const project = await createProject(app, { name: "Ticket-Projekt" });
+    const milestone = await createMilestone(app, project.id, { name: "Ticket-Meilenstein" });
+    const directTicket = await createTicket(app, { type: "project", id: project.id }, { title: "Direktes Ticket" });
+    const inheritedTicket = await supertest(app.server).post(`/api/milestones/${milestone.id}/tickets`).send({ title: "Meilenstein-Ticket" }).expect(201);
+    const duplicateTicket = await createTicket(app, { type: "project", id: project.id }, { title: "Doppeltes Ticket" });
+    await supertest(app.server).post(`/api/milestones/${milestone.id}/tickets/${duplicateTicket.id}`).expect(200);
+
+    const projectTickets = await supertest(app.server).get(`/api/projects/${project.id}/tickets`).expect(200);
+    const projectTicketIds = projectTickets.body.map((ticket: { id: number }) => ticket.id);
+    expect(projectTicketIds).toEqual(expect.arrayContaining([directTicket.id, inheritedTicket.body.id, duplicateTicket.id]));
+    expect(projectTicketIds.filter((id: number) => id === duplicateTicket.id)).toHaveLength(1);
+    expect(projectTickets.body.find((ticket: { id: number }) => ticket.id === directTicket.id).visibleParent).toMatchObject({ type: "project", id: project.id, label: "Ticket-Projekt", origin: "direct" });
+    expect(projectTickets.body.find((ticket: { id: number }) => ticket.id === inheritedTicket.body.id).visibleParent).toMatchObject({ type: "milestone", id: milestone.id, label: "Ticket-Meilenstein", origin: "inherited" });
+
+    const milestoneTickets = await supertest(app.server).get(`/api/milestones/${milestone.id}/tickets`).expect(200);
+    expect(milestoneTickets.body.map((ticket: { id: number }) => ticket.id)).toEqual(expect.arrayContaining([inheritedTicket.body.id, duplicateTicket.id]));
+    expect(milestoneTickets.body.find((ticket: { id: number }) => ticket.id === duplicateTicket.id).visibleParent).toMatchObject({ type: "milestone", id: milestone.id, origin: "direct" });
   });
 
   it("owner ticket lists stay isolated until an explicit link is created", async () => {

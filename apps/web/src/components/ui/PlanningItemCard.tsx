@@ -16,8 +16,9 @@ interface PlanningItemCardProps {
   description: string;
   accentColor: string;
   icon: ReactNode;
-  subtitle?: string;
+  subtitle?: ReactNode;
   pills?: ReactNode;
+  footerMeta?: ReactNode;
   taskStats: PlanningTaskStats;
   variant?: "card" | "row";
   onOpen: () => void;
@@ -56,14 +57,14 @@ function PlanningHeader({ title, subtitle, pills }: Pick<PlanningItemCardProps, 
     <div className="grid min-w-0 gap-3">
       <div className="min-w-0">
         <h2 className="line-clamp-2 break-words text-base font-semibold text-ink">{title}</h2>
-        {subtitle ? <p className="mt-1 text-xs font-semibold text-slate-500">{subtitle}</p> : null}
+        {subtitle ? <div className="mt-1 text-xs font-semibold text-slate-500">{subtitle}</div> : null}
       </div>
       {pills ? <div className="flex min-w-0 flex-wrap items-center gap-2">{pills}</div> : null}
     </div>
   );
 }
 
-export function PlanningItemCard({ title, description, accentColor, icon, subtitle, pills, taskStats, variant = "card", onOpen, onEdit, onDelete }: PlanningItemCardProps) {
+export function PlanningItemCard({ title, description, accentColor, icon, subtitle, pills, footerMeta, taskStats, variant = "card", onOpen, onEdit, onDelete }: PlanningItemCardProps) {
   if (variant === "row") {
     return (
       <>
@@ -75,6 +76,7 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
             icon={icon}
             subtitle={subtitle}
             pills={pills}
+            footerMeta={footerMeta}
             taskStats={taskStats}
             onOpen={onOpen}
             onEdit={onEdit}
@@ -89,6 +91,7 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
             pills={pills}
             pillsClassName="max-w-64 flex-wrap justify-end"
             meta={<TaskMeta stats={taskStats} />}
+            footer={footerMeta}
             actions={
               <ActionMenu
                 items={[
@@ -109,7 +112,7 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
       accentColor={accentColor}
       header={<PlanningHeader title={title} subtitle={subtitle} pills={pills} />}
       body={description ? <p className="line-clamp-3 text-sm text-slate-600">{description}</p> : null}
-      footer={<TaskProgress stats={taskStats} accentColor={accentColor} />}
+      footer={<div className="grid gap-3">{footerMeta}<TaskProgress stats={taskStats} accentColor={accentColor} /></div>}
       onOpen={onOpen}
       onEdit={onEdit}
       onDelete={onDelete}

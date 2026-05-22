@@ -101,7 +101,10 @@ describe("OwnerRelationBoard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Neu" }));
     fireEvent.click(screen.getByRole("button", { name: "Neu erledigt" }));
     fireEvent.click(screen.getByRole("button", { name: "Öffnen" }));
-    fireEvent.click(screen.getByRole("button", { name: /Verkn/i }));
+    const linkButton = screen.getByRole("button", { name: /Verkn/i });
+    expect(linkButton).toHaveClass("h-9", "w-9", "bg-transparent");
+    expect(linkButton).toHaveTextContent("");
+    fireEvent.click(linkButton);
 
     expect(onCreateItem).toHaveBeenNthCalledWith(1);
     expect(onCreateItem).toHaveBeenNthCalledWith(2, "done");

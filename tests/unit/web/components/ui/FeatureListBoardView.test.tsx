@@ -18,7 +18,7 @@ import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FeatureListBoardView } from "../../../../../apps/web/src/components/features/FeatureListBoardView";
-import { buildFeatureSet } from "../../../../fixtures/web/components/ui/factories";
+import { buildFeature, buildFeatureSet } from "../../../../fixtures/web/components/ui/factories";
 
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
@@ -77,9 +77,9 @@ function expectToolbar() {
   expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Neues Feature" }),
-  ).toBeInTheDocument();
+  const addButton = screen.getByRole("button", { name: "Neues Feature" });
+  expect(addButton).toBeInTheDocument();
+  expect(addButton).toHaveTextContent("");
 }
 
 function expectItemCardClasses(cards: NodeListOf<Element>) {
@@ -146,7 +146,7 @@ describe("FeatureListBoardView", () => {
     expect(activeHeader).toHaveTextContent("1");
   });
 
-  it("öffnet die Feature-Route per einfachem Klick auf eine Karte", () => {
+  it("öffnet die Feature-Route per Doppelklick auf eine Karte", () => {
     const features = buildFeatureSet();
     const onOpen = vi.fn();
     renderFeatureList({ features, onOpen });
@@ -154,11 +154,13 @@ describe("FeatureListBoardView", () => {
     const card = screen.getByText("Feature Aktiv").closest("article");
     expect(card).toBeInTheDocument();
     fireEvent.click(card as HTMLElement);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.doubleClick(card as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledWith(features[1]);
   });
 
-  it("wechselt von Board- in Listen-Modus und rendert weiterhin ItemCards", () => {
+  it("wechselt von Board- in Listen-Modus und rendert ItemRows", () => {
     const features = buildFeatureSet();
     const { container } = renderFeatureList({ features });
 
@@ -166,14 +168,10 @@ describe("FeatureListBoardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
     expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
-    const cards = container.querySelectorAll("article.rounded-2xl");
-    expect(cards).toHaveLength(features.length);
-    expectItemCardClasses(cards);
-    expect(
-      container.querySelector("article.rounded-xl"),
-    ).not.toBeInTheDocument();
+    expect(container.querySelectorAll("article.rounded-2xl")).toHaveLength(features.length);
+    expect(container.querySelectorAll("article.rounded-xl")).toHaveLength(features.length);
     features.forEach((feature) => {
-      expect(screen.getByText(feature.title)).toBeInTheDocument();
+      expect(screen.getAllByText(feature.title).length).toBeGreaterThan(0);
     });
   });
 
@@ -187,5 +185,45 @@ describe("FeatureListBoardView", () => {
     expect(
       container.querySelector("article.rounded-xl"),
     ).not.toBeInTheDocument();
+  });
+
+  it("filtert die Suche ausschließlich nach Feature-Titel", () => {
+    const features = [
+      buildFeature({
+        id: 1,
+        title: "Suchnadel Feature",
+        description: "Beschreibung ohne Treffer",
+        content: "Inhalt ohne Treffer",
+      }),
+      buildFeature({
+        id: 2,
+        title: "Beschreibungstreffer Feature",
+        description: "Suchnadel steht nur in der Beschreibung",
+        content: "Inhalt ohne Treffer",
+      }),
+      buildFeature({
+        id: 3,
+        title: "Contenttreffer Feature",
+        description: "Beschreibung ohne Treffer",
+        content: "Suchnadel steht nur im Content",
+      }),
+    ];
+    renderFeatureList({ features });
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "  suchNADEL  " },
+    });
+
+    expect(screen.getByText("Suchnadel Feature")).toBeInTheDocument();
+    expect(screen.queryByText("Beschreibungstreffer Feature")).not.toBeInTheDocument();
+    expect(screen.queryByText("Contenttreffer Feature")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "" },
+    });
+
+    features.forEach((feature) => {
+      expect(screen.getAllByText(feature.title).length).toBeGreaterThan(0);
+    });
   });
 });

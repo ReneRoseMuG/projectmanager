@@ -2,7 +2,6 @@ import type { UseCase } from "@taskmanager/shared-types";
 import { BookOpen } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
-import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { UseCaseCard } from "./UseCaseCard";
@@ -13,6 +12,7 @@ interface UseCaseListBoardViewProps {
   onViewModeChange: (viewMode: ViewMode) => void;
   onCreate: () => void;
   onOpen: (useCase: UseCase) => void;
+  onStatusChange?: (useCase: UseCase, status: UseCase["status"]) => void | Promise<unknown>;
 }
 
 function sortUseCases(useCases: UseCase[]) {
@@ -33,12 +33,11 @@ function matchesSearch(useCase: UseCase, searchValue: string) {
     return true;
   }
 
-  const values = [useCase.title, richTextToPlainText(useCase.description), useCase.status];
-  return values.some((value) => value.toLocaleLowerCase("de-DE").includes(normalized));
+  return useCase.title.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
 /** Use-case adapter for the generic ListBoardView without status grouping. */
-export function UseCaseListBoardView({ useCases, viewMode, onViewModeChange, onCreate, onOpen }: UseCaseListBoardViewProps) {
+export function UseCaseListBoardView({ useCases, viewMode, onViewModeChange, onCreate, onOpen, onStatusChange }: UseCaseListBoardViewProps) {
   const [searchValue, setSearchValue] = useState("");
   const visibleUseCases = useMemo(() => sortUseCases(useCases).filter((useCase) => matchesSearch(useCase, searchValue)), [searchValue, useCases]);
 
@@ -55,8 +54,8 @@ export function UseCaseListBoardView({ useCases, viewMode, onViewModeChange, onC
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       emptyState={<EmptyState icon={<BookOpen size={22} />} title="Keine Use Cases" body="Lege Use Cases an, um fachliche Abläufe zu beschreiben." tone="violet" variant="tinted" />}
-      renderCard={(useCase) => <UseCaseCard useCase={useCase} onOpen={onOpen} />}
-      renderRow={(useCase) => <UseCaseCard useCase={useCase} variant="row" onOpen={onOpen} />}
+      renderCard={(useCase) => <UseCaseCard useCase={useCase} onOpen={onOpen} onStatusChange={onStatusChange} />}
+      renderRow={(useCase) => <UseCaseCard useCase={useCase} variant="row" onOpen={onOpen} onStatusChange={onStatusChange} />}
     />
   );
 }

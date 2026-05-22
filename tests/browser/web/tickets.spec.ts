@@ -24,7 +24,7 @@ import {
  *
  * Abgedeckte Regeln:
  * - Tickets werden global und aus Owner-Tabs über `/tickets/new` erstellt, schließen nach Speichern zurück und werden über `/tickets/:id` bearbeitet.
- * - Einfacher Klick und Bearbeiten-Button in Ticket-Boards und Listen navigieren auf dieselbe Detailformular-Seite.
+ * - Doppelklick und Bearbeiten-Button in Ticket-Boards und Listen navigieren auf dieselbe Detailformular-Seite.
  * - Projekt-, Aufgaben-, Feature- und Use-Case-Ticket-Tabs öffnen echte Ticketdaten per Route.
  *
  * Fehlerfälle:
@@ -115,7 +115,7 @@ async function expectTicketNavigationFromScope(
   title: string,
   ticketId: number,
 ) {
-  await itemCard(scope, title).click();
+  await itemCard(scope, title).dblclick();
   await expect(page).toHaveURL(new RegExp(`/tickets/${ticketId}`));
   await expectTicketFormData(page, { title });
 }
@@ -159,7 +159,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
     }
   });
 
-  test("Ticket öffnen: Klick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({
+  test("Ticket öffnen: Doppelklick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({
     page,
     request,
   }) => {
@@ -167,7 +167,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
 
     try {
       await openTicketList(page);
-      await itemCard(page, ticket.title).click();
+      await itemCard(page, ticket.title).dblclick();
       await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
       await expectTicketFormData(page, ticket);
 
@@ -215,7 +215,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
     }
   });
 
-  test("Projekt-Tickets-Tab: Neu, Klick und Bearbeiten navigieren auf Ticket-Detailformular", async ({
+  test("Projekt-Tickets-Tab: Neu, Doppelklick und Bearbeiten navigieren auf Ticket-Detailformular", async ({
     page,
     request,
   }) => {

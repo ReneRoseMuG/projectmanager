@@ -18,7 +18,7 @@ import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProjectListBoardView } from "../../../../../apps/web/src/components/projects/ProjectListBoardView";
-import { buildProjectSet } from "../../../../fixtures/web/components/ui/factories";
+import { buildProject, buildProjectSet, buildTag } from "../../../../fixtures/web/components/ui/factories";
 
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
@@ -85,9 +85,9 @@ function expectToolbar() {
   expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Neues Projekt" }),
-  ).toBeInTheDocument();
+  const addButton = screen.getByRole("button", { name: "Neues Projekt" });
+  expect(addButton).toBeInTheDocument();
+  expect(addButton).toHaveTextContent("");
 }
 
 function expectItemCardClasses(cards: NodeListOf<Element>) {
@@ -181,7 +181,7 @@ describe("ProjectListBoardView", () => {
     expect(activeHeader).toHaveTextContent("1");
   });
 
-  it("ruft onEdit per einfachem Klick auf eine Karte auf", () => {
+  it("ruft onEdit per Doppelklick auf eine Karte auf", () => {
     const projects = buildProjectSet();
     const onEdit = vi.fn();
     renderProjectList({ projects, onEdit });
@@ -189,6 +189,8 @@ describe("ProjectListBoardView", () => {
     const card = screen.getByText("Projekt Aktiv").closest("article");
     expect(card).toBeInTheDocument();
     fireEvent.click(card as HTMLElement);
+    expect(onEdit).not.toHaveBeenCalled();
+    fireEvent.doubleClick(card as HTMLElement);
 
     expect(onEdit).toHaveBeenCalledWith(projects[0]);
   });
@@ -224,5 +226,45 @@ describe("ProjectListBoardView", () => {
     expect(
       container.querySelector("article.rounded-xl"),
     ).not.toBeInTheDocument();
+  });
+
+  it("filtert die Suche ausschließlich nach Projektname", () => {
+    const projects = [
+      buildProject({
+        id: 1,
+        name: "Suchnadel Projekt",
+        description: "Beschreibung ohne Treffer",
+        tags: [buildTag({ id: 1, name: "Neutral" })],
+      }),
+      buildProject({
+        id: 2,
+        name: "Beschreibungstreffer Projekt",
+        description: "Suchnadel steht nur in der Beschreibung",
+        tags: [buildTag({ id: 2, name: "Neutral" })],
+      }),
+      buildProject({
+        id: 3,
+        name: "Tagtreffer Projekt",
+        description: "Beschreibung ohne Treffer",
+        tags: [buildTag({ id: 3, name: "Suchnadel Tag" })],
+      }),
+    ];
+    renderProjectList({ projects });
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "  suchNADEL  " },
+    });
+
+    expect(screen.getByText("Suchnadel Projekt")).toBeInTheDocument();
+    expect(screen.queryByText("Beschreibungstreffer Projekt")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tagtreffer Projekt")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "" },
+    });
+
+    projects.forEach((project) => {
+      expect(screen.getByText(project.name)).toBeInTheDocument();
+    });
   });
 });

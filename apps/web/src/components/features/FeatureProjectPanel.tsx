@@ -2,8 +2,6 @@ import type { Project } from "@taskmanager/shared-types";
 import { Edit3, FolderKanban, FolderOpen, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { ViewMode } from "../../types";
-import { useCatalogs } from "../../hooks/useCatalogs";
-import { catalogLabel } from "../../utils/catalogs";
 import { formatHumanDate } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { TagBadge } from "../tags/TagBadge";
@@ -35,25 +33,13 @@ function toViewMode(mode: ListBoardMode): ViewMode {
   return mode === "board" ? "kanban" : "list";
 }
 
-function matchesSearch(
-  project: Project,
-  searchValue: string,
-  statusLabel: string,
-) {
+function matchesSearch(project: Project, searchValue: string) {
   const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
   if (!normalized) {
     return true;
   }
 
-  const values = [
-    project.name,
-    richTextToPlainText(project.description),
-    statusLabel,
-    ...project.tags.map((tag) => tag.name),
-  ];
-  return values.some((value) =>
-    value.toLocaleLowerCase("de-DE").includes(normalized),
-  );
+  return project.name.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
 function sortProjects(projects: Project[]) {
@@ -72,7 +58,6 @@ export function FeatureProjectPanel({
   onRemoveProject,
   onOpen,
 }: FeatureProjectPanelProps) {
-  const catalogs = useCatalogs();
   const [searchValue, setSearchValue] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
@@ -97,14 +82,8 @@ export function FeatureProjectPanel({
   );
   const visibleProjects = useMemo(
     () =>
-      sortProjects(projects).filter((project) =>
-        matchesSearch(
-          project,
-          searchValue,
-          catalogLabel(catalogs.entries, "workStatus", project.status),
-        ),
-      ),
-    [catalogs.entries, projects, searchValue],
+      sortProjects(projects).filter((project) => matchesSearch(project, searchValue)),
+    [projects, searchValue],
   );
 
   useEffect(() => {

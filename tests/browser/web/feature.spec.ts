@@ -21,7 +21,7 @@ import {
  * Abgedeckte Regeln:
  * - Feature-Create läuft über `/features/new` und schließt nach Speichern zurück zur Übersicht.
  * - Feature-Edit läuft über `/features/:id`.
- * - Einfacher Klick und Bearbeiten-Button in Feature-Übersicht und Feature-Tab-Views navigieren korrekt.
+ * - Doppelklick und Bearbeiten-Button in Feature-Übersicht und Feature-Tab-Views navigieren korrekt.
  * - Feature-, Projekt- und Use-Case-Detailseiten zeigen ihre vollständigen Formulardaten.
  *
  * Fehlerfälle:
@@ -98,7 +98,7 @@ test.describe("Feature-Routen und Detailformular", () => {
     }
   });
 
-  test("Feature öffnen: Klick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({
+  test("Feature öffnen: Doppelklick und Bearbeiten-Button zeigen dieselbe vollständige Formularseite", async ({
     page,
     request,
   }) => {
@@ -106,7 +106,7 @@ test.describe("Feature-Routen und Detailformular", () => {
 
     try {
       await openFeatureList(page);
-      await itemCard(page, feature.title).click();
+      await itemCard(page, feature.title).dblclick();
       await expect(page).toHaveURL(new RegExp(`/features/${feature.id}$`));
       await expectFeatureFormData(page, feature);
 
@@ -154,7 +154,7 @@ test.describe("Feature-Routen und Detailformular", () => {
     }
   });
 
-  test("Feature-Projekte-Tab: Klick und Bearbeiten öffnen das Projekt-Detailformular per Route", async ({
+  test("Feature-Projekte-Tab: Doppelklick und Bearbeiten öffnen das Projekt-Detailformular per Route", async ({
     page,
     request,
   }) => {
@@ -169,7 +169,7 @@ test.describe("Feature-Routen und Detailformular", () => {
       await featureForm.getByRole("button", { name: /Projekte/ }).click();
       await expect(itemCard(featureForm, project.name)).toBeVisible();
 
-      await itemCard(featureForm, project.name).click();
+      await itemCard(featureForm, project.name).dblclick();
       await expect(page).toHaveURL(new RegExp(`/projects/${project.id}`));
       const projectForm = formPage(page, "Projekt bearbeiten");
       await expect(projectForm.locator("input[required]").first()).toHaveValue(
@@ -196,7 +196,7 @@ test.describe("Feature-Routen und Detailformular", () => {
     }
   });
 
-  test("Feature-Use-Cases-Tab: Klick und Bearbeiten öffnen das Use-Case-Detailformular per Route", async ({
+  test("Feature-Use-Cases-Tab: Doppelklick und Bearbeiten öffnen das Use-Case-Detailformular per Route", async ({
     page,
     request,
   }) => {
@@ -213,7 +213,7 @@ test.describe("Feature-Routen und Detailformular", () => {
       await featureForm.getByRole("button", { name: /Use Cases/ }).click();
       await expect(itemCard(featureForm, useCase.title)).toBeVisible();
 
-      await itemCard(featureForm, useCase.title).click();
+      await itemCard(featureForm, useCase.title).dblclick();
       await expect(page).toHaveURL(new RegExp(`/use-cases/${useCase.id}`));
       const useCaseForm = formPage(page, "Use Case bearbeiten");
       await expect(useCaseForm.locator("input[required]").nth(0)).toHaveValue(

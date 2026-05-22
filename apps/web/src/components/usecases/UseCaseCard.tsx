@@ -12,9 +12,10 @@ interface UseCaseCardProps {
   useCase: UseCase;
   variant?: "card" | "row";
   onOpen: (useCase: UseCase) => void;
+  onStatusChange?: (useCase: UseCase, status: UseCase["status"]) => void | Promise<unknown>;
 }
 
-export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardProps) {
+export function UseCaseCard({ useCase, variant = "card", onOpen, onStatusChange }: UseCaseCardProps) {
   const catalogs = useCatalogs();
   const description = richTextToPlainText(useCase.description);
   const statusColor = catalogColor(catalogs.entries, "featureStatus", useCase.status);
@@ -23,14 +24,14 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
     return (
       <>
         <div className="md:hidden">
-          <UseCaseCard useCase={useCase} onOpen={onOpen} />
+          <UseCaseCard useCase={useCase} onOpen={onOpen} onStatusChange={onStatusChange} />
         </div>
         <div className="hidden md:block">
           <ItemRow
             accentColor={statusColor}
             title={useCase.title}
             description={description}
-            pills={<StatusPill kind="featureStatus" value={useCase.status} />}
+            pills={<StatusPill kind="featureStatus" value={useCase.status} onChange={onStatusChange ? (status) => onStatusChange(useCase, status) : undefined} />}
             actions={<ActionMenu items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(useCase) }]} />}
             onOpen={() => onOpen(useCase)}
           />
@@ -45,7 +46,7 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
       header={
         <div className="grid gap-2">
           <h3 className="line-clamp-2 text-sm font-semibold text-ink">{useCase.title}</h3>
-          <StatusPill kind="featureStatus" value={useCase.status} />
+          <StatusPill kind="featureStatus" value={useCase.status} onChange={onStatusChange ? (status) => onStatusChange(useCase, status) : undefined} />
         </div>
       }
       body={description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null}

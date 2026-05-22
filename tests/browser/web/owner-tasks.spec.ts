@@ -29,7 +29,7 @@ import {
  * Abgedeckte Regeln:
  * - Projekt-, Feature- und Use-Case-Detailseiten besitzen einen Aufgaben-Tab.
  * - Neue Aufgaben aus Owner-Tabs navigieren auf `/tasks/new` und schließen nach Speichern zurück zum Owner.
- * - Einfacher Klick und Bearbeiten-Button öffnen verknüpfte Aufgaben als vollständige Detailformular-Seite.
+ * - Doppelklick und Bearbeiten-Button öffnen verknüpfte Aufgaben als vollständige Detailformular-Seite.
  * - `Verknüpfen` und `Entfernen` bleiben relationale Aktionen und löschen Aufgaben nicht global.
  *
  * Fehlerfälle:
@@ -197,7 +197,7 @@ async function expectTaskNavigation(
   taskId: number,
 ) {
   let scope = await reopenScope();
-  await itemCard(scope, title).click();
+  await itemCard(scope, title).dblclick();
   await expect(page).toHaveURL(new RegExp(`/tasks/${taskId}`));
   await expect(
     formPage(page, "Aufgabe bearbeiten").locator("input[required]").first(),

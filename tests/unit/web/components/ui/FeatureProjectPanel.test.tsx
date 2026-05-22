@@ -19,7 +19,7 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ViewMode } from "../../../../../apps/web/src/types";
 import { FeatureProjectPanel } from "../../../../../apps/web/src/components/features/FeatureProjectPanel";
-import { buildProjectSet } from "../../../../fixtures/web/components/ui/factories";
+import { buildProject, buildProjectSet, buildTag } from "../../../../fixtures/web/components/ui/factories";
 
 const workStatusColumnCount = 12;
 
@@ -91,9 +91,9 @@ describe("FeatureProjectPanel", () => {
     const { container } = renderFeatureProjectPanel({ projects });
 
     expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Projekt hinzufügen" }),
-    ).toBeInTheDocument();
+    const addButton = screen.getByRole("button", { name: "Projekt hinzufügen" });
+    expect(addButton).toBeInTheDocument();
+    expect(addButton).toHaveTextContent("");
     expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
     expect(
@@ -213,5 +213,45 @@ describe("FeatureProjectPanel", () => {
     expect(
       container.querySelector("article.rounded-xl"),
     ).not.toBeInTheDocument();
+  });
+
+  it("filtert die Suche ausschließlich nach Projektname", () => {
+    const projects = [
+      buildProject({
+        id: 1,
+        name: "Suchnadel Featureprojekt",
+        description: "Beschreibung ohne Treffer",
+        tags: [buildTag({ id: 1, name: "Neutral" })],
+      }),
+      buildProject({
+        id: 2,
+        name: "Beschreibungstreffer Featureprojekt",
+        description: "Suchnadel steht nur in der Beschreibung",
+        tags: [buildTag({ id: 2, name: "Neutral" })],
+      }),
+      buildProject({
+        id: 3,
+        name: "Tagtreffer Featureprojekt",
+        description: "Beschreibung ohne Treffer",
+        tags: [buildTag({ id: 3, name: "Suchnadel Tag" })],
+      }),
+    ];
+    renderFeatureProjectPanel({ projects, availableProjects: projects });
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "  suchNADEL  " },
+    });
+
+    expect(screen.getByText("Suchnadel Featureprojekt")).toBeInTheDocument();
+    expect(screen.queryByText("Beschreibungstreffer Featureprojekt")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tagtreffer Featureprojekt")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "" },
+    });
+
+    projects.forEach((project) => {
+      expect(screen.getByText(project.name)).toBeInTheDocument();
+    });
   });
 });

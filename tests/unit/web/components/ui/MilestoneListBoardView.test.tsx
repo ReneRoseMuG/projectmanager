@@ -17,7 +17,7 @@ import { fireEvent, screen, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MilestoneListBoardView } from "../../../../../apps/web/src/components/milestones/MilestoneListBoardView";
-import { buildMilestoneSet } from "../../../../fixtures/web/components/ui/factories";
+import { buildMilestone, buildMilestoneSet, buildTag } from "../../../../fixtures/web/components/ui/factories";
 
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
@@ -96,6 +96,17 @@ describe("MilestoneListBoardView", () => {
     });
   });
 
+  it("rendert die gemeinsame Toolbar mit icon-only Add", () => {
+    renderMilestoneList();
+
+    expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
+    const addButton = screen.getByRole("button", { name: "Neuer Meilenstein" });
+    expect(addButton).toBeInTheDocument();
+    expect(addButton).toHaveTextContent("");
+  });
+
   it("rendert Listenzeilen mit Aufgaben-Meta und öffnet Meilensteine", () => {
     const milestones = buildMilestoneSet();
     const onEdit = vi.fn();
@@ -112,6 +123,48 @@ describe("MilestoneListBoardView", () => {
     expect(within(firstRow).getByText("3 offen")).toBeInTheDocument();
 
     fireEvent.click(firstRow);
+    expect(onEdit).not.toHaveBeenCalled();
+    fireEvent.doubleClick(firstRow);
     expect(onEdit).toHaveBeenCalledWith(firstMilestone);
+  });
+
+  it("filtert die Suche ausschließlich nach Meilenstein-Name", () => {
+    const milestones = [
+      buildMilestone({
+        id: 1,
+        name: "Suchnadel Meilenstein",
+        description: "Beschreibung ohne Treffer",
+        tags: [buildTag({ id: 1, name: "Neutral" })],
+      }),
+      buildMilestone({
+        id: 2,
+        name: "Beschreibungstreffer Meilenstein",
+        description: "Suchnadel steht nur in der Beschreibung",
+        tags: [buildTag({ id: 2, name: "Neutral" })],
+      }),
+      buildMilestone({
+        id: 3,
+        name: "Tagtreffer Meilenstein",
+        description: "Beschreibung ohne Treffer",
+        tags: [buildTag({ id: 3, name: "Suchnadel Tag" })],
+      }),
+    ];
+    renderMilestoneList({ milestones });
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "  suchNADEL  " },
+    });
+
+    expect(screen.getByText("Suchnadel Meilenstein")).toBeInTheDocument();
+    expect(screen.queryByText("Beschreibungstreffer Meilenstein")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tagtreffer Meilenstein")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "" },
+    });
+
+    milestones.forEach((milestone) => {
+      expect(screen.getByText(milestone.name)).toBeInTheDocument();
+    });
   });
 });

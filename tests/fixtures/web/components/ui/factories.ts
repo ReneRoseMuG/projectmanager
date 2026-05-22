@@ -10,6 +10,7 @@ import {
   type Tag,
   type TaskBoardItem,
   type TaskStatus,
+  type Ticket,
   type UseCase
 } from "@taskmanager/shared-types";
 
@@ -174,6 +175,32 @@ export function buildProjectSet(): Project[] {
   );
 }
 
+export function buildTicket(overrides: Partial<Ticket> = {}): Ticket {
+  return {
+    id: 1,
+    parentId: null,
+    type: "bug",
+    title: "Ticket Offen",
+    description: "Ein vollständig beschriebenes Ticket",
+    status: "open",
+    priority: "high",
+    resolution: null,
+    reporter: "Max Mustermann",
+    assignee: "Erika Musterfrau",
+    environment: "Test",
+    affectedVersion: "1.0.0",
+    dueDate: "2026-12-31",
+    resolvedAt: null,
+    position: 1,
+    version: 1,
+    createdAt,
+    updatedAt,
+    tags: [buildTag()],
+    subTicketCount: 0,
+    ...overrides
+  };
+}
+
 export function buildMilestoneSet(): Milestone[] {
   return PROJECT_STATUSES.map((status, index) =>
     buildMilestone({
@@ -205,6 +232,18 @@ export function buildFeatureSet(): Feature[] {
       title: `Feature ${featureStatusLabels[status]}`,
       status,
       sortOrder: index + 1
+    })
+  );
+}
+
+export function buildTicketSet(): Ticket[] {
+  return TASK_STATUSES.map((status, index) =>
+    buildTicket({
+      id: index + 1,
+      title: `Ticket ${taskStatusLabels[status]}`,
+      status,
+      position: index + 1,
+      tags: [buildTag({ id: index + 1, name: `Tag ${taskStatusLabels[status]}` })]
     })
   );
 }

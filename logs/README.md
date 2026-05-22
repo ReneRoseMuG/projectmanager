@@ -2,6 +2,13 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 22.05.26 | Fix           | Doppelklick Items                            | ✅     |
+| 22.05.26 | 6             | List-/Board-Testabdeckung                    | ✅     |
+| 22.05.26 | 5             | Inline Status und Datum                      | ✅     |
+| 22.05.26 | 4             | Status-Cards und Tag-Footer                  | ✅     |
+| 22.05.26 | 3             | Kumulative Projektlisten                     | ✅     |
+| 22.05.26 | 2             | List-/Board-Adapter                          | ⚠️     |
+| 22.05.26 | 1             | List-/Board-Toolbar                          | ⚠️     |
 | 22.05.26 | Fix           | Globale Suche                                | ✅     |
 | 22.05.26 | Fix           | Testfixes Projektgrenzen Relationen          | ⚠️     |
 | 22.05.26 | Feature       | Projektgrenzen Relationen                    | ⚠️     |

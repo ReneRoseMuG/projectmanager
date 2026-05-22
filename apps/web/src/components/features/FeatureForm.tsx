@@ -518,6 +518,7 @@ export function FeatureForm({
                       `/use-cases/${useCase.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
                     )
                   }
+                  onStatusChange={(useCase, status) => useCases.updateUseCase(useCase.id, { status, expectedVersion: useCase.version })}
                 />
               )
             ) : (

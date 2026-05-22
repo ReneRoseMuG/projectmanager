@@ -8,6 +8,7 @@ interface ItemRowProps {
   pills?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
+  footer?: ReactNode;
   onOpen?: () => void;
   className?: string;
   pillsClassName?: string;
@@ -24,6 +25,7 @@ export function ItemRow({
   pills,
   meta,
   actions,
+  footer,
   onOpen,
   className = "",
   pillsClassName = "",
@@ -36,9 +38,9 @@ export function ItemRow({
 
   return (
     <article
-      className={`grid ${columns} items-center gap-4 rounded-xl border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:border-steel-300 hover:shadow-md ${onOpen ? "cursor-pointer" : ""} ${className}`}
+      className={`grid h-full ${columns} items-center gap-4 rounded-xl border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:border-steel-300 hover:shadow-md ${onOpen ? "cursor-pointer" : ""} ${className}`}
       style={accentColor ? { borderLeftColor: accentColor } : undefined}
-      onClick={onOpen}
+      onDoubleClick={onOpen}
     >
       {statusIndicator ? (
         <span onClick={(event) => event.stopPropagation()}>
@@ -74,6 +76,11 @@ export function ItemRow({
         >
           {actions}
         </div>
+      ) : null}
+      {footer ? (
+        <footer className="col-span-full flex min-w-0 flex-wrap gap-2 border-t border-line pt-2" onClick={(event) => event.stopPropagation()}>
+          {footer}
+        </footer>
       ) : null}
     </article>
   );
