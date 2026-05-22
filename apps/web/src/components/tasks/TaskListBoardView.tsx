@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { catalogEntriesByKind } from "../../utils/catalogs";
-import { richTextToPlainText } from "../../utils/richText";
 import { EmptyState } from "../ui/EmptyState";
 import { FilterChips } from "../ui/FilterChips";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
@@ -19,6 +18,8 @@ interface TaskListBoardViewProps {
   onAddStatus?: (status: Task["status"]) => void;
   onOpen: (task: Task) => void;
   onDelete: (task: Task) => void;
+  onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>;
+  onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>;
   linkAction?: ReactNode;
   loading?: boolean;
 }
@@ -37,12 +38,11 @@ function matchesSearch(task: Task, searchValue: string) {
     return true;
   }
 
-  const values = [task.title, richTextToPlainText(task.description), task.status, task.priority, ...task.tags.map((tag) => tag.name)];
-  return values.some((value) => (value ?? "").toLocaleLowerCase("de-DE").includes(normalized));
+  return task.title.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
 /** Task-specific ListBoardView adapter with status Kanban columns. */
-export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, linkAction, loading = false }: TaskListBoardViewProps) {
+export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, onStatusChange, onDueDateChange, linkAction, loading = false }: TaskListBoardViewProps) {
   const catalogs = useCatalogs();
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState<Task["status"] | "all">("all");
@@ -73,8 +73,8 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
       filters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={tasks.length} />}
       loading={loading}
       emptyState={<EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben" body="Für diesen Kontext sind noch keine Aufgaben vorhanden." tone="fern" variant="tinted" />}
-      renderCard={(task) => <TaskCard task={task} onOpen={onOpen} onDelete={onDelete} />}
-      renderRow={(task) => <TaskCard task={task} variant="row" onOpen={onOpen} onDelete={onDelete} />}
+      renderCard={(task) => <TaskCard task={task} onOpen={onOpen} onDelete={task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />}
+      renderRow={(task) => <TaskCard task={task} variant="row" onOpen={onOpen} onDelete={task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />}
     />
   );
 }

@@ -1,4 +1,4 @@
-import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskUpdate } from "@taskmanager/shared-types";
+import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureTasks, features, milestoneTasks, milestones, projectTasks, projects, tasks, useCases, useCaseTasks } from "../db/schema.js";
@@ -29,6 +29,7 @@ import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 export type { TaskOwner };
 
 type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "version" | "createdAt" | "updatedAt">;
+type OwnerTaskRecord = MappableTaskRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
 
 const taskSelect = {
   id: tasks.id,
@@ -57,7 +58,8 @@ export function mapTask(
   database: DbClient,
   record: MappableTaskRecord,
   tags = getTaskTags(database, record.id),
-  subtaskCount = getSubtaskCounts(database, [record.id]).get(record.id) ?? 0
+  subtaskCount = getSubtaskCounts(database, [record.id]).get(record.id) ?? 0,
+  visibleParent?: VisibleParentContext | null
 ): Task {
   return {
     id: record.id,
@@ -72,13 +74,14 @@ export function mapTask(
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     tags,
-    subtaskCount
+    subtaskCount,
+    visibleParent
   };
 }
 
-function mapTaskBoardItem(database: DbClient, record: MappableTaskRecord & { boardPosition: number }, tags?: Task["tags"], subtaskCount?: number): TaskBoardItem {
+function mapTaskBoardItem(database: DbClient, record: OwnerTaskRecord, tags?: Task["tags"], subtaskCount?: number): TaskBoardItem {
   return {
-    ...mapTask(database, record, tags, subtaskCount),
+    ...mapTask(database, record, tags, subtaskCount, record.visibleParent),
     boardPosition: record.boardPosition
   };
 }
@@ -142,6 +145,20 @@ function getOwnerJournalObject(database: DbClient, owner: TaskOwner): JournalObj
   }
   const useCase = database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)).get();
   return makeJournalObject("useCase", owner.id, useCase?.title ?? `Use Case ${owner.id}`);
+}
+
+function visibleParentForOwner(database: DbClient, owner: TaskOwner, origin: VisibleParentContext["origin"]): VisibleParentContext {
+  const ownerObject = getOwnerJournalObject(database, owner);
+  return {
+    type: owner.type,
+    id: owner.id,
+    label: ownerObject.label,
+    origin
+  };
+}
+
+function withVisibleParent(rows: Array<MappableTaskRecord & { boardPosition: number }>, parent: VisibleParentContext): OwnerTaskRecord[] {
+  return rows.map((row) => ({ ...row, visibleParent: parent }));
 }
 
 function taskJournalObject(task: Pick<TaskRecord, "id" | "title">): JournalObjectRef {
@@ -260,6 +277,46 @@ function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Array<Mappab
     .all();
 }
 
+function selectProjectMilestoneTaskRows(database: DbClient, projectId: number): OwnerTaskRecord[] {
+  const milestoneRows = database
+    .select({
+      ...taskSelect,
+      boardPosition: milestoneTasks.position,
+      milestoneId: milestones.id,
+      milestoneName: milestones.name
+    })
+    .from(milestoneTasks)
+    .innerJoin(milestones, eq(milestoneTasks.ownerId, milestones.id))
+    .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
+    .where(and(eq(milestones.projectId, projectId), isNull(tasks.parentId)))
+    .orderBy(tasks.status, milestoneTasks.position)
+    .all();
+
+  return milestoneRows.map((row) => {
+    const { milestoneId, milestoneName, ...taskRow } = row;
+    return {
+      ...taskRow,
+      visibleParent: {
+        type: "milestone",
+        id: milestoneId,
+        label: milestoneName,
+        origin: "inherited"
+      }
+    };
+  });
+}
+
+function selectVisibleOwnerTaskRows(database: DbClient, owner: TaskOwner): OwnerTaskRecord[] {
+  const directRows = withVisibleParent(selectOwnerTaskRows(database, owner), visibleParentForOwner(database, owner, "direct"));
+  if (owner.type !== "project") {
+    return directRows;
+  }
+
+  const directIds = new Set(directRows.map((row) => row.id));
+  const inheritedRows = selectProjectMilestoneTaskRows(database, owner.id).filter((row) => !directIds.has(row.id));
+  return [...directRows, ...inheritedRows];
+}
+
 function getOwnerTaskRow(database: DbClient, owner: TaskOwner, taskId: number): (MappableTaskRecord & { boardPosition: number }) | undefined {
   return selectOwnerTaskRows(database, owner).find((task) => task.id === taskId);
 }
@@ -333,7 +390,7 @@ function insertTask(database: DbClient, input: TaskInput, parentId: number | nul
 
 export function listOwnerTasks(database: DbClient, owner: TaskOwner): TaskBoardItem[] {
   ensureOwnerExists(database, owner);
-  const rows = selectOwnerTaskRows(database, owner);
+  const rows = selectVisibleOwnerTaskRows(database, owner);
   const ids = rows.map((task) => task.id);
   const tagsByTask = getTaskTagsMap(database, ids);
   const subtaskCounts = getSubtaskCounts(database, ids);
@@ -353,7 +410,7 @@ export function listTasks(database: DbClient): Task[] {
 export function listTaskLinkCandidates(database: DbClient, owner: TaskOwner): Task[] {
   ensureOwnerExists(database, owner);
   const ownerContext = taskOwnerProjectContext(database, owner);
-  const linkedTaskIds = new Set(selectOwnerTaskRows(database, owner).map((task) => task.id));
+  const linkedTaskIds = new Set(selectVisibleOwnerTaskRows(database, owner).map((task) => task.id));
 
   return listTasks(database).filter((task) => !linkedTaskIds.has(task.id) && projectContextsAreCompatible(ownerContext, taskProjectContext(database, task.id)));
 }

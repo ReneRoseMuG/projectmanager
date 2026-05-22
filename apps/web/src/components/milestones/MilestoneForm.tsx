@@ -51,7 +51,6 @@ import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
-import { ColorPicker } from "../ui/ColorPicker";
 import { CommentThread } from "../ui/CommentThread";
 import { DatePicker } from "../ui/DatePicker";
 import { EmptyState } from "../ui/EmptyState";
@@ -120,18 +119,6 @@ const tabs: Array<Tab<MilestoneFormTab>> = [
   { value: "attachments", label: "Dateien" },
   { value: "events", label: "Events" },
   { value: "journal", label: "Journal" },
-];
-
-const swatches = [
-  "var(--color-teal)",
-  "var(--color-steel-700)",
-  "var(--color-crimson)",
-  "var(--color-tangerine)",
-  "var(--color-mustard)",
-  "var(--color-fern)",
-  "var(--color-violet)",
-  "var(--color-magenta)",
-  "var(--color-ink)",
 ];
 
 export function MilestoneForm({
@@ -534,23 +521,14 @@ export function MilestoneForm({
                 />
               </FormField>
             </Section>
-            <Section title="Identität">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <FormField label="Farbe">
-                  <ColorPicker
-                    value={color}
-                    onChange={setColor}
-                    swatches={swatches}
-                  />
-                </FormField>
-                <FormField label="Status">
-                  <StatusToggle
-                    kind="workStatus"
-                    value={status}
-                    onChange={setStatus}
-                  />
-                </FormField>
-              </div>
+            <Section title="Status">
+              <FormField label="Status">
+                <StatusToggle
+                  kind="workStatus"
+                  value={status}
+                  onChange={setStatus}
+                />
+              </FormField>
             </Section>
             <Section title="Zeitraum">
               <div className="grid gap-4 md:grid-cols-2">

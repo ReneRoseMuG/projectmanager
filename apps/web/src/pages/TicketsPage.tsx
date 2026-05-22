@@ -1,8 +1,6 @@
 import type { Ticket } from "@taskmanager/shared-types";
-import { Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TicketListBoardView } from "../components/tickets/TicketListBoardView";
-import { Button } from "../components/ui/Button";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessageAsync } from "../hooks/errors";
@@ -41,22 +39,33 @@ export function TicketsPage() {
     }
   };
 
+  const updateTicketStatus = async (ticket: Ticket, status: Ticket["status"]) => {
+    try {
+      await tickets.updateTicket(ticket.id, { status, expectedVersion: ticket.version });
+    } catch (ticketError) {
+      showToast({ tone: "error", title: "Ticketstatus konnte nicht geändert werden", message: await errorMessageAsync(ticketError) });
+      throw ticketError;
+    }
+  };
+
+  const updateTicketDueDate = async (ticket: Ticket, dueDate: string | null) => {
+    try {
+      await tickets.updateTicket(ticket.id, { dueDate, expectedVersion: ticket.version });
+    } catch (ticketError) {
+      showToast({ tone: "error", title: "Ticketdatum konnte nicht geändert werden", message: await errorMessageAsync(ticketError) });
+      throw ticketError;
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header>
         <div>
           <h1 className="text-2xl font-semibold text-ink">Tickets</h1>
           <p className="text-sm text-slate-500">
             {tickets.tickets.length} Einträge
           </p>
         </div>
-        <Button
-          variant="primary"
-          icon={<Plus size={17} />}
-          onClick={() => navigate("/tickets/new")}
-        >
-          Neues Ticket
-        </Button>
       </header>
 
       {tickets.error ? (
@@ -74,7 +83,8 @@ export function TicketsPage() {
         onAddStatus={(status) => navigate(`/tickets/new?status=${status}`)}
         onOpen={(ticket) => navigate(`/tickets/${ticket.id}`)}
         onDelete={deleteTicket}
-        showToolbarAdd={false}
+        onStatusChange={updateTicketStatus}
+        onDueDateChange={updateTicketDueDate}
       />
     </div>
   );

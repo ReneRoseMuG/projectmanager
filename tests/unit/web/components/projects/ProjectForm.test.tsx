@@ -214,12 +214,14 @@ describe("ProjectForm", () => {
 
     clickTab("Meilensteine");
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
-    expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("bg-steel-700");
+    expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("border-2", "border-ink");
+    expect(screen.getByRole("button", { name: "Liste" })).not.toHaveClass("bg-steel-700");
 
     clickTab("Features");
     clickTab("Meilensteine");
 
-    expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("bg-steel-700");
+    expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("border-2", "border-ink");
+    expect(screen.getByRole("button", { name: "Liste" })).not.toHaveClass("bg-steel-700");
   });
 
   it("zeigt im Edit-Modus CommentThread, NoteList, AttachmentList, Backlog und Import", () => {

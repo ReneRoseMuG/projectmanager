@@ -76,9 +76,9 @@ describe("ProjectFeaturePanel", () => {
     expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Neues Feature" }),
-    ).toBeInTheDocument();
+    const addButton = screen.getByRole("button", { name: "Neues Feature" });
+    expect(addButton).toBeInTheDocument();
+    expect(addButton).toHaveTextContent("");
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns).toHaveLength(4);
@@ -160,6 +160,8 @@ describe("ProjectFeaturePanel", () => {
       }),
     ).toBeInTheDocument();
     fireEvent.click(activeRow as HTMLElement);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.doubleClick(activeRow as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledWith(features[1]);
   });
@@ -201,5 +203,45 @@ describe("ProjectFeaturePanel", () => {
       container.querySelector("article.rounded-xl"),
     ).not.toBeInTheDocument();
     expect(container.querySelector("table")).not.toBeInTheDocument();
+  });
+
+  it("filtert die Suche ausschließlich nach Feature-Titel", () => {
+    const features = [
+      buildFeature({
+        id: 1,
+        title: "Suchnadel Projektfeature",
+        description: "Beschreibung ohne Treffer",
+        useCaseCount: 1,
+      }),
+      buildFeature({
+        id: 2,
+        title: "Beschreibungstreffer Projektfeature",
+        description: "Suchnadel steht nur in der Beschreibung",
+        useCaseCount: 1,
+      }),
+      buildFeature({
+        id: 3,
+        title: "Counttreffer Projektfeature",
+        description: "Beschreibung ohne Treffer",
+        useCaseCount: 999,
+      }),
+    ];
+    renderProjectFeaturePanel({ features });
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "  suchNADEL  " },
+    });
+
+    expect(screen.getByText("Suchnadel Projektfeature")).toBeInTheDocument();
+    expect(screen.queryByText("Beschreibungstreffer Projektfeature")).not.toBeInTheDocument();
+    expect(screen.queryByText("Counttreffer Projektfeature")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "" },
+    });
+
+    features.forEach((feature) => {
+      expect(screen.getByText(feature.title)).toBeInTheDocument();
+    });
   });
 });

@@ -2,8 +2,6 @@ import type { Feature } from "@taskmanager/shared-types";
 import { BookOpen, Edit3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
-import { useCatalogs } from "../../hooks/useCatalogs";
-import { catalogLabel } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { Badge } from "../ui/Badge";
 import { ActionMenu } from "../ui/ActionMenu";
@@ -36,23 +34,13 @@ function toViewMode(mode: ListBoardMode): ViewMode {
   return mode === "board" ? "kanban" : "list";
 }
 
-function matchesSearch(feature: Feature, searchValue: string, statusLabel: string) {
+function matchesSearch(feature: Feature, searchValue: string) {
   const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
   if (!normalized) {
     return true;
   }
 
-  const values = [
-    feature.title,
-    statusLabel,
-    richTextToPlainText(feature.description),
-    String(getUseCaseCount(feature)),
-  ];
-  return values.some((value) =>
-    String(value ?? "")
-      .toLocaleLowerCase("de-DE")
-      .includes(normalized),
-  );
+  return feature.title.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
 function getUseCaseCount(feature: Feature): number {
@@ -67,13 +55,11 @@ export function ProjectFeaturePanel({
   onCreate,
   onOpen,
 }: ProjectFeaturePanelProps) {
-  const catalogs = useCatalogs();
   const [searchValue, setSearchValue] = useState("");
   const sortedFeatures = useMemo(() => sortFeatures(features), [features]);
   const visibleFeatures = useMemo(
-    () =>
-      sortedFeatures.filter((feature) => matchesSearch(feature, searchValue, catalogLabel(catalogs.entries, "featureStatus", feature.status))),
-    [catalogs.entries, searchValue, sortedFeatures],
+    () => sortedFeatures.filter((feature) => matchesSearch(feature, searchValue)),
+    [searchValue, sortedFeatures],
   );
 
   return (

@@ -17,6 +17,7 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, screen, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Button } from "../../../../../apps/web/src/components/ui/Button";
 import { ItemCard } from "../../../../../apps/web/src/components/ui/ItemCard";
@@ -45,6 +46,7 @@ function renderListBoardView({
   onModeChange = vi.fn(),
   onAdd = vi.fn(),
   onSearchChange = vi.fn(),
+  filters,
 }: {
   mode?: ListBoardMode;
   viewItems?: TestItem[];
@@ -52,6 +54,7 @@ function renderListBoardView({
   onModeChange?: (mode: ListBoardMode) => void;
   onAdd?: () => void;
   onSearchChange?: (value: string) => void;
+  filters?: ReactNode;
 } = {}) {
   return render(
     <ListBoardView
@@ -62,6 +65,7 @@ function renderListBoardView({
       addLabel="Anlegen"
       searchValue=""
       onSearchChange={onSearchChange}
+      filters={filters}
       emptyState={<div>Keine Einträge</div>}
       loading={loading}
       renderCard={(item) => (
@@ -82,6 +86,40 @@ afterEach(() => {
 });
 
 describe("ListBoardView", () => {
+  it("rendert die Toolbar als drei Spalten mit Suche, Filtern und Aktionen", () => {
+    const { container } = renderListBoardView({
+      filters: <div data-testid="status-filters">Statusfilter</div>,
+    });
+
+    const toolbar = screen.getByTestId("list-board-view")
+      .firstElementChild as HTMLElement;
+    expect(toolbar).toHaveClass("grid");
+    expect(toolbar.className).toContain(
+      "md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]",
+    );
+
+    const [searchColumn, filterColumn, actionColumn] = Array.from(
+      toolbar.children,
+    ) as HTMLElement[];
+    expect(searchColumn).toHaveClass("justify-start");
+    expect(filterColumn).toHaveClass("justify-center");
+    expect(actionColumn).toHaveClass("md:justify-end");
+    expect(searchColumn).toContainElement(screen.getByPlaceholderText("Suchen"));
+    expect(filterColumn).toContainElement(screen.getByTestId("status-filters"));
+    expect(actionColumn).toContainElement(
+      screen.getByRole("button", { name: "Anlegen" }),
+    );
+    expect(container.querySelector("[data-testid='list-board-view']")).toBeInTheDocument();
+  });
+
+  it("begrenzt das Suchfeld auf 15 Zeichen und eine schmale Breite", () => {
+    renderListBoardView();
+
+    const searchInput = screen.getByPlaceholderText("Suchen") as HTMLInputElement;
+    expect(searchInput.maxLength).toBe(15);
+    expect(searchInput.closest("label")).toHaveClass("max-w-[15rem]");
+  });
+
   it("rendert Items als Karten im Board-Modus", () => {
     const { container } = renderListBoardView({ mode: "board" });
 
@@ -167,11 +205,11 @@ describe("ListBoardView", () => {
     renderListBoardView({ mode: "board", onModeChange });
 
     const listButton = screen.getByRole("button", { name: "Liste" });
+    const boardButton = screen.getByRole("button", { name: "Kanban" });
     expect(listButton).toHaveClass("h-8", "w-8");
-    expect(screen.getByRole("button", { name: "Kanban" })).toHaveClass(
-      "h-8",
-      "w-8",
-    );
+    expect(boardButton).toHaveClass("h-8", "w-8", "border-2", "border-ink");
+    expect(boardButton).toHaveClass("bg-transparent");
+    expect(boardButton).not.toHaveClass("bg-steel-700");
 
     fireEvent.click(listButton);
 
@@ -184,6 +222,7 @@ describe("ListBoardView", () => {
 
     const addButton = screen.getByRole("button", { name: "Anlegen" });
     expect(addButton).toHaveClass("h-9", "w-9");
+    expect(addButton).toHaveClass("bg-transparent", "border-fern", "text-fern");
     expect(addButton).toHaveTextContent("");
 
     fireEvent.click(addButton);
@@ -229,7 +268,7 @@ describe("ListBoardView", () => {
         addLabel="Anlegen"
         statusKey="status"
         statusColumns={[
-          { value: "todo", label: "Offen" },
+          { value: "todo", label: "Offen", color: "#4D9359" },
           { value: "done", label: "Erledigt" },
         ]}
         renderCard={(item) => (
@@ -244,19 +283,53 @@ describe("ListBoardView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Offen hinzufügen" }));
+    const addButton = screen.getByRole("button", { name: "Offen hinzufügen" });
+    expect(addButton).toHaveClass("h-7", "w-7", "border-white");
+    expect(addButton).toHaveStyle({ backgroundColor: "#4D9359" });
+    fireEvent.click(addButton);
 
     screen.getAllByRole("heading").forEach((heading) => {
       expect(heading.closest("section")).toHaveClass("min-w-0");
     });
-    expect(
-      screen.getByRole("heading", { name: "Offen" }).closest("header"),
-    ).toHaveClass("bg-white");
-    expect(
-      screen.getByRole("heading", { name: "Offen" }).closest("header"),
-    ).not.toHaveClass("bg-white/60", "backdrop-blur-sm");
+    const openHeader = screen.getByRole("heading", { name: "Offen" }).closest("header") as HTMLElement;
+    expect(openHeader).toHaveClass("bg-white");
+    expect(openHeader).not.toHaveClass("bg-white/60", "backdrop-blur-sm");
+    const labelCounter = openHeader.firstElementChild as HTMLElement;
+    expect(labelCounter).toHaveClass("items-center", "gap-2");
+    expect(labelCounter).toContainElement(screen.getByRole("heading", { name: "Offen" }));
+    expect(labelCounter).toContainElement(within(labelCounter).getByText("1"));
 
     expect(onAddToColumn).toHaveBeenCalledWith("todo");
+  });
+
+  it("setzt für sichtbare Items eine einheitliche Mindesthöhe", () => {
+    const originalMeasure = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+      const height = this.textContent?.includes("Beta") ? 72 : 48;
+      return {
+        x: 0,
+        y: 0,
+        width: 320,
+        height,
+        top: 0,
+        right: 320,
+        bottom: height,
+        left: 0,
+        toJSON: () => ({}),
+      } as DOMRect;
+    };
+
+    try {
+      const { container } = renderListBoardView({ mode: "board" });
+      const wrappers = container.querySelectorAll<HTMLElement>("[data-equal-item='true']");
+
+      expect(wrappers).toHaveLength(items.length);
+      wrappers.forEach((wrapper) => {
+        expect(wrapper.style.minHeight).toBe("72px");
+      });
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = originalMeasure;
+    }
   });
 
   it("EmptyState erscheint wenn items=[]", () => {
@@ -297,24 +370,26 @@ describe("ListBoardView", () => {
 });
 
 describe("ItemCard", () => {
-  it("einfacher Klick ruft onOpen auf", () => {
+  it("Doppelklick ruft onOpen auf, einfacher Klick nicht", () => {
     const onOpen = vi.fn();
     render(<ItemCard header={<h3>Alpha</h3>} onOpen={onOpen} />);
 
     const card = screen.getByText("Alpha").closest("article");
     expect(card).toBeInTheDocument();
     fireEvent.click(card as HTMLElement);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.doubleClick(card as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("Karte ohne onOpen reagiert nicht auf Klick", () => {
+  it("Karte ohne onOpen reagiert nicht auf Doppelklick", () => {
     const onOpen = vi.fn();
     render(<ItemCard header={<h3>Alpha</h3>} />);
 
     const card = screen.getByText("Alpha").closest("article");
     expect(card).toBeInTheDocument();
-    fireEvent.click(card as HTMLElement);
+    fireEvent.doubleClick(card as HTMLElement);
 
     expect(onOpen).not.toHaveBeenCalled();
   });
@@ -327,7 +402,7 @@ describe("ItemCard", () => {
     );
 
     const trigger = screen.getByRole("button", { name: "Aktionen" });
-    expect(trigger).toHaveClass("h-10", "w-10", "border", "shadow-sm");
+    expect(trigger).toHaveClass("h-8", "w-7", "border", "shadow-none");
 
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: "Bearbeiten" }));
@@ -377,13 +452,15 @@ describe("ItemRow", () => {
     expect(screen.getByText("Beschreibung")).toBeInTheDocument();
   });
 
-  it("einfacher Klick ruft onOpen auf", () => {
+  it("Doppelklick ruft onOpen auf, einfacher Klick nicht", () => {
     const onOpen = vi.fn();
     render(<ItemRow title="Alpha" onOpen={onOpen} />);
 
     const row = screen.getByText("Alpha").closest("article");
     expect(row).toBeInTheDocument();
     fireEvent.click(row as HTMLElement);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.doubleClick(row as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledTimes(1);
   });

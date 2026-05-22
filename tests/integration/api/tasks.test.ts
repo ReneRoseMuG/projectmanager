@@ -93,6 +93,26 @@ describe("Tasks API", () => {
     expect(res.body.find((item: { id: number }) => item.id === subtask.id)).toBeUndefined();
   });
 
+  it("GET /api/projects/:id/tasks liefert direkte und Meilenstein-Aufgaben kumulativ", async () => {
+    const project = await createProject(app, { name: "Projekt Alpha" });
+    const milestone = await createMilestone(app, project.id, { name: "Meilenstein A" });
+    const directTask = await createTask(app, project.id, { title: "Direkte Aufgabe" });
+    const inheritedTask = await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks`).send({ title: "Meilenstein-Aufgabe" }).expect(201);
+    const duplicateTask = await createTask(app, project.id, { title: "Doppelt sichtbar" });
+    await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks/${duplicateTask.id}`).expect(200);
+
+    const projectTasks = await supertest(app.server).get(`/api/projects/${project.id}/tasks`).expect(200);
+    const projectTaskIds = projectTasks.body.map((task: { id: number }) => task.id);
+    expect(projectTaskIds).toEqual(expect.arrayContaining([directTask.id, inheritedTask.body.id, duplicateTask.id]));
+    expect(projectTaskIds.filter((id: number) => id === duplicateTask.id)).toHaveLength(1);
+    expect(projectTasks.body.find((task: { id: number }) => task.id === directTask.id).visibleParent).toMatchObject({ type: "project", id: project.id, label: "Projekt Alpha", origin: "direct" });
+    expect(projectTasks.body.find((task: { id: number }) => task.id === inheritedTask.body.id).visibleParent).toMatchObject({ type: "milestone", id: milestone.id, label: "Meilenstein A", origin: "inherited" });
+
+    const milestoneTasks = await supertest(app.server).get(`/api/milestones/${milestone.id}/tasks`).expect(200);
+    expect(milestoneTasks.body.map((task: { id: number }) => task.id)).toEqual(expect.arrayContaining([inheritedTask.body.id, duplicateTask.id]));
+    expect(milestoneTasks.body.find((task: { id: number }) => task.id === duplicateTask.id).visibleParent).toMatchObject({ type: "milestone", id: milestone.id, origin: "direct" });
+  });
+
   it("GET /api/tasks/:id gibt Task mit Subtask-Count zurueck", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);

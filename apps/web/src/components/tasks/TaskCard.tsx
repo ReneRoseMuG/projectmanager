@@ -1,15 +1,17 @@
 import type { Task } from "@taskmanager/shared-types";
-import { CalendarClock, CheckCircle2, Edit3, Trash2 } from "lucide-react";
+import { CheckCircle2, Edit3, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { catalogColor } from "../../utils/catalogs";
-import { formatHumanDate, isOverdue } from "../../utils/date";
+import { isOverdue } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
-import { Badge } from "../ui/Badge";
+import { InlineDateField } from "../ui/InlineDateField";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
+import { ParentBadge } from "../ui/ParentBadge";
 import { PriorityBadge } from "../ui/PriorityBadge";
 import { StatusPill } from "../ui/StatusPill";
+import { TagFooter } from "../ui/TagFooter";
 
 interface TaskCardProps {
   task: Task;
@@ -17,32 +19,32 @@ interface TaskCardProps {
   variant?: "card" | "row";
   onOpen: (task: Task) => void;
   onDelete?: (task: Task) => void;
+  onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>;
+  onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>;
 }
 
-const tagTones: Array<"violet" | "teal" | "magenta" | "fern" | "steel"> = ["violet", "teal", "magenta", "fern", "steel"];
-
-export function TaskCard({ task, compact = false, variant = "card", onOpen, onDelete }: TaskCardProps) {
+export function TaskCard({ task, compact = false, variant = "card", onOpen, onDelete, onStatusChange, onDueDateChange }: TaskCardProps) {
   const catalogs = useCatalogs();
   const description = richTextToPlainText(task.description);
-  const priorityColor = catalogColor(catalogs.entries, "priority", task.priority);
+  const statusColor = catalogColor(catalogs.entries, "workStatus", task.status);
 
   if (variant === "row") {
     return (
       <>
         <div className="md:hidden">
-          <TaskCard task={task} compact={compact} onOpen={onOpen} onDelete={onDelete} />
+          <TaskCard task={task} compact={compact} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
         </div>
-        <TaskRow task={task} description={description} priorityColor={priorityColor} onOpen={onOpen} onDelete={onDelete} />
+        <TaskRow task={task} description={description} statusColor={statusColor} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
       </>
     );
   }
 
   return (
     <ItemCard
-      accentColor={priorityColor}
-      header={<TaskCardHeader task={task} />}
+      accentColor={statusColor}
+      header={<TaskCardHeader task={task} onStatusChange={onStatusChange} />}
       body={<TaskCardBody description={description} />}
-      footer={<TaskCardFooter task={task} />}
+      footer={<TaskCardFooter task={task} onDueDateChange={onDueDateChange} />}
       onOpen={() => onOpen(task)}
       onEdit={() => onOpen(task)}
       onDelete={onDelete ? () => onDelete(task) : undefined}
@@ -51,12 +53,12 @@ export function TaskCard({ task, compact = false, variant = "card", onOpen, onDe
   );
 }
 
-function TaskCardHeader({ task }: { task: Task }) {
+function TaskCardHeader({ task, onStatusChange }: { task: Task; onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown> }) {
   return (
     <div className="grid gap-2">
       <h3 className="line-clamp-2 text-sm font-semibold text-ink">{task.title}</h3>
       <div className="flex flex-wrap items-center gap-2">
-        <StatusPill kind="workStatus" value={task.status} />
+        <StatusPill kind="workStatus" value={task.status} onChange={onStatusChange ? (status) => onStatusChange(task, status) : undefined} />
         <PriorityBadge value={task.priority} />
       </div>
     </div>
@@ -67,7 +69,7 @@ function TaskCardBody({ description }: { description: string }) {
   return description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null;
 }
 
-function TaskCardFooter({ task }: { task: Task }) {
+function TaskCardFooter({ task, onDueDateChange }: { task: Task; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown> }) {
   const overdue = task.status !== "done" && isOverdue(task.dueDate);
   const hasMeta = task.subtaskCount > 0 || Boolean(task.dueDate);
 
@@ -82,48 +84,39 @@ function TaskCardFooter({ task }: { task: Task }) {
             </span>
           ) : null}
           {task.dueDate ? (
-            <span className={`inline-flex items-center gap-1 ${overdue ? "text-crimson" : ""}`}>
-              <CalendarClock size={14} />
-              {formatHumanDate(task.dueDate)}
-            </span>
+            <InlineDateField value={task.dueDate} className={overdue ? "text-crimson" : ""} onChange={onDueDateChange ? (dueDate) => onDueDateChange(task, dueDate) : undefined} />
           ) : null}
         </div>
       ) : null}
-      {task.tags.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {task.tags.map((tag, index) => (
-            <Badge key={tag.id} tone={tagTones[index % tagTones.length]}>
-              {tag.name}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <ParentBadge parent={task.visibleParent} />
+      </div>
+      <TagFooter tags={task.tags} />
     </div>
   );
 }
 
-function TaskRow({ task, description, priorityColor, onOpen, onDelete }: { task: Task; description: string; priorityColor: string; onOpen: (task: Task) => void; onDelete?: (task: Task) => void }) {
+function TaskRow({ task, description, statusColor, onOpen, onDelete, onStatusChange, onDueDateChange }: { task: Task; description: string; statusColor: string; onOpen: (task: Task) => void; onDelete?: (task: Task) => void; onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown> }) {
   const overdue = task.status !== "done" && isOverdue(task.dueDate);
-  const primaryTag = task.tags[0];
 
   return (
     <div className="hidden md:block">
       <ItemRow
-        accentColor={priorityColor}
+        accentColor={statusColor}
         title={task.title}
         description={description}
         pills={
           <>
-            <StatusPill kind="workStatus" value={task.status} />
-            {primaryTag ? <Badge tone={tagTones[0]}>{primaryTag.name}</Badge> : <Badge tone="mute">Ohne Tag</Badge>}
+            <StatusPill kind="workStatus" value={task.status} onChange={onStatusChange ? (status) => onStatusChange(task, status) : undefined} />
+            <PriorityBadge value={task.priority} />
           </>
         }
         meta={
           <span className={`inline-flex min-w-[82px] items-center gap-1 text-xs font-semibold ${overdue ? "text-crimson" : "text-slate-500"}`}>
-            <CalendarClock size={14} />
-            {task.dueDate ? formatHumanDate(task.dueDate) : "Ohne Datum"}
+            <InlineDateField value={task.dueDate} onChange={onDueDateChange ? (dueDate) => onDueDateChange(task, dueDate) : undefined} />
           </span>
         }
+        footer={<><ParentBadge parent={task.visibleParent} /><TagFooter tags={task.tags} /></>}
         actions={
           <ActionMenu
             items={[

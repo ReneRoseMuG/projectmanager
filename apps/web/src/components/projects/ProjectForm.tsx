@@ -61,7 +61,6 @@ import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { Button } from "../ui/Button";
-import { ColorPicker } from "../ui/ColorPicker";
 import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { DatePicker } from "../ui/DatePicker";
@@ -133,18 +132,6 @@ const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "backlog", label: "Backlog" },
   { value: "journal", label: "Journal" },
   { value: "import", label: "Import" },
-];
-
-const swatches = [
-  "var(--color-steel-700)",
-  "var(--color-crimson)",
-  "var(--color-tangerine)",
-  "var(--color-mustard)",
-  "var(--color-fern)",
-  "var(--color-teal)",
-  "var(--color-violet)",
-  "var(--color-magenta)",
-  "var(--color-ink)",
 ];
 
 function workStatusValue(
@@ -584,23 +571,14 @@ export function ProjectForm({
                 />
               </FormField>
             </Section>
-            <Section title="Identität">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <FormField label="Farbe">
-                  <ColorPicker
-                    value={color}
-                    onChange={setColor}
-                    swatches={swatches}
-                  />
-                </FormField>
-                <FormField label="Status">
-                  <StatusToggle
-                    kind="workStatus"
-                    value={status}
-                    onChange={setStatus}
-                  />
-                </FormField>
-              </div>
+            <Section title="Status">
+              <FormField label="Status">
+                <StatusToggle
+                  kind="workStatus"
+                  value={status}
+                  onChange={setStatus}
+                />
+              </FormField>
             </Section>
             <Section title="Zeitraum">
               <div className="grid gap-4 md:grid-cols-2">
@@ -641,6 +619,8 @@ export function ProjectForm({
                   )
                 }
                 onDelete={(milestone) => void deleteMilestone(milestone)}
+                onStatusChange={(milestone, status) => milestones.updateMilestone(milestone.id, { status, expectedVersion: milestone.version })}
+                onDueDateChange={(milestone, dueDate) => milestones.updateMilestone(milestone.id, { dueDate, expectedVersion: milestone.version })}
               />
             ) : (
               <EmptyState
@@ -915,6 +895,7 @@ export function ProjectForm({
                     )
                   }
                   onDelete={(item) => void deleteBacklogItem(item)}
+                  onStatusChange={(item, status) => backlog.updateItem(item.id, { status, expectedVersion: item.version })}
                 />
               )
             ) : (

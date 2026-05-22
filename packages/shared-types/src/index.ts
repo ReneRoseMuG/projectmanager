@@ -501,6 +501,15 @@ export interface MilestoneInput {
 
 export type MilestoneUpdate = WithExpectedVersion<Partial<MilestoneInput>>;
 
+export type VisibleParentType = "project" | "milestone" | "task" | "feature" | "useCase";
+
+export interface VisibleParentContext {
+  type: VisibleParentType;
+  id: number;
+  label: string;
+  origin: "direct" | "inherited";
+}
+
 export interface Task {
   id: number;
   parentId: number | null;
@@ -515,6 +524,7 @@ export interface Task {
   updatedAt: string;
   tags: Tag[];
   subtaskCount: number;
+  visibleParent?: VisibleParentContext | null;
 }
 
 export interface TaskBoardItem extends Task {
@@ -560,6 +570,7 @@ export interface Ticket {
   updatedAt: string;
   tags: Tag[];
   subTicketCount: number;
+  visibleParent?: VisibleParentContext | null;
 }
 
 export interface TicketRelationEntry {

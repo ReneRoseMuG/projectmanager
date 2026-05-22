@@ -1,41 +1,67 @@
 import type { Feature } from "@taskmanager/shared-types";
-import { ArrowRight, FileText } from "lucide-react";
+import { ArrowRight, Edit3, FileText, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
+import { ActionMenu } from "../ui/ActionMenu";
 import { ItemCard } from "../ui/ItemCard";
+import { ItemRow } from "../ui/ItemRow";
 import { StatusPill } from "../ui/StatusPill";
 
 interface FeatureCardProps {
   feature: Feature;
+  variant?: "card" | "row";
   onOpen: (feature: Feature) => void;
   onDelete: (feature: Feature) => void;
+  onStatusChange?: (feature: Feature, status: Feature["status"]) => void | Promise<unknown>;
 }
 
 /** Feature card based on the shared ItemCard surface. */
-export function FeatureCard({ feature, onOpen, onDelete }: FeatureCardProps) {
+export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onStatusChange }: FeatureCardProps) {
   const catalogs = useCatalogs();
   const open = () => onOpen(feature);
   const description = richTextToPlainText(feature.description);
+  const statusColor = catalogColor(catalogs.entries, "featureStatus", feature.status);
+
+  if (variant === "row") {
+    return (
+      <>
+        <div className="md:hidden">
+          <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} />
+        </div>
+        <div className="hidden md:block">
+          <ItemRow
+            accentColor={statusColor}
+            title={feature.title}
+            description={description}
+            pills={<StatusPill kind="featureStatus" value={feature.status} onChange={onStatusChange ? (status) => onStatusChange(feature, status) : undefined} />}
+            meta={<span className="text-xs font-semibold text-slate-500">{feature.useCaseCount} Use Cases</span>}
+            actions={<ActionMenu items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: open }, { label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(feature), danger: true }]} />}
+            onOpen={open}
+          />
+        </div>
+      </>
+    );
+  }
 
   return (
     <ItemCard
-      accentColor={catalogColor(catalogs.entries, "featureStatus", feature.status)}
+      accentColor={statusColor}
       onOpen={open}
       onEdit={open}
       onDelete={() => onDelete(feature)}
-      header={<FeatureCardHeader feature={feature} />}
+      header={<FeatureCardHeader feature={feature} onStatusChange={onStatusChange} />}
       body={description ? <p className="line-clamp-3 text-sm text-slate-600">{description}</p> : null}
       footer={<FeatureCardFooter feature={feature} />}
     />
   );
 }
 
-function FeatureCardHeader({ feature }: { feature: Feature }) {
+function FeatureCardHeader({ feature, onStatusChange }: { feature: Feature; onStatusChange?: (feature: Feature, status: Feature["status"]) => void | Promise<unknown> }) {
   return (
     <div className="grid gap-2">
       <span className="line-clamp-2 text-base font-semibold text-ink">{feature.title}</span>
-      <StatusPill kind="featureStatus" value={feature.status} />
+      <StatusPill kind="featureStatus" value={feature.status} onChange={onStatusChange ? (status) => onStatusChange(feature, status) : undefined} />
     </div>
   );
 }

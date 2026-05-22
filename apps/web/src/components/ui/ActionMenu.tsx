@@ -57,9 +57,9 @@ export function ActionMenu({ items, ariaLabel = "Aktionen" }: ActionMenuProps) {
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         title={ariaLabel}
-        icon={<MoreVertical size={20} />}
+        icon={<MoreVertical size={18} />}
         variant="ghost"
-        className="h-10 w-10 border border-line bg-white px-0 text-steel-700 shadow-sm hover:bg-steel-50"
+        className="-mr-2 h-8 w-7 border border-transparent bg-transparent px-0 text-steel-700 shadow-none hover:border-line hover:bg-steel-50"
         onClick={(event) => {
           event.stopPropagation();
           setOpen((current) => !current);

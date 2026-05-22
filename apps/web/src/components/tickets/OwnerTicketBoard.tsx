@@ -33,6 +33,24 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
     navigate(`/tickets/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${resolvedStatus}&returnTo=${encodeURIComponent(returnTo)}`);
   };
 
+  const updateTicketStatus = async (ticket: Ticket, status: TicketStatus) => {
+    try {
+      await ticketController.updateTicket(ticket.id, { status, expectedVersion: ticket.version });
+    } catch (ticketError) {
+      showToast({ tone: "error", title: "Ticketstatus konnte nicht geändert werden", message: await errorMessageAsync(ticketError) });
+      throw ticketError;
+    }
+  };
+
+  const updateTicketDueDate = async (ticket: Ticket, dueDate: string | null) => {
+    try {
+      await ticketController.updateTicket(ticket.id, { dueDate, expectedVersion: ticket.version });
+    } catch (ticketError) {
+      showToast({ tone: "error", title: "Ticketdatum konnte nicht geändert werden", message: await errorMessageAsync(ticketError) });
+      throw ticketError;
+    }
+  };
+
   return (
     <>
       <OwnerRelationBoard<Ticket>
@@ -54,6 +72,8 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
             onAddStatus={(status) => props.onAddStatus?.(status)}
             onOpen={props.onOpen}
             onDelete={props.onDelete}
+            onStatusChange={updateTicketStatus}
+            onDueDateChange={updateTicketDueDate}
             linkAction={props.linkAction}
           />
         )}

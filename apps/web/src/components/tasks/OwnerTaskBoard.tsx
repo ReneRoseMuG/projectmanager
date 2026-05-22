@@ -33,6 +33,24 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
     navigate(`/tasks/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${resolvedStatus}&returnTo=${encodeURIComponent(returnTo)}`);
   };
 
+  const updateTaskStatus = async (task: TaskBoardItem, status: TaskStatus) => {
+    try {
+      await taskController.updateTask(task.id, { status, expectedVersion: task.version });
+    } catch (taskError) {
+      showToast({ tone: "error", title: "Aufgabenstatus konnte nicht geändert werden", message: errorMessage(taskError) });
+      throw taskError;
+    }
+  };
+
+  const updateTaskDueDate = async (task: TaskBoardItem, dueDate: string | null) => {
+    try {
+      await taskController.updateTask(task.id, { dueDate, expectedVersion: task.version });
+    } catch (taskError) {
+      showToast({ tone: "error", title: "Aufgabendatum konnte nicht geändert werden", message: errorMessage(taskError) });
+      throw taskError;
+    }
+  };
+
   return (
     <>
       <OwnerRelationBoard<TaskBoardItem>
@@ -54,6 +72,8 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
             onAddStatus={(status) => props.onAddStatus?.(status)}
             onOpen={(task) => props.onOpen(task as TaskBoardItem)}
             onDelete={(task) => props.onDelete(task as TaskBoardItem)}
+            onStatusChange={(task, status) => updateTaskStatus(task as TaskBoardItem, status)}
+            onDueDateChange={(task, dueDate) => updateTaskDueDate(task as TaskBoardItem, dueDate)}
             linkAction={props.linkAction}
           />
         )}

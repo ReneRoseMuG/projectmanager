@@ -111,9 +111,9 @@ function expectToolbar() {
   expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Neuer Use Case" }),
-  ).toBeInTheDocument();
+  const addButton = screen.getByRole("button", { name: "Neuer Use Case" });
+  expect(addButton).toBeInTheDocument();
+  expect(addButton).toHaveTextContent("");
 }
 
 function expectItemCardClasses(cards: NodeListOf<Element>) {
@@ -189,7 +189,7 @@ describe("UseCaseListBoardView", () => {
     expect(onCreate).toHaveBeenCalledTimes(1);
   });
 
-  it("ruft onOpen per einfachem Klick auf eine Karte auf", () => {
+  it("ruft onOpen per Doppelklick auf eine Karte auf", () => {
     const useCases = buildUseCases();
     const onOpen = vi.fn();
     renderUseCaseList({ useCases, onOpen });
@@ -199,6 +199,8 @@ describe("UseCaseListBoardView", () => {
       .closest("article");
     expect(card).toBeInTheDocument();
     fireEvent.click(card as HTMLElement);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.doubleClick(card as HTMLElement);
 
     expect(onOpen).toHaveBeenCalledWith(useCases[0]);
   });
@@ -262,5 +264,45 @@ describe("UseCaseListBoardView", () => {
     expect(
       container.querySelector("article.rounded-xl"),
     ).not.toBeInTheDocument();
+  });
+
+  it("filtert die Suche ausschließlich nach Use-Case-Titel", () => {
+    const useCases = [
+      buildUseCase({
+        id: 1,
+        title: "Suchnadel Use Case",
+        description: "Beschreibung ohne Treffer",
+        content: "Inhalt ohne Treffer",
+      }),
+      buildUseCase({
+        id: 2,
+        title: "Beschreibungstreffer Use Case",
+        description: "Suchnadel steht nur in der Beschreibung",
+        content: "Inhalt ohne Treffer",
+      }),
+      buildUseCase({
+        id: 3,
+        title: "Contenttreffer Use Case",
+        description: "Beschreibung ohne Treffer",
+        content: "Suchnadel steht nur im Content",
+      }),
+    ];
+    renderUseCaseList({ useCases });
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "  suchNADEL  " },
+    });
+
+    expect(screen.getByText("Suchnadel Use Case")).toBeInTheDocument();
+    expect(screen.queryByText("Beschreibungstreffer Use Case")).not.toBeInTheDocument();
+    expect(screen.queryByText("Contenttreffer Use Case")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "" },
+    });
+
+    useCases.forEach((useCase) => {
+      expect(screen.getByText(useCase.title)).toBeInTheDocument();
+    });
   });
 });

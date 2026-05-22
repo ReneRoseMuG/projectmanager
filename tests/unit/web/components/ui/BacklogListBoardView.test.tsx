@@ -79,7 +79,9 @@ function expectToolbar() {
   expect(screen.getByPlaceholderText("Suchen")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Kanban" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Liste" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Neues Backlog-Item" })).toBeInTheDocument();
+  const addButton = screen.getByRole("button", { name: "Neues Backlog-Item" });
+  expect(addButton).toBeInTheDocument();
+  expect(addButton).toHaveTextContent("");
 }
 
 function expectItemCardClasses(cards: NodeListOf<Element>) {
@@ -185,5 +187,49 @@ describe("BacklogListBoardView", () => {
     expect(screen.getByText("Keine Backlog-Items")).toBeInTheDocument();
     expect(container.querySelector("article.rounded-2xl")).not.toBeInTheDocument();
     expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+  });
+
+  it("filtert die Suche ausschließlich nach Backlog-Titel", () => {
+    const features = [
+      buildFeature({ id: 1, title: "Feature ohne Treffer" }),
+      buildFeature({ id: 2, title: "Suchnadel Feature" }),
+    ];
+    const items = [
+      buildBacklogItem({
+        id: 1,
+        title: "Suchnadel Backlog",
+        description: "Beschreibung ohne Treffer",
+        featureId: 1,
+      }),
+      buildBacklogItem({
+        id: 2,
+        title: "Beschreibungstreffer Backlog",
+        description: "Suchnadel steht nur in der Beschreibung",
+        featureId: 1,
+      }),
+      buildBacklogItem({
+        id: 3,
+        title: "Featuretreffer Backlog",
+        description: "Beschreibung ohne Treffer",
+        featureId: 2,
+      }),
+    ];
+    renderBacklogList({ items, features });
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "  suchNADEL  " },
+    });
+
+    expect(screen.getByText("Suchnadel Backlog")).toBeInTheDocument();
+    expect(screen.queryByText("Beschreibungstreffer Backlog")).not.toBeInTheDocument();
+    expect(screen.queryByText("Featuretreffer Backlog")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Suchen"), {
+      target: { value: "" },
+    });
+
+    items.forEach((item) => {
+      expect(screen.getByText(item.title)).toBeInTheDocument();
+    });
   });
 });
