@@ -2,6 +2,8 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 22.05.26 | Fix           | DnD Status Views                             | ✅     |
+| 22.05.26 | Fix           | Action Menu Sichtbarkeit                     | ✅     |
 | 22.05.26 | Fix           | Board-Spaltenhöhe                            | ✅     |
 | 22.05.26 | Feature       | Task DnD Board und Liste                     | ⚠️     |
 | 22.05.26 | Fix           | Doppelklick Items                            | ✅     |

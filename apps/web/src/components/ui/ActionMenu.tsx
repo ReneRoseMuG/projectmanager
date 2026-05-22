@@ -59,7 +59,7 @@ export function ActionMenu({ items, ariaLabel = "Aktionen" }: ActionMenuProps) {
         title={ariaLabel}
         icon={<MoreVertical size={18} />}
         variant="ghost"
-        className="-mr-2 h-8 w-7 border border-transparent bg-transparent px-0 text-steel-700 shadow-none hover:border-line hover:bg-steel-50"
+        className="-mr-1 h-8 w-8 border border-line bg-white px-0 text-ink shadow-sm hover:border-steel-300 hover:bg-steel-50"
         onClick={(event) => {
           event.stopPropagation();
           setOpen((current) => !current);

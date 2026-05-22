@@ -3,10 +3,13 @@ import {
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
+  pointerWithin,
+  rectIntersection,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
   type UniqueIdentifier,
@@ -371,6 +374,13 @@ interface ItemWrapperBaseProps {
   children: ReactNode;
 }
 
+const statusCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  return pointerCollisions.length > 0
+    ? pointerCollisions
+    : rectIntersection(args);
+};
+
 function PlainItemWrapper({
   itemId,
   className,
@@ -612,6 +622,7 @@ function ListBoardViewContent<T>({
 
     return (
       <DndContext
+        collisionDetection={statusCollisionDetection}
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}

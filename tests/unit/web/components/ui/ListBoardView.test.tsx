@@ -440,7 +440,7 @@ describe("ItemCard", () => {
     );
 
     const trigger = screen.getByRole("button", { name: "Aktionen" });
-    expect(trigger).toHaveClass("h-8", "w-7", "border", "shadow-none");
+    expect(trigger).toHaveClass("h-8", "w-8", "border-line", "bg-white", "shadow-sm");
 
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: "Bearbeiten" }));

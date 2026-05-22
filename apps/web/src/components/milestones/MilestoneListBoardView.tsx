@@ -59,6 +59,7 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
       addLabel="Neuer Meilenstein"
       statusKey="status"
       statusCatalogKind="workStatus"
+      onItemStatusChange={onStatusChange ? (milestone, status) => onStatusChange(milestone, status as Milestone["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       loading={loading}

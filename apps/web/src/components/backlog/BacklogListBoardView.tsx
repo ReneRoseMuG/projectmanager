@@ -69,6 +69,7 @@ export function BacklogListBoardView({ items, features, statusFilter, onStatusFi
       statusKey="status"
       statusCatalogKind="workStatus"
       statusColumns={statusColumns}
+      onItemStatusChange={onStatusChange ? (item, status) => onStatusChange(item, status as BacklogItem["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={<FilterChips value={statusFilter} onChange={onStatusFilterChange} options={filterOptions} allCount={items.length} />}

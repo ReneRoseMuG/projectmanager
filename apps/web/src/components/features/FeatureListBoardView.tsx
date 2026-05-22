@@ -51,6 +51,7 @@ export function FeatureListBoardView({
       showToolbarAdd={showToolbarAdd}
       statusKey="status"
       statusCatalogKind="featureStatus"
+      onItemStatusChange={onStatusChange ? (feature, status) => onStatusChange(feature, status as Feature["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={filters}

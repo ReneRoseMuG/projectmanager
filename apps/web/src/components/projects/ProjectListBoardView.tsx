@@ -54,6 +54,7 @@ export function ProjectListBoardView({
       showToolbarAdd={showToolbarAdd}
       statusKey="status"
       statusCatalogKind="workStatus"
+      onItemStatusChange={onStatusChange ? (project, status) => onStatusChange(project, status as Project["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={filters}

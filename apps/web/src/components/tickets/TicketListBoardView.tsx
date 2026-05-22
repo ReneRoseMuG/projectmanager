@@ -94,6 +94,7 @@ export function TicketListBoardView({
       statusKey="status"
       statusCatalogKind="workStatus"
       statusColumns={statusColumns}
+      onItemStatusChange={onStatusChange ? (ticket, status) => onStatusChange(ticket, status as Ticket["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={

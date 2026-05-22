@@ -5,6 +5,7 @@
  *
  * Abgedeckte Regeln:
  * - ActionMenu öffnet und schließt ein kompaktes Aktionsmenü per Trigger, Eintrag, Escape und Outside-Klick.
+ * - Der Trigger bleibt trotz kompakter Darstellung als sichtbares Drei-Punkte-Menü erkennbar.
  * - Danger-Einträge erhalten eine rote Textklasse und Menü-Klicks bleiben innerhalb der Karte/Zeile.
  *
  * Fehlerfälle:
@@ -32,6 +33,15 @@ describe("ActionMenu", () => {
     expect(screen.getByRole("button", { name: "Aktionen" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Bearbeiten" })).not.toBeInTheDocument();
+  });
+
+  it("rendert den Trigger kompakt, aber sichtbar", () => {
+    render(<ActionMenu items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: vi.fn() }]} />);
+
+    const trigger = screen.getByRole("button", { name: "Aktionen" });
+
+    expect(trigger).toHaveClass("h-8", "w-8", "border-line", "bg-white", "text-ink", "shadow-sm");
+    expect(trigger).not.toHaveClass("border-transparent", "bg-transparent", "shadow-none");
   });
 
   it("öffnet das Dropdown per Trigger", () => {
