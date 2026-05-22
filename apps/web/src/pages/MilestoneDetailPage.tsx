@@ -103,7 +103,7 @@ export function MilestoneDetailPage() {
 
   if (!isCreateMode && !Number.isFinite(milestoneId)) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Meilenstein nicht gefunden
       </div>
     );
@@ -115,7 +115,7 @@ export function MilestoneDetailPage() {
 
   if (!isCreateMode && !milestone) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Meilenstein nicht gefunden
       </div>
     );

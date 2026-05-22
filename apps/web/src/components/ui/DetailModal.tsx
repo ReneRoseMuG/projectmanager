@@ -53,7 +53,7 @@ export function DetailModal<T extends string>({ open, onClose, title, subtitle, 
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="max-w-[760px] text-2xl font-bold leading-tight tracking-normal text-white md:text-3xl">{title}</h2>
-              {subtitle ? <span className="inline-flex min-h-6 items-center rounded-full border border-white/15 bg-white/10 px-2 text-xs font-semibold text-white">{subtitle}</span> : null}
+              {subtitle ? <span className="inline-flex min-h-6 items-center rounded-md border border-white/15 bg-white/10 px-2 text-xs font-semibold text-white">{subtitle}</span> : null}
             </div>
             {metaPills || metaInfo ? (
               <div className="flex flex-wrap items-center gap-2">

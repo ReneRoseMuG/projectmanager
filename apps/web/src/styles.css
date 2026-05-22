@@ -30,12 +30,13 @@ textarea {
   font: inherit;
 }
 
+/* ─── Drittanbieter: ProseMirror / RichText ─────────────────────────────── */
 .ProseMirror {
   min-height: 80px;
   padding: 0.5rem 0.75rem;
 }
 
-/* Keep TLDraw internals inside the embedded drawing block. */
+/* ─── Drittanbieter: TLDraw ─────────────────────────────────────────────── */
 .tl-container {
   position: relative !important;
 }
@@ -50,7 +51,7 @@ textarea {
 
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: theme("colors.slate.500");
+  color: theme("colors.steel.500");
   float: left;
   height: 0;
   font-style: italic;
@@ -150,9 +151,10 @@ textarea {
   margin: 0.8rem 0;
   border-left: 3px solid theme("colors.steel.300");
   padding-left: 0.9rem;
-  color: theme("colors.slate.600");
+  color: theme("colors.steel.600");
 }
 
+/* ─── Drittanbieter: FullCalendar ──────────────────────────────────────── */
 .fc {
   --fc-border-color: theme("colors.line");
   --fc-today-bg-color: rgba(46, 89, 132, 0.05);
@@ -170,7 +172,7 @@ textarea {
 }
 
 .fc-daygrid-day-number {
-  color: theme("colors.slate.700");
+  color: theme("colors.steel.700");
   font-weight: 700;
 }
 
@@ -195,6 +197,7 @@ textarea {
   color: theme("colors.ink") !important;
 }
 
+/* ─── Drittanbieter: Toast und Skeleton Animationen ────────────────────── */
 @keyframes toast-enter {
   from {
     opacity: 0;

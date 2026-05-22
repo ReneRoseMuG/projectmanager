@@ -35,18 +35,18 @@ function TaskProgress({ stats, accentColor }: { stats: PlanningTaskStats; accent
     <div className="grid gap-2 border-t border-line pt-3">
       <div className="flex min-w-0 items-center justify-between gap-3 text-xs">
         <span className="font-semibold text-ink">Aufgaben</span>
-        <span className="min-w-0 truncate font-medium text-slate-500">{stats.totalTasks > 0 ? `${stats.doneTasks} / ${stats.totalTasks} erledigt` : "Keine Aufgaben"}</span>
+        <span className="min-w-0 truncate font-medium text-steel-500">{stats.totalTasks > 0 ? `${stats.doneTasks} / ${stats.totalTasks} erledigt` : "Keine Aufgaben"}</span>
       </div>
       <ProgressBar value={progressValue(stats)} color={accentColor} />
-      <span className="justify-self-end text-xs font-semibold text-slate-500">{stats.openTasks} offen</span>
+      <span className="justify-self-end text-xs font-semibold text-steel-500">{stats.openTasks} offen</span>
     </div>
   );
 }
 
 function TaskMeta({ stats }: { stats: PlanningTaskStats }) {
   return (
-    <span className="grid justify-items-end gap-0.5 text-xs font-semibold text-slate-500">
-      <span className="text-[11px] uppercase tracking-wide text-slate-400">Aufgaben</span>
+    <span className="grid justify-items-end gap-0.5 text-xs font-semibold text-steel-500">
+      <span className="text-[11px] uppercase tracking-wide text-steel-400">Aufgaben</span>
       <span>{stats.openTasks} offen</span>
     </span>
   );
@@ -57,7 +57,7 @@ function PlanningHeader({ title, subtitle, pills }: Pick<PlanningItemCardProps, 
     <div className="grid min-w-0 gap-3">
       <div className="min-w-0">
         <h2 className="line-clamp-2 break-words text-base font-semibold text-ink">{title}</h2>
-        {subtitle ? <div className="mt-1 text-xs font-semibold text-slate-500">{subtitle}</div> : null}
+        {subtitle ? <div className="mt-1 text-xs font-semibold text-steel-500">{subtitle}</div> : null}
       </div>
       {pills ? <div className="flex min-w-0 flex-wrap items-center gap-2">{pills}</div> : null}
     </div>
@@ -111,7 +111,7 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
     <ItemCard
       accentColor={accentColor}
       header={<PlanningHeader title={title} subtitle={subtitle} pills={pills} />}
-      body={description ? <p className="line-clamp-3 text-sm text-slate-600">{description}</p> : null}
+      body={description ? <p className="line-clamp-3 text-sm text-steel-600">{description}</p> : null}
       footer={<div className="grid gap-3">{footerMeta}<TaskProgress stats={taskStats} accentColor={accentColor} /></div>}
       onOpen={onOpen}
       onEdit={onEdit}

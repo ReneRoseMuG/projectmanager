@@ -117,7 +117,7 @@ function FeatureBoardCard({
       }
       body={
         description ? (
-          <p className="line-clamp-3 text-xs text-slate-600">{description}</p>
+          <p className="line-clamp-3 text-xs text-steel-600">{description}</p>
         ) : null
       }
     />

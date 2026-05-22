@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
+import { FormField } from "../components/ui/FormField";
 import { Input } from "../components/ui/Input";
 import { useAuth } from "../hooks/useAuth";
 import { errorMessageAsync } from "../hooks/errors";
@@ -37,17 +38,15 @@ export function SetupPasswordPage() {
             <KeyRound size={20} />
           </span>
           <h1 className="text-xl font-bold text-ink">Passwort vergeben</h1>
-          <p className="mt-1 text-sm text-muted">Initiales Admin-Passwort</p>
+          <p className="mt-1 text-sm text-steel-500">Initiales Admin-Passwort</p>
         </div>
         <form className="grid gap-4" onSubmit={handleSubmit}>
-          <label className="grid gap-1.5 text-sm font-medium">
-            Neues Passwort
-            <Input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="new-password" iconLeft={<KeyRound size={16} />} />
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium">
-            Bestätigung
-            <Input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} type="password" autoComplete="new-password" iconLeft={<KeyRound size={16} />} />
-          </label>
+          <FormField label="Neues Passwort" htmlFor="setup-password">
+            <Input id="setup-password" value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="new-password" iconLeft={<KeyRound size={16} />} />
+          </FormField>
+          <FormField label="Bestätigung">
+            <Input id="setup-password-confirmation" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} type="password" autoComplete="new-password" iconLeft={<KeyRound size={16} />} />
+          </FormField>
           {error ? <p className="rounded-md border border-crimson/30 bg-crimson/5 px-3 py-2 text-sm text-crimson">{error}</p> : null}
           <Button type="submit" variant="primary" loading={setPasswordPending}>
             Speichern

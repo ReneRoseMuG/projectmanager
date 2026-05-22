@@ -183,7 +183,7 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
         />
       ) : (
         <div
-          className={cn("rounded-md px-3 py-2 text-sm italic text-slate-500 transition-colors", minRowsClassName, fieldChromeClassName, fieldHoverClassName)}
+          className={cn("rounded-md px-3 py-2 text-sm italic text-steel-500 transition-colors", minRowsClassName, fieldChromeClassName, fieldHoverClassName)}
           data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
           style={minRowsStyle}
           onClick={readOnly ? undefined : handleActivate}
@@ -200,14 +200,14 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
               aria-label="Mit KI bearbeiten"
               title="Mit KI bearbeiten"
               data-testid={testIdPrefix ? `${testIdPrefix}-ai-button` : undefined}
-              className="pointer-events-auto flex h-6 w-6 items-center justify-center rounded text-slate-500 transition hover:bg-line/50 hover:text-ink"
+              className="pointer-events-auto flex h-6 w-6 items-center justify-center rounded text-steel-500 transition hover:bg-line/50 hover:text-ink"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setDialogOpen(true)}
             >
               <Sparkles className="h-3.5 w-3.5" />
             </button>
           ) : null}
-          <Pencil className="h-3 w-3 text-slate-500" />
+          <Pencil className="h-3 w-3 text-steel-500" />
         </div>
       ) : null}
       <AiFieldEditDialog open={dialogOpen} currentHtml={value ?? ""} onApply={handleApplyAiText} onClose={() => setDialogOpen(false)} />
@@ -415,7 +415,7 @@ function ToolbarButton({ onClick, active, title, icon, disabled = false }: Toolb
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={cn("flex h-7 w-7 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50", active ? "bg-steel-700 text-white" : "text-slate-500 hover:bg-line/50 hover:text-ink")}
+      className={cn("flex h-7 w-7 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50", active ? "bg-steel-700 text-white" : "text-steel-500 hover:bg-line/50 hover:text-ink")}
     >
       {React.cloneElement(icon, { className: "h-3.5 w-3.5" })}
     </button>

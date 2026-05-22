@@ -35,7 +35,7 @@ export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onSta
             title={feature.title}
             description={description}
             pills={<StatusPill kind="featureStatus" value={feature.status} onChange={onStatusChange ? (status) => onStatusChange(feature, status) : undefined} />}
-            meta={<span className="text-xs font-semibold text-slate-500">{feature.useCaseCount} Use Cases</span>}
+            meta={<span className="text-xs font-semibold text-steel-500">{feature.useCaseCount} Use Cases</span>}
             actions={<ActionMenu items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: open }, { label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(feature), danger: true }]} />}
             onOpen={open}
           />
@@ -51,7 +51,7 @@ export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onSta
       onEdit={open}
       onDelete={() => onDelete(feature)}
       header={<FeatureCardHeader feature={feature} onStatusChange={onStatusChange} />}
-      body={description ? <p className="line-clamp-3 text-sm text-slate-600">{description}</p> : null}
+      body={description ? <p className="line-clamp-3 text-sm text-steel-600">{description}</p> : null}
       footer={<FeatureCardFooter feature={feature} />}
     />
   );
@@ -73,7 +73,7 @@ function FeatureCardFooter({ feature }: { feature: Feature }) {
         <FileText size={14} />
         {feature.useCaseCount} Use Cases
       </span>
-      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-steel-100 text-steel-700 transition group-hover:bg-steel-700 group-hover:text-white" aria-hidden="true">
+      <span className="flex h-9 w-9 items-center justify-center rounded-md bg-steel-100 text-steel-700 transition group-hover:bg-steel-700 group-hover:text-white" aria-hidden="true">
         <ArrowRight size={16} />
       </span>
     </div>

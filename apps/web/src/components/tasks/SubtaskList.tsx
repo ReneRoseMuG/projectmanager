@@ -35,7 +35,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="font-semibold text-ink">Tasks</h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-steel-500">
               {completed} von {subtasks.length} erledigt
             </p>
           </div>
@@ -62,7 +62,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
               >
                 <Check size={15} />
               </button>
-              <span className={`min-w-0 flex-1 truncate text-sm font-medium ${done ? "text-slate-500 line-through" : "text-ink"}`}>{subtask.title}</span>
+              <span className={`min-w-0 flex-1 truncate text-sm font-medium ${done ? "text-steel-500 line-through" : "text-ink"}`}>{subtask.title}</span>
               <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={18} />} variant="ghost" className="h-10 w-10" onClick={() => void onDelete(subtask.id).catch(() => undefined)} />
             </div>
           );

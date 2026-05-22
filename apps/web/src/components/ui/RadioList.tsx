@@ -24,10 +24,10 @@ const activeClasses: Record<RadioColor, string> = {
 };
 
 const inactiveClasses: Record<RadioColor, string> = {
-  fern: "border-line bg-shell/50 text-slate-600 hover:border-fern",
-  tangerine: "border-line bg-shell/50 text-slate-600 hover:border-tangerine",
-  crimson: "border-line bg-shell/50 text-slate-600 hover:border-crimson",
-  violet: "border-line bg-shell/50 text-slate-600 hover:border-violet"
+  fern: "border-line bg-shell/50 text-steel-600 hover:border-fern",
+  tangerine: "border-line bg-shell/50 text-steel-600 hover:border-tangerine",
+  crimson: "border-line bg-shell/50 text-steel-600 hover:border-crimson",
+  violet: "border-line bg-shell/50 text-steel-600 hover:border-violet"
 };
 
 const checkClasses: Record<RadioColor, string> = {

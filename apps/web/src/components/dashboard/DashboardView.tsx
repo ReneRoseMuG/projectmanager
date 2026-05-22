@@ -121,7 +121,7 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-ink">{title}</h2>
-            {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
+            {subtitle ? <p className="mt-1 text-sm text-steel-500">{subtitle}</p> : null}
           </div>
         </div>
       )}

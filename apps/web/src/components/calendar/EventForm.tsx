@@ -144,13 +144,13 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
             <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
               {projects.length > 0 ? (
                 projects.map((project) => (
-                  <label key={project.id} className="flex items-center gap-2 text-sm text-slate-700">
+                  <label key={project.id} className="flex items-center gap-2 text-sm text-steel-700">
                     <input type="checkbox" checked={projectIds.includes(project.id)} onChange={() => setProjectIds((current) => toggleId(current, project.id))} />
                     {project.name}
                   </label>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">Keine Projekte</p>
+                <p className="text-sm text-steel-500">Keine Projekte</p>
               )}
             </div>
           </FormField>
@@ -158,13 +158,13 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
             <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
               {milestones.length > 0 ? (
                 milestones.map((milestone) => (
-                  <label key={milestone.id} className="flex items-center gap-2 text-sm text-slate-700">
+                  <label key={milestone.id} className="flex items-center gap-2 text-sm text-steel-700">
                     <input type="checkbox" checked={milestoneIds.includes(milestone.id)} onChange={() => setMilestoneIds((current) => toggleId(current, milestone.id))} />
                     {milestone.name}
                   </label>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">Keine Meilensteine</p>
+                <p className="text-sm text-steel-500">Keine Meilensteine</p>
               )}
             </div>
           </FormField>
@@ -172,13 +172,13 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
             <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
               {tasks.length > 0 ? (
                 tasks.map((task) => (
-                  <label key={task.id} className="flex items-center gap-2 text-sm text-slate-700">
+                  <label key={task.id} className="flex items-center gap-2 text-sm text-steel-700">
                     <input type="checkbox" checked={taskIds.includes(task.id)} onChange={() => setTaskIds((current) => toggleId(current, task.id))} />
                     {task.title}
                   </label>
                 ))
               ) : (
-                <p className="text-sm text-slate-500">Keine Aufgaben</p>
+                <p className="text-sm text-steel-500">Keine Aufgaben</p>
               )}
             </div>
           </FormField>

@@ -56,7 +56,7 @@ export function FeatureRelationPanel({
 
         return (
           <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]">
-            <span className={`flex h-[38px] w-[38px] items-center justify-center rounded-xl ${featureToneMap[tone]}`} aria-hidden="true">
+            <span className={`flex h-[38px] w-[38px] items-center justify-center rounded-lg ${featureToneMap[tone]}`} aria-hidden="true">
               <BookOpen size={17} />
             </span>
             <span className="min-w-0">
@@ -65,7 +65,7 @@ export function FeatureRelationPanel({
             <span className="hidden md:inline-flex">
               <StatusPill kind="featureStatus" value={feature.status} />
             </span>
-            <span className="hidden rounded-md bg-steel-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 md:inline-flex">{feature.useCaseCount} UCs</span>
+            <span className="hidden rounded-md bg-steel-100 px-2 py-0.5 text-[11px] font-semibold text-steel-500 md:inline-flex">{feature.useCaseCount} UCs</span>
           </span>
         );
       }}

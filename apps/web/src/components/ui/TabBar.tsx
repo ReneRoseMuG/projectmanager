@@ -28,7 +28,7 @@ export function TabBar<T extends string>({
           <button
             key={tab.value}
             type="button"
-            className={`flex h-12 shrink-0 items-center gap-2 border-b-2 px-3 text-sm font-semibold transition ${selected ? "border-steel-700 text-steel-700" : "border-transparent text-slate-500 hover:text-ink"}`}
+            className={`flex h-12 shrink-0 items-center gap-2 border-b-2 px-3 text-sm font-semibold transition ${selected ? "border-steel-700 text-steel-700" : "border-transparent text-steel-500 hover:text-ink"}`}
             onClick={() => onChange(tab.value)}
           >
             {tab.icon}
@@ -37,7 +37,7 @@ export function TabBar<T extends string>({
               <>
                 {" "}
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${selected ? "bg-steel-700 text-white" : "bg-shell text-slate-500"}`}
+                  className={`rounded px-2 py-0.5 text-xs ${selected ? "bg-steel-700 text-white" : "bg-shell text-steel-500"}`}
                 >
                   {tab.count}
                 </span>

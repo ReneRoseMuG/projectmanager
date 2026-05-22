@@ -173,7 +173,7 @@ export function FeatureDetailPage() {
 
   if (!isCreateMode && !Number.isFinite(featureId)) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Feature nicht gefunden
       </div>
     );
@@ -185,7 +185,7 @@ export function FeatureDetailPage() {
 
   if (!isCreateMode && !features.feature) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Feature nicht gefunden
       </div>
     );

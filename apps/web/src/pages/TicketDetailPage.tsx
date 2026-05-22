@@ -185,7 +185,7 @@ export function TicketDetailPage() {
 
   if (!Number.isFinite(ticketId)) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Ticket nicht gefunden
       </div>
     );
@@ -197,7 +197,7 @@ export function TicketDetailPage() {
 
   if (!detail.ticket) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Ticket nicht gefunden
       </div>
     );

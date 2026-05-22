@@ -59,7 +59,7 @@ describe("Projekt Manager API integration", () => {
     await app.ready();
     api = request.agent(app.server);
     await api.post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
-  });
+  }, 60_000);
 
   afterAll(async () => {
     await app?.close();

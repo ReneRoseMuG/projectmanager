@@ -157,7 +157,7 @@ export function ProjectDetailPage() {
 
   if (!isCreateMode && !Number.isFinite(projectId)) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Projekt nicht gefunden
       </div>
     );
@@ -169,7 +169,7 @@ export function ProjectDetailPage() {
 
   if (!isCreateMode && !project) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Projekt nicht gefunden
       </div>
     );

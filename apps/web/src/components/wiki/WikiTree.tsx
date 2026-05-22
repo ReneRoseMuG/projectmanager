@@ -49,7 +49,7 @@ function WikiNode({ node, activeId, level, onCreate }: WikiNodeProps) {
           className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-sm ${
             activeId === node.id
               ? "bg-steel-900 text-white"
-              : "text-slate-700 hover:bg-shell"
+              : "text-steel-700 hover:bg-shell"
           }`}
           to={`/wiki/${node.id}`}
         >

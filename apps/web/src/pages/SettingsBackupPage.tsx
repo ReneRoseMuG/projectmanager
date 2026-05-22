@@ -5,6 +5,8 @@ import { useState } from "react";
 import { applyRemoteDump, previewRemoteDump, saveLocalDump } from "../api/dumps";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { EmptyState } from "../components/ui/EmptyState";
+import { PageHeader } from "../components/ui/PageHeader";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { useLocalDumpStatus, useRemoteDumpStatus } from "../hooks/useLocalDumpStatus";
 import { useHasPermission } from "../hooks/usePermissions";
@@ -125,12 +127,11 @@ export function SettingsBackupPage() {
 
   return (
     <div className="mx-auto grid max-w-6xl gap-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">Sicherung</h1>
-          <p className="text-sm text-slate-500">Lokale Dumps mit SFTP-Kopie</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <PageHeader
+        title="Sicherung"
+        subtitle="Lokale Dumps mit SFTP-Kopie"
+        actions={
+          <div className="flex flex-wrap gap-2">
           <Button variant="primary" icon={<DatabaseBackup size={16} />} loading={saving} disabled={!canWriteDumps} onClick={() => void handleSave()}>
             Sichern
           </Button>
@@ -140,8 +141,9 @@ export function SettingsBackupPage() {
           <Button icon={<RefreshCw size={16} />} loading={refreshing} onClick={() => void handleRefresh()}>
             Aktualisieren
           </Button>
-        </div>
-      </header>
+          </div>
+        }
+      />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="rounded-md border border-line bg-white p-4 shadow-sm">
@@ -153,9 +155,9 @@ export function SettingsBackupPage() {
             {backupStatus.status && <Badge tone={backupStatus.status.ready ? "fern" : "crimson"}>{backupStatus.status.ready ? "bereit" : "nicht bereit"}</Badge>}
           </div>
 
-          <div className="grid gap-2 text-sm text-slate-600">
+          <div className="grid gap-2 text-sm text-steel-600">
             <span className="select-all">{backupStatus.status?.backupDirectory ?? "lädt"}</span>
-            <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+            <div className="flex flex-wrap gap-2 text-xs text-steel-500">
               <span>Dateien: {backupStatus.status?.fileCount ?? 0}</span>
               {backupStatus.status?.latestFile && <span>Neueste: {backupStatus.status.latestFile.name}</span>}
             </div>
@@ -172,9 +174,9 @@ export function SettingsBackupPage() {
             {remoteStatus.status && <Badge tone={remoteStatus.status.ready ? "fern" : "crimson"}>{remoteStatus.status.ready ? "bereit" : "nicht bereit"}</Badge>}
           </div>
 
-          <div className="grid gap-2 text-sm text-slate-600">
+          <div className="grid gap-2 text-sm text-steel-600">
             <span className="select-all">{remoteStatus.status?.remoteDirectory ?? "lädt"}</span>
-            <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+            <div className="flex flex-wrap gap-2 text-xs text-steel-500">
               <span>Dateien: {remoteStatus.status?.fileCount ?? 0}</span>
               {remoteStatus.status?.latestFile && <span>Neueste: {remoteStatus.status.latestFile.name}</span>}
             </div>
@@ -196,7 +198,7 @@ export function SettingsBackupPage() {
             <DatabaseBackup size={18} />
             <h2 className="text-base font-semibold">Letzte Sicherung</h2>
           </div>
-          <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-3">
+          <div className="grid gap-2 text-sm text-steel-600 md:grid-cols-3">
             <span>{saveResult.backupFile.name}</span>
             <span>{megabytes(saveResult.sizeBytes)}</span>
             <span>{saveResult.dumpId}</span>
@@ -216,11 +218,11 @@ export function SettingsBackupPage() {
         </div>
 
         {remoteFiles.length === 0 ? (
-          <p className="rounded-md border border-line bg-shell p-3 text-sm text-slate-500">Keine Backup-Dateien gefunden.</p>
+          <EmptyState icon={<HardDrive size={22} />} title="Keine Backup-Dateien" body="Keine Backup-Dateien gefunden." variant="tinted" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-line text-xs uppercase text-slate-500">
+              <thead className="bg-steel-50 text-xs font-semibold uppercase text-steel-500">
                 <tr>
                   <th className="py-2 pr-3 font-semibold">Datei</th>
                   <th className="py-2 pr-3 font-semibold">Größe</th>
@@ -231,10 +233,10 @@ export function SettingsBackupPage() {
               </thead>
               <tbody>
                 {remoteFiles.map((file: DumpRemoteBackupFile) => (
-                  <tr key={file.id} className="border-b border-line/70 last:border-0">
+                  <tr key={file.id} className="border-b border-line text-sm last:border-0">
                     <td className="py-2 pr-3 font-medium text-ink">{file.name}</td>
-                    <td className="py-2 pr-3 text-slate-600">{megabytes(file.sizeBytes)}</td>
-                    <td className="py-2 pr-3 text-slate-600">{formatDateTime(file.modifiedTime)}</td>
+                    <td className="py-2 pr-3 text-steel-600">{megabytes(file.sizeBytes)}</td>
+                    <td className="py-2 pr-3 text-steel-600">{formatDateTime(file.modifiedTime)}</td>
                     <td className="py-2 pr-3">
                       <Badge tone={file.imported ? "mustard" : "fern"}>{file.imported ? "importiert" : "bereit"}</Badge>
                     </td>
@@ -266,7 +268,7 @@ export function SettingsBackupPage() {
             <Badge tone={readinessTone(preview.transferReadiness)}>{preview.transferReadiness}</Badge>
           </div>
 
-          <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-3">
+          <div className="grid gap-2 text-sm text-steel-600 md:grid-cols-3">
             <span>{preview.backupFile.name}</span>
             <span>{preview.expectedTables.length} Tabellen</span>
             <span>{preview.expectedFileRoots.reduce((sum, item) => sum + item.fileCount, 0)} Dateien</span>

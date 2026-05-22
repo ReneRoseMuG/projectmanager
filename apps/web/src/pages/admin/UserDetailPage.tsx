@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
+import { FormField } from "../../components/ui/FormField";
 import { Input } from "../../components/ui/Input";
 import { useAdminRoles } from "../../hooks/useAdminRoles";
 import { useAdminUserDetail, useAdminUsers } from "../../hooks/useAdminUsers";
@@ -111,46 +112,39 @@ export function UserDetailPage() {
   return (
     <section className="mx-auto grid max-w-3xl gap-5">
       <div>
-        <h1 className="text-2xl font-bold text-ink">{isNew ? "Benutzer anlegen" : "Benutzer bearbeiten"}</h1>
-        <p className="text-sm text-muted">Administration</p>
+        <h1 className="text-2xl font-semibold text-ink">{isNew ? "Benutzer anlegen" : "Benutzer bearbeiten"}</h1>
+        <p className="text-sm text-steel-500">Administration</p>
       </div>
-      {loading ? <p className="text-sm text-muted">Lädt...</p> : null}
+      {loading ? <p className="text-sm text-steel-500">Lädt...</p> : null}
       <form className="grid gap-4 rounded-lg border border-line bg-white p-5" onSubmit={handleSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="grid gap-1.5 text-sm font-medium">
-            Vorname
+          <FormField label="Vorname">
             <Input value={form.firstName} onChange={(event) => setField("firstName", event.target.value)} />
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium">
-            Nachname
+          </FormField>
+          <FormField label="Nachname">
             <Input value={form.lastName} onChange={(event) => setField("lastName", event.target.value)} />
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium">
-            E-Mail
+          </FormField>
+          <FormField label="E-Mail">
             <Input value={form.email} onChange={(event) => setField("email", event.target.value)} />
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium">
-            Rolle
-            <select className="h-11 rounded-lg border border-line bg-white px-3 text-sm" value={form.roleId} onChange={(event) => setField("roleId", event.target.value)}>
+          </FormField>
+          <FormField label="Rolle">
+            <select className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10" value={form.roleId} onChange={(event) => setField("roleId", event.target.value)}>
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>
                   {role.label}
                 </option>
               ))}
             </select>
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium">
-            Adresse
+          </FormField>
+          <FormField label="Adresse">
             <Input value={form.address} onChange={(event) => setField("address", event.target.value)} />
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium">
-            Telefon
+          </FormField>
+          <FormField label="Telefon">
             <Input value={form.phone} onChange={(event) => setField("phone", event.target.value)} />
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium md:col-span-2">
-            Passwort
+          </FormField>
+          <FormField label="Passwort" className="md:col-span-2">
             <Input value={form.password} onChange={(event) => setField("password", event.target.value)} type="password" autoComplete="new-password" placeholder={isNew ? "" : "Leer lassen für keine Änderung"} />
-          </label>
+          </FormField>
         </div>
         <label className="flex items-center gap-2 text-sm font-medium">
           <input type="checkbox" checked={form.isActive} onChange={(event) => setField("isActive", event.target.checked)} />

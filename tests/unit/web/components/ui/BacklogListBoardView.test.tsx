@@ -125,7 +125,7 @@ describe("BacklogListBoardView", () => {
     expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(workStatusColumnCount);
     expect(container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3")).not.toBeInTheDocument();
 
-    const cards = container.querySelectorAll("article.rounded-2xl");
+    const cards = container.querySelectorAll("article.p-5");
     expect(cards).toHaveLength(items.length);
     expectItemCardClasses(cards);
     expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(items.length);
@@ -139,7 +139,7 @@ describe("BacklogListBoardView", () => {
     const { container } = renderBacklogList({ items });
 
     expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
-    const rows = container.querySelectorAll("article.rounded-xl");
+    const rows = container.querySelectorAll("article[class*='border-l-[4px]']");
     expect(rows).toHaveLength(items.length);
     expectItemRowClasses(rows);
     items.forEach((item, index) => {
@@ -154,12 +154,12 @@ describe("BacklogListBoardView", () => {
     const { container } = renderBacklogList({ items });
 
     fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
-    expect(container.querySelectorAll("article.rounded-2xl")).toHaveLength(items.length);
+    expect(container.querySelectorAll("article.p-5")).toHaveLength(items.length);
 
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
     expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
-    expect(container.querySelectorAll("article.rounded-xl")).toHaveLength(items.length);
-    expect(container.querySelector("article.rounded-2xl")).not.toBeInTheDocument();
+    expect(container.querySelectorAll("article[class*='border-l-[4px]']")).toHaveLength(items.length);
+    expect(container.querySelector("article.p-5")).not.toBeInTheDocument();
   });
 
   it("zeigt BacklogItems ohne Feature-Zuordnung als Ohne Feature", () => {
@@ -175,7 +175,7 @@ describe("BacklogListBoardView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
 
-    const card = container.querySelector("article.rounded-2xl");
+    const card = container.querySelector("article.p-5");
     const title = screen.getByText("Abgelehnte Idee");
     expect(card).toHaveClass("opacity-65");
     expect(title).toHaveClass("line-through");
@@ -185,8 +185,8 @@ describe("BacklogListBoardView", () => {
     const { container } = renderBacklogList({ items: [] });
 
     expect(screen.getByText("Keine Backlog-Items")).toBeInTheDocument();
-    expect(container.querySelector("article.rounded-2xl")).not.toBeInTheDocument();
-    expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+    expect(container.querySelector("article.p-5")).not.toBeInTheDocument();
+    expect(container.querySelector("article[class*='border-l-[4px]']")).not.toBeInTheDocument();
   });
 
   it("filtert die Suche ausschließlich nach Backlog-Titel", () => {

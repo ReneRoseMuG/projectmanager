@@ -10,10 +10,10 @@ interface SearchInputProps {
 
 export function SearchInput({ value, onChange, placeholder = "Suchen", hint, maxLength = 15 }: SearchInputProps) {
   return (
-    <label className="flex h-10 w-full max-w-[15rem] items-center gap-2 rounded-md bg-steel-100 px-3 text-sm text-slate-500">
+    <label className="flex h-10 w-full max-w-[15rem] items-center gap-2 rounded-md bg-steel-100 px-3 text-sm text-steel-500">
       <Search className="shrink-0 text-steel-500" size={17} />
       <input
-        className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-slate-400"
+        className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-steel-400"
         value={value}
         placeholder={placeholder}
         maxLength={maxLength}

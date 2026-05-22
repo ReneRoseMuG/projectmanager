@@ -173,7 +173,7 @@ describe("UseCaseListBoardView", () => {
       container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3"),
     ).not.toBeInTheDocument();
 
-    const cards = container.querySelectorAll("article.rounded-2xl");
+    const cards = container.querySelectorAll("article.p-5");
     expect(cards).toHaveLength(useCases.length);
     expectItemCardClasses(cards);
     cards.forEach((card) => {
@@ -212,7 +212,7 @@ describe("UseCaseListBoardView", () => {
     expect(
       container.querySelector(".lg\\:grid-cols-3"),
     ).not.toBeInTheDocument();
-    const rows = container.querySelectorAll("article.rounded-xl");
+    const rows = container.querySelectorAll("article[class*='border-l-[4px]']");
     expect(rows).toHaveLength(useCases.length);
     expectItemRowClasses(rows);
     useCases.forEach((useCase, index) => {
@@ -240,7 +240,7 @@ describe("UseCaseListBoardView", () => {
       />,
     );
 
-    expect(container.querySelectorAll("article.rounded-2xl")).toHaveLength(
+    expect(container.querySelectorAll("article.p-5")).toHaveLength(
       useCases.length,
     );
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
@@ -249,7 +249,7 @@ describe("UseCaseListBoardView", () => {
     expect(
       container.querySelector(".lg\\:grid-cols-3"),
     ).not.toBeInTheDocument();
-    expect(container.querySelectorAll("article.rounded-xl")).toHaveLength(
+    expect(container.querySelectorAll("article[class*='border-l-[4px]']")).toHaveLength(
       useCases.length,
     );
   });
@@ -259,10 +259,10 @@ describe("UseCaseListBoardView", () => {
 
     expect(screen.getByText("Keine Use Cases")).toBeInTheDocument();
     expect(
-      container.querySelector("article.rounded-2xl"),
+      container.querySelector("article.p-5"),
     ).not.toBeInTheDocument();
     expect(
-      container.querySelector("article.rounded-xl"),
+      container.querySelector("article[class*='border-l-[4px]']"),
     ).not.toBeInTheDocument();
   });
 

@@ -33,7 +33,7 @@ export function ProjectMilestoneFilterBar({
 
   return (
     <div className="flex flex-wrap items-end justify-center gap-3">
-      <label className="grid min-w-48 gap-1.5 text-xs font-semibold text-muted">
+      <label className="grid min-w-48 gap-1.5 text-xs font-semibold text-steel-500">
         Projekt
         <select
           aria-label="Projektfilter"
@@ -50,7 +50,7 @@ export function ProjectMilestoneFilterBar({
         </select>
       </label>
       {onMilestoneChange ? (
-        <label className="grid min-w-56 gap-1.5 text-xs font-semibold text-muted">
+        <label className="grid min-w-56 gap-1.5 text-xs font-semibold text-steel-500">
           Meilenstein
           <select
             aria-label="Meilensteinfilter"

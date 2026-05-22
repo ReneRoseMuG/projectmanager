@@ -121,7 +121,7 @@ function StatusReport({ stats, kind }: { stats: TaskStats | TicketStats | undefi
             <div key={status} className="grid gap-1.5">
               <div className="flex items-center justify-between gap-3 text-sm">
                 <span className="font-medium text-ink">{catalogLabel(catalogs.entries, kind, status)}</span>
-                <span className="text-slate-500">{count}</span>
+                <span className="text-steel-500">{count}</span>
               </div>
               <ProgressBar value={value} color={catalogColor(catalogs.entries, kind, status)} />
             </div>
@@ -143,12 +143,12 @@ function TaskRows({ tasks, emptyTitle }: { tasks: Task[] | undefined; emptyTitle
         <Link key={task.id} to={`/tasks/${task.id}`} className="grid gap-2 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <span className="min-w-0 truncate text-sm font-semibold text-ink">{task.title}</span>
-            <ExternalLink size={14} className="shrink-0 text-slate-400" />
+            <ExternalLink size={14} className="shrink-0 text-steel-400" />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill kind="workStatus" value={task.status} />
             <PriorityBadge value={task.priority} />
-            {task.dueDate ? <span className="text-xs text-slate-500">Fällig {formatHumanDate(task.dueDate)}</span> : null}
+            {task.dueDate ? <span className="text-xs text-steel-500">Fällig {formatHumanDate(task.dueDate)}</span> : null}
           </div>
         </Link>
       ))}
@@ -167,7 +167,7 @@ function TicketRows({ tickets }: { tickets: Ticket[] | undefined }) {
         <Link key={ticket.id} to={`/tickets/${ticket.id}`} className="grid gap-2 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <span className="min-w-0 truncate text-sm font-semibold text-ink">{ticket.title}</span>
-            <ExternalLink size={14} className="shrink-0 text-slate-400" />
+            <ExternalLink size={14} className="shrink-0 text-steel-400" />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <TicketTypeBadge value={ticket.type} />
@@ -192,10 +192,10 @@ function JournalRows({ response }: { response: JournalListResponse | undefined }
         <Link key={entry.id} to={dashboardPath(entry.objectType, entry.objectId)} className="grid gap-1 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex items-center justify-between gap-3">
             <span className="truncate text-sm font-semibold text-ink">{entry.objectLabel}</span>
-            <span className="shrink-0 text-xs text-slate-500">{formatHumanDate(entry.createdAt)}</span>
+            <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(entry.createdAt)}</span>
           </div>
-          <p className="line-clamp-2 text-xs text-slate-600">{entry.summary}</p>
-          <p className="text-xs text-slate-400">{entry.actorName}</p>
+          <p className="line-clamp-2 text-xs text-steel-600">{entry.summary}</p>
+          <p className="text-xs text-steel-400">{entry.actorName}</p>
         </Link>
       ))}
     </div>
@@ -213,10 +213,10 @@ function CommentRows({ comments }: { comments: RecentComment[] | undefined }) {
         <Link key={comment.id} to={dashboardPath(comment.entityType, comment.entityId)} className="grid gap-1 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex items-center justify-between gap-3">
             <span className="truncate text-sm font-semibold text-ink">{comment.entityLabel}</span>
-            <span className="shrink-0 text-xs text-slate-500">{formatHumanDate(comment.createdAt)}</span>
+            <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(comment.createdAt)}</span>
           </div>
-          <p className="line-clamp-2 text-xs text-slate-600">{comment.body}</p>
-          <p className="text-xs text-slate-400">{comment.authorName}</p>
+          <p className="line-clamp-2 text-xs text-steel-600">{comment.body}</p>
+          <p className="text-xs text-steel-400">{comment.authorName}</p>
         </Link>
       ))}
     </div>
@@ -234,10 +234,10 @@ function AttachmentRows({ attachments }: { attachments: RecentAttachment[] | und
         <Link key={attachment.id} to={dashboardPath(attachment.entityType, attachment.entityId)} className="grid gap-1 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex items-center justify-between gap-3">
             <span className="truncate text-sm font-semibold text-ink">{attachment.filename}</span>
-            <span className="shrink-0 text-xs text-slate-500">{formatHumanDate(attachment.createdAt)}</span>
+            <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(attachment.createdAt)}</span>
           </div>
-          <p className="text-xs text-slate-500">{attachment.entityLabel}</p>
-          <p className="text-xs text-slate-400">{attachment.authorName}</p>
+          <p className="text-xs text-steel-500">{attachment.entityLabel}</p>
+          <p className="text-xs text-steel-400">{attachment.authorName}</p>
         </Link>
       ))}
     </div>
@@ -261,7 +261,7 @@ function MilestoneRows({ milestones }: { milestones: Milestone[] | undefined }) 
               <StatusPill kind="workStatus" value={milestone.status} />
             </div>
             <ProgressBar value={progress} label={`${milestone.doneTaskCount}/${total} Aufgaben erledigt`} />
-            <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+            <div className="flex flex-wrap gap-3 text-xs text-steel-500">
               <span>{milestone.openTaskCount} offen</span>
               <span>{milestone.ticketCount} Tickets</span>
               {milestone.dueDate ? <span>Fällig {formatHumanDate(milestone.dueDate)}</span> : null}

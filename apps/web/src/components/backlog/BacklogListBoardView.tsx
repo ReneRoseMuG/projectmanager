@@ -91,13 +91,13 @@ function BacklogItemCard({ item, featureName, onEdit, onDelete, onStatusChange }
       accentColor={statusColor}
       header={
         <div className="grid gap-2">
-          <h3 className={`line-clamp-2 text-sm font-semibold ${closed ? "text-slate-500 line-through" : "text-ink"}`}>{item.title}</h3>
+          <h3 className={`line-clamp-2 text-sm font-semibold ${closed ? "text-steel-500 line-through" : "text-ink"}`}>{item.title}</h3>
           <div className="flex flex-wrap items-center gap-1.5">
             <StatusPill kind="workStatus" value={item.status} onChange={onStatusChange ? (status) => onStatusChange(item, status) : undefined} />
           </div>
         </div>
       }
-      body={description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null}
+      body={description ? <p className="line-clamp-3 text-xs text-steel-600">{description}</p> : null}
       footer={featureName ? <Badge tone="teal">Feature: {featureName}</Badge> : <Badge tone="mute">Ohne Feature</Badge>}
       onOpen={() => onEdit(item)}
       onEdit={() => onEdit(item)}

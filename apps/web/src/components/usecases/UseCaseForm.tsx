@@ -402,7 +402,7 @@ export function UseCaseForm({
             <Section
               title="Inhalt"
               actions={
-                <span className="text-xs font-semibold text-slate-500">
+                <span className="text-xs font-semibold text-steel-500">
                   HTML
                 </span>
               }

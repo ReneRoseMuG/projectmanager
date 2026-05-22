@@ -113,7 +113,7 @@ describe("ProjectFeaturePanel", () => {
       expect(column).toHaveClass("min-w-0");
     });
 
-    const cards = container.querySelectorAll("article.rounded-2xl");
+    const cards = container.querySelectorAll("article.p-5");
     expect(cards).toHaveLength(4);
     cards.forEach((card) => {
       expect(card).toHaveClass("min-w-0");
@@ -145,7 +145,7 @@ describe("ProjectFeaturePanel", () => {
     });
 
     expect(container.querySelector("table")).not.toBeInTheDocument();
-    const rows = container.querySelectorAll("article.rounded-xl");
+    const rows = container.querySelectorAll("article[class*='border-l-[4px]']");
     expect(rows).toHaveLength(features.length);
     features.forEach((feature) => {
       expect(screen.getByText(feature.title)).toBeInTheDocument();
@@ -200,7 +200,7 @@ describe("ProjectFeaturePanel", () => {
       screen.getAllByRole("button", { name: "Neues Feature" }),
     ).toHaveLength(1);
     expect(
-      container.querySelector("article.rounded-xl"),
+      container.querySelector("article[class*='border-l-[4px]']"),
     ).not.toBeInTheDocument();
     expect(container.querySelector("table")).not.toBeInTheDocument();
   });

@@ -81,7 +81,7 @@ export function BacklogItemDetailPage() {
 
   if (isCreateMode && projectId === undefined) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Backlog-Items benötigen ein Projekt.
       </div>
     );
@@ -89,7 +89,7 @@ export function BacklogItemDetailPage() {
 
   if (!isCreateMode && !Number.isFinite(itemId)) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Backlog-Item nicht gefunden
       </div>
     );
@@ -101,7 +101,7 @@ export function BacklogItemDetailPage() {
 
   if (!isCreateMode && !item) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Backlog-Item nicht gefunden
       </div>
     );

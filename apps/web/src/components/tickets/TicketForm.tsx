@@ -418,7 +418,7 @@ export function TicketForm({
               <div className="grid gap-4 md:grid-cols-3">
                 <FormField label="Zuständig" error={userList.error ?? undefined}>
                   <select
-                    className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 disabled:bg-steel-50 disabled:text-slate-400"
+                    className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 disabled:bg-steel-50 disabled:text-steel-400"
                     value={assignee}
                     disabled={userList.loading || Boolean(userList.error)}
                     onChange={(event) => setAssignee(event.target.value)}
@@ -433,7 +433,7 @@ export function TicketForm({
                 </FormField>
                 <FormField label="Reporter">
                   <select
-                    className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 disabled:bg-steel-50 disabled:text-slate-400"
+                    className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 disabled:bg-steel-50 disabled:text-steel-400"
                     value={reporter}
                     disabled={userList.loading || Boolean(userList.error)}
                     onChange={(event) => setReporter(event.target.value)}

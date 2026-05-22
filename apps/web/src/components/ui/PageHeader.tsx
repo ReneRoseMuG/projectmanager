@@ -21,7 +21,7 @@ export function PageHeader({
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 className="text-2xl font-semibold text-ink">{title}</h1>
-        {subtitle ? <p className="text-sm text-muted">{subtitle}</p> : null}
+        {subtitle ? <p className="text-sm text-steel-500">{subtitle}</p> : null}
       </div>
       {actions || onRefresh ? (
         <div className="flex flex-wrap items-center justify-end gap-2">

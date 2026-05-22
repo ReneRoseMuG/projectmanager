@@ -148,7 +148,7 @@ export function AiAgentPanel({ open, onClose }: AiAgentPanelProps) {
                   <Bot size={16} className="mt-0.5 text-steel-700" />
                   <div className="min-w-0 flex-1">
                     <h3 className="text-sm font-semibold text-ink">{action.label}</h3>
-                    <p className="mt-1 text-sm text-slate-600">{action.description}</p>
+                    <p className="mt-1 text-sm text-steel-600">{action.description}</p>
                     <pre className="mt-2 max-h-44 overflow-auto rounded-md bg-steel-900 p-3 text-xs text-white">{JSON.stringify(action.payload, null, 2)}</pre>
                   </div>
                 </div>

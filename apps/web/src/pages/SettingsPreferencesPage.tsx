@@ -10,6 +10,7 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { FormField } from "../components/ui/FormField";
 import { Input } from "../components/ui/Input";
+import { PageHeader } from "../components/ui/PageHeader";
 import { Section } from "../components/ui/Section";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessageAsync } from "../hooks/errors";
@@ -138,13 +139,13 @@ function SettingScopeEditor({
     <div className="grid gap-3 rounded-md border border-line bg-shell/40 p-3 md:grid-cols-[minmax(12rem,1fr)_minmax(14rem,1.2fr)_auto] md:items-end">
       <div className="grid gap-1">
         <span className="text-sm font-semibold text-ink">{title}</span>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-steel-500">
           Aktiv: {scopeLabel(setting.resolvedScope)}
         </span>
       </div>
       <FormField label="Wert" error={localError ?? undefined}>
         {setting.valueType === "boolean" ? (
-          <label className="flex h-11 items-center gap-2 rounded-lg border border-line bg-white px-3 text-sm font-semibold text-slate-700">
+          <label className="flex h-11 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-steel-700">
             <input
               type="checkbox"
               checked={checked}
@@ -154,7 +155,7 @@ function SettingScopeEditor({
           </label>
         ) : setting.valueType === "enum" ? (
           <select
-            className="h-11 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
+            className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
             value={rawValue}
             onChange={(event) => setRawValue(event.target.value)}
           >
@@ -232,7 +233,7 @@ function SettingsList({
                 <h2 className="text-base font-semibold text-ink">
                   {setting.label}
                 </h2>
-                <p className="text-sm text-slate-500">{setting.description}</p>
+                <p className="text-sm text-steel-500">{setting.description}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge tone="steel">{setting.valueType}</Badge>
@@ -268,14 +269,7 @@ export function SettingsPreferencesPage() {
 
   return (
     <div className="mx-auto grid max-w-5xl gap-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">Präferenzen</h1>
-          <p className="text-sm text-slate-500">
-            {settings.length} Einstellungen
-          </p>
-        </div>
-      </header>
+      <PageHeader title="Präferenzen" subtitle={`${settings.length} Einstellungen`} />
 
       {settingsState.error ? (
         <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">
@@ -283,7 +277,7 @@ export function SettingsPreferencesPage() {
         </div>
       ) : null}
       {settingsState.loading ? (
-        <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center text-sm text-slate-500">
+        <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center text-sm text-steel-500">
           Einstellungen werden geladen.
         </div>
       ) : null}

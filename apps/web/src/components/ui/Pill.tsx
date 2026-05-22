@@ -16,5 +16,5 @@ export function Pill({ tone = "steel", color, children }: { tone?: PillTone; col
   const style = color ? catalogFillStyle(color) : undefined;
   const toneClass = color ? "" : map[tone];
 
-  return <span className={`${toneClass} inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white`} style={style}>{children}</span>;
+  return <span className={`${toneClass} inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white`} style={style}>{children}</span>;
 }

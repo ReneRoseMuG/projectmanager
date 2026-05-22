@@ -56,7 +56,7 @@ export function StatusPill({ kind, value, onChange, disabled = false }: StatusPi
     <span ref={ref} className="relative inline-flex" onClick={(event) => event.stopPropagation()}>
       <button
         type="button"
-        className="rounded-full text-left transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-steel-300"
+        className="rounded-md text-left transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-steel-300"
         disabled={disabled}
         aria-haspopup="menu"
         aria-expanded={open}

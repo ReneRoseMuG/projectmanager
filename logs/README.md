@@ -2,6 +2,12 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 22.05.26 | Fix           | API-Integration-Hook-Timeout                 | ✅     |
+| 22.05.26 | Fix           | Auth-Form-Labels                             | ✅     |
+| 22.05.26 | Fix           | Testseitige Design-Erwartungen               | ⚠️     |
+| 22.05.26 | 3             | text-muted und blockierte Muster             | ✅     |
+| 22.05.26 | 2             | Design-Vereinheitlichung ohne text-muted     | ⚠️     |
+| 22.05.26 | 1             | text-muted Analyse                           | ✅     |
 | 22.05.26 | Fix           | Shell Navigation Suche                       | ✅     |
 | 22.05.26 | Fix           | Owner Task E2E Selector                      | ✅     |
 | 22.05.26 | Fix           | Dashboard E2E Testfixes                      | ⚠️     |

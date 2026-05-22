@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTags } from "../../hooks/useTags";
 import { Button } from "../ui/Button";
+import { FormField } from "../ui/FormField";
 import { TagBadge } from "./TagBadge";
 
 interface TagPickerProps {
@@ -61,14 +62,13 @@ export function TagPicker({ selected, onChange }: TagPickerProps) {
         ))}
       </div>
       <div className="flex flex-wrap items-end gap-2">
-        <label className="grid min-w-44 flex-1 gap-1 text-sm font-medium">
-          Tag
+        <FormField label="Tag" className="min-w-44 flex-1">
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
             className="h-10 rounded-md border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
           />
-        </label>
+        </FormField>
         <div className="flex gap-1">
           {colors.map((item) => (
             <button
@@ -76,7 +76,7 @@ export function TagPicker({ selected, onChange }: TagPickerProps) {
               type="button"
               title={item}
               aria-label={item}
-              className={`h-8 w-8 rounded border border-white shadow ${item === color ? "ring-2 ring-ink ring-offset-2" : ""}`}
+              className={`h-8 w-8 rounded border border-white shadow-panel ${item === color ? "ring-2 ring-ink ring-offset-2" : ""}`}
               style={{ backgroundColor: item }}
               onClick={() => setColor(item)}
             />

@@ -9,7 +9,7 @@ export function Divider({ label }: DividerProps) {
   }
 
   return (
-    <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-steel-500">
       <span className="h-px flex-1 bg-line" />
       <span>{label}</span>
       <span className="h-px flex-1 bg-line" />

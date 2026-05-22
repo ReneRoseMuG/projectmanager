@@ -27,7 +27,7 @@ export function Modal({ open, title, size = "md", showHeader = true, bodyClassNa
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-steel-900/55 p-4 backdrop-blur-[2px]">
-      <div className={`flex max-h-[calc(100vh-64px)] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-modal ${sizes[size]}`}>
+      <div className={`flex max-h-[calc(100vh-64px)] w-full flex-col overflow-hidden rounded-lg bg-white shadow-modal ${sizes[size]}`}>
         {showHeader ? (
           <header className="flex items-center justify-between border-b border-line px-5 py-4">
             <h2 className="text-lg font-semibold text-ink">{title}</h2>

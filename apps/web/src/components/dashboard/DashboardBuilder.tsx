@@ -91,7 +91,7 @@ function SortableWidgetRow({
       <div className="flex items-center gap-3">
         <button
           type="button"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-steel-100 hover:text-steel-700"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-steel-400 transition hover:bg-steel-100 hover:text-steel-700"
           aria-label={`${meta.label} verschieben`}
           title={`${meta.label} verschieben`}
           {...sortable.attributes}

@@ -49,9 +49,9 @@ export function UseCaseCard({ useCase, variant = "card", onOpen, onStatusChange 
           <StatusPill kind="featureStatus" value={useCase.status} onChange={onStatusChange ? (status) => onStatusChange(useCase, status) : undefined} />
         </div>
       }
-      body={description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null}
+      body={description ? <p className="line-clamp-3 text-xs text-steel-600">{description}</p> : null}
       footer={
-        <div className="flex items-center justify-between border-t border-line pt-2 text-[11px] font-semibold text-slate-500">
+        <div className="flex items-center justify-between border-t border-line pt-2 text-[11px] font-semibold text-steel-500">
           <span>Doppelklick zum Öffnen</span>
           <span>#{useCase.sortOrder}</span>
         </div>

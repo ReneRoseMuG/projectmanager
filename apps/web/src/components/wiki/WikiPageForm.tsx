@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { WikiTreeNode } from "../../hooks/useWiki";
 import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
+import { FormField } from "../ui/FormField";
 import { Modal } from "../ui/Modal";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
@@ -115,12 +116,10 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOp
         <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
           <Section>
             <div className="grid gap-4 md:grid-cols-2">
-              <label className="grid gap-1 text-sm font-semibold text-ink">
-                Titel
+              <FormField label="Titel">
                 <input className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/15" value={title} onChange={(event) => { setTitle(event.target.value); setDirty(true); }} required />
-              </label>
-              <label className="grid gap-1 text-sm font-semibold text-ink">
-                Kategorie
+              </FormField>
+              <FormField label="Kategorie">
                 <select className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-teal" value={parentId ?? ""} onChange={(event) => { setParentId(event.target.value ? Number(event.target.value) : null); setDirty(true); }}>
                   <option value="">Root-Seite</option>
                   {pages.map((item) => (
@@ -129,7 +128,7 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOp
                     </option>
                   ))}
                 </select>
-              </label>
+              </FormField>
             </div>
             <div className="mt-4 grid gap-2 md:grid-cols-2">
               <label className="flex items-center justify-between gap-3 rounded-lg border border-line bg-shell/60 p-3 text-sm font-semibold text-ink">
@@ -141,13 +140,12 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOp
                 <input type="checkbox" checked disabled className="h-4 w-4" />
               </label>
             </div>
-            <label className="mt-4 grid max-w-[10rem] gap-1 text-sm font-semibold text-ink">
-              Sortierung
+            <FormField label="Sortierung" className="mt-4 max-w-[10rem]">
               <input className="h-10 rounded-md border border-line px-3 text-sm outline-none focus:border-teal" type="number" value={sortOrder} onChange={(event) => { setSortOrder(Number(event.target.value)); setDirty(true); }} />
-            </label>
+            </FormField>
           </Section>
 
-          {versionsOpen ? <Section><div className="rounded-lg border border-dashed border-line bg-shell/60 p-8 text-center text-sm text-slate-500">Noch keine Versionen vorhanden.</div></Section> : null}
+          {versionsOpen ? <Section><div className="rounded-lg border border-dashed border-line bg-shell/60 p-8 text-center text-sm text-steel-500">Noch keine Versionen vorhanden.</div></Section> : null}
 
           <Section>
             {preview ? (
