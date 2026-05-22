@@ -68,6 +68,7 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
       statusKey="status"
       statusCatalogKind="workStatus"
       statusColumns={statusColumns}
+      onItemStatusChange={onStatusChange}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       filters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={tasks.length} />}

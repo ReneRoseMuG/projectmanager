@@ -1,4 +1,4 @@
-import type { TaskBoardPositionInput, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+import type { TaskBoardItem, TaskBoardPositionInput, TaskInput, TaskStatus, TaskUpdate } from "@taskmanager/shared-types";
 import type { QueryClient } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
@@ -104,6 +104,38 @@ export function useTasks(owner?: TaskOwner) {
     }
   });
 
+  const updateTaskStatusMutation = useMutation({
+    mutationFn: ({ id, status, expectedVersion }: { id: number; status: TaskStatus; expectedVersion: number }) => updateTaskRequest(id, { status, expectedVersion }),
+    onMutate: async ({ id, status }) => {
+      const queryKey = ownerTaskKey(validOwner);
+      await queryClient.cancelQueries({ queryKey });
+      const previousTasks = queryClient.getQueryData<TaskBoardItem[]>(queryKey);
+
+      queryClient.setQueryData<TaskBoardItem[]>(queryKey, (currentTasks) =>
+        currentTasks?.map((task) =>
+          task.id === id
+            ? {
+                ...task,
+                status,
+                version: task.version + 1
+              }
+            : task
+        )
+      );
+
+      return { previousTasks };
+    },
+    onError: (_error, _variables, context) => {
+      const queryKey = ownerTaskKey(validOwner);
+      if (context?.previousTasks) {
+        queryClient.setQueryData(queryKey, context.previousTasks);
+      }
+    },
+    onSuccess: async (updated) => {
+      await invalidateOwner(queryClient, validOwner, updated.id);
+    }
+  });
+
   const updateTaskBoardMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TaskBoardPositionInput }) => {
       if (validOwner === undefined) {
@@ -151,6 +183,13 @@ export function useTasks(owner?: TaskOwner) {
     [updateTaskMutation]
   );
 
+  const updateTaskStatus = useCallback(
+    async (id: number, status: TaskStatus, expectedVersion: number) => {
+      return updateTaskStatusMutation.mutateAsync({ id, status, expectedVersion });
+    },
+    [updateTaskStatusMutation]
+  );
+
   const updateTaskBoard = useCallback(
     async (id: number, input: TaskBoardPositionInput) => {
       return updateTaskBoardMutation.mutateAsync({ id, input });
@@ -174,6 +213,7 @@ export function useTasks(owner?: TaskOwner) {
     linkTask,
     unlinkTask,
     updateTask,
+    updateTaskStatus,
     updateTaskBoard,
     removeTask
   };

@@ -60,7 +60,8 @@ function renderTaskList({
   onAdd = vi.fn(),
   onAddStatus = vi.fn(),
   onOpen = vi.fn(),
-  onDelete = vi.fn()
+  onDelete = vi.fn(),
+  onStatusChange
 }: {
   tasks?: TaskBoardItem[];
   viewMode?: ViewMode;
@@ -69,6 +70,7 @@ function renderTaskList({
   onAddStatus?: (status: Task["status"]) => void;
   onOpen?: (task: Task) => void;
   onDelete?: (task: Task) => void;
+  onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>;
 } = {}) {
   return render(
     <TaskListBoardView
@@ -79,6 +81,7 @@ function renderTaskList({
       onAddStatus={onAddStatus}
       onOpen={onOpen}
       onDelete={onDelete}
+      onStatusChange={onStatusChange}
     />
   );
 }
@@ -178,6 +181,23 @@ describe("TaskListBoardView", () => {
     expect(todoHeader).toHaveTextContent("1");
   });
 
+  it("aktiviert DnD nur bei vorhandenem onStatusChange", () => {
+    const tasks = buildTaskSet();
+    const withoutStatusChange = renderTaskList({ tasks });
+
+    expect(withoutStatusChange.container.querySelector("[data-dnd-enabled='true']")).not.toBeInTheDocument();
+    expect(withoutStatusChange.container.querySelector("[data-dnd-draggable='true']")).not.toBeInTheDocument();
+    cleanup();
+
+    const withStatusChange = renderTaskList({
+      tasks,
+      onStatusChange: vi.fn(),
+    });
+
+    expect(withStatusChange.container.querySelector("[data-dnd-enabled='true']")).toBeInTheDocument();
+    expect(withStatusChange.container.querySelectorAll("[data-dnd-draggable='true']")).toHaveLength(tasks.length);
+  });
+
   it("rendert Listen-Modus mit ItemRows und Row-Controls", () => {
     const tasks = buildTaskSet();
     const { container } = renderTaskList({ tasks, viewMode: "list" });
@@ -219,10 +239,17 @@ describe("TaskListBoardView", () => {
     expect(overdueDate).toHaveClass("text-crimson");
   });
 
-  it("zeigt EmptyState wenn keine Aufgaben vorhanden sind", () => {
+  it("zeigt leere Statusspalten wenn keine Aufgaben vorhanden sind", () => {
     const { container } = renderTaskList({ tasks: [] });
 
-    expect(screen.getByText("Keine Aufgaben")).toBeInTheDocument();
+    expect(screen.queryByText("Keine Aufgaben")).not.toBeInTheDocument();
+    const columns = container.querySelectorAll("section.rounded-lg");
+    expect(columns).toHaveLength(statusColumns.length);
+    statusColumns.forEach((column, index) => {
+      const section = columns[index] as HTMLElement;
+      expect(within(section).getByRole("heading", { name: column.label })).toBeInTheDocument();
+      expect(within(section).getByText("0")).toBeInTheDocument();
+    });
     expect(container.querySelector("article.rounded-2xl")).not.toBeInTheDocument();
     expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
   });
