@@ -459,6 +459,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const project = await createProject(app);
       const task = await createTask(app, project.id);
       const feature = await createFeature(app);
+      await setProjectFeatures(app, project.id, [feature.id]);
       const useCase = await createUseCase(app, feature.id);
       await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await setTaskUseCases(app, task.id, [useCase.id]);
@@ -524,6 +525,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const project = await createProject(app);
       const task = await createTask(app, project.id);
       const feature = await createFeature(app);
+      await setProjectFeatures(app, project.id, [feature.id]);
       const uc = await createUseCase(app, feature.id);
       await setTaskUseCases(app, task.id, [uc.id]);
 
@@ -576,6 +578,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const project = await createProject(app);
       const task = await createTask(app, project.id);
       const feature = await createFeature(app);
+      await setProjectFeatures(app, project.id, [feature.id]);
       await setTaskFeatures(app, task.id, [feature.id]);
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
@@ -632,6 +635,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const project = await createProject(app);
       const task = await createTask(app, project.id);
       const feature = await createFeature(app);
+      await setProjectFeatures(app, project.id, [feature.id]);
       const uc = await createUseCase(app, feature.id);
       await setTaskUseCases(app, task.id, [uc.id]);
 

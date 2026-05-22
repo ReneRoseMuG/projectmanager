@@ -1,7 +1,7 @@
-import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskUpdate } from "@taskmanager/shared-types";
 import { api } from "./client";
 
-export type TaskOwner = { type: "project" | "milestone" | "feature" | "useCase"; id: number };
+export type { TaskOwner };
 
 function ownerPath(owner: TaskOwner): string {
   if (owner.type === "project") {
@@ -26,6 +26,10 @@ export async function getProjectTasks(projectId: number): Promise<TaskBoardItem[
 
 export async function getTasks(): Promise<Task[]> {
   return api.get("tasks").json<Task[]>();
+}
+
+export async function getTaskLinkCandidates(owner: TaskOwner): Promise<Task[]> {
+  return api.get("tasks/link-candidates", { searchParams: { ownerType: owner.type, ownerId: owner.id } }).json<Task[]>();
 }
 
 export async function createOwnerTask(owner: TaskOwner, input: TaskInput): Promise<TaskBoardItem> {

@@ -13,9 +13,11 @@ import type {
   TicketType,
   UserOption,
 } from "@taskmanager/shared-types";
+import { useQuery } from "@tanstack/react-query";
 import { Bug, GitBranch, Link2, Paperclip, StickyNote } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { getTicketLinkCandidates, getTicketRelationCandidates, type TicketOwner } from "../../api/tickets";
 import type { DraftFile } from "../../types";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useCatalogs } from "../../hooks/useCatalogs";
@@ -23,7 +25,7 @@ import { errorMessage } from "../../hooks/errors";
 import { useNotes } from "../../hooks/useNotes";
 import { useHasPermission } from "../../hooks/usePermissions";
 import { useTicketDetail } from "../../hooks/useTicketDetail";
-import { useTickets } from "../../hooks/useTickets";
+import { queryKeys } from "../../queries/queryKeys";
 import { useUsers } from "../../hooks/useUsers";
 import {
   catalogColor,
@@ -89,6 +91,7 @@ export interface TicketFormInput extends TicketInput {
 interface TicketFormProps {
   open: boolean;
   ticket?: Ticket | null;
+  owner?: TicketOwner;
   initialStatus?: TicketStatus;
   title?: string;
   onSubmit: (input: TicketFormInput) => Promise<Ticket | void>;
@@ -152,6 +155,7 @@ function buildUserOptions(users: UserOption[], currentValue: string): Array<{ va
 export function TicketForm({
   open,
   ticket,
+  owner,
   initialStatus = "open",
   title = "Ticket",
   onSubmit,
@@ -165,7 +169,16 @@ export function TicketForm({
 }: TicketFormProps) {
   const ticketId = ticket?.id ?? null;
   const detail = useTicketDetail(open && ticketId ? ticketId : null);
-  const allTickets = useTickets(open ? undefined : null);
+  const validOwner = owner && Number.isFinite(owner.id) ? owner : undefined;
+  const relationCandidatesQuery = useQuery({
+    queryKey: ticketId
+      ? queryKeys.tickets.relationCandidates(ticketId)
+      : validOwner
+        ? queryKeys.tickets.linkCandidates(validOwner.type, validOwner.id)
+        : queryKeys.tickets.root,
+    queryFn: () => (ticketId ? getTicketRelationCandidates(ticketId) : getTicketLinkCandidates(validOwner as TicketOwner)),
+    enabled: open && (ticketId !== null || validOwner !== undefined),
+  });
   const userList = useUsers(open);
   const catalogs = useCatalogs();
   const notes = useNotes(ticketId && open ? { type: "ticket", id: ticketId } : null);
@@ -239,8 +252,8 @@ export function TicketForm({
 
   const loadedTicket = detail.ticket;
   const availableRelationTickets = useMemo(
-    () => allTickets.tickets.filter((item) => item.id !== ticketId),
-    [allTickets.tickets, ticketId],
+    () => (relationCandidatesQuery.data ?? []).filter((item) => item.id !== ticketId),
+    [relationCandidatesQuery.data, ticketId],
   );
   const ticketTypeOptions = useMemo(
     () => catalogEntriesByKind(catalogs.entries, "ticketType").map((entry) => ({ value: entry.key, label: entry.label, color: entry.color })),
@@ -542,6 +555,7 @@ export function TicketForm({
                 emptyIcon={<Link2 size={22} />}
                 emptyTitle="Keine Relationen vorgemerkt"
                 showCreateNew={false}
+                showLinkExisting={validOwner !== undefined}
                 linkExistingLabel="Relation hinzufügen"
                 onLinkExisting={() => setRelationDraftOpen(true)}
                 onRemoveExisting={(index) => setPendingRelations((items) => items.filter((_, itemIndex) => itemIndex !== index))}

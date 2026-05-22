@@ -36,7 +36,9 @@ import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { JournalPanel } from "../journal/JournalPanel";
+import type { TaskOwner } from "../../api/tasks";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
+import type { TicketOwner } from "../../api/tickets";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
@@ -65,6 +67,7 @@ import { useHasPermission } from "../../hooks/usePermissions";
 interface TaskFormProps {
   open: boolean;
   task?: Task | null;
+  owner?: TaskOwner;
   initialStatus?: TaskStatus;
   onSubmit: (input: TaskFormInput) => Promise<Task | void>;
   onClose: () => void;
@@ -138,6 +141,7 @@ function ticketTypeValue(
 export function TaskForm({
   open,
   task,
+  owner,
   initialStatus = "active",
   onSubmit,
   onClose,
@@ -151,6 +155,8 @@ export function TaskForm({
   const detail = useTaskDetail(open && taskId ? taskId : null);
   const ticketOwner =
     taskId && open ? { type: "task" as const, id: taskId } : null;
+  const ticketCandidateOwner: TicketOwner | null =
+    ticketOwner ?? (owner && Number.isFinite(owner.id) ? owner : null);
   const tickets = useTickets(ticketOwner);
   const catalogs = useCatalogs();
   const notes = useNotes(taskId && open ? { type: "task", id: taskId } : null);
@@ -551,6 +557,7 @@ export function TaskForm({
                 )}
                 emptyIcon={<ClipboardList size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
+                showLinkExisting={ticketCandidateOwner !== null}
                 onLinkExisting={() => setTicketLinkOpen(true)}
                 onCreateNew={() => setTicketDraftOpen(true)}
                 onRemoveExisting={(index) =>
@@ -749,6 +756,7 @@ export function TaskForm({
 
       <TicketLinkDialog
         open={ticketLinkOpen}
+        owner={ticketCandidateOwner}
         currentTickets={pendingTickets.flatMap((item) =>
           item.kind === "existing" ? [item.ticket] : [],
         )}

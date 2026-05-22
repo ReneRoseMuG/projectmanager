@@ -2,6 +2,7 @@ import type {
   Ticket,
   TicketDetail,
   TicketInput,
+  TicketOwner,
   TicketPositionInput,
   TicketRelationEntry,
   TicketRelationInput,
@@ -32,9 +33,10 @@ import {
   type JournalObjectRef
 } from "./journal.service.js";
 import { deleteTicketNotesForIds, listTicketNotes } from "./notes.service.js";
+import { assertCompatibleProjectContexts, projectContextsAreCompatible, ticketOwnerProjectContext, ticketProjectContext } from "./project-context.service.js";
 import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
 
-export type TicketOwner = { type: "project" | "milestone" | "task" | "feature" | "useCase"; id: number };
+export type { TicketOwner };
 
 type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number };
 
@@ -415,6 +417,14 @@ export function listTickets(database: DbClient): Ticket[] {
   return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0));
 }
 
+export function listTicketLinkCandidates(database: DbClient, owner: TicketOwner): Ticket[] {
+  ensureOwnerExists(database, owner);
+  const ownerContext = ticketOwnerProjectContext(database, owner);
+  const linkedTicketIds = new Set(selectOwnerTicketRows(database, owner).map((ticket) => ticket.id));
+
+  return listTickets(database).filter((ticket) => !linkedTicketIds.has(ticket.id) && projectContextsAreCompatible(ownerContext, ticketProjectContext(database, ticket.id)));
+}
+
 export function listOwnerTickets(database: DbClient, owner: TicketOwner): Ticket[] {
   ensureOwnerExists(database, owner);
   const rows = selectOwnerTicketRows(database, owner);
@@ -498,6 +508,8 @@ export function linkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId
   if (existing) {
     return mapTicket(database, existing, undefined, undefined, existing.boardPosition);
   }
+
+  assertCompatibleProjectContexts(ticketOwnerProjectContext(database, owner), ticketProjectContext(database, ticketId));
 
   const position = nextOwnerPosition(database, owner, ticket.status);
   database.transaction((tx) => {
@@ -737,6 +749,25 @@ export function listTicketRelations(database: DbClient, ticketId: number): Ticke
   return entries;
 }
 
+function ticketRelationPeerIds(database: DbClient, ticketId: number): Set<number> {
+  const rows = database
+    .select({ sourceTicketId: ticketRelations.sourceTicketId, targetTicketId: ticketRelations.targetTicketId })
+    .from(ticketRelations)
+    .where(or(eq(ticketRelations.sourceTicketId, ticketId), eq(ticketRelations.targetTicketId, ticketId)))
+    .all();
+  return new Set(rows.map((row) => (row.sourceTicketId === ticketId ? row.targetTicketId : row.sourceTicketId)));
+}
+
+export function listTicketRelationCandidates(database: DbClient, ticketId: number): Ticket[] {
+  getTicketRecord(database, ticketId);
+  const sourceContext = ticketProjectContext(database, ticketId);
+  const relatedTicketIds = ticketRelationPeerIds(database, ticketId);
+
+  return listTickets(database).filter(
+    (ticket) => ticket.id !== ticketId && !relatedTicketIds.has(ticket.id) && projectContextsAreCompatible(sourceContext, ticketProjectContext(database, ticket.id))
+  );
+}
+
 export function addTicketRelation(database: DbClient, ticketId: number, input: TicketRelationInput, actor?: JournalActor | null): void {
   const source = getTicketRecord(database, ticketId);
   const target = getTicketRecord(database, input.targetTicketId);
@@ -760,6 +791,8 @@ export function addTicketRelation(database: DbClient, ticketId: number, input: T
   if (existing) {
     throw badRequest("Ticket relation already exists");
   }
+
+  assertCompatibleProjectContexts(ticketProjectContext(database, ticketId), ticketProjectContext(database, input.targetTicketId));
 
   database.transaction((tx) => {
     const txDb = tx as unknown as DbClient;

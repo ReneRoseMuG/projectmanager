@@ -64,6 +64,7 @@ describe("TaskForm", () => {
     clickTab("Tickets");
 
     expect(screen.getByText("Keine Tickets vorgemerkt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Verknüpfen" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("owner-ticket-board")).not.toBeInTheDocument();
   });
 
@@ -93,7 +94,7 @@ describe("TaskForm", () => {
 
   it("verknüpft ein bestehendes Ticket lokal ohne Submit", async () => {
     const onSubmit = vi.fn();
-    renderWithProviders(<TaskForm open onSubmit={onSubmit} onClose={vi.fn()} />);
+    renderWithProviders(<TaskForm open owner={{ type: "project", id: 1 }} onSubmit={onSubmit} onClose={vi.fn()} />);
 
     clickTab("Tickets");
     fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
@@ -131,7 +132,7 @@ describe("TaskForm", () => {
     const onSubmit = vi.fn().mockResolvedValue(createdTask);
     const onClose = vi.fn();
     const file = new File(["task"], "task.txt", { type: "text/plain" });
-    const { container } = renderWithProviders(<TaskForm open initialStatus="in_progress" onSubmit={onSubmit} onClose={onClose} />);
+    const { container } = renderWithProviders(<TaskForm open owner={{ type: "project", id: 1 }} initialStatus="in_progress" onSubmit={onSubmit} onClose={onClose} />);
 
     changeInput(0, "Neue Aufgabe");
     clickTab("Subtasks");

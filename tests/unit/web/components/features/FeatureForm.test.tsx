@@ -67,6 +67,7 @@ describe("FeatureForm", () => {
     clickTab("Aufgaben");
 
     expect(screen.getByText("Keine Aufgaben vorgemerkt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Verknüpfen" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("owner-task-board")).not.toBeInTheDocument();
   });
 
@@ -76,6 +77,7 @@ describe("FeatureForm", () => {
     clickTab("Tickets");
 
     expect(screen.getByText("Keine Tickets vorgemerkt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Verknüpfen" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("owner-ticket-board")).not.toBeInTheDocument();
   });
 
@@ -106,7 +108,7 @@ describe("FeatureForm", () => {
 
   it("verknüpft eine Aufgabe lokal ohne Submit", async () => {
     const onSubmit = vi.fn();
-    renderWithProviders(<FeatureForm open onSubmit={onSubmit} onClose={vi.fn()} />);
+    renderWithProviders(<FeatureForm open initialProjectId={project.id} onSubmit={onSubmit} onClose={vi.fn()} />);
 
     clickTab("Aufgaben");
     fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
@@ -135,7 +137,7 @@ describe("FeatureForm", () => {
     const onPostCreate = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
     const file = new File(["feature"], "feature.txt", { type: "text/plain" });
-    const { container } = renderWithProviders(<FeatureForm open onSubmit={onSubmit} onPostCreate={onPostCreate} onClose={onClose} />);
+    const { container } = renderWithProviders(<FeatureForm open initialProjectId={project.id} onSubmit={onSubmit} onPostCreate={onPostCreate} onClose={onClose} />);
 
     changeInput(0, "Neues Feature");
     clickTab("Use Cases");
@@ -178,7 +180,6 @@ describe("FeatureForm", () => {
     clickTab("Use Cases");
     fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
     changeInput(0, "Reset Use Case");
-    changeInput(1, "reset-use-case");
     fireEvent.click(screen.getByRole("button", { name: "Vormerken" }));
     expect(screen.getByText("Reset Use Case")).toBeInTheDocument();
 

@@ -58,6 +58,7 @@ describe("TicketForm", () => {
     expect(screen.getByText("Keine Sub-Tickets vorgemerkt")).toBeInTheDocument();
     clickTab("Relationen");
     expect(screen.getByText("Keine Relationen vorgemerkt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Relation hinzufügen" })).not.toBeInTheDocument();
     clickTab("Kommentare");
     expect(screen.getByText("Keine Kommentare vorgemerkt")).toBeInTheDocument();
     clickTab("Notizen");
@@ -69,7 +70,7 @@ describe("TicketForm", () => {
   it("übergibt alle Pending-Daten im Create-Submit", async () => {
     const onSubmit = vi.fn().mockResolvedValue(ticket);
     const file = new File(["ticket"], "ticket.txt", { type: "text/plain" });
-    const { container } = renderWithProviders(<TicketForm open initialStatus="open" onSubmit={onSubmit} onClose={vi.fn()} />);
+    const { container } = renderWithProviders(<TicketForm open owner={{ type: "project", id: 1 }} initialStatus="open" onSubmit={onSubmit} onClose={vi.fn()} />);
 
     changeInput(0, "Neues Ticket");
     clickTab("Sub-Tickets");
@@ -80,6 +81,7 @@ describe("TicketForm", () => {
 
     clickTab("Relationen");
     fireEvent.click(screen.getByRole("button", { name: "Relation hinzufügen" }));
+    await waitFor(() => expect(screen.getByText(`TICKET-${ticket.id} · ${ticket.title}`)).toBeInTheDocument());
     const selects = document.body.querySelectorAll("select");
     fireEvent.change(selects[0] as HTMLSelectElement, { target: { value: String(ticket.id) } });
     fireEvent.click(screen.getByRole("button", { name: /Hinzuf/ }));

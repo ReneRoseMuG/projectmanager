@@ -171,6 +171,7 @@ export function TicketDetailPage() {
         <TicketForm
           open
           variant="page"
+          owner={owner}
           initialStatus={parseTicketStatus(searchParams.get("status"))}
           onSubmit={createTicket}
           onClose={closePage}
@@ -204,6 +205,7 @@ export function TicketDetailPage() {
       <TicketForm
         open
         ticket={detail.ticket}
+        owner={owner}
         variant="page"
         onSubmit={saveTicket}
         onClose={closePage}

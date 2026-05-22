@@ -247,4 +247,31 @@ describe("Auth API", () => {
     await custom.get("/api/tickets").expect(200);
     await custom.post("/api/projects").send({ name: "Nicht erlaubt" }).expect(403);
   });
+
+  it("schützt Aufgaben- und Ticket-Kandidaten-Endpunkte über read-Rechte", async () => {
+    await supertest(app.server).get("/api/tasks/link-candidates?ownerType=project&ownerId=1").expect(401);
+
+    const admin = await loginAdmin(app);
+    const project = await admin.post("/api/projects").send({ name: "Kandidaten-Projekt" }).expect(201);
+    const ticket = await admin.post(`/api/projects/${project.body.id}/tickets`).send({ title: "Kandidaten-Ticket" }).expect(201);
+
+    await admin.get(`/api/tasks/link-candidates?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    await admin.get(`/api/tickets/link-candidates?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    await admin.get(`/api/tickets/${ticket.body.id}/relation-candidates`).expect(200);
+
+    const ticketReaderRole = await admin
+      .post("/api/admin/roles")
+      .send({ key: "ticket_candidates_reader", label: "Ticket Candidates Reader", permissions: [{ resource: "tickets", action: "read" }] })
+      .expect(201);
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Ticket", lastName: "Reader", email: "ticket-reader@example.test", roleId: ticketReaderRole.body.id, password: "password123", isActive: true })
+      .expect(201);
+
+    const ticketReader = supertest.agent(app.server);
+    await ticketReader.post("/api/auth/login").send({ email: "ticket-reader@example.test", password: "password123" }).expect(200);
+    await ticketReader.get(`/api/tasks/link-candidates?ownerType=project&ownerId=${project.body.id}`).expect(403);
+    await ticketReader.get(`/api/tickets/link-candidates?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    await ticketReader.get(`/api/tickets/${ticket.body.id}/relation-candidates`).expect(200);
+  });
 });

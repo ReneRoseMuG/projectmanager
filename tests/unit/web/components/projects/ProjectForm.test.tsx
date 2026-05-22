@@ -21,7 +21,7 @@
  */
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
-import { addPendingComment, changeInput, clickTab, feature, getFileInput, project, renderWithProviders, task, ticket } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
+import { addPendingComment, changeInput, clickTab, feature, getFileInput, project, renderWithProviders } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { ProjectForm } from "../../../../../apps/web/src/components/projects/ProjectForm";
 
 describe("ProjectForm", () => {
@@ -79,6 +79,7 @@ describe("ProjectForm", () => {
     clickTab("Aufgaben");
 
     expect(screen.getByText("Keine Aufgaben vorgemerkt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Verknüpfen" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("owner-task-board")).not.toBeInTheDocument();
   });
 
@@ -88,6 +89,7 @@ describe("ProjectForm", () => {
     clickTab("Tickets");
 
     expect(screen.getByText("Keine Tickets vorgemerkt")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Verknüpfen" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("owner-ticket-board")).not.toBeInTheDocument();
   });
 
@@ -149,11 +151,13 @@ describe("ProjectForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Verknüpfen" }).at(-1) as HTMLElement);
     clickTab("Aufgaben");
-    fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
-    fireEvent.click(screen.getByRole("button", { name: "Aufgabe wählen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
+    changeInput(0, "Projekt-Aufgabe Pending");
+    fireEvent.click(screen.getByRole("button", { name: "Vormerken" }));
     clickTab("Tickets");
-    fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
-    fireEvent.click(screen.getByRole("button", { name: "Ticket wählen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
+    changeInput(0, "Projekt-Ticket Pending");
+    fireEvent.click(screen.getByRole("button", { name: "Vormerken" }));
     clickTab("Kommentare");
     addPendingComment("Projekt-Kommentar");
     clickTab("Notizen");
@@ -169,8 +173,8 @@ describe("ProjectForm", () => {
       createdProject.id,
       expect.objectContaining({
         featureIds: [feature.id],
-        tasks: [{ kind: "existing", task }],
-        tickets: [{ kind: "existing", ticket }],
+        tasks: [{ kind: "new", draft: { title: "Projekt-Aufgabe Pending", status: "active", priority: "medium" } }],
+        tickets: [{ kind: "new", draft: { title: "Projekt-Ticket Pending", type: "bug", status: "open", priority: "medium" } }],
         comments: [{ text: "Projekt-Kommentar" }],
         notes: [{ title: "Projekt-Notiz", contentJson: {} }],
         files: [{ file, previewUrl: undefined }]

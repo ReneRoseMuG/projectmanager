@@ -68,6 +68,7 @@ describe("Tickets API", () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id, { title: "Owner task" });
     const feature = await createFeature(app, { title: "Owner feature" });
+    await supertest(app.server).put(`/api/projects/${project.id}/features`).send({ featureIds: [feature.id] }).expect(200);
     const useCase = await createUseCase(app, feature.id, { title: "Owner use case" });
 
     return [
@@ -178,6 +179,36 @@ describe("Tickets API", () => {
       await supertest(app.server).post(`${owner.path}/${ticket.id}`).expect(200);
       await expectOwnerContains(owner, ticket.id);
     }
+  });
+
+  it("weist projektfremde Ticket-Owner-Links ab", async () => {
+    const firstProject = await createProject(app, { name: "Erstes Projekt" });
+    const secondProject = await createProject(app, { name: "Zweites Projekt" });
+    const task = await createTask(app, secondProject.id, { title: "Task im zweiten Projekt" });
+    const feature = await createFeature(app, { title: "Feature im zweiten Projekt" });
+    await supertest(app.server).put(`/api/projects/${secondProject.id}/features`).send({ featureIds: [feature.id] }).expect(200);
+    const useCase = await createUseCase(app, feature.id, { title: "Use Case im zweiten Projekt" });
+    const ticket = await createTicket(app, firstProject.id, { title: "Projektfremdes Ticket" });
+
+    await supertest(app.server).post(`/api/projects/${secondProject.id}/tickets/${ticket.id}`).expect(400);
+    await supertest(app.server).post(`/api/tasks/${task.id}/tickets/${ticket.id}`).expect(400);
+    await supertest(app.server).post(`/api/features/${feature.id}/tickets/${ticket.id}`).expect(400);
+    await supertest(app.server).post(`/api/use-cases/${useCase.id}/tickets/${ticket.id}`).expect(400);
+  });
+
+  it("GET /api/tickets/link-candidates liefert nur projektkompatible unverknüpfte Tickets", async () => {
+    const firstProject = await createProject(app, { name: "Erstes Projekt" });
+    const secondProject = await createProject(app, { name: "Zweites Projekt" });
+    const foreignTicket = await createTicket(app, firstProject.id, { title: "Fremdes Ticket" });
+    const neutralTicket = await createTicket(app, null, { title: "Neutrales Ticket" });
+    const linkedTicket = await createTicket(app, secondProject.id, { title: "Schon verknüpftes Ticket" });
+
+    const res = await supertest(app.server).get(`/api/tickets/link-candidates?ownerType=project&ownerId=${secondProject.id}`).expect(200);
+
+    const ids = (res.body as TestTicket[]).map((ticket) => ticket.id);
+    expect(ids).toContain(neutralTicket.id);
+    expect(ids).not.toContain(foreignTicket.id);
+    expect(ids).not.toContain(linkedTicket.id);
   });
 
   it("owner ticket lists stay isolated until an explicit link is created", async () => {
@@ -353,6 +384,36 @@ describe("Tickets API", () => {
     const incoming = await supertest(app.server).get(`/api/tickets/${target.id}/relations`).expect(200);
     expect(outgoing.body[0]).toMatchObject({ relationType: "blocks", direction: "outgoing", ticket: { id: target.id } });
     expect(incoming.body[0]).toMatchObject({ relationType: "blocks", direction: "incoming", ticket: { id: source.id } });
+  });
+
+  it("weist projektfremde Ticket-Relationen ab und erlaubt neutrale Ziele", async () => {
+    const firstProject = await createProject(app, { name: "Erstes Projekt" });
+    const secondProject = await createProject(app, { name: "Zweites Projekt" });
+    const source = await createTicket(app, firstProject.id, { title: "Source" });
+    const foreignTarget = await createTicket(app, secondProject.id, { title: "Foreign target" });
+    const neutralTarget = await createTicket(app, null, { title: "Neutral target" });
+    const neutralSource = await createTicket(app, null, { title: "Neutral source" });
+
+    await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send({ targetTicketId: foreignTarget.id, relationType: "related" }).expect(400);
+    await supertest(app.server).post(`/api/tickets/${neutralSource.id}/relations`).send({ targetTicketId: foreignTarget.id, relationType: "related" }).expect(400);
+    await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send({ targetTicketId: neutralTarget.id, relationType: "related" }).expect(201);
+  });
+
+  it("GET /api/tickets/:id/relation-candidates filtert projektfremde und bereits relationierte Tickets", async () => {
+    const firstProject = await createProject(app, { name: "Erstes Projekt" });
+    const secondProject = await createProject(app, { name: "Zweites Projekt" });
+    const source = await createTicket(app, firstProject.id, { title: "Source" });
+    const foreignTarget = await createTicket(app, secondProject.id, { title: "Foreign target" });
+    const neutralTarget = await createTicket(app, null, { title: "Neutral target" });
+    const relatedTarget = await createTicket(app, null, { title: "Related target" });
+    await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send({ targetTicketId: relatedTarget.id, relationType: "related" }).expect(201);
+
+    const res = await supertest(app.server).get(`/api/tickets/${source.id}/relation-candidates`).expect(200);
+
+    const ids = (res.body as TestTicket[]).map((ticket) => ticket.id);
+    expect(ids).toContain(neutralTarget.id);
+    expect(ids).not.toContain(foreignTarget.id);
+    expect(ids).not.toContain(relatedTarget.id);
   });
 
   it("DELETE /api/tickets/:id blocks tickets with ticket relations until the relation is removed", async () => {

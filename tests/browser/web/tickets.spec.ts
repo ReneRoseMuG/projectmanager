@@ -52,13 +52,11 @@ async function expectTicketFormData(
     ticket.title,
   );
   await expectRichText(form, descriptionText);
-  await expect(form.locator("input").nth(1)).toHaveValue("Ada Lovelace");
-  await expect(form.locator("input").nth(2)).toHaveValue("Grace Hopper");
+  await expect(form.locator("select").nth(0)).toHaveValue("Ada Lovelace");
+  await expect(form.locator("select").nth(1)).toHaveValue("Grace Hopper");
   await expect(form.locator('input[type="date"]').first()).toHaveValue(
     "2026-05-30",
   );
-  await expect(form.locator("input").nth(4)).toHaveValue("E2E Umgebung");
-  await expect(form.locator("input").nth(5)).toHaveValue("v1.2.3");
 }
 
 async function openProjectTickets(page: Page, projectId: number) {
@@ -142,11 +140,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
         "ticket-description",
         "E2E neues Ticket vollständig",
       );
-      await form.locator("input").nth(1).fill("Ada Lovelace");
-      await form.locator("input").nth(2).fill("Grace Hopper");
       await form.locator('input[type="date"]').first().fill("2026-05-30");
-      await form.locator("input").nth(4).fill("E2E Umgebung");
-      await form.locator("input").nth(5).fill("v1.2.3");
       const ticketResponsePromise = page.waitForResponse(
         (response) =>
           response.url().includes("/api/tickets") &&

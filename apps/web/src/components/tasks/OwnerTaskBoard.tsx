@@ -61,6 +61,7 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
 
       <TaskLinkDialog
         open={linkDialogOpen}
+        owner={owner}
         currentTasks={taskController.tasks}
         onLink={async (task) => {
           try {
