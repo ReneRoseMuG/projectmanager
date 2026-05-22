@@ -49,6 +49,7 @@ import {
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { BacklogListBoardView } from "../backlog/BacklogListBoardView";
+import { ProjectDashboard } from "../dashboard/DashboardView";
 import { ProjectFeaturePanel } from "../features/ProjectFeaturePanel";
 import { WikiImportPanel } from "../imports/WikiImportPanel";
 import { JournalPanel } from "../journal/JournalPanel";
@@ -108,6 +109,7 @@ interface ProjectFormProps {
 }
 
 type ProjectFormTab =
+  | "overview"
   | "details"
   | "milestones"
   | "features"
@@ -121,6 +123,7 @@ type ProjectFormTab =
   | "import";
 
 const baseTabs: Array<Tab<ProjectFormTab>> = [
+  { value: "overview", label: "Übersicht" },
   { value: "details", label: "Details" },
   { value: "milestones", label: "Meilensteine" },
   { value: "features", label: "Features" },
@@ -421,7 +424,7 @@ export function ProjectForm({
   const visibleTabs = project
     ? baseTabs.filter((tab) => tab.value !== "journal" || canReadJournal)
     : baseTabs.filter(
-        (tab) => tab.value !== "import" && tab.value !== "journal",
+        (tab) => tab.value !== "overview" && tab.value !== "import" && tab.value !== "journal",
       );
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
@@ -543,12 +546,16 @@ export function ProjectForm({
         variant={variant}
         onOpenInTab={onOpenInTab}
         contentClassName={
-          activeTab === "details" ? "w-full max-w-7xl self-center" : ""
+          activeTab === "details" || activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
         }
         tabBar={
           <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
         }
       >
+        {activeTab === "overview" && project ? (
+          <ProjectDashboard projectId={project.id} />
+        ) : null}
+
         {activeTab === "details" ? (
           <>
             <Section title="Stammdaten">

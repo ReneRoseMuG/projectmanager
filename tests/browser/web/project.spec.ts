@@ -14,6 +14,7 @@ import {
   formPage,
   itemCard,
   linkProjectFeature,
+  pathWithOptionalQuery,
   uniqueTitle,
 } from "./domain-test-utils";
 
@@ -71,7 +72,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await openProjectList(page);
       await page.getByRole("button", { name: "Neues Projekt" }).click();
 
-      await expect(page).toHaveURL(/\/projects\/new$/);
+      await expect(page).toHaveURL(pathWithOptionalQuery("/projects/new"));
       const form = formPage(page, "Projekt anlegen");
       await expect(form).toBeVisible();
       await form.locator("input[required]").first().fill(name);
@@ -109,18 +110,24 @@ test.describe("Projekt-Routen und Detailformular", () => {
     try {
       await openProjectList(page);
       await itemCard(page, project.name).dblclick();
-      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
+      await expect(page).toHaveURL(
+        pathWithOptionalQuery(`/projects/${project.id}`),
+      );
       await expectProjectFormData(page, project);
 
       await openProjectList(page);
       await clickItemAction(page, project.name, "Bearbeiten");
-      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
+      await expect(page).toHaveURL(
+        pathWithOptionalQuery(`/projects/${project.id}`),
+      );
       await expectProjectFormData(page, project);
 
       await openProjectList(page);
       await page.getByRole("button", { name: "Liste", exact: true }).click();
       await clickItemAction(page, project.name, "Bearbeiten");
-      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
+      await expect(page).toHaveURL(
+        pathWithOptionalQuery(`/projects/${project.id}`),
+      );
       await expectProjectFormData(page, project);
     } finally {
       await deleteProject(request, project.id);

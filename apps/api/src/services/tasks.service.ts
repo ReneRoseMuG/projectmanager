@@ -1,4 +1,4 @@
-import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
+import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskStats, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureTasks, features, milestoneTasks, milestones, projectTasks, projects, tasks, useCases, useCaseTasks } from "../db/schema.js";
@@ -27,6 +27,9 @@ import { assertCompatibleProjectContexts, projectContextsAreCompatible, taskOwne
 import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 
 export type { TaskOwner };
+
+export type DashboardTaskOwner = { type: "project" | "milestone" | "task"; id: number };
+export type DashboardOverdueTaskOwner = { type: "project" | "milestone"; id: number };
 
 type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "version" | "createdAt" | "updatedAt">;
 type OwnerTaskRecord = MappableTaskRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
@@ -423,6 +426,59 @@ export function listSubtasks(database: DbClient, taskId: number): Task[] {
   const subtaskCounts = getSubtaskCounts(database, ids);
 
   return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
+}
+
+function listDashboardTasks(database: DbClient, owner?: DashboardTaskOwner): Task[] {
+  if (!owner) {
+    return listTasks(database);
+  }
+  if (owner.type === "task") {
+    return listSubtasks(database, owner.id);
+  }
+  if (owner.type === "project") {
+    return listOwnerTasks(database, { type: "project", id: owner.id });
+  }
+  return listOwnerTasks(database, { type: "milestone", id: owner.id });
+}
+
+function dateKey(value: string): number {
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function isOpenTaskStatus(status: string): boolean {
+  return !["done", "completed", "closed", "resolved", "archived", "rejected"].includes(status);
+}
+
+export function getTaskStats(database: DbClient, owner?: DashboardTaskOwner): TaskStats {
+  const statusCounts: Record<string, number> = {};
+  for (const task of listDashboardTasks(database, owner)) {
+    statusCounts[task.status] = (statusCounts[task.status] ?? 0) + 1;
+  }
+  return {
+    statusCounts,
+    total: Object.values(statusCounts).reduce((sum, count) => sum + count, 0)
+  };
+}
+
+export function listRecentTasks(
+  database: DbClient,
+  options: { owner?: DashboardTaskOwner; limit?: number; sort?: "createdAt" | "updatedAt" } = {}
+): Task[] {
+  const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
+  const sort = options.sort ?? "updatedAt";
+  return [...listDashboardTasks(database, options.owner)]
+    .sort((left, right) => dateKey(right[sort]) - dateKey(left[sort]) || right.id - left.id)
+    .slice(0, limit);
+}
+
+export function listOverdueTasks(database: DbClient, options: { owner?: DashboardOverdueTaskOwner; limit?: number } = {}): Task[] {
+  const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
+  const today = new Date().toISOString().slice(0, 10);
+  return [...listDashboardTasks(database, options.owner)]
+    .filter((task) => task.dueDate !== null && task.dueDate < today && isOpenTaskStatus(task.status))
+    .sort((left, right) => String(left.dueDate).localeCompare(String(right.dueDate)) || left.id - right.id)
+    .slice(0, limit);
 }
 
 export function createOwnerTask(database: DbClient, owner: TaskOwner, input: TaskInput, actor?: JournalActor | null): TaskBoardItem {

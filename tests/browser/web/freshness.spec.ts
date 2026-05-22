@@ -102,6 +102,15 @@ async function discardUnsavedNoteChangesIfNeeded(page: Page) {
   }
 }
 
+async function expectEmptyProjectTaskBoard(page: Page, taskTitle?: string) {
+  const form = projectForm(page);
+  await expect(form.getByRole("button", { name: "Neue Aufgabe" })).toBeVisible();
+  await expect(form.getByRole("heading", { name: "Aktiv" }).first()).toBeVisible();
+  if (taskTitle) {
+    await expect(visibleArticle(form, taskTitle)).toHaveCount(0);
+  }
+}
+
 test.describe("Globale UI-Aktualität", () => {
   test("Task-Collection: Create/Delete aktualisiert Liste und Board im Projekt-Tab", async ({
     page,
@@ -113,9 +122,7 @@ test.describe("Globale UI-Aktualität", () => {
     try {
       await openProjectDetail(page, project.id);
       await openTab(projectForm(page), "Aufgaben");
-      await expect(
-        projectForm(page).getByRole("heading", { name: "Keine Aufgaben" }),
-      ).toBeVisible();
+      await expectEmptyProjectTaskBoard(page);
 
       await projectForm(page)
         .getByRole("button", { name: "Neue Aufgabe" })
@@ -166,9 +173,7 @@ test.describe("Globale UI-Aktualität", () => {
           .locator("article:visible")
           .filter({ hasText: taskTitle }),
       ).toHaveCount(0);
-      await expect(
-        projectForm(page).getByRole("heading", { name: "Keine Aufgaben" }),
-      ).toBeVisible();
+      await expectEmptyProjectTaskBoard(page, taskTitle);
     } finally {
       await deleteProject(request, project.id);
     }

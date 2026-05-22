@@ -2,6 +2,12 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 22.05.26 | Fix           | Shell Navigation Suche                       | ✅     |
+| 22.05.26 | Fix           | Owner Task E2E Selector                      | ✅     |
+| 22.05.26 | Fix           | Dashboard E2E Testfixes                      | ⚠️     |
+| 22.05.26 | 3             | Dashboard Tests und Verifikation             | ⚠️     |
+| 22.05.26 | 2             | Dashboard Frontend                           | ✅     |
+| 22.05.26 | 1             | Dashboard Backend                            | ✅     |
 | 22.05.26 | Fix           | Meilenstein-Statusfilter                     | ✅     |
 | 22.05.26 | Fix           | Board-Toolbar Statusfilter                   | ✅     |
 | 22.05.26 | Fix           | API-Test-Erwartungen                         | ✅     |

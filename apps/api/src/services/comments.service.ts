@@ -1,5 +1,5 @@
-import type { Comment, CommentEntityType, CommentInput, CommentOwner } from "@taskmanager/shared-types";
-import { and, eq } from "drizzle-orm";
+import type { Comment, CommentEntityType, CommentInput, CommentOwner, JournalObjectType, RecentComment } from "@taskmanager/shared-types";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
 import {
   backlogItemComments,
@@ -8,13 +8,18 @@ import {
   featureComments,
   features,
   milestoneComments,
+  milestoneTasks,
+  milestoneTickets,
   milestones,
   projectComments,
+  projectTasks,
+  projectTickets,
   projects,
   taskComments,
   tasks,
   ticketComments,
   tickets,
+  users,
   useCaseComments,
   useCases,
   wikiPageComments,
@@ -332,6 +337,221 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
     .where(eq(ticketComments.ticketId, owner.id))
     .orderBy(comments.createdAt, comments.id)
     .all();
+}
+
+type RecentCommentOwner = { type: "project" | "milestone" | "task"; id: number };
+
+interface RecentCommentRow {
+  id: number;
+  body: string;
+  createdAt: string;
+  authorFullName: string | null;
+  authorEmail: string | null;
+  entityType: JournalObjectType;
+  entityId: number;
+  entityLabel: string;
+}
+
+function authorName(row: Pick<RecentCommentRow, "authorFullName" | "authorEmail">): string {
+  const name = row.authorFullName?.trim();
+  return name || row.authorEmail || "System";
+}
+
+function collectTaskDescendantIds(database: DbClient, rootIds: number[]): number[] {
+  const result = new Set(rootIds);
+  let frontier = [...new Set(rootIds)];
+  while (frontier.length > 0) {
+    const rows = database.select({ id: tasks.id }).from(tasks).where(inArray(tasks.parentId, frontier)).all();
+    frontier = rows.map((row) => row.id).filter((id) => !result.has(id));
+    for (const id of frontier) {
+      result.add(id);
+    }
+  }
+  return [...result];
+}
+
+function projectMilestoneIds(database: DbClient, projectId: number): number[] {
+  return database.select({ id: milestones.id }).from(milestones).where(eq(milestones.projectId, projectId)).all().map((row) => row.id);
+}
+
+function taskIdsForOwner(database: DbClient, owner: RecentCommentOwner): number[] {
+  if (owner.type === "task") {
+    return [owner.id];
+  }
+  const direct =
+    owner.type === "project"
+      ? database.select({ id: projectTasks.taskId }).from(projectTasks).where(eq(projectTasks.ownerId, owner.id)).all().map((row) => row.id)
+      : database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(eq(milestoneTasks.ownerId, owner.id)).all().map((row) => row.id);
+  if (owner.type === "project") {
+    const milestoneIds = projectMilestoneIds(database, owner.id);
+    const milestoneLinked =
+      milestoneIds.length === 0
+        ? []
+        : database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(inArray(milestoneTasks.ownerId, milestoneIds)).all().map((row) => row.id);
+    return collectTaskDescendantIds(database, [...direct, ...milestoneLinked]);
+  }
+  return collectTaskDescendantIds(database, direct);
+}
+
+function ticketIdsForOwner(database: DbClient, owner: RecentCommentOwner): number[] {
+  if (owner.type === "task") {
+    return [];
+  }
+  const direct =
+    owner.type === "project"
+      ? database.select({ id: projectTickets.ticketId }).from(projectTickets).where(eq(projectTickets.ownerId, owner.id)).all().map((row) => row.id)
+      : database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(eq(milestoneTickets.ownerId, owner.id)).all().map((row) => row.id);
+  if (owner.type === "project") {
+    const milestoneIds = projectMilestoneIds(database, owner.id);
+    const milestoneLinked =
+      milestoneIds.length === 0
+        ? []
+        : database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(inArray(milestoneTickets.ownerId, milestoneIds)).all().map((row) => row.id);
+    return [...new Set([...direct, ...milestoneLinked])];
+  }
+  return [...new Set(direct)];
+}
+
+function recentProjectCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: comments.id,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: projects.id,
+      entityLabel: projects.name
+    })
+    .from(projectComments)
+    .innerJoin(comments, eq(projectComments.commentId, comments.id))
+    .innerJoin(projects, eq(projectComments.projectId, projects.id))
+    .leftJoin(users, eq(comments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(projectComments.projectId, ids) : and(inArray(projectComments.projectId, ids), eq(comments.createdBy, mineUserId)))
+    .orderBy(desc(comments.createdAt), desc(comments.id))
+    .all()
+    .map((row) => ({ ...row, entityType: "project" as const }));
+}
+
+function recentMilestoneCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: comments.id,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: milestones.id,
+      entityLabel: milestones.name
+    })
+    .from(milestoneComments)
+    .innerJoin(comments, eq(milestoneComments.commentId, comments.id))
+    .innerJoin(milestones, eq(milestoneComments.milestoneId, milestones.id))
+    .leftJoin(users, eq(comments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(milestoneComments.milestoneId, ids) : and(inArray(milestoneComments.milestoneId, ids), eq(comments.createdBy, mineUserId)))
+    .orderBy(desc(comments.createdAt), desc(comments.id))
+    .all()
+    .map((row) => ({ ...row, entityType: "milestone" as const }));
+}
+
+function recentTaskCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: comments.id,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: tasks.id,
+      entityLabel: tasks.title
+    })
+    .from(taskComments)
+    .innerJoin(comments, eq(taskComments.commentId, comments.id))
+    .innerJoin(tasks, eq(taskComments.taskId, tasks.id))
+    .leftJoin(users, eq(comments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(taskComments.taskId, ids) : and(inArray(taskComments.taskId, ids), eq(comments.createdBy, mineUserId)))
+    .orderBy(desc(comments.createdAt), desc(comments.id))
+    .all()
+    .map((row) => ({ ...row, entityType: "task" as const }));
+}
+
+function recentTicketCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: comments.id,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: tickets.id,
+      entityLabel: tickets.title
+    })
+    .from(ticketComments)
+    .innerJoin(comments, eq(ticketComments.commentId, comments.id))
+    .innerJoin(tickets, eq(ticketComments.ticketId, tickets.id))
+    .leftJoin(users, eq(comments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(ticketComments.ticketId, ids) : and(inArray(ticketComments.ticketId, ids), eq(comments.createdBy, mineUserId)))
+    .orderBy(desc(comments.createdAt), desc(comments.id))
+    .all()
+    .map((row) => ({ ...row, entityType: "ticket" as const }));
+}
+
+function recentCommentRowsForOwner(database: DbClient, owner: RecentCommentOwner): RecentCommentRow[] {
+  if (owner.type === "project") {
+    const milestoneIds = projectMilestoneIds(database, owner.id);
+    return [
+      ...recentProjectCommentRows(database, [owner.id]),
+      ...recentMilestoneCommentRows(database, milestoneIds),
+      ...recentTaskCommentRows(database, taskIdsForOwner(database, owner)),
+      ...recentTicketCommentRows(database, ticketIdsForOwner(database, owner))
+    ];
+  }
+  if (owner.type === "milestone") {
+    return [
+      ...recentMilestoneCommentRows(database, [owner.id]),
+      ...recentTaskCommentRows(database, taskIdsForOwner(database, owner)),
+      ...recentTicketCommentRows(database, ticketIdsForOwner(database, owner))
+    ];
+  }
+  return recentTaskCommentRows(database, [owner.id]);
+}
+
+function recentOwnCommentRows(database: DbClient, userId: number): RecentCommentRow[] {
+  return [
+    ...recentProjectCommentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id), userId),
+    ...recentMilestoneCommentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id), userId),
+    ...recentTaskCommentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id), userId),
+    ...recentTicketCommentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id), userId)
+  ];
+}
+
+export function listRecentComments(database: DbClient, options: { owner?: RecentCommentOwner; currentUserId: number; limit?: number }): RecentComment[] {
+  const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
+  const rows = options.owner ? recentCommentRowsForOwner(database, options.owner) : recentOwnCommentRows(database, options.currentUserId);
+  return rows
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime() || right.id - left.id)
+    .slice(0, limit)
+    .map((row) => ({
+      id: row.id,
+      body: row.body,
+      createdAt: row.createdAt,
+      authorName: authorName(row),
+      entityType: row.entityType,
+      entityId: row.entityId,
+      entityLabel: row.entityLabel
+    }));
 }
 
 export function listEntityComments(database: DbClient, entityType: CommentEntityType, entityId: number): Comment[] {

@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import type { CommentEntityType, CommentInput } from "@taskmanager/shared-types";
-import { createComment, createEntityComment, deleteComment, deleteEntityComment, linkEntityComment, listComments, listEntityComments } from "../services/comments.service.js";
+import { requireCurrentUser } from "../plugins/auth.js";
+import { createComment, createEntityComment, deleteComment, deleteEntityComment, linkEntityComment, listComments, listEntityComments, listRecentComments } from "../services/comments.service.js";
 import { createJournalActor } from "../services/journal.service.js";
+import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema, taskIdParamSchema } from "../utils/route-schemas.js";
 
 const commentBodySchema = {
@@ -29,6 +31,30 @@ const entityCommentDeleteParamsSchema = {
     commentId: { type: "integer", minimum: 1 }
   }
 } as const;
+
+const recentCommentsQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    ownerType: { type: "string", enum: ["project", "milestone", "task"] },
+    ownerId: { type: "integer", minimum: 1 },
+    mine: { type: "boolean" },
+    limit: { type: "integer", minimum: 1, maximum: 50 }
+  }
+} as const;
+
+function recentCommentOwnerFromQuery(query: { ownerType?: "project" | "milestone" | "task"; ownerId?: number; mine?: boolean }) {
+  if (query.ownerType !== undefined || query.ownerId !== undefined) {
+    if (query.ownerType === undefined || query.ownerId === undefined) {
+      throw badRequest("ownerType and ownerId must be provided together");
+    }
+    if (query.mine === true) {
+      throw badRequest("mine cannot be combined with ownerType and ownerId");
+    }
+    return { type: query.ownerType, id: query.ownerId };
+  }
+  return undefined;
+}
 
 function registerEntityCommentRoutes(app: FastifyInstance, path: string, entityType: CommentEntityType): void {
   app.get<{ Params: { id: number } }>(
@@ -60,6 +86,15 @@ function registerEntityCommentRoutes(app: FastifyInstance, path: string, entityT
 }
 
 export async function registerCommentsRoutes(app: FastifyInstance): Promise<void> {
+  app.get<{ Querystring: { ownerType?: "project" | "milestone" | "task"; ownerId?: number; mine?: boolean; limit?: number } }>(
+    "/comments/recent",
+    { schema: { querystring: recentCommentsQuerySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => {
+      const currentUser = requireCurrentUser(request);
+      return listRecentComments(app.db, { owner: recentCommentOwnerFromQuery(request.query), currentUserId: currentUser.id, limit: request.query.limit });
+    }
+  );
+
   app.get<{ Params: { taskId: number } }>(
     "/tasks/:taskId/comments",
     { schema: { params: taskIdParamSchema, response: { 200: arrayResponseSchema } } },

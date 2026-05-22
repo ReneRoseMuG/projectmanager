@@ -1,4 +1,4 @@
-import type { CommentEntityType, JournalObjectType } from "@taskmanager/shared-types";
+import type { CommentEntityType, DashboardContext, DashboardWidgetId, DashboardWidgetParams, JournalObjectType } from "@taskmanager/shared-types";
 
 export type NoteOwnerType = "project" | "milestone" | "task" | "ticket";
 export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket";
@@ -9,6 +9,13 @@ export const queryKeys = {
   auth: {
     root: ["auth"] as const,
     me: () => [...queryKeys.auth.root, "me"] as const
+  },
+  dashboards: {
+    root: ["dashboards"] as const,
+    list: (context: DashboardContext) => [...queryKeys.dashboards.root, "list", context] as const,
+    detail: (dashboardId: number) => [...queryKeys.dashboards.root, "detail", dashboardId] as const,
+    widgetData: (widgetId: DashboardWidgetId, ownerKey: string, params: DashboardWidgetParams = {}) =>
+      [...queryKeys.dashboards.root, "widgetData", widgetId, ownerKey, params] as const
   },
   adminUsers: {
     root: ["adminUsers"] as const,

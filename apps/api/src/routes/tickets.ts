@@ -13,7 +13,9 @@ import {
   createTicket,
   deleteTicket,
   getTicketDetail,
+  getTicketStats,
   linkOwnerTicket,
+  listRecentTickets,
   listTicketLinkCandidates,
   listOwnerTickets,
   listProjectTickets,
@@ -26,7 +28,7 @@ import {
   updateTicket,
   updateTicketPosition
 } from "../services/tickets.service.js";
-import type { TicketOwner } from "../services/tickets.service.js";
+import type { DashboardTicketOwner, TicketOwner } from "../services/tickets.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, projectIdParamSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
 
@@ -137,6 +139,27 @@ const ticketLinkCandidatesQuerySchema = {
   }
 } as const;
 
+const dashboardTicketQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    ownerType: { type: "string", enum: ["project", "milestone"] },
+    ownerId: { type: "integer", minimum: 1 },
+    limit: { type: "integer", minimum: 1, maximum: 50 },
+    sort: { type: "string", enum: ["createdAt", "updatedAt"] }
+  }
+} as const;
+
+function ticketOwnerFromQuery(query: { ownerType?: DashboardTicketOwner["type"]; ownerId?: number }): DashboardTicketOwner | undefined {
+  if (query.ownerType === undefined && query.ownerId === undefined) {
+    return undefined;
+  }
+  if (query.ownerType === undefined || query.ownerId === undefined) {
+    throw badRequest("ownerType and ownerId must be provided together");
+  }
+  return { type: query.ownerType, id: query.ownerId };
+}
+
 const uploadBodySchema = {
   consumes: ["multipart/form-data"],
   body: {
@@ -164,6 +187,18 @@ async function readUpload(request: FastifyRequest) {
 
 export async function registerTicketsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/tickets", { schema: { response: { 200: arrayResponseSchema } } }, async () => listTickets(app.db));
+
+  app.get<{ Querystring: { ownerType?: DashboardTicketOwner["type"]; ownerId?: number } }>(
+    "/tickets/stats",
+    { schema: { querystring: dashboardTicketQuerySchema, response: { 200: objectResponseSchema } } },
+    async (request) => getTicketStats(app.db, ticketOwnerFromQuery(request.query))
+  );
+
+  app.get<{ Querystring: { ownerType?: DashboardTicketOwner["type"]; ownerId?: number; limit?: number; sort?: "createdAt" | "updatedAt" } }>(
+    "/tickets/recent",
+    { schema: { querystring: dashboardTicketQuerySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listRecentTickets(app.db, { owner: ticketOwnerFromQuery(request.query), limit: request.query.limit, sort: request.query.sort })
+  );
 
   app.post<{ Body: TicketInput }>(
     "/tickets",
