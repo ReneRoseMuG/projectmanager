@@ -211,7 +211,7 @@ describe("FeatureProjectPanel", () => {
     expect(onViewModeChange).toHaveBeenCalledWith("list");
     expect(screen.getByText("Keine Projekte verknüpft")).toBeInTheDocument();
     expect(
-      container.querySelector("article.rounded-xl"),
+      container.querySelector("article[class*='border-l-[4px]']"),
     ).not.toBeInTheDocument();
   });
 

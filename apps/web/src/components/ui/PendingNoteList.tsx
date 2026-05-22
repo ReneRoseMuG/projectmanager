@@ -56,7 +56,7 @@ export function PendingNoteList({ notes, onAdd, onRemove }: PendingNoteListProps
           </div>
         )}
 
-        <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs font-semibold text-slate-600">Notizen werden nach dem Speichern angelegt.</p>
+        <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs font-semibold text-steel-600">Notizen werden nach dem Speichern angelegt.</p>
       </div>
 
       <Modal open={dialogOpen} title="Neue Notiz" size="md" onClose={closeDialog}>

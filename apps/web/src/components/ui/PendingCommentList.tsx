@@ -44,14 +44,14 @@ export function PendingCommentList({ comments, onAdd, onRemove }: PendingComment
         <div className="grid gap-2">
           {comments.map((comment, index) => (
             <div key={`${comment.text}-${index}`} className="flex items-start justify-between gap-3 rounded-md border border-line bg-white p-3 shadow-sm">
-              <p className="line-clamp-3 text-sm leading-6 text-slate-700">{comment.text}</p>
+              <p className="line-clamp-3 text-sm leading-6 text-steel-700">{comment.text}</p>
               <Button aria-label="Kommentar entfernen" title="Entfernen" variant="ghost" icon={<Trash2 size={16} />} onClick={() => onRemove(index)} />
             </div>
           ))}
         </div>
       )}
 
-      <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs font-semibold text-slate-600">Kommentare werden nach dem Speichern angelegt.</p>
+      <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs font-semibold text-steel-600">Kommentare werden nach dem Speichern angelegt.</p>
     </div>
   );
 }

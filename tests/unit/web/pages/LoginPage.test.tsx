@@ -66,7 +66,7 @@ describe("LoginPage", () => {
     );
 
     await waitFor(() => expect(screen.getByLabelText("E-Mail")).toHaveFocus());
-    expect(screen.getByText("Anmeldung")).toHaveClass("text-slate-500");
+    expect(screen.getByText("Anmeldung")).toHaveClass("text-steel-500");
   });
 
   it("zeigt Fehler aus fehlgeschlagenem Login", async () => {

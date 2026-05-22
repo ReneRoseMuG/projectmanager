@@ -66,7 +66,7 @@ function TaskCardHeader({ task, onStatusChange }: { task: Task; onStatusChange?:
 }
 
 function TaskCardBody({ description }: { description: string }) {
-  return description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null;
+  return description ? <p className="line-clamp-3 text-xs text-steel-600">{description}</p> : null;
 }
 
 function TaskCardFooter({ task, onDueDateChange }: { task: Task; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown> }) {
@@ -76,7 +76,7 @@ function TaskCardFooter({ task, onDueDateChange }: { task: Task; onDueDateChange
   return (
     <div className="grid gap-3">
       {hasMeta ? (
-        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-2 text-xs text-slate-600">
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-2 text-xs text-steel-600">
           {task.subtaskCount > 0 ? (
             <span className="inline-flex items-center gap-1">
               <CheckCircle2 size={14} />
@@ -112,7 +112,7 @@ function TaskRow({ task, description, statusColor, onOpen, onDelete, onStatusCha
           </>
         }
         meta={
-          <span className={`inline-flex min-w-[82px] items-center gap-1 text-xs font-semibold ${overdue ? "text-crimson" : "text-slate-500"}`}>
+          <span className={`inline-flex min-w-[82px] items-center gap-1 text-xs font-semibold ${overdue ? "text-crimson" : "text-steel-500"}`}>
             <InlineDateField value={task.dueDate} onChange={onDueDateChange ? (dueDate) => onDueDateChange(task, dueDate) : undefined} />
           </span>
         }

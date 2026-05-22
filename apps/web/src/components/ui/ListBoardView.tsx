@@ -357,7 +357,7 @@ function StatusSectionHeader({
         <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
           {column.label}
         </h2>
-        <span className="rounded-full bg-steel-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+        <span className="rounded bg-steel-100 px-2 py-0.5 text-xs font-semibold text-steel-600">
           {itemCount}
         </span>
       </div>

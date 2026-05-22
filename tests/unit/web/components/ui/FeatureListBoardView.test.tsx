@@ -132,7 +132,7 @@ describe("FeatureListBoardView", () => {
       screen.getByText("Feature Archiviert"),
     );
 
-    expectItemCardClasses(container.querySelectorAll("article.rounded-2xl"));
+    expectItemCardClasses(container.querySelectorAll("article.p-5"));
     expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(
       features.length,
     );
@@ -168,8 +168,8 @@ describe("FeatureListBoardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
     expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
-    expect(container.querySelectorAll("article.rounded-2xl")).toHaveLength(features.length);
-    expect(container.querySelectorAll("article.rounded-xl")).toHaveLength(features.length);
+    expect(container.querySelectorAll("article.p-5")).toHaveLength(features.length);
+    expect(container.querySelectorAll("article[class*='border-l-[4px]']")).toHaveLength(features.length);
     features.forEach((feature) => {
       expect(screen.getAllByText(feature.title).length).toBeGreaterThan(0);
     });
@@ -180,10 +180,10 @@ describe("FeatureListBoardView", () => {
 
     expect(screen.getByText("Keine Features")).toBeInTheDocument();
     expect(
-      container.querySelector("article.rounded-2xl"),
+      container.querySelector("article.p-5"),
     ).not.toBeInTheDocument();
     expect(
-      container.querySelector("article.rounded-xl"),
+      container.querySelector("article[class*='border-l-[4px]']"),
     ).not.toBeInTheDocument();
   });
 

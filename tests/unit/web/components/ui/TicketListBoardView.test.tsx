@@ -129,7 +129,7 @@ describe("TicketListBoardView", () => {
     expect(screen.getByRole("button", { name: /^In Arbeit\s*1$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Erledigt\s*1$/ })).toBeInTheDocument();
 
-    const cards = container.querySelectorAll("article.rounded-2xl");
+    const cards = container.querySelectorAll("article.p-5");
     expect(cards).toHaveLength(tickets.length);
     expectItemCardClasses(cards);
     expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(tickets.length);
@@ -143,7 +143,7 @@ describe("TicketListBoardView", () => {
     const { container } = renderTicketList({ tickets, viewMode: "list" });
 
     expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
-    const rows = container.querySelectorAll("article.rounded-xl");
+    const rows = container.querySelectorAll("article[class*='border-l-[4px]']");
     expect(rows).toHaveLength(tickets.length);
     expectItemRowClasses(rows);
     tickets.forEach((ticket, index) => {
@@ -220,7 +220,7 @@ describe("TicketListBoardView", () => {
     const { container } = renderTicketList({ tickets: [] });
 
     expect(screen.getByText("Keine Tickets")).toBeInTheDocument();
-    expect(container.querySelector("article.rounded-2xl")).not.toBeInTheDocument();
-    expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+    expect(container.querySelector("article.p-5")).not.toBeInTheDocument();
+    expect(container.querySelector("article[class*='border-l-[4px]']")).not.toBeInTheDocument();
   });
 });

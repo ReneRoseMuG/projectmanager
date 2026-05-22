@@ -21,7 +21,7 @@ export function StatusToggle<TStatus extends string>({ kind, value, onChange }: 
       {options.map((option) => (
         <button
           key={option.key}
-          className="h-9 shrink-0 rounded-lg border border-transparent px-3 text-xs font-bold uppercase tracking-wide text-slate-500 transition hover:bg-white data-[active=true]:text-white"
+          className="h-9 shrink-0 rounded-lg border border-transparent px-3 text-xs font-bold uppercase tracking-wide text-steel-500 transition hover:bg-white data-[active=true]:text-white"
           data-active={value === option.key}
           type="button"
           style={value === option.key ? catalogFillStyle(option.color) : undefined}

@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button";
+import { FormField } from "../../components/ui/FormField";
 import { Input } from "../../components/ui/Input";
 import { useAdminRoleDetail, useAdminRoles } from "../../hooks/useAdminRoles";
 import { errorMessageAsync } from "../../hooks/errors";
@@ -81,24 +82,22 @@ export function RoleDetailPage() {
   return (
     <section className="mx-auto grid max-w-5xl gap-5">
       <div>
-        <h1 className="text-2xl font-bold text-ink">{isNew ? "Rolle anlegen" : "Rolle bearbeiten"}</h1>
-        <p className="text-sm text-muted">Administration</p>
+        <h1 className="text-2xl font-semibold text-ink">{isNew ? "Rolle anlegen" : "Rolle bearbeiten"}</h1>
+        <p className="text-sm text-steel-500">Administration</p>
       </div>
-      {loading ? <p className="text-sm text-muted">Lädt...</p> : null}
+      {loading ? <p className="text-sm text-steel-500">Lädt...</p> : null}
       <form className="grid gap-5 rounded-lg border border-line bg-white p-5" onSubmit={handleSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="grid gap-1.5 text-sm font-medium">
-            Schlüssel
+          <FormField label="Schlüssel">
             <Input value={key} onChange={(event) => setKey(event.target.value)} disabled={Boolean(role?.isSystem)} />
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium">
-            Bezeichnung
+          </FormField>
+          <FormField label="Bezeichnung">
             <Input value={label} onChange={(event) => setLabel(event.target.value)} />
-          </label>
+          </FormField>
         </div>
         <div className="overflow-x-auto rounded-md border border-line">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-steel-50 text-left text-xs uppercase text-muted">
+            <thead className="bg-steel-50 text-left text-xs font-semibold uppercase text-steel-500">
               <tr>
                 <th className="px-3 py-2">Ressource</th>
                 {permissionCatalog?.actions.map((action) => (

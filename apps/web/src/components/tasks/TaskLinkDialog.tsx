@@ -74,7 +74,7 @@ export function TaskLinkDialog({ open, owner, currentTasks, excludeIds = [], onL
                       <StatusPill kind="workStatus" value={task.status} />
                       <PriorityBadge value={task.priority} />
                     </div>
-                    {description ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{description}</p> : null}
+                    {description ? <p className="mt-1 line-clamp-2 text-xs text-steel-500">{description}</p> : null}
                   </div>
                   <Button variant="secondary" icon={<LinkIcon size={17} />} loading={linkingTaskId === task.id} onClick={() => void linkTask(task)}>
                     Verknüpfen

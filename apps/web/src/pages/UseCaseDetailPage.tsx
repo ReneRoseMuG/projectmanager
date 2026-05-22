@@ -155,7 +155,7 @@ export function UseCaseDetailPage() {
 
   if (isCreateMode && validFeatureId === undefined) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Use Cases benötigen ein Feature.
       </div>
     );
@@ -163,7 +163,7 @@ export function UseCaseDetailPage() {
 
   if (!isCreateMode && !Number.isFinite(useCaseId)) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Use Case nicht gefunden
       </div>
     );
@@ -175,7 +175,7 @@ export function UseCaseDetailPage() {
 
   if (!isCreateMode && !useCase) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Use Case nicht gefunden
       </div>
     );

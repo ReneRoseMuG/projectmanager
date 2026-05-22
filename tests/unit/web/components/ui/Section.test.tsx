@@ -32,7 +32,7 @@ describe("Section", () => {
 
     const section = screen.getByText("Details").closest("section");
 
-    expect(section).toHaveClass("rounded-xl", "border", "border-line", "bg-white", "p-4", "shadow-panel");
+    expect(section).toHaveClass("rounded-lg", "border", "border-line", "bg-white", "p-4", "shadow-panel");
   });
 
   it("rendert Fill-Sections ohne zusätzlichen Außenrand", () => {
@@ -45,6 +45,6 @@ describe("Section", () => {
     const section = screen.getByText("Aufgaben").closest("section");
 
     expect(section).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
-    expect(section).not.toHaveClass("rounded-xl", "border", "border-line", "bg-white", "p-4", "shadow-panel");
+    expect(section).not.toHaveClass("rounded-lg", "border", "border-line", "bg-white", "p-4", "shadow-panel");
   });
 });

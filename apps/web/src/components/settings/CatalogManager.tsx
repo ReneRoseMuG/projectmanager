@@ -129,7 +129,7 @@ function CatalogGroup({
             <ColorPicker value={color} onChange={setColor} swatches={[]} />
           </FormField>
           {canMarkClosed ? (
-            <label className="flex h-11 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-slate-700">
+            <label className="flex h-11 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-steel-700">
               <input
                 type="checkbox"
                 checked={isClosed}
@@ -150,7 +150,7 @@ function CatalogGroup({
           </Button>
         </div>
 
-        <div className="hidden grid-cols-[minmax(8rem,0.7fr)_minmax(10rem,1fr)_8rem_minmax(13rem,1fr)_8rem_auto] gap-3 border-b border-line pb-2 text-xs font-bold uppercase text-slate-500 md:grid">
+        <div className="hidden grid-cols-[minmax(8rem,0.7fr)_minmax(10rem,1fr)_8rem_minmax(13rem,1fr)_8rem_auto] gap-3 border-b border-line pb-2 text-xs font-bold uppercase text-steel-500 md:grid">
           <span>Schlüssel</span>
           <span>Label</span>
           <span>Sortierung</span>
@@ -215,7 +215,7 @@ function CatalogRow({
 
   return (
     <div className="grid gap-3 border-b border-line py-3 text-sm md:grid-cols-[minmax(8rem,0.7fr)_minmax(10rem,1fr)_8rem_minmax(13rem,1fr)_8rem_auto] md:items-center">
-      <span className="truncate font-mono text-xs font-semibold text-slate-500">
+      <span className="truncate font-mono text-xs font-semibold text-steel-500">
         {entry.key}
       </span>
       {editing ? (
@@ -235,7 +235,7 @@ function CatalogRow({
           onChange={(event) => setSortOrder(event.target.value)}
         />
       ) : (
-        <span className="text-slate-600">{entry.sortOrder}</span>
+        <span className="text-steel-600">{entry.sortOrder}</span>
       )}
       {editing ? (
         <ColorPicker value={color} onChange={setColor} swatches={[]} />
@@ -246,7 +246,7 @@ function CatalogRow({
       )}
       {canMarkClosed ? (
         editing ? (
-          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <label className="flex items-center gap-2 text-sm font-semibold text-steel-700">
             <input
               type="checkbox"
               checked={isClosed}
@@ -256,13 +256,13 @@ function CatalogRow({
           </label>
         ) : (
           <span
-            className={`rounded-full px-2 py-1 text-center text-xs font-semibold ${entry.isClosed ? "bg-steel-700 text-white" : "bg-fern/10 text-fern"}`}
+            className={`rounded-md px-2 py-1 text-center text-xs font-semibold ${entry.isClosed ? "bg-steel-700 text-white" : "bg-fern/10 text-fern"}`}
           >
             {entry.isClosed ? "Geschlossen" : "Offen"}
           </span>
         )
       ) : (
-        <span className="text-xs font-semibold text-slate-400">-</span>
+        <span className="text-xs font-semibold text-steel-400">-</span>
       )}
       <div className="flex justify-end gap-1">
         {editing ? (
@@ -422,7 +422,7 @@ export function CatalogManager() {
             </div>
           ) : null}
           {catalogs.loading ? (
-            <div className="rounded-lg border border-dashed border-line bg-shell/60 p-8 text-center text-sm text-slate-500">
+            <div className="rounded-lg border border-dashed border-line bg-shell/60 p-8 text-center text-sm text-steel-500">
               Kataloge werden geladen.
             </div>
           ) : null}

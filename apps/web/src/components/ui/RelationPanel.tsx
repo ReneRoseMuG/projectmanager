@@ -109,7 +109,7 @@ export function RelationPanel<T extends RelationItem>({
     return (
       <label
         key={item.id}
-        className={`grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-xl border-[1.5px] bg-white px-4 py-3.5 transition hover:border-steel-500 ${
+        className={`grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-lg border-[1.5px] bg-white px-4 py-3.5 transition hover:border-steel-500 ${
           checked ? "border-steel-700 bg-steel-700/[0.04]" : "border-line"
         }`}
       >
@@ -128,7 +128,7 @@ export function RelationPanel<T extends RelationItem>({
   };
 
   return (
-    <section className="grid gap-4 rounded-xl border border-line bg-white p-4 shadow-sm">
+    <section className="grid gap-4 rounded-lg border border-line bg-white p-4 shadow-sm">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-sm font-bold uppercase tracking-wide text-ink">{title}</h2>
@@ -145,7 +145,7 @@ export function RelationPanel<T extends RelationItem>({
 
       {items.length === 0 ? <div>{emptyAvailable}</div> : null}
       {items.length > 0 && selectedIds.length === 0 && emptySelected ? <div>{emptySelected}</div> : null}
-      {items.length > 0 && visibleItems.length === 0 ? <p className="rounded-lg border border-dashed border-line bg-shell/60 p-4 text-sm text-slate-500">Keine passenden Einträge.</p> : null}
+      {items.length > 0 && visibleItems.length === 0 ? <p className="rounded-lg border border-dashed border-line bg-shell/60 p-4 text-sm text-steel-500">Keine passenden Einträge.</p> : null}
 
       {items.length > 0 && visibleItems.length > 0 && groupedItems ? (
         <div className="grid gap-3">

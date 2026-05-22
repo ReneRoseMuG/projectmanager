@@ -104,7 +104,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
           <div className="rounded-lg border border-line bg-shell/60 p-3">
             <p className="text-sm font-semibold text-ink">{selectedFeature ? selectedFeature.title : "Ohne Feature-Bezug"}</p>
-            <p className="truncate text-xs text-slate-500">{selectedFeature ? "Feature zugeordnet" : "Feature zuordnen"}</p>
+            <p className="truncate text-xs text-steel-500">{selectedFeature ? "Feature zugeordnet" : "Feature zuordnen"}</p>
           </div>
           <FormField label="Sortierung">
             <Input type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />

@@ -78,7 +78,7 @@ export function ColorPicker({
           onSelect={() => onChange(swatch)}
         />
       ))}
-      <label className="flex h-9 items-center gap-2 rounded-full border border-line bg-white px-3 text-xs font-semibold text-slate-600">
+      <label className="flex h-9 items-center gap-2 rounded-md border border-line bg-white px-3 text-xs font-semibold text-steel-600">
         Eigene Farbe
         <input
           className="h-6 w-8 border-0 bg-transparent p-0"

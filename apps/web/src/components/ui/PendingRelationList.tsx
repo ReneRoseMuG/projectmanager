@@ -100,7 +100,7 @@ export function PendingRelationList<TItem extends PendingExistingItem = PendingE
         </div>
       ) : null}
 
-      <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs font-semibold text-slate-600">Diese Zuordnungen werden nach dem Speichern verknüpft.</p>
+      <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs font-semibold text-steel-600">Diese Zuordnungen werden nach dem Speichern verknüpft.</p>
     </div>
   );
 }

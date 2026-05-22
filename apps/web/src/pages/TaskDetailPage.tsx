@@ -170,7 +170,7 @@ export function TaskDetailPage() {
 
   if (isCreateMode && !owner) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Aufgaben benötigen einen Parent-Kontext.
       </div>
     );
@@ -178,7 +178,7 @@ export function TaskDetailPage() {
 
   if (!isCreateMode && !Number.isFinite(taskId)) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Aufgabe nicht gefunden
       </div>
     );
@@ -190,7 +190,7 @@ export function TaskDetailPage() {
 
   if (!isCreateMode && !detail.task) {
     return (
-      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
         Aufgabe nicht gefunden
       </div>
     );

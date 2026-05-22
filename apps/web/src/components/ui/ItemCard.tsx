@@ -26,12 +26,12 @@ export function ItemCard({
 }: ItemCardProps) {
   return (
     <article
-      className={`relative grid h-full min-w-0 max-w-full gap-3 overflow-visible rounded-2xl border border-line bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-panel ${onOpen ? "cursor-pointer" : ""} ${className}`}
+      className={`relative grid h-full min-w-0 max-w-full gap-3 overflow-visible rounded-lg border border-line bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-panel ${onOpen ? "cursor-pointer" : ""} ${className}`}
       onDoubleClick={onOpen}
     >
       {accentColor ? (
         <span
-          className="pointer-events-none absolute inset-x-0 top-0 h-1 rounded-t-2xl"
+          className="pointer-events-none absolute inset-x-0 top-0 h-1 rounded-t-lg"
           style={{ backgroundColor: accentColor }}
         />
       ) : null}

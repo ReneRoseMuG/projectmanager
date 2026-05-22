@@ -20,7 +20,7 @@ const toneClasses: Record<BadgeTone, string> = {
   violet: "border-violet/20 bg-violet/10 text-violet",
   magenta: "border-magenta/20 bg-magenta/10 text-magenta",
   steel: "border-steel-200 bg-steel-100 text-steel-700",
-  mute: "border-line bg-shell text-slate-600"
+  mute: "border-line bg-shell text-steel-600"
 };
 
 /** Compact label for metadata, statuses and custom color tags. */
@@ -37,7 +37,7 @@ export function Badge({ children, color, filled = false, muted = false, tone }: 
   const toneClass = tone ? toneClasses[tone] : muted ? toneClasses.mute : "border";
 
   return (
-    <span className={`inline-flex min-h-6 items-center rounded-full border px-2 text-xs font-semibold ${toneClass}`} style={style}>
+    <span className={`inline-flex min-h-6 items-center rounded-md border px-2 text-xs font-semibold ${toneClass}`} style={style}>
       {children}
     </span>
   );

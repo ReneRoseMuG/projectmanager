@@ -153,7 +153,7 @@ describe("ProjectListBoardView", () => {
       screen.getByText("Projekt Archiviert"),
     );
 
-    expectItemCardClasses(container.querySelectorAll("article.rounded-2xl"));
+    expectItemCardClasses(container.querySelectorAll("article.p-5"));
     expect(
       within(activeColumn as HTMLElement).getByText("Aufgaben"),
     ).toBeInTheDocument();
@@ -199,11 +199,11 @@ describe("ProjectListBoardView", () => {
     const projects = buildProjectSet();
     const { container } = renderProjectList({ projects });
 
-    expect(container.querySelector("article.rounded-2xl")).toBeInTheDocument();
+    expect(container.querySelector("article.p-5")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
     expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
-    const rows = container.querySelectorAll("article.rounded-xl");
+    const rows = container.querySelectorAll("article[class*='border-l-[4px]']");
     expect(rows).toHaveLength(projects.length);
     expectItemRowClasses(rows);
     projects.forEach((project, index) => {
@@ -221,10 +221,10 @@ describe("ProjectListBoardView", () => {
 
     expect(screen.getByText("Keine Projekte")).toBeInTheDocument();
     expect(
-      container.querySelector("article.rounded-2xl"),
+      container.querySelector("article.p-5"),
     ).not.toBeInTheDocument();
     expect(
-      container.querySelector("article.rounded-xl"),
+      container.querySelector("article[class*='border-l-[4px]']"),
     ).not.toBeInTheDocument();
   });
 

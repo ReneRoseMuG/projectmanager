@@ -40,7 +40,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
         <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${tone.icon}`}>{tone.iconNode}</span>
         <div className="min-w-0">
           <p className="text-sm font-bold text-ink">{toast.title}</p>
-          {toast.body ? <div className="mt-1 break-words text-xs leading-5 text-slate-600">{toast.body}</div> : null}
+          {toast.body ? <div className="mt-1 break-words text-xs leading-5 text-steel-600">{toast.body}</div> : null}
           {toast.actions?.length ? (
             <div className="mt-2 flex flex-wrap gap-2">
               {toast.actions.map((action) => (

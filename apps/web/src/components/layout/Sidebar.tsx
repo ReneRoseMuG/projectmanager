@@ -125,7 +125,7 @@ function canReadItem(user: CurrentUser | null | undefined, item: NavigationItem)
 }
 
 function navLinkClass(isActive: boolean): string {
-  return `group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-md" : "text-white/75 hover:bg-white/5 hover:text-white"}`;
+  return `group relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition ${isActive ? "bg-white font-semibold text-steel-700 shadow-panel" : "text-white/75 hover:bg-white/5 hover:text-white"}`;
 }
 
 function NavigationLinks({
@@ -201,7 +201,7 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
         title="Aktualisieren"
         onClick={() => void invalidateWikiImportData(queryClient)}
       >
-        <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-steel-700 shadow-lg">PM</span>
+        <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-steel-700 shadow-steel-icon">PM</span>
         <span className="flex min-h-10 items-center text-sm font-bold text-white">Projekt Manager</span>
         <RefreshCw size={14} className="ml-auto text-white/55" />
       </button>

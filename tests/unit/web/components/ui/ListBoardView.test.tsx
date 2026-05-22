@@ -148,7 +148,7 @@ describe("ListBoardView", () => {
     expect(
       container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3"),
     ).toHaveClass("h-full", "min-h-[30rem]", "min-w-0", "flex-1");
-    container.querySelectorAll("article.rounded-2xl").forEach((card) => {
+    container.querySelectorAll("article.p-5").forEach((card) => {
       expect(card).toHaveClass("min-w-0");
       expect(card).toHaveClass("max-w-full");
     });
@@ -225,9 +225,7 @@ describe("ListBoardView", () => {
     const listButton = screen.getByRole("button", { name: "Liste" });
     const boardButton = screen.getByRole("button", { name: "Kanban" });
     expect(listButton).toHaveClass("h-8", "w-8");
-    expect(boardButton).toHaveClass("h-8", "w-8", "border-2", "border-ink");
-    expect(boardButton).toHaveClass("bg-transparent");
-    expect(boardButton).not.toHaveClass("bg-steel-700");
+    expect(boardButton).toHaveClass("h-8", "w-8", "rounded-md", "border-steel-700", "bg-steel-700", "text-white");
 
     fireEvent.click(listButton);
 

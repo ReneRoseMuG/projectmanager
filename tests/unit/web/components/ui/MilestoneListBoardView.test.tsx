@@ -88,7 +88,7 @@ describe("MilestoneListBoardView", () => {
       within(activeColumn).queryByText("2 Features"),
     ).not.toBeInTheDocument();
 
-    const cards = container.querySelectorAll("article.rounded-2xl");
+    const cards = container.querySelectorAll("article.p-5");
     expect(cards).toHaveLength(milestones.length);
     cards.forEach((card) => {
       expect(card).toHaveClass("min-w-0");
@@ -131,7 +131,7 @@ describe("MilestoneListBoardView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
-    const rows = container.querySelectorAll("article.rounded-xl");
+    const rows = container.querySelectorAll("article[class*='border-l-[4px]']");
     expect(rows).toHaveLength(milestones.length);
     const firstRow = rows[0] as HTMLElement;
     const firstMilestone = milestones[0] as Milestone;

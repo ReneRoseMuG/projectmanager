@@ -37,7 +37,7 @@ function CommentItem({
   return (
     <article className="grid gap-3 rounded-lg border border-line bg-white p-4 shadow-card">
       <div className="flex items-start justify-between gap-3">
-        <time className="text-xs text-slate-500">
+        <time className="text-xs text-steel-500">
           {formatHumanDate(comment.createdAt)}
         </time>
         <Button

@@ -74,13 +74,13 @@ export function PendingFileList({ files, onAdd, onRemove }: PendingFileListProps
                 {draftFile.previewUrl ? (
                   <img className="h-12 w-12 rounded-md border border-line object-cover" src={draftFile.previewUrl} alt="" />
                 ) : (
-                  <span className="flex h-12 w-12 items-center justify-center rounded-md border border-line bg-shell text-slate-500">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-md border border-line bg-shell text-steel-500">
                     <Image size={18} />
                   </span>
                 )}
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink">{draftFile.file.name}</p>
-                  <p className="text-xs font-semibold text-slate-500">{formatFileSize(draftFile.file.size)}</p>
+                  <p className="text-xs font-semibold text-steel-500">{formatFileSize(draftFile.file.size)}</p>
                 </div>
               </div>
               <Button aria-label={`${draftFile.file.name} entfernen`} title="Entfernen" variant="ghost" icon={<Trash2 size={16} />} onClick={() => onRemove(index)} />
@@ -89,7 +89,7 @@ export function PendingFileList({ files, onAdd, onRemove }: PendingFileListProps
         </div>
       )}
 
-      <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs font-semibold text-slate-600">Dateien werden nach dem Speichern hochgeladen.</p>
+      <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs font-semibold text-steel-600">Dateien werden nach dem Speichern hochgeladen.</p>
     </div>
   );
 }

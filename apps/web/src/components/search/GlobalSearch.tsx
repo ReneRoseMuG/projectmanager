@@ -119,17 +119,17 @@ export function GlobalSearch({ open, initialQuery = "", onClose }: GlobalSearchP
 
   return (
     <div className="fixed inset-0 z-[55] flex items-start justify-center bg-steel-900/55 p-4 pt-[12vh] backdrop-blur-[2px]">
-      <section className="w-full max-w-[720px] overflow-hidden rounded-2xl border border-line bg-white shadow-modal">
+      <section className="w-full max-w-[720px] overflow-hidden rounded-lg border border-line bg-white shadow-modal">
         <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-line px-4 py-3">
           <Search size={18} className="text-steel-500" />
-          <input autoFocus className="h-10 min-w-0 bg-transparent text-base outline-none placeholder:text-slate-400" placeholder="Global suchen" value={query} onChange={(event) => setQuery(event.target.value)} />
-          <button type="button" className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-shell hover:text-ink" aria-label="Schließen" onClick={onClose}>
+          <input autoFocus className="h-10 min-w-0 bg-transparent text-base outline-none placeholder:text-steel-400" placeholder="Global suchen" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <button type="button" className="flex h-8 w-8 items-center justify-center rounded-md text-steel-500 hover:bg-shell hover:text-ink" aria-label="Schließen" onClick={onClose}>
             <X size={17} />
           </button>
         </header>
         <nav className="flex gap-1 overflow-x-auto border-b border-line px-3 py-2">
           {scopes.map((item) => (
-            <button key={item.value} type="button" className={`rounded-full px-3 py-1.5 text-xs font-bold ${scope === item.value ? "bg-steel-700 text-white" : "bg-shell text-slate-600 hover:text-ink"}`} onClick={() => setScope(item.value)}>
+            <button key={item.value} type="button" className={`rounded-md px-3 py-1.5 text-xs font-bold ${scope === item.value ? "bg-steel-700 text-white" : "bg-shell text-steel-600 hover:text-ink"}`} onClick={() => setScope(item.value)}>
               {item.label} · {item.count}
             </button>
           ))}
@@ -148,9 +148,9 @@ export function GlobalSearch({ open, initialQuery = "", onClose }: GlobalSearchP
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-steel-100 text-steel-700">{result.icon}</span>
                   <span className="min-w-0">
                     <span className="block truncate font-semibold text-ink">{result.title}</span>
-                    <span className="block truncate text-xs text-slate-500">{result.type}</span>
+                    <span className="block truncate text-xs text-steel-500">{result.type}</span>
                   </span>
-                  <kbd className="rounded border border-line px-1.5 py-0.5 text-xs text-slate-500">↵</kbd>
+                  <kbd className="rounded border border-line px-1.5 py-0.5 text-xs text-steel-500">↵</kbd>
                 </button>
               ))}
             </div>

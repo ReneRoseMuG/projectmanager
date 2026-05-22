@@ -8,7 +8,7 @@ interface ViewToggleProps {
 
 function toggleButtonClass(active: boolean): string {
   return `inline-flex h-8 w-8 items-center justify-center rounded-md border bg-transparent text-steel-700 transition hover:border-steel-400 hover:text-ink ${
-    active ? "border-2 border-ink" : "border-line"
+    active ? "border-steel-700 bg-steel-700 text-white hover:border-steel-700 hover:text-white" : "border-line"
   }`;
 }
 

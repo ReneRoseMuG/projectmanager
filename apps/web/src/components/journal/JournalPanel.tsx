@@ -42,7 +42,7 @@ function formatDateTime(value: string): string {
 }
 
 function OperationPill({ operation }: { operation: JournalOperation }) {
-  return <span className="inline-flex h-6 items-center rounded-full bg-steel-100 px-2 text-xs font-semibold text-steel-700">{journalOperationLabels[operation]}</span>;
+  return <span className="inline-flex h-6 items-center rounded-md bg-steel-100 px-2 text-xs font-semibold text-steel-700">{journalOperationLabels[operation]}</span>;
 }
 
 function JournalContextList({ entry }: { entry: JournalEntry }) {
@@ -54,7 +54,7 @@ function JournalContextList({ entry }: { entry: JournalEntry }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {contexts.map((context) => (
-        <span key={`${entry.id}-${context.id}`} className="inline-flex min-h-6 items-center rounded-full border border-line bg-white px-2 text-xs font-medium text-slate-600">
+        <span key={`${entry.id}-${context.id}`} className="inline-flex min-h-6 items-center rounded-md border border-line bg-white px-2 text-xs font-medium text-steel-600">
           {relationLabels[context.relation]}: {journalObjectLabels[context.objectType]} "{context.objectLabel}"
         </span>
       ))}
@@ -69,11 +69,11 @@ function JournalEntryRow({ entry }: { entry: JournalEntry }) {
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <OperationPill operation={entry.operation} />
-            <span className="text-xs font-semibold uppercase text-slate-400">{journalObjectLabels[entry.objectType]}</span>
+            <span className="text-xs font-semibold uppercase text-steel-400">{journalObjectLabels[entry.objectType]}</span>
           </div>
           <p className="text-sm font-semibold leading-6 text-ink">{entry.summary}</p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-slate-500">
+        <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-steel-500">
           <span className="inline-flex items-center gap-1">
             <Clock3 size={13} />
             {formatDateTime(entry.createdAt)}
@@ -88,11 +88,11 @@ function JournalEntryRow({ entry }: { entry: JournalEntry }) {
       {entry.changes.length > 0 ? (
         <div className="grid gap-1.5">
           {entry.changes.map((change) => (
-            <div key={change.id} className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+            <div key={change.id} className="flex flex-wrap items-center gap-2 text-xs text-steel-600">
               <GitCommitHorizontal size={13} className="text-steel-500" />
-              <span className="font-semibold text-slate-700">{change.fieldLabel}</span>
+              <span className="font-semibold text-steel-700">{change.fieldLabel}</span>
               <span>{change.oldValueLabel ?? "leer"}</span>
-              <span className="text-slate-400">→</span>
+              <span className="text-steel-400">→</span>
               <span>{change.newValueLabel ?? "leer"}</span>
             </div>
           ))}

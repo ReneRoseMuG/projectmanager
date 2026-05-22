@@ -17,7 +17,7 @@ export function SegmentedControl<T extends string>({ value, options, onChange }:
       {options.map((option) => (
         <button
           key={option.value}
-          className={`h-9 rounded-lg px-3 text-xs font-bold uppercase tracking-wide text-slate-500 transition hover:bg-white ${option.activeClassName ?? "data-[active=true]:bg-steel-700 data-[active=true]:text-white"}`}
+          className={`h-9 rounded-md px-3 text-xs font-bold uppercase tracking-wide text-steel-500 transition hover:bg-white ${option.activeClassName ?? "data-[active=true]:bg-steel-700 data-[active=true]:text-white"}`}
           data-active={value === option.value}
           type="button"
           onClick={() => onChange(option.value)}

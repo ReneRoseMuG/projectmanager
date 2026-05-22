@@ -69,7 +69,7 @@ function TicketCardHeader({ ticket, onStatusChange }: { ticket: Ticket; onStatus
 }
 
 function TicketCardBody({ description }: { description: string }) {
-  return description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null;
+  return description ? <p className="line-clamp-3 text-xs text-steel-600">{description}</p> : null;
 }
 
 function TicketCardFooter({ ticket, onDueDateChange }: { ticket: Ticket; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown> }) {
@@ -79,7 +79,7 @@ function TicketCardFooter({ ticket, onDueDateChange }: { ticket: Ticket; onDueDa
   return (
     <div className="grid gap-3">
       {hasMeta ? (
-        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-2 text-xs text-slate-600">
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-2 text-xs text-steel-600">
           {ticket.subTicketCount > 0 ? (
             <span className="inline-flex items-center gap-1">
               <GitBranch size={14} />
@@ -118,7 +118,7 @@ function TicketRow({ ticket, description, statusColor, onOpen, onDelete, onStatu
         }
         meta={
           <div className="flex items-center gap-3">
-            <span className={`inline-flex min-w-[82px] items-center gap-1 text-xs font-semibold ${overdue ? "text-crimson" : "text-slate-500"}`}>
+            <span className={`inline-flex min-w-[82px] items-center gap-1 text-xs font-semibold ${overdue ? "text-crimson" : "text-steel-500"}`}>
               <InlineDateField value={ticket.dueDate} onChange={onDueDateChange ? (dueDate) => onDueDateChange(ticket, dueDate) : undefined} />
             </span>
             <Avatar name={ticket.assignee} />

@@ -42,14 +42,14 @@ describe("DetailModal", () => {
     const main = screen.getByTestId("detail-body").closest("main");
     const footer = screen.getByRole("button", { name: "Bearbeiten" }).closest("footer");
 
-    expect(screen.getByRole("heading", { name: "Ticket" }).closest("header")).not.toHaveClass("rounded-t-2xl");
+    expect(screen.getByRole("heading", { name: "Ticket" }).closest("header")).not.toHaveClass("rounded-t-lg");
     expect(tabWrapper).toHaveClass("shrink-0", "shadow-sm");
     expect(tabWrapper).not.toHaveClass("sticky");
     expect(main).toHaveClass("flex", "min-h-0", "flex-1", "flex-col", "overflow-auto");
     expect(main).not.toHaveClass("pb-24");
     expect(footer).toHaveClass("shrink-0");
     expect(footer).not.toHaveClass("sticky");
-    expect(footer).not.toHaveClass("rounded-b-2xl");
+    expect(footer).not.toHaveClass("rounded-b-lg");
   });
 
   it("behält in der Modal-Variante das bestehende Scrollmodell", () => {

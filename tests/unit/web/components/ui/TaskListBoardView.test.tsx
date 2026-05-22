@@ -166,7 +166,7 @@ describe("TaskListBoardView", () => {
     const doneColumn = screen.getByRole("heading", { name: "Erledigt" }).closest("section");
     expect(doneColumn).toContainElement(screen.getByText("Aufgabe Erledigt"));
 
-    expectItemCardClasses(container.querySelectorAll("article.rounded-2xl"));
+    expectItemCardClasses(container.querySelectorAll("article.p-5"));
     const actionButtons = screen.getAllByRole("button", { name: "Aktionen" });
     expect(actionButtons).toHaveLength(tasks.length);
 
@@ -203,7 +203,7 @@ describe("TaskListBoardView", () => {
     const { container } = renderTaskList({ tasks, viewMode: "list" });
 
     expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
-    const rows = container.querySelectorAll("article.rounded-xl");
+    const rows = container.querySelectorAll("article[class*='border-l-[4px]']");
     expect(rows).toHaveLength(tasks.length);
     expectItemRowClasses(rows);
     tasks.forEach((task, index) => {
@@ -218,12 +218,12 @@ describe("TaskListBoardView", () => {
     const onViewModeChange = vi.fn();
     const { container } = render(<TaskHarness tasks={tasks} onViewModeChange={onViewModeChange} />);
 
-    expect(container.querySelector("article.rounded-2xl")).toBeInTheDocument();
+    expect(container.querySelector("article.p-5")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
     expect(onViewModeChange).toHaveBeenCalledWith("list");
     expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
-    expect(container.querySelectorAll("article.rounded-xl")).toHaveLength(tasks.length);
+    expect(container.querySelectorAll("article[class*='border-l-[4px]']")).toHaveLength(tasks.length);
   });
 
   it("stellt Aufgaben ohne Tags und überfällige Aufgaben korrekt dar", () => {
@@ -250,8 +250,8 @@ describe("TaskListBoardView", () => {
       expect(within(section).getByRole("heading", { name: column.label })).toBeInTheDocument();
       expect(within(section).getByText("0")).toBeInTheDocument();
     });
-    expect(container.querySelector("article.rounded-2xl")).not.toBeInTheDocument();
-    expect(container.querySelector("article.rounded-xl")).not.toBeInTheDocument();
+    expect(container.querySelector("article.p-5")).not.toBeInTheDocument();
+    expect(container.querySelector("article[class*='border-l-[4px]']")).not.toBeInTheDocument();
   });
 
   it("filtert die Suche ausschließlich nach Aufgaben-Titel", () => {

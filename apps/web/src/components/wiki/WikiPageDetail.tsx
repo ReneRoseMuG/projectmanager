@@ -62,7 +62,7 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
         {activeTab === "content" ? (
           <form id="wiki-page-detail-form" className="grid gap-5" onSubmit={submit}>
             <RichTextInlineField value={content} placeholder="Wiki-Inhalt" testIdPrefix="wiki-page-detail-content" onChange={setContent} />
-            <footer className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white/95 p-4 shadow-panel backdrop-blur">
+            <footer className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-white/95 p-4 shadow-panel backdrop-blur">
               <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(page)}>
                 Löschen
               </Button>

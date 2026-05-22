@@ -39,16 +39,16 @@ export function ConfirmDialog({ open, options, onConfirm, onCancel }: ConfirmDia
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-steel-900/55 p-4 backdrop-blur-[2px]">
-      <section className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white shadow-modal" role="alertdialog" aria-modal="true">
+      <section className="w-full max-w-md overflow-hidden rounded-lg border border-line bg-white shadow-modal" role="alertdialog" aria-modal="true">
         <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
           <div className="flex items-start gap-3">
-            {!compact ? <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.iconClass}`}>{tone.icon}</span> : null}
+            {!compact ? <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${tone.iconClass}`}>{tone.icon}</span> : null}
             <div>
               <h2 className="text-base font-bold text-ink">{options.title}</h2>
-              {options.body ? <div className="mt-1 text-sm leading-6 text-slate-600">{options.body}</div> : null}
+              {options.body ? <div className="mt-1 text-sm leading-6 text-steel-600">{options.body}</div> : null}
             </div>
           </div>
-          <button type="button" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-shell hover:text-ink" aria-label="Schließen" onClick={onCancel}>
+          <button type="button" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-steel-500 hover:bg-shell hover:text-ink" aria-label="Schließen" onClick={onCancel}>
             <X size={16} />
           </button>
         </header>

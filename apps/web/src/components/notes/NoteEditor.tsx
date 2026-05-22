@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
+import { FormField } from "../ui/FormField";
 import { Modal } from "../ui/Modal";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
@@ -163,8 +164,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
           <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
             <Section>
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem]">
-                <label className="grid gap-1 text-sm font-semibold text-ink">
-                  Titel
+                <FormField label="Titel">
                   <input
                     className="h-11 rounded-md border border-line bg-white px-3 text-lg font-semibold outline-none transition focus:border-violet focus:ring-2 focus:ring-violet/15"
                     value={title}
@@ -174,15 +174,14 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
                       setDirty(true);
                     }}
                   />
-                </label>
-                <label className="grid gap-1 text-sm font-semibold text-ink">
-                  Verknüpft mit
-                  <select className="h-11 rounded-md border border-line bg-shell px-3 text-sm text-slate-600 outline-none" disabled>
+                </FormField>
+                <FormField label="Verknüpft mit">
+                  <select className="h-11 rounded-md border border-line bg-shell px-3 text-sm text-steel-600 outline-none" disabled>
                     <option>Aktueller Kontext</option>
                   </select>
-                </label>
+                </FormField>
               </div>
-              <div className="mt-4 rounded-lg border border-dashed border-line bg-shell/60 p-3 text-sm text-slate-600">Tags für Notizen werden über die Kontextlisten gepflegt.</div>
+              <div className="mt-4 rounded-lg border border-dashed border-line bg-shell/60 p-3 text-sm text-steel-600">Tags für Notizen werden über die Kontextlisten gepflegt.</div>
             </Section>
 
             <Section>

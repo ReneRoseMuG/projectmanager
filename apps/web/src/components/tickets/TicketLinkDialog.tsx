@@ -76,7 +76,7 @@ export function TicketLinkDialog({ open, owner, currentTickets, excludeIds = [],
                       <TicketTypeBadge value={ticket.type} />
                       <PriorityBadge value={ticket.priority} />
                     </div>
-                    {description ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{description}</p> : null}
+                    {description ? <p className="mt-1 line-clamp-2 text-xs text-steel-500">{description}</p> : null}
                   </div>
                   <Button variant="secondary" icon={<LinkIcon size={17} />} loading={linkingTicketId === ticket.id} onClick={() => void linkTicket(ticket)}>
                     Verknüpfen

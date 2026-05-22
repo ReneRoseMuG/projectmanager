@@ -96,7 +96,7 @@ export function TldrawNodeView({ node, updateAttributes, selected }: ReactNodeVi
           {previewSvg ? (
             <img src={previewSvg} alt="Zeichnung" className="w-full rounded-md" />
           ) : (
-            <div className="flex h-32 items-center justify-center gap-2 text-sm text-slate-500">
+            <div className="flex h-32 items-center justify-center gap-2 text-sm text-steel-500">
               <PenLine className="h-4 w-4" />
               Zeichnung — Doppelklick zum Bearbeiten
             </div>
@@ -121,7 +121,7 @@ export function TldrawNodeView({ node, updateAttributes, selected }: ReactNodeVi
           <button
             type="button"
             onClick={handleCancel}
-            className="rounded px-3 py-1.5 text-sm text-slate-600 hover:bg-line/50"
+            className="rounded px-3 py-1.5 text-sm text-steel-600 hover:bg-line/50"
             data-testid="tldraw-node-cancel"
             disabled={isCommitting}
           >

@@ -236,12 +236,12 @@ function FeatureProjectCard({
       header={<FeatureProjectHeader project={project} />}
       body={
         description ? (
-          <p className="line-clamp-3 text-sm text-slate-600">{description}</p>
+          <p className="line-clamp-3 text-sm text-steel-600">{description}</p>
         ) : null
       }
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
-          <span className="text-xs font-semibold text-slate-500">
+          <span className="text-xs font-semibold text-steel-500">
             Aktualisiert {formatHumanDate(project.updatedAt)}
           </span>
           <ActionMenu
@@ -293,7 +293,7 @@ function FeatureProjectRow({
         </>
       }
       meta={
-        <span className="text-xs font-semibold text-slate-500">
+        <span className="text-xs font-semibold text-steel-500">
           Aktualisiert {formatHumanDate(project.updatedAt)}
         </span>
       }
@@ -324,7 +324,7 @@ function FeatureProjectHeader({ project }: { project: Project }) {
           <h3 className="line-clamp-2 text-base font-semibold text-ink">
             {project.name}
           </h3>
-          <p className="mt-1 text-xs font-semibold text-slate-500">
+          <p className="mt-1 text-xs font-semibold text-steel-500">
             {project.openTaskCount} offene Aufgaben
           </p>
         </div>
@@ -344,7 +344,7 @@ function ProjectAvatar({ project }: { project: Project }) {
 
   return (
     <span
-      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-sm"
+      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
       style={{ backgroundColor: accent }}
     >
       <FolderOpen size={20} />

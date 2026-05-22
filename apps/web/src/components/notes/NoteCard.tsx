@@ -22,14 +22,14 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
   const tone = noteTones[note.id % noteTones.length] ?? "violet";
 
   return (
-    <article className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-line bg-white px-4 py-3.5 transition hover:border-steel-300 hover:shadow-md">
+    <article className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-line bg-white px-4 py-3.5 transition hover:border-steel-300 hover:shadow-panel">
       <button type="button" className="flex min-w-0 items-center gap-3 text-left" onClick={() => onEdit(note)}>
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneMap[tone]}`}>
+        <span className={`flex h-10 w-10 items-center justify-center rounded-lg ${toneMap[tone]}`}>
           <FileText size={18} />
         </span>
         <span className="min-w-0">
           <strong className="block truncate text-sm font-semibold text-ink">{note.title}</strong>
-          <time className="mt-0.5 block text-xs text-slate-500">{formatHumanDate(note.updatedAt)}</time>
+          <time className="mt-0.5 block text-xs text-steel-500">{formatHumanDate(note.updatedAt)}</time>
         </span>
       </button>
       <div className="flex gap-1">

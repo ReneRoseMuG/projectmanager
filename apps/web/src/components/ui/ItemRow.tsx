@@ -38,7 +38,7 @@ export function ItemRow({
 
   return (
     <article
-      className={`grid h-full ${columns} items-center gap-4 rounded-xl border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:border-steel-300 hover:shadow-md ${onOpen ? "cursor-pointer" : ""} ${className}`}
+      className={`grid h-full ${columns} items-center gap-4 rounded-lg border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:border-steel-300 hover:shadow-panel ${onOpen ? "cursor-pointer" : ""} ${className}`}
       style={accentColor ? { borderLeftColor: accentColor } : undefined}
       onDoubleClick={onOpen}
     >
@@ -50,7 +50,7 @@ export function ItemRow({
       <div className="min-w-0 text-left">
         <h3 className="truncate text-[14px] font-semibold text-ink">{title}</h3>
         {description ? (
-          <p className="truncate text-[12px] text-slate-500">{description}</p>
+          <p className="truncate text-[12px] text-steel-500">{description}</p>
         ) : null}
       </div>
       {pills ? (
