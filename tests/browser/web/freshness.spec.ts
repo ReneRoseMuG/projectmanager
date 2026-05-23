@@ -528,13 +528,16 @@ test.describe("Globale UI-Aktualität", () => {
         async (route) => route.fulfill({ status: 204 }),
         { times: 1 },
       );
-      const openRequestPromise = page.waitForRequest(
-        (openRequest) =>
-          openRequest.url().includes(`/api/attachments/${createdAttachment.id}/open`) &&
-          openRequest.method() === "POST",
+      const openResponsePromise = page.waitForResponse(
+        (openResponse) =>
+          openResponse
+            .url()
+            .includes(`/api/attachments/${createdAttachment.id}/open`) &&
+          openResponse.request().method() === "POST" &&
+          openResponse.status() === 204,
       );
       await attachmentCard.getByRole("button", { name: "Lokal öffnen" }).click();
-      await openRequestPromise;
+      await openResponsePromise;
 
       await page.route(
         `**/api/attachments/${createdAttachment.id}/open`,
@@ -550,7 +553,16 @@ test.describe("Globale UI-Aktualität", () => {
           }),
         { times: 1 },
       );
+      const missingFileResponsePromise = page.waitForResponse(
+        (openResponse) =>
+          openResponse
+            .url()
+            .includes(`/api/attachments/${createdAttachment.id}/open`) &&
+          openResponse.request().method() === "POST" &&
+          openResponse.status() === 404,
+      );
       await attachmentCard.getByRole("button", { name: "Lokal öffnen" }).click();
+      await missingFileResponsePromise;
       await expect(
         page.getByText("Die Datei wurde im Upload-Verzeichnis nicht gefunden."),
       ).toBeVisible();

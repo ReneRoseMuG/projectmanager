@@ -2,6 +2,9 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 23.05.26 | Fix           | Env Examples                                 | ✅     |
+| 23.05.26 | Fix           | API-Key Env                                  | ✅     |
+| 23.05.26 | Fix           | Attachment Open E2E Wait                     | ✅     |
 | 23.05.26 | Fix           | Testentwurfs-Skill Pflicht                   | ✅     |
 | 23.05.26 | Fix / Feature | MCP Tests und Tool-Doku                      | ⚠️     |
 | 23.05.26 | Fix           | MCP HTTP Hardening                           | ✅     |

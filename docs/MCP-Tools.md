@@ -7,6 +7,7 @@ Diese Übersicht beschreibt die aktuell verfügbaren MCP-Tools des Projekt-Manag
 ## Betrieb und Authentifizierung
 
 Der MCP-Server liegt im Workspace `apps/mcp-server`. Für die Kommunikation mit der Projekt-Manager-API werden diese Umgebungsvariablen verwendet:
+Eine Vorlage liegt in `apps/mcp-server/.env.example`.
 
 | Variable | Zweck |
 |---|---|

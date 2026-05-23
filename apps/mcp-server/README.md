@@ -4,6 +4,8 @@ Der MCP-Server stellt eine nicht-destruktive v1-Toolschicht für Claude Desktop 
 
 ## Umgebungsvariablen
 
+Eine Vorlage liegt in `.env.example`.
+
 - `PROJECT_MANAGER_API_BASE_URL`: API-Basis, Standard `http://localhost:3001/api`
 - `PROJECT_MANAGER_API_KEY`: API-Key der Projekt-Manager-API, Pflicht
 - `MCP_HTTP_HOST`: HTTP-Host, Standard `127.0.0.1`
