@@ -42,28 +42,6 @@ const defaultCatalogColors: Record<CatalogKind, Record<string, string>> = {
   },
 };
 
-const themeColorHex: Record<string, string> = {
-  "var(--color-ink)": "#0F2542",
-  "var(--color-steel-50)": "#F4F7FA",
-  "var(--color-steel-100)": "#E8EFF5",
-  "var(--color-steel-200)": "#D5E1EE",
-  "var(--color-steel-300)": "#BACDE3",
-  "var(--color-steel-400)": "#94B2D1",
-  "var(--color-steel-500)": "#6B92BD",
-  "var(--color-steel-600)": "#4682B4",
-  "var(--color-steel-700)": "#2E5984",
-  "var(--color-steel-800)": "#1B355C",
-  "var(--color-steel-900)": "#0F2542",
-  "var(--color-crimson)": "#D9416A",
-  "var(--color-tangerine)": "#ED8C3A",
-  "var(--color-mustard)": "#E2BA2C",
-  "var(--color-mustard-dark)": "#6E5800",
-  "var(--color-fern)": "#4D9359",
-  "var(--color-teal)": "#2F8E96",
-  "var(--color-violet)": "#6A40BE",
-  "var(--color-magenta)": "#C13D9A",
-};
-
 export function defaultCatalogColor(kind: CatalogKind, key: string): string {
   return defaultCatalogColors[kind][key] ?? "var(--color-steel-700)";
 }
@@ -122,34 +100,11 @@ export function catalogColor(entries: CatalogEntry[], kind: CatalogKind, key: st
   return catalogEntry(entries, kind, key)?.color ?? defaultCatalogColor(kind, key);
 }
 
-function normalizeHexColor(color: string): string | undefined {
-  const value = themeColorHex[color] ?? color;
-  if (/^#[0-9a-fA-F]{3}$/.test(value)) {
-    return `#${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}`;
-  }
-  if (/^#[0-9a-fA-F]{6}$/.test(value)) {
-    return value;
-  }
-  return undefined;
-}
-
-function readableTextColor(color: string): string {
-  const normalized = normalizeHexColor(color);
-  if (!normalized) {
-    return "#ffffff";
-  }
-  const red = Number.parseInt(normalized.slice(1, 3), 16);
-  const green = Number.parseInt(normalized.slice(3, 5), 16);
-  const blue = Number.parseInt(normalized.slice(5, 7), 16);
-  const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
-  return luminance > 0.58 ? "#0F2542" : "#ffffff";
-}
-
 export function catalogFillStyle(color: string): CSSProperties {
   return {
     backgroundColor: color,
     borderColor: color,
-    color: readableTextColor(color),
+    color: "#ffffff",
   };
 }
 

@@ -1,52 +1,36 @@
-# Setup-Skript: Projekt-Manager MCP-Server in Claude Desktop registrieren
-# -----------------------------------------------------------------------
-# 1. Trage deinen API-Key bei $ApiKey ein
-# 2. Führe das Skript in PowerShell aus: .\setup-mcp.ps1
-
 $ApiKey = "qfKrFhngzK8f8gYSny9UG9cDv9O42U7c1P0H4Dj7nls="
-
-# Pfade
 $ConfigPath = "$env:APPDATA\Claude\claude_desktop_config.json"
-$McpEntry = @{
+$ScriptDir = $PSScriptRoot
+
+$McpEntry = [PSCustomObject]@{
     command = "node"
-    args    = @("C:\Users\schro\source\repos\Projekt Manager\apps\mcp-server\dist\stdio.js")
-    env     = @{
+    args = @("$ScriptDir\apps\mcp-server\dist\stdio.js")
+    env = [PSCustomObject]@{
         PROJECT_MANAGER_API_BASE_URL = "http://127.0.0.1:3001/api"
-        PROJECT_MANAGER_API_KEY      = $ApiKey
+        PROJECT_MANAGER_API_KEY = $ApiKey
     }
 }
 
-# Prüfen ob der Key noch ein Platzhalter ist
-if ($ApiKey -eq "YOUR_API_KEY_HERE") {
-    Write-Error "Bitte trage deinen API-Key in die Variable `$ApiKey ein (Zeile 6)."
-    exit 1
-}
-
-# Config laden oder neu anlegen
 if (Test-Path $ConfigPath) {
-    $Config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+    $raw = Get-Content $ConfigPath -Raw -Encoding UTF8
+    $Config = $raw | ConvertFrom-Json
 } else {
-    Write-Host "Keine bestehende Config gefunden — lege neue an."
+    Write-Host "No existing config found - creating new one."
     $Config = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} }
 }
 
-# mcpServers sicherstellen
-if (-not $Config.PSObject.Properties["mcpServers"]) {
+if (-not ($Config.PSObject.Properties.Name -contains "mcpServers")) {
     $Config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value ([PSCustomObject]@{})
 }
 
-# Eintrag setzen (überschreibt bestehenden, falls vorhanden)
-$Config.mcpServers | Add-Member -MemberType NoteProperty -Name "projekt-manager" -Value $McpEntry -Force
-
-# Backup der alten Config
 if (Test-Path $ConfigPath) {
-    $Backup = "$ConfigPath.bak"
-    Copy-Item $ConfigPath $Backup -Force
-    Write-Host "Backup erstellt: $Backup"
+    Copy-Item $ConfigPath "$ConfigPath.bak" -Force
+    Write-Host "Backup created: $ConfigPath.bak"
 }
 
-# Speichern
-$Config | ConvertTo-Json -Depth 10 | Set-Content $ConfigPath -Encoding UTF8
-Write-Host ""
-Write-Host "Fertig! 'projekt-manager' wurde in $ConfigPath eingetragen."
-Write-Host "Starte Claude Desktop neu, damit der MCP-Server geladen wird."
+$Config.mcpServers | Add-Member -MemberType NoteProperty -Name "projekt-manager" -Value $McpEntry -Force
+
+$dir = Split-Path $ConfigPath
+if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+$Config | ConvertTo-Json -Depth 10 | Out-File $ConfigPath -Encoding UTF8
+Write-Host "Done! Please restart Claude Desktop."

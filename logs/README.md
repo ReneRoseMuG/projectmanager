@@ -2,6 +2,12 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 23.05.26 | Fix           | ListBoard-Toolbar und Aktionsicon            | ✅     |
+| 23.05.26 | Fix           | Board-Icon-Nachjustierung                    | ✅     |
+| 23.05.26 | Fix           | Circle-Plus-Icongröße                        | ✅     |
+| 23.05.26 | Fix           | Board-Controls-Kontrast                      | ✅     |
+| 23.05.26 | Fix           | Status-Spalten-Plus                          | ✅     |
+| 23.05.26 | Fix           | Status-Pill-Textfarbe                        | ✅     |
 | 23.05.26 | Fix           | Env Examples                                 | ✅     |
 | 23.05.26 | Fix           | API-Key Env                                  | ✅     |
 | 23.05.26 | Fix           | Attachment Open E2E Wait                     | ✅     |
