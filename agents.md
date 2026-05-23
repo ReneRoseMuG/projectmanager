@@ -91,6 +91,18 @@ Vor jeder Planerstellung im Chat oder im Plan-Modus nutzt Codex den Repo-Skill `
 
 Der Skill ist ein Planungs-Gate und ersetzt diese Datei nicht. `agents.md` bleibt die maßgebliche Quelle; bei Widersprüchen gilt `agents.md`. Der Skill stellt sicher, dass Architekturentscheidungen, Rollen-/Permission-Regeln, Teststrategie, Branch-Hygiene, UI-Leitplanken und Abnahmekriterien bei jeder Planung geprüft werden.
 
+### 3.0.1 Testentwurfs-Skill (Pflicht bei Tests)
+
+Sobald ein Auftrag Tests plant, ergänzt, ändert, bewertet oder ausführt, nutzt Codex zusätzlich den Repo-Skill `skills/projekt-manager-test-entwurfsleitplanken`.
+
+Das gilt insbesondere bei Begriffen wie „Testsuite“, „Testabdeckung“, „echte Daten“, „Integrationstest“, „E2E“, „Abnahme“, „Testfälle“ oder „Testlauf“.
+
+Codex dokumentiert zu Beginn kurz:
+- dass der Testentwurfs-Skill angewendet wird,
+- welche Testebene betroffen ist,
+- welches beobachtbare Verhalten bewiesen werden soll,
+- welche echten Daten und welche Isolation verwendet werden.
+
 ### 3.1 Branch-Nutzung (nur bei explizitem Nutzerwunsch)
 
 Codex fragt nicht aktiv nach einem Branch. Ein Branch wird nur angelegt, wenn der Nutzer dies ausdrücklich verlangt oder das Kurzkommando `branch <name>` verwendet.
@@ -231,6 +243,8 @@ Der Ordner `logs/` liegt im Repo-Root. Er wird beim ersten Log automatisch angel
 
 <Falls keine: „Keine." — sonst konkret auflisten.>
 ```
+
+Bei Teständerungen nennt der Schritt-Log zusätzlich, welche Testleitplanken angewendet wurden und welche Testebenen abgedeckt sind.
 
 ### 5.3 Wann gilt eine Teilaufgabe als abgeschlossen?
 
@@ -478,6 +492,16 @@ Codex startet keinen Web-Dev-Server als Abschluss-Service, nur damit der Nutzer 
 ## 11. Teststrategie
 
 > ⚠️ Die Testinfrastruktur wird im Verlauf des Projekts aufgebaut. Dieser Abschnitt wächst mit. Noch nicht vorhandene Kommandos sind als Platzhalter markiert.
+
+### Testentwurfs-Gate
+
+Vor jeder Test-Erstellung, Test-Änderung oder Testabdeckungsbewertung muss Codex `skills/projekt-manager-test-entwurfsleitplanken` anwenden und kurz im Chat oder im Schritt-Log benennen.
+
+Für Testpläne und Teständerungen dokumentiert Codex mindestens:
+- Testebene: Unit, Integration oder Browser/E2E
+- zu beweisendes Verhalten: Ausgangszustand, Aktion und beobachtbares Ergebnis
+- echte Daten und Isolation: Temp-DB, In-Memory-DB, `tests/.runtime` oder Temp-Root
+- Mock-Entscheidung und relevante Negativ-, Berechtigungs- oder Konfliktfälle
 
 ### Testebenen
 
