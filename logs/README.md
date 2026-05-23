@@ -2,6 +2,8 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 23.05.26 | Fix           | Katalog-Geschlossen-Status                   | ✅     |
+| 23.05.26 | Fix           | Einheitliche Badge-Darstellung               | ✅     |
 | 23.05.26 | Fix           | ListBoard-Toolbar und Aktionsicon            | ✅     |
 | 23.05.26 | Fix           | Board-Icon-Nachjustierung                    | ✅     |
 | 23.05.26 | Fix           | Circle-Plus-Icongröße                        | ✅     |

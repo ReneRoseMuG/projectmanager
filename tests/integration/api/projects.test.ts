@@ -92,14 +92,21 @@ describe("Projects API", () => {
 
   it("GET /api/projects enthaelt offene Aufgabenanzahl", async () => {
     const project = await createProject(app);
+    const closedStatus = await supertest(app.server)
+      .post("/api/catalogs/workStatus")
+      .send({ key: "accepted", label: "Akzeptiert", sortOrder: 1300, isClosed: true, color: "var(--color-steel-500)" })
+      .expect(201);
     await createTask(app, project.id, { title: "Todo", status: "todo" });
     await createTask(app, project.id, { title: "In Arbeit", status: "in_progress" });
     await createTask(app, project.id, { title: "Fertig", status: "done" });
+    await createTask(app, project.id, { title: "Akzeptiert", status: closedStatus.body.key });
 
     const res = await supertest(app.server).get("/api/projects").expect(200);
     const found = res.body.find((item: { id: number }) => item.id === project.id);
 
     expect(found.openTaskCount).toBe(2);
+    expect(found.doneTaskCount).toBe(2);
+    expect(found.totalTaskCount).toBe(4);
   });
 
   it("PATCH /api/projects/:id aktualisiert Name und Status", async () => {

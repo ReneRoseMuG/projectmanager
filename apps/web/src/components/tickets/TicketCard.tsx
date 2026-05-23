@@ -1,7 +1,7 @@
 import type { Ticket } from "@taskmanager/shared-types";
 import { Edit3, GitBranch, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
-import { catalogColor } from "../../utils/catalogs";
+import { catalogColor, isCatalogStatusClosed } from "../../utils/catalogs";
 import { isOverdue } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
@@ -29,6 +29,7 @@ export function TicketCard({ ticket, compact = false, variant = "card", onOpen, 
   const catalogs = useCatalogs();
   const description = richTextToPlainText(ticket.description);
   const statusColor = catalogColor(catalogs.entries, "workStatus", ticket.status);
+  const ticketClosed = isCatalogStatusClosed(catalogs.entries, "workStatus", ticket.status);
 
   if (variant === "row") {
     return (
@@ -36,7 +37,7 @@ export function TicketCard({ ticket, compact = false, variant = "card", onOpen, 
         <div className="md:hidden">
           <TicketCard ticket={ticket} compact={compact} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
         </div>
-        <TicketRow ticket={ticket} description={description} statusColor={statusColor} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
+        <TicketRow ticket={ticket} description={description} statusColor={statusColor} ticketClosed={ticketClosed} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
       </>
     );
   }
@@ -46,7 +47,7 @@ export function TicketCard({ ticket, compact = false, variant = "card", onOpen, 
       accentColor={statusColor}
       header={<TicketCardHeader ticket={ticket} onStatusChange={onStatusChange} />}
       body={<TicketCardBody description={description} />}
-      footer={<TicketCardFooter ticket={ticket} onDueDateChange={onDueDateChange} />}
+      footer={<TicketCardFooter ticket={ticket} ticketClosed={ticketClosed} onDueDateChange={onDueDateChange} />}
       onOpen={() => onOpen(ticket)}
       onEdit={() => onOpen(ticket)}
       onDelete={onDelete ? () => onDelete(ticket) : undefined}
@@ -72,8 +73,8 @@ function TicketCardBody({ description }: { description: string }) {
   return description ? <p className="line-clamp-3 text-xs text-steel-600">{description}</p> : null;
 }
 
-function TicketCardFooter({ ticket, onDueDateChange }: { ticket: Ticket; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown> }) {
-  const overdue = ticket.status !== "resolved" && ticket.status !== "closed" && isOverdue(ticket.dueDate);
+function TicketCardFooter({ ticket, ticketClosed, onDueDateChange }: { ticket: Ticket; ticketClosed: boolean; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown> }) {
+  const overdue = !ticketClosed && isOverdue(ticket.dueDate);
   const hasMeta = ticket.subTicketCount > 0 || Boolean(ticket.dueDate);
 
   return (
@@ -99,8 +100,8 @@ function TicketCardFooter({ ticket, onDueDateChange }: { ticket: Ticket; onDueDa
   );
 }
 
-function TicketRow({ ticket, description, statusColor, onOpen, onDelete, onStatusChange, onDueDateChange }: { ticket: Ticket; description: string; statusColor: string; onOpen: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void; onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown> }) {
-  const overdue = ticket.status !== "resolved" && ticket.status !== "closed" && isOverdue(ticket.dueDate);
+function TicketRow({ ticket, description, statusColor, ticketClosed, onOpen, onDelete, onStatusChange, onDueDateChange }: { ticket: Ticket; description: string; statusColor: string; ticketClosed: boolean; onOpen: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void; onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown> }) {
+  const overdue = !ticketClosed && isOverdue(ticket.dueDate);
 
   return (
     <div className="hidden md:block">

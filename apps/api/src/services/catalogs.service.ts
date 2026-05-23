@@ -169,6 +169,10 @@ export function isCatalogEntryClosed(database: DbClient, kind: CatalogKind, key:
   return catalogRepository.findByKindAndKey(database, kind, key)?.isClosed ?? false;
 }
 
+export function listClosedCatalogEntryKeys(database: DbClient, kind: CatalogKind): Set<string> {
+  return new Set(catalogRepository.findByKind(database, kind).filter((entry) => entry.isClosed).map((entry) => entry.key));
+}
+
 export function createCatalogEntry(database: DbClient, kind: string, input: CatalogEntryInput): CatalogEntry {
   assertCatalogKind(kind);
   const key = normalizeCatalogKey(input.key);

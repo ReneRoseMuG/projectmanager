@@ -2,7 +2,7 @@ import type { StatusCatalogKind } from "@taskmanager/shared-types";
 import { useEffect, useRef, useState } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { catalogEntriesByKind } from "../../utils/catalogs";
-import { Pill } from "./Pill";
+import { Badge } from "./Badge";
 
 interface StatusPillProps {
   kind: StatusCatalogKind;
@@ -46,9 +46,9 @@ export function StatusPill({ kind, value, onChange, disabled = false }: StatusPi
 
   if (!onChange) {
     return (
-      <Pill color={entry?.color}>
+      <Badge color={entry?.color} filled>
         {entry?.label ?? value}
-      </Pill>
+      </Badge>
     );
   }
 
@@ -65,9 +65,9 @@ export function StatusPill({ kind, value, onChange, disabled = false }: StatusPi
           setOpen((current) => !current);
         }}
       >
-        <Pill color={entry?.color}>
+        <Badge color={entry?.color} filled>
           {entry?.label ?? value}
-        </Pill>
+        </Badge>
       </button>
       {open ? (
         <span role="menu" className="absolute left-0 top-full z-50 mt-1 grid min-w-40 gap-1 rounded-lg border border-line bg-white p-1 shadow-panel">

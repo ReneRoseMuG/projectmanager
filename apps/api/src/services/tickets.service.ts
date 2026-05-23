@@ -17,7 +17,7 @@ import { featureTickets, features, milestoneTickets, milestones, projectTickets,
 import { ticketRepository, type TicketRecord } from "../repositories/ticket.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
-import { ensureCatalogEntryExists, isCatalogEntryClosed, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
+import { ensureCatalogEntryExists, isCatalogEntryClosed, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { listEntityComments } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 import {
@@ -378,6 +378,7 @@ function insertTicketRecord(database: DbClient, input: TicketInput, parentId: nu
   ensureCatalogEntryExists(database, "ticketType", type);
   ensureCatalogEntryExists(database, "workStatus", status);
   ensureCatalogEntryExists(database, "priority", priority);
+  const resolvedAt = isCatalogEntryClosed(database, "workStatus", status) ? nowIso() : null;
   return ticketRepository.create(
     database,
     {
@@ -393,7 +394,7 @@ function insertTicketRecord(database: DbClient, input: TicketInput, parentId: nu
       environment: cleanNullable(input.environment) ?? null,
       affectedVersion: cleanNullable(input.affectedVersion) ?? null,
       dueDate: cleanNullable(input.dueDate) ?? null,
-      resolvedAt: null,
+      resolvedAt,
       position: nextPosition(database, status, parentId)
     },
     actor?.actorUserId ?? undefined
@@ -537,7 +538,9 @@ export function listRecentTickets(
 ): Ticket[] {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
   const sort = options.sort ?? "updatedAt";
+  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
   return [...listDashboardTickets(database, options.owner)]
+    .filter((ticket) => !closedStatusKeys.has(ticket.status))
     .sort((left, right) => dateKey(right[sort]) - dateKey(left[sort]) || right.id - left.id)
     .slice(0, limit);
 }

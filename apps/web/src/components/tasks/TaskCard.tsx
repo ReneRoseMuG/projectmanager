@@ -1,7 +1,7 @@
 import type { Task } from "@taskmanager/shared-types";
 import { CheckCircle2, Edit3, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
-import { catalogColor } from "../../utils/catalogs";
+import { catalogColor, isCatalogStatusClosed } from "../../utils/catalogs";
 import { isOverdue } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
@@ -27,6 +27,7 @@ export function TaskCard({ task, compact = false, variant = "card", onOpen, onDe
   const catalogs = useCatalogs();
   const description = richTextToPlainText(task.description);
   const statusColor = catalogColor(catalogs.entries, "workStatus", task.status);
+  const taskClosed = isCatalogStatusClosed(catalogs.entries, "workStatus", task.status);
 
   if (variant === "row") {
     return (
@@ -34,7 +35,7 @@ export function TaskCard({ task, compact = false, variant = "card", onOpen, onDe
         <div className="md:hidden">
           <TaskCard task={task} compact={compact} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
         </div>
-        <TaskRow task={task} description={description} statusColor={statusColor} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
+        <TaskRow task={task} description={description} statusColor={statusColor} taskClosed={taskClosed} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
       </>
     );
   }
@@ -44,7 +45,7 @@ export function TaskCard({ task, compact = false, variant = "card", onOpen, onDe
       accentColor={statusColor}
       header={<TaskCardHeader task={task} onStatusChange={onStatusChange} />}
       body={<TaskCardBody description={description} />}
-      footer={<TaskCardFooter task={task} onDueDateChange={onDueDateChange} />}
+      footer={<TaskCardFooter task={task} taskClosed={taskClosed} onDueDateChange={onDueDateChange} />}
       onOpen={() => onOpen(task)}
       onEdit={() => onOpen(task)}
       onDelete={onDelete ? () => onDelete(task) : undefined}
@@ -69,8 +70,8 @@ function TaskCardBody({ description }: { description: string }) {
   return description ? <p className="line-clamp-3 text-xs text-steel-600">{description}</p> : null;
 }
 
-function TaskCardFooter({ task, onDueDateChange }: { task: Task; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown> }) {
-  const overdue = task.status !== "done" && isOverdue(task.dueDate);
+function TaskCardFooter({ task, taskClosed, onDueDateChange }: { task: Task; taskClosed: boolean; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown> }) {
+  const overdue = !taskClosed && isOverdue(task.dueDate);
   const hasMeta = task.subtaskCount > 0 || Boolean(task.dueDate);
 
   return (
@@ -96,8 +97,8 @@ function TaskCardFooter({ task, onDueDateChange }: { task: Task; onDueDateChange
   );
 }
 
-function TaskRow({ task, description, statusColor, onOpen, onDelete, onStatusChange, onDueDateChange }: { task: Task; description: string; statusColor: string; onOpen: (task: Task) => void; onDelete?: (task: Task) => void; onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown> }) {
-  const overdue = task.status !== "done" && isOverdue(task.dueDate);
+function TaskRow({ task, description, statusColor, taskClosed, onOpen, onDelete, onStatusChange, onDueDateChange }: { task: Task; description: string; statusColor: string; taskClosed: boolean; onOpen: (task: Task) => void; onDelete?: (task: Task) => void; onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown> }) {
+  const overdue = !taskClosed && isOverdue(task.dueDate);
 
   return (
     <div className="hidden md:block">

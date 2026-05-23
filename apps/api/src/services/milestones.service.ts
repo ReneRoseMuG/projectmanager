@@ -6,7 +6,7 @@ import { milestoneRepository, type MilestoneRecord } from "../repositories/miles
 import { badRequest, notFound } from "../utils/errors.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import { deleteMilestoneAttachmentsForIds } from "./attachments.service.js";
-import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
+import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import {
   buildCreateSummary,
   buildDeleteSummary,
@@ -109,11 +109,12 @@ function getMilestoneCounts(database: DbClient, milestoneIds: number[]): Map<num
     .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
     .where(inArray(milestoneTasks.ownerId, milestoneIds))
     .all();
+  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
   for (const row of taskRows) {
     const current = counts.get(row.ownerId) ?? emptyMilestoneCounts();
     current.taskCount += 1;
     current.totalTaskCount += 1;
-    if (row.status === "done") {
+    if (closedStatusKeys.has(row.status)) {
       current.doneTaskCount += 1;
     } else {
       current.openTaskCount += 1;

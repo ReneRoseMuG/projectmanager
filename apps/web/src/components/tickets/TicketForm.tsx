@@ -32,6 +32,7 @@ import {
   catalogEntriesByKind,
   catalogLabel,
   countOpenStatusItems,
+  isCatalogStatusClosed,
   resolveCatalogEntryKey,
 } from "../../utils/catalogs";
 import { toDateInput } from "../../utils/date";
@@ -265,6 +266,7 @@ export function TicketForm({
   );
   const assigneeOptions = useMemo(() => buildUserOptions(userList.users, assignee), [assignee, userList.users]);
   const reporterOptions = useMemo(() => buildUserOptions(userList.users, reporter), [reporter, userList.users]);
+  const statusClosed = isCatalogStatusClosed(catalogs.entries, "workStatus", status);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -276,7 +278,7 @@ export function TicketForm({
         type: ticketTypeValue(catalogs.entries, type),
         status: ticketStatusValue(catalogs.entries, status),
         priority: priorityValue(catalogs.entries, priority),
-        resolution: status === "resolved" || status === "closed" ? resolution : null,
+        resolution: statusClosed ? resolution : null,
         reporter,
         assignee,
         environment: type === "bug" ? environment : null,
@@ -406,7 +408,7 @@ export function TicketForm({
                 <FormField label="Status">
                   <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
                 </FormField>
-                {status === "resolved" || status === "closed" ? (
+                {statusClosed ? (
                   <FormField label="Lösung">
                     <RadioList value={resolution} options={resolutionOptions} onChange={setResolution} />
                   </FormField>

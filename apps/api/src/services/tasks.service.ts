@@ -5,7 +5,7 @@ import { featureTasks, features, milestoneTasks, milestones, projectTasks, proje
 import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
-import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
+import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { listComments } from "./comments.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import {
@@ -446,8 +446,8 @@ function dateKey(value: string): number {
   return Number.isFinite(time) ? time : 0;
 }
 
-function isOpenTaskStatus(status: string): boolean {
-  return !["done", "completed", "closed", "resolved", "archived", "rejected"].includes(status);
+function isOpenTaskStatus(status: string, closedStatusKeys: Set<string>): boolean {
+  return !closedStatusKeys.has(status);
 }
 
 export function getTaskStats(database: DbClient, owner?: DashboardTaskOwner): TaskStats {
@@ -467,7 +467,9 @@ export function listRecentTasks(
 ): Task[] {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
   const sort = options.sort ?? "updatedAt";
+  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
   return [...listDashboardTasks(database, options.owner)]
+    .filter((task) => isOpenTaskStatus(task.status, closedStatusKeys))
     .sort((left, right) => dateKey(right[sort]) - dateKey(left[sort]) || right.id - left.id)
     .slice(0, limit);
 }
@@ -475,8 +477,9 @@ export function listRecentTasks(
 export function listOverdueTasks(database: DbClient, options: { owner?: DashboardOverdueTaskOwner; limit?: number } = {}): Task[] {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
   const today = new Date().toISOString().slice(0, 10);
+  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
   return [...listDashboardTasks(database, options.owner)]
-    .filter((task) => task.dueDate !== null && task.dueDate < today && isOpenTaskStatus(task.status))
+    .filter((task) => task.dueDate !== null && task.dueDate < today && isOpenTaskStatus(task.status, closedStatusKeys))
     .sort((left, right) => String(left.dueDate).localeCompare(String(right.dueDate)) || left.id - right.id)
     .slice(0, limit);
 }

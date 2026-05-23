@@ -241,4 +241,27 @@ describe("Milestones API", () => {
     expect(countRows(testDb, "notes", "id", note.body.id)).toBe(0);
     expect(countRows(testDb, "attachments", "id", attachment.body.id)).toBe(0);
   });
+
+  it("zählt beliebige per Katalog geschlossene Aufgaben als erledigt", async () => {
+    const project = await createProject(app);
+    const milestone = await createMilestone(app, project.id);
+    const closedStatus = await supertest(app.server)
+      .post("/api/catalogs/workStatus")
+      .send({ key: "qa_passed", label: "QA passiert", sortOrder: 1300, isClosed: true, color: "var(--color-steel-500)" })
+      .expect(201);
+
+    await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks`).send({ title: "Geschlossen 1", status: closedStatus.body.key, priority: "medium" }).expect(201);
+    await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks`).send({ title: "Geschlossen 2", status: closedStatus.body.key, priority: "medium" }).expect(201);
+    await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks`).send({ title: "Geschlossen 3", status: closedStatus.body.key, priority: "medium" }).expect(201);
+
+    const detail = await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(200);
+    expect(detail.body).toMatchObject({ taskCount: 3, openTaskCount: 0, doneTaskCount: 3, totalTaskCount: 3 });
+
+    const projectMilestones = await supertest(app.server).get(`/api/projects/${project.id}/milestones`).expect(200);
+    expect(projectMilestones.body.find((item: { id: number }) => item.id === milestone.id)).toMatchObject({
+      openTaskCount: 0,
+      doneTaskCount: 3,
+      totalTaskCount: 3
+    });
+  });
 });

@@ -1,6 +1,8 @@
 import type { Task, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
 import { Check, ListChecks, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { catalogEntriesByKind, isCatalogStatusClosed } from "../../utils/catalogs";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 
@@ -13,7 +15,11 @@ interface SubtaskListProps {
 
 export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskListProps) {
   const [title, setTitle] = useState("");
-  const completed = subtasks.filter((subtask) => subtask.status === "done").length;
+  const catalogs = useCatalogs();
+  const workStatusEntries = catalogEntriesByKind(catalogs.entries, "workStatus");
+  const openStatusKey = workStatusEntries.find((entry) => !entry.isClosed)?.key ?? "todo";
+  const closedStatusKey = workStatusEntries.find((entry) => entry.isClosed)?.key ?? "done";
+  const completed = subtasks.filter((subtask) => isCatalogStatusClosed(catalogs.entries, "workStatus", subtask.status)).length;
   const progress = subtasks.length > 0 ? Math.round((completed / subtasks.length) * 100) : 0;
 
   const add = async () => {
@@ -49,7 +55,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
       <section className="grid gap-2 rounded-lg border border-line bg-white p-4 shadow-card">
         {subtasks.length === 0 ? <EmptyState icon={<ListChecks size={20} />} title="Noch keine Tasks" body="Zerlege die Aufgabe in kleinere Schritte." tone="fern" variant="default" className="p-6" /> : null}
         {subtasks.map((subtask) => {
-          const done = subtask.status === "done";
+          const done = isCatalogStatusClosed(catalogs.entries, "workStatus", subtask.status);
           return (
             <div key={subtask.id} className="flex items-center gap-3 rounded-md border border-line bg-shell/40 px-3 py-2 transition hover:border-fern/60 hover:bg-white">
               <button
@@ -58,7 +64,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
                   done ? "border-fern bg-fern text-white" : "border-steel-300 bg-white text-transparent hover:border-fern"
                 }`}
                 aria-label={done ? "Als offen markieren" : "Als erledigt markieren"}
-                onClick={() => void onUpdate(subtask.id, { status: done ? "todo" : "done", expectedVersion: subtask.version }).catch(() => undefined)}
+                onClick={() => void onUpdate(subtask.id, { status: done ? openStatusKey : closedStatusKey, expectedVersion: subtask.version }).catch(() => undefined)}
               >
                 <Check size={15} />
               </button>

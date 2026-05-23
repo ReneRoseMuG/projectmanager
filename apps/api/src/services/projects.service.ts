@@ -5,7 +5,7 @@ import { projects, projectTasks, tasks } from "../db/schema.js";
 import { projectRepository, type ProjectRecord } from "../repositories/project.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
-import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
+import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import {
   buildCreateSummary,
@@ -79,11 +79,12 @@ function getProjectTaskCounts(database: DbClient, projectIds: number[]): Map<num
     .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
     .where(inArray(projectTasks.ownerId, projectIds))
     .all();
+  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
 
   for (const row of rows) {
     const current = counts.get(row.projectId) ?? emptyProjectTaskCounts();
     current.totalTaskCount += 1;
-    if (row.status === "done") {
+    if (closedStatusKeys.has(row.status)) {
       current.doneTaskCount += 1;
     } else {
       current.openTaskCount += 1;

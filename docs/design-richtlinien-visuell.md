@@ -183,18 +183,17 @@ Immer in `<FormField>` gewrappt (Label + Fehler/Hinweis).
 ### 8.3 Badge
 
 Rechteckiges Inline-Label für Metadaten, Typen, Kategorien, Relationen.  
-Form: `rounded-md border px-2 text-xs font-semibold`.  
+Form: `inline-flex min-h-6 items-center rounded-md border px-2 text-xs font-semibold`.  
 Farbe: über `tone`-Prop oder `color`-Prop (Katalogfarbe).  
 Zwei Modi: standard (Rahmen + Tint + farbiger Text), `filled` (solide Füllfarbe + weißer Text).
 
 ### 8.4 Pill
 
-Hochbetontes Inline-Label für **Statuswerte** (änderbar, Workflow-orientiert).  
-Form: `rounded-md px-2 py-0.5 text-xs font-bold uppercase tracking-wide`.  
-Farbe: immer solide Füllfarbe + weißer Text.  
-Ausschließlich für Status verwenden — nicht für Typen oder Kategorien.
+Kompatibilitätslabel für ältere Stellen. Neue Status-, Prioritäts-, Tag- und Parent-Darstellungen verwenden die Badge-Grundform.  
+Form: identisch zu Badge (`inline-flex min-h-6 items-center rounded-md border px-2 text-xs font-semibold`).  
+Farbe: bei Status/Priorität solide Füllfarbe + weißer Text, bei Tags/Parent getönte Badge-Darstellung.
 
-> **Trennregel Badge vs. Pill:** `Pill` = Workflow-Status (änderbar). `Badge(filled)` = Klassifikation (fest, typ-beschreibend). Nicht mischen.
+> **Einheitsregel:** Status, Priorität, Tags und Parent-Hinweise müssen dieselbe Höhe, denselben Radius und dieselbe Grundtypografie verwenden. Unterschiede entstehen nur durch Farbe und Füllmodus.
 
 ### 8.5 FilterChips
 
