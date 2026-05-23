@@ -44,6 +44,8 @@ Statt großer Dateien vollständig zu laden, gilt immer diese Eskalationsreihenf
 3. Weitere Abschnitte nur dann laden, wenn die erste gezielte Lektüre nicht ausreicht
 4. Vollständige Lektüre großer Dokumente nur bei ausdrücklicher Architekturarbeit
 
+Bei UI-bezogenen Aktionen ist `docs/design-richtlinien-visuell.md` als verbindliche Design-Vorgabe gezielt zu berücksichtigen. Codex lädt auch hier nur die für den konkreten Auftrag relevanten Abschnitte.
+
 **Schnellcheck vor jedem Task:**
 
 | Situation | Dokument nötig? |

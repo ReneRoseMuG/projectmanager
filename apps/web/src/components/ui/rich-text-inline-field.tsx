@@ -47,6 +47,7 @@ import {
   LinkIcon,
   List,
   ListOrdered,
+  Loader2,
   PenLine,
   Pencil,
   Quote,
@@ -84,6 +85,8 @@ interface RichTextInlineFieldProps {
   className?: string;
   /** Unique prefix for data-testid attributes at each usage site. */
   testIdPrefix?: string;
+  /** Optional image upload handler for clipboard images and toolbar file picker. */
+  onImageUpload?: (file: File) => Promise<string>;
 }
 
 interface RichTextInlineEditorProps {
@@ -94,6 +97,7 @@ interface RichTextInlineEditorProps {
   toolbar: RichTextToolbarVariant;
   clickPosition: ClickPosition | null;
   testIdPrefix?: string;
+  onImageUpload?: (file: File) => Promise<string>;
   onCommit: (html: string) => void;
   onCancel: () => void;
 }
@@ -107,11 +111,14 @@ interface ToolbarButtonProps {
 }
 
 type RichTextToolbarVariant = "full" | "minimal" | "none";
+type ImageUploadHandler = (file: File) => Promise<string>;
 
 interface ClickPosition {
   left: number;
   top: number;
 }
+
+const IMAGE_UPLOAD_PLACEHOLDER = "[Bild wird hochgeladen...]";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -121,7 +128,7 @@ function canWriteAi(user: CurrentUser | null | undefined): boolean {
   return Boolean(user?.permissions.some((permission) => (permission.resource === "*" || permission.resource === "ai") && (permission.action === "*" || permission.action === "write" || permission.action === "admin")));
 }
 
-export function RichTextInlineField({ value, onChange, placeholder, minRows, toolbar = "full", readOnly = false, className = "", testIdPrefix }: RichTextInlineFieldProps) {
+export function RichTextInlineField({ value, onChange, placeholder, minRows, toolbar = "full", readOnly = false, className = "", testIdPrefix, onImageUpload }: RichTextInlineFieldProps) {
   const queryClient = useQueryClient();
   const currentUser = queryClient.getQueryData<CurrentUser>(queryKeys.auth.me());
   const canUseAi = canWriteAi(currentUser);
@@ -167,7 +174,18 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
   return (
     <div className={cn("relative group", className)}>
       {isEditing ? (
-        <RichTextInlineEditor value={value ?? ""} originalValue={originalValue} placeholder={placeholder} minRows={minRows} toolbar={toolbar} clickPosition={clickPosition} testIdPrefix={testIdPrefix} onCommit={handleCommit} onCancel={handleCancel} />
+        <RichTextInlineEditor
+          value={value ?? ""}
+          originalValue={originalValue}
+          placeholder={placeholder}
+          minRows={minRows}
+          toolbar={toolbar}
+          clickPosition={clickPosition}
+          testIdPrefix={testIdPrefix}
+          onImageUpload={onImageUpload}
+          onCommit={handleCommit}
+          onCancel={handleCancel}
+        />
       ) : hasContent ? (
         <div
           className={cn(
@@ -215,8 +233,10 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
   );
 }
 
-function RichTextInlineEditor({ value, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onCommit, onCancel }: RichTextInlineEditorProps) {
+function RichTextInlineEditor({ value, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, onCommit, onCancel }: RichTextInlineEditorProps) {
   const cancellingRef = useRef(false);
+  const [imageUploadCount, setImageUploadCount] = useState(0);
+  const { showToast } = useToast();
   const editorAttributes = useMemo(() => {
     const attributes: Record<string, string> = {
       class: cn("rich-text-surface max-w-none", Boolean(minRows) && "rich-text-inline-min-rows")
@@ -255,7 +275,55 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
     content: value,
     autofocus: false,
     editorProps: {
-      attributes: editorAttributes
+      attributes: editorAttributes,
+      transformPastedText(text: string): string {
+        return text.replace(/\n{3,}/g, "\n\n");
+      },
+      handlePaste(view, event): boolean {
+        if (!onImageUpload) {
+          return false;
+        }
+
+        const imageItem = Array.from(event.clipboardData?.items ?? []).find((item) => item.type.startsWith("image/"));
+        if (!imageItem) {
+          return false;
+        }
+
+        const file = imageItem.getAsFile();
+        if (!file) {
+          return false;
+        }
+
+        event.preventDefault();
+        const placeholderFrom = view.state.selection.from;
+        view.dispatch(view.state.tr.insertText(IMAGE_UPLOAD_PLACEHOLDER));
+        setImageUploadCount((count) => count + 1);
+
+        void onImageUpload(file)
+          .then((url) => {
+            const imageNode = view.state.schema.nodes.image?.create({ src: url });
+            if (!imageNode) {
+              return;
+            }
+
+            view.dispatch(view.state.tr.delete(placeholderFrom, placeholderFrom + IMAGE_UPLOAD_PLACEHOLDER.length).insert(placeholderFrom, imageNode));
+          })
+          .catch((uploadError) => {
+            view.dispatch(view.state.tr.delete(placeholderFrom, placeholderFrom + IMAGE_UPLOAD_PLACEHOLDER.length));
+            showToast({ tone: "error", title: "Bild konnte nicht hochgeladen werden", message: errorMessage(uploadError) });
+          })
+          .finally(() => setImageUploadCount((count) => Math.max(0, count - 1)));
+
+        return true;
+      }
+    },
+    onTransaction({ editor: activeEditor, transaction }) {
+      if (!transaction.getMeta("paste")) {
+        return;
+      }
+
+      const { from, to } = transaction.selection;
+      activeEditor.chain().selectAll().unsetColor().unsetMark("textStyle").setTextSelection({ from, to }).run();
     },
     onBlur: ({ editor: activeEditor }: { editor: Editor }) => {
       if (cancellingRef.current) {
@@ -311,15 +379,16 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
   }
 
   return (
-    <div className="overflow-hidden rounded-md border border-steel-600 bg-white shadow-sm ring-2 ring-steel-700/10" data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
-      {toolbar !== "none" ? <RichTextToolbar editor={editor} variant={toolbar} /> : null}
+    <div className="overflow-clip rounded-md border border-steel-600 bg-white shadow-sm ring-2 ring-steel-700/10" data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
+      {toolbar !== "none" ? <RichTextToolbar editor={editor} variant={toolbar} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} /> : null}
       <EditorContent editor={editor} />
     </div>
   );
 }
 
-function RichTextToolbar({ editor, variant }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none"> }) {
+function RichTextToolbar({ editor, variant, onImageUpload, imageUploading }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none">; onImageUpload?: ImageUploadHandler; imageUploading: boolean }) {
   const showFullToolbar = variant === "full";
+  const [pickerUploading, setPickerUploading] = useState(false);
   const queryClient = useQueryClient();
   const currentUser = queryClient.getQueryData<CurrentUser>(queryKeys.auth.me());
   const canUseAi = canWriteAi(currentUser);
@@ -337,7 +406,7 @@ function RichTextToolbar({ editor, variant }: { editor: Editor; variant: Exclude
   });
 
   return (
-    <div data-testid="rich-text-toolbar" className="flex flex-wrap items-center gap-1 rounded-t-md border-b border-line bg-shell p-1.5">
+    <div data-testid="rich-text-toolbar" className="sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-t-md border-b border-line bg-shell p-1.5">
       {canUseAi ? (
         <>
           <ToolbarButton onClick={() => aiMutation.mutate("rewrite")} active={false} disabled={aiMutation.isPending} title="Umformulieren" icon={<Sparkles />} />
@@ -366,7 +435,7 @@ function RichTextToolbar({ editor, variant }: { editor: Editor; variant: Exclude
           <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Zitat" icon={<Quote />} />
           <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive("codeBlock")} title="Codeblock" icon={<Code2 />} />
           <ToolbarButton onClick={() => setLink(editor)} active={editor.isActive("link")} title="Link" icon={<LinkIcon />} />
-          <ToolbarButton onClick={() => setImage(editor)} active={false} title="Bild" icon={<ImageIcon />} />
+          <ToolbarButton onClick={() => handleImageInsert(editor, onImageUpload, setPickerUploading, showToast)} active={false} disabled={imageUploading || pickerUploading} title="Bild" icon={imageUploading || pickerUploading ? <Loader2 /> : <ImageIcon />} />
           <Separator />
           <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Links" icon={<AlignLeft />} />
           <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Mitte" icon={<AlignCenter />} />
@@ -396,7 +465,31 @@ function setLink(editor: Editor) {
   editor.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
 }
 
-function setImage(editor: Editor) {
+function handleImageInsert(editor: Editor, onImageUpload: ImageUploadHandler | undefined, setUploading: (uploading: boolean) => void, showToast: ReturnType<typeof useToast>["showToast"]) {
+  if (onImageUpload) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) {
+        return;
+      }
+
+      setUploading(true);
+      void onImageUpload(file)
+        .then((url) => {
+          editor.chain().focus().setImage({ src: url }).run();
+        })
+        .catch((uploadError) => {
+          showToast({ tone: "error", title: "Bild konnte nicht hochgeladen werden", message: errorMessage(uploadError) });
+        })
+        .finally(() => setUploading(false));
+    };
+    input.click();
+    return;
+  }
+
   const src = window.prompt("Bild-URL");
 
   if (!src?.trim()) {
@@ -415,9 +508,9 @@ function ToolbarButton({ onClick, active, title, icon, disabled = false }: Toolb
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={cn("flex h-7 w-7 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50", active ? "bg-steel-700 text-white" : "text-steel-500 hover:bg-line/50 hover:text-ink")}
+      className={cn("flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50", active ? "bg-steel-700 text-white" : "text-steel-500 hover:bg-line/50 hover:text-ink")}
     >
-      {React.cloneElement(icon, { className: "h-3.5 w-3.5" })}
+      {React.cloneElement(icon, { className: cn("h-3.5 w-3.5", icon.type === Loader2 && "animate-spin") })}
     </button>
   );
 }

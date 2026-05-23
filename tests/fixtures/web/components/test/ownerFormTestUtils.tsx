@@ -221,14 +221,16 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
     value,
     onChange,
     placeholder,
-    testIdPrefix
+    testIdPrefix,
+    onImageUpload
   }: {
     value: string | null | undefined;
     onChange: (value: string) => void;
     placeholder?: string;
     testIdPrefix?: string;
+    onImageUpload?: (file: File) => Promise<string>;
   }) {
-    return <textarea aria-label={placeholder ?? "Rich Text"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
+    return <textarea aria-label={placeholder ?? "Rich Text"} data-image-upload={onImageUpload ? "enabled" : "disabled"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
   }
 }));
 

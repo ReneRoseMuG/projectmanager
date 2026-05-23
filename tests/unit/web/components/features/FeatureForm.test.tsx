@@ -38,6 +38,20 @@ describe("FeatureForm", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Neue Kurzbeschreibung</p>", content: "<p>Neuer Inhalt</p>" })));
   });
 
+  it("stellt Bild-Upload für Kurzbeschreibung und Inhalt nur im Edit-Modus bereit", () => {
+    renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("feature-form-description-view")).toHaveAttribute("data-image-upload", "enabled");
+    expect(screen.getByTestId("feature-form-content-view")).toHaveAttribute("data-image-upload", "enabled");
+  });
+
+  it("deaktiviert Bild-Upload für Kurzbeschreibung und Inhalt im Create-Modus", () => {
+    renderWithProviders(<FeatureForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("feature-form-description-view")).toHaveAttribute("data-image-upload", "disabled");
+    expect(screen.getByTestId("feature-form-content-view")).toHaveAttribute("data-image-upload", "disabled");
+  });
+
   it("zeigt im Create-Modus alle erwarteten Verwaltungs-Tabs", () => {
     renderWithProviders(<FeatureForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 

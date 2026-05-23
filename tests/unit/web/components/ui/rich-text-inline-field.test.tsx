@@ -44,6 +44,7 @@ interface MockEditor {
 
 interface MockCommandChain {
   focus: () => MockCommandChain;
+  selectAll: () => MockCommandChain;
   toggleBold: () => MockCommandChain;
   toggleItalic: () => MockCommandChain;
   toggleUnderline: () => MockCommandChain;
@@ -57,25 +58,59 @@ interface MockCommandChain {
   extendMarkRange: () => MockCommandChain;
   unsetLink: () => MockCommandChain;
   setLink: () => MockCommandChain;
-  setImage: () => MockCommandChain;
+  unsetColor: () => MockCommandChain;
+  unsetMark: (name: string) => MockCommandChain;
+  setImage: (attrs?: Record<string, string>) => MockCommandChain;
   setTextAlign: () => MockCommandChain;
+  setTextSelection: (selection: { from: number; to: number }) => MockCommandChain;
   unsetHighlight: () => MockCommandChain;
   setParagraph: () => MockCommandChain;
   unsetAllMarks: () => MockCommandChain;
   clearNodes: () => MockCommandChain;
+  insertContent: (content: unknown) => MockCommandChain;
   run: () => boolean;
+}
+
+interface MockPasteTransaction {
+  insertText: ReturnType<typeof vi.fn<[string], MockPasteTransaction>>;
+  delete: ReturnType<typeof vi.fn<[number, number], MockPasteTransaction>>;
+  insert: ReturnType<typeof vi.fn<[number, unknown], MockPasteTransaction>>;
+}
+
+interface MockPasteView {
+  state: {
+    selection: { from: number };
+    tr: MockPasteTransaction;
+    schema: {
+      nodes: {
+        image?: {
+          create: ReturnType<typeof vi.fn<[Record<string, string>], unknown>>;
+        };
+      };
+    };
+  };
+  dispatch: ReturnType<typeof vi.fn<[MockPasteTransaction], void>>;
+}
+
+interface MockTransaction {
+  getMeta: ReturnType<typeof vi.fn<[string], boolean>>;
+  selection: { from: number; to: number };
 }
 
 interface MockEditorConfig {
   editorProps?: {
     attributes?: Record<string, string>;
+    transformPastedText?: (text: string) => string;
+    handlePaste?: (view: MockPasteView, event: ClipboardEvent) => boolean;
   };
+  onTransaction?: (input: { editor: MockEditor; transaction: MockTransaction }) => void;
   onBlur?: (input: { editor: MockEditor }) => void;
 }
 
 const tiptapMock = vi.hoisted(() => ({
   editor: undefined as MockEditor | undefined,
   config: undefined as MockEditorConfig | undefined,
+  chain: undefined as MockCommandChain | undefined,
   html: "<p>mock content</p>"
 }));
 
@@ -85,30 +120,45 @@ const aiApiMock = vi.hoisted(() => ({
 
 function createCommandChain(): MockCommandChain {
   const chain: MockCommandChain = {
-    focus: () => chain,
-    toggleBold: () => chain,
-    toggleItalic: () => chain,
-    toggleUnderline: () => chain,
-    toggleStrike: () => chain,
-    toggleHighlight: () => chain,
-    toggleHeading: () => chain,
-    toggleBulletList: () => chain,
-    toggleOrderedList: () => chain,
-    toggleBlockquote: () => chain,
-    toggleCodeBlock: () => chain,
-    extendMarkRange: () => chain,
-    unsetLink: () => chain,
-    setLink: () => chain,
-    setImage: () => chain,
-    setTextAlign: () => chain,
-    unsetHighlight: () => chain,
-    setParagraph: () => chain,
-    unsetAllMarks: () => chain,
-    clearNodes: () => chain,
-    run: () => true
+    focus: vi.fn(() => chain),
+    selectAll: vi.fn(() => chain),
+    toggleBold: vi.fn(() => chain),
+    toggleItalic: vi.fn(() => chain),
+    toggleUnderline: vi.fn(() => chain),
+    toggleStrike: vi.fn(() => chain),
+    toggleHighlight: vi.fn(() => chain),
+    toggleHeading: vi.fn(() => chain),
+    toggleBulletList: vi.fn(() => chain),
+    toggleOrderedList: vi.fn(() => chain),
+    toggleBlockquote: vi.fn(() => chain),
+    toggleCodeBlock: vi.fn(() => chain),
+    extendMarkRange: vi.fn(() => chain),
+    unsetLink: vi.fn(() => chain),
+    setLink: vi.fn(() => chain),
+    unsetColor: vi.fn(() => chain),
+    unsetMark: vi.fn(() => chain),
+    setImage: vi.fn(() => chain),
+    setTextAlign: vi.fn(() => chain),
+    setTextSelection: vi.fn(() => chain),
+    unsetHighlight: vi.fn(() => chain),
+    setParagraph: vi.fn(() => chain),
+    unsetAllMarks: vi.fn(() => chain),
+    clearNodes: vi.fn(() => chain),
+    insertContent: vi.fn(() => chain),
+    run: vi.fn(() => true)
   };
 
+  tiptapMock.chain = chain;
   return chain;
+}
+
+function createPasteTransaction(): MockPasteTransaction {
+  const tr: MockPasteTransaction = {
+    insertText: vi.fn(() => tr),
+    delete: vi.fn(() => tr),
+    insert: vi.fn(() => tr)
+  };
+  return tr;
 }
 
 vi.mock("@tiptap/react", () => ({
@@ -202,6 +252,7 @@ afterEach(() => {
   vi.clearAllMocks();
   tiptapMock.editor = undefined;
   tiptapMock.config = undefined;
+  tiptapMock.chain = undefined;
   tiptapMock.html = "<p>mock content</p>";
 });
 
@@ -396,5 +447,100 @@ describe("RichTextInlineField", () => {
 
     await waitFor(() => expect(onChange).toHaveBeenCalledWith("<p>KI Ergebnis</p>"));
     expect(screen.getByTestId("field-editor")).toBeInTheDocument();
+  });
+
+  it("T-22 hält Toolbar sticky und bricht Sticky nicht durch overflow-hidden", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByTestId("field-view"));
+
+    expect(screen.getByTestId("field-editor")).toHaveClass("overflow-clip");
+    expect(screen.getByTestId("rich-text-toolbar")).toHaveClass("sticky", "top-0", "z-10");
+  });
+
+  it("T-23 normalisiert überzählige Leerzeilen beim Einfügen", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByTestId("field-view"));
+
+    expect(tiptapMock.config?.editorProps?.transformPastedText?.("A\n\n\n\nB")).toBe("A\n\nB");
+  });
+
+  it("T-24 entfernt geerbte Farb- und TextStyle-Marks nach Paste-Transaktionen", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByTestId("field-view"));
+    const activeEditor = tiptapMock.editor;
+    if (!activeEditor) {
+      throw new Error("Editor mock was not created");
+    }
+
+    tiptapMock.config?.onTransaction?.({
+      editor: activeEditor,
+      transaction: {
+        getMeta: vi.fn((key: string) => key === "paste"),
+        selection: { from: 2, to: 2 }
+      }
+    });
+
+    expect(tiptapMock.chain?.selectAll).toHaveBeenCalled();
+    expect(tiptapMock.chain?.unsetColor).toHaveBeenCalled();
+    expect(tiptapMock.chain?.unsetMark).toHaveBeenCalledWith("textStyle");
+    expect(tiptapMock.chain?.setTextSelection).toHaveBeenCalledWith({ from: 2, to: 2 });
+    expect(tiptapMock.chain?.run).toHaveBeenCalled();
+  });
+
+  it("T-25 fügt Clipboard-Bilder über onImageUpload in den Editor ein", async () => {
+    const file = new File(["image"], "screen.png", { type: "image/png" });
+    const imageNode = { type: "image", attrs: { src: "http://assets.test/uploads/screen.png" } };
+    const tr = createPasteTransaction();
+    const view: MockPasteView = {
+      state: {
+        selection: { from: 3 },
+        tr,
+        schema: {
+          nodes: {
+            image: {
+              create: vi.fn(() => imageNode)
+            }
+          }
+        }
+      },
+      dispatch: vi.fn()
+    };
+    const preventDefault = vi.fn();
+    const uploadImage = vi.fn<[File], Promise<string>>().mockResolvedValue("http://assets.test/uploads/screen.png");
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} onImageUpload={uploadImage} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByTestId("field-view"));
+    const handled = tiptapMock.config?.editorProps?.handlePaste?.(
+      view,
+      {
+        preventDefault,
+        clipboardData: {
+          items: [{ type: "image/png", getAsFile: () => file }]
+        }
+      } as unknown as ClipboardEvent
+    );
+
+    expect(handled).toBe(true);
+    expect(preventDefault).toHaveBeenCalled();
+    expect(tr.insertText).toHaveBeenCalledWith("[Bild wird hochgeladen...]");
+    expect(uploadImage).toHaveBeenCalledWith(file);
+    await waitFor(() => expect(view.state.schema.nodes.image?.create).toHaveBeenCalledWith({ src: "http://assets.test/uploads/screen.png" }));
+    expect(tr.delete).toHaveBeenCalledWith(3, 29);
+    expect(tr.insert).toHaveBeenCalledWith(3, imageNode);
+  });
+
+  it("T-26 nutzt ohne onImageUpload weiterhin den URL-Prompt für Bilder", () => {
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("https://assets.test/image.png");
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByTestId("field-view"));
+    fireEvent.click(screen.getByRole("button", { name: "Bild" }));
+
+    expect(promptSpy).toHaveBeenCalledWith("Bild-URL");
+    expect(tiptapMock.chain?.setImage).toHaveBeenCalledWith({ src: "https://assets.test/image.png" });
+    promptSpy.mockRestore();
   });
 });

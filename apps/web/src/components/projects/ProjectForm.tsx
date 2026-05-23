@@ -28,6 +28,7 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
+import { assetUrl } from "../../api/client";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useBacklog } from "../../hooks/useBacklog";
@@ -345,6 +346,16 @@ export function ProjectForm({
     }
   };
 
+  const uploadEditorImage = project
+    ? async (file: File): Promise<string> => {
+        const uploaded = await uploadAttachment(file);
+        if (!uploaded) {
+          throw new Error("Image upload requires a saved project.");
+        }
+        return assetUrl(uploaded.url);
+      }
+    : undefined;
+
   const deleteBacklogItem = async (item: BacklogItem) => {
     const approved = await confirm({
       title: "Backlog-Item löschen?",
@@ -575,6 +586,7 @@ export function ProjectForm({
                   placeholder="Worum geht es in diesem Projekt?"
                   minRows={5}
                   testIdPrefix="project-description"
+                  onImageUpload={uploadEditorImage}
                 />
               </FormField>
             </Section>

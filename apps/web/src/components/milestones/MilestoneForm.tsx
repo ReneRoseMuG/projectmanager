@@ -22,6 +22,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { ViewMode } from "../../types";
+import { assetUrl } from "../../api/client";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useCalendarTasks } from "../../hooks/useCalendarTasks";
@@ -326,6 +327,16 @@ export function MilestoneForm({
     }
   };
 
+  const uploadEditorImage = milestone
+    ? async (file: File): Promise<string> => {
+        const uploaded = await uploadAttachment(file);
+        if (!uploaded) {
+          throw new Error("Image upload requires a saved milestone.");
+        }
+        return assetUrl(uploaded.url);
+      }
+    : undefined;
+
   const linkFeature = async () => {
     if (selectedFeatureId === "" || !milestoneId) {
       return;
@@ -525,6 +536,7 @@ export function MilestoneForm({
                   placeholder="Wofür steht dieser Meilenstein?"
                   minRows={12}
                   testIdPrefix="milestone-description"
+                  onImageUpload={uploadEditorImage}
                 />
               </FormField>
             </Section>

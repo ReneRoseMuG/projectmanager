@@ -16,6 +16,7 @@ import { ClipboardList, ListChecks, Paperclip, StickyNote } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import type { DraftFile } from "../../types";
+import { assetUrl } from "../../api/client";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTickets } from "../../hooks/useTickets";
 import {
@@ -298,6 +299,16 @@ export function TaskForm({
     }
   };
 
+  const uploadEditorImage = task
+    ? async (file: File): Promise<string> => {
+        const uploaded = await uploadAttachment(file);
+        if (!uploaded) {
+          throw new Error("Image upload requires a saved task.");
+        }
+        return assetUrl(uploaded.url);
+      }
+    : undefined;
+
   const canShowOverview = Boolean(task && ((detail.task?.subtasks.length ?? task.subtaskCount) > 0));
   const visibleTabs = task
     ? tabs.filter((tab) => (tab.value !== "overview" || canShowOverview) && (tab.value !== "journal" || canReadJournal))
@@ -421,6 +432,7 @@ export function TaskForm({
                     placeholder="Beschreibung"
                     minRows={12}
                     testIdPrefix="task-description"
+                    onImageUpload={uploadEditorImage}
                     onChange={setDescription}
                   />
                 </FormField>

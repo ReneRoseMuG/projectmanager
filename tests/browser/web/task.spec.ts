@@ -180,6 +180,58 @@ test.describe("Task-Routen und Detailformular", () => {
     }
   });
 
+  test("Task-Editor: Bild-Button lädt Datei hoch und fügt das Bild inline ein", async ({
+    page,
+    request,
+  }) => {
+    const project = await createProject(request, "E2E Task Inline Image Project");
+    const task = await createTask(
+      request,
+      { type: "project", id: project.id },
+      "E2E Task Inline Image",
+    );
+
+    try {
+      await authenticatedGoto(
+        page,
+        `/tasks/${task.id}?returnTo=${encodeURIComponent(`/projects/${project.id}`)}`,
+      );
+      const taskForm = formPage(page, "Aufgabe bearbeiten");
+      await taskForm.locator('[data-testid="task-description-view"]').click();
+      await expect(
+        taskForm.locator('[data-testid="task-description-editor"]'),
+      ).toBeVisible();
+
+      const uploadResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/tasks/${task.id}/attachments`) &&
+          response.request().method() === "POST",
+      );
+      const fileChooserPromise = page.waitForEvent("filechooser");
+      await taskForm.getByRole("button", { name: "Bild" }).click();
+      const fileChooser = await fileChooserPromise;
+      await fileChooser.setFiles({
+        name: "inline-editor.png",
+        mimeType: "image/png",
+        buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      });
+
+      const uploadedAttachment = (await (
+        await uploadResponsePromise
+      ).json()) as { filename: string; originalName: string };
+      await expect(
+        taskForm.locator(
+          `[data-testid="task-description-editor"] img[src*="${uploadedAttachment.filename}"]`,
+        ),
+      ).toBeVisible();
+
+      await taskForm.getByRole("button", { name: /^Dateien/ }).click();
+      await expect(taskForm.getByText(uploadedAttachment.originalName)).toBeVisible();
+    } finally {
+      await deleteProject(request, project.id);
+    }
+  });
+
   test("Task-Zuordnung entfernen: Delete-Icon entfernt nur die Owner-Relation", async ({
     page,
     request,

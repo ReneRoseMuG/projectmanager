@@ -23,8 +23,8 @@ import { ToastProvider } from "../../../../../apps/web/src/components/ui/ToastPr
 import { MilestoneForm } from "../../../../../apps/web/src/components/milestones/MilestoneForm";
 
 vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
-  RichTextInlineField({ value, onChange, placeholder, testIdPrefix }: { value: string | null | undefined; onChange: (value: string) => void; placeholder?: string; testIdPrefix?: string }) {
-    return <textarea aria-label={placeholder ?? "Rich Text"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
+  RichTextInlineField({ value, onChange, placeholder, testIdPrefix, onImageUpload }: { value: string | null | undefined; onChange: (value: string) => void; placeholder?: string; testIdPrefix?: string; onImageUpload?: (file: File) => Promise<string> }) {
+    return <textarea aria-label={placeholder ?? "Rich Text"} data-image-upload={onImageUpload ? "enabled" : "disabled"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
   }
 }));
 
@@ -259,6 +259,18 @@ describe("MilestoneForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Meilenstein aktualisiert</p>" }), []));
+  });
+
+  it("stellt Bild-Upload für die Beschreibung nur im Edit-Modus bereit", () => {
+    renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    expect(screen.getByTestId("milestone-description-view")).toHaveAttribute("data-image-upload", "enabled");
+  });
+
+  it("deaktiviert Bild-Upload für die Beschreibung im Create-Modus", () => {
+    renderWithProviders(<MilestoneForm open projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    expect(screen.getByTestId("milestone-description-view")).toHaveAttribute("data-image-upload", "disabled");
   });
 
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {

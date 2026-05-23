@@ -34,6 +34,7 @@ Read these references only when they are relevant:
 - `references/testing.md` for test plans, test migration, fixtures, E2E, test runtime, or acceptance evidence.
 - `references/git-workflow.md` for branch, save, savetowork, merge, push, or cleanup planning.
 - `references/ui-guidelines.md` for frontend layout, navigation, component, menu, or interaction planning.
+- `docs/design-richtlinien-visuell.md` relevant sections for any visual frontend, dashboard, page, component, form, layout, styling, or design-system planning.
 - `references/acceptance-criteria.md` before finalizing a plan or calling a task complete.
 
 ## Plan Output Rules
@@ -53,4 +54,4 @@ Do not write vague plans such as "add tests" or "update UI". Name the test types
 
 ## UI Extension Point
 
-Future component, menu, and layout rules belong in `references/ui-guidelines.md`. When that file is updated later, apply it during every frontend or product-surface plan.
+Future component, menu, and layout rules belong in `references/ui-guidelines.md`. Binding visual rules belong in `docs/design-richtlinien-visuell.md`. Apply both during every frontend or product-surface plan, loading only the sections relevant to the concrete task.

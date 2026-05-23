@@ -2,6 +2,10 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 23.05.26 | Feature       | Codex Code Discipline Skill                  | ⚠️     |
+| 23.05.26 | Feature       | TipTap-Editor-Verbesserungen                 | ✅     |
+| 23.05.26 | Fix           | Planungsleitplanken Designrichtlinien        | ✅     |
+| 23.05.26 | Fix           | Design-Richtlinien-Pfad                      | ✅     |
 | 22.05.26 | Fix           | API-Integration-Hook-Timeout                 | ✅     |
 | 22.05.26 | Fix           | Auth-Form-Labels                             | ✅     |
 | 22.05.26 | Fix           | Testseitige Design-Erwartungen               | ⚠️     |
