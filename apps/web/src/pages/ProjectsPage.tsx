@@ -16,12 +16,11 @@ import { withStandaloneView } from "../utils/standalone";
 export function ProjectsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { projects, loading, error, reload, updateProject, removeProject } = useProjects();
+  const { projects, loading, error, updateProject, removeProject } = useProjects();
   const catalogs = useCatalogs();
   const standalone = useStandaloneView();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
-  const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">(
     "all",
   );
@@ -50,16 +49,6 @@ export function ProjectsPage() {
       (project) => statusFilter === "all" || project.status === statusFilter,
     );
   }, [projects, statusFilter]);
-
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      await reload();
-      await catalogs.reload();
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const deleteProject = async (project: Project) => {
     const approved = await confirm({
@@ -97,8 +86,6 @@ export function ProjectsPage() {
       <PageHeader
         title="Projekte"
         subtitle={`${projects.length} Einträge`}
-        onRefresh={standalone ? refresh : undefined}
-        refreshing={refreshing}
       />
 
       {error ? (

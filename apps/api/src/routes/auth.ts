@@ -1,10 +1,8 @@
 import type { CurrentUser, LoginRequest, SetPasswordRequest } from "@taskmanager/shared-types";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { config } from "../config.js";
 import { requireAuth, requireCurrentUser } from "../plugins/auth.js";
-import { getBypassAdminUser, getCurrentUser, login, setInitialPassword } from "../services/auth.service.js";
+import { login, setInitialPassword } from "../services/auth.service.js";
 import { objectResponseSchema } from "../utils/route-schemas.js";
-import { unauthorized } from "../utils/errors.js";
 
 const loginBodySchema = {
   type: "object",
@@ -51,14 +49,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/auth/me", { schema: { response: { 200: objectResponseSchema } } }, async (request) => {
-    const userId = request.session.userId;
-    if (!userId) {
-      if (config.authBypassAdmin) {
-        return getBypassAdminUser(app.db);
-      }
-      throw unauthorized("Authentication required");
-    }
-    return getCurrentUser(app.db, userId);
+    return requireCurrentUser(request);
   });
 
   app.post<{ Body: SetPasswordRequest }>(

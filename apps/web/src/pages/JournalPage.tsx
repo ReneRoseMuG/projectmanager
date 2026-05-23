@@ -5,15 +5,12 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { SearchInput } from "../components/ui/SearchInput";
 import { Select } from "../components/ui/Select";
 import { useJournalEntries } from "../hooks/useJournal";
-import { useStandaloneView } from "../hooks/useStandaloneView";
 import { ForbiddenPage } from "./ForbiddenPage";
 
 export function JournalPage() {
   const [query, setQuery] = useState("");
   const [objectType, setObjectType] = useState<JournalObjectType | "">("");
   const [operation, setOperation] = useState<JournalOperation | "">("");
-  const [refreshing, setRefreshing] = useState(false);
-  const standalone = useStandaloneView();
 
   const filters = useMemo(
     () => ({
@@ -30,22 +27,9 @@ export function JournalPage() {
     return <ForbiddenPage />;
   }
 
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      await journal.reload();
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   return (
     <div className="grid gap-4">
-      <PageHeader
-        title="Journal"
-        onRefresh={standalone ? refresh : undefined}
-        refreshing={refreshing}
-      />
+      <PageHeader title="Journal" />
 
       <section className="grid gap-3 rounded-md border border-line bg-white p-4 md:grid-cols-[minmax(16rem,1fr)_14rem_14rem]">
         <SearchInput value={query} placeholder="Journal durchsuchen" onChange={setQuery} />

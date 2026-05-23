@@ -295,7 +295,7 @@ export interface ApiErrorPayload {
   statusCode: number;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "catalogs", "tags", "journal", "dashboards", "dumps", "settings", "ai", "users", "roles"] as const;
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "catalogs", "tags", "journal", "dashboards", "dumps", "settings", "realtime", "users", "roles"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";
@@ -335,6 +335,38 @@ export type RoleUpdate = WithExpectedVersion<Partial<RoleInput>>;
 export interface PermissionCatalog {
   resources: readonly (typeof AUTH_RESOURCES)[number][];
   actions: readonly (typeof AUTH_ACTIONS)[number][];
+}
+
+export const REALTIME_INVALIDATION_SCOPES = [
+  "all",
+  "projects",
+  "milestones",
+  "tasks",
+  "tickets",
+  "features",
+  "useCases",
+  "backlog",
+  "wiki",
+  "comments",
+  "notes",
+  "attachments",
+  "tags",
+  "catalogs",
+  "events",
+  "dashboards",
+  "settings",
+  "dumps",
+  "adminUsers",
+  "adminRoles"
+] as const;
+
+export type RealtimeInvalidationScope = (typeof REALTIME_INVALIDATION_SCOPES)[number];
+
+export interface RealtimeInvalidationEvent {
+  type: "invalidate";
+  scope: RealtimeInvalidationScope;
+  sourceTabId: string | null;
+  occurredAt: string;
 }
 
 export interface AdminUser {
@@ -483,105 +515,6 @@ export interface JournalEntry {
 export interface JournalListResponse {
   entries: JournalEntry[];
   nextCursor: number | null;
-}
-
-export interface AiModelInfo {
-  name: string;
-  sizeBytes: number | null;
-  modifiedAt: string | null;
-  digest: string | null;
-}
-
-export interface AiModelsResponse {
-  provider: "ollama";
-  baseUrl: string;
-  defaultModel: string;
-  available: boolean;
-  models: AiModelInfo[];
-  message?: string;
-}
-
-export const AI_TEXT_OPERATIONS = ["rewrite", "formatParagraph"] as const;
-export type AiTextOperation = (typeof AI_TEXT_OPERATIONS)[number];
-
-export interface AiTextAssistRequest {
-  model?: string | null;
-  html: string;
-  operation: AiTextOperation;
-  instruction?: string | null;
-}
-
-export interface AiTextAssistResponse {
-  model: string;
-  html: string;
-}
-
-export const AI_AGENT_ACTION_TYPES = [
-  "createProject",
-  "createMilestone",
-  "createTask",
-  "createSubtask",
-  "createTicket",
-  "createSubTicket",
-  "createFeature",
-  "createUseCase",
-  "createWikiPage",
-  "createBacklogItem",
-  "createComment",
-  "createNote",
-  "createTag",
-  "createEvent",
-  "setProjectFeatures",
-  "setMilestoneFeatures",
-  "setFeatureRelations",
-  "linkOwnerTask",
-  "linkOwnerTicket",
-  "addTicketRelation",
-  "setProjectTags",
-  "setMilestoneTags",
-  "setTaskTags",
-  "setTicketTags"
-] as const;
-
-export type AiAgentActionType = (typeof AI_AGENT_ACTION_TYPES)[number];
-
-export interface AiAgentAction {
-  type: AiAgentActionType;
-  label: string;
-  description: string;
-  payload: JsonObject;
-  requiresConfirmation: true;
-}
-
-export interface AiAgentPlanRequest {
-  model?: string | null;
-  prompt: string;
-}
-
-export interface AiAgentPlanResponse {
-  status: "ready" | "blocked";
-  model: string;
-  message: string;
-  actions: AiAgentAction[];
-  blockers: string[];
-}
-
-export interface AiAgentExecuteRequest {
-  actions: AiAgentAction[];
-}
-
-export interface AiAgentActionResult {
-  type: AiAgentActionType;
-  label: string;
-  success: boolean;
-  entityType: string | null;
-  entityId: number | null;
-  message: string;
-}
-
-export interface AiAgentExecuteResponse {
-  message: string;
-  results: AiAgentActionResult[];
 }
 
 export interface Tag {

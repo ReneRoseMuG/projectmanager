@@ -31,20 +31,24 @@ describe("Auth API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
   let originalAuthBypassAdmin: boolean;
+  let originalApiKey: string | null;
 
   beforeAll(async () => {
     originalAuthBypassAdmin = config.authBypassAdmin;
+    originalApiKey = config.apiKey;
     testDb = createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true });
   });
 
   beforeEach(() => {
     config.authBypassAdmin = false;
+    config.apiKey = null;
     truncateAll(testDb.sqlite);
   });
 
   afterAll(async () => {
     config.authBypassAdmin = originalAuthBypassAdmin;
+    config.apiKey = originalApiKey;
     await app.close();
     testDb.sqlite.close();
   });
@@ -81,6 +85,34 @@ describe("Auth API", () => {
     if (renewedCookie) {
       expect(renewedCookie.join(";")).toContain("HttpOnly");
     }
+  });
+
+  it("authentifiziert API-Key-Requests als Admin ohne Cookie-Session", async () => {
+    config.apiKey = "integration-api-key";
+    testDb.sqlite.prepare("UPDATE users SET password_hash = NULL WHERE email = 'admin@local'").run();
+    testDb.sqlite.prepare("UPDATE app_settings SET value = 'false' WHERE key = 'admin_setup_done'").run();
+
+    const me = await supertest(app.server).get("/api/auth/me").set("X-API-Key", "integration-api-key").expect(200);
+    expect(me.body).toMatchObject({
+      email: "admin@local",
+      role: { key: "admin" },
+      requiresPasswordSetup: false
+    });
+
+    await supertest(app.server).get("/api/projects").set("X-API-Key", "integration-api-key").expect(200);
+    await supertest(app.server).get("/api/admin/users").set("X-API-Key", "integration-api-key").expect(200);
+  });
+
+  it("ignoriert falsche oder deaktivierte API-Keys und nutzt weiter Sessions", async () => {
+    config.apiKey = "integration-api-key";
+
+    await supertest(app.server).get("/api/projects").set("X-API-Key", "wrong-api-key").expect(401);
+
+    const admin = await loginAdmin(app);
+    await admin.get("/api/projects").set("X-API-Key", "wrong-api-key").expect(200);
+
+    config.apiKey = null;
+    await supertest(app.server).get("/api/projects").set("X-API-Key", "integration-api-key").expect(401);
   });
 
   it("blockiert falsches Passwort, inaktive Benutzer und anonyme Domain-Routen", async () => {

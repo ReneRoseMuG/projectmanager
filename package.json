@@ -12,9 +12,7 @@
     "node": "20.x || 22.x || 24.x"
   },
   "scripts": {
-    "ai:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-local-ai.ps1",
-    "ai:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-ai.ps1 -EnsureModel",
-    "dev": "npm run ai:start && concurrently \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "dev": "concurrently \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
     "build": "npm run build -w packages/shared-types && npm run build -w apps/api && npm run build -w apps/web",
     "db:generate": "npm run db:generate -w apps/api",
     "db:migrate": "npm run db:migrate -w apps/api",

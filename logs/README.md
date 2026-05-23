@@ -2,6 +2,11 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 23.05.26 | 4             | Realtime Tests und Abnahme                   | ✅     |
+| 23.05.26 | 3             | Realtime-Frontend-Sync                       | ✅     |
+| 23.05.26 | 2             | Realtime-API-Infrastruktur                   | ✅     |
+| 23.05.26 | 1             | KI-Feature entfernen                         | ✅     |
+| 23.05.26 | Feature       | API Key Authentifizierung                    | ✅     |
 | 23.05.26 | Feature       | Codex Code Discipline Skill                  | ⚠️     |
 | 23.05.26 | Feature       | TipTap-Editor-Verbesserungen                 | ✅     |
 | 23.05.26 | Fix           | Planungsleitplanken Designrichtlinien        | ✅     |

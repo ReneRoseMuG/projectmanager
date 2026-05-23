@@ -1,16 +1,10 @@
 import { useEffect, useState } from "react";
-import { AiAgentPanel } from "../ai/AiAgentPanel";
 import { GlobalSearch } from "../search/GlobalSearch";
 
-const openAiAgentEvent = "open-ai-agent";
 const openGlobalSearchEvent = "open-global-search";
 
 interface OpenGlobalSearchDetail {
   query?: string;
-}
-
-export function openAiAgent(): void {
-  window.dispatchEvent(new Event(openAiAgentEvent));
 }
 
 export function openGlobalSearch(query = ""): void {
@@ -22,12 +16,10 @@ export function openGlobalSearch(query = ""): void {
 }
 
 export function ShellOverlays() {
-  const [agentOpen, setAgentOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [initialSearchQuery, setInitialSearchQuery] = useState("");
 
   useEffect(() => {
-    const openAgent = () => setAgentOpen(true);
     const openSearch = (event: Event) => {
       const detail =
         event instanceof CustomEvent
@@ -44,11 +36,9 @@ export function ShellOverlays() {
       }
     };
 
-    window.addEventListener(openAiAgentEvent, openAgent);
     window.addEventListener(openGlobalSearchEvent, openSearch);
     window.addEventListener("keydown", handleKey);
     return () => {
-      window.removeEventListener(openAiAgentEvent, openAgent);
       window.removeEventListener(openGlobalSearchEvent, openSearch);
       window.removeEventListener("keydown", handleKey);
     };
@@ -61,7 +51,6 @@ export function ShellOverlays() {
         initialQuery={initialSearchQuery}
         onClose={() => setSearchOpen(false)}
       />
-      <AiAgentPanel open={agentOpen} onClose={() => setAgentOpen(false)} />
     </>
   );
 }

@@ -208,6 +208,3 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
   ]);
 }
 
-export async function invalidateAiAgentScopes(queryClient: QueryClient): Promise<void> {
-  await invalidateWikiImportData(queryClient);
-}

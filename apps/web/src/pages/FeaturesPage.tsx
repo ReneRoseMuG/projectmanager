@@ -22,7 +22,6 @@ export function FeaturesPage() {
   const { confirm } = useConfirm();
   const features = useFeatures();
   const catalogs = useCatalogs();
-  const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | "all">(
     "all",
   );
@@ -53,16 +52,6 @@ export function FeaturesPage() {
       ),
     [features.features, statusFilter],
   );
-
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      await features.reload();
-      await catalogs.reload();
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const deleteFeature = async (feature: Feature) => {
     const approved = await confirm({
@@ -105,8 +94,6 @@ export function FeaturesPage() {
       <PageHeader
         title="Features"
         subtitle={`${features.features.length} Einträge`}
-        onRefresh={standalone ? refresh : undefined}
-        refreshing={refreshing}
       />
 
       {features.loading ? (

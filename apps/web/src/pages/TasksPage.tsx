@@ -1,5 +1,4 @@
 import type { Task, TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
-import { useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { TaskListBoardView } from "../components/tasks/TaskListBoardView";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -50,7 +49,6 @@ export function TasksPage() {
   const ownerTasks = useTasks(owner);
   const catalogs = useCatalogs();
   const { viewMode, setViewMode } = useViewMode("kanban", "taskBoard.viewMode");
-  const [refreshing, setRefreshing] = useState(false);
   const tasks = owner ? ownerTasks.tasks : globalTasks.tasks;
   const loading = projects.loading || milestones.loading || (owner ? ownerTasks.loading : globalTasks.loading);
   const error = projects.error ?? milestones.error ?? (owner ? ownerTasks.error : globalTasks.error);
@@ -88,21 +86,6 @@ export function TasksPage() {
       returnTo: currentReturnTo,
     });
     navigate(targetForMode(`/tasks/new?${params.toString()}`));
-  };
-
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      await projects.reload();
-      await milestones.reload();
-      if (owner) {
-        await ownerTasks.reload();
-      } else {
-        await globalTasks.reload();
-      }
-    } finally {
-      setRefreshing(false);
-    }
   };
 
   const deleteTask = async (task: TaskBoardItem) => {
@@ -163,8 +146,6 @@ export function TasksPage() {
       <PageHeader
         title="Aufgaben"
         subtitle={`${tasks.length} Einträge`}
-        onRefresh={standalone ? refresh : undefined}
-        refreshing={refreshing}
       />
 
       {error ? (

@@ -3,27 +3,14 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { TestDb } from "./db.js";
-import type { AiLocalModelClient } from "../../../apps/api/src/services/ai-ollama.service.js";
 import type { FileOpener } from "../../../apps/api/src/services/file-opener.service.js";
+import { createRealtimeEventBus } from "../../../apps/api/src/services/realtime-event-bus.service.js";
 
 interface BuildTestAppOptions {
   enableMultipart?: boolean;
   enableAuth?: boolean;
-  aiClient?: AiLocalModelClient;
   fileOpener?: FileOpener;
 }
-
-const unavailableAiClient: AiLocalModelClient = {
-  async listModels() {
-    throw new Error("AI test client is not configured");
-  },
-  async chatText() {
-    throw new Error("AI test client is not configured");
-  },
-  async chatJson() {
-    throw new Error("AI test client is not configured");
-  }
-};
 
 const unavailableFileOpener: FileOpener = async () => {
   throw new Error("File opener test client is not configured");
@@ -40,17 +27,18 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
 
   app.decorate("db", testDb.db);
   app.decorate("sqlite", testDb.sqlite);
-  app.decorate("aiClient", options.aiClient ?? unavailableAiClient);
   app.decorate("fileOpener", options.fileOpener ?? unavailableFileOpener);
+  app.decorate("realtimeBus", createRealtimeEventBus());
 
   const { errorHandler } = await import("../../../apps/api/src/utils/errors.js");
   const { registerCors } = await import("../../../apps/api/src/plugins/cors.js");
   const { registerAuthPlugins, registerGlobalAuthGuard } = await import("../../../apps/api/src/plugins/auth.js");
+  const { registerRealtimePublisher } = await import("../../../apps/api/src/plugins/realtime.js");
   const { seedAuthData } = await import("../../../apps/api/src/services/auth.service.js");
   const { registerAuthRoutes } = await import("../../../apps/api/src/routes/auth.js");
   const { registerAdminUserRoutes } = await import("../../../apps/api/src/routes/admin-users.js");
   const { registerAdminRoleRoutes } = await import("../../../apps/api/src/routes/admin-roles.js");
-  const { registerAiRoutes } = await import("../../../apps/api/src/routes/ai.js");
+  const { registerRealtimeRoutes } = await import("../../../apps/api/src/routes/realtime.js");
   const { registerProjectsRoutes } = await import("../../../apps/api/src/routes/projects.js");
   const { registerMilestoneRoutes } = await import("../../../apps/api/src/routes/milestones.js");
   const { registerTasksRoutes } = await import("../../../apps/api/src/routes/tasks.js");
@@ -81,6 +69,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
     await registerAuthPlugins(app);
     await seedAuthData(testDb.db);
   }
+  await registerRealtimePublisher(app);
   await registerMultipart(app);
 
   if (options.enableMultipart) {
@@ -95,10 +84,10 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
     registerGlobalAuthGuard(app);
     await app.register(registerAdminUserRoutes, { prefix: "/api" });
     await app.register(registerAdminRoleRoutes, { prefix: "/api" });
+    await app.register(registerRealtimeRoutes, { prefix: "/api" });
   }
 
   await app.register(registerProjectsRoutes, { prefix: "/api" });
-  await app.register(registerAiRoutes, { prefix: "/api" });
   await app.register(registerMilestoneRoutes, { prefix: "/api" });
   await app.register(registerTasksRoutes, { prefix: "/api" });
   await app.register(registerSubtasksRoutes, { prefix: "/api" });

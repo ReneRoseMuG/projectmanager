@@ -3,7 +3,7 @@ import session from "@fastify/session";
 import type { AuthAction, AuthResource, CurrentUser } from "@taskmanager/shared-types";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { config } from "../config.js";
-import { getBypassAdminUser, getCurrentUser } from "../services/auth.service.js";
+import { getApiKeyAdminUser, getBypassAdminUser, getCurrentUser } from "../services/auth.service.js";
 import { hasPermission } from "../services/roles.service.js";
 import { forbidden, unauthorized } from "../utils/errors.js";
 
@@ -61,7 +61,6 @@ function resourceForPath(path: string): AuthResource {
     ["/dashboards", "dashboards"],
     ["/dumps", "dumps"],
     ["/settings", "settings"],
-    ["/ai", "ai"],
     ["/imports", "wiki"],
     ["/doc-links", "wiki"],
     ["/projects", "projects"]
@@ -77,6 +76,15 @@ function sessionUserId(request: FastifyRequest): number | undefined {
   return typeof value === "number" && Number.isInteger(value) ? value : undefined;
 }
 
+function apiKeyHeaderValue(request: FastifyRequest): string | undefined {
+  const value = request.headers["x-api-key"];
+  return typeof value === "string" ? value : undefined;
+}
+
+function hasMatchingApiKey(request: FastifyRequest): boolean {
+  return Boolean(config.apiKey && apiKeyHeaderValue(request) === config.apiKey);
+}
+
 function routeAuthOverride(request: FastifyRequest): { resource: AuthResource; action: AuthAction } | undefined {
   return request.routeOptions.config.auth;
 }
@@ -84,6 +92,11 @@ function routeAuthOverride(request: FastifyRequest): { resource: AuthResource; a
 export function requireCurrentUser(request: FastifyRequest): CurrentUser {
   if (request.currentUser) {
     return request.currentUser;
+  }
+  if (hasMatchingApiKey(request)) {
+    const currentUser = getApiKeyAdminUser(request.server.db);
+    request.currentUser = currentUser;
+    return currentUser;
   }
   const userId = sessionUserId(request);
   if (!userId) {

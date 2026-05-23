@@ -36,7 +36,6 @@ export function WikiPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [formParent, setFormParent] = useState<WikiPageType | null>(null);
   const [editingPage, setEditingPage] = useState<WikiPageType | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const standalone = useStandaloneView();
 
   const openCreate = (parent: WikiTreeNode | null) => {
@@ -123,22 +122,11 @@ export function WikiPage() {
     }
   };
 
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      await wiki.reload();
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
       <PageHeader
         title="Wiki"
         subtitle={wiki.loading ? "" : `${countPages(wiki.tree)} Seiten`}
-        onRefresh={standalone ? refresh : undefined}
-        refreshing={refreshing}
         actions={
           <Button
             variant="primary"

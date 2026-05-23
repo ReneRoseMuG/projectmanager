@@ -13,7 +13,6 @@ import { useCalendarTasks } from "../hooks/useCalendarTasks";
 import { useEvents } from "../hooks/useEvents";
 import { useMilestones } from "../hooks/useMilestones";
 import { useProjects } from "../hooks/useProjects";
-import { useStandaloneView } from "../hooks/useStandaloneView";
 
 export function CalendarPage() {
   const { showToast } = useToast();
@@ -23,13 +22,11 @@ export function CalendarPage() {
   const { milestones, loading: milestonesLoading } = milestoneController;
   const calendarTasks = useCalendarTasks();
   const events = useEvents();
-  const standalone = useStandaloneView();
   const [formOpen, setFormOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
   );
   const [initialDate, setInitialDate] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
 
   const openCreate = (date?: string) => {
     setSelectedEvent(null);
@@ -61,25 +58,11 @@ export function CalendarPage() {
     }
   };
 
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      await projectController.reload();
-      await milestoneController.reload();
-      await calendarTasks.reload();
-      await events.reload();
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   return (
     <div className="mx-auto grid max-w-7xl gap-6">
       <PageHeader
         title="Kalender"
         subtitle={`${events.events.length} Termine`}
-        onRefresh={standalone ? refresh : undefined}
-        refreshing={refreshing}
         actions={
           <Button
             variant="primary"

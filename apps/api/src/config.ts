@@ -21,15 +21,12 @@ export interface AppConfig {
   backupSftpPassword: string;
   backupSftpRemoteDir: string;
   backupSftpProtectedConfirmed: boolean;
-  aiBaseUrl: string;
-  aiDefaultModel: string;
-  aiTimeoutMs: number;
-  aiMaxInputChars: number;
   adminEmail: string;
   adminFirstName: string;
   adminLastName: string;
   adminInitialPassword: string | null;
   authBypassAdmin: boolean;
+  apiKey: string | null;
   sessionSecret: string;
   sessionSecretIsFallback: boolean;
 }
@@ -62,6 +59,7 @@ function booleanFromEnv(value: string | undefined): boolean {
 }
 
 const configuredSessionSecret = process.env.SESSION_SECRET?.trim();
+const configuredApiKey = process.env.API_KEY?.trim();
 
 export const config: AppConfig = {
   databasePath: resolveFromApiRoot(process.env.DATABASE_PATH ?? "./data/taskmanager.sqlite"),
@@ -82,15 +80,12 @@ export const config: AppConfig = {
   backupSftpPassword: process.env.BACKUP_SFTP_PASSWORD ?? "",
   backupSftpRemoteDir: process.env.BACKUP_SFTP_REMOTE_DIR?.trim() ?? "",
   backupSftpProtectedConfirmed: booleanFromEnv(process.env.BACKUP_SFTP_PROTECTED_CONFIRMED),
-  aiBaseUrl: process.env.AI_BASE_URL ?? "http://127.0.0.1:11434/api",
-  aiDefaultModel: process.env.AI_DEFAULT_MODEL ?? "llama3.2:1b",
-  aiTimeoutMs: numberFromEnv(process.env.AI_TIMEOUT_MS, 60000),
-  aiMaxInputChars: numberFromEnv(process.env.AI_MAX_INPUT_CHARS, 12000),
   adminEmail: process.env.ADMIN_EMAIL?.trim() || "admin@local",
   adminFirstName: process.env.ADMIN_FIRST_NAME?.trim() || "Admin",
   adminLastName: process.env.ADMIN_LAST_NAME?.trim() || "System",
   adminInitialPassword: process.env.ADMIN_INITIAL_PASSWORD?.trim() ? process.env.ADMIN_INITIAL_PASSWORD.trim() : null,
   authBypassAdmin: booleanFromEnv(process.env.AUTH_BYPASS_ADMIN),
+  apiKey: configuredApiKey || null,
   sessionSecret: configuredSessionSecret || "taskmanager-local-dev-session-secret-change-me",
   sessionSecretIsFallback: !configuredSessionSecret
 };

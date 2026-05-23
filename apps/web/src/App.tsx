@@ -34,6 +34,7 @@ import { UserDetailPage } from "./pages/admin/UserDetailPage";
 import { UsersPage } from "./pages/admin/UsersPage";
 import { useAuth } from "./hooks/useAuth";
 import { hasPermission } from "./hooks/usePermissions";
+import { useRealtimeSync } from "./hooks/useRealtimeSync";
 import { SettingsProvider } from "./providers/SettingsProvider";
 import { isStandaloneSearch } from "./utils/standalone";
 
@@ -49,6 +50,7 @@ export default function App() {
   const auth = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  useRealtimeSync(Boolean(auth.user && !auth.requiresPasswordSetup && hasPermission(auth.user, "realtime", "read")));
 
   if (auth.loading) {
     return (

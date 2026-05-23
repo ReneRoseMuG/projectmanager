@@ -1,5 +1,4 @@
 import type { Ticket } from "@taskmanager/shared-types";
-import { useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import type { TicketOwner } from "../api/tickets";
 import { TicketListBoardView } from "../components/tickets/TicketListBoardView";
@@ -49,7 +48,6 @@ export function TicketsPage() {
       ? { type: "project", id: projectId }
       : null;
   const tickets = useTickets(owner ?? undefined);
-  const [refreshing, setRefreshing] = useState(false);
   const currentReturnTo = `${location.pathname}${location.search}`;
   const targetForMode = (to: string) => (standalone ? withStandaloneView(to) : to);
 
@@ -82,17 +80,6 @@ export function TicketsPage() {
   const ticketOpenTarget = (ticket: Ticket) => {
     const params = new URLSearchParams({ returnTo: currentReturnTo });
     return targetForMode(`/tickets/${ticket.id}?${params.toString()}`);
-  };
-
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      await projects.reload();
-      await milestones.reload();
-      await tickets.reload();
-    } finally {
-      setRefreshing(false);
-    }
   };
 
   const deleteTicket = async (ticket: Ticket) => {
@@ -140,8 +127,6 @@ export function TicketsPage() {
       <PageHeader
         title="Tickets"
         subtitle={`${tickets.tickets.length} Einträge`}
-        onRefresh={standalone ? refresh : undefined}
-        refreshing={refreshing}
       />
 
       {tickets.error || projects.error || milestones.error ? (

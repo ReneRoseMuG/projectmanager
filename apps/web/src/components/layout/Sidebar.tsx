@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   BookOpen,
-  Bot,
   Bug,
   CalendarDays,
   ExternalLink,
@@ -27,7 +26,7 @@ import { hasPermission } from "../../hooks/usePermissions";
 import { invalidateWikiImportData } from "../../queries/invalidation";
 import { withStandaloneView } from "../../utils/standalone";
 import { SearchInput } from "../ui/SearchInput";
-import { openAiAgent, openGlobalSearch } from "./ShellOverlays";
+import { openGlobalSearch } from "./ShellOverlays";
 
 interface NavigationItem {
   to: string;
@@ -216,14 +215,6 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
           hint="Ctrl K"
         />
       </div>
-      <button
-        type="button"
-        className="mb-6 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm font-medium text-white/75 transition hover:bg-white/5 hover:text-white"
-        onClick={openAiAgent}
-      >
-        <Bot size={17} />
-        KI-Agent
-      </button>
       <NavSection>Projekt Management</NavSection>
       <NavigationLinks currentUser={currentUser} items={projectManagementItems} allowStandalone />
       <NavSection>Projekt Dokumentation</NavSection>

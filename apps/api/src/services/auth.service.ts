@@ -96,6 +96,14 @@ export function getBypassAdminUser(database: DbClient, appConfig: AppConfig = co
   return { ...mapCurrentUser(database, user, appConfig), requiresPasswordSetup: false };
 }
 
+export function getApiKeyAdminUser(database: DbClient, appConfig: AppConfig = config): CurrentUser {
+  const user = userRepository.findByEmail(database, appConfig.adminEmail.toLowerCase());
+  if (!appConfig.apiKey || !user || !user.isActive) {
+    throw unauthorized("Authentication required");
+  }
+  return { ...mapCurrentUser(database, user, appConfig), requiresPasswordSetup: false };
+}
+
 export async function setInitialPassword(database: DbClient, userId: number, input: SetPasswordRequest, appConfig: AppConfig = config): Promise<CurrentUser> {
   const user = userRepository.findById(database, userId);
   if (!user || !user.isActive || !isFirstLoginAdmin(database, user, appConfig)) {

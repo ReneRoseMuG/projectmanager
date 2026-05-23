@@ -37,7 +37,6 @@ export function MilestonesPage() {
   const projectId = parseId(searchParams.get("projectId"));
   const milestones = useMilestones(null, projectId);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
-  const [refreshing, setRefreshing] = useState(false);
 
   const currentReturnTo = `${location.pathname}${location.search}`;
   const targetForMode = (to: string) => (standalone ? withStandaloneView(to) : to);
@@ -59,16 +58,6 @@ export function MilestonesPage() {
       params.set("projectId", String(projectId));
     }
     navigate(targetForMode(`/milestones/new?${params.toString()}`));
-  };
-
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      await projects.reload();
-      await milestones.reload();
-    } finally {
-      setRefreshing(false);
-    }
   };
 
   const deleteMilestone = async (milestone: Milestone) => {
@@ -116,8 +105,6 @@ export function MilestonesPage() {
       <PageHeader
         title="Meilensteine"
         subtitle={`${milestones.milestones.length} Einträge`}
-        onRefresh={standalone ? refresh : undefined}
-        refreshing={refreshing}
       />
 
       {milestones.error || projects.error ? (

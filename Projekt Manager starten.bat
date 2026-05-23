@@ -31,10 +31,6 @@ set "CORS_ORIGIN=http://localhost:5173"
 set "VITE_API_URL=http://localhost:3001/api"
 set "NODE_ENV=production"
 set "TASKMANAGER_TEST_MODE="
-set "AI_BASE_URL=http://127.0.0.1:11434/api"
-set "AI_DEFAULT_MODEL=llama3.2:1b"
-set "AI_TIMEOUT_MS=60000"
-set "AI_MAX_INPUT_CHARS=12000"
 set "AUTH_BYPASS_ADMIN=true"
 
 echo Starte Projekt Manager im lokalen Produktionsmodus.
@@ -43,14 +39,6 @@ echo Geschützte Datenbank: %DATABASE_PATH%
 echo Stoppe laufende Projekt Manager-Ports...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 3001,5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"
 timeout /t 1 /nobreak > nul
-
-echo Bereite lokale KI vor...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%APP_DIR%\scripts\start-local-ai.ps1" -AppDir "%APP_DIR%" -EnsureModel -Model "%AI_DEFAULT_MODEL%"
-if errorlevel 1 (
-  echo Lokale KI konnte nicht vorbereitet werden.
-  pause
-  exit /b 1
-)
 
 echo Baue Production-Bundle...
 call npm run build

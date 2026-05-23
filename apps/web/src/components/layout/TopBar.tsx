@@ -1,6 +1,5 @@
-import { Bot, CalendarDays, FolderKanban } from "lucide-react";
+import { CalendarDays, FolderKanban } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import { openAiAgent } from "./ShellOverlays";
 
 export function TopBar() {
   return (
@@ -12,14 +11,6 @@ export function TopBar() {
         </span>
       </div>
       <nav className="flex gap-1">
-        <button
-          className="flex h-10 w-10 items-center justify-center rounded-md hover:bg-shell"
-          type="button"
-          title="KI-Agent"
-          onClick={openAiAgent}
-        >
-          <Bot size={18} />
-        </button>
         <NavLink
           className={({ isActive }) =>
             `flex h-10 w-10 items-center justify-center rounded-md ${isActive ? "bg-steel-900 text-white" : "hover:bg-shell"}`
