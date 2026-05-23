@@ -2,6 +2,19 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 23.05.26 | Fix           | ListBoard-Toolbar und Aktionsicon            | ✅     |
+| 23.05.26 | Fix           | Board-Icon-Nachjustierung                    | ✅     |
+| 23.05.26 | Fix           | Circle-Plus-Icongröße                        | ✅     |
+| 23.05.26 | Fix           | Board-Controls-Kontrast                      | ✅     |
+| 23.05.26 | Fix           | Status-Spalten-Plus                          | ✅     |
+| 23.05.26 | Fix           | Status-Pill-Textfarbe                        | ✅     |
+| 23.05.26 | Fix           | Env Examples                                 | ✅     |
+| 23.05.26 | Fix           | API-Key Env                                  | ✅     |
+| 23.05.26 | Fix           | Attachment Open E2E Wait                     | ✅     |
+| 23.05.26 | Fix           | Testentwurfs-Skill Pflicht                   | ✅     |
+| 23.05.26 | Fix / Feature | MCP Tests und Tool-Doku                      | ⚠️     |
+| 23.05.26 | Fix           | MCP HTTP Hardening                           | ✅     |
+| 23.05.26 | Feature       | MCP Server                                   | ✅     |
 | 23.05.26 | 4             | Realtime Tests und Abnahme                   | ✅     |
 | 23.05.26 | 3             | Realtime-Frontend-Sync                       | ✅     |
 | 23.05.26 | 2             | Realtime-API-Infrastruktur                   | ✅     |

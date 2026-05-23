@@ -7,14 +7,14 @@ interface ViewToggleProps {
 }
 
 function toggleButtonClass(active: boolean): string {
-  return `inline-flex h-8 w-8 items-center justify-center rounded-md border bg-transparent text-steel-700 transition hover:border-steel-400 hover:text-ink ${
-    active ? "border-steel-700 bg-steel-700 text-white hover:border-steel-700 hover:text-white" : "border-line"
+  return `inline-flex h-8 w-8 items-center justify-center rounded-md border transition hover:border-steel-500 hover:text-ink ${
+    active ? "border-steel-900 bg-steel-900 text-white shadow-sm hover:border-steel-900 hover:bg-steel-800 hover:text-white" : "border-line bg-white text-steel-700"
   }`;
 }
 
 export function ViewToggle({ value, onChange }: ViewToggleProps) {
   return (
-    <div className="inline-flex gap-1 rounded-md border border-line bg-transparent p-0.5">
+    <div className="inline-flex gap-1 rounded-lg border border-line bg-steel-100 p-1">
       <button
         type="button"
         aria-label="Liste"
@@ -22,7 +22,7 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
         className={toggleButtonClass(value === "list")}
         onClick={() => onChange("list")}
       >
-        <ListTodo size={17} />
+        <ListTodo size={18} strokeWidth={2.3} />
       </button>
       <button
         type="button"
@@ -31,7 +31,7 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
         className={toggleButtonClass(value === "kanban")}
         onClick={() => onChange("kanban")}
       >
-        <Columns3 size={17} />
+        <Columns3 size={18} strokeWidth={2.3} />
       </button>
     </div>
   );

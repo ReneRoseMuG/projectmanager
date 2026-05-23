@@ -19,7 +19,7 @@ import type {
   CatalogEntry,
   StatusCatalogKind,
 } from "@taskmanager/shared-types";
-import { Plus } from "lucide-react";
+import { CirclePlus, Plus } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import type { ViewMode } from "../../types";
@@ -534,9 +534,9 @@ function ListBoardViewContent<T>({
         aria-label={`${column.label} hinzufügen`}
         title={`${column.label} hinzufügen`}
         variant="ghost"
-        className="h-7 w-7 border border-white bg-steel-700 px-0 text-white shadow-sm hover:brightness-95"
+        className="h-9 w-9 border border-white bg-steel-700 px-0 text-white shadow-sm hover:brightness-95"
         style={statusAddButtonStyle(column)}
-        icon={<Plus size={13} />}
+        icon={<Plus size={30} strokeWidth={3.4} />}
         onClick={() => onAddToColumn(column.value)}
       />
     ) : null;
@@ -693,7 +693,7 @@ function ListBoardViewContent<T>({
                 aria-label={addLabel}
                 title={addLabel}
                 variant="ghost"
-                icon={<Plus size={17} />}
+                icon={<Plus size={26} strokeWidth={3} />}
                 className="h-9 w-9 border border-fern bg-transparent text-fern hover:bg-fern/10"
                 onClick={onAdd}
               />

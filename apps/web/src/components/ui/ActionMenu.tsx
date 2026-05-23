@@ -1,4 +1,4 @@
-import { MoreVertical } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "./Button";
 
@@ -57,9 +57,9 @@ export function ActionMenu({ items, ariaLabel = "Aktionen" }: ActionMenuProps) {
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         title={ariaLabel}
-        icon={<MoreVertical size={18} />}
+        icon={<Settings2 size={22} strokeWidth={2.4} />}
         variant="ghost"
-        className="-mr-1 h-8 w-8 border border-line bg-white px-0 text-ink shadow-sm hover:border-steel-300 hover:bg-steel-50"
+        className="-mr-1 h-9 w-[36px] border border-line bg-white px-0 text-ink shadow-sm hover:border-steel-300 hover:bg-steel-50"
         onClick={(event) => {
           event.stopPropagation();
           setOpen((current) => !current);
