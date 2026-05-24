@@ -148,7 +148,7 @@ test.describe("Task Board Drag & Drop", () => {
     request,
   }) => {
     const ticket = await createTicket(request, null, "E2E Ticket DnD", {
-      status: "open",
+      status: "in_review",
     });
 
     try {
@@ -157,7 +157,7 @@ test.describe("Task Board Drag & Drop", () => {
       await expect(page.locator("[data-dnd-enabled='true']")).toBeVisible();
       await expect(
         page
-          .locator('section[data-status-column="open"]')
+          .locator('section[data-status-column="in_review"]')
           .filter({ hasText: ticket.title }),
       ).toBeVisible();
 
@@ -179,7 +179,7 @@ test.describe("Task Board Drag & Drop", () => {
       ).toBeVisible();
       await expect(
         page
-          .locator('section[data-status-column="open"]')
+          .locator('section[data-status-column="in_review"]')
           .filter({ hasText: ticket.title }),
       ).toHaveCount(0);
     } finally {
