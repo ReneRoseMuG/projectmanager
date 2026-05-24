@@ -1,4 +1,4 @@
-import { Settings2 } from "lucide-react";
+import { Copy, Settings2 } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Button } from "./Button";
 
@@ -12,10 +12,11 @@ export interface ActionMenuItem {
 interface ActionMenuProps {
   items: ActionMenuItem[];
   ariaLabel?: string;
+  objectReference?: string;
 }
 
 /** Compact menu for secondary row and card actions. */
-export function ActionMenu({ items, ariaLabel = "Aktionen" }: ActionMenuProps) {
+export function ActionMenu({ items, ariaLabel = "Aktionen", objectReference }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const ref = useRef<HTMLDivElement>(null);
@@ -45,12 +46,33 @@ export function ActionMenu({ items, ariaLabel = "Aktionen" }: ActionMenuProps) {
     };
   }, [open]);
 
-  if (items.length === 0) {
+  if (items.length === 0 && !objectReference) {
     return null;
   }
 
+  const copyReference = async () => {
+    if (!objectReference || !navigator.clipboard?.writeText) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(objectReference);
+  };
+
+  const menuItems: ActionMenuItem[] = [
+    ...(objectReference
+      ? [
+          {
+            label: "ID kopieren",
+            icon: <Copy size={16} />,
+            onClick: () => void copyReference(),
+          },
+        ]
+      : []),
+    ...items,
+  ];
+
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative z-50">
       <Button
         aria-label={ariaLabel}
         aria-haspopup="menu"
@@ -69,14 +91,14 @@ export function ActionMenu({ items, ariaLabel = "Aktionen" }: ActionMenuProps) {
         <div
           id={menuId}
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1 min-w-[140px] rounded-lg border border-line bg-white py-1 shadow-panel"
+          className="absolute right-0 top-full z-50 mt-1 min-w-48 rounded-lg border border-line bg-white py-1 shadow-panel"
         >
-          {items.map((item) => (
+          {menuItems.map((item) => (
             <button
               key={item.label}
               type="button"
               role="menuitem"
-              className={`flex w-full items-center gap-2 px-3 py-2 text-sm font-medium transition hover:bg-steel-50 ${
+              className={`flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm font-medium transition hover:bg-steel-50 ${
                 item.danger ? "text-crimson hover:bg-crimson/5" : "text-ink"
               }`}
               onClick={(event) => {
@@ -85,8 +107,8 @@ export function ActionMenu({ items, ariaLabel = "Aktionen" }: ActionMenuProps) {
                 item.onClick();
               }}
             >
-              {item.icon}
-              {item.label}
+              <span className="flex shrink-0 items-center">{item.icon}</span>
+              <span>{item.label}</span>
             </button>
           ))}
         </div>

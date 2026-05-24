@@ -31,6 +31,7 @@ import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useNotes } from "../../hooks/useNotes";
 import { useTaskDetail } from "../../hooks/useTaskDetail";
+import { objectReference } from "../../lib/references";
 import { TagPicker } from "../tags/TagPicker";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
@@ -374,6 +375,7 @@ export function TaskForm({
       <FormModal
         open={open}
         title={task ? "Aufgabe bearbeiten" : "Aufgabe anlegen"}
+        objectReference={task ? objectReference("task", task.id) : undefined}
         icon={<ClipboardList size={20} />}
         breadcrumb={["Aufgaben", task ? task.title : "Neu"]}
         submitLabel={

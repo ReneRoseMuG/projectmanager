@@ -42,11 +42,15 @@ function renderMilestoneList({
   onCreate = vi.fn(),
   onEdit = vi.fn(),
   onDelete = vi.fn(),
+  onCreateTask,
+  onCreateTicket,
 }: {
   milestones?: Milestone[];
   onCreate?: () => void;
   onEdit?: (milestone: Milestone) => void;
   onDelete?: (milestone: Milestone) => void;
+  onCreateTask?: (milestone: Milestone) => void;
+  onCreateTicket?: (milestone: Milestone) => void;
 } = {}) {
   return render(
     <MilestoneListBoardView
@@ -54,6 +58,8 @@ function renderMilestoneList({
       onCreate={onCreate}
       onEdit={onEdit}
       onDelete={onDelete}
+      onCreateTask={onCreateTask}
+      onCreateTicket={onCreateTicket}
     />,
   );
 }
@@ -109,6 +115,36 @@ describe("MilestoneListBoardView", () => {
     const addButton = screen.getByRole("button", { name: "Neuer Meilenstein" });
     expect(addButton).toBeInTheDocument();
     expect(addButton).toHaveTextContent("");
+  });
+
+  it("zeigt ohne Create-Callbacks keine neuen Meilenstein-Menüeinträge", () => {
+    const milestones = buildMilestoneSet();
+    renderMilestoneList({ milestones });
+
+    const card = screen.getByText(milestones[0].name).closest("article") as HTMLElement;
+    fireEvent.click(within(card).getByRole("button", { name: "Aktionen" }));
+
+    expect(within(card).queryByRole("menuitem", { name: "Neue Aufgabe" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("menuitem", { name: "Neues Ticket" })).not.toBeInTheDocument();
+  });
+
+  it("ruft Create-Callbacks aus dem Meilenstein-Menü mit dem konkreten Meilenstein auf", () => {
+    const milestones = buildMilestoneSet();
+    const onCreateTask = vi.fn();
+    const onCreateTicket = vi.fn();
+    renderMilestoneList({ milestones, onCreateTask, onCreateTicket });
+
+    const card = screen.getByText(milestones[0].name).closest("article") as HTMLElement;
+    fireEvent.click(within(card).getByRole("button", { name: "Aktionen" }));
+    expect(within(card).getByRole("menuitem", { name: "Neue Aufgabe" })).toBeInTheDocument();
+    expect(within(card).getByRole("menuitem", { name: "Neues Ticket" })).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole("menuitem", { name: "Neue Aufgabe" }));
+
+    fireEvent.click(within(card).getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(within(card).getByRole("menuitem", { name: "Neues Ticket" }));
+
+    expect(onCreateTask).toHaveBeenCalledWith(milestones[0]);
+    expect(onCreateTicket).toHaveBeenCalledWith(milestones[0]);
   });
 
   it("filtert Meilensteine nach Status", () => {
@@ -183,5 +219,18 @@ describe("MilestoneListBoardView", () => {
     milestones.forEach((milestone) => {
       expect(screen.getByText(milestone.name)).toBeInTheDocument();
     });
+  });
+
+  it("zeigt Create-Aktionen auch im Listen-Modus", () => {
+    const milestones = buildMilestoneSet();
+    const onCreateTask = vi.fn();
+    const { container } = renderMilestoneList({ milestones, onCreateTask });
+
+    fireEvent.click(screen.getByRole("button", { name: "Liste" }));
+    const firstRow = container.querySelector("article[class*='border-l-[4px]']") as HTMLElement;
+    fireEvent.click(within(firstRow).getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(within(firstRow).getByRole("menuitem", { name: "Neue Aufgabe" }));
+
+    expect(onCreateTask).toHaveBeenCalledWith(milestones[0]);
   });
 });

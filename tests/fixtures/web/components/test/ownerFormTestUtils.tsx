@@ -24,7 +24,9 @@ import { ToastProvider } from "../../../../../apps/web/src/components/ui/ToastPr
 const ownerFormMocks = vi.hoisted(() => ({
   createUseCase: vi.fn(),
   updateUseCase: vi.fn(),
+  createTask: vi.fn(),
   createSubtask: vi.fn(),
+  createTicket: vi.fn(),
   createSubTicket: vi.fn(),
   uploadAttachment: vi.fn(),
   createNote: vi.fn(),
@@ -45,7 +47,8 @@ const ownerFormMocks = vi.hoisted(() => ({
   updateBacklogItem: vi.fn(),
   removeBacklogItem: vi.fn(),
   previewImport: vi.fn(),
-  runImport: vi.fn()
+  runImport: vi.fn(),
+  hasPermission: vi.fn()
 }));
 
 const fixtures = vi.hoisted(() => {
@@ -215,6 +218,7 @@ export const milestone = fixtures.milestone as Milestone;
 export const task = fixtures.task as Task;
 export const ticket = fixtures.ticket as Ticket;
 export const ticketDetail = fixtures.ticketDetail as TicketDetail;
+export const formTestMocks = ownerFormMocks;
 
 vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
   RichTextInlineField({
@@ -235,8 +239,8 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
-  hasPermission: () => false,
-  useHasPermission: () => false
+  hasPermission: ownerFormMocks.hasPermission,
+  useHasPermission: ownerFormMocks.hasPermission
 }));
 
 vi.mock("../../../../../apps/web/src/components/tasks/OwnerTaskBoard", () => ({
@@ -416,7 +420,8 @@ vi.mock("../../../../../apps/web/src/hooks/useTasks", () => ({
       tasks: [fixtures.task],
       loading: false,
       error: null,
-      reload: vi.fn().mockResolvedValue(undefined)
+      reload: vi.fn().mockResolvedValue(undefined),
+      createTask: ownerFormMocks.createTask
     };
   }
 }));
@@ -511,7 +516,8 @@ vi.mock("../../../../../apps/web/src/hooks/useTickets", () => ({
   useTickets() {
     return {
       tickets: [fixtures.ticket],
-      loading: false
+      loading: false,
+      createTicket: ownerFormMocks.createTicket
     };
   }
 }));
@@ -579,9 +585,12 @@ beforeEach(() => {
     configurable: true,
     value: vi.fn(() => "blob:owner-form-preview")
   });
+  ownerFormMocks.hasPermission.mockReturnValue(false);
   ownerFormMocks.createUseCase.mockResolvedValue(fixtures.useCase);
   ownerFormMocks.updateUseCase.mockResolvedValue(fixtures.useCase);
+  ownerFormMocks.createTask.mockResolvedValue(fixtures.task);
   ownerFormMocks.createSubtask.mockResolvedValue(fixtures.task);
+  ownerFormMocks.createTicket.mockResolvedValue(fixtures.ticket);
   ownerFormMocks.createSubTicket.mockResolvedValue(fixtures.ticket);
   ownerFormMocks.uploadAttachment.mockResolvedValue(fixtures.attachment);
   ownerFormMocks.createNote.mockResolvedValue(fixtures.note);

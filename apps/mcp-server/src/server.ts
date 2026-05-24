@@ -16,7 +16,10 @@ const writeHint: ToolAnnotations = {
 };
 
 function annotationsForTool(name: string): ToolAnnotations {
-  return name.startsWith("list_") || name.startsWith("get_") ? readOnlyHint : writeHint;
+  if (name.startsWith("list_") || name.startsWith("get_") || name === "resolve_reference") {
+    return readOnlyHint;
+  }
+  return writeHint;
 }
 
 export function createProjectManagerMcpServer(config: Pick<McpConfig, "apiBaseUrl" | "apiKey">): McpServer {

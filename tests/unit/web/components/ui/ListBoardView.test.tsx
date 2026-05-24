@@ -31,7 +31,7 @@ interface TestItem {
   id: number;
   title: string;
   description: string;
-  status: "todo" | "done";
+  status: string;
 }
 
 const items: TestItem[] = [
@@ -342,11 +342,11 @@ describe("ListBoardView", () => {
       />,
     );
 
-    const boardGrid = container.querySelector(".grid-flow-col") as HTMLElement;
-    expect(boardGrid).toHaveStyle({ minHeight: "max(30rem, 100%)" });
-    expect(boardGrid).not.toHaveClass("h-full");
-    expect(boardGrid).not.toHaveClass("flex-1");
-    expect(boardGrid).not.toHaveClass("items-start");
+    const boardRoot = container.querySelector("[data-list-board-layout='board']") as HTMLElement;
+    expect(boardRoot).toHaveClass("flex", "flex-nowrap", "items-start");
+    expect(boardRoot).toHaveStyle({ minHeight: "max(30rem, 100%)" });
+    expect(boardRoot).not.toHaveClass("grid-flow-col");
+    expect(boardRoot).not.toHaveClass("auto-cols-[minmax(17rem,1fr)]");
 
     const sections = container.querySelectorAll("section.rounded-lg");
     expect(sections).toHaveLength(2);
@@ -354,6 +354,130 @@ describe("ListBoardView", () => {
       expect(section).toHaveClass("h-fit", "min-h-full", "content-start");
       expect(section).not.toHaveClass("h-full");
     });
+    container.querySelectorAll("[data-status-column-wrapper]").forEach((wrapper) => {
+      expect(wrapper).toHaveClass("min-w-[17rem]", "max-w-[calc((100%-2rem)/3)]", "flex-1");
+      expect(wrapper).toHaveStyle({ minHeight: "max(30rem, 100%)" });
+    });
+  });
+
+  it("kollabiert leere bekannte Board-Spalten und behält Add-Button und DnD-Ziel", () => {
+    const onAddToColumn = vi.fn();
+    const { container } = render(
+      <ListBoardView
+        items={[items[0]!]}
+        mode="board"
+        onModeChange={vi.fn()}
+        onAdd={vi.fn()}
+        onAddToColumn={onAddToColumn}
+        onItemStatusChange={vi.fn()}
+        statusKey="status"
+        statusColumns={[
+          { value: "todo", label: "Offen" },
+          { value: "done", label: "Erledigt", isClosed: true },
+        ]}
+        renderCard={(item) => (
+          <ItemCard
+            header={<h3>Card {item.title}</h3>}
+            body={<p>{item.description}</p>}
+          />
+        )}
+        renderRow={(item) => (
+          <ItemRow title={`Row ${item.title}`} description={item.description} />
+        )}
+      />,
+    );
+
+    const filledWrapper = container.querySelector("[data-status-column-wrapper='todo']") as HTMLElement;
+    const collapsedWrapper = container.querySelector("[data-status-column-wrapper='done']") as HTMLElement;
+    expect(filledWrapper).toHaveClass("min-w-[17rem]", "max-w-[calc((100%-2rem)/3)]", "flex-1");
+    expect(collapsedWrapper).toHaveClass("w-12", "shrink-0", "self-stretch");
+    expect(collapsedWrapper).toHaveAttribute("data-status-collapsed-wrapper", "true");
+
+    const collapsedSection = container.querySelector("section[data-status-column='done']") as HTMLElement;
+    expect(collapsedSection).toHaveAttribute("data-status-collapsed", "true");
+    expect(collapsedSection).toHaveAttribute("data-dnd-droppable", "true");
+    expect(collapsedSection).toHaveClass("h-full", "w-full", "flex-col");
+    expect(collapsedSection.firstElementChild).toContainElement(
+      within(collapsedSection).getByRole("button", { name: "Erledigt hinzufügen" }),
+    );
+    expect(within(collapsedSection).getByText("Erledigt").parentElement).toHaveStyle({
+      writingMode: "vertical-rl",
+      transform: "rotate(180deg)",
+    });
+
+    fireEvent.click(within(collapsedSection).getByRole("button", { name: "Erledigt hinzufügen" }));
+    expect(onAddToColumn).toHaveBeenCalledWith("done");
+
+    const filledSection = container.querySelector("section[data-status-column='todo']") as HTMLElement;
+    expect(filledSection).not.toHaveAttribute("data-status-collapsed");
+    expect(within(filledSection).getByRole("heading", { name: "Offen" }).closest("header")).toBeInTheDocument();
+    expect(within(filledSection).getByText("Card Alpha")).toBeInTheDocument();
+  });
+
+  it("kollabiert leere bekannte List-Gruppen als kompakte Zeile", () => {
+    const onAddToColumn = vi.fn();
+    const { container } = render(
+      <ListBoardView
+        items={[items[0]!]}
+        mode="list"
+        onModeChange={vi.fn()}
+        onAdd={vi.fn()}
+        onAddToColumn={onAddToColumn}
+        statusKey="status"
+        statusColumns={[
+          { value: "todo", label: "Offen" },
+          { value: "done", label: "Erledigt", isClosed: true },
+        ]}
+        renderCard={(item) => (
+          <ItemCard
+            header={<h3>Card {item.title}</h3>}
+            body={<p>{item.description}</p>}
+          />
+        )}
+        renderRow={(item) => (
+          <ItemRow title={`Row ${item.title}`} description={item.description} />
+        )}
+      />,
+    );
+
+    const collapsedSection = container.querySelector("section[data-status-column='done']") as HTMLElement;
+    expect(collapsedSection).toHaveAttribute("data-status-collapsed", "true");
+    expect(collapsedSection).toHaveClass("h-12", "items-center", "justify-between");
+    expect(within(collapsedSection).getByRole("heading", { name: "Erledigt" })).toBeInTheDocument();
+    expect(within(collapsedSection).getByText("0")).toBeInTheDocument();
+
+    fireEvent.click(within(collapsedSection).getByRole("button", { name: "Erledigt hinzufügen" }));
+    expect(onAddToColumn).toHaveBeenCalledWith("done");
+  });
+
+  it("kollabiert unbekannte Status-Gruppen nicht", () => {
+    const { container } = render(
+      <ListBoardView
+        items={[
+          { id: 10, title: "Gamma", description: "Unbekannter Status", status: "blocked" },
+        ]}
+        mode="board"
+        onModeChange={vi.fn()}
+        onAdd={vi.fn()}
+        statusKey="status"
+        statusColumns={[{ value: "todo", label: "Offen" }]}
+        renderCard={(item) => (
+          <ItemCard
+            header={<h3>Card {item.title}</h3>}
+            body={<p>{item.description}</p>}
+          />
+        )}
+        renderRow={(item) => (
+          <ItemRow title={`Row ${item.title}`} description={item.description} />
+        )}
+      />,
+    );
+
+    const unknownSection = container.querySelector("section[data-status-column='blocked']") as HTMLElement;
+    expect(unknownSection).toHaveAttribute("data-status-known", "false");
+    expect(unknownSection).not.toHaveAttribute("data-status-collapsed");
+    expect(within(unknownSection).getByRole("heading", { name: "blocked" })).toBeInTheDocument();
+    expect(within(unknownSection).getByText("Card Gamma")).toBeInTheDocument();
   });
 
   it("setzt für sichtbare Items eine einheitliche Mindesthöhe", () => {

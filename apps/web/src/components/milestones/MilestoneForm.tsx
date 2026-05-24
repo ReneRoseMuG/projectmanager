@@ -35,6 +35,7 @@ import { useMilestones } from "../../hooks/useMilestones";
 import { useNotes } from "../../hooks/useNotes";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
+import { objectReference } from "../../lib/references";
 import { formatHumanDate } from "../../utils/date";
 import {
   countOpenStatusItems,
@@ -77,6 +78,7 @@ interface MilestoneFormProps {
   milestone?: Milestone | null;
   projects: Project[];
   initialProjectId?: number;
+  lockProjectSelection?: boolean;
   onSubmit: (
     input: MilestoneInput,
     tagIds: number[],
@@ -130,6 +132,7 @@ export function MilestoneForm({
   milestone,
   projects,
   initialProjectId,
+  lockProjectSelection = false,
   onSubmit,
   onClose,
   onDelete,
@@ -457,6 +460,7 @@ export function MilestoneForm({
       <FormModal
         open={open}
         title={milestone ? "Meilenstein bearbeiten" : "Meilenstein anlegen"}
+        objectReference={milestone ? objectReference("milestone", milestone.id) : undefined}
         icon={<Flag size={21} />}
         breadcrumb={[
           "Meilensteine",
@@ -513,6 +517,7 @@ export function MilestoneForm({
                   label="Projekt"
                   required
                   value={projectId}
+                  disabled={lockProjectSelection}
                   onChange={(inputEvent) =>
                     setProjectId(
                       inputEvent.target.value
@@ -879,6 +884,7 @@ function MilestoneFeatureList({
           <ItemRow
             key={feature.id}
             accentColor="var(--color-steel-600)"
+            objectReference={objectReference("feature", feature.id)}
             title={feature.title}
             description={richTextToPlainText(feature.description)}
             pills={

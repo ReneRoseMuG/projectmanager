@@ -19,6 +19,8 @@ interface MilestoneListBoardViewProps {
   onDelete: (milestone: Milestone) => void;
   onStatusChange?: (milestone: Milestone, status: Milestone["status"]) => void | Promise<unknown>;
   onDueDateChange?: (milestone: Milestone, dueDate: string | null) => void | Promise<unknown>;
+  onCreateTask?: (milestone: Milestone) => void;
+  onCreateTicket?: (milestone: Milestone) => void;
   filters?: ReactNode;
 }
 
@@ -39,7 +41,7 @@ function matchesSearch(milestone: Milestone, searchValue: string) {
   return milestone.name.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
-export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onDelete, onStatusChange, onDueDateChange, filters }: MilestoneListBoardViewProps) {
+export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onDelete, onStatusChange, onDueDateChange, onCreateTask, onCreateTicket, filters }: MilestoneListBoardViewProps) {
   const catalogs = useCatalogs();
   const [internalViewMode, setInternalViewMode] = useState<ViewMode>("kanban");
   const [searchValue, setSearchValue] = useState("");
@@ -87,8 +89,29 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
       filters={filters}
       loading={loading}
       emptyState={<EmptyState icon={<Flag size={22} />} title="Keine Meilensteine" body="Lege Meilensteine an, um Projektziele und abhängige Arbeit zu bündeln." tone="teal" variant="tinted" />}
-      renderCard={(milestone) => <MilestoneCard milestone={milestone} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />}
-      renderRow={(milestone) => <MilestoneCard milestone={milestone} variant="row" onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />}
+      renderCard={(milestone) => (
+        <MilestoneCard
+          milestone={milestone}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onStatusChange={onStatusChange}
+          onDueDateChange={onDueDateChange}
+          onCreateTask={onCreateTask ? () => onCreateTask(milestone) : undefined}
+          onCreateTicket={onCreateTicket ? () => onCreateTicket(milestone) : undefined}
+        />
+      )}
+      renderRow={(milestone) => (
+        <MilestoneCard
+          milestone={milestone}
+          variant="row"
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onStatusChange={onStatusChange}
+          onDueDateChange={onDueDateChange}
+          onCreateTask={onCreateTask ? () => onCreateTask(milestone) : undefined}
+          onCreateTicket={onCreateTicket ? () => onCreateTicket(milestone) : undefined}
+        />
+      )}
     />
   );
 }

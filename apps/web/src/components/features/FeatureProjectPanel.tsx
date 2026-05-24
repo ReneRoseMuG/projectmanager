@@ -2,6 +2,7 @@ import type { Project } from "@taskmanager/shared-types";
 import { Edit3, FolderKanban, FolderOpen, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { ViewMode } from "../../types";
+import { objectReference } from "../../lib/references";
 import { formatHumanDate } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { TagBadge } from "../tags/TagBadge";
@@ -245,6 +246,7 @@ function FeatureProjectCard({
             Aktualisiert {formatHumanDate(project.updatedAt)}
           </span>
           <ActionMenu
+            objectReference={objectReference("project", project.id)}
             items={[
               {
                 label: "Bearbeiten",
@@ -283,6 +285,7 @@ function FeatureProjectRow({
   return (
     <ItemRow
       accentColor={accent}
+      objectReference={objectReference("project", project.id)}
       statusIndicator={<ProjectAvatar project={project} />}
       title={project.name}
       description={description}
@@ -299,6 +302,7 @@ function FeatureProjectRow({
       }
       actions={
         <ActionMenu
+          objectReference={objectReference("project", project.id)}
           items={[
             { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: onOpen },
             {
@@ -310,6 +314,7 @@ function FeatureProjectRow({
           ]}
         />
       }
+      actionsIncludeObjectReference
       onOpen={onOpen}
     />
   );

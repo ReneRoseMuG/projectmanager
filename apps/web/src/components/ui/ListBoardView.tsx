@@ -45,6 +45,8 @@ interface StatusGroup<T> {
   items: T[];
 }
 
+const occupiedBoardColumnClass = "min-w-[17rem] max-w-[calc((100%-2rem)/3)] flex-1";
+
 interface ListBoardViewProps<T> {
   items: T[];
   mode: ListBoardMode;
@@ -265,6 +267,7 @@ interface StatusSectionProps {
   itemCount: number;
   knownColumn: boolean;
   layout: ListBoardMode;
+  collapsed: boolean;
   children: ReactNode;
   renderColumnAddButton: (column: StatusColumn) => ReactNode;
 }
@@ -287,9 +290,22 @@ function PlainStatusSection({
   itemCount,
   knownColumn,
   layout,
+  collapsed,
   children,
   renderColumnAddButton,
 }: StatusSectionProps) {
+  if (collapsed) {
+    return (
+      <CollapsedStatusSection
+        column={column}
+        itemCount={itemCount}
+        knownColumn={knownColumn}
+        layout={layout}
+        renderColumnAddButton={renderColumnAddButton}
+      />
+    );
+  }
+
   return (
     <section
       className={statusSectionClass(column, layout)}
@@ -312,6 +328,7 @@ function DroppableStatusSection({
   itemCount,
   knownColumn,
   layout,
+  collapsed,
   children,
   renderColumnAddButton,
 }: StatusSectionProps) {
@@ -319,6 +336,21 @@ function DroppableStatusSection({
     id: column.value,
     disabled: !knownColumn,
   });
+
+  if (collapsed) {
+    return (
+      <CollapsedStatusSection
+        column={column}
+        itemCount={itemCount}
+        knownColumn={knownColumn}
+        layout={layout}
+        isOver={isOver}
+        setNodeRef={setNodeRef}
+        droppable={knownColumn}
+        renderColumnAddButton={renderColumnAddButton}
+      />
+    );
+  }
 
   return (
     <section
@@ -335,6 +367,74 @@ function DroppableStatusSection({
         renderColumnAddButton={renderColumnAddButton}
       />
       {children}
+    </section>
+  );
+}
+
+function CollapsedStatusSection({
+  column,
+  itemCount,
+  knownColumn,
+  layout,
+  isOver = false,
+  setNodeRef,
+  droppable = false,
+  renderColumnAddButton,
+}: {
+  column: StatusColumn;
+  itemCount: number;
+  knownColumn: boolean;
+  layout: ListBoardMode;
+  isOver?: boolean;
+  setNodeRef?: (element: HTMLElement | null) => void;
+  droppable?: boolean;
+  renderColumnAddButton: (column: StatusColumn) => ReactNode;
+}) {
+  const overClass = isOver ? " ring-2 ring-fern/40 brightness-[1.02]" : "";
+
+  if (layout === "board") {
+    return (
+      <section
+        ref={setNodeRef}
+        className={`flex h-full min-w-0 w-full flex-col items-center gap-3 rounded-lg border py-3 transition ${statusGroupClass(column)}${overClass}`}
+        style={statusGroupStyle(column)}
+        data-dnd-droppable={droppable ? "true" : undefined}
+        data-status-collapsed="true"
+        data-status-column={column.value}
+        data-status-known={knownColumn ? "true" : "false"}
+      >
+        <div className="shrink-0">{renderColumnAddButton(column)}</div>
+        <div
+          className="flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+          style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+        >
+          <h2 className="truncate text-xs font-semibold text-steel-600">
+            {column.label}
+          </h2>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      ref={setNodeRef}
+      className={`flex h-12 min-w-0 items-center justify-between gap-2 rounded-lg border px-3 transition ${statusGroupClass(column)}${overClass}`}
+      style={statusGroupStyle(column)}
+      data-dnd-droppable={droppable ? "true" : undefined}
+      data-status-collapsed="true"
+      data-status-column={column.value}
+      data-status-known={knownColumn ? "true" : "false"}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <h2 className="min-w-0 truncate text-sm font-semibold text-steel-600">
+          {column.label}
+        </h2>
+        <span className="rounded bg-steel-100 px-2 py-0.5 text-xs font-semibold text-steel-600">
+          {itemCount}
+        </span>
+      </div>
+      <div className="shrink-0">{renderColumnAddButton(column)}</div>
     </section>
   );
 }
@@ -571,7 +671,7 @@ function ListBoardViewContent<T>({
   ) => {
     const rootClass =
       layout === "board"
-        ? "grid w-full min-w-0 grid-flow-col auto-cols-[minmax(17rem,1fr)] gap-4 overflow-x-auto pb-2"
+        ? "flex w-full min-w-0 flex-nowrap items-start gap-4 overflow-x-auto pb-2"
         : "grid h-full min-h-[30rem] w-full flex-1 content-start gap-4";
     const itemClass =
       layout === "board" ? "min-w-0 max-w-full" : "";
@@ -580,41 +680,65 @@ function ListBoardViewContent<T>({
         className={rootClass}
         style={layout === "board" ? { minHeight: "max(30rem, 100%)" } : undefined}
         data-dnd-enabled={dndEnabled ? "true" : undefined}
+        data-list-board-layout={layout}
       >
         {groups.map((group) => {
           const knownColumn = isKnownStatusGroup(orderedStatusColumns, group);
+          const collapsed = group.items.length === 0 && knownColumn;
           const Section =
             dndEnabled && knownColumn
               ? DroppableStatusSection
               : PlainStatusSection;
 
-          return (
+          const section = (
             <Section
-              key={group.column.value}
               column={group.column}
               itemCount={group.items.length}
               knownColumn={knownColumn}
               layout={layout}
+              collapsed={collapsed}
               renderColumnAddButton={renderColumnAddButton}
             >
-              <div className="grid gap-3 p-3">
-                {group.items.map((item, index) => {
-                  const itemId = itemIdentifier(item, itemIdKey);
-                  const Wrapper = dndEnabled ? DraggableItemWrapper : PlainItemWrapper;
+              {collapsed ? null : (
+                <div className="grid gap-3 p-3">
+                  {group.items.map((item, index) => {
+                    const itemId = itemIdentifier(item, itemIdKey);
+                    const Wrapper = dndEnabled ? DraggableItemWrapper : PlainItemWrapper;
 
-                  return (
-                    <Wrapper
-                      key={`${String(itemId)}-${index}`}
-                      itemId={itemId}
-                      className={itemClass}
-                      equalItemProps={equalItemProps}
-                    >
-                      {layout === "board" ? renderCard(item) : renderRow(item)}
-                    </Wrapper>
-                  );
-                })}
-              </div>
+                    return (
+                      <Wrapper
+                        key={`${String(itemId)}-${index}`}
+                        itemId={itemId}
+                        className={itemClass}
+                        equalItemProps={equalItemProps}
+                      >
+                        {layout === "board" ? renderCard(item) : renderRow(item)}
+                      </Wrapper>
+                    );
+                  })}
+                </div>
+              )}
             </Section>
+          );
+
+          if (layout !== "board") {
+            return (
+              <div key={group.column.value}>
+                {section}
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={group.column.value}
+              className={collapsed ? "w-12 shrink-0 self-stretch" : occupiedBoardColumnClass}
+              style={{ minHeight: "max(30rem, 100%)" }}
+              data-status-column-wrapper={group.column.value}
+              data-status-collapsed-wrapper={collapsed ? "true" : "false"}
+            >
+              {section}
+            </div>
           );
         })}
       </div>

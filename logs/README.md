@@ -2,6 +2,27 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 24.05.26 | Fix           | Board-Spaltenbreite                          | ✅     |
+| 24.05.26 | Feature       | Projekt-Meilenstein Create-Aktionen          | ⚠️     |
+| 24.05.26 | Fix           | Project Feature Status-Akzentfarben          | ✅     |
+| 24.05.26 | Fix           | Project Features Tab Position                | ✅     |
+| 24.05.26 | Fix           | ActionMenu Stacking und Breite               | ✅     |
+| 24.05.26 | Feature       | List/Board Item Menü Create-Aktionen         | ⚠️     |
+| 24.05.26 | Fix           | Sidebar rechter Abstand                      | ✅     |
+| 24.05.26 | Fix           | Collapsed Plus Button Position               | ✅     |
+| 24.05.26 | Feature       | Kollabierte Status-Spalten                   | ⚠️     |
+| 24.05.26 | Fix           | Sidebar-Navigation Breite                    | ✅     |
+| 24.05.26 | Fix           | Sidebar-Navigation Buttonhöhe und Breite     | ✅     |
+| 24.05.26 | Fix           | Sidebar-Navigation als begrenzte Flächen     | ✅     |
+| 23.05.26 | Feature       | Sidebar Collapse                             | ⚠️     |
+| 23.05.26 | Feature       | Copy Reference im Menü                       | ✅     |
+| 23.05.26 | Fix           | Copy Link Hero Icon                          | ✅     |
+| 23.05.26 | Feature       | MCP Link Tools Feature Use Case              | ✅     |
+| 23.05.26 | Feature       | MCP Link Tools                               | ✅     |
+| 23.05.26 | Test          | MCP und Referenz Abnahme                     | ⚠️     |
+| 23.05.26 | Feature       | Objekt-Referenzen UI                         | ✅     |
+| 23.05.26 | Feature       | MCP Update Create Resolve Tools              | ✅     |
+| 23.05.26 | Fix           | Codex MCP Registrierung                      | ⚠️     |
 | 23.05.26 | Fix           | Katalog-Geschlossen-Status                   | ✅     |
 | 23.05.26 | Fix           | Einheitliche Badge-Darstellung               | ✅     |
 | 23.05.26 | Fix           | ListBoard-Toolbar und Aktionsicon            | ✅     |

@@ -150,7 +150,7 @@ describe("TaskListBoardView", () => {
     const { container } = renderTaskList({ tasks, onAddStatus, onOpen });
 
     expectToolbar();
-    expect(container.querySelector(".grid-flow-col")).toBeInTheDocument();
+    expect(container.querySelector("[data-list-board-layout='board']")).toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns.length).toBe(statusColumns.length);
@@ -202,7 +202,7 @@ describe("TaskListBoardView", () => {
     const tasks = buildTaskSet();
     const { container } = renderTaskList({ tasks, viewMode: "list" });
 
-    expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-list-board-layout='board']")).not.toBeInTheDocument();
     const rows = container.querySelectorAll("article[class*='border-l-[4px]']");
     expect(rows).toHaveLength(tasks.length);
     expectItemRowClasses(rows);
@@ -222,7 +222,7 @@ describe("TaskListBoardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
     expect(onViewModeChange).toHaveBeenCalledWith("list");
-    expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-list-board-layout='board']")).not.toBeInTheDocument();
     expect(container.querySelectorAll("article[class*='border-l-[4px]']")).toHaveLength(tasks.length);
   });
 
@@ -248,7 +248,7 @@ describe("TaskListBoardView", () => {
     statusColumns.forEach((column, index) => {
       const section = columns[index] as HTMLElement;
       expect(within(section).getByRole("heading", { name: column.label })).toBeInTheDocument();
-      expect(within(section).getByText("0")).toBeInTheDocument();
+      expect(section).toHaveAttribute("data-status-collapsed", "true");
     });
     expect(container.querySelector("article.p-5")).not.toBeInTheDocument();
     expect(container.querySelector("article[class*='border-l-[4px]']")).not.toBeInTheDocument();

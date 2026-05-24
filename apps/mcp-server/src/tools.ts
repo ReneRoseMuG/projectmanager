@@ -1,17 +1,26 @@
+import { TICKET_RESOLUTIONS } from "@taskmanager/shared-types";
 import type {
   CatalogEntry,
   Comment,
   Feature,
   FeatureInput,
+  FeatureUpdate,
   Milestone,
+  MilestoneInput,
+  MilestoneUpdate,
   Note,
   Project,
+  ProjectInput,
+  ProjectUpdate,
   Task,
   TaskInput,
+  TaskUpdate,
   Ticket,
   TicketInput,
+  TicketUpdate,
   UseCase,
   UseCaseInput,
+  UseCaseUpdate,
   UserOption
 } from "@taskmanager/shared-types";
 import { z } from "zod";
@@ -19,6 +28,7 @@ import type { ProjectManagerApiClient } from "./api-client.js";
 import { plainTextDocument } from "./rich-text.js";
 
 export type ParentType = "project" | "milestone";
+export type LinkParentType = ParentType | "feature" | "useCase";
 export type ExtendedParentType = ParentType | "task" | "feature" | "useCase" | "ticket";
 
 export interface ToolDefinition {
@@ -47,6 +57,10 @@ const parentSchema = z.object({
   parentType: z.enum(["project", "milestone"]),
   parentId: z.number().int().positive()
 });
+const linkParentSchema = z.object({
+  parentType: z.enum(["project", "milestone", "feature", "useCase"]),
+  parentId: z.number().int().positive()
+});
 const extendedParentSchema = z.object({
   parentType: z.enum(["project", "milestone", "task", "feature", "useCase", "ticket"]),
   parentId: z.number().int().positive()
@@ -71,6 +85,12 @@ const ticketInputSchema = parentSchema.extend({
   affectedVersion: z.string().nullable().optional(),
   dueDate: z.string().nullable().optional()
 });
+const taskLinkSchema = linkParentSchema.extend({
+  taskId: z.number().int().positive()
+});
+const ticketLinkSchema = linkParentSchema.extend({
+  ticketId: z.number().int().positive()
+});
 const editorialTaskSchema = parentSchema.extend({
   title: z.string().min(1),
   editorialBrief: z.string().min(1),
@@ -89,20 +109,66 @@ const noteInputSchema = z
     title: z.string().optional(),
     text: z.string().min(1)
   });
-const descriptionUpdateSchema = z.object({
-  id: z.number().int().positive(),
-  description: z.string().nullable()
-});
-const contentUpdateSchema = z.object({
-  id: z.number().int().positive(),
+const projectCreateSchema = z.object({
+  name: z.string().min(1),
   description: z.string().nullable().optional(),
-  content: z.string().optional()
+  status: z.string().min(1).optional(),
+  color: z.string().nullable().optional(),
+  startDate: z.string().nullable().optional(),
+  dueDate: z.string().nullable().optional()
+});
+const milestoneCreateSchema = projectCreateSchema.extend({
+  projectId: z.number().int().positive()
+});
+const updateProjectSchema = idSchema.extend({
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  status: z.string().min(1).optional(),
+  color: z.string().nullable().optional(),
+  startDate: z.string().nullable().optional(),
+  dueDate: z.string().nullable().optional()
+});
+const updateMilestoneSchema = idSchema.extend({
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  status: z.string().min(1).optional(),
+  color: z.string().nullable().optional(),
+  startDate: z.string().nullable().optional(),
+  dueDate: z.string().nullable().optional()
+});
+const updateTaskSchema = idSchema.extend({
+  title: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  status: z.string().min(1).optional(),
+  priority: z.string().min(1).optional(),
+  assignee: z.string().nullable().optional(),
+  dueDate: z.string().nullable().optional()
+});
+const updateTicketSchema = idSchema.extend({
+  title: z.string().min(1).optional(),
+  type: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  status: z.string().min(1).optional(),
+  priority: z.string().min(1).optional(),
+  reporter: z.string().nullable().optional(),
+  assignee: z.string().nullable().optional(),
+  environment: z.string().nullable().optional(),
+  affectedVersion: z.string().nullable().optional(),
+  dueDate: z.string().nullable().optional(),
+  resolution: z.enum(TICKET_RESOLUTIONS).nullable().optional()
 });
 const featureCreateSchema = z.object({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   content: z.string().optional(),
   status: z.string().min(1).optional(),
+  sortOrder: z.number().int().optional()
+});
+const updateFeatureSchema = idSchema.extend({
+  title: z.string().min(1).optional(),
+  status: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  content: z.string().optional(),
   sortOrder: z.number().int().optional()
 });
 const useCaseCreateSchema = z.object({
@@ -112,6 +178,17 @@ const useCaseCreateSchema = z.object({
   content: z.string().optional(),
   status: z.string().min(1).optional(),
   sortOrder: z.number().int().optional()
+});
+const updateUseCaseSchema = idSchema.extend({
+  title: z.string().min(1).optional(),
+  status: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  content: z.string().optional(),
+  sortOrder: z.number().int().optional(),
+  featureId: z.number().int().positive().optional()
+});
+const referenceSchema = z.object({
+  reference: z.string().min(1)
 });
 const featureLinkSchema = parentSchema.extend({
   featureId: z.number().int().positive()
@@ -128,6 +205,13 @@ function ownerPath(parentType: ParentType, parentId: number): string {
   return parentType === "project" ? `projects/${parentId}` : `milestones/${parentId}`;
 }
 
+function linkOwnerPath(parentType: LinkParentType, parentId: number): string {
+  if (parentType === "useCase") {
+    return `use-cases/${parentId}`;
+  }
+  return `${parentType}s/${parentId}`;
+}
+
 function extendedOwnerPath(parentType: ExtendedParentType, parentId: number): string {
   if (parentType === "useCase") {
     return `use-cases/${parentId}`;
@@ -140,24 +224,45 @@ function withoutParent<T extends { parentType: string; parentId: number }>(input
   return body;
 }
 
-async function updateVersionedDescription<T extends { version: number }>(
-  client: ProjectManagerApiClient,
-  detailPath: string,
-  updatePath: string,
-  description: string | null
-): Promise<T> {
-  const current = await client.get<T>(detailPath);
-  return client.patch<T>(updatePath, { description, expectedVersion: current.version });
+function withoutId<T extends { id: number }>(input: T): Omit<T, "id"> {
+  const { id: _id, ...body } = input;
+  return body;
 }
 
-async function updateVersionedContent<T extends { version: number }>(
+async function updateVersioned<T extends { version: number }>(
   client: ProjectManagerApiClient,
-  detailPath: string,
-  updatePath: string,
-  input: z.infer<typeof contentUpdateSchema>
+  path: string,
+  fields: object
 ): Promise<T> {
-  const current = await client.get<T>(detailPath);
-  return client.patch<T>(updatePath, { description: input.description, content: input.content, expectedVersion: current.version });
+  const current = await client.get<T>(path);
+  return client.patch<T>(path, { ...fields, expectedVersion: current.version });
+}
+
+function referencePath(reference: string): string {
+  const normalized = reference.toUpperCase().trim();
+  const match = normalized.match(/^(PROJ|MS|TASK|TKT|FEAT|UC)-(\d+)$/);
+
+  if (!match) {
+    throw new Error(`Ungültige Referenz "${reference}" - erwartet z. B. TASK-10`);
+  }
+
+  const id = Number.parseInt(match[2] ?? "", 10);
+  switch (match[1]) {
+    case "PROJ":
+      return `projects/${id}`;
+    case "MS":
+      return `milestones/${id}`;
+    case "TASK":
+      return `tasks/${id}`;
+    case "TKT":
+      return `tickets/${id}`;
+    case "FEAT":
+      return `features/${id}`;
+    case "UC":
+      return `use-cases/${id}`;
+    default:
+      throw new Error(`Ungültige Referenz "${reference}" - erwartet z. B. TASK-10`);
+  }
 }
 
 export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefinition[] {
@@ -247,6 +352,13 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       execute: ({ id }) => client.get<UseCase>(`use-cases/${id}`)
     }),
     defineTool({
+      name: "resolve_reference",
+      title: "Objekt per Referenz laden",
+      description: "Lädt ein Domänenobjekt anhand seines Kurzbezeichners, z. B. TASK-10, FEAT-3 oder PROJ-1.",
+      inputSchema: referenceSchema,
+      execute: async ({ reference }) => client.get(referencePath(reference))
+    }),
+    defineTool({
       name: "list_catalogs",
       title: "Kataloge lesen",
       description: "Liest Status-, Prioritäts- und Tickettyp-Kataloge als Lookup für Schreibtools.",
@@ -261,11 +373,32 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       execute: () => client.get<UserOption[]>("users")
     }),
     defineTool({
+      name: "create_project",
+      title: "Projekt erstellen",
+      description: "Erstellt ein neues Projekt mit Stammdaten, Beschreibung, Status, Farbe und Zeitraum.",
+      inputSchema: projectCreateSchema,
+      execute: (input) => client.post<Project>("projects", input satisfies ProjectInput)
+    }),
+    defineTool({
+      name: "create_milestone",
+      title: "Meilenstein erstellen",
+      description: "Erstellt einen neuen Meilenstein unter einem Projekt mit Stammdaten, Beschreibung, Status, Farbe und Zeitraum.",
+      inputSchema: milestoneCreateSchema,
+      execute: ({ projectId, ...body }) => client.post<Milestone>(`projects/${projectId}/milestones`, body satisfies Omit<MilestoneInput, "projectId">)
+    }),
+    defineTool({
       name: "add_task_to_parent",
       title: "Aufgabe hinzufügen",
       description: "Legt eine normale Aufgabe an einem Projekt oder Meilenstein an und befüllt die Stammdatenfelder.",
       inputSchema: taskInputSchema,
       execute: (input) => client.post<Task>(`${ownerPath(input.parentType, input.parentId)}/tasks`, withoutParent(input) satisfies TaskInput)
+    }),
+    defineTool({
+      name: "link_task_to_parent",
+      title: "Aufgabe verknüpfen",
+      description: "Verknüpft eine bestehende Aufgabe mit Projekt, Meilenstein, Feature oder Use Case, ohne die Aufgabe neu anzulegen.",
+      inputSchema: taskLinkSchema,
+      execute: ({ parentType, parentId, taskId }) => client.post<Task>(`${linkOwnerPath(parentType, parentId)}/tasks/${taskId}`, {})
     }),
     defineTool({
       name: "assign_editorial_task",
@@ -290,6 +423,13 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       execute: (input) => client.post<Ticket>(`${ownerPath(input.parentType, input.parentId)}/tickets`, withoutParent(input) satisfies TicketInput)
     }),
     defineTool({
+      name: "link_ticket_to_parent",
+      title: "Ticket verknüpfen",
+      description: "Verknüpft ein bestehendes Ticket mit Projekt, Meilenstein, Feature oder Use Case, ohne das Ticket neu anzulegen.",
+      inputSchema: ticketLinkSchema,
+      execute: ({ parentType, parentId, ticketId }) => client.post<Ticket>(`${linkOwnerPath(parentType, parentId)}/tickets/${ticketId}`, {})
+    }),
+    defineTool({
       name: "add_comment_to_parent",
       title: "Kommentar hinzufügen",
       description: "Legt einen Kommentar an Projekt, Meilenstein, Task, Ticket, Feature oder Use Case an.",
@@ -308,32 +448,32 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
         })
     }),
     defineTool({
-      name: "update_project_description",
-      title: "Projektbeschreibung überarbeiten",
-      description: "Aktualisiert die Projektbeschreibung versionsgeschützt.",
-      inputSchema: descriptionUpdateSchema,
-      execute: ({ id, description }) => updateVersionedDescription<Project>(client, `projects/${id}`, `projects/${id}`, description)
+      name: "update_project",
+      title: "Projekt aktualisieren",
+      description: "Aktualisiert Projektstammdaten und Beschreibung versionsgeschützt.",
+      inputSchema: updateProjectSchema,
+      execute: (input) => updateVersioned<Project>(client, `projects/${input.id}`, withoutId(input) satisfies Omit<ProjectUpdate, "expectedVersion">)
     }),
     defineTool({
-      name: "update_milestone_description",
-      title: "Meilensteinbeschreibung überarbeiten",
-      description: "Aktualisiert die Meilensteinbeschreibung versionsgeschützt.",
-      inputSchema: descriptionUpdateSchema,
-      execute: ({ id, description }) => updateVersionedDescription<Milestone>(client, `milestones/${id}`, `milestones/${id}`, description)
+      name: "update_milestone",
+      title: "Meilenstein aktualisieren",
+      description: "Aktualisiert Meilenstein-Stammdaten und Beschreibung versionsgeschützt.",
+      inputSchema: updateMilestoneSchema,
+      execute: (input) => updateVersioned<Milestone>(client, `milestones/${input.id}`, withoutId(input) satisfies Omit<MilestoneUpdate, "expectedVersion">)
     }),
     defineTool({
-      name: "update_task_description",
-      title: "Aufgabenbeschreibung überarbeiten",
-      description: "Aktualisiert die Aufgabenbeschreibung versionsgeschützt.",
-      inputSchema: descriptionUpdateSchema,
-      execute: ({ id, description }) => updateVersionedDescription<Task>(client, `tasks/${id}`, `tasks/${id}`, description)
+      name: "update_task",
+      title: "Aufgabe aktualisieren",
+      description: "Aktualisiert Aufgabenstammdaten und Beschreibung versionsgeschützt.",
+      inputSchema: updateTaskSchema,
+      execute: (input) => updateVersioned<Task>(client, `tasks/${input.id}`, withoutId(input) satisfies Omit<TaskUpdate, "expectedVersion">)
     }),
     defineTool({
-      name: "update_ticket_description",
-      title: "Ticketbeschreibung überarbeiten",
-      description: "Aktualisiert die Ticketbeschreibung versionsgeschützt.",
-      inputSchema: descriptionUpdateSchema,
-      execute: ({ id, description }) => updateVersionedDescription<Ticket>(client, `tickets/${id}`, `tickets/${id}`, description)
+      name: "update_ticket",
+      title: "Ticket aktualisieren",
+      description: "Aktualisiert Ticketstammdaten, Beschreibung und Lösung versionsgeschützt.",
+      inputSchema: updateTicketSchema,
+      execute: (input) => updateVersioned<Ticket>(client, `tickets/${input.id}`, withoutId(input) satisfies Omit<TicketUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "create_feature",
@@ -343,11 +483,11 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       execute: (input) => client.post<Feature>("features", input satisfies FeatureInput)
     }),
     defineTool({
-      name: "update_feature_content",
-      title: "Feature-Inhalt überarbeiten",
-      description: "Aktualisiert Feature-Beschreibung und/oder Feature-Content versionsgeschützt.",
-      inputSchema: contentUpdateSchema,
-      execute: (input) => updateVersionedContent<Feature>(client, `features/${input.id}`, `features/${input.id}`, input)
+      name: "update_feature",
+      title: "Feature aktualisieren",
+      description: "Aktualisiert Feature-Stammdaten, Beschreibung und Content versionsgeschützt.",
+      inputSchema: updateFeatureSchema,
+      execute: (input) => updateVersioned<Feature>(client, `features/${input.id}`, withoutId(input) satisfies Omit<FeatureUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "link_feature_to_parent",
@@ -369,11 +509,11 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       execute: (input) => client.post<UseCase>(`features/${input.featureId}/use-cases`, input satisfies UseCaseInput)
     }),
     defineTool({
-      name: "update_use_case_content",
-      title: "Use-Case-Inhalt überarbeiten",
-      description: "Aktualisiert Use-Case-Beschreibung und/oder Use-Case-Content versionsgeschützt.",
-      inputSchema: contentUpdateSchema,
-      execute: (input) => updateVersionedContent<UseCase>(client, `use-cases/${input.id}`, `use-cases/${input.id}`, input)
+      name: "update_use_case",
+      title: "Use Case aktualisieren",
+      description: "Aktualisiert Use-Case-Stammdaten, Feature-Zuordnung, Beschreibung und Content versionsgeschützt.",
+      inputSchema: updateUseCaseSchema,
+      execute: (input) => updateVersioned<UseCase>(client, `use-cases/${input.id}`, withoutId(input) satisfies Omit<UseCaseUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "add_task_to_use_case",

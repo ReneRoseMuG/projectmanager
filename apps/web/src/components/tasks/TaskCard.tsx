@@ -1,6 +1,7 @@
 import type { Task } from "@taskmanager/shared-types";
 import { CheckCircle2, Edit3, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
+import { objectReference } from "../../lib/references";
 import { catalogColor, isCatalogStatusClosed } from "../../utils/catalogs";
 import { isOverdue } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
@@ -43,6 +44,7 @@ export function TaskCard({ task, compact = false, variant = "card", onOpen, onDe
   return (
     <ItemCard
       accentColor={statusColor}
+      objectReference={objectReference("task", task.id)}
       header={<TaskCardHeader task={task} onStatusChange={onStatusChange} />}
       body={<TaskCardBody description={description} />}
       footer={<TaskCardFooter task={task} taskClosed={taskClosed} onDueDateChange={onDueDateChange} />}
@@ -104,6 +106,7 @@ function TaskRow({ task, description, statusColor, taskClosed, onOpen, onDelete,
     <div className="hidden md:block">
       <ItemRow
         accentColor={statusColor}
+        objectReference={objectReference("task", task.id)}
         title={task.title}
         description={description}
         pills={
@@ -120,12 +123,14 @@ function TaskRow({ task, description, statusColor, taskClosed, onOpen, onDelete,
         footer={<><ParentBadge parent={task.visibleParent} /><TagFooter tags={task.tags} /></>}
         actions={
           <ActionMenu
+            objectReference={objectReference("task", task.id)}
             items={[
               { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(task) },
               ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(task), danger: true }] : [])
             ]}
           />
         }
+        actionsIncludeObjectReference
         onOpen={() => onOpen(task)}
       />
     </div>

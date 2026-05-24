@@ -1,15 +1,20 @@
-import type { Milestone } from "@taskmanager/shared-types";
+import type { Milestone, TaskInput, TicketInput } from "@taskmanager/shared-types";
 import { useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { MilestoneListBoardView } from "../components/milestones/MilestoneListBoardView";
+import { TaskForm } from "../components/tasks/TaskForm";
+import { TicketForm } from "../components/tickets/TicketForm";
 import { PageHeader } from "../components/ui/PageHeader";
 import { ProjectMilestoneFilterBar } from "../components/ui/ProjectMilestoneFilterBar";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { useToast } from "../components/ui/ToastProvider";
-import { errorMessage } from "../hooks/errors";
+import { errorMessage, errorMessageAsync } from "../hooks/errors";
 import { useMilestones } from "../hooks/useMilestones";
+import { useHasPermission } from "../hooks/usePermissions";
 import { useProjects } from "../hooks/useProjects";
 import { useStandaloneView } from "../hooks/useStandaloneView";
+import { useTasks } from "../hooks/useTasks";
+import { useTickets } from "../hooks/useTickets";
 import type { ViewMode } from "../types";
 import { withStandaloneView } from "../utils/standalone";
 
@@ -33,10 +38,18 @@ export function MilestonesPage() {
   const standalone = useStandaloneView();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const canCreateTasks = useHasPermission("tasks", "write");
+  const canCreateTickets = useHasPermission("tickets", "write");
   const projects = useProjects();
   const projectId = parseId(searchParams.get("projectId"));
   const milestones = useMilestones(null, projectId);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [createTaskForMilestone, setCreateTaskForMilestone] = useState<Milestone | null>(null);
+  const [createTicketForMilestone, setCreateTicketForMilestone] = useState<Milestone | null>(null);
+  const createTaskOwner = createTaskForMilestone ? { type: "milestone" as const, id: createTaskForMilestone.id } : null;
+  const createTicketOwner = createTicketForMilestone ? { type: "milestone" as const, id: createTicketForMilestone.id } : null;
+  const taskActions = useTasks(createTaskOwner);
+  const ticketActions = useTickets(createTicketOwner);
 
   const currentReturnTo = `${location.pathname}${location.search}`;
   const targetForMode = (to: string) => (standalone ? withStandaloneView(to) : to);
@@ -100,6 +113,36 @@ export function MilestonesPage() {
     }
   };
 
+  const createTask = async (input: TaskInput) => {
+    try {
+      const created = await taskActions.createTask(input);
+      showToast({ tone: "success", title: "Aufgabe angelegt" });
+      return created ?? undefined;
+    } catch (taskError) {
+      showToast({
+        tone: "error",
+        title: "Aufgabe konnte nicht angelegt werden",
+        message: errorMessage(taskError),
+      });
+      throw taskError;
+    }
+  };
+
+  const createTicket = async (input: TicketInput) => {
+    try {
+      const created = await ticketActions.createTicket(input);
+      showToast({ tone: "success", title: "Ticket angelegt" });
+      return created;
+    } catch (ticketError) {
+      showToast({
+        tone: "error",
+        title: "Ticket konnte nicht angelegt werden",
+        message: await errorMessageAsync(ticketError),
+      });
+      throw ticketError;
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
       <PageHeader
@@ -123,6 +166,8 @@ export function MilestonesPage() {
         onDelete={(milestone) => void deleteMilestone(milestone)}
         onStatusChange={updateMilestoneStatus}
         onDueDateChange={updateMilestoneDueDate}
+        onCreateTask={canCreateTasks ? (milestone) => setCreateTaskForMilestone(milestone) : undefined}
+        onCreateTicket={canCreateTickets ? (milestone) => setCreateTicketForMilestone(milestone) : undefined}
         filters={
           <ProjectMilestoneFilterBar
             projects={projects.projects}
@@ -130,6 +175,20 @@ export function MilestonesPage() {
             onProjectChange={updateProjectFilter}
           />
         }
+      />
+      <TaskForm
+        open={createTaskForMilestone !== null}
+        owner={createTaskOwner ?? undefined}
+        closeOnSubmit
+        onSubmit={createTask}
+        onClose={() => setCreateTaskForMilestone(null)}
+      />
+      <TicketForm
+        open={createTicketForMilestone !== null}
+        owner={createTicketOwner ?? undefined}
+        closeOnSubmit
+        onSubmit={createTicket}
+        onClose={() => setCreateTicketForMilestone(null)}
       />
     </div>
   );

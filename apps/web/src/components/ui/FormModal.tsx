@@ -1,12 +1,14 @@
 import { ExternalLink, Save, X } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { Button } from "./Button";
+import { CopyReferenceButton } from "./CopyReferenceButton";
 import { Modal } from "./Modal";
 
 interface FormModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
+  objectReference?: string;
   icon?: ReactNode;
   breadcrumb?: string[];
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
@@ -26,6 +28,7 @@ export function FormModal({
   open,
   onClose,
   title,
+  objectReference,
   icon,
   breadcrumb = [],
   onSubmit,
@@ -87,6 +90,12 @@ export function FormModal({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {objectReference ? (
+              <CopyReferenceButton
+                reference={objectReference}
+                variant="hero"
+              />
+            ) : null}
             {onOpenInTab ? (
               <button
                 type="button"

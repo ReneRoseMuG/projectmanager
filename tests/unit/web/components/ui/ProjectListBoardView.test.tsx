@@ -62,11 +62,17 @@ function renderProjectList({
   onCreate = vi.fn(),
   onEdit = vi.fn(),
   onDelete = vi.fn(),
+  onCreateMilestone,
+  onCreateTask,
+  onCreateTicket,
 }: {
   projects?: Project[];
   onCreate?: () => void;
   onEdit?: (project: Project) => void;
   onDelete?: (project: Project) => void;
+  onCreateMilestone?: (project: Project) => void;
+  onCreateTask?: (project: Project) => void;
+  onCreateTicket?: (project: Project) => void;
 } = {}) {
   return render(
     <MemoryRouter initialEntries={["/"]}>
@@ -75,6 +81,9 @@ function renderProjectList({
         onCreate={onCreate}
         onEdit={onEdit}
         onDelete={onDelete}
+        onCreateMilestone={onCreateMilestone}
+        onCreateTask={onCreateTask}
+        onCreateTicket={onCreateTicket}
       />
       <LocationProbe />
     </MemoryRouter>,
@@ -127,7 +136,7 @@ describe("ProjectListBoardView", () => {
     const { container } = renderProjectList({ projects, onCreate });
 
     expectToolbar();
-    expect(container.querySelector(".grid-flow-col")).toBeInTheDocument();
+    expect(container.querySelector("[data-list-board-layout='board']")).toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns.length).toBe(statusColumns.length);
@@ -195,6 +204,43 @@ describe("ProjectListBoardView", () => {
     expect(onEdit).toHaveBeenCalledWith(projects[0]);
   });
 
+  it("zeigt ohne Create-Callbacks keine neuen Projekt-Menüeinträge", () => {
+    const projects = buildProjectSet();
+    renderProjectList({ projects });
+
+    const card = screen.getByText(projects[0].name).closest("article") as HTMLElement;
+    fireEvent.click(within(card).getByRole("button", { name: "Aktionen" }));
+
+    expect(within(card).queryByRole("menuitem", { name: "Neuer Meilenstein" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("menuitem", { name: "Neue Aufgabe" })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("menuitem", { name: "Neues Ticket" })).not.toBeInTheDocument();
+  });
+
+  it("ruft Create-Callbacks aus dem Projekt-Menü mit dem konkreten Projekt auf", () => {
+    const projects = buildProjectSet();
+    const onCreateMilestone = vi.fn();
+    const onCreateTask = vi.fn();
+    const onCreateTicket = vi.fn();
+    renderProjectList({ projects, onCreateMilestone, onCreateTask, onCreateTicket });
+
+    const card = screen.getByText(projects[0].name).closest("article") as HTMLElement;
+    fireEvent.click(within(card).getByRole("button", { name: "Aktionen" }));
+    expect(within(card).getByRole("menuitem", { name: "Neuer Meilenstein" })).toBeInTheDocument();
+    expect(within(card).getByRole("menuitem", { name: "Neue Aufgabe" })).toBeInTheDocument();
+    expect(within(card).getByRole("menuitem", { name: "Neues Ticket" })).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole("menuitem", { name: "Neuer Meilenstein" }));
+
+    fireEvent.click(within(card).getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(within(card).getByRole("menuitem", { name: "Neue Aufgabe" }));
+
+    fireEvent.click(within(card).getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(within(card).getByRole("menuitem", { name: "Neues Ticket" }));
+
+    expect(onCreateMilestone).toHaveBeenCalledWith(projects[0]);
+    expect(onCreateTask).toHaveBeenCalledWith(projects[0]);
+    expect(onCreateTicket).toHaveBeenCalledWith(projects[0]);
+  });
+
   it("wechselt von Board- in Listen-Modus und rendert Rows", () => {
     const projects = buildProjectSet();
     const { container } = renderProjectList({ projects });
@@ -202,7 +248,7 @@ describe("ProjectListBoardView", () => {
     expect(container.querySelector("article.p-5")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
-    expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-list-board-layout='board']")).not.toBeInTheDocument();
     const rows = container.querySelectorAll("article[class*='border-l-[4px]']");
     expect(rows).toHaveLength(projects.length);
     expectItemRowClasses(rows);
@@ -214,6 +260,19 @@ describe("ProjectListBoardView", () => {
         within(row).getByRole("button", { name: "Aktionen" }),
       ).toBeInTheDocument();
     });
+  });
+
+  it("zeigt Create-Aktionen auch im Listen-Modus", () => {
+    const projects = buildProjectSet();
+    const onCreateTicket = vi.fn();
+    const { container } = renderProjectList({ projects, onCreateTicket });
+
+    fireEvent.click(screen.getByRole("button", { name: "Liste" }));
+    const firstRow = container.querySelector("article[class*='border-l-[4px]']") as HTMLElement;
+    fireEvent.click(within(firstRow).getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(within(firstRow).getByRole("menuitem", { name: "Neues Ticket" }));
+
+    expect(onCreateTicket).toHaveBeenCalledWith(projects[0]);
   });
 
   it("zeigt EmptyState wenn keine Projekte vorhanden sind", () => {

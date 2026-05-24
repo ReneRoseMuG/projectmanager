@@ -18,11 +18,23 @@
  * 10. OwnerTaskBoard / OwnerTicketBoard in Relation-Tabs sichtbar.
  * 11. CommentThread im Kommentare-Tab sichtbar.
  * 12. AttachmentList im Dateien-Tab sichtbar (sofern Tab vorhanden).
+ * 13. Meilenstein-Karten im Projekt-Tab bieten Aufgabe/Ticket-Erstellung nur mit Schreibrechten an.
+ *
+ * Fehlerfälle:
+ * - Ohne `tasks:write` und `tickets:write` dürfen die Create-Aktionen im Meilenstein-Menü nicht sichtbar sein.
  */
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
-import { addPendingComment, changeInput, clickTab, feature, getFileInput, project, renderWithProviders } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
+import { addPendingComment, changeInput, clickTab, feature, formTestMocks, getFileInput, project, renderWithProviders } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { ProjectForm } from "../../../../../apps/web/src/components/projects/ProjectForm";
+
+function changeTitleInForm(heading: string, value: string) {
+  const form = screen.getByRole("heading", { name: heading }).closest("form");
+  expect(form).not.toBeNull();
+  const input = form?.querySelector("input[required]");
+  expect(input).toBeDefined();
+  fireEvent.change(input as HTMLInputElement, { target: { value } });
+}
 
 describe("ProjectForm", () => {
   it("begrenzt nur den Details-Tab auf die frühere Formularbreite", () => {
@@ -219,6 +231,53 @@ describe("ProjectForm", () => {
     expect(screen.getByTestId("owner-task-board")).toHaveTextContent(`project:${project.id}`);
     clickTab("Tickets");
     expect(screen.getByTestId("owner-ticket-board")).toHaveTextContent(`project:${project.id}`);
+  });
+
+  it("blendet Meilenstein-Create-Aktionen ohne Schreibrechte aus", () => {
+    renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    clickTab("Meilensteine");
+    fireEvent.click(screen.getByRole("button", { name: "Aktionen" }));
+
+    expect(screen.queryByRole("menuitem", { name: "Neue Aufgabe" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Neues Ticket" })).not.toBeInTheDocument();
+  });
+
+  it("erstellt Aufgabe und Ticket aus dem Meilenstein-Menü mit Schreibrechten", async () => {
+    formTestMocks.hasPermission.mockImplementation(
+      (resource: string, action: string) =>
+        (resource === "tasks" || resource === "tickets") && action === "write",
+    );
+    renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    clickTab("Meilensteine");
+    fireEvent.click(screen.getByRole("button", { name: "Aktionen" }));
+    expect(screen.getByRole("menuitem", { name: "Neue Aufgabe" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Neues Ticket" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Neue Aufgabe" }));
+    expect(screen.getByRole("heading", { name: "Aufgabe anlegen" })).toBeInTheDocument();
+    changeTitleInForm("Aufgabe anlegen", "Aufgabe aus Projekt-Meilenstein");
+    fireEvent.click(screen.getByRole("button", { name: "Aufgabe anlegen" }));
+
+    await waitFor(() =>
+      expect(formTestMocks.createTask).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Aufgabe aus Projekt-Meilenstein" }),
+      ),
+    );
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Aufgabe anlegen" })).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Neues Ticket" }));
+    expect(screen.getByRole("heading", { name: "Ticket" })).toBeInTheDocument();
+    changeTitleInForm("Ticket", "Ticket aus Projekt-Meilenstein");
+    fireEvent.click(screen.getByRole("button", { name: "Ticket anlegen" }));
+
+    await waitFor(() =>
+      expect(formTestMocks.createTicket).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Ticket aus Projekt-Meilenstein" }),
+      ),
+    );
   });
 
   it("behält im Meilenstein-Tab die Listenansicht nach Tabwechsel", () => {

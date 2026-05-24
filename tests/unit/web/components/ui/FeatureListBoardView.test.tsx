@@ -108,7 +108,7 @@ describe("FeatureListBoardView", () => {
     const { container } = renderFeatureList({ features, onCreate });
 
     expectToolbar();
-    expect(container.querySelector(".grid-flow-col")).toBeInTheDocument();
+    expect(container.querySelector("[data-list-board-layout='board']")).toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
     expect(columns.length).toBe(statusColumns.length);
@@ -164,10 +164,10 @@ describe("FeatureListBoardView", () => {
     const features = buildFeatureSet();
     const { container } = renderFeatureList({ features });
 
-    expect(container.querySelector(".grid-flow-col")).toBeInTheDocument();
+    expect(container.querySelector("[data-list-board-layout='board']")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
-    expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-list-board-layout='board']")).not.toBeInTheDocument();
     expect(container.querySelectorAll("article.p-5")).toHaveLength(features.length);
     expect(container.querySelectorAll("article[class*='border-l-[4px]']")).toHaveLength(features.length);
     features.forEach((feature) => {

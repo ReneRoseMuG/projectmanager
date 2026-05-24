@@ -24,7 +24,8 @@ import { createProjectManagerMcpServer } from "./server.js";
  * Abgedeckte Regeln:
  * - Jedes verfügbare MCP-v1-Tool wird einmal über den MCP-Transport ausgeführt.
  * - Die Tools arbeiten gegen echte Fastify-Routen mit isolierter Temp-SQLite-Datenbank.
- * - Schreibende Tools erzeugen beobachtbare Daten oder versionsgeschützte Updates.
+ * - Schreibende Tools erzeugen oder ändern beobachtbare Daten versionsgeschützt.
+ * - Destruktive Delete-Tools bleiben bewusst außerhalb der MCP-Oberfläche.
  *
  * Fehlerfälle:
  * - MCP-Tool-Fehler würden als isError-Ergebnis sichtbar und brechen den Test.
@@ -148,6 +149,7 @@ describe("MCP tools integration", () => {
       id: useCase.id,
       content: "# MCP Use Case"
     });
+    expect(await callTool<Task>(executedTools, "resolve_reference", { reference: `task-${task.id}` })).toMatchObject({ id: task.id });
     expect(await callTool<CatalogEntry[]>(executedTools, "list_catalogs")).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ kind: "workStatus", key: "todo" }),
@@ -158,6 +160,27 @@ describe("MCP tools integration", () => {
     expect(await callTool<UserOption[]>(executedTools, "list_users")).toEqual(
       expect.arrayContaining([expect.objectContaining({ email: "admin@local", fullName: "Admin, Test" })])
     );
+
+    const createdProject = await callTool<Project>(executedTools, "create_project", {
+      name: "MCP Tool Projekt",
+      description: "Per MCP angelegtes Projekt",
+      status: "active",
+      color: "#2563eb",
+      startDate: "2026-05-01",
+      dueDate: "2026-07-01"
+    });
+    expect(createdProject).toMatchObject({ name: "MCP Tool Projekt", color: "#2563eb" });
+
+    const createdMilestone = await callTool<Milestone>(executedTools, "create_milestone", {
+      projectId: createdProject.id,
+      name: "MCP Tool Meilenstein",
+      description: "Per MCP angelegter Meilenstein",
+      status: "active",
+      color: "#14b8a6",
+      startDate: "2026-05-15",
+      dueDate: "2026-06-15"
+    });
+    expect(createdMilestone).toMatchObject({ projectId: createdProject.id, name: "MCP Tool Meilenstein" });
 
     const createdTask = await callTool<Task>(executedTools, "add_task_to_parent", {
       parentType: "project",
@@ -170,6 +193,28 @@ describe("MCP tools integration", () => {
       dueDate: "2026-06-01"
     });
     expect(createdTask).toMatchObject({ title: "MCP Tool Aufgabe", description: "Per MCP angelegt" });
+
+    expect(
+      await callTool<Task>(executedTools, "link_task_to_parent", {
+        parentType: "milestone",
+        parentId: milestone.id,
+        taskId: createdTask.id
+      })
+    ).toMatchObject({ id: createdTask.id, title: "MCP Tool Aufgabe" });
+    expect(
+      await callTool<Task>(executedTools, "link_task_to_parent", {
+        parentType: "feature",
+        parentId: feature.id,
+        taskId: createdTask.id
+      })
+    ).toMatchObject({ id: createdTask.id, title: "MCP Tool Aufgabe" });
+    expect(
+      await callTool<Task>(executedTools, "link_task_to_parent", {
+        parentType: "useCase",
+        parentId: useCase.id,
+        taskId: createdTask.id
+      })
+    ).toMatchObject({ id: createdTask.id, title: "MCP Tool Aufgabe" });
 
     const editorialTask = await callTool<Task>(executedTools, "assign_editorial_task", {
       parentType: "milestone",
@@ -202,6 +247,28 @@ describe("MCP tools integration", () => {
     });
     expect(createdTicket).toMatchObject({ title: "MCP Tool Ticket", environment: "Integrationstest" });
 
+    expect(
+      await callTool<Ticket>(executedTools, "link_ticket_to_parent", {
+        parentType: "project",
+        parentId: project.id,
+        ticketId: createdTicket.id
+      })
+    ).toMatchObject({ id: createdTicket.id, title: "MCP Tool Ticket" });
+    expect(
+      await callTool<Ticket>(executedTools, "link_ticket_to_parent", {
+        parentType: "feature",
+        parentId: feature.id,
+        ticketId: createdTicket.id
+      })
+    ).toMatchObject({ id: createdTicket.id, title: "MCP Tool Ticket" });
+    expect(
+      await callTool<Ticket>(executedTools, "link_ticket_to_parent", {
+        parentType: "useCase",
+        parentId: useCase.id,
+        ticketId: createdTicket.id
+      })
+    ).toMatchObject({ id: createdTicket.id, title: "MCP Tool Ticket" });
+
     const comment = await callTool<Comment>(executedTools, "add_comment_to_parent", {
       parentType: "project",
       parentId: project.id,
@@ -218,17 +285,23 @@ describe("MCP tools integration", () => {
     expect(note.title).toBe("MCP Notiz");
     expect(note.contentJson).toMatchObject({ type: "doc" });
 
-    expect(await callTool<Project>(executedTools, "update_project_description", { id: project.id, description: "Projektbeschreibung MCP" })).toMatchObject({
-      description: "Projektbeschreibung MCP"
+    expect(await callTool<Project>(executedTools, "update_project", { id: project.id, name: "MCP Projekt aktualisiert", description: "Projektbeschreibung MCP", status: "active", color: "#2563eb", startDate: "2026-05-01", dueDate: "2026-08-01" })).toMatchObject({
+      name: "MCP Projekt aktualisiert",
+      description: "Projektbeschreibung MCP",
+      dueDate: "2026-08-01"
     });
     expect(
-      await callTool<Milestone>(executedTools, "update_milestone_description", { id: milestone.id, description: "Meilensteinbeschreibung MCP" })
-    ).toMatchObject({ description: "Meilensteinbeschreibung MCP" });
-    expect(await callTool<Task>(executedTools, "update_task_description", { id: task.id, description: "Aufgabenbeschreibung MCP" })).toMatchObject({
-      description: "Aufgabenbeschreibung MCP"
+      await callTool<Milestone>(executedTools, "update_milestone", { id: milestone.id, name: "MCP Meilenstein aktualisiert", description: "Meilensteinbeschreibung MCP", status: "active", color: "#14b8a6", startDate: null, dueDate: "2026-07-15" })
+    ).toMatchObject({ name: "MCP Meilenstein aktualisiert", description: "Meilensteinbeschreibung MCP", dueDate: "2026-07-15" });
+    expect(await callTool<Task>(executedTools, "update_task", { id: task.id, title: "MCP Aufgabe aktualisiert", description: "Aufgabenbeschreibung MCP", status: "in_progress", priority: "high", assignee: "Test Admin", dueDate: "2026-06-20" })).toMatchObject({
+      title: "MCP Aufgabe aktualisiert",
+      description: "Aufgabenbeschreibung MCP",
+      priority: "high"
     });
-    expect(await callTool<Ticket>(executedTools, "update_ticket_description", { id: ticket.id, description: "Ticketbeschreibung MCP" })).toMatchObject({
-      description: "Ticketbeschreibung MCP"
+    expect(await callTool<Ticket>(executedTools, "update_ticket", { id: ticket.id, title: "MCP Ticket aktualisiert", type: "bug", description: "Ticketbeschreibung MCP", status: "resolved", priority: "high", reporter: "Test Admin", assignee: "Test Admin", environment: "Integrationstest", affectedVersion: "0.2.0", dueDate: "2026-06-30", resolution: "fixed" })).toMatchObject({
+      title: "MCP Ticket aktualisiert",
+      description: "Ticketbeschreibung MCP",
+      resolution: "fixed"
     });
 
     const createdFeature = await callTool<Feature>(executedTools, "create_feature", {
@@ -240,12 +313,15 @@ describe("MCP tools integration", () => {
     expect(createdFeature).toMatchObject({ title: "MCP Tool Feature" });
 
     expect(
-      await callTool<Feature>(executedTools, "update_feature_content", {
+      await callTool<Feature>(executedTools, "update_feature", {
         id: createdFeature.id,
+        title: "MCP Tool Feature aktualisiert",
+        status: "active",
         description: "Featurebeschreibung MCP",
-        content: "# Aktualisiertes Feature"
+        content: "# Aktualisiertes Feature",
+        sortOrder: 20
       })
-    ).toMatchObject({ description: "Featurebeschreibung MCP", content: "# Aktualisiertes Feature" });
+    ).toMatchObject({ title: "MCP Tool Feature aktualisiert", description: "Featurebeschreibung MCP", content: "# Aktualisiertes Feature", sortOrder: 20 });
 
     const linkedFeatures = await callTool<Feature[]>(executedTools, "link_feature_to_parent", {
       parentType: "project",
@@ -264,12 +340,16 @@ describe("MCP tools integration", () => {
     expect(createdUseCase).toMatchObject({ title: "MCP Tool Use Case" });
 
     expect(
-      await callTool<UseCase>(executedTools, "update_use_case_content", {
+      await callTool<UseCase>(executedTools, "update_use_case", {
         id: createdUseCase.id,
+        title: "MCP Tool Use Case aktualisiert",
+        status: "active",
         description: "Use-Case-Beschreibung MCP",
-        content: "# Aktualisierter Use Case"
+        content: "# Aktualisierter Use Case",
+        sortOrder: 30,
+        featureId: createdFeature.id
       })
-    ).toMatchObject({ description: "Use-Case-Beschreibung MCP", content: "# Aktualisierter Use Case" });
+    ).toMatchObject({ title: "MCP Tool Use Case aktualisiert", description: "Use-Case-Beschreibung MCP", content: "# Aktualisierter Use Case", sortOrder: 30 });
 
     expect(
       await callTool<Task>(executedTools, "add_task_to_use_case", {

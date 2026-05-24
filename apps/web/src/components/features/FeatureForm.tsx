@@ -35,6 +35,7 @@ import { useProjects } from "../../hooks/useProjects";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useUseCases } from "../../hooks/useUseCases";
+import { objectReference } from "../../lib/references";
 import {
   catalogEntriesByKind,
   catalogColor,
@@ -425,6 +426,7 @@ export function FeatureForm({
       <FormModal
         open={open}
         title={feature ? "Feature bearbeiten" : "Neues Feature"}
+        objectReference={feature ? objectReference("feature", feature.id) : undefined}
         icon={<BookOpen size={20} />}
         breadcrumb={["Features", feature ? "Bearbeiten" : "Neu"]}
         submitLabel={

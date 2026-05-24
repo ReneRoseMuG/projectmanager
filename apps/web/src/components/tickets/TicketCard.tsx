@@ -1,6 +1,7 @@
 import type { Ticket } from "@taskmanager/shared-types";
 import { Edit3, GitBranch, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
+import { objectReference } from "../../lib/references";
 import { catalogColor, isCatalogStatusClosed } from "../../utils/catalogs";
 import { isOverdue } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
@@ -45,6 +46,7 @@ export function TicketCard({ ticket, compact = false, variant = "card", onOpen, 
   return (
     <ItemCard
       accentColor={statusColor}
+      objectReference={objectReference("ticket", ticket.id)}
       header={<TicketCardHeader ticket={ticket} onStatusChange={onStatusChange} />}
       body={<TicketCardBody description={description} />}
       footer={<TicketCardFooter ticket={ticket} ticketClosed={ticketClosed} onDueDateChange={onDueDateChange} />}
@@ -107,6 +109,7 @@ function TicketRow({ ticket, description, statusColor, ticketClosed, onOpen, onD
     <div className="hidden md:block">
       <ItemRow
         accentColor={statusColor}
+        objectReference={objectReference("ticket", ticket.id)}
         statusIndicator={<span className="block h-3 w-3 rounded-full" style={{ backgroundColor: statusColor }} aria-hidden="true" />}
         title={ticket.title}
         description={description}
@@ -128,12 +131,14 @@ function TicketRow({ ticket, description, statusColor, ticketClosed, onOpen, onD
         footer={<><ParentBadge parent={ticket.visibleParent} /><TagFooter tags={ticket.tags} /></>}
         actions={
           <ActionMenu
+            objectReference={objectReference("ticket", ticket.id)}
             items={[
               { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(ticket) },
               ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(ticket), danger: true }] : [])
             ]}
           />
         }
+        actionsIncludeObjectReference
         onOpen={() => onOpen(ticket)}
       />
     </div>

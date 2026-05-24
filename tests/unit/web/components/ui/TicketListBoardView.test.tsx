@@ -124,7 +124,7 @@ describe("TicketListBoardView", () => {
     const { container } = renderTicketList({ tickets, onAddStatus });
 
     expectToolbar();
-    expect(container.querySelector(".grid-flow-col")).toBeInTheDocument();
+    expect(container.querySelector("[data-list-board-layout='board']")).toBeInTheDocument();
     expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(workStatusColumnCount);
     expect(screen.getByRole("button", { name: /^In Arbeit\s*1$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Erledigt\s*1$/ })).toBeInTheDocument();
@@ -142,7 +142,7 @@ describe("TicketListBoardView", () => {
     const tickets = buildTicketItems();
     const { container } = renderTicketList({ tickets, viewMode: "list" });
 
-    expect(container.querySelector(".grid-flow-col")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-list-board-layout='board']")).not.toBeInTheDocument();
     const rows = container.querySelectorAll("article[class*='border-l-[4px]']");
     expect(rows).toHaveLength(tickets.length);
     expectItemRowClasses(rows);

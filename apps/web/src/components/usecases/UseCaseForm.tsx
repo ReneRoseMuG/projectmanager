@@ -18,6 +18,7 @@ import { useCatalogs } from "../../hooks/useCatalogs";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
+import { objectReference } from "../../lib/references";
 import {
   catalogEntriesByKind,
   catalogColor,
@@ -306,6 +307,7 @@ export function UseCaseForm({
       <FormModal
         open={open}
         title={useCase ? "Use Case bearbeiten" : "Use Case anlegen"}
+        objectReference={useCase ? objectReference("useCase", useCase.id) : undefined}
         icon={<BookOpen size={21} />}
         breadcrumb={["Use Cases", useCase ? useCase.title : "Neu"]}
         onSubmit={submit}

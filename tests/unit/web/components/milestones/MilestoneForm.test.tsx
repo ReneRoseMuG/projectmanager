@@ -208,6 +208,12 @@ const project: Project = {
   tags: []
 };
 
+const otherProject: Project = {
+  ...project,
+  id: 31,
+  name: "Projekt Beta"
+};
+
 const milestone: Milestone = {
   id: 35,
   projectId: project.id,
@@ -271,6 +277,22 @@ describe("MilestoneForm", () => {
     renderWithProviders(<MilestoneForm open projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
     expect(screen.getByTestId("milestone-description-view")).toHaveAttribute("data-image-upload", "disabled");
+  });
+
+  it("sperrt die Projektauswahl im vorbelegten Create-Flow", () => {
+    renderWithProviders(<MilestoneForm open projects={[project, otherProject]} initialProjectId={project.id} lockProjectSelection onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    const projectSelect = screen.getByRole("combobox", { name: "Projekt" });
+    expect(projectSelect).toHaveValue(String(project.id));
+    expect(projectSelect).toBeDisabled();
+  });
+
+  it("lässt die Projektauswahl ohne Sperr-Prop im Create-Flow änderbar", () => {
+    renderWithProviders(<MilestoneForm open projects={[project, otherProject]} initialProjectId={project.id} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    const projectSelect = screen.getByRole("combobox", { name: "Projekt" });
+    expect(projectSelect).toHaveValue(String(project.id));
+    expect(projectSelect).not.toBeDisabled();
   });
 
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {

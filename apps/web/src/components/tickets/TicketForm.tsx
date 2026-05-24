@@ -25,6 +25,7 @@ import { errorMessage } from "../../hooks/errors";
 import { useNotes } from "../../hooks/useNotes";
 import { useHasPermission } from "../../hooks/usePermissions";
 import { useTicketDetail } from "../../hooks/useTicketDetail";
+import { objectReference } from "../../lib/references";
 import { queryKeys } from "../../queries/queryKeys";
 import { useUsers } from "../../hooks/useUsers";
 import {
@@ -357,6 +358,7 @@ export function TicketForm({
       <FormModal
         open={open}
         title={ticket ? "Ticket bearbeiten" : title}
+        objectReference={ticket ? objectReference("ticket", ticket.id) : undefined}
         icon={<Bug size={20} />}
         breadcrumb={["Tickets", ticket ? `TICKET-${ticket.id}` : "Neu"]}
         submitLabel={saving ? (savingLabel ?? "Speichern...") : ticket ? "Speichern" : "Ticket anlegen"}

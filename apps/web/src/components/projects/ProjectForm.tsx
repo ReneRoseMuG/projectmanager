@@ -12,7 +12,9 @@ import type {
   ProjectInput,
   ProjectStatus,
   Tag,
+  TaskInput,
   TaskStatus,
+  TicketInput,
   TicketStatus,
 } from "@taskmanager/shared-types";
 import {
@@ -29,7 +31,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { assetUrl } from "../../api/client";
-import { errorMessage } from "../../hooks/errors";
+import { errorMessage, errorMessageAsync } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useBacklog } from "../../hooks/useBacklog";
 import { useEntityComments } from "../../hooks/useEntityComments";
@@ -41,6 +43,7 @@ import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useWikiImport } from "../../hooks/useWikiImport";
+import { objectReference } from "../../lib/references";
 import {
   catalogColor,
   catalogLabel,
@@ -58,8 +61,10 @@ import { MilestoneListBoardView } from "../milestones/MilestoneListBoardView";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { TagPicker } from "../tags/TagPicker";
+import { TaskForm } from "../tasks/TaskForm";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
+import { TicketForm } from "../tickets/TicketForm";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { Button } from "../ui/Button";
@@ -127,9 +132,9 @@ const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "overview", label: "Übersicht" },
   { value: "details", label: "Details" },
   { value: "milestones", label: "Meilensteine" },
-  { value: "features", label: "Features" },
   { value: "tasks", label: "Aufgaben" },
   { value: "tickets", label: "Tickets" },
+  { value: "features", label: "Features" },
   { value: "comments", label: "Kommentare" },
   { value: "notes", label: "Notizen" },
   { value: "attachments", label: "Dateien" },
@@ -211,6 +216,8 @@ export function ProjectForm({
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
   const canReadJournal = useHasPermission("journal", "read");
+  const canCreateTasks = useHasPermission("tasks", "write");
+  const canCreateTickets = useHasPermission("tickets", "write");
   const [pendingFeatures, setPendingFeatures] = useState<Feature[]>([]);
   const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
   const [pendingTickets, setPendingTickets] = useState<DraftTicket[]>([]);
@@ -222,6 +229,12 @@ export function ProjectForm({
   const [taskDraftOpen, setTaskDraftOpen] = useState(false);
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
+  const [createTaskForMilestone, setCreateTaskForMilestone] = useState<Milestone | null>(null);
+  const [createTicketForMilestone, setCreateTicketForMilestone] = useState<Milestone | null>(null);
+  const createTaskOwner = createTaskForMilestone ? { type: "milestone" as const, id: createTaskForMilestone.id } : null;
+  const createTicketOwner = createTicketForMilestone ? { type: "milestone" as const, id: createTicketForMilestone.id } : null;
+  const milestoneTaskActions = useTasks(createTaskOwner);
+  const milestoneTicketActions = useTickets(createTicketOwner);
 
   useEffect(() => {
     if (!open) {
@@ -236,6 +249,8 @@ export function ProjectForm({
       setTaskDraftOpen(false);
       setTicketLinkOpen(false);
       setTicketDraftOpen(false);
+      setCreateTaskForMilestone(null);
+      setCreateTicketForMilestone(null);
       return;
     }
 
@@ -400,6 +415,36 @@ export function ProjectForm({
     }
   };
 
+  const createMilestoneTask = async (input: TaskInput) => {
+    try {
+      const created = await milestoneTaskActions.createTask(input);
+      showToast({ tone: "success", title: "Aufgabe angelegt" });
+      return created ?? undefined;
+    } catch (taskError) {
+      showToast({
+        tone: "error",
+        title: "Aufgabe konnte nicht angelegt werden",
+        message: errorMessage(taskError),
+      });
+      throw taskError;
+    }
+  };
+
+  const createMilestoneTicket = async (input: TicketInput) => {
+    try {
+      const created = await milestoneTicketActions.createTicket(input);
+      showToast({ tone: "success", title: "Ticket angelegt" });
+      return created;
+    } catch (ticketError) {
+      showToast({
+        tone: "error",
+        title: "Ticket konnte nicht angelegt werden",
+        message: await errorMessageAsync(ticketError),
+      });
+      throw ticketError;
+    }
+  };
+
   const previewWikiImport = async () => {
     try {
       const report = await wikiImport.previewImport(wikiImportSourcePath);
@@ -529,6 +574,7 @@ export function ProjectForm({
       <FormModal
         open={open}
         title={project ? "Projekt bearbeiten" : "Projekt anlegen"}
+        objectReference={project ? objectReference("project", project.id) : undefined}
         icon={<FolderKanban size={21} />}
         breadcrumb={["Projekte", project ? project.name : "Neues Projekt"]}
         onSubmit={submit}
@@ -640,6 +686,8 @@ export function ProjectForm({
                 onDelete={(milestone) => void deleteMilestone(milestone)}
                 onStatusChange={(milestone, status) => milestones.updateMilestone(milestone.id, { status, expectedVersion: milestone.version })}
                 onDueDateChange={(milestone, dueDate) => milestones.updateMilestone(milestone.id, { dueDate, expectedVersion: milestone.version })}
+                onCreateTask={canCreateTasks ? (milestone) => setCreateTaskForMilestone(milestone) : undefined}
+                onCreateTicket={canCreateTickets ? (milestone) => setCreateTicketForMilestone(milestone) : undefined}
               />
             ) : (
               <EmptyState
@@ -994,6 +1042,20 @@ export function ProjectForm({
           setPendingTickets((items) => [...items, { kind: "new", draft }])
         }
         onClose={() => setTicketDraftOpen(false)}
+      />
+      <TaskForm
+        open={createTaskForMilestone !== null}
+        owner={createTaskOwner ?? undefined}
+        closeOnSubmit
+        onSubmit={createMilestoneTask}
+        onClose={() => setCreateTaskForMilestone(null)}
+      />
+      <TicketForm
+        open={createTicketForMilestone !== null}
+        owner={createTicketOwner ?? undefined}
+        closeOnSubmit
+        onSubmit={createMilestoneTicket}
+        onClose={() => setCreateTicketForMilestone(null)}
       />
     </>
   );

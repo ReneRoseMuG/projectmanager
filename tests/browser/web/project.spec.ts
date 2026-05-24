@@ -7,6 +7,7 @@ import {
   createFeature,
   createProject,
   createTask,
+  deleteTask,
   deleteFeature,
   deleteProject,
   expectRichText,
@@ -387,6 +388,56 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expect(page.getByRole("heading", { name: "Aktiv" })).toBeVisible();
       await expect(itemCard(page, project.name)).toBeVisible();
     } finally {
+      await deleteProject(request, project.id);
+    }
+  });
+
+  test("Projekt-Menü erstellt Aufgabe im Modal und Abbrechen bleibt ohne Mutation", async ({
+    page,
+    request,
+  }) => {
+    const project = await createProject(request, "E2E Project Menu Create");
+    const cancelTitle = uniqueTitle("E2E Project Menu Cancel Task");
+    const taskTitle = uniqueTitle("E2E Project Menu Task");
+    let taskId: number | null = null;
+
+    try {
+      await openProjectList(page);
+      let projectCard = itemCard(page, project.name);
+      await projectCard.getByRole("button", { name: "Aktionen" }).click();
+      await projectCard.getByRole("menuitem", { name: "Neue Aufgabe" }).click();
+
+      const cancelForm = formPage(page, "Aufgabe anlegen");
+      await expect(cancelForm).toBeVisible();
+      await cancelForm.locator("input[required]").first().fill(cancelTitle);
+      await cancelForm.getByRole("button", { name: "Abbrechen" }).click();
+      await expect(cancelForm).not.toBeVisible();
+
+      const tasksAfterCancelResponse = await request.get(`${apiBaseUrl}/projects/${project.id}/tasks`);
+      expect(tasksAfterCancelResponse.ok()).toBeTruthy();
+      const tasksAfterCancel = (await tasksAfterCancelResponse.json()) as Array<{ title: string }>;
+      expect(tasksAfterCancel.some((task) => task.title === cancelTitle)).toBe(false);
+
+      projectCard = itemCard(page, project.name);
+      await projectCard.getByRole("button", { name: "Aktionen" }).click();
+      await projectCard.getByRole("menuitem", { name: "Neue Aufgabe" }).click();
+
+      const taskForm = formPage(page, "Aufgabe anlegen");
+      await taskForm.locator("input[required]").first().fill(taskTitle);
+      await fillRichText(taskForm, "task-description", "E2E Aufgabenbeschreibung aus Projektmenü");
+      const taskResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/projects/${project.id}/tasks`) &&
+          response.request().method() === "POST",
+      );
+      await taskForm.getByRole("button", { name: "Aufgabe anlegen" }).click();
+      const createdTask = (await (await taskResponsePromise).json()) as { id: number };
+      taskId = createdTask.id;
+
+      await expect(taskForm).not.toBeVisible();
+      await expect(itemCard(page, project.name)).toContainText("1 offen");
+    } finally {
+      await deleteTask(request, taskId);
       await deleteProject(request, project.id);
     }
   });

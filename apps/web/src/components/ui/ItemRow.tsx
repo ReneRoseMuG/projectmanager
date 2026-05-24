@@ -1,13 +1,16 @@
 import type { ReactNode } from "react";
+import { ActionMenu } from "./ActionMenu";
 
 interface ItemRowProps {
   accentColor?: string;
+  objectReference?: string;
   statusIndicator?: ReactNode;
   title: string;
   description?: string;
   pills?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
+  actionsIncludeObjectReference?: boolean;
   footer?: ReactNode;
   onOpen?: () => void;
   className?: string;
@@ -19,12 +22,14 @@ interface ItemRowProps {
 /** Shared row base for domain items in list layouts. */
 export function ItemRow({
   accentColor,
+  objectReference,
   statusIndicator,
   title,
   description,
   pills,
   meta,
   actions,
+  actionsIncludeObjectReference = false,
   footer,
   onOpen,
   className = "",
@@ -38,7 +43,7 @@ export function ItemRow({
 
   return (
     <article
-      className={`grid h-full ${columns} items-center gap-4 rounded-lg border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:border-steel-300 hover:shadow-panel ${onOpen ? "cursor-pointer" : ""} ${className}`}
+      className={`group/reference-row relative grid h-full ${columns} items-center gap-4 rounded-lg border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:z-30 hover:border-steel-300 hover:shadow-panel focus-within:z-30 ${onOpen ? "cursor-pointer" : ""} ${className}`}
       style={accentColor ? { borderLeftColor: accentColor } : undefined}
       onDoubleClick={onOpen}
     >
@@ -69,12 +74,13 @@ export function ItemRow({
           {meta}
         </div>
       ) : null}
-      {actions ? (
+      {objectReference || actions ? (
         <div
           className={`relative z-20 flex shrink-0 justify-end gap-1 ${actionsClassName}`}
           onClick={(event) => event.stopPropagation()}
         >
-          {actions}
+          {objectReference && actions && !actionsIncludeObjectReference ? <ActionMenu objectReference={objectReference} items={[]} /> : null}
+          {actions ?? <ActionMenu objectReference={objectReference} items={[]} />}
         </div>
       ) : null}
       {footer ? (

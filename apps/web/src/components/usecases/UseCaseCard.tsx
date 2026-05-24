@@ -1,6 +1,7 @@
 import type { UseCase } from "@taskmanager/shared-types";
 import { Edit3 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
+import { objectReference } from "../../lib/references";
 import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
@@ -29,10 +30,12 @@ export function UseCaseCard({ useCase, variant = "card", onOpen, onStatusChange 
         <div className="hidden md:block">
           <ItemRow
             accentColor={statusColor}
+            objectReference={objectReference("useCase", useCase.id)}
             title={useCase.title}
             description={description}
             pills={<StatusPill kind="featureStatus" value={useCase.status} onChange={onStatusChange ? (status) => onStatusChange(useCase, status) : undefined} />}
-            actions={<ActionMenu items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(useCase) }]} />}
+            actions={<ActionMenu objectReference={objectReference("useCase", useCase.id)} items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(useCase) }]} />}
+            actionsIncludeObjectReference
             onOpen={() => onOpen(useCase)}
           />
         </div>
@@ -43,6 +46,7 @@ export function UseCaseCard({ useCase, variant = "card", onOpen, onStatusChange 
   return (
     <ItemCard
       accentColor={statusColor}
+      objectReference={objectReference("useCase", useCase.id)}
       header={
         <div className="grid gap-2">
           <h3 className="line-clamp-2 text-sm font-semibold text-ink">{useCase.title}</h3>

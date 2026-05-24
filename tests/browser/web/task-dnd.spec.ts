@@ -39,11 +39,25 @@ async function openProjectTasksBoard(page: Page, projectId: number) {
   return projectForm;
 }
 
+async function openProjectTasksList(page: Page, projectId: number) {
+  await authenticatedGoto(page, `/projects/${projectId}`);
+  const projectForm = formPage(page, "Projekt bearbeiten");
+  await expect(projectForm).toBeVisible();
+  await projectForm.getByRole("button", { name: /Aufgaben/ }).click();
+  await expect(
+    projectForm.getByRole("button", { name: "Neue Aufgabe", exact: true }),
+  ).toBeVisible();
+  await projectForm.getByRole("button", { name: "Liste", exact: true }).click();
+  await expect(projectForm.locator("[data-list-board-layout='list']")).toBeVisible();
+  return projectForm;
+}
+
 async function dragItemToStatus(
   page: Page,
   scope: Locator,
   title: string,
   status: string,
+  beforeDrop?: (target: Locator) => Promise<void>,
 ) {
   const source = itemCard(scope, title);
   const target = scope.locator(`section[data-status-column="${status}"]`);
@@ -70,6 +84,7 @@ async function dragItemToStatus(
     targetBox.y + Math.min(targetBox.height - 20, 96),
     { steps: 12 },
   );
+  await beforeDrop?.(target);
   await page.mouse.up();
 }
 
@@ -93,13 +108,18 @@ test.describe("Task Board Drag & Drop", () => {
           .locator('section[data-status-column="active"]')
           .filter({ hasText: task.title }),
       ).toBeVisible();
+      const onHoldColumn = projectForm.locator('section[data-status-column="on_hold"]');
+      await expect(onHoldColumn).toHaveAttribute("data-status-collapsed", "true");
+      await expect(onHoldColumn).toHaveCSS("width", "48px");
 
       const updateResponse = page.waitForResponse(
         (response) =>
           response.url().includes(`/api/tasks/${task.id}`) &&
           response.request().method() === "PATCH",
       );
-      await dragItemToStatus(page, projectForm, task.title, "on_hold");
+      await dragItemToStatus(page, projectForm, task.title, "on_hold", async (target) => {
+        await expect(target).toHaveClass(/ring-2/);
+      });
       const updated = (await (await updateResponse).json()) as {
         status: string;
       };
@@ -110,6 +130,7 @@ test.describe("Task Board Drag & Drop", () => {
           .locator('section[data-status-column="on_hold"]')
           .filter({ hasText: task.title }),
       ).toBeVisible();
+      await expect(onHoldColumn).not.toHaveAttribute("data-status-collapsed", "true");
       await expect(
         projectForm
           .locator('section[data-status-column="active"]')
@@ -162,6 +183,30 @@ test.describe("Task Board Drag & Drop", () => {
       ).toHaveCount(0);
     } finally {
       await deleteTicket(request, ticket.id);
+    }
+  });
+
+  test("kollabierte Listen-Gruppe öffnet den Aufgabendialog mit vorgewähltem Status", async ({
+    page,
+    request,
+  }) => {
+    const project = await createProject(request, "E2E Collapsed List Project");
+
+    try {
+      const projectForm = await openProjectTasksList(page, project.id);
+      const onHoldGroup = projectForm.locator('section[data-status-column="on_hold"]');
+      await expect(onHoldGroup).toHaveAttribute("data-status-collapsed", "true");
+      await expect(onHoldGroup).toHaveClass(/h-12/);
+
+      await onHoldGroup.getByRole("button", { name: "Pausiert hinzufügen" }).click();
+
+      const taskForm = formPage(page, "Aufgabe anlegen");
+      await expect(taskForm).toBeVisible();
+      await expect(
+        taskForm.getByRole("button", { name: "Pausiert", exact: true }),
+      ).toHaveAttribute("data-active", "true");
+    } finally {
+      await deleteProject(request, project.id);
     }
   });
 });

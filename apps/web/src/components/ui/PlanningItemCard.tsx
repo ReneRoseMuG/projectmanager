@@ -1,6 +1,6 @@
 import { Edit3, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { ActionMenu } from "./ActionMenu";
+import { ActionMenu, type ActionMenuItem } from "./ActionMenu";
 import { ItemCard } from "./ItemCard";
 import { ItemRow } from "./ItemRow";
 import { ProgressBar } from "./ProgressBar";
@@ -15,12 +15,14 @@ interface PlanningItemCardProps {
   title: string;
   description: string;
   accentColor: string;
+  objectReference?: string;
   icon: ReactNode;
   subtitle?: ReactNode;
   pills?: ReactNode;
   footerMeta?: ReactNode;
   taskStats: PlanningTaskStats;
   variant?: "card" | "row";
+  extraMenuItems?: ActionMenuItem[];
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -64,7 +66,7 @@ function PlanningHeader({ title, subtitle, pills }: Pick<PlanningItemCardProps, 
   );
 }
 
-export function PlanningItemCard({ title, description, accentColor, icon, subtitle, pills, footerMeta, taskStats, variant = "card", onOpen, onEdit, onDelete }: PlanningItemCardProps) {
+export function PlanningItemCard({ title, description, accentColor, objectReference, icon, subtitle, pills, footerMeta, taskStats, variant = "card", extraMenuItems = [], onOpen, onEdit, onDelete }: PlanningItemCardProps) {
   if (variant === "row") {
     return (
       <>
@@ -73,11 +75,13 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
             title={title}
             description={description}
             accentColor={accentColor}
+            objectReference={objectReference}
             icon={icon}
             subtitle={subtitle}
             pills={pills}
             footerMeta={footerMeta}
             taskStats={taskStats}
+            extraMenuItems={extraMenuItems}
             onOpen={onOpen}
             onEdit={onEdit}
             onDelete={onDelete}
@@ -86,6 +90,7 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
         <div className="hidden md:block">
           <ItemRow
             accentColor={accentColor}
+            objectReference={objectReference}
             title={title}
             description={description}
             pills={pills}
@@ -94,12 +99,15 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
             footer={footerMeta}
             actions={
               <ActionMenu
+                objectReference={objectReference}
                 items={[
                   { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: onEdit },
+                  ...extraMenuItems,
                   { label: "Löschen", icon: <Trash2 size={16} />, onClick: onDelete, danger: true }
                 ]}
               />
             }
+            actionsIncludeObjectReference
             onOpen={onOpen}
           />
         </div>
@@ -110,11 +118,13 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
   return (
     <ItemCard
       accentColor={accentColor}
+      objectReference={objectReference}
       header={<PlanningHeader title={title} subtitle={subtitle} pills={pills} />}
       body={description ? <p className="line-clamp-3 text-sm text-steel-600">{description}</p> : null}
       footer={<div className="grid gap-3">{footerMeta}<TaskProgress stats={taskStats} accentColor={accentColor} /></div>}
       onOpen={onOpen}
       onEdit={onEdit}
+      extraMenuItems={extraMenuItems}
       onDelete={onDelete}
       className="h-full min-h-60"
     />

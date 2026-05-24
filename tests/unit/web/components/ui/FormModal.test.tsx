@@ -7,6 +7,7 @@
  * Abgedeckte Regeln:
  * - Page-Formulare halten TabBar und Footer außerhalb des scrollbaren Inhaltsbereichs.
  * - Modal-Formulare behalten ihren begrenzten internen Scrollbereich.
+ * - Objekt-Referenzen werden dauerhaft im Hero-Bereich angeboten.
  *
  * Fehlerfälle:
  * - Die TabBar darf nicht im scrollbaren Inhaltsbereich landen.
@@ -41,6 +42,7 @@ describe("FormModal", () => {
         variant="page"
         contentClassName="w-full max-w-7xl self-center"
         breadcrumb={["Projekte", "Alpha"]}
+        objectReference="PROJ-42"
         onClose={vi.fn()}
         onSubmit={vi.fn()}
         tabBar={<nav data-testid="tab-bar">Tabs</nav>}
@@ -71,6 +73,7 @@ describe("FormModal", () => {
     expect(footer).not.toHaveClass("sticky");
     expect(tabWrapper?.nextElementSibling).toBe(bodyWrapper);
     expect(screen.getByText("Projekte · Alpha")).toHaveClass("text-white/60");
+    expect(screen.getByRole("button", { name: "ID PROJ-42 kopieren" })).toBeInTheDocument();
     expect(form).not.toHaveTextContent("›");
   });
 

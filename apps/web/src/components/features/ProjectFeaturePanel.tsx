@@ -1,7 +1,10 @@
 import type { Feature } from "@taskmanager/shared-types";
 import { BookOpen, Edit3 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useCatalogs } from "../../hooks/useCatalogs";
 import type { ViewMode } from "../../types";
+import { objectReference } from "../../lib/references";
+import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { Badge } from "../ui/Badge";
 import { ActionMenu } from "../ui/ActionMenu";
@@ -97,11 +100,14 @@ function FeatureBoardCard({
   feature: Feature;
   onOpen: (feature: Feature) => void;
 }) {
+  const catalogs = useCatalogs();
   const description = richTextToPlainText(feature.description);
+  const statusColor = catalogColor(catalogs.entries, "featureStatus", feature.status);
 
   return (
     <ItemCard
-      accentColor="var(--color-steel-600)"
+      accentColor={statusColor}
+      objectReference={objectReference("feature", feature.id)}
       onOpen={() => onOpen(feature)}
       onEdit={() => onOpen(feature)}
       header={
@@ -131,11 +137,14 @@ function FeatureRow({
   feature: Feature;
   onOpen: (feature: Feature) => void;
 }) {
+  const catalogs = useCatalogs();
   const description = richTextToPlainText(feature.description);
+  const statusColor = catalogColor(catalogs.entries, "featureStatus", feature.status);
 
   return (
     <ItemRow
-      accentColor="var(--color-steel-600)"
+      accentColor={statusColor}
+      objectReference={objectReference("feature", feature.id)}
       title={feature.title}
       description={description}
       pills={
@@ -145,8 +154,9 @@ function FeatureRow({
         </>
       }
       actions={
-        <ActionMenu items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(feature) }]} />
+        <ActionMenu objectReference={objectReference("feature", feature.id)} items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(feature) }]} />
       }
+      actionsIncludeObjectReference
       onOpen={() => onOpen(feature)}
       pillsClassName="w-52"
     />

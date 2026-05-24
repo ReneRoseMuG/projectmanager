@@ -1,6 +1,7 @@
 import type { Feature } from "@taskmanager/shared-types";
 import { ArrowRight, Edit3, FileText, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
+import { objectReference } from "../../lib/references";
 import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
@@ -32,11 +33,13 @@ export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onSta
         <div className="hidden md:block">
           <ItemRow
             accentColor={statusColor}
+            objectReference={objectReference("feature", feature.id)}
             title={feature.title}
             description={description}
             pills={<StatusPill kind="featureStatus" value={feature.status} onChange={onStatusChange ? (status) => onStatusChange(feature, status) : undefined} />}
             meta={<span className="text-xs font-semibold text-steel-500">{feature.useCaseCount} Use Cases</span>}
-            actions={<ActionMenu items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: open }, { label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(feature), danger: true }]} />}
+            actions={<ActionMenu objectReference={objectReference("feature", feature.id)} items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: open }, { label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(feature), danger: true }]} />}
+            actionsIncludeObjectReference
             onOpen={open}
           />
         </div>
@@ -47,6 +50,7 @@ export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onSta
   return (
     <ItemCard
       accentColor={statusColor}
+      objectReference={objectReference("feature", feature.id)}
       onOpen={open}
       onEdit={open}
       onDelete={() => onDelete(feature)}

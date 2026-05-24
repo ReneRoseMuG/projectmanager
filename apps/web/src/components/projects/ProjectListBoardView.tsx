@@ -12,6 +12,9 @@ interface ProjectListBoardViewProps {
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
   onStatusChange?: (project: Project, status: Project["status"]) => void | Promise<unknown>;
+  onCreateMilestone?: (project: Project) => void;
+  onCreateTask?: (project: Project) => void;
+  onCreateTicket?: (project: Project) => void;
   filters?: ReactNode;
   showToolbarAdd?: boolean;
 }
@@ -33,6 +36,9 @@ export function ProjectListBoardView({
   onEdit,
   onDelete,
   onStatusChange,
+  onCreateMilestone,
+  onCreateTask,
+  onCreateTicket,
   filters,
   showToolbarAdd = true,
 }: ProjectListBoardViewProps) {
@@ -69,7 +75,15 @@ export function ProjectListBoardView({
         />
       }
       renderCard={(project) => (
-        <ProjectCard project={project} onEdit={onEdit} onDelete={onDelete} onStatusChange={onStatusChange} />
+        <ProjectCard
+          project={project}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onStatusChange={onStatusChange}
+          onCreateMilestone={onCreateMilestone ? () => onCreateMilestone(project) : undefined}
+          onCreateTask={onCreateTask ? () => onCreateTask(project) : undefined}
+          onCreateTicket={onCreateTicket ? () => onCreateTicket(project) : undefined}
+        />
       )}
       renderRow={(project) => (
         <ProjectCard
@@ -78,6 +92,9 @@ export function ProjectListBoardView({
           onEdit={onEdit}
           onDelete={onDelete}
           onStatusChange={onStatusChange}
+          onCreateMilestone={onCreateMilestone ? () => onCreateMilestone(project) : undefined}
+          onCreateTask={onCreateTask ? () => onCreateTask(project) : undefined}
+          onCreateTicket={onCreateTicket ? () => onCreateTicket(project) : undefined}
         />
       )}
     />

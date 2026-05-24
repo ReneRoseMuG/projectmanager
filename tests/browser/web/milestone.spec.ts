@@ -76,6 +76,43 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
     }
   });
 
+  test("Meilenstein-Menü erstellt Ticket im Modal mit Meilenstein-Owner", async ({ page, request }) => {
+    const project = await createProject(request, "E2E Milestone Menu Project");
+    const milestone = await createMilestone(request, project.id, "E2E Milestone Menu");
+    const ticketTitle = uniqueTitle("E2E Milestone Menu Ticket");
+    let ticketId: number | null = null;
+
+    try {
+      await authenticatedGoto(page, "/milestones");
+      const milestoneCard = itemCard(page, milestone.name);
+      await expect(milestoneCard).toBeVisible();
+      await milestoneCard.getByRole("button", { name: "Aktionen" }).click();
+      await milestoneCard.getByRole("menuitem", { name: "Neues Ticket" }).click();
+
+      const ticketForm = formPage(page, "Ticket");
+      await expect(ticketForm).toBeVisible();
+      await ticketForm.locator("input[required]").first().fill(ticketTitle);
+      await fillRichText(ticketForm, "ticket-description", "E2E Ticket aus Meilensteinmenü");
+      const ticketResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/milestones/${milestone.id}/tickets`) &&
+          response.request().method() === "POST",
+      );
+      await ticketForm.getByRole("button", { name: "Ticket anlegen" }).click();
+      const createdTicket = (await (await ticketResponsePromise).json()) as { id: number };
+      ticketId = createdTicket.id;
+
+      await expect(ticketForm).not.toBeVisible();
+      const linkedTicketsResponse = await request.get(`${apiBaseUrl}/milestones/${milestone.id}/tickets`);
+      expect(linkedTicketsResponse.ok()).toBeTruthy();
+      const linkedTickets = (await linkedTicketsResponse.json()) as Array<{ title: string }>;
+      expect(linkedTickets.some((ticket) => ticket.title === ticketTitle)).toBe(true);
+    } finally {
+      await deleteTicket(request, ticketId);
+      await deleteProject(request, project.id);
+    }
+  });
+
   test("Meilensteinformular zeigt Stammdaten und aktualisierte Subview-Mengen", async ({ page, request }) => {
     const project = await createProject(request, "E2E Milestone Detail Project");
     const milestone = await createMilestone(request, project.id, "E2E Milestone Detail");
