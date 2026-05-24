@@ -37,7 +37,7 @@ echo Starte Projekt Manager im lokalen Produktionsmodus.
 echo Projektordner: %APP_DIR%
 echo Geschützte Datenbank: %DATABASE_PATH%
 echo Stoppe laufende Projekt Manager-Ports...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 3001,5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 3001,5173,3010 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"
 timeout /t 1 /nobreak > nul
 
 echo Baue Production-Bundle...
@@ -60,8 +60,8 @@ echo Starte API und Web im selben Terminal...
 start "" /B powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 5; Start-Process 'http://localhost:5173'"
 
 echo Projekt Manager läuft unter http://localhost:5173
-echo Dieses Fenster offen lassen; Strg+C beendet API und Web.
-call npx concurrently --names API,WEB --prefix "[{name}]" --kill-others-on-fail "npm run start -w apps/api" "npm run preview -w apps/web -- --host 0.0.0.0 --port 5173"
+echo Dieses Fenster offen lassen; Strg+C beendet API, Web, MCP und Tunnel.
+call node apps\mcp-server\dist\start-project-manager.js --production
 
 echo Projekt Manager wurde beendet.
 pause

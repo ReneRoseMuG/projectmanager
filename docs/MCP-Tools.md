@@ -7,15 +7,20 @@ Diese Übersicht beschreibt die aktuell verfügbaren MCP-Tools des Projekt-Manag
 ## Betrieb und Authentifizierung
 
 Der MCP-Server liegt im Workspace `apps/mcp-server`. Für die Kommunikation mit der Projekt-Manager-API werden diese Umgebungsvariablen verwendet:
-Eine Vorlage liegt in `apps/mcp-server/.env.example`.
+Eine Vorlage liegt in `apps/mcp-server/.env.example`; für den gemeinsamen Projektstart liegt im Repo-Root `.env.local.example`.
 
 | Variable | Zweck |
 |---|---|
 | `PROJECT_MANAGER_API_BASE_URL` | Basis-URL der API, zum Beispiel `http://127.0.0.1:3001/api` |
 | `PROJECT_MANAGER_API_KEY` | API-Key für geschützte Projekt-Manager-Routen |
-| `MCP_HTTP_BEARER_TOKEN` | Optionaler Bearer Token für den HTTP-Transport des MCP-Servers |
+| `MCP_HTTP_AUTH_MODE` | HTTP-Auth-Modus: `bearer` als sicherer Standard oder `none` für lokale ChatGPT-Tests |
+| `MCP_HTTP_BEARER_TOKEN` | Bearer Token für den HTTP-Transport im `bearer`-Modus |
+| `PROJECT_MANAGER_MCP_AUTOSTART` | Startet MCP-HTTP automatisch mit `npm run dev` und dem Startscript |
+| `PROJECT_MANAGER_MCP_TUNNEL_AUTOSTART` | Startet zusätzlich den stabilen HTTPS-Tunnel, wenn `MCP_TUNNEL_COMMAND` gesetzt ist |
+| `MCP_TUNNEL_COMMAND` | Lokaler Tunnel-Befehl, zum Beispiel ein named Cloudflare- oder ngrok-Tunnel |
+| `MCP_PUBLIC_URL` | Stabile ChatGPT-Connector-URL, zum Beispiel `https://.../mcp` |
 
-Ohne `MCP_HTTP_BEARER_TOKEN` ist der Streamable-HTTP-Transport im Entwicklungsbetrieb offen. Sobald die Variable gesetzt ist, akzeptiert der Server HTTP-Anfragen nur noch mit passendem Header `Authorization: Bearer <token>`.
+Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt und startet dann nur mit `MCP_HTTP_BEARER_TOKEN`. Für lokale ChatGPT-Developer-Mode-Tests kann bewusst `MCP_HTTP_AUTH_MODE=none` gesetzt werden; dieser Modus darf nur mit privatem lokalem Tunnel verwendet werden. Claude Desktop nutzt weiterhin den `stdio`-Transport und ist von dieser HTTP-Auth-Einstellung unabhängig.
 
 ## Lesende Tools
 

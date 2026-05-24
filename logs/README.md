@@ -2,6 +2,9 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 24.05.26 | Fix           | MCP Büro Anleitung                           | ✅     |
+| 24.05.26 | 2             | MCP Autostart Startpfade                     | ✅     |
+| 24.05.26 | 1             | ChatGPT MCP HTTP Auth                        | ✅     |
 | 24.05.26 | Fix / Feature | Meilenstein-Karten-Kindobjekte               | ✅     |
 | 24.05.26 | Analyse       | Create-Kindobjekte und DnD                   | ✅     |
 | 24.05.26 | Fix           | StatusPill Fallback                          | ✅     |
