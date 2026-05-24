@@ -233,6 +233,17 @@ describe("ProjectForm", () => {
     expect(screen.getByTestId("owner-ticket-board")).toHaveTextContent(`project:${project.id}`);
   });
 
+  it("behält den aktiven Tab bei einem Projekt-Refetch", () => {
+    const { rerender } = renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    clickTab("Aufgaben");
+    expect(screen.getByTestId("owner-task-board")).toHaveTextContent(`project:${project.id}`);
+
+    rerender(<ProjectForm open project={{ ...project, name: "Projekt Refetch" }} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("owner-task-board")).toHaveTextContent(`project:${project.id}`);
+  });
+
   it("blendet Meilenstein-Create-Aktionen ohne Schreibrechte aus", () => {
     renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
@@ -285,12 +296,12 @@ describe("ProjectForm", () => {
 
     clickTab("Meilensteine");
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
-    expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("border-steel-700", "bg-steel-700", "text-white");
+    expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("border-steel-900", "bg-steel-900", "text-white");
 
     clickTab("Features");
     clickTab("Meilensteine");
 
-    expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("border-steel-700", "bg-steel-700", "text-white");
+    expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("border-steel-900", "bg-steel-900", "text-white");
   });
 
   it("zeigt im Edit-Modus CommentThread, NoteList, AttachmentList, Backlog und Import", () => {

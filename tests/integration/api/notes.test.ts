@@ -9,11 +9,13 @@ import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   buildTestApp,
+  createMilestone,
   createNoteForProject,
   createNoteForTask,
   createProject,
   createTask,
   createTestDb,
+  createTicket,
   truncateAll,
   type TestDb
 } from "../../fixtures/api/index.js";
@@ -77,6 +79,49 @@ describe("Notes API", () => {
 
     const list = await supertest(app.server).get(`/api/tasks/${task.id}/notes`).expect(200);
     expect(list.body[0].id).toBe(res.body.id);
+  });
+
+  it.each([
+    {
+      label: "project",
+      createOwner: async () => {
+        const project = await createProject(app);
+        return { id: project.id, path: `/api/projects/${project.id}/notes` };
+      }
+    },
+    {
+      label: "milestone",
+      createOwner: async () => {
+        const project = await createProject(app);
+        const milestone = await createMilestone(app, project.id);
+        return { id: milestone.id, path: `/api/milestones/${milestone.id}/notes` };
+      }
+    },
+    {
+      label: "task",
+      createOwner: async () => {
+        const project = await createProject(app);
+        const task = await createTask(app, project.id);
+        return { id: task.id, path: `/api/tasks/${task.id}/notes` };
+      }
+    },
+    {
+      label: "ticket",
+      createOwner: async () => {
+        const ticket = await createTicket(app, null);
+        return { id: ticket.id, path: `/api/tickets/${ticket.id}/notes` };
+      }
+    }
+  ])("POST+GET verknuepft Notizen mit $label", async ({ label, createOwner }) => {
+    const owner = await createOwner();
+    const title = `Notiz fuer ${label}`;
+    const contentJson = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: label }] }] };
+
+    const created = await supertest(app.server).post(owner.path).send({ title, contentJson }).expect(201);
+    const listed = await supertest(app.server).get(owner.path).expect(200);
+
+    expect(created.body).toEqual(expect.objectContaining({ title, contentJson }));
+    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, title, contentJson })]);
   });
 
   it("GET /api/tasks/:id/notes gibt alle Task-Notizen zurueck", async () => {

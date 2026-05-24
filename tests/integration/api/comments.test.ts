@@ -7,7 +7,21 @@
 import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { buildTestApp, createComment, createProject, createTask, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
+import {
+  buildTestApp,
+  createBacklogItem,
+  createComment,
+  createFeature,
+  createMilestone,
+  createProject,
+  createTask,
+  createTestDb,
+  createTicket,
+  createUseCase,
+  createWikiPage,
+  truncateAll,
+  type TestDb
+} from "../../fixtures/api/index.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -38,6 +52,86 @@ describe("Comments API", () => {
 
     expect(res.body.body).toBe("Erster Kommentar");
     expect(res.body.owners).toEqual([{ type: "task", id: task.id }]);
+  });
+
+  it.each([
+    {
+      label: "project",
+      ownerType: "project",
+      createOwner: async () => {
+        const project = await createProject(app);
+        return { id: project.id, path: `/api/projects/${project.id}/comments` };
+      }
+    },
+    {
+      label: "milestone",
+      ownerType: "milestone",
+      createOwner: async () => {
+        const project = await createProject(app);
+        const milestone = await createMilestone(app, project.id);
+        return { id: milestone.id, path: `/api/milestones/${milestone.id}/comments` };
+      }
+    },
+    {
+      label: "task",
+      ownerType: "task",
+      createOwner: async () => {
+        const project = await createProject(app);
+        const task = await createTask(app, project.id);
+        return { id: task.id, path: `/api/tasks/${task.id}/comments` };
+      }
+    },
+    {
+      label: "feature",
+      ownerType: "feature",
+      createOwner: async () => {
+        const feature = await createFeature(app);
+        return { id: feature.id, path: `/api/features/${feature.id}/comments` };
+      }
+    },
+    {
+      label: "useCase",
+      ownerType: "useCase",
+      createOwner: async () => {
+        const feature = await createFeature(app);
+        const useCase = await createUseCase(app, feature.id);
+        return { id: useCase.id, path: `/api/use-cases/${useCase.id}/comments` };
+      }
+    },
+    {
+      label: "backlogItem",
+      ownerType: "backlogItem",
+      createOwner: async () => {
+        const project = await createProject(app);
+        const item = await createBacklogItem(app, project.id);
+        return { id: item.id, path: `/api/backlog/${item.id}/comments` };
+      }
+    },
+    {
+      label: "wikiPage",
+      ownerType: "wikiPage",
+      createOwner: async () => {
+        const page = await createWikiPage(app);
+        return { id: page.id, path: `/api/wiki/${page.id}/comments` };
+      }
+    },
+    {
+      label: "ticket",
+      ownerType: "ticket",
+      createOwner: async () => {
+        const ticket = await createTicket(app, null);
+        return { id: ticket.id, path: `/api/tickets/${ticket.id}/comments` };
+      }
+    }
+  ])("POST+GET verknuepft Kommentare mit $label", async ({ ownerType, createOwner }) => {
+    const owner = await createOwner();
+    const body = `Kommentar fuer ${ownerType}`;
+
+    const created = await supertest(app.server).post(owner.path).send({ body }).expect(201);
+    const listed = await supertest(app.server).get(owner.path).expect(200);
+
+    expect(created.body).toEqual(expect.objectContaining({ body, owners: [{ type: ownerType, id: owner.id }] }));
+    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, body, owners: [{ type: ownerType, id: owner.id }] })]);
   });
 
   it("POST ohne body gibt 400 zurueck", async () => {

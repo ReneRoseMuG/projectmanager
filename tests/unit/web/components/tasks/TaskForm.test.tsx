@@ -205,6 +205,17 @@ describe("TaskForm", () => {
     expect(screen.getByTestId("owner-ticket-board")).toHaveTextContent(`task:${task.id}`);
   });
 
+  it("behält den aktiven Tab bei einem Aufgaben-Refetch", () => {
+    const { rerender } = renderWithProviders(<TaskForm open task={task} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    clickTab("Tickets");
+    expect(screen.getByTestId("owner-ticket-board")).toHaveTextContent(`task:${task.id}`);
+
+    rerender(<TaskForm open task={{ ...task, title: "Aufgabe Refetch" }} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("owner-ticket-board")).toHaveTextContent(`task:${task.id}`);
+  });
+
   it("zeigt im Edit-Modus CommentThread, NoteList und AttachmentList", () => {
     renderWithProviders(<TaskForm open task={task} onSubmit={vi.fn()} onClose={vi.fn()} />);
 

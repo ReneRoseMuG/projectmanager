@@ -60,6 +60,7 @@ vi.mock("../../../../apps/web/src/components/usecases/UseCaseForm", () => ({
       <div data-testid="use-case-form" />
     );
   },
+  parseUseCaseFormTab: () => undefined,
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({

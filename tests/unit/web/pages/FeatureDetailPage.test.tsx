@@ -44,6 +44,7 @@ vi.mock("../../../../apps/web/src/components/features/FeatureForm", () => ({
       <div data-testid="feature-form" />
     );
   },
+  parseFeatureFormTab: () => undefined,
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({

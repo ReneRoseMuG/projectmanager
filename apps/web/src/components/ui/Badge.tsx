@@ -34,7 +34,13 @@ export function Badge({ children, color, filled = false, muted = false, tone }: 
         backgroundColor: `${color}14`
       }
     : undefined;
-  const toneClass = tone ? toneClasses[tone] : muted ? toneClasses.mute : "border";
+  const toneClass = tone
+    ? toneClasses[tone]
+    : muted
+      ? toneClasses.mute
+      : filled
+        ? "border-steel-500 bg-steel-500 text-white"
+        : "border";
 
   return (
     <span className={`inline-flex min-h-6 items-center rounded-md border px-2 text-xs font-semibold ${toneClass}`} style={style}>

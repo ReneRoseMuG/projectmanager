@@ -127,6 +127,17 @@ describe("TicketForm", () => {
     expect(screen.getByTestId("attachment-list")).toHaveTextContent("1");
   });
 
+  it("behält den aktiven Tab bei einem Ticket-Refetch", () => {
+    const { rerender } = renderWithProviders(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    clickTab("Relationen");
+    expect(screen.getAllByText("Ticket Bravo").length).toBeGreaterThan(0);
+
+    rerender(<TicketForm open ticket={{ ...ticket, title: "Ticket Refetch" }} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getAllByText("Ticket Bravo").length).toBeGreaterThan(0);
+  });
+
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {
     renderWithProviders(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} variant="page" />);
 

@@ -225,7 +225,7 @@ describe("ListBoardView", () => {
     const listButton = screen.getByRole("button", { name: "Liste" });
     const boardButton = screen.getByRole("button", { name: "Kanban" });
     expect(listButton).toHaveClass("h-8", "w-8");
-    expect(boardButton).toHaveClass("h-8", "w-8", "rounded-md", "border-steel-700", "bg-steel-700", "text-white");
+    expect(boardButton).toHaveClass("h-8", "w-8", "rounded-md", "border-steel-900", "bg-steel-900", "text-white");
 
     fireEvent.click(listButton);
 
@@ -300,7 +300,7 @@ describe("ListBoardView", () => {
     );
 
     const addButton = screen.getByRole("button", { name: "Offen hinzufügen" });
-    expect(addButton).toHaveClass("h-7", "w-7", "border-white");
+    expect(addButton).toHaveClass("h-9", "w-9", "border-white");
     expect(addButton).toHaveStyle({ backgroundColor: "#4D9359" });
     fireEvent.click(addButton);
 
@@ -580,7 +580,7 @@ describe("ItemCard", () => {
     );
 
     const trigger = screen.getByRole("button", { name: "Aktionen" });
-    expect(trigger).toHaveClass("h-8", "w-8", "border-line", "bg-white", "shadow-sm");
+    expect(trigger).toHaveClass("h-9", "w-[36px]", "border-line", "bg-white", "shadow-sm");
 
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("menuitem", { name: "Bearbeiten" }));

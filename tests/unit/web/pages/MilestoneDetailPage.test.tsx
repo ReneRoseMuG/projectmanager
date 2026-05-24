@@ -44,6 +44,7 @@ vi.mock("../../../../apps/web/src/components/milestones/MilestoneForm", () => ({
       <div data-testid="milestone-form" />
     );
   },
+  parseMilestoneFormTab: () => undefined,
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({

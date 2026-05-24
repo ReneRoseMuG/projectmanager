@@ -26,6 +26,7 @@
  * Den neuen Projekt-Menü-Create-Flow auf Page-Ebene gegen Permission- und Parent-Regressionen absichern.
  */
 import "@testing-library/jest-dom/vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Project } from "@taskmanager/shared-types";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
@@ -188,11 +189,32 @@ vi.mock("../../../../apps/web/src/components/tasks/TaskForm", () => ({
   }: {
     open: boolean;
     owner?: { type: string; id: number };
-    onSubmit: (input: { title: string }) => Promise<unknown> | unknown;
+    onSubmit: (input: {
+      title: string;
+      tagIds: number[];
+      pendingSubtasks: [];
+      pendingTickets: [];
+      pendingComments: [];
+      pendingNotes: [];
+      pendingFiles: [];
+    }) => Promise<unknown> | unknown;
   }) {
     return open ? (
       <div data-testid="task-form" data-owner={owner ? `${owner.type}:${owner.id}` : ""}>
-        <button type="button" onClick={() => void onSubmit({ title: "Aufgabe aus Projekt" })}>
+        <button
+          type="button"
+          onClick={() =>
+            void onSubmit({
+              title: "Aufgabe aus Projekt",
+              tagIds: [],
+              pendingSubtasks: [],
+              pendingTickets: [],
+              pendingComments: [],
+              pendingNotes: [],
+              pendingFiles: [],
+            })
+          }
+        >
           Save Task
         </button>
       </div>
@@ -208,11 +230,38 @@ vi.mock("../../../../apps/web/src/components/tickets/TicketForm", () => ({
   }: {
     open: boolean;
     owner?: { type: string; id: number };
-    onSubmit: (input: { title: string }) => Promise<unknown> | unknown;
+    onSubmit: (input: {
+      title: string;
+      type: "bug";
+      status: "open";
+      priority: "medium";
+      tagIds: number[];
+      pendingSubTickets: [];
+      pendingRelations: [];
+      pendingComments: [];
+      pendingNotes: [];
+      pendingFiles: [];
+    }) => Promise<unknown> | unknown;
   }) {
     return open ? (
       <div data-testid="ticket-form" data-owner={owner ? `${owner.type}:${owner.id}` : ""}>
-        <button type="button" onClick={() => void onSubmit({ title: "Ticket aus Projekt" })}>
+        <button
+          type="button"
+          onClick={() =>
+            void onSubmit({
+              title: "Ticket aus Projekt",
+              type: "bug",
+              status: "open",
+              priority: "medium",
+              tagIds: [],
+              pendingSubTickets: [],
+              pendingRelations: [],
+              pendingComments: [],
+              pendingNotes: [],
+              pendingFiles: [],
+            })
+          }
+        >
           Save Ticket
         </button>
       </div>
@@ -223,10 +272,19 @@ vi.mock("../../../../apps/web/src/components/tickets/TicketForm", () => ({
 import { ProjectsPage } from "../../../../apps/web/src/pages/ProjectsPage";
 
 function renderProjectsPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
   return render(
-    <MemoryRouter initialEntries={["/projects"]}>
-      <ProjectsPage />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={["/projects"]}>
+        <ProjectsPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

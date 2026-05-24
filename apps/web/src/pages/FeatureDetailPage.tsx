@@ -14,7 +14,10 @@ import { getProjectFeatures, setProjectFeatures } from "../api/doc-links";
 import { createOwnerTask, linkOwnerTask } from "../api/tasks";
 import { createOwnerTicket, linkOwnerTicket } from "../api/tickets";
 import { createUseCase as createUseCaseRequest } from "../api/use-cases";
-import { FeatureForm } from "../components/features/FeatureForm";
+import {
+  FeatureForm,
+  parseFeatureFormTab,
+} from "../components/features/FeatureForm";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
@@ -35,6 +38,7 @@ export function FeatureDetailPage() {
   const initialProjectId = initialProjectIdParam
     ? Number(initialProjectIdParam)
     : undefined;
+  const initialTab = parseFeatureFormTab(searchParams.get("tab"));
   const features = useFeatures(featureId);
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
 
@@ -159,7 +163,7 @@ export function FeatureDetailPage() {
     try {
       await features.removeFeature(feature.id);
       showToast({ tone: "success", title: "Feature gelöscht" });
-      navigate("/features");
+      navigate(returnTo);
       return true;
     } catch (featureError) {
       showToast({
@@ -198,6 +202,7 @@ export function FeatureDetailPage() {
         feature={features.feature}
         variant="page"
         initialProjectId={initialProjectId}
+        initialTab={initialTab}
         onSubmit={saveFeature}
         onDelete={deleteFeature}
         savingLabel={savingLabel}

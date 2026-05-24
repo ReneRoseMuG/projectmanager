@@ -273,6 +273,23 @@ describe("MilestoneForm", () => {
     expect(screen.getByTestId("milestone-description-view")).toHaveAttribute("data-image-upload", "enabled");
   });
 
+  it("behält den aktiven Tab bei einem Meilenstein-Refetch", () => {
+    const { rerender } = renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Aufgaben/ }));
+    expect(screen.getByTestId("owner-task-board")).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <ToastProvider>
+          <MilestoneForm open milestone={{ ...milestone, name: "Meilenstein Refetch" }} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />
+        </ToastProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("owner-task-board")).toBeInTheDocument();
+  });
+
   it("deaktiviert Bild-Upload für die Beschreibung im Create-Modus", () => {
     renderWithProviders(<MilestoneForm open projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 

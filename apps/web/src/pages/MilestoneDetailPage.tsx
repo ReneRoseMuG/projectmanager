@@ -1,12 +1,19 @@
-import type { Milestone, MilestoneInput } from "@taskmanager/shared-types";
+import type { DraftComment, DraftNote, Milestone, MilestoneInput } from "@taskmanager/shared-types";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { MilestoneForm } from "../components/milestones/MilestoneForm";
+import { uploadMilestoneAttachment } from "../api/attachments";
+import { createEntityComment } from "../api/comments";
+import { createMilestoneNote } from "../api/notes";
+import {
+  MilestoneForm,
+  parseMilestoneFormTab,
+} from "../components/milestones/MilestoneForm";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useMilestones } from "../hooks/useMilestones";
 import { useProjects } from "../hooks/useProjects";
+import type { DraftFile } from "../types";
 import { withStandaloneView } from "../utils/standalone";
 
 export function MilestoneDetailPage() {
@@ -26,6 +33,7 @@ export function MilestoneDetailPage() {
     Number.isFinite(parsedInitialProjectId)
       ? parsedInitialProjectId
       : undefined;
+  const initialTab = parseMilestoneFormTab(searchParams.get("tab"));
   const { projects, loading: projectsLoading } = useProjects();
   const {
     milestone,
@@ -73,6 +81,35 @@ export function MilestoneDetailPage() {
         message: errorMessage(milestoneError),
       });
       throw milestoneError;
+    }
+  };
+
+  const postCreateMilestone = async (
+    milestoneId: number,
+    pending: {
+      comments: DraftComment[];
+      notes: DraftNote[];
+      files: DraftFile[];
+    },
+  ) => {
+    try {
+      for (const comment of pending.comments) {
+        await createEntityComment("milestone", milestoneId, { body: comment.text });
+      }
+      for (const note of pending.notes) {
+        await createMilestoneNote(milestoneId, note);
+      }
+      for (const file of pending.files) {
+        await uploadMilestoneAttachment(milestoneId, file.file);
+      }
+    } catch (postCreateError) {
+      showToast({
+        tone: "error",
+        title:
+          "Meilenstein wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden",
+        message: errorMessage(postCreateError),
+      });
+      throw postCreateError;
     }
   };
 
@@ -128,8 +165,10 @@ export function MilestoneDetailPage() {
         milestone={milestone}
         projects={projects}
         initialProjectId={initialProjectId}
+        initialTab={initialTab}
         variant="page"
         onSubmit={submitMilestone}
+        onPostCreate={postCreateMilestone}
         onDelete={deleteMilestone}
         onClose={closePage}
         onOpenInTab={openInTab}

@@ -19,7 +19,17 @@ import os from "node:os";
 import path from "node:path";
 import supertest from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { buildTestApp, createProject, createTask, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
+import {
+  buildTestApp,
+  createFeature,
+  createMilestone,
+  createProject,
+  createTask,
+  createTestDb,
+  createTicket,
+  truncateAll,
+  type TestDb
+} from "../../fixtures/api/index.js";
 
 const uploadDir = path.join(os.tmpdir(), `taskmanager-api-attachments-${process.pid}`);
 const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-attachment-previews-${process.pid}`);
@@ -104,6 +114,63 @@ describe("Attachments API", () => {
 
     expect(res.body.owners).toEqual([{ type: "task", id: task.id }]);
     expect(res.body.mimetype).toBe("application/pdf");
+  });
+
+  it.each([
+    {
+      label: "project",
+      ownerType: "project",
+      createOwner: async () => {
+        const project = await createProject(app);
+        return { id: project.id, path: `/api/projects/${project.id}/attachments` };
+      }
+    },
+    {
+      label: "milestone",
+      ownerType: "milestone",
+      createOwner: async () => {
+        const project = await createProject(app);
+        const milestone = await createMilestone(app, project.id);
+        return { id: milestone.id, path: `/api/milestones/${milestone.id}/attachments` };
+      }
+    },
+    {
+      label: "task",
+      ownerType: "task",
+      createOwner: async () => {
+        const project = await createProject(app);
+        const task = await createTask(app, project.id);
+        return { id: task.id, path: `/api/tasks/${task.id}/attachments` };
+      }
+    },
+    {
+      label: "feature",
+      ownerType: "feature",
+      createOwner: async () => {
+        const feature = await createFeature(app);
+        return { id: feature.id, path: `/api/features/${feature.id}/attachments` };
+      }
+    },
+    {
+      label: "ticket",
+      ownerType: "ticket",
+      createOwner: async () => {
+        const ticket = await createTicket(app, null);
+        return { id: ticket.id, path: `/api/tickets/${ticket.id}/attachments` };
+      }
+    }
+  ])("POST+GET verknuepft Attachments mit $label", async ({ label, ownerType, createOwner }) => {
+    const owner = await createOwner();
+    const filename = `${label}-create-flow.txt`;
+
+    const created = await supertest(app.server)
+      .post(owner.path)
+      .attach("file", Buffer.from(`Datei fuer ${label}`), { filename, contentType: "text/plain" })
+      .expect(201);
+    const listed = await supertest(app.server).get(owner.path).expect(200);
+
+    expect(created.body).toEqual(expect.objectContaining({ originalName: filename, owners: [{ type: ownerType, id: owner.id }] }));
+    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, originalName: filename, owners: [{ type: ownerType, id: owner.id }] })]);
   });
 
   it("POST zu nicht existierendem Projekt gibt 404 zurueck", async () => {

@@ -16,7 +16,7 @@ import type {
 import { useQuery } from "@tanstack/react-query";
 import { Bug, GitBranch, Link2, Paperclip, StickyNote } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getTicketLinkCandidates, getTicketRelationCandidates, type TicketOwner } from "../../api/tickets";
 import type { DraftFile } from "../../types";
 import { useAttachments } from "../../hooks/useAttachments";
@@ -210,6 +210,7 @@ export function TicketForm({
   const [subTicketDraftOpen, setSubTicketDraftOpen] = useState(false);
   const [relationDraftOpen, setRelationDraftOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const prevOpenRef = useRef(false);
 
   useEffect(() => {
     if (!open) {
@@ -221,9 +222,13 @@ export function TicketForm({
       setSubTicketDraftOpen(false);
       setRelationDraftOpen(false);
       setEditingNote(null);
+      prevOpenRef.current = false;
       return;
     }
-    setActiveTab("details");
+    if (!prevOpenRef.current) {
+      setActiveTab("details");
+    }
+    prevOpenRef.current = true;
   }, [open]);
 
   useEffect(() => {

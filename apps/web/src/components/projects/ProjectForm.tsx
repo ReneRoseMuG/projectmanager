@@ -12,11 +12,10 @@ import type {
   ProjectInput,
   ProjectStatus,
   Tag,
-  TaskInput,
   TaskStatus,
-  TicketInput,
   TicketStatus,
 } from "@taskmanager/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Flag,
   FolderKanban,
@@ -27,10 +26,16 @@ import {
   Trash2,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
+import { uploadTaskAttachment } from "../../api/attachments";
 import { assetUrl } from "../../api/client";
+import { createEntityComment } from "../../api/comments";
+import { createTaskNote } from "../../api/notes";
+import { createSubtask } from "../../api/subtasks";
+import { setTaskTags } from "../../api/tags";
+import { addTicketRelation, createOwnerTicket, createSubTicket, createTicketNote, linkOwnerTicket, setTicketTags, uploadTicketAttachment } from "../../api/tickets";
 import { errorMessage, errorMessageAsync } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useBacklog } from "../../hooks/useBacklog";
@@ -44,6 +49,7 @@ import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useWikiImport } from "../../hooks/useWikiImport";
 import { objectReference } from "../../lib/references";
+import { invalidateTags } from "../../queries/invalidation";
 import {
   catalogColor,
   catalogLabel,
@@ -61,10 +67,10 @@ import { MilestoneListBoardView } from "../milestones/MilestoneListBoardView";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { TagPicker } from "../tags/TagPicker";
-import { TaskForm } from "../tasks/TaskForm";
+import { TaskForm, type TaskFormInput } from "../tasks/TaskForm";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
-import { TicketForm } from "../tickets/TicketForm";
+import { TicketForm, type TicketFormInput } from "../tickets/TicketForm";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { Button } from "../ui/Button";
@@ -98,6 +104,7 @@ interface ProjectFormProps {
   onClose: () => void;
   onDelete?: (project: Project) => Promise<boolean>;
   savingLabel?: string;
+  initialTab?: ProjectFormTab;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
   onOpenInTab?: () => void;
@@ -114,7 +121,7 @@ interface ProjectFormProps {
   ) => Promise<void>;
 }
 
-type ProjectFormTab =
+export type ProjectFormTab =
   | "overview"
   | "details"
   | "milestones"
@@ -142,6 +149,14 @@ const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "journal", label: "Journal" },
   { value: "import", label: "Import" },
 ];
+
+export function parseProjectFormTab(
+  value: string | null | undefined,
+): ProjectFormTab | undefined {
+  return baseTabs.some((tab) => tab.value === value)
+    ? (value as ProjectFormTab)
+    : undefined;
+}
 
 function workStatusValue(
   entries: Parameters<typeof resolveCatalogEntryKey>[0],
@@ -172,6 +187,7 @@ export function ProjectForm({
   onClose,
   onDelete,
   savingLabel,
+  initialTab,
   variant = "modal",
   closeOnSubmit = true,
   onOpenInTab,
@@ -179,6 +195,7 @@ export function ProjectForm({
 }: ProjectFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const projectId = project?.id;
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -231,10 +248,21 @@ export function ProjectForm({
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
   const [createTaskForMilestone, setCreateTaskForMilestone] = useState<Milestone | null>(null);
   const [createTicketForMilestone, setCreateTicketForMilestone] = useState<Milestone | null>(null);
+  const prevOpenRef = useRef(false);
   const createTaskOwner = createTaskForMilestone ? { type: "milestone" as const, id: createTaskForMilestone.id } : null;
   const createTicketOwner = createTicketForMilestone ? { type: "milestone" as const, id: createTicketForMilestone.id } : null;
   const milestoneTaskActions = useTasks(createTaskOwner);
   const milestoneTicketActions = useTickets(createTicketOwner);
+
+  const handleTabChange = (nextTab: ProjectFormTab) => {
+    setActiveTab(nextTab);
+    if (variant !== "page") {
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    params.set("tab", nextTab);
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+  };
 
   useEffect(() => {
     if (!open) {
@@ -251,9 +279,19 @@ export function ProjectForm({
       setTicketDraftOpen(false);
       setCreateTaskForMilestone(null);
       setCreateTicketForMilestone(null);
+      prevOpenRef.current = false;
       return;
     }
+    if (!prevOpenRef.current) {
+      setActiveTab(initialTab ?? "details");
+    }
+    prevOpenRef.current = true;
+  }, [initialTab, open]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
     setName(project?.name ?? "");
     setDescription(project?.description ?? "");
     setStatus(project?.status ?? "active");
@@ -261,7 +299,6 @@ export function ProjectForm({
     setSelectedTags(project?.tags ?? []);
     setStartDate(project?.startDate ?? "");
     setDueDate(project?.dueDate ?? "");
-    setActiveTab("details");
   }, [open, project]);
 
   useEffect(() => {
@@ -415,30 +452,109 @@ export function ProjectForm({
     }
   };
 
-  const createMilestoneTask = async (input: TaskInput) => {
+  const createMilestoneTask = async (input: TaskFormInput) => {
+    const {
+      tagIds,
+      pendingSubtasks,
+      pendingTickets,
+      pendingComments,
+      pendingNotes,
+      pendingFiles,
+      ...taskInput
+    } = input;
+    let created: Awaited<ReturnType<typeof milestoneTaskActions.createTask>> | null = null;
     try {
-      const created = await milestoneTaskActions.createTask(input);
+      created = await milestoneTaskActions.createTask(taskInput);
+      if (!created) {
+        throw new Error("Aufgabe konnte nicht angelegt werden");
+      }
+      if (tagIds.length > 0) {
+        await setTaskTags(created.id, tagIds);
+        await invalidateTags(queryClient);
+      }
+      for (const subtask of pendingSubtasks) {
+        await createSubtask(created.id, subtask);
+      }
+      const ticketOwner = { type: "task" as const, id: created.id };
+      for (const ticket of pendingTickets) {
+        if (ticket.kind === "existing") {
+          await linkOwnerTicket(ticketOwner, ticket.ticket.id);
+        } else {
+          await createOwnerTicket(ticketOwner, ticket.draft);
+        }
+      }
+      for (const comment of pendingComments) {
+        await createEntityComment("task", created.id, { body: comment.text });
+      }
+      for (const note of pendingNotes) {
+        await createTaskNote(created.id, note);
+      }
+      for (const file of pendingFiles) {
+        await uploadTaskAttachment(created.id, file.file);
+      }
       showToast({ tone: "success", title: "Aufgabe angelegt" });
-      return created ?? undefined;
+      return created;
     } catch (taskError) {
       showToast({
         tone: "error",
-        title: "Aufgabe konnte nicht angelegt werden",
+        title: created
+          ? "Aufgabe wurde angelegt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Aufgabe konnte nicht angelegt werden",
         message: errorMessage(taskError),
       });
       throw taskError;
     }
   };
 
-  const createMilestoneTicket = async (input: TicketInput) => {
+  const createMilestoneTicket = async (input: TicketFormInput) => {
+    const { tagIds, pendingSubTickets, pendingRelations, pendingComments, pendingNotes, pendingFiles } = input;
+    const ticketInput = {
+      title: input.title,
+      type: input.type,
+      description: input.description,
+      status: input.status,
+      priority: input.priority,
+      reporter: input.reporter,
+      assignee: input.assignee,
+      environment: input.environment,
+      affectedVersion: input.affectedVersion,
+      dueDate: input.dueDate,
+    };
+    let created: Awaited<ReturnType<typeof milestoneTicketActions.createTicket>> | null = null;
     try {
-      const created = await milestoneTicketActions.createTicket(input);
+      created = await milestoneTicketActions.createTicket(ticketInput);
+      if (!created) {
+        throw new Error("Ticket konnte nicht angelegt werden");
+      }
+      if (tagIds.length > 0) {
+        await setTicketTags(created.id, tagIds);
+      }
+      for (const subTicket of pendingSubTickets) {
+        await createSubTicket(created.id, subTicket);
+      }
+      for (const relation of pendingRelations) {
+        await addTicketRelation(created.id, {
+          targetTicketId: relation.ticket.id,
+          relationType: relation.relationType,
+        });
+      }
+      for (const comment of pendingComments) {
+        await createEntityComment("ticket", created.id, { body: comment.text });
+      }
+      for (const note of pendingNotes) {
+        await createTicketNote(created.id, note);
+      }
+      for (const file of pendingFiles) {
+        await uploadTicketAttachment(created.id, file.file);
+      }
       showToast({ tone: "success", title: "Ticket angelegt" });
       return created;
     } catch (ticketError) {
       showToast({
         tone: "error",
-        title: "Ticket konnte nicht angelegt werden",
+        title: created
+          ? "Ticket wurde angelegt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Ticket konnte nicht angelegt werden",
         message: await errorMessageAsync(ticketError),
       });
       throw ticketError;
@@ -606,7 +722,7 @@ export function ProjectForm({
           activeTab === "details" || activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
         }
         tabBar={
-          <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+          <TabBar tabs={tabItems} active={activeTab} onChange={handleTabChange} />
         }
       >
         {activeTab === "overview" && project ? (

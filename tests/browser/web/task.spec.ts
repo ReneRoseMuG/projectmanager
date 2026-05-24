@@ -91,7 +91,7 @@ test.describe("Task-Routen und Detailformular", () => {
       };
       taskId = createdTask.id;
 
-      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}\\?tab=tasks$`));
       const reopenedProjectForm = await openProjectTasks(page, project.id);
       await expect(itemCard(reopenedProjectForm, taskTitle)).toBeVisible();
       await itemCard(reopenedProjectForm, taskTitle).dblclick();

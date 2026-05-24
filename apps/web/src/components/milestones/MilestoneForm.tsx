@@ -1,5 +1,7 @@
 import type {
   CalendarEvent,
+  DraftComment,
+  DraftNote,
   EventInput,
   Feature,
   Milestone,
@@ -19,9 +21,9 @@ import {
   Trash2,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { ViewMode } from "../../types";
+import type { DraftFile, ViewMode } from "../../types";
 import { assetUrl } from "../../api/client";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
@@ -61,6 +63,9 @@ import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
 import { ItemRow } from "../ui/ItemRow";
+import { PendingCommentList } from "../ui/PendingCommentList";
+import { PendingFileList } from "../ui/PendingFileList";
+import { PendingNoteList } from "../ui/PendingNoteList";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { SectionHeader } from "../ui/SectionHeader";
@@ -86,9 +91,18 @@ interface MilestoneFormProps {
   onClose: () => void;
   onDelete?: (milestone: Milestone) => Promise<boolean>;
   savingLabel?: string;
+  initialTab?: MilestoneFormTab;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
   onOpenInTab?: () => void;
+  onPostCreate?: (
+    milestoneId: number,
+    pending: {
+      comments: DraftComment[];
+      notes: DraftNote[];
+      files: DraftFile[];
+    },
+  ) => Promise<void>;
 }
 
 function workStatusValue(
@@ -102,7 +116,7 @@ function workStatusValue(
   );
 }
 
-type MilestoneFormTab =
+export type MilestoneFormTab =
   | "overview"
   | "details"
   | "features"
@@ -127,6 +141,14 @@ const tabs: Array<Tab<MilestoneFormTab>> = [
   { value: "journal", label: "Journal" },
 ];
 
+export function parseMilestoneFormTab(
+  value: string | null | undefined,
+): MilestoneFormTab | undefined {
+  return tabs.some((tab) => tab.value === value)
+    ? (value as MilestoneFormTab)
+    : undefined;
+}
+
 export function MilestoneForm({
   open,
   milestone,
@@ -137,9 +159,11 @@ export function MilestoneForm({
   onClose,
   onDelete,
   savingLabel,
+  initialTab,
   variant = "modal",
   closeOnSubmit = true,
   onOpenInTab,
+  onPostCreate,
 }: MilestoneFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -184,6 +208,10 @@ export function MilestoneForm({
   const [eventFormOpen, setEventFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
+  const [pendingNotes, setPendingNotes] = useState<DraftNote[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<DraftFile[]>([]);
+  const prevOpenRef = useRef(false);
   const returnTo = `${location.pathname}${location.search}`;
   const projectOptions = projects.map((project) => ({
     value: project.id,
@@ -212,6 +240,34 @@ export function MilestoneForm({
     [milestoneId],
   );
 
+  const handleTabChange = (nextTab: MilestoneFormTab) => {
+    setActiveTab(nextTab);
+    if (variant !== "page") {
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    params.set("tab", nextTab);
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+  };
+
+  useEffect(() => {
+    if (!open) {
+      prevOpenRef.current = false;
+      return;
+    }
+
+    if (!prevOpenRef.current) {
+      setActiveTab(initialTab ?? "details");
+      setSelectedFeatureId("");
+      setSelectedEvent(null);
+      setEventFormOpen(false);
+      setPendingComments([]);
+      setPendingNotes([]);
+      setPendingFiles([]);
+    }
+    prevOpenRef.current = true;
+  }, [initialTab, open]);
+
   useEffect(() => {
     if (!open) {
       return;
@@ -226,10 +282,6 @@ export function MilestoneForm({
     setStartDate(milestone?.startDate ?? "");
     setDueDate(milestone?.dueDate ?? "");
     setSelectedTags(milestone?.tags ?? []);
-    setActiveTab("details");
-    setSelectedFeatureId("");
-    setSelectedEvent(null);
-    setEventFormOpen(false);
   }, [initialProjectId, milestone, open, projects]);
 
   useEffect(() => {
@@ -254,7 +306,7 @@ export function MilestoneForm({
     }
     setSaving(true);
     try {
-      await onSubmit(
+      const created = await onSubmit(
         {
           projectId,
           name,
@@ -271,6 +323,13 @@ export function MilestoneForm({
         },
         selectedTags.map((tag) => tag.id),
       );
+      if (!milestone && created && onPostCreate) {
+        await onPostCreate(created.id, {
+          comments: pendingComments,
+          notes: pendingNotes,
+          files: pendingFiles,
+        });
+      }
       if (closeOnSubmit) {
         onClose();
       }
@@ -441,13 +500,13 @@ export function MilestoneForm({
       };
     }
     if (tab.value === "comments") {
-      return { ...tab, count: milestone ? comments.comments.length : 0 };
+      return { ...tab, count: milestone ? comments.comments.length : pendingComments.length };
     }
     if (tab.value === "notes") {
-      return { ...tab, count: milestone ? notes.notes.length : 0 };
+      return { ...tab, count: milestone ? notes.notes.length : pendingNotes.length };
     }
     if (tab.value === "attachments") {
-      return { ...tab, count: milestone ? attachments.attachments.length : 0 };
+      return { ...tab, count: milestone ? attachments.attachments.length : pendingFiles.length };
     }
     if (tab.value === "events") {
       return { ...tab, count: milestone ? milestoneEvents.length : 0 };
@@ -495,7 +554,7 @@ export function MilestoneForm({
           activeTab === "details" || activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
         }
         tabBar={
-          <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+          <TabBar tabs={tabItems} active={activeTab} onChange={handleTabChange} />
         }
       >
         {activeTab === "overview" && milestone ? (
@@ -685,11 +744,10 @@ export function MilestoneForm({
                 onDelete={comments.removeComment}
               />
             ) : (
-              <EmptyState
-                icon={<Flag size={22} />}
-                title="Kommentare sind nach dem Speichern verfügbar."
-                tone="teal"
-                variant="tinted"
+              <PendingCommentList
+                comments={pendingComments}
+                onAdd={(comment) => setPendingComments((items) => [...items, comment])}
+                onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))}
               />
             )}
           </Section>
@@ -717,11 +775,10 @@ export function MilestoneForm({
                 />
               </>
             ) : (
-              <EmptyState
-                icon={<StickyNote size={22} />}
-                title="Notizen sind nach dem Speichern verfügbar."
-                tone="fern"
-                variant="tinted"
+              <PendingNoteList
+                notes={pendingNotes}
+                onAdd={(note) => setPendingNotes((items) => [...items, note])}
+                onRemove={(index) => setPendingNotes((items) => items.filter((_, itemIndex) => itemIndex !== index))}
               />
             )}
           </Section>
@@ -746,11 +803,18 @@ export function MilestoneForm({
                 />
               </div>
             ) : (
-              <EmptyState
-                icon={<Paperclip size={22} />}
-                title="Dateien sind nach dem Speichern verfügbar."
-                tone="fern"
-                variant="tinted"
+              <PendingFileList
+                files={pendingFiles}
+                onAdd={(files) => setPendingFiles((items) => [...items, ...files])}
+                onRemove={(index) =>
+                  setPendingFiles((items) => {
+                    const removed = items[index];
+                    if (removed?.previewUrl) {
+                      URL.revokeObjectURL(removed.previewUrl);
+                    }
+                    return items.filter((_, itemIndex) => itemIndex !== index);
+                  })
+                }
               />
             )}
           </Section>

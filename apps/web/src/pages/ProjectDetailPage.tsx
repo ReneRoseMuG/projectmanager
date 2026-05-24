@@ -14,7 +14,10 @@ import { setProjectFeatures } from "../api/doc-links";
 import { createProjectNote } from "../api/notes";
 import { createOwnerTask, linkOwnerTask } from "../api/tasks";
 import { createOwnerTicket, linkOwnerTicket } from "../api/tickets";
-import { ProjectForm } from "../components/projects/ProjectForm";
+import {
+  parseProjectFormTab,
+  ProjectForm,
+} from "../components/projects/ProjectForm";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
@@ -34,6 +37,7 @@ export function ProjectDetailPage() {
   const { project, loading, createProject, updateProject, removeProject } =
     useProjects(projectId);
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
+  const initialTab = parseProjectFormTab(searchParams.get("tab"));
 
   const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/projects") : "/projects");
   const closePage = () => navigate(returnTo);
@@ -143,7 +147,7 @@ export function ProjectDetailPage() {
     try {
       await removeProject(targetProject.id);
       showToast({ tone: "success", title: "Projekt gelöscht" });
-      navigate("/projects");
+      navigate(returnTo);
       return true;
     } catch (projectError) {
       showToast({
@@ -181,6 +185,7 @@ export function ProjectDetailPage() {
         open
         project={project}
         variant="page"
+        initialTab={initialTab}
         onSubmit={submitProject}
         onDelete={deleteProject}
         savingLabel={savingLabel}

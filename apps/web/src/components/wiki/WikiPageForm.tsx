@@ -1,4 +1,4 @@
-import type { WikiPage, WikiPageInput } from "@taskmanager/shared-types";
+import type { DraftComment, WikiPage, WikiPageInput } from "@taskmanager/shared-types";
 import { ExternalLink, Eye, History, Save, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
 import { Modal } from "../ui/Modal";
+import { PendingCommentList } from "../ui/PendingCommentList";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 
@@ -15,7 +16,8 @@ interface WikiPageFormProps {
   page?: WikiPage | null;
   parent?: WikiPage | null;
   tree: WikiTreeNode[];
-  onSubmit: (input: WikiPageInput) => Promise<void>;
+  onSubmit: (input: WikiPageInput) => Promise<WikiPage | void>;
+  onPostCreate?: (pageId: number, pending: { comments: DraftComment[] }) => Promise<void>;
   onClose: () => void;
   onOpenInTab?: () => void;
 }
@@ -24,7 +26,7 @@ function flattenTree(nodes: WikiTreeNode[]): WikiPage[] {
   return nodes.flatMap((node) => [node, ...flattenTree(node.children)]);
 }
 
-export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOpenInTab }: WikiPageFormProps) {
+export function WikiPageForm({ open, page, parent, tree, onSubmit, onPostCreate, onClose, onOpenInTab }: WikiPageFormProps) {
   const { confirm } = useConfirm();
   const pages = useMemo(() => flattenTree(tree).filter((item) => item.id !== page?.id), [page?.id, tree]);
   const [title, setTitle] = useState("");
@@ -35,6 +37,7 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOp
   const [preview, setPreview] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
 
   useEffect(() => {
     if (!open) {
@@ -47,13 +50,19 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOp
     setPreview(false);
     setVersionsOpen(false);
     setDirty(false);
+    if (!page) {
+      setPendingComments([]);
+    }
   }, [open, page, parent]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     try {
-      await onSubmit({ title, parentId, sortOrder, content });
+      const created = await onSubmit({ title, parentId, sortOrder, content });
+      if (!page && created && onPostCreate) {
+        await onPostCreate(created.id, { comments: pendingComments });
+      }
       setDirty(false);
       onClose();
     } catch {
@@ -156,6 +165,22 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onClose, onOp
               </>
             )}
           </Section>
+
+          {!page ? (
+            <Section title="Kommentare">
+              <PendingCommentList
+                comments={pendingComments}
+                onAdd={(comment) => {
+                  setPendingComments((items) => [...items, comment]);
+                  setDirty(true);
+                }}
+                onRemove={(index) => {
+                  setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index));
+                  setDirty(true);
+                }}
+              />
+            </Section>
+          ) : null}
         </div>
 
         <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">

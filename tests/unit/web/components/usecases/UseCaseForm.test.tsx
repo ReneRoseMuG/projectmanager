@@ -167,6 +167,17 @@ describe("UseCaseForm", () => {
     expect(screen.getByTestId("owner-task-board")).toHaveTextContent(`useCase:${useCase.id}`);
   });
 
+  it("behält den aktiven Tab bei einem Use-Case-Refetch", () => {
+    const { rerender } = renderWithProviders(<UseCaseForm open useCase={useCase} features={[feature]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    clickTab("Aufgaben");
+    expect(screen.getByTestId("owner-task-board")).toHaveTextContent(`useCase:${useCase.id}`);
+
+    rerender(<UseCaseForm open useCase={{ ...useCase, title: "Use Case Refetch" }} features={[feature]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("owner-task-board")).toHaveTextContent(`useCase:${useCase.id}`);
+  });
+
   it("zeigt im Edit-Modus OwnerTicketBoard im Tickets-Tab", () => {
     renderWithProviders(<UseCaseForm open useCase={useCase} features={[feature]} onSubmit={vi.fn()} onClose={vi.fn()} />);
 

@@ -61,7 +61,7 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       const createdMilestone = (await (await milestoneResponsePromise).json()) as { id: number };
       milestoneId = createdMilestone.id;
 
-      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}\\?tab=milestones$`));
 
       await authenticatedGoto(page, `/projects/${project.id}`);
       const refreshedProjectForm = formPage(page, "Projekt bearbeiten");

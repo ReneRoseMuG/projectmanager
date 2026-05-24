@@ -485,7 +485,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
       };
       featureId = createdFeature.id;
 
-      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}\\?tab=features$`));
       const refreshedProjectForm = formPage(page, "Projekt bearbeiten");
       await refreshedProjectForm
         .getByRole("button", { name: /Features/ })

@@ -2,10 +2,12 @@ import type {
   WikiPage as WikiPageType,
   WikiPageInput,
   WikiPageUpdate,
+  DraftComment,
 } from "@taskmanager/shared-types";
 import { FileText, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { createEntityComment } from "../api/comments";
 import { Button } from "../components/ui/Button";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -87,12 +89,32 @@ export function WikiPage() {
       } else {
         const created = await wiki.createWikiPage(input);
         showToast({ tone: "success", title: "Wiki-Seite erstellt" });
-        navigate(standalone ? withStandaloneView(`/wiki/${created.id}`) : `/wiki/${created.id}`);
+        return created;
       }
     } catch (wikiError) {
       showToast({
         tone: "error",
         title: "Wiki-Seite konnte nicht gespeichert werden",
+        message: errorMessage(wikiError),
+      });
+      throw wikiError;
+    }
+  };
+
+  const postCreatePage = async (
+    pageId: number,
+    pending: { comments: DraftComment[] },
+  ) => {
+    try {
+      for (const comment of pending.comments) {
+        await createEntityComment("wikiPage", pageId, { body: comment.text });
+      }
+      navigate(standalone ? withStandaloneView(`/wiki/${pageId}`) : `/wiki/${pageId}`);
+    } catch (wikiError) {
+      showToast({
+        tone: "error",
+        title:
+          "Wiki-Seite wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden",
         message: errorMessage(wikiError),
       });
       throw wikiError;
@@ -184,6 +206,7 @@ export function WikiPage() {
         parent={formParent}
         tree={wiki.tree}
         onSubmit={submitForm}
+        onPostCreate={postCreatePage}
         onOpenInTab={openInTab}
         onClose={() => {
           setFormOpen(false);

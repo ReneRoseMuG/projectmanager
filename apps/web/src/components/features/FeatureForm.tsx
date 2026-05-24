@@ -22,7 +22,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { assetUrl } from "../../api/client";
@@ -83,6 +83,7 @@ interface FeatureFormProps {
   onDelete?: (feature: Feature) => Promise<boolean>;
   savingLabel?: string;
   initialProjectId?: number;
+  initialTab?: FeatureFormTab;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
   onOpenInTab?: () => void;
@@ -99,7 +100,7 @@ interface FeatureFormProps {
   ) => Promise<void>;
 }
 
-type FeatureFormTab =
+export type FeatureFormTab =
   | "details"
   | "useCases"
   | "tasks"
@@ -119,6 +120,14 @@ const tabs: Array<Tab<FeatureFormTab>> = [
   { value: "attachments", label: "Dateien" },
   { value: "journal", label: "Journal" },
 ];
+
+export function parseFeatureFormTab(
+  value: string | null | undefined,
+): FeatureFormTab | undefined {
+  return tabs.some((tab) => tab.value === value)
+    ? (value as FeatureFormTab)
+    : undefined;
+}
 
 function featureStatusValue(
   entries: Parameters<typeof resolveCatalogEntryKey>[0],
@@ -172,6 +181,7 @@ export function FeatureForm({
   onDelete,
   savingLabel,
   initialProjectId,
+  initialTab,
   variant = "modal",
   closeOnSubmit = true,
   onOpenInTab,
@@ -233,6 +243,17 @@ export function FeatureForm({
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
   const [projectLinkOpen, setProjectLinkOpen] = useState(false);
+  const prevOpenRef = useRef(false);
+
+  const handleTabChange = (nextTab: FeatureFormTab) => {
+    setActiveTab(nextTab);
+    if (variant !== "page") {
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    params.set("tab", nextTab);
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+  };
 
   useEffect(() => {
     if (!open) {
@@ -248,6 +269,17 @@ export function FeatureForm({
       setTicketLinkOpen(false);
       setTicketDraftOpen(false);
       setProjectLinkOpen(false);
+      prevOpenRef.current = false;
+      return;
+    }
+    if (!prevOpenRef.current) {
+      setActiveTab(initialTab ?? "details");
+    }
+    prevOpenRef.current = true;
+  }, [initialTab, open]);
+
+  useEffect(() => {
+    if (!open) {
       return;
     }
     setTitle(feature?.title ?? "");
@@ -255,7 +287,6 @@ export function FeatureForm({
     setDescription(feature?.description ?? "");
     setSortOrder(feature?.sortOrder ?? 0);
     setContent(feature?.content ?? "");
-    setActiveTab("details");
   }, [feature, open]);
 
   useEffect(() => {
@@ -458,7 +489,7 @@ export function FeatureForm({
           activeTab === "details" ? "w-full max-w-7xl self-center" : ""
         }
         tabBar={
-          <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+          <TabBar tabs={tabItems} active={activeTab} onChange={handleTabChange} />
         }
       >
         {activeTab === "details" ? (

@@ -252,7 +252,7 @@ test.describe("Ticket-Routen und Detailformular", () => {
         await createdTicketResponsePromise
       ).json()) as { id: number };
       createdTicketId = createdTicket.id;
-      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}$`));
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}\\?tab=tickets$`));
       scope = await openProjectTickets(page, project.id);
       await expect(itemCard(scope, createdTitle)).toBeVisible();
 

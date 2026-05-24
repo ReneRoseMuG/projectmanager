@@ -1,9 +1,16 @@
-import type { Milestone, TaskInput, TicketInput } from "@taskmanager/shared-types";
+import type { Milestone } from "@taskmanager/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { uploadTaskAttachment } from "../api/attachments";
+import { createEntityComment } from "../api/comments";
+import { createTaskNote } from "../api/notes";
+import { createSubtask } from "../api/subtasks";
+import { setTaskTags } from "../api/tags";
+import { addTicketRelation, createOwnerTicket, createSubTicket, createTicketNote, linkOwnerTicket, setTicketTags, uploadTicketAttachment } from "../api/tickets";
 import { MilestoneListBoardView } from "../components/milestones/MilestoneListBoardView";
-import { TaskForm } from "../components/tasks/TaskForm";
-import { TicketForm } from "../components/tickets/TicketForm";
+import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
+import { TicketForm, type TicketFormInput } from "../components/tickets/TicketForm";
 import { PageHeader } from "../components/ui/PageHeader";
 import { ProjectMilestoneFilterBar } from "../components/ui/ProjectMilestoneFilterBar";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
@@ -15,6 +22,7 @@ import { useProjects } from "../hooks/useProjects";
 import { useStandaloneView } from "../hooks/useStandaloneView";
 import { useTasks } from "../hooks/useTasks";
 import { useTickets } from "../hooks/useTickets";
+import { invalidateTags } from "../queries/invalidation";
 import type { ViewMode } from "../types";
 import { withStandaloneView } from "../utils/standalone";
 
@@ -35,6 +43,7 @@ export function MilestonesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const standalone = useStandaloneView();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -113,30 +122,109 @@ export function MilestonesPage() {
     }
   };
 
-  const createTask = async (input: TaskInput) => {
+  const createTask = async (input: TaskFormInput) => {
+    const {
+      tagIds,
+      pendingSubtasks,
+      pendingTickets,
+      pendingComments,
+      pendingNotes,
+      pendingFiles,
+      ...taskInput
+    } = input;
+    let created: Awaited<ReturnType<typeof taskActions.createTask>> | null = null;
     try {
-      const created = await taskActions.createTask(input);
+      created = await taskActions.createTask(taskInput);
+      if (!created) {
+        throw new Error("Aufgabe konnte nicht angelegt werden");
+      }
+      if (tagIds.length > 0) {
+        await setTaskTags(created.id, tagIds);
+        await invalidateTags(queryClient);
+      }
+      for (const subtask of pendingSubtasks) {
+        await createSubtask(created.id, subtask);
+      }
+      const ticketOwner = { type: "task" as const, id: created.id };
+      for (const ticket of pendingTickets) {
+        if (ticket.kind === "existing") {
+          await linkOwnerTicket(ticketOwner, ticket.ticket.id);
+        } else {
+          await createOwnerTicket(ticketOwner, ticket.draft);
+        }
+      }
+      for (const comment of pendingComments) {
+        await createEntityComment("task", created.id, { body: comment.text });
+      }
+      for (const note of pendingNotes) {
+        await createTaskNote(created.id, note);
+      }
+      for (const file of pendingFiles) {
+        await uploadTaskAttachment(created.id, file.file);
+      }
       showToast({ tone: "success", title: "Aufgabe angelegt" });
-      return created ?? undefined;
+      return created;
     } catch (taskError) {
       showToast({
         tone: "error",
-        title: "Aufgabe konnte nicht angelegt werden",
+        title: created
+          ? "Aufgabe wurde angelegt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Aufgabe konnte nicht angelegt werden",
         message: errorMessage(taskError),
       });
       throw taskError;
     }
   };
 
-  const createTicket = async (input: TicketInput) => {
+  const createTicket = async (input: TicketFormInput) => {
+    const { tagIds, pendingSubTickets, pendingRelations, pendingComments, pendingNotes, pendingFiles } = input;
+    const ticketInput = {
+      title: input.title,
+      type: input.type,
+      description: input.description,
+      status: input.status,
+      priority: input.priority,
+      reporter: input.reporter,
+      assignee: input.assignee,
+      environment: input.environment,
+      affectedVersion: input.affectedVersion,
+      dueDate: input.dueDate,
+    };
+    let created: Awaited<ReturnType<typeof ticketActions.createTicket>> | null = null;
     try {
-      const created = await ticketActions.createTicket(input);
+      created = await ticketActions.createTicket(ticketInput);
+      if (!created) {
+        throw new Error("Ticket konnte nicht angelegt werden");
+      }
+      if (tagIds.length > 0) {
+        await setTicketTags(created.id, tagIds);
+      }
+      for (const subTicket of pendingSubTickets) {
+        await createSubTicket(created.id, subTicket);
+      }
+      for (const relation of pendingRelations) {
+        await addTicketRelation(created.id, {
+          targetTicketId: relation.ticket.id,
+          relationType: relation.relationType,
+        });
+      }
+      for (const comment of pendingComments) {
+        await createEntityComment("ticket", created.id, { body: comment.text });
+      }
+      for (const note of pendingNotes) {
+        await createTicketNote(created.id, note);
+      }
+      for (const file of pendingFiles) {
+        await uploadTicketAttachment(created.id, file.file);
+      }
       showToast({ tone: "success", title: "Ticket angelegt" });
       return created;
     } catch (ticketError) {
       showToast({
         tone: "error",
-        title: "Ticket konnte nicht angelegt werden",
+        title: created
+          ? "Ticket wurde angelegt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Ticket konnte nicht angelegt werden",
         message: await errorMessageAsync(ticketError),
       });
       throw ticketError;

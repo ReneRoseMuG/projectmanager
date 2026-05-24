@@ -11,7 +11,10 @@ import { createEntityComment } from "../api/comments";
 import { createOwnerTask, linkOwnerTask } from "../api/tasks";
 import { createOwnerTicket, linkOwnerTicket } from "../api/tickets";
 import { getUseCase } from "../api/use-cases";
-import { UseCaseForm } from "../components/usecases/UseCaseForm";
+import {
+  parseUseCaseFormTab,
+  UseCaseForm,
+} from "../components/usecases/UseCaseForm";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
@@ -36,6 +39,7 @@ export function UseCaseDetailPage() {
     initialFeatureId !== undefined && Number.isFinite(initialFeatureId)
       ? initialFeatureId
       : undefined;
+  const initialTab = parseUseCaseFormTab(searchParams.get("tab"));
   const allFeatures = useFeatures();
   const useCases = useUseCases(validFeatureId);
   const [useCase, setUseCase] = useState<UseCase | null>(null);
@@ -189,6 +193,7 @@ export function UseCaseDetailPage() {
         currentFeatureId={useCase?.featureId ?? validFeatureId}
         features={allFeatures.features}
         variant="page"
+        initialTab={initialTab}
         onSubmit={submitUseCase}
         onPostCreate={postCreateUseCase}
         onDelete={deleteUseCase}

@@ -1,4 +1,4 @@
-import type { BacklogItem, BacklogItemInput, BacklogStatus, Feature } from "@taskmanager/shared-types";
+import type { BacklogItem, BacklogItemInput, BacklogStatus, DraftComment, Feature } from "@taskmanager/shared-types";
 import { Inbox, Send } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -8,6 +8,7 @@ import { JournalPanel } from "../journal/JournalPanel";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { Input } from "../ui/Input";
+import { PendingCommentList } from "../ui/PendingCommentList";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
@@ -21,14 +22,15 @@ interface BacklogItemFormProps {
   open: boolean;
   item?: BacklogItem | null;
   features: Feature[];
-  onSubmit: (input: BacklogItemInput) => Promise<void>;
+  onSubmit: (input: BacklogItemInput) => Promise<BacklogItem | void>;
+  onPostCreate?: (itemId: number, pending: { comments: DraftComment[] }) => Promise<void>;
   onClose: () => void;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
   onOpenInTab?: () => void;
 }
 
-export function BacklogItemForm({ open, item, features, onSubmit, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: BacklogItemFormProps) {
+export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: BacklogItemFormProps) {
   const comments = useEntityComments("backlogItem", item?.id);
   const catalogs = useCatalogs();
   const canReadJournal = useHasPermission("journal", "read");
@@ -38,6 +40,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
   const [featureId, setFeatureId] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
   const selectedFeature = useMemo(() => features.find((feature) => feature.id === featureId) ?? null, [featureId, features]);
 
   useEffect(() => {
@@ -50,6 +53,9 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
     setStatus(item?.status ?? "open");
     setFeatureId(item?.featureId ?? null);
     setSortOrder(item?.sortOrder ?? 0);
+    if (!item) {
+      setPendingComments([]);
+    }
   }, [open, item]);
 
   useEffect(() => {
@@ -62,7 +68,10 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
     event.preventDefault();
     setSaving(true);
     try {
-      await onSubmit({ title, description, status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"), featureId, sortOrder });
+      const created = await onSubmit({ title, description, status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"), featureId, sortOrder });
+      if (!item && created && onPostCreate) {
+        await onPostCreate(created.id, { comments: pendingComments });
+      }
       if (closeOnSubmit) {
         onClose();
       }
@@ -128,12 +137,20 @@ export function BacklogItemForm({ open, item, features, onSubmit, onClose, varia
         </Button>
       </Section>
 
-      {item ? (
-        <Section title="Kommentare">
-          {comments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{comments.error}</div> : null}
-          <CommentThread comments={comments.comments} entityLabel="Backlog-Item" onCreate={comments.createComment} onDelete={comments.removeComment} />
-        </Section>
-      ) : null}
+      <Section title="Kommentare">
+        {item ? (
+          <>
+            {comments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{comments.error}</div> : null}
+            <CommentThread comments={comments.comments} entityLabel="Backlog-Item" onCreate={comments.createComment} onDelete={comments.removeComment} />
+          </>
+        ) : (
+          <PendingCommentList
+            comments={pendingComments}
+            onAdd={(comment) => setPendingComments((items) => [...items, comment])}
+            onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))}
+          />
+        )}
+      </Section>
 
       {item && canReadJournal ? (
         <Section title="Journal" fill>

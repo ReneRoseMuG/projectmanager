@@ -14,7 +14,7 @@ import type {
 } from "@taskmanager/shared-types";
 import { ClipboardList, ListChecks, Paperclip, StickyNote } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DraftFile } from "../../types";
 import { assetUrl } from "../../api/client";
 import { useCatalogs } from "../../hooks/useCatalogs";
@@ -188,6 +188,8 @@ export function TaskForm({
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const prevOpenRef = useRef(false);
+
   useEffect(() => {
     if (!open) {
       setPendingSubtasks([]);
@@ -199,10 +201,14 @@ export function TaskForm({
       setTicketLinkOpen(false);
       setTicketDraftOpen(false);
       setEditingNote(null);
+      prevOpenRef.current = false;
       return;
     }
-    setActiveTab("details");
-  }, [open, task]);
+    if (!prevOpenRef.current) {
+      setActiveTab("details");
+    }
+    prevOpenRef.current = true;
+  }, [open]);
 
   useEffect(() => {
     if (!open) {

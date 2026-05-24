@@ -13,7 +13,8 @@ import type {
 } from "@taskmanager/shared-types";
 import { BookOpen, Bug, ListTodo, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useTasks } from "../../hooks/useTasks";
@@ -66,12 +67,13 @@ interface UseCaseFormProps {
   ) => Promise<void>;
   onDelete?: (useCase: UseCase) => Promise<boolean> | boolean;
   onClose: () => void;
+  initialTab?: UseCaseFormTab;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
   onOpenInTab?: () => void;
 }
 
-type UseCaseFormTab = "details" | "tasks" | "tickets" | "comments" | "journal";
+export type UseCaseFormTab = "details" | "tasks" | "tickets" | "comments" | "journal";
 
 const tabs: Array<Tab<UseCaseFormTab>> = [
   { value: "details", label: "Stammdaten" },
@@ -80,6 +82,14 @@ const tabs: Array<Tab<UseCaseFormTab>> = [
   { value: "comments", label: "Kommentare" },
   { value: "journal", label: "Journal" },
 ];
+
+export function parseUseCaseFormTab(
+  value: string | null | undefined,
+): UseCaseFormTab | undefined {
+  return tabs.some((tab) => tab.value === value)
+    ? (value as UseCaseFormTab)
+    : undefined;
+}
 
 function featureStatusValue(
   entries: Parameters<typeof resolveCatalogEntryKey>[0],
@@ -134,10 +144,13 @@ export function UseCaseForm({
   onPostCreate,
   onDelete,
   onClose,
+  initialTab,
   variant = "modal",
   closeOnSubmit = true,
   onOpenInTab,
 }: UseCaseFormProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const comments = useEntityComments("useCase", useCase?.id);
   const catalogs = useCatalogs();
   const tasks = useTasks(
@@ -163,6 +176,7 @@ export function UseCaseForm({
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [taskDraftOpen, setTaskDraftOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
+  const prevOpenRef = useRef(false);
   const candidateFeatureId = useCase?.featureId ?? (typeof selectedFeatureId === "number" ? selectedFeatureId : currentFeatureId);
   const taskCandidateOwner: TaskOwner | null = useCase
     ? { type: "useCase", id: useCase.id }
@@ -175,6 +189,16 @@ export function UseCaseForm({
       ? { type: "feature", id: candidateFeatureId }
       : null;
 
+  const handleTabChange = (nextTab: UseCaseFormTab) => {
+    setActiveTab(nextTab);
+    if (variant !== "page") {
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    params.set("tab", nextTab);
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+  };
+
   useEffect(() => {
     if (!open) {
       setPendingTasks([]);
@@ -184,16 +208,25 @@ export function UseCaseForm({
       setTicketLinkOpen(false);
       setTaskDraftOpen(false);
       setTicketDraftOpen(false);
+      prevOpenRef.current = false;
       return;
     }
+    if (!prevOpenRef.current) {
+      setActiveTab(initialTab ?? "details");
+    }
+    prevOpenRef.current = true;
+  }, [initialTab, open]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
     setTitle(useCase?.title ?? "");
     setStatus(useCase?.status ?? "draft");
     setDescription(useCase?.description ?? "");
     setSortOrder(useCase?.sortOrder ?? 0);
     setContent(useCase?.content ?? "");
     setSelectedFeatureId(useCase?.featureId ?? currentFeatureId ?? "");
-    setActiveTab("details");
   }, [currentFeatureId, open, useCase]);
 
   useEffect(() => {
@@ -333,7 +366,7 @@ export function UseCaseForm({
           activeTab === "details" ? "w-full max-w-7xl self-center" : ""
         }
         tabBar={
-          <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+          <TabBar tabs={tabItems} active={activeTab} onChange={handleTabChange} />
         }
       >
         {activeTab === "details" ? (

@@ -2,6 +2,15 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 24.05.26 | Fix / Feature | Meilenstein-Karten-Kindobjekte               | ✅     |
+| 24.05.26 | Analyse       | Create-Kindobjekte und DnD                   | ✅     |
+| 24.05.26 | Fix           | StatusPill Fallback                          | ✅     |
+| 24.05.26 | Fix           | Web-Unit-Test-Erwartungen                    | ✅     |
+| 24.05.26 | 4             | Create-Kindobjekte Abnahme                   | ⚠️     |
+| 24.05.26 | 3             | Create-Kindobjekte Browsertests              | ⚠️     |
+| 24.05.26 | 2             | Kindobjekte Integrationstests                | ✅     |
+| 24.05.26 | 1             | Create-Kindobjekte UI                        | ⚠️     |
+| 24.05.26 | Fix / Feature | MS-13 Navigation                             | ✅     |
 | 24.05.26 | Fix           | Sidebar Header Buttons                       | ✅     |
 | 24.05.26 | Fix           | Sidebar Header Suche                         | ✅     |
 | 24.05.26 | Feature       | MCP Attachment Tool                          | ✅     |

@@ -1,7 +1,8 @@
-import type { BacklogItem, BacklogItemInput } from "@taskmanager/shared-types";
+import type { BacklogItem, BacklogItemInput, DraftComment } from "@taskmanager/shared-types";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getBacklogItem } from "../api/backlog";
+import { createEntityComment } from "../api/comments";
 import { BacklogItemForm } from "../components/backlog/BacklogItemForm";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
@@ -67,8 +68,9 @@ export function BacklogItemDetailPage() {
         showToast({ tone: "success", title: "Backlog-Item gespeichert" });
         return;
       }
-      await backlog.createItem(input);
+      const created = await backlog.createItem(input);
       showToast({ tone: "success", title: "Backlog-Item erstellt" });
+      return created;
     } catch (backlogError) {
       showToast({
         tone: "error",
@@ -76,6 +78,25 @@ export function BacklogItemDetailPage() {
         message: errorMessage(backlogError),
       });
       throw backlogError;
+    }
+  };
+
+  const postCreateBacklogItem = async (
+    itemId: number,
+    pending: { comments: DraftComment[] },
+  ) => {
+    try {
+      for (const comment of pending.comments) {
+        await createEntityComment("backlogItem", itemId, { body: comment.text });
+      }
+    } catch (postCreateError) {
+      showToast({
+        tone: "error",
+        title:
+          "Backlog-Item wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden",
+        message: errorMessage(postCreateError),
+      });
+      throw postCreateError;
     }
   };
 
@@ -115,6 +136,7 @@ export function BacklogItemDetailPage() {
         features={features.features}
         variant="page"
         onSubmit={submitBacklogItem}
+        onPostCreate={postCreateBacklogItem}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

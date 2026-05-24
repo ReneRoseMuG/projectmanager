@@ -214,6 +214,17 @@ describe("FeatureForm", () => {
     expect(screen.getByTestId("owner-task-board")).toHaveTextContent(`feature:${feature.id}`);
   });
 
+  it("behält den aktiven Tab bei einem Feature-Refetch", () => {
+    const { rerender } = renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    clickTab("Aufgaben");
+    expect(screen.getByTestId("owner-task-board")).toHaveTextContent(`feature:${feature.id}`);
+
+    rerender(<FeatureForm open feature={{ ...feature, title: "Feature Refetch" }} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("owner-task-board")).toHaveTextContent(`feature:${feature.id}`);
+  });
+
   it("zeigt im Edit-Modus OwnerTicketBoard, FeatureProjectPanel, CommentThread und AttachmentList", () => {
     renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onClose={vi.fn()} />);
 

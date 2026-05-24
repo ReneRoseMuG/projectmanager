@@ -125,6 +125,7 @@ test.describe("Task Board Drag & Drop", () => {
       };
 
       expect(updated.status).toBe("on_hold");
+      await expect(page).toHaveURL(new RegExp(`/projects/${project.id}\\?tab=tasks$`));
       await expect(
         projectForm
           .locator('section[data-status-column="on_hold"]')

@@ -1,10 +1,17 @@
-import type { MilestoneInput, Project, ProjectStatus, TaskInput, TicketInput } from "@taskmanager/shared-types";
+import type { DraftComment, DraftNote, MilestoneInput, Project, ProjectStatus } from "@taskmanager/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { uploadMilestoneAttachment, uploadTaskAttachment } from "../api/attachments";
+import { createEntityComment } from "../api/comments";
+import { createMilestoneNote, createTaskNote } from "../api/notes";
+import { createSubtask } from "../api/subtasks";
+import { setTaskTags } from "../api/tags";
+import { addTicketRelation, createOwnerTicket, createSubTicket, createTicketNote, linkOwnerTicket, setTicketTags, uploadTicketAttachment } from "../api/tickets";
 import { MilestoneForm } from "../components/milestones/MilestoneForm";
 import { ProjectListBoardView } from "../components/projects/ProjectListBoardView";
-import { TaskForm } from "../components/tasks/TaskForm";
-import { TicketForm } from "../components/tickets/TicketForm";
+import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
+import { TicketForm, type TicketFormInput } from "../components/tickets/TicketForm";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -17,12 +24,15 @@ import { useProjects } from "../hooks/useProjects";
 import { useStandaloneView } from "../hooks/useStandaloneView";
 import { useTasks } from "../hooks/useTasks";
 import { useTickets } from "../hooks/useTickets";
+import { invalidateTags } from "../queries/invalidation";
+import type { DraftFile } from "../types";
 import { catalogEntriesByKind } from "../utils/catalogs";
 import { withStandaloneView } from "../utils/standalone";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const { projects, loading, error, updateProject, removeProject } = useProjects();
   const catalogs = useCatalogs();
   const standalone = useStandaloneView();
@@ -114,30 +124,138 @@ export function ProjectsPage() {
     }
   };
 
-  const createTask = async (input: TaskInput) => {
+  const postCreateMilestone = async (
+    milestoneId: number,
+    pending: {
+      comments: DraftComment[];
+      notes: DraftNote[];
+      files: DraftFile[];
+    },
+  ) => {
     try {
-      const created = await taskActions.createTask(input);
-      showToast({ tone: "success", title: "Aufgabe angelegt" });
-      return created ?? undefined;
+      for (const comment of pending.comments) {
+        await createEntityComment("milestone", milestoneId, { body: comment.text });
+      }
+      for (const note of pending.notes) {
+        await createMilestoneNote(milestoneId, note);
+      }
+      for (const file of pending.files) {
+        await uploadMilestoneAttachment(milestoneId, file.file);
+      }
     } catch (createError) {
       showToast({
         tone: "error",
-        title: "Aufgabe konnte nicht angelegt werden",
+        title:
+          "Meilenstein wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden",
         message: errorMessage(createError),
       });
       throw createError;
     }
   };
 
-  const createTicket = async (input: TicketInput) => {
+  const createTask = async (input: TaskFormInput) => {
+    const {
+      tagIds,
+      pendingSubtasks,
+      pendingTickets,
+      pendingComments,
+      pendingNotes,
+      pendingFiles,
+      ...taskInput
+    } = input;
+    let created: Awaited<ReturnType<typeof taskActions.createTask>> | null = null;
     try {
-      const created = await ticketActions.createTicket(input);
+      created = await taskActions.createTask(taskInput);
+      if (!created) {
+        throw new Error("Aufgabe konnte nicht angelegt werden");
+      }
+      if (tagIds.length > 0) {
+        await setTaskTags(created.id, tagIds);
+        await invalidateTags(queryClient);
+      }
+      for (const subtask of pendingSubtasks) {
+        await createSubtask(created.id, subtask);
+      }
+      const ticketOwner = { type: "task" as const, id: created.id };
+      for (const ticket of pendingTickets) {
+        if (ticket.kind === "existing") {
+          await linkOwnerTicket(ticketOwner, ticket.ticket.id);
+        } else {
+          await createOwnerTicket(ticketOwner, ticket.draft);
+        }
+      }
+      for (const comment of pendingComments) {
+        await createEntityComment("task", created.id, { body: comment.text });
+      }
+      for (const note of pendingNotes) {
+        await createTaskNote(created.id, note);
+      }
+      for (const file of pendingFiles) {
+        await uploadTaskAttachment(created.id, file.file);
+      }
+      showToast({ tone: "success", title: "Aufgabe angelegt" });
+      return created;
+    } catch (createError) {
+      showToast({
+        tone: "error",
+        title: created
+          ? "Aufgabe wurde angelegt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Aufgabe konnte nicht angelegt werden",
+        message: errorMessage(createError),
+      });
+      throw createError;
+    }
+  };
+
+  const createTicket = async (input: TicketFormInput) => {
+    const { tagIds, pendingSubTickets, pendingRelations, pendingComments, pendingNotes, pendingFiles } = input;
+    const ticketInput = {
+      title: input.title,
+      type: input.type,
+      description: input.description,
+      status: input.status,
+      priority: input.priority,
+      reporter: input.reporter,
+      assignee: input.assignee,
+      environment: input.environment,
+      affectedVersion: input.affectedVersion,
+      dueDate: input.dueDate,
+    };
+    let created: Awaited<ReturnType<typeof ticketActions.createTicket>> | null = null;
+    try {
+      created = await ticketActions.createTicket(ticketInput);
+      if (!created) {
+        throw new Error("Ticket konnte nicht angelegt werden");
+      }
+      if (tagIds.length > 0) {
+        await setTicketTags(created.id, tagIds);
+      }
+      for (const subTicket of pendingSubTickets) {
+        await createSubTicket(created.id, subTicket);
+      }
+      for (const relation of pendingRelations) {
+        await addTicketRelation(created.id, {
+          targetTicketId: relation.ticket.id,
+          relationType: relation.relationType,
+        });
+      }
+      for (const comment of pendingComments) {
+        await createEntityComment("ticket", created.id, { body: comment.text });
+      }
+      for (const note of pendingNotes) {
+        await createTicketNote(created.id, note);
+      }
+      for (const file of pendingFiles) {
+        await uploadTicketAttachment(created.id, file.file);
+      }
       showToast({ tone: "success", title: "Ticket angelegt" });
       return created;
     } catch (createError) {
       showToast({
         tone: "error",
-        title: "Ticket konnte nicht angelegt werden",
+        title: created
+          ? "Ticket wurde angelegt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Ticket konnte nicht angelegt werden",
         message: await errorMessageAsync(createError),
       });
       throw createError;
@@ -184,6 +302,7 @@ export function ProjectsPage() {
         lockProjectSelection
         closeOnSubmit
         onSubmit={createMilestone}
+        onPostCreate={postCreateMilestone}
         onClose={() => setCreateMilestoneForProject(null)}
       />
       <TaskForm

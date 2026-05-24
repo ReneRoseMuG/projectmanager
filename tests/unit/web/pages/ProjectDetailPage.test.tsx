@@ -44,6 +44,7 @@ vi.mock("../../../../apps/web/src/components/projects/ProjectForm", () => ({
       <div data-testid="project-form" />
     );
   },
+  parseProjectFormTab: () => undefined,
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({
