@@ -391,30 +391,50 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
             </span>
           </div>
         ) : (
+          <>
+            <div className="mb-3 flex w-0 min-w-full items-center gap-2 overflow-hidden px-1">
+              <span className="flex h-12 w-12 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-base font-bold text-steel-700 shadow-steel-icon">
+                PM
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-white/55 transition hover:bg-white/5 hover:text-white"
+                  aria-label={collapseToggleLabel}
+                  title={collapseToggleLabel}
+                  onClick={toggleCollapsed}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-white/55 transition hover:bg-white/5 hover:text-white"
+                  aria-label="Aktualisieren"
+                  title="Aktualisieren"
+                  onClick={() => void invalidateWikiImportData(queryClient)}
+                >
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+            </div>
+            <div className="mb-4 flex min-h-10 w-0 min-w-full items-center overflow-hidden px-1">
+              <span className="min-w-0 text-sm font-bold leading-5 text-white">
+                Projekt Manager
+              </span>
+            </div>
+          </>
+        )}
+        {collapsed ? (
           <button
             type="button"
-            className="mb-3 flex w-0 min-w-full items-center gap-3 overflow-hidden rounded-lg p-1 text-left transition hover:bg-white/5"
-            title="Aktualisieren"
-            onClick={() => void invalidateWikiImportData(queryClient)}
+            className="mb-3 flex h-8 w-full items-center justify-center rounded-lg text-white/55 transition hover:bg-white/5 hover:text-white"
+            aria-label={collapseToggleLabel}
+            title={collapseToggleLabel}
+            onClick={toggleCollapsed}
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-steel-700 shadow-steel-icon">
-              PM
-            </span>
-            <span className="flex min-h-10 items-center text-sm font-bold text-white">
-              Projekt Manager
-            </span>
-            <RefreshCw size={14} className="ml-auto text-white/55" />
+            <ChevronRight size={16} />
           </button>
-        )}
-        <button
-          type="button"
-          className={`mb-3 flex h-8 items-center justify-center rounded-lg text-white/55 transition hover:bg-white/5 hover:text-white ${collapsed ? "w-full" : "w-0 min-w-full overflow-hidden"}`}
-          aria-label={collapseToggleLabel}
-          title={collapseToggleLabel}
-          onClick={toggleCollapsed}
-        >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
+        ) : null}
         {!collapsed ? (
           <div
             className="mb-2 w-0 min-w-full overflow-hidden"

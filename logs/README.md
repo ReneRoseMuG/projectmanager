@@ -2,6 +2,8 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 24.05.26 | Fix           | Sidebar Header Buttons                       | ✅     |
+| 24.05.26 | Fix           | Sidebar Header Suche                         | ✅     |
 | 24.05.26 | Feature       | MCP Attachment Tool                          | ✅     |
 | 24.05.26 | Fix           | Board-Spaltenbreite                          | ✅     |
 | 24.05.26 | Feature       | Projekt-Meilenstein Create-Aktionen          | ⚠️     |
