@@ -37,6 +37,10 @@ export class ProjectManagerApiClient {
     return this.request<T>("POST", path, body);
   }
 
+  async postForm<T>(path: string, formData: FormData): Promise<T> {
+    return this.request<T>("POST", path, formData, "form");
+  }
+
   async patch<T>(path: string, body: unknown): Promise<T> {
     return this.request<T>("PATCH", path, body);
   }
@@ -45,14 +49,24 @@ export class ProjectManagerApiClient {
     return this.request<T>("PUT", path, body);
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown, bodyType: "json" | "form" = "json"): Promise<T> {
+    const headers: Record<string, string> = {
+      "x-api-key": this.apiKey
+    };
+    let requestBody: BodyInit | undefined;
+    if (body !== undefined) {
+      if (bodyType === "form") {
+        requestBody = body as FormData;
+      } else {
+        headers["content-type"] = "application/json";
+        requestBody = JSON.stringify(body);
+      }
+    }
+
     const response = await this.fetchImpl(`${this.baseUrl}/${path.replace(/^\/+/, "")}`, {
       method,
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": this.apiKey
-      },
-      body: body === undefined ? undefined : JSON.stringify(body)
+      headers,
+      body: requestBody
     });
 
     if (!response.ok) {

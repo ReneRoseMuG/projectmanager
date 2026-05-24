@@ -1,5 +1,6 @@
 import { TICKET_RESOLUTIONS } from "@taskmanager/shared-types";
 import type {
+  Attachment,
   CatalogEntry,
   Comment,
   Feature,
@@ -30,6 +31,7 @@ import { plainTextDocument } from "./rich-text.js";
 export type ParentType = "project" | "milestone";
 export type LinkParentType = ParentType | "feature" | "useCase";
 export type ExtendedParentType = ParentType | "task" | "feature" | "useCase" | "ticket";
+export type AttachmentParentType = ParentType | "task" | "feature" | "ticket";
 
 export interface ToolDefinition {
   name: string;
@@ -109,6 +111,13 @@ const noteInputSchema = z
     title: z.string().optional(),
     text: z.string().min(1)
   });
+const attachmentInputSchema = z.object({
+  parentType: z.enum(["project", "milestone", "task", "feature", "ticket"]),
+  parentId: z.number().int().positive(),
+  fileName: z.string().min(1),
+  contentBase64: z.string().min(1),
+  mimetype: z.string().min(1).optional()
+});
 const projectCreateSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
@@ -217,6 +226,36 @@ function extendedOwnerPath(parentType: ExtendedParentType, parentId: number): st
     return `use-cases/${parentId}`;
   }
   return `${parentType}s/${parentId}`;
+}
+
+function attachmentOwnerPath(parentType: AttachmentParentType, parentId: number): string {
+  return `${parentType}s/${parentId}`;
+}
+
+function decodeBase64Content(contentBase64: string): Buffer {
+  const normalized = contentBase64.replace(/\s+/g, "");
+  const buffer = Buffer.from(normalized, "base64");
+  const canonicalContent = buffer.toString("base64").replace(/=+$/, "");
+  const canonicalInput = normalized.replace(/=+$/, "");
+  if (buffer.length === 0 || canonicalContent !== canonicalInput) {
+    throw new Error("contentBase64 must be valid base64 file content");
+  }
+  return buffer;
+}
+
+function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
+  const arrayBuffer = new ArrayBuffer(buffer.byteLength);
+  new Uint8Array(arrayBuffer).set(buffer);
+  return arrayBuffer;
+}
+
+function attachmentFormData(input: z.infer<typeof attachmentInputSchema>): FormData {
+  const formData = new FormData();
+  const blob = new Blob([bufferToArrayBuffer(decodeBase64Content(input.contentBase64))], {
+    type: input.mimetype ?? "application/octet-stream"
+  });
+  formData.append("file", blob, input.fileName);
+  return formData;
 }
 
 function withoutParent<T extends { parentType: string; parentId: number }>(input: T): Omit<T, "parentType" | "parentId"> {
@@ -446,6 +485,13 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
           title: input.title,
           contentJson: plainTextDocument(input.text)
         })
+    }),
+    defineTool({
+      name: "add_attachment_to_parent",
+      title: "Attachment hinzufügen",
+      description: "Hängt eine Base64-codierte Datei an Projekt, Meilenstein, Task, Feature oder Ticket.",
+      inputSchema: attachmentInputSchema,
+      execute: (input) => client.postForm<Attachment>(`${attachmentOwnerPath(input.parentType, input.parentId)}/attachments`, attachmentFormData(input))
     }),
     defineTool({
       name: "update_project",

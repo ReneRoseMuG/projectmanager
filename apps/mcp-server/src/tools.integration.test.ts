@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type {
+  Attachment,
   CatalogEntry,
   Comment,
   Feature,
@@ -13,6 +14,9 @@ import type {
   UserOption
 } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../../tests/fixtures/api/index.js";
 import { ProjectManagerApiClient } from "./api-client.js";
@@ -24,6 +28,7 @@ import { createProjectManagerMcpServer } from "./server.js";
  * Abgedeckte Regeln:
  * - Jedes verfügbare MCP-v1-Tool wird einmal über den MCP-Transport ausgeführt.
  * - Die Tools arbeiten gegen echte Fastify-Routen mit isolierter Temp-SQLite-Datenbank.
+ * - Attachment-Uploads verwenden ein isoliertes Temp-Upload-Verzeichnis.
  * - Schreibende Tools erzeugen oder ändern beobachtbare Daten versionsgeschützt.
  * - Destruktive Delete-Tools bleiben bewusst außerhalb der MCP-Oberfläche.
  *
@@ -37,6 +42,8 @@ import { createProjectManagerMcpServer } from "./server.js";
 type ToolCallResponse = Awaited<ReturnType<Client["callTool"]>>;
 
 const apiKey = "mcp-integration-api-key";
+const uploadDir = path.join(os.tmpdir(), `taskmanager-mcp-attachments-${process.pid}`);
+const previewCacheDir = path.join(os.tmpdir(), `taskmanager-mcp-attachment-previews-${process.pid}`);
 
 describe("MCP tools integration", () => {
   let testDb: TestDb;
@@ -48,10 +55,14 @@ describe("MCP tools integration", () => {
 
   beforeAll(async () => {
     process.env.API_KEY = apiKey;
+    process.env.UPLOAD_DIR = uploadDir;
+    process.env.PREVIEW_CACHE_DIR = previewCacheDir;
 
     testDb = createTestDb();
     truncateAll(testDb.sqlite);
-    app = await buildTestApp(testDb, { enableAuth: true });
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
+    app = await buildTestApp(testDb, { enableAuth: true, enableMultipart: true });
     await app.listen({ host: "127.0.0.1", port: 0 });
 
     const address = app.server.address();
@@ -74,6 +85,8 @@ describe("MCP tools integration", () => {
     await mcpServer.close();
     await app.close();
     testDb.sqlite.close();
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
   });
 
   async function callTool<T>(executedTools: Set<string>, name: string, args: Record<string, unknown> = {}): Promise<T> {
@@ -284,6 +297,25 @@ describe("MCP tools integration", () => {
     });
     expect(note.title).toBe("MCP Notiz");
     expect(note.contentJson).toMatchObject({ type: "doc" });
+
+    const attachmentContent = "MCP attachment content";
+    const attachment = await callTool<Attachment>(executedTools, "add_attachment_to_parent", {
+      parentType: "task",
+      parentId: task.id,
+      fileName: "mcp-attachment.txt",
+      contentBase64: Buffer.from(attachmentContent, "utf8").toString("base64"),
+      mimetype: "text/plain"
+    });
+    expect(attachment).toMatchObject({
+      owners: [{ type: "task", id: task.id }],
+      originalName: "mcp-attachment.txt",
+      mimetype: "text/plain",
+      size: Buffer.byteLength(attachmentContent)
+    });
+    expect(await fs.readFile(path.join(uploadDir, attachment.filename), "utf8")).toBe(attachmentContent);
+    expect(await seedClient.get<Attachment[]>(`tasks/${task.id}/attachments`)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: attachment.id, originalName: "mcp-attachment.txt" })])
+    );
 
     expect(await callTool<Project>(executedTools, "update_project", { id: project.id, name: "MCP Projekt aktualisiert", description: "Projektbeschreibung MCP", status: "active", color: "#2563eb", startDate: "2026-05-01", dueDate: "2026-08-01" })).toMatchObject({
       name: "MCP Projekt aktualisiert",

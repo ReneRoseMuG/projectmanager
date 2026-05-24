@@ -1,6 +1,6 @@
 # MCP-Tools
 
-**Stand:** 23.05.26
+**Stand:** 24.05.26
 
 Diese Übersicht beschreibt die aktuell verfügbaren MCP-Tools des Projekt-Managers. Die Tools sind für Clients wie Claude Desktop oder ChatGPT gedacht und laufen gegen die bestehenden API-Routen der App.
 
@@ -45,6 +45,7 @@ Ohne `MCP_HTTP_BEARER_TOKEN` ist der Streamable-HTTP-Transport im Entwicklungsbe
 | `add_ticket_to_parent` | Legt ein Ticket an einem Projekt oder Meilenstein an und befüllt Stammdatenfelder. | `parentType`, `parentId`, `title`, optional `type`, `description`, `status`, `priority`, `reporter`, `assignee`, `environment`, `affectedVersion`, `dueDate` | Neues Ticket |
 | `add_comment_to_parent` | Legt einen Kommentar an Projekt, Meilenstein, Aufgabe, Ticket, Feature oder Use Case an. | `parentType`, `parentId`, `body` | Neuer Kommentar |
 | `add_note_to_parent` | Legt eine Textnotiz an Projekt, Meilenstein, Aufgabe oder Ticket an. | `parentType`, `parentId`, optional `title`, `text` | Neue Notiz |
+| `add_attachment_to_parent` | Hängt eine Base64-codierte Datei an Projekt, Meilenstein, Aufgabe, Feature oder Ticket an. | `parentType`, `parentId`, `fileName`, `contentBase64`, optional `mimetype` | Neues Attachment |
 | `create_feature` | Erstellt ein neues Feature mit Beschreibung und optionalem Content. | `title`, optional `description`, `content`, `status` | Neues Feature |
 | `create_use_case` | Erstellt einen neuen Use Case unter einem Feature. | `featureId`, `title`, optional `description`, `content`, `status` | Neuer Use Case |
 | `add_task_to_use_case` | Legt eine Aufgabe an einem Use Case an. | `useCaseId`, `title`, optional `description`, `status`, `priority`, `assignee`, `dueDate` | Neue Aufgabe |
@@ -74,6 +75,7 @@ Ohne `MCP_HTTP_BEARER_TOKEN` ist der Streamable-HTTP-Transport im Entwicklungsbe
 | Aufgaben und Tickets an Parent | `project`, `milestone` |
 | Kommentare | `project`, `milestone`, `task`, `ticket`, `feature`, `useCase` |
 | Notizen | `project`, `milestone`, `task`, `ticket` |
+| Attachments | `project`, `milestone`, `task`, `feature`, `ticket` |
 | Feature-Verknüpfung | `project`, `milestone` |
 
 ## Testabdeckung

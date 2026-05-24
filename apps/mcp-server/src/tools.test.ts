@@ -23,6 +23,7 @@ import { errorResult } from "./tool-result.js";
 interface MockClient {
   get: ReturnType<typeof vi.fn>;
   post: ReturnType<typeof vi.fn>;
+  postForm: ReturnType<typeof vi.fn>;
   patch: ReturnType<typeof vi.fn>;
   put: ReturnType<typeof vi.fn>;
 }
@@ -31,6 +32,7 @@ function createMockClient(): MockClient & ProjectManagerApiClient {
   return {
     get: vi.fn(),
     post: vi.fn(),
+    postForm: vi.fn(),
     patch: vi.fn(),
     put: vi.fn()
   } as unknown as MockClient & ProjectManagerApiClient;
@@ -52,6 +54,7 @@ describe("MCP tool definitions", () => {
     expect(names).toEqual(expect.arrayContaining([
       "create_project",
       "create_milestone",
+      "add_attachment_to_parent",
       "link_task_to_parent",
       "link_ticket_to_parent",
       "update_project",
@@ -193,6 +196,53 @@ describe("MCP tool definitions", () => {
     ).toThrow();
 
     expect(client.post).not.toHaveBeenCalled();
+  });
+
+  it("uploads attachments to all supported owner parents", async () => {
+    const client = createMockClient();
+    client.postForm.mockResolvedValue({ id: 7 });
+    const contentBase64 = Buffer.from("MCP attachment content", "utf8").toString("base64");
+    const parents = [
+      { parentType: "project", parentId: 1, path: "projects/1" },
+      { parentType: "milestone", parentId: 2, path: "milestones/2" },
+      { parentType: "task", parentId: 3, path: "tasks/3" },
+      { parentType: "feature", parentId: 4, path: "features/4" },
+      { parentType: "ticket", parentId: 5, path: "tickets/5" }
+    ] as const;
+
+    for (const parent of parents) {
+      await tool("add_attachment_to_parent", client).execute({
+        parentType: parent.parentType,
+        parentId: parent.parentId,
+        fileName: `${parent.parentType}.txt`,
+        contentBase64,
+        mimetype: "text/plain"
+      });
+    }
+
+    expect(client.postForm.mock.calls.map(([path]) => path)).toEqual(parents.map((parent) => `${parent.path}/attachments`));
+    const firstFormData = client.postForm.mock.calls[0]?.[1];
+    expect(firstFormData).toBeInstanceOf(FormData);
+    const uploadedFile = (firstFormData as FormData).get("file");
+    expect(uploadedFile).toBeInstanceOf(Blob);
+    expect((uploadedFile as File).name).toBe("project.txt");
+    expect((uploadedFile as Blob).type).toBe("text/plain");
+    await expect((uploadedFile as Blob).text()).resolves.toBe("MCP attachment content");
+  });
+
+  it("rejects unsupported attachment parents before calling the API", async () => {
+    const client = createMockClient();
+
+    expect(() =>
+      tool("add_attachment_to_parent", client).execute({
+        parentType: "useCase",
+        parentId: 6,
+        fileName: "use-case.txt",
+        contentBase64: Buffer.from("unsupported", "utf8").toString("base64")
+      })
+    ).toThrow();
+
+    expect(client.postForm).not.toHaveBeenCalled();
   });
 
   it("updates tasks with the current expectedVersion and full fields", async () => {
