@@ -37,12 +37,14 @@ export function StartPage() {
       />
 
       <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
-        <HomeDashboard />
+        <section className="grid gap-4" data-testid="start-dashboard-section">
+          <h2 className="text-sm font-semibold text-ink">Dashboard</h2>
+          <HomeDashboard hideInlineHeader />
+        </section>
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]" data-testid="start-calendar-preview">
           <div className="xl:col-span-2">
             <h2 className="text-sm font-semibold text-ink">Kalender</h2>
-            <p className="mt-1 text-sm text-steel-500">Kommende Termine und fällige Aufgaben.</p>
           </div>
           {!calendarEnabled ? (
             <EmptyState

@@ -17,8 +17,8 @@
  *
  * Abgedeckte Regeln:
  * - Für jeden Haupt-Navigationseintrag existiert ein In-neuem-Tab-Button.
- * - Im expanded Zustand ist der In-neuem-Tab-Button ein eigener sichtbarer Button neben dem Link.
- * - Link-Fläche und In-neuem-Tab-Button haben im expanded Zustand dieselbe Höhe.
+ * - Im expanded Zustand ist der In-neuem-Tab-Button als sichtbare Affordanz in die Zeile integriert.
+ * - Der Edge-Stil zeigt Header, Sektionen, Suchleiste und User-Block an den vorgesehenen Stellen.
  * - Klick ruft window.open(path?standalone=1, "_blank") auf.
  * - Klick löst keine Router-Navigation im aktuellen Tab aus.
  * - Die Sidebar kann kollabiert werden und persistiert den Zustand in localStorage.
@@ -138,24 +138,20 @@ afterEach(() => {
 });
 
 describe("Sidebar", () => {
-  it("rendert die gruppierte Navigation mit Tab-Buttons für Hauptansichten", () => {
+  it("rendert die Edge-Sidebar mit Header, Sektionen und integrierten Tab-Buttons", () => {
     renderSidebar(readerUser);
 
     const sidebar = screen.getByText("Projekt Manager").closest("aside");
 
-    expect(sidebar).toHaveClass("overflow-y-auto", "w-fit", "pl-4", "pr-4");
+    expect(sidebar).toHaveClass("sidebar-edge-shell", "w-[272px]");
     expect(sidebar).not.toHaveClass("min-w-60");
+    expect(screen.getByText("Lokal · v0.1.0")).toBeInTheDocument();
+    expect(screen.queryByTitle("Aktualisieren")).not.toBeInTheDocument();
     const navigation = screen.getByRole("navigation", {
       name: "Navigationsbereiche",
     });
 
-    expect(navigation).toHaveClass(
-      "grid",
-      "w-fit",
-      "grid-cols-[max-content_auto]",
-    );
-    expect(navigation.parentElement).toHaveClass("w-fit");
-    expect(screen.queryByText("Lokal")).not.toBeInTheDocument();
+    expect(navigation).toHaveClass("overflow-y-auto");
 
     for (const section of [
       "Start",
@@ -175,6 +171,7 @@ describe("Sidebar", () => {
       "Tickets",
       "Features",
       "Wiki",
+      "Dashboard",
       "Kalender",
       "Journal",
     ]) {
@@ -187,20 +184,17 @@ describe("Sidebar", () => {
     const featuresTabButton = screen.getByTitle("Features in neuem Tab öffnen");
     const projectsLink = screen.getByText("Projekte").closest("a");
 
-    expect(featuresLink).toHaveClass("border-white/10", "bg-white/[0.04]");
+    expect(featuresLink).toHaveClass("sidebar-edge-nav-row");
     expect(projectsLink).toHaveClass(
-      "border-white/25",
-      "bg-white/10",
-      "shadow-none",
+      "sidebar-edge-nav-row",
+      "sidebar-edge-nav-row-active",
     );
-    expect(projectsLink).not.toHaveClass(
-      "bg-white",
-      "text-steel-700",
-      "shadow-panel",
-    );
-    expect(featuresTabButton).toHaveClass("h-10", "w-10", "rounded-md");
+    expect(featuresTabButton).toHaveClass("sidebar-edge-external");
     expect(featuresTabButton).not.toHaveClass("opacity-0");
-    expect(featuresTabButton.closest("a")).toBeNull();
+    expect(featuresTabButton.closest("a")).toBe(featuresLink);
+    expect(screen.getByTestId("sidebar-global-search")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Navigation durchsuchen")).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-user")).toHaveTextContent("Reader, Test");
     expect(
       screen.queryByTitle("Meine Einstellungen in neuem Tab öffnen"),
     ).not.toBeInTheDocument();
@@ -234,8 +228,8 @@ describe("Sidebar", () => {
     const startLink = screen.getByText("Startseite").closest("a");
     const projectsLink = screen.getByText("Projekte").closest("a");
 
-    expect(startLink).toHaveClass("border-white/25", "bg-white/10");
-    expect(projectsLink).toHaveClass("border-white/10", "bg-white/[0.04]");
+    expect(startLink).toHaveClass("sidebar-edge-nav-row-active");
+    expect(projectsLink).not.toHaveClass("sidebar-edge-nav-row-active");
   });
 
   it("blendet die Startseite ohne Dashboard-Leserecht aus", () => {
@@ -257,27 +251,28 @@ describe("Sidebar", () => {
     renderSidebar(readerUser);
 
     const sidebar = screen.getByLabelText("Hauptnavigation");
-    const sidebarHero = screen.getByTestId("sidebar-hero");
-    const sidebarHeroLabel = screen.getByTestId("sidebar-hero-label");
+    const sidebarHeader = screen.getByTestId("sidebar-header");
     const globalSearch = screen.getByTestId("sidebar-global-search");
-    const firstNavigationTitle = screen.getByText("Start");
+    const settingsTitle = screen.getByText("Einstellungen");
+    const settingsLink = screen.getByText("Meine Einstellungen");
 
-    expect(sidebar).toHaveClass("w-fit");
+    expect(sidebar).toHaveClass("w-[272px]");
     expect(sidebar).not.toHaveClass("min-w-60");
-    expect(sidebarHero).toHaveStyle({ height: "var(--hero-h, 128px)" });
-    expect(sidebarHero).toHaveClass("w-[calc(100%+2rem)]");
-    expect(sidebarHeroLabel).toHaveClass("items-center", "text-sm", "font-semibold");
-    expect(globalSearch).toHaveClass("my-2");
-    expect(firstNavigationTitle).toHaveClass("mt-0");
+    expect(sidebarHeader).toHaveTextContent("Projekt Manager");
+    expect(globalSearch).toHaveClass("px-3", "py-2");
     expect(
-      sidebarHero.compareDocumentPosition(globalSearch) &
+      sidebarHeader.compareDocumentPosition(globalSearch) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      globalSearch.compareDocumentPosition(firstNavigationTitle) &
+      settingsTitle.compareDocumentPosition(globalSearch) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(screen.getByPlaceholderText("Global suchen")).toBeInTheDocument();
+    expect(
+      globalSearch.compareDocumentPosition(settingsLink) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByPlaceholderText("Navigation durchsuchen")).toBeInTheDocument();
     expect(screen.getByTitle("Navigation einklappen")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTitle("Navigation einklappen"));
@@ -288,7 +283,7 @@ describe("Sidebar", () => {
 
     fireEvent.click(screen.getByTitle("Navigation aufklappen"));
 
-    expect(sidebar).toHaveClass("w-fit");
+    expect(sidebar).toHaveClass("w-[272px]");
     expect(sidebar).not.toHaveClass("min-w-60");
     expect(window.localStorage.getItem("ui.sidebar.collapsed")).toBe("false");
     expect(screen.getByTitle("Navigation einklappen")).toBeInTheDocument();
@@ -304,7 +299,7 @@ describe("Sidebar", () => {
     expect(screen.queryByText("Projekt Management")).not.toBeInTheDocument();
     expect(screen.queryByText("Start")).not.toBeInTheDocument();
     expect(
-      screen.queryByPlaceholderText("Global suchen"),
+      screen.queryByPlaceholderText("Navigation durchsuchen"),
     ).not.toBeInTheDocument();
   });
 
@@ -319,7 +314,7 @@ describe("Sidebar", () => {
     expect(screen.queryByText("Start")).not.toBeInTheDocument();
     expect(screen.queryByText("Einstellungen")).not.toBeInTheDocument();
     expect(
-      screen.queryByPlaceholderText("Global suchen"),
+      screen.queryByPlaceholderText("Navigation durchsuchen"),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Features")).not.toBeInTheDocument();
     expect(screen.getByTitle("Features")).toBeInTheDocument();
@@ -361,6 +356,8 @@ describe("Sidebar", () => {
     renderSidebar(adminUser);
 
     expect(screen.getByText("Administration")).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-server-status")).toHaveTextContent("Server Status");
+    expect(screen.getByTestId("sidebar-server-status")).toHaveTextContent("erreichbar");
     expect(screen.queryByText("Meine Einstellungen")).not.toBeInTheDocument();
     expect(screen.queryByText("Benutzer")).not.toBeInTheDocument();
     expect(screen.queryByText("Rollen")).not.toBeInTheDocument();

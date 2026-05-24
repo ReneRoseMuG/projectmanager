@@ -1,12 +1,9 @@
 import type { AuthResource, CurrentUser } from "@taskmanager/shared-types";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   BookOpen,
   Bug,
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
   ExternalLink,
   Flag,
   FolderKanban,
@@ -16,19 +13,21 @@ import {
   LayoutDashboard,
   ListTodo,
   LogOut,
-  RefreshCw,
+  PanelLeftClose,
+  PanelLeftOpen,
   RotateCcw,
+  Search,
   ShieldCheck,
   SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
-import { Fragment, useState } from "react";
+import { useState } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
+import webPackage from "../../../package.json";
 import { useHealthCheck } from "../../hooks/useHealthCheck";
 import { hasPermission } from "../../hooks/usePermissions";
-import { invalidateWikiImportData } from "../../queries/invalidation";
 import { withStandaloneView } from "../../utils/standalone";
-import { SearchInput } from "../ui/SearchInput";
 import { openGlobalSearch } from "./ShellOverlays";
 
 interface NavigationItem {
@@ -91,56 +90,78 @@ const informationItems: NavigationItem[] = [
   { to: "/journal", label: "Journal", icon: History, resource: "journal" },
 ];
 
-function ServerStatus({
-  online,
-  latencyMs,
-  open,
+function MarkGlyph() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      viewBox="0 0 20 20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect x="2.5" y="3" width="3.5" height="14" rx="1.2" fill="currentColor" opacity="0.92" />
+      <rect x="8.25" y="3" width="3.5" height="10" rx="1.2" fill="currentColor" opacity="0.65" />
+      <rect x="14" y="3" width="3.5" height="6" rx="1.2" fill="currentColor" opacity="0.4" />
+    </svg>
+  );
+}
+
+function SidebarHeader({
+  collapsed,
+  toggleLabel,
   onToggle,
-  onRefetch,
 }: {
-  online: boolean;
-  latencyMs: number | null;
-  open: boolean;
+  collapsed: boolean;
+  toggleLabel: string;
   onToggle: () => void;
-  onRefetch: () => Promise<void>;
 }) {
-  const slow = online && latencyMs !== null && latencyMs > 250;
-  const statusText = online
-    ? `${slow ? "langsam" : "erreichbar"}${latencyMs !== null ? ` - ${latencyMs} ms` : ""}`
-    : "offline";
-  const dotClass = online ? (slow ? "bg-tangerine" : "bg-fern") : "bg-crimson";
+  if (collapsed) {
+    return (
+      <div className="grid gap-3 px-3 py-3">
+        <span
+          className="flex h-10 w-10 items-center justify-center rounded-md border border-white/[0.18] bg-white/[0.08] text-white shadow-steel-icon"
+          title="Projekt Manager"
+        >
+          <MarkGlyph />
+        </span>
+        <button
+          type="button"
+          className="flex h-8 w-10 items-center justify-center rounded-md text-white/55 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+          aria-label={toggleLabel}
+          title={toggleLabel}
+          onClick={onToggle}
+        >
+          <PanelLeftOpen size={16} />
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="mt-2">
+    <div
+      className="flex items-center gap-3 px-3.5 pb-3.5 pt-[18px]"
+      data-testid="sidebar-header"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.18] bg-white/[0.08] text-white shadow-steel-icon">
+        <MarkGlyph />
+      </span>
+      <div className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold leading-tight text-white">
+          Projekt Manager
+        </span>
+        <span className="mt-0.5 block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
+          Lokal · v{webPackage.version}
+        </span>
+      </div>
       <button
         type="button"
-        className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-white/75 transition hover:bg-white/5 hover:text-white"
-        title={latencyMs ? `${latencyMs} ms` : undefined}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/55 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+        aria-label={toggleLabel}
+        title={toggleLabel}
         onClick={onToggle}
       >
-        <Activity size={17} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate">Server Status</span>
-          <span className="block truncate text-[11px] font-normal text-white/55">
-            {statusText}
-          </span>
-        </span>
-        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
+        <PanelLeftClose size={16} />
       </button>
-      {open ? (
-        <div className="mt-2 rounded-lg border border-white/10 bg-steel-900 p-3 text-xs text-white/70 shadow-panel">
-          <p className="font-semibold text-white">Server {statusText}</p>
-          <p className="mt-1">Endpoint http://localhost:3001</p>
-          <button
-            type="button"
-            className="mt-3 flex h-8 items-center gap-2 rounded-md bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/15"
-            onClick={() => void onRefetch()}
-          >
-            <RotateCcw size={14} />
-            Erneut prüfen
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -168,173 +189,326 @@ function canReadItem(
   );
 }
 
-function navLinkClass(isActive: boolean): string {
-  return `flex h-10 items-center gap-3 rounded-lg border px-3 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-white/20 ${isActive ? "border-white/25 bg-white/10 font-semibold text-white shadow-none" : "border-white/10 bg-white/[0.04] text-white/75 hover:border-white/20 hover:bg-white/10 hover:text-white"}`;
+function openStandalone(event: MouseEvent<HTMLButtonElement>, path: string) {
+  event.preventDefault();
+  event.stopPropagation();
+  window.open(withStandaloneView(path), "_blank");
 }
 
-function navLinkClassCollapsed(isActive: boolean): string {
-  return `relative flex h-10 w-10 items-center justify-center rounded-lg border transition ${isActive ? "border-white/25 bg-white/10 text-white shadow-none" : "border-transparent text-white/75 hover:bg-white/5 hover:text-white"}`;
-}
-
-const standaloneButtonClass =
-  "flex h-10 w-10 items-center justify-center self-center rounded-md border border-white/10 bg-white/[0.04] text-white/70 transition hover:border-white/20 hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20";
-
-function NavigationLinks({
-  currentUser,
-  items,
+function NavigationRow({
+  item,
   allowStandalone,
-  collapsed = false,
 }: {
-  currentUser?: CurrentUser | null;
-  items: NavigationItem[];
+  item: NavigationItem;
   allowStandalone: boolean;
-  collapsed?: boolean;
+}) {
+  const Icon = item.icon;
+
+  return (
+    <NavLink
+      to={item.to}
+      end={item.to === "/"}
+      title={item.label}
+      className={({ isActive }) =>
+        `sidebar-edge-nav-row group ${isActive ? "sidebar-edge-nav-row-active" : ""}`
+      }
+    >
+      <Icon size={16} className="shrink-0" />
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {allowStandalone ? (
+        <button
+          type="button"
+          className="sidebar-edge-external"
+          aria-label={`${item.label} in neuem Tab öffnen`}
+          title={`${item.label} in neuem Tab öffnen`}
+          onClick={(event) => openStandalone(event, item.to)}
+        >
+          <ExternalLink size={13} />
+        </button>
+      ) : null}
+    </NavLink>
+  );
+}
+
+function CollapsedNavigationRow({
+  item,
+  allowStandalone,
+}: {
+  item: NavigationItem;
+  allowStandalone: boolean;
+}) {
+  const Icon = item.icon;
+
+  return (
+    <NavLink
+      to={item.to}
+      end={item.to === "/"}
+      title={item.label}
+      className={({ isActive }) =>
+        `relative flex h-10 w-10 items-center justify-center rounded-md transition focus:outline-none focus:ring-2 focus:ring-white/20 ${isActive ? "bg-white/10 text-white" : "text-white/75 hover:bg-white/5 hover:text-white"}`
+      }
+    >
+      <Icon size={17} />
+      {allowStandalone ? (
+        <button
+          type="button"
+          className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-md bg-steel-600 text-white/80 transition hover:bg-steel-500 hover:text-white"
+          aria-label={`${item.label} in neuem Tab öffnen`}
+          title={`${item.label} in neuem Tab öffnen`}
+          onClick={(event) => openStandalone(event, item.to)}
+        >
+          <ExternalLink size={9} />
+        </button>
+      ) : null}
+    </NavLink>
+  );
+}
+
+function SidebarSearch({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
 }) {
   return (
-    <nav className={`grid gap-1 ${collapsed ? "justify-items-center" : ""}`}>
-      {items
-        .filter((item) => canReadItem(currentUser, item))
-        .map((item) => {
-          const Icon = item.icon;
-          if (collapsed) {
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                title={item.label}
-                className={({ isActive }) => navLinkClassCollapsed(isActive)}
-              >
-                <Icon size={17} />
-                {allowStandalone ? (
-                  <button
-                    type="button"
-                    className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-md bg-steel-600 text-white/80 transition hover:bg-steel-500 hover:text-white"
-                    aria-label={`${item.label} in neuem Tab öffnen`}
-                    title={`${item.label} in neuem Tab öffnen`}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      window.open(withStandaloneView(item.to), "_blank");
-                    }}
-                  >
-                    <ExternalLink size={9} />
-                  </button>
-                ) : null}
-              </NavLink>
-            );
-          }
+    <div
+      className="px-3 py-2"
+      data-testid="sidebar-global-search"
+      onClick={() => openGlobalSearch(value)}
+    >
+      <label className="sidebar-edge-search">
+        <Search size={14} className="shrink-0 text-white/50" />
+        <input
+          className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/45"
+          value={value}
+          placeholder="Navigation durchsuchen"
+          maxLength={15}
+          onChange={(event) => {
+            onChange(event.target.value);
+            openGlobalSearch(event.target.value);
+          }}
+        />
+        <span className="rounded border border-white/10 bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-white/55">
+          Ctrl K
+        </span>
+      </label>
+    </div>
+  );
+}
 
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              title={item.label}
-              className={({ isActive }) => navLinkClass(isActive)}
-            >
-              <Icon size={17} />
-              <span className="flex-1 truncate">{item.label}</span>
-              {allowStandalone ? (
-                <button
-                  type="button"
-                  className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded opacity-0 transition hover:bg-white/20 group-hover:opacity-100"
-                  aria-label={`${item.label} in neuem Tab öffnen`}
-                  title={`${item.label} in neuem Tab öffnen`}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    window.open(withStandaloneView(item.to), "_blank");
-                  }}
-                >
-                  <ExternalLink size={13} />
-                </button>
-              ) : null}
-            </NavLink>
-          );
-        })}
+function NavigationSection({
+  section,
+  currentUser,
+  children,
+}: {
+  section: NavigationSectionConfig;
+  currentUser?: CurrentUser | null;
+  children?: ReactNode;
+}) {
+  const visibleItems = section.items.filter((item) =>
+    canReadItem(currentUser, item),
+  );
+
+  if (visibleItems.length === 0 && !children) {
+    return null;
+  }
+
+  return (
+    <section className="grid gap-1" data-sidebar-section={section.label}>
+      <p className="px-3.5 pt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-white/40">
+        {section.label}
+      </p>
+      {children}
+      <div className="grid gap-px px-2 py-1">
+        {visibleItems.map((item) => (
+          <NavigationRow
+            key={item.to}
+            item={item}
+            allowStandalone={section.allowStandalone}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CollapsedNavigationMenu({
+  currentUser,
+  sections,
+}: {
+  currentUser?: CurrentUser | null;
+  sections: NavigationSectionConfig[];
+}) {
+  return (
+    <nav
+      aria-label="Navigationsbereiche"
+      className="grid justify-items-center gap-2 px-3"
+    >
+      {sections.flatMap((section) =>
+        section.items
+          .filter((item) => canReadItem(currentUser, item))
+          .map((item) => (
+            <CollapsedNavigationRow
+              key={`${section.label}-${item.to}`}
+              item={item}
+              allowStandalone={section.allowStandalone}
+            />
+          )),
+      )}
     </nav>
   );
 }
 
-function NavigationMenu({
-  currentUser,
-  sections,
-  collapsed,
+function ServerStatus({
+  online,
+  latencyMs,
+  open,
+  onToggle,
+  onRefetch,
 }: {
-  currentUser?: CurrentUser | null;
-  sections: NavigationSectionConfig[];
-  collapsed?: boolean;
+  online: boolean;
+  latencyMs: number | null;
+  open: boolean;
+  onToggle: () => void;
+  onRefetch: () => Promise<void>;
 }) {
-  const visibleSections = sections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => canReadItem(currentUser, item)),
-    }))
-    .filter((section) => section.items.length > 0);
+  const slow = online && latencyMs !== null && latencyMs > 250;
+  const statusText = online
+    ? `${slow ? "langsam" : "erreichbar"}${latencyMs !== null ? ` · ${latencyMs} ms` : ""}`
+    : "offline";
+  const dotClass = online
+    ? slow
+      ? "bg-tangerine shadow-[0_0_8px_var(--color-tangerine)]"
+      : "bg-fern shadow-[0_0_8px_var(--color-fern)]"
+    : "bg-crimson shadow-[0_0_8px_var(--color-crimson)]";
 
+  return (
+    <div className="grid gap-1 px-2 pb-1" data-testid="sidebar-server-status">
+      <button
+        type="button"
+        className="sidebar-edge-nav-row"
+        title={latencyMs ? `${latencyMs} ms` : undefined}
+        onClick={onToggle}
+      >
+        <Activity size={16} className="shrink-0" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate">Server Status</span>
+          <span className="block truncate text-[11px] font-normal text-white/45">
+            {statusText}
+          </span>
+        </span>
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotClass}`} />
+      </button>
+      {open ? (
+        <div className="mx-1 rounded-lg border border-white/10 bg-steel-900/80 p-3 text-xs text-white/70 shadow-panel">
+          <p className="font-semibold text-white">Server {statusText}</p>
+          <p className="mt-1">Endpoint http://localhost:3001</p>
+          <button
+            type="button"
+            className="mt-3 flex h-8 items-center gap-2 rounded-md bg-white/10 px-2.5 text-xs font-semibold text-white transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/20"
+            onClick={() => void onRefetch()}
+          >
+            <RotateCcw size={14} />
+            Erneut prüfen
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CollapsedServerStatus({
+  online,
+  latencyMs,
+}: {
+  online: boolean;
+  latencyMs: number | null;
+}) {
+  return (
+    <button
+      type="button"
+      className="relative flex h-10 w-10 items-center justify-center rounded-md text-white/75 transition hover:bg-white/5 hover:text-white"
+      title={`Server ${online ? "erreichbar" : "offline"}`}
+    >
+      <Activity size={17} />
+      <span
+        className={`absolute right-2 top-2 h-1.5 w-1.5 rounded-full ${online ? "bg-fern" : "bg-crimson"}`}
+        title={latencyMs ? `${latencyMs} ms` : undefined}
+      />
+    </button>
+  );
+}
+
+function userInitials(user: CurrentUser): string {
+  const first = user.firstName?.trim().charAt(0) ?? "";
+  const last = user.lastName?.trim().charAt(0) ?? "";
+  const initials = `${first}${last}`.trim();
+
+  if (initials) {
+    return initials.toUpperCase();
+  }
+
+  return user.fullName
+    .split(/\s+/)
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function SidebarUser({
+  currentUser,
+  collapsed,
+  onLogout,
+}: {
+  currentUser: CurrentUser;
+  collapsed: boolean;
+  onLogout?: () => void;
+}) {
   if (collapsed) {
     return (
-      <>
-        {visibleSections.map((section) => (
-          <NavigationLinks
-            key={section.label}
-            currentUser={currentUser}
-            items={section.items}
-            allowStandalone={section.allowStandalone}
-            collapsed
-          />
-        ))}
-      </>
+      <div className="border-t border-white/10 px-3 py-4">
+        <button
+          type="button"
+          onClick={onLogout}
+          className="flex h-10 w-10 items-center justify-center rounded-md text-white/75 transition hover:bg-white/5 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+          title="Abmelden"
+        >
+          <LogOut size={17} />
+        </button>
+      </div>
     );
   }
 
   return (
-    <nav
-      aria-label="Navigationsbereiche"
-      className="grid w-fit grid-cols-[max-content_auto] gap-x-1 gap-y-1"
+    <div
+      className="border-t border-white/10 bg-gradient-to-b from-transparent to-steel-900/40 px-3.5 py-4"
+      data-testid="sidebar-user"
     >
-      {visibleSections.map((section, sectionIndex) => (
-        <Fragment key={section.label}>
-          <div className={`col-span-2 mb-1 max-w-0 overflow-visible whitespace-nowrap px-1.5 text-[10px] font-semibold uppercase tracking-widest text-steel-400 ${sectionIndex === 0 ? "mt-0" : "mt-5"}`}>
-            {section.label}
-          </div>
-          {section.items.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Fragment key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.to === "/"}
-                  title={item.label}
-                  className={({ isActive }) => navLinkClass(isActive)}
-                >
-                  <Icon size={17} />
-                  <span className="whitespace-nowrap">{item.label}</span>
-                </NavLink>
-                {section.allowStandalone ? (
-                  <button
-                    type="button"
-                    className={standaloneButtonClass}
-                    aria-label={`${item.label} in neuem Tab öffnen`}
-                    title={`${item.label} in neuem Tab öffnen`}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      window.open(withStandaloneView(item.to), "_blank");
-                    }}
-                  >
-                    <ExternalLink size={13} />
-                  </button>
-                ) : (
-                  <span className="h-10 w-10 self-center" aria-hidden="true" />
-                )}
-              </Fragment>
-            );
-          })}
-        </Fragment>
-      ))}
-    </nav>
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-steel-400 to-steel-600 text-[11px] font-bold tracking-[0.05em] text-white shadow-[0_1px_0_rgba(255,255,255,0.20)_inset]">
+          {userInitials(currentUser)}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-semibold text-white">
+            {currentUser.fullName}
+          </span>
+          <span className="block truncate text-[11px] text-white/50">
+            {currentUser.role.label}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white/55 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+          aria-label="Abmelden"
+          title="Abmelden"
+        >
+          <LogOut size={15} />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -344,7 +518,6 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
-  const queryClient = useQueryClient();
   const health = useHealthCheck();
   const [apiOpen, setApiOpen] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
@@ -379,8 +552,12 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
       allowStandalone: true,
     },
     { label: "Information", items: informationItems, allowStandalone: true },
-    { label: "Einstellungen", items: settingsItems, allowStandalone: false },
   ];
+  const settingsSection: NavigationSectionConfig = {
+    label: "Einstellungen",
+    items: settingsItems,
+    allowStandalone: false,
+  };
   const collapseToggleLabel = collapsed
     ? "Navigation aufklappen"
     : "Navigation einklappen";
@@ -396,109 +573,49 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
   return (
     <aside
       aria-label="Hauptnavigation"
-      className={`hidden shrink-0 overflow-y-auto bg-gradient-to-b from-steel-700 to-steel-800 text-white transition-[width] duration-200 md:block ${collapsed ? "w-16 p-3" : "w-fit pb-4 pl-4 pr-4"}`}
+      className={`sidebar-edge-shell hidden h-full shrink-0 overflow-hidden text-white transition-[width] duration-200 md:flex md:flex-col ${collapsed ? "w-16" : "w-[272px]"}`}
     >
-      <div className={collapsed ? "" : "w-fit"}>
+      <SidebarHeader
+        collapsed={collapsed}
+        toggleLabel={collapseToggleLabel}
+        onToggle={toggleCollapsed}
+      />
+
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
         {collapsed ? (
-          <div className="mb-3 flex justify-center">
-            <span
-              className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-sm font-bold text-steel-700 shadow-steel-icon"
-              title="Projekt Manager"
-            >
-              PM
-            </span>
+          <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+            <CollapsedNavigationMenu
+              currentUser={currentUser}
+              sections={[...navigationSections, settingsSection]}
+            />
+            {showAdmin ? (
+              <div className="mt-2 grid justify-items-center px-3">
+                <CollapsedServerStatus
+                  online={health.online}
+                  latencyMs={health.latencyMs}
+                />
+              </div>
+            ) : null}
           </div>
         ) : (
-          <div
-            className="-mx-4 flex w-[calc(100%+2rem)] flex-col border-b border-white/12"
-            data-testid="sidebar-hero"
-            style={{ height: "var(--hero-h, 128px)" }}
+          <nav
+            aria-label="Navigationsbereiche"
+            className="min-h-0 flex-1 overflow-y-auto pb-3"
           >
-            <div className="mx-4 mt-2 overflow-hidden rounded-lg border border-white/15 bg-white/6">
-              <div className="flex h-10 items-center justify-center">
-                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-sm font-bold text-steel-700 shadow-steel-icon">
-                  PM
-                </span>
-              </div>
-              <div className="flex h-[26px] border-t border-white/12">
-                <button
-                  type="button"
-                  className="flex flex-1 items-center justify-center text-white/55 transition hover:bg-white/5 hover:text-white"
-                  aria-label="Aktualisieren"
-                  title="Aktualisieren"
-                  onClick={() => void invalidateWikiImportData(queryClient)}
-                >
-                  <RefreshCw size={13} />
-                </button>
-                <div
-                  className="w-px bg-white/12"
-                  data-testid="sidebar-hero-action-divider"
-                />
-                <button
-                  type="button"
-                  className="flex flex-1 items-center justify-center text-white/55 transition hover:bg-white/5 hover:text-white"
-                  aria-label={collapseToggleLabel}
-                  title={collapseToggleLabel}
-                  onClick={toggleCollapsed}
-                >
-                  <ChevronLeft size={14} />
-                </button>
-              </div>
-            </div>
-            <div
-              className="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm font-semibold leading-none text-white/70"
-              data-testid="sidebar-hero-label"
+            {navigationSections.map((section) => (
+              <NavigationSection
+                key={section.label}
+                section={section}
+                currentUser={currentUser}
+              />
+            ))}
+            <NavigationSection
+              section={settingsSection}
+              currentUser={currentUser}
             >
-              Projekt Manager
-            </div>
-          </div>
-        )}
-        {collapsed ? (
-          <button
-            type="button"
-            className="mb-3 flex h-8 w-full items-center justify-center rounded-lg text-white/55 transition hover:bg-white/5 hover:text-white"
-            aria-label={collapseToggleLabel}
-            title={collapseToggleLabel}
-            onClick={toggleCollapsed}
-          >
-            <ChevronRight size={16} />
-          </button>
-        ) : null}
-        {!collapsed ? (
-          <div
-            className="my-2 w-0 min-w-full overflow-hidden"
-            data-testid="sidebar-global-search"
-            onClick={() => openGlobalSearch(sidebarSearch)}
-          >
-            <SearchInput
-              value={sidebarSearch}
-              onChange={(value) => {
-                setSidebarSearch(value);
-                openGlobalSearch(value);
-              }}
-              placeholder="Global suchen"
-              hint="Ctrl K"
-            />
-          </div>
-        ) : null}
-        <NavigationMenu
-          currentUser={currentUser}
-          sections={navigationSections}
-          collapsed={collapsed}
-        />
-        {showAdmin ? (
-          collapsed ? (
-            <div className="mt-2">
-              <button
-                type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-lg text-white/75 transition hover:bg-white/5 hover:text-white"
-                title={`Server ${health.online ? "erreichbar" : "offline"}`}
-              >
-                <Activity size={17} />
-              </button>
-            </div>
-          ) : (
-            <div className="w-0 min-w-full overflow-hidden">
+              <SidebarSearch value={sidebarSearch} onChange={setSidebarSearch} />
+            </NavigationSection>
+            {showAdmin ? (
               <ServerStatus
                 online={health.online}
                 latencyMs={health.latencyMs}
@@ -506,31 +623,16 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
                 onToggle={() => setApiOpen((current) => !current)}
                 onRefetch={health.refetch}
               />
-            </div>
-          )
-        ) : null}
-        {currentUser ? (
-          <div
-            className={`mt-6 border-t border-white/10 pt-4 ${collapsed ? "" : "w-0 min-w-full overflow-hidden"}`}
-          >
-            {!collapsed ? (
-              <div className="mb-3 px-3 text-xs text-white/70">
-                <span className="block font-semibold text-white">
-                  {currentUser.fullName}
-                </span>
-                <span>{currentUser.role.label}</span>
-              </div>
             ) : null}
-            <button
-              type="button"
-              onClick={onLogout}
-              className={`flex h-10 items-center gap-3 rounded-lg text-sm font-medium text-white/75 transition hover:bg-white/5 hover:text-white ${collapsed ? "w-10 justify-center" : "w-full px-3"}`}
-              title="Abmelden"
-            >
-              <LogOut size={17} />
-              {!collapsed ? "Abmelden" : null}
-            </button>
-          </div>
+          </nav>
+        )}
+
+        {currentUser ? (
+          <SidebarUser
+            currentUser={currentUser}
+            collapsed={collapsed}
+            onLogout={onLogout}
+          />
         ) : null}
       </div>
     </aside>

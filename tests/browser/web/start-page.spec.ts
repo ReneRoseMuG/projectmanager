@@ -33,7 +33,11 @@ test.describe("Startseite", () => {
       await authenticatedGoto(page, "/");
 
       await expect(page.getByRole("heading", { name: "Startseite", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Kalender", exact: true })).toBeVisible();
       await expect(page.getByTestId("dashboard-view-home")).toBeVisible();
+      await expect(page.getByText("Startseiten-Dashboard")).toHaveCount(0);
+      await expect(page.getByText("Kommende Termine und fällige Aufgaben.")).toHaveCount(0);
       await expect(page.getByTestId("start-calendar-preview")).toContainText(event.title);
     } finally {
       await deleteEvent(request, event.id);
@@ -46,7 +50,7 @@ test.describe("Startseite", () => {
     try {
       await authenticatedGoto(page, "/dashboard");
 
-      await page.getByRole("button", { name: "Startseite" }).click();
+      await page.getByRole("button", { name: "Startseite", exact: true }).click();
       await expect(page.getByTestId("dashboard-view-home")).toBeVisible();
       await page.getByRole("button", { name: "Neues Dashboard" }).click();
       await expect(page.getByRole("heading", { name: "Dashboard-Editor" })).toBeVisible();

@@ -58,8 +58,8 @@ vi.mock("../../../../apps/web/src/hooks/useCalendarTasks", () => ({
 }));
 
 vi.mock("../../../../apps/web/src/components/dashboard/DashboardView", () => ({
-  HomeDashboard() {
-    return <div data-testid="home-dashboard" />;
+  HomeDashboard({ hideInlineHeader }: { hideInlineHeader?: boolean }) {
+    return <div data-testid="home-dashboard" data-hide-inline-header={String(Boolean(hideInlineHeader))} />;
   },
 }));
 
@@ -107,7 +107,12 @@ describe("StartPage", () => {
     renderStartPage();
 
     expect(screen.getByRole("heading", { name: "Startseite" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Dashboard" })).toHaveClass("text-sm", "font-semibold", "text-ink");
+    expect(screen.getByRole("heading", { name: "Kalender" })).toHaveClass("text-sm", "font-semibold", "text-ink");
     expect(screen.getByTestId("home-dashboard")).toBeInTheDocument();
+    expect(screen.getByTestId("home-dashboard")).toHaveAttribute("data-hide-inline-header", "true");
+    expect(screen.queryByText("Startseiten-Dashboard")).not.toBeInTheDocument();
+    expect(screen.queryByText("Kommende Termine und fällige Aufgaben.")).not.toBeInTheDocument();
     expect(screen.getByTestId("calendar-view")).toHaveTextContent("compact:1:1");
     expect(screen.getByTestId("upcoming-events")).toHaveTextContent("1");
   });

@@ -18,10 +18,12 @@ interface DashboardViewProps {
   title?: string;
   subtitle?: string;
   showHeader?: boolean;
+  hideInlineHeader?: boolean;
 }
 
 interface DashboardShortcutProps {
   showHeader?: boolean;
+  hideInlineHeader?: boolean;
 }
 
 function DashboardLoading() {
@@ -37,7 +39,7 @@ function DashboardLoading() {
   );
 }
 
-export function DashboardView({ context, owner, title = dashboardContextLabels[context], subtitle, showHeader = false }: DashboardViewProps) {
+export function DashboardView({ context, owner, title = dashboardContextLabels[context], subtitle, showHeader = false, hideInlineHeader = false }: DashboardViewProps) {
   const dashboards = useDashboards(context);
   const canWrite = useHasPermission("dashboards", "write");
   const canAdmin = useHasPermission("dashboards", "admin");
@@ -121,7 +123,7 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
           title={title}
           subtitle={subtitle ?? "Projektstatus, Aufgaben, Tickets und Aktivität."}
         />
-      ) : (
+      ) : hideInlineHeader ? null : (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-ink">{title}</h2>
@@ -153,8 +155,8 @@ export function GlobalDashboard({ showHeader = true }: DashboardShortcutProps = 
   return <DashboardView context="global" showHeader={showHeader} />;
 }
 
-export function HomeDashboard({ showHeader = false }: DashboardShortcutProps = {}) {
-  return <DashboardView context="home" showHeader={showHeader} title="Startseiten-Dashboard" />;
+export function HomeDashboard({ showHeader = false, hideInlineHeader = false }: DashboardShortcutProps = {}) {
+  return <DashboardView context="home" showHeader={showHeader} hideInlineHeader={hideInlineHeader} title="Startseiten-Dashboard" />;
 }
 
 export function ProjectDashboard({ projectId }: { projectId: number }) {

@@ -2,6 +2,8 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 24.05.26 | 53            | Startseite Sektion-Titel                     | ⚠️     |
+| 24.05.26 | 52            | Sidebar Edge Style                           | ⚠️     |
 | 24.05.26 | Fix           | MCP Dev Start                                | ✅     |
 | 24.05.26 | Feature       | MS-12 Backup und Sync                        | ✅     |
 | 24.05.26 | Feature       | TASK-49 App-Startseite                       | ⚠️     |
