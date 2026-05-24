@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ProjectManagerApiError, type ProjectManagerApiClient } from "./api-client.js";
+import { parseReferenceInput, type ReferenceContext } from "./reference-context.js";
 import { createToolDefinitions } from "./tools.js";
 import { errorResult } from "./tool-result.js";
 
@@ -38,6 +39,17 @@ function createMockClient(): MockClient & ProjectManagerApiClient {
   } as unknown as MockClient & ProjectManagerApiClient;
 }
 
+function createMappedClient(responses: Record<string, unknown>): MockClient & ProjectManagerApiClient {
+  const client = createMockClient();
+  client.get.mockImplementation((path: string) => {
+    if (!Object.hasOwn(responses, path)) {
+      return Promise.reject(new Error(`Unexpected GET ${path}`));
+    }
+    return Promise.resolve(responses[path]);
+  });
+  return client;
+}
+
 function tool(name: string, client: ProjectManagerApiClient) {
   const found = createToolDefinitions(client).find((definition) => definition.name === name);
   if (!found) {
@@ -63,7 +75,8 @@ describe("MCP tool definitions", () => {
       "update_ticket",
       "update_feature",
       "update_use_case",
-      "resolve_reference"
+      "resolve_reference",
+      "get_reference_context"
     ]));
     expect(names.some((name) => name.startsWith("delete_"))).toBe(false);
     [
@@ -292,6 +305,127 @@ describe("MCP tool definitions", () => {
     const client = createMockClient();
 
     await expect(tool("resolve_reference", client).execute({ reference: "TASK#10" })).rejects.toThrow("Ungültige Referenz");
+    expect(client.get).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["PROJ-1", "project", 1, "PROJ-1"],
+    ["ms-2", "milestone", 2, "MS-2"],
+    ["TASK-3", "task", 3, "TASK-3"],
+    ["tkt-4", "ticket", 4, "TKT-4"],
+    ["FEAT-5", "feature", 5, "FEAT-5"],
+    ["uc-6", "useCase", 6, "UC-6"],
+    ["Meilenstein ID 12 lesen", "milestone", 12, "MS-12"],
+    ["Meilenstein-ID 12 lesen", "milestone", 12, "MS-12"],
+    ["Ticket 5 prüfen", "ticket", 5, "TKT-5"],
+    ["Projekt ID 3 anzeigen", "project", 3, "PROJ-3"]
+  ])("parses reference input %s", (input, expectedType, expectedId, expectedReference) => {
+    expect(parseReferenceInput(input)).toEqual({
+      type: expectedType,
+      id: expectedId,
+      reference: expectedReference
+    });
+  });
+
+  it("loads recursive reference context and previews text attachments only", async () => {
+    const textAttachment = {
+      id: 101,
+      originalName: "context.md",
+      filename: "context.md",
+      mimetype: "text/markdown",
+      size: 12,
+      url: "/attachments/101",
+      owners: [{ type: "project", id: 1 }],
+      createdAt: "2026-05-24T00:00:00.000Z",
+      updatedAt: "2026-05-24T00:00:00.000Z",
+      version: 1
+    };
+    const imageAttachment = {
+      id: 102,
+      originalName: "screen.png",
+      filename: "screen.png",
+      mimetype: "image/png",
+      size: 20,
+      url: "/attachments/102",
+      owners: [{ type: "feature", id: 7 }],
+      createdAt: "2026-05-24T00:00:00.000Z",
+      updatedAt: "2026-05-24T00:00:00.000Z",
+      version: 1
+    };
+    const taskDetail = {
+      id: 3,
+      title: "Root task",
+      subtasks: [{ id: 4, title: "Subtask" }],
+      comments: [],
+      notes: [],
+      attachments: []
+    };
+    const ticketDetail = {
+      id: 5,
+      title: "Root ticket",
+      subTickets: [{ id: 6, title: "Subticket" }],
+      comments: [],
+      notes: [],
+      attachments: [],
+      relations: [{ id: 501, relationType: "related", direction: "outgoing", ticket: { id: 9, title: "Related ticket" } }]
+    };
+    const responses: Record<string, unknown> = {
+      "projects/1": { id: 1, name: "Projekt" },
+      "projects/1/milestones": [{ id: 2, name: "Meilenstein" }],
+      "projects/1/tasks": [{ id: 3, title: "Root task" }],
+      "projects/1/tickets": [{ id: 5, title: "Root ticket" }],
+      "projects/1/features": [{ id: 7, title: "Feature" }],
+      "projects/1/notes": [{ id: 201, title: "Notiz", contentJson: {}, version: 1 }],
+      "projects/1/comments": [{ id: 301, body: "Kommentar", owners: [] }],
+      "projects/1/attachments": [textAttachment],
+      "attachments/101/preview": { id: 101, kind: "text", status: "available", label: "MD", previewUrl: null, text: { content: "Kontext", encoding: "utf-8", truncated: false, bytesRead: 7 }, message: null, generatedAt: "2026-05-24T00:00:00.000Z" },
+      "milestones/2": { id: 2, name: "Meilenstein" },
+      "milestones/2/tasks": [],
+      "milestones/2/tickets": [],
+      "milestones/2/features": [],
+      "milestones/2/notes": [],
+      "milestones/2/comments": [],
+      "milestones/2/attachments": [],
+      "tasks/3": taskDetail,
+      "tasks/3/tickets": [{ id: 5, title: "Root ticket" }],
+      "tasks/4": { id: 4, title: "Subtask", subtasks: [], comments: [], notes: [], attachments: [] },
+      "tasks/4/tickets": [],
+      "tickets/5": ticketDetail,
+      "tickets/6": { id: 6, title: "Subticket", subTickets: [], comments: [], notes: [], attachments: [], relations: [] },
+      "features/7": { id: 7, title: "Feature" },
+      "features/7/use-cases": [{ id: 8, title: "Use Case" }],
+      "features/7/tasks": [{ id: 3, title: "Root task" }],
+      "features/7/tickets": [],
+      "features/7/notes": [],
+      "features/7/comments": [],
+      "features/7/attachments": [imageAttachment],
+      "features/7/relations": [{ sourceFeatureId: 7, targetFeatureId: 11, relationType: "related", description: null, targetFeature: { id: 11, title: "Related feature" }, createdAt: "2026-05-24T00:00:00.000Z", updatedAt: "2026-05-24T00:00:00.000Z" }],
+      "use-cases/8": { id: 8, title: "Use Case" },
+      "use-cases/8/tasks": [],
+      "use-cases/8/tickets": [],
+      "use-cases/8/comments": []
+    };
+    const client = createMappedClient(responses);
+
+    const context = (await tool("get_reference_context", client).execute({ reference: "Projekt ID 1" })) as ReferenceContext;
+
+    expect(context.normalizedReference).toBe("PROJ-1");
+    expect(context.root.children.milestones[0]?.id).toBe(2);
+    expect(context.root.children.features[0]?.children.useCases[0]?.id).toBe(8);
+    expect(context.root.support.notes[0]?.id).toBe(201);
+    expect(context.root.support.attachments[0]?.preview?.text?.content).toBe("Kontext");
+    expect(context.root.children.features[0]?.support.attachments[0]?.preview).toBeNull();
+
+    const calls = client.get.mock.calls.map(([path]) => path);
+    expect(calls).toContain("attachments/101/preview");
+    expect(calls).not.toContain("attachments/102/preview");
+    expect(calls.filter((path) => path === "tasks/3/tickets")).toHaveLength(1);
+  });
+
+  it("rejects invalid reference context requests before calling the API", async () => {
+    const client = createMockClient();
+
+    await expect(tool("get_reference_context", client).execute({ reference: "ID 12" })).rejects.toThrow("Ungültige Referenz");
     expect(client.get).not.toHaveBeenCalled();
   });
 

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Projekt Manager Referenz Lesen"
+  short_description: "Projekt-IDs automatisch per MCP lesen"
+  default_prompt: "Use $projekt-manager-referenz-lesen to read Projekt Manager object references through MCP with recursive context."
+
+policy:
+  allow_implicit_invocation: true

@@ -282,9 +282,9 @@ function NavigationMenu({
       aria-label="Navigationsbereiche"
       className="grid w-fit grid-cols-[max-content_auto] gap-x-1 gap-y-1"
     >
-      {visibleSections.map((section) => (
+      {visibleSections.map((section, sectionIndex) => (
         <Fragment key={section.label}>
-          <div className="col-span-2 mb-1 mt-5 max-w-0 overflow-visible whitespace-nowrap px-1.5 text-[10px] font-semibold uppercase tracking-widest text-steel-400">
+          <div className={`col-span-2 mb-1 max-w-0 overflow-visible whitespace-nowrap px-1.5 text-[10px] font-semibold uppercase tracking-widest text-steel-400 ${sectionIndex === 0 ? "mt-0" : "mt-5"}`}>
             {section.label}
           </div>
           {section.items.map((item) => {
@@ -378,7 +378,7 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
   return (
     <aside
       aria-label="Hauptnavigation"
-      className={`hidden shrink-0 overflow-y-auto bg-gradient-to-b from-steel-700 to-steel-800 text-white transition-[width] duration-200 md:block ${collapsed ? "w-16 p-3" : "w-fit py-4 pl-4 pr-4"}`}
+      className={`hidden shrink-0 overflow-y-auto bg-gradient-to-b from-steel-700 to-steel-800 text-white transition-[width] duration-200 md:block ${collapsed ? "w-16 p-3" : "w-fit pb-4 pl-4 pr-4"}`}
     >
       <div className={collapsed ? "" : "w-fit"}>
         {collapsed ? (
@@ -391,38 +391,49 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
             </span>
           </div>
         ) : (
-          <>
-            <div className="mb-3 flex w-0 min-w-full items-center gap-2 overflow-hidden px-1">
-              <span className="flex h-12 w-12 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-base font-bold text-steel-700 shadow-steel-icon">
-                PM
-              </span>
-              <div className="flex items-center gap-1">
+          <div
+            className="-mx-4 flex w-[calc(100%+2rem)] flex-col border-b border-white/12"
+            data-testid="sidebar-hero"
+            style={{ height: "var(--hero-h, 128px)" }}
+          >
+            <div className="mx-4 mt-2 overflow-hidden rounded-lg border border-white/15 bg-white/6">
+              <div className="flex h-10 items-center justify-center">
+                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-steel-300 to-white text-sm font-bold text-steel-700 shadow-steel-icon">
+                  PM
+                </span>
+              </div>
+              <div className="flex h-[26px] border-t border-white/12">
                 <button
                   type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-white/55 transition hover:bg-white/5 hover:text-white"
-                  aria-label={collapseToggleLabel}
-                  title={collapseToggleLabel}
-                  onClick={toggleCollapsed}
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <button
-                  type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-white/55 transition hover:bg-white/5 hover:text-white"
+                  className="flex flex-1 items-center justify-center text-white/55 transition hover:bg-white/5 hover:text-white"
                   aria-label="Aktualisieren"
                   title="Aktualisieren"
                   onClick={() => void invalidateWikiImportData(queryClient)}
                 >
-                  <RefreshCw size={14} />
+                  <RefreshCw size={13} />
+                </button>
+                <div
+                  className="w-px bg-white/12"
+                  data-testid="sidebar-hero-action-divider"
+                />
+                <button
+                  type="button"
+                  className="flex flex-1 items-center justify-center text-white/55 transition hover:bg-white/5 hover:text-white"
+                  aria-label={collapseToggleLabel}
+                  title={collapseToggleLabel}
+                  onClick={toggleCollapsed}
+                >
+                  <ChevronLeft size={14} />
                 </button>
               </div>
             </div>
-            <div className="mb-4 flex min-h-10 w-0 min-w-full items-center overflow-hidden px-1">
-              <span className="min-w-0 text-sm font-bold leading-5 text-white">
-                Projekt Manager
-              </span>
+            <div
+              className="flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm font-semibold leading-none text-white/70"
+              data-testid="sidebar-hero-label"
+            >
+              Projekt Manager
             </div>
-          </>
+          </div>
         )}
         {collapsed ? (
           <button
@@ -437,7 +448,8 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
         ) : null}
         {!collapsed ? (
           <div
-            className="mb-2 w-0 min-w-full overflow-hidden"
+            className="my-2 w-0 min-w-full overflow-hidden"
+            data-testid="sidebar-global-search"
             onClick={() => openGlobalSearch(sidebarSearch)}
           >
             <SearchInput

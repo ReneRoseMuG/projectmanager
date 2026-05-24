@@ -20,6 +20,7 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../../tests/fixtures/api/index.js";
 import { ProjectManagerApiClient } from "./api-client.js";
+import type { ReferenceContext } from "./reference-context.js";
 import { createProjectManagerMcpServer } from "./server.js";
 
 /**
@@ -315,6 +316,24 @@ describe("MCP tools integration", () => {
     expect(await fs.readFile(path.join(uploadDir, attachment.filename), "utf8")).toBe(attachmentContent);
     expect(await seedClient.get<Attachment[]>(`tasks/${task.id}/attachments`)).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: attachment.id, originalName: "mcp-attachment.txt" })])
+    );
+
+    const context = await callTool<ReferenceContext>(executedTools, "get_reference_context", { reference: `PROJ-${project.id}` });
+    expect(context.normalizedReference).toBe(`PROJ-${project.id}`);
+    expect(context.root.children.milestones).toEqual(expect.arrayContaining([expect.objectContaining({ id: milestone.id })]));
+    expect(context.root.children.tasks).toEqual(expect.arrayContaining([expect.objectContaining({ id: task.id })]));
+    expect(context.root.children.tickets).toEqual(expect.arrayContaining([expect.objectContaining({ id: ticket.id })]));
+    expect(context.root.children.features).toEqual(expect.arrayContaining([expect.objectContaining({ id: feature.id })]));
+    expect(context.root.support.notes).toEqual(expect.arrayContaining([expect.objectContaining({ id: note.id, title: "MCP Notiz" })]));
+    expect(context.root.support.comments).toEqual(expect.arrayContaining([expect.objectContaining({ id: comment.id, body: "MCP Kommentar" })]));
+    const taskContext = context.root.children.tasks.find((child) => child.id === task.id);
+    expect(taskContext?.support.attachments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          attachment: expect.objectContaining({ id: attachment.id, originalName: "mcp-attachment.txt" }),
+          preview: expect.objectContaining({ status: "available", text: expect.objectContaining({ content: attachmentContent }) })
+        })
+      ])
     );
 
     expect(await callTool<Project>(executedTools, "update_project", { id: project.id, name: "MCP Projekt aktualisiert", description: "Projektbeschreibung MCP", status: "active", color: "#2563eb", startDate: "2026-05-01", dueDate: "2026-08-01" })).toMatchObject({

@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import type { TicketOwner } from "../api/tickets";
 import { TicketListBoardView } from "../components/tickets/TicketListBoardView";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
-import { PageHeader } from "../components/ui/PageHeader";
+import { PageHero } from "../components/ui/PageHero";
 import { ProjectMilestoneFilterBar } from "../components/ui/ProjectMilestoneFilterBar";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessageAsync } from "../hooks/errors";
@@ -123,40 +123,43 @@ export function TicketsPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
-      <PageHeader
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <PageHero
+        variant="list"
         title="Tickets"
         subtitle={`${tickets.tickets.length} Einträge`}
       />
 
-      {tickets.error || projects.error || milestones.error ? (
-        <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
-          {tickets.error ?? projects.error ?? milestones.error}
-        </div>
-      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+        {tickets.error || projects.error || milestones.error ? (
+          <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
+            {tickets.error ?? projects.error ?? milestones.error}
+          </div>
+        ) : null}
 
-      <TicketListBoardView
-        tickets={tickets.tickets}
-        loading={tickets.loading || projects.loading || milestones.loading}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onAdd={() => navigate(ticketCreateTarget())}
-        onAddStatus={(status) => navigate(ticketCreateTarget(status))}
-        onOpen={(ticket) => navigate(ticketOpenTarget(ticket))}
-        onDelete={deleteTicket}
-        onStatusChange={updateTicketStatus}
-        onDueDateChange={updateTicketDueDate}
-        filters={
-          <ProjectMilestoneFilterBar
-            projects={projects.projects}
-            milestones={milestones.milestones}
-            projectId={milestoneId ? null : projectId}
-            milestoneId={milestoneId}
-            onProjectChange={updateProjectFilter}
-            onMilestoneChange={updateMilestoneFilter}
-          />
-        }
-      />
+        <TicketListBoardView
+          tickets={tickets.tickets}
+          loading={tickets.loading || projects.loading || milestones.loading}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onAdd={() => navigate(ticketCreateTarget())}
+          onAddStatus={(status) => navigate(ticketCreateTarget(status))}
+          onOpen={(ticket) => navigate(ticketOpenTarget(ticket))}
+          onDelete={deleteTicket}
+          onStatusChange={updateTicketStatus}
+          onDueDateChange={updateTicketDueDate}
+          filters={
+            <ProjectMilestoneFilterBar
+              projects={projects.projects}
+              milestones={milestones.milestones}
+              projectId={milestoneId ? null : projectId}
+              milestoneId={milestoneId}
+              onProjectChange={updateProjectFilter}
+              onMilestoneChange={updateMilestoneFilter}
+            />
+          }
+        />
+      </div>
     </div>
   );
 }

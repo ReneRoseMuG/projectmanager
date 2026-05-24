@@ -14,7 +14,7 @@ import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
 import { TicketForm, type TicketFormInput } from "../components/tickets/TicketForm";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
-import { PageHeader } from "../components/ui/PageHeader";
+import { PageHero } from "../components/ui/PageHero";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage, errorMessageAsync } from "../hooks/errors";
 import { useCatalogs } from "../hooks/useCatalogs";
@@ -263,38 +263,41 @@ export function ProjectsPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
-      <PageHeader
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <PageHero
+        variant="list"
         title="Projekte"
         subtitle={`${projects.length} Einträge`}
       />
 
-      {error ? (
-        <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
-          {error}
-        </div>
-      ) : null}
-      <ProjectListBoardView
-        projects={filteredProjects}
-        loading={loading}
-        onCreate={() => navigate(projectTarget("/projects/new"))}
-        onEdit={(project) => navigate(projectTarget(`/projects/${project.id}`))}
-        onDelete={(project) => void deleteProject(project)}
-        onStatusChange={updateProjectStatus}
-        onCreateMilestone={canCreateMilestones ? (project) => setCreateMilestoneForProject(project) : undefined}
-        onCreateTask={canCreateTasks ? (project) => setCreateTaskForProject(project) : undefined}
-        onCreateTicket={canCreateTickets ? (project) => setCreateTicketForProject(project) : undefined}
-        filters={
-          !loading ? (
-            <FilterChips
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={statusOptions}
-              allCount={projects.length}
-            />
-          ) : null
-        }
-      />
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+        {error ? (
+          <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
+            {error}
+          </div>
+        ) : null}
+        <ProjectListBoardView
+          projects={filteredProjects}
+          loading={loading}
+          onCreate={() => navigate(projectTarget("/projects/new"))}
+          onEdit={(project) => navigate(projectTarget(`/projects/${project.id}`))}
+          onDelete={(project) => void deleteProject(project)}
+          onStatusChange={updateProjectStatus}
+          onCreateMilestone={canCreateMilestones ? (project) => setCreateMilestoneForProject(project) : undefined}
+          onCreateTask={canCreateTasks ? (project) => setCreateTaskForProject(project) : undefined}
+          onCreateTicket={canCreateTickets ? (project) => setCreateTicketForProject(project) : undefined}
+          filters={
+            !loading ? (
+              <FilterChips
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={statusOptions}
+                allCount={projects.length}
+              />
+            ) : null
+          }
+        />
+      </div>
       <MilestoneForm
         open={createMilestoneForProject !== null}
         projects={projects}

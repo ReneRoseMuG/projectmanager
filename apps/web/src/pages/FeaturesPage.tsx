@@ -5,7 +5,7 @@ import { FeatureCardSkeleton } from "../components/features/FeatureCardSkeleton"
 import { FeatureListBoardView } from "../components/features/FeatureListBoardView";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
-import { PageHeader } from "../components/ui/PageHeader";
+import { PageHero } from "../components/ui/PageHero";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useCatalogs } from "../hooks/useCatalogs";
@@ -90,35 +90,38 @@ export function FeaturesPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
-      <PageHeader
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <PageHero
+        variant="list"
         title="Features"
         subtitle={`${features.features.length} Einträge`}
       />
 
-      {features.loading ? (
-        <FeatureCardSkeleton />
-      ) : features.error ? (
-        <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-crimson">
-          {features.error}
-        </div>
-      ) : (
-        <FeatureListBoardView
-          features={filteredFeatures}
-          onCreate={() => navigate(featureTarget("/features/new"))}
-          onOpen={(feature) => navigate(featureTarget(`/features/${feature.id}`))}
-          onStatusChange={updateFeatureStatus}
-          filters={
-            <FilterChips
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={statusOptions}
-              allCount={features.features.length}
-            />
-          }
-          onDelete={(feature) => void deleteFeature(feature)}
-        />
-      )}
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+        {features.loading ? (
+          <FeatureCardSkeleton />
+        ) : features.error ? (
+          <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-crimson">
+            {features.error}
+          </div>
+        ) : (
+          <FeatureListBoardView
+            features={filteredFeatures}
+            onCreate={() => navigate(featureTarget("/features/new"))}
+            onOpen={(feature) => navigate(featureTarget(`/features/${feature.id}`))}
+            onStatusChange={updateFeatureStatus}
+            filters={
+              <FilterChips
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={statusOptions}
+                allCount={features.features.length}
+              />
+            }
+            onDelete={(feature) => void deleteFeature(feature)}
+          />
+        )}
+      </div>
     </div>
   );
 }

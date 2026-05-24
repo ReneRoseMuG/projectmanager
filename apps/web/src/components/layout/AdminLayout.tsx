@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 
 const adminItems = [
   { to: "/admin/catalogs", label: "Kataloge" },
@@ -17,20 +17,35 @@ function adminLinkClass(isActive: boolean): string {
   }`;
 }
 
+export function AdminNavigation() {
+  return (
+    <nav className="flex flex-wrap gap-2 border-b border-line bg-white px-4 py-3 md:px-5">
+      {adminItems.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          className={({ isActive }) => adminLinkClass(isActive)}
+        >
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+function usesOwnAdminChrome(pathname: string): boolean {
+  return /^\/admin\/(?:backup|users|roles)\/?$/.test(pathname);
+}
+
 export function AdminLayout({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  if (usesOwnAdminChrome(location.pathname)) {
+    return children;
+  }
+
   return (
     <div className="grid gap-5">
-      <nav className="flex flex-wrap gap-2">
-        {adminItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) => adminLinkClass(isActive)}
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
+      <AdminNavigation />
       {children}
     </div>
   );

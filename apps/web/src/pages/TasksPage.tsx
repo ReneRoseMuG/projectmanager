@@ -1,7 +1,7 @@
 import type { Task, TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { TaskListBoardView } from "../components/tasks/TaskListBoardView";
-import { PageHeader } from "../components/ui/PageHeader";
+import { PageHero } from "../components/ui/PageHero";
 import { ProjectMilestoneFilterBar } from "../components/ui/ProjectMilestoneFilterBar";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { useToast } from "../components/ui/ToastProvider";
@@ -142,41 +142,44 @@ export function TasksPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
-      <PageHeader
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <PageHero
+        variant="list"
         title="Aufgaben"
         subtitle={`${tasks.length} Einträge`}
       />
 
-      {error ? (
-        <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
-          {error}
-        </div>
-      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+        {error ? (
+          <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
+            {error}
+          </div>
+        ) : null}
 
-      <TaskListBoardView
-        tasks={tasks}
-        loading={loading}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onAdd={() => openCreate()}
-        onAddStatus={openCreate}
-        onOpen={openTask}
-        onDelete={(task) => void deleteTask(task as TaskBoardItem)}
-        onStatusChange={(task, status) => updateTaskStatus(task as TaskBoardItem, status)}
-        onDueDateChange={(task, dueDate) => updateTaskDueDate(task as TaskBoardItem, dueDate)}
-        showCreateActions={owner !== null}
-        filters={
-          <ProjectMilestoneFilterBar
-            projects={projects.projects}
-            milestones={milestones.milestones}
-            projectId={milestoneId ? null : projectId}
-            milestoneId={milestoneId}
-            onProjectChange={updateProjectFilter}
-            onMilestoneChange={updateMilestoneFilter}
-          />
-        }
-      />
+        <TaskListBoardView
+          tasks={tasks}
+          loading={loading}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onAdd={() => openCreate()}
+          onAddStatus={openCreate}
+          onOpen={openTask}
+          onDelete={(task) => void deleteTask(task as TaskBoardItem)}
+          onStatusChange={(task, status) => updateTaskStatus(task as TaskBoardItem, status)}
+          onDueDateChange={(task, dueDate) => updateTaskDueDate(task as TaskBoardItem, dueDate)}
+          showCreateActions={owner !== null}
+          filters={
+            <ProjectMilestoneFilterBar
+              projects={projects.projects}
+              milestones={milestones.milestones}
+              projectId={milestoneId ? null : projectId}
+              milestoneId={milestoneId}
+              onProjectChange={updateProjectFilter}
+              onMilestoneChange={updateMilestoneFilter}
+            />
+          }
+        />
+      </div>
     </div>
   );
 }

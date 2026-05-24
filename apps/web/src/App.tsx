@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import type { CSSProperties } from "react";
 import { AdminLayout } from "./components/layout/AdminLayout";
 import { ShellOverlays } from "./components/layout/ShellOverlays";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -42,9 +43,16 @@ function hasAdminAccess(user: ReturnType<typeof useAuth>["user"]): boolean {
   return Boolean(user?.permissions.some((permission) => (permission.resource === "*" || permission.resource === "users" || permission.resource === "roles") && (permission.action === "*" || permission.action === "admin")));
 }
 
-function isFullBleedDetailRoute(pathname: string): boolean {
-  return /^\/(?:projects|milestones|tickets|tasks|features|use-cases|backlog)\/(?:new|\d+)\/?$/.test(pathname);
+function isFullBleedRoute(pathname: string): boolean {
+  return (
+    /^\/(?:projects|milestones|tasks|tickets|features|use-cases|backlog)(?:\/|$)/.test(pathname) ||
+    /^\/(?:wiki|calendar|journal)(?:\/|$)/.test(pathname) ||
+    /^\/settings\/preferences\/?$/.test(pathname) ||
+    /^\/admin\/(?:backup|users|roles)\/?$/.test(pathname)
+  );
 }
+
+const heroLayoutStyle = { "--hero-h": "128px" } as CSSProperties;
 
 export default function App() {
   const auth = useAuth();
@@ -84,9 +92,9 @@ export default function App() {
 
   const adminAccess = hasAdminAccess(auth.user);
   const backupAccess = hasPermission(auth.user, "dumps", "read");
-  const fullBleedDetailRoute = isFullBleedDetailRoute(location.pathname);
+  const fullBleedRoute = isFullBleedRoute(location.pathname);
   const standaloneView = isStandaloneSearch(location.search);
-  const mainClass = `flex min-h-0 min-w-0 flex-1 flex-col ${fullBleedDetailRoute ? "overflow-hidden p-0" : "overflow-auto p-4 md:p-6"}`;
+  const mainClass = `flex min-h-0 min-w-0 flex-1 flex-col ${fullBleedRoute ? "overflow-hidden p-0" : "overflow-auto p-4 md:p-6"}`;
   const routes = (
     <Routes>
       <Route path="/" element={<Navigate to="/projects" replace />} />
@@ -138,7 +146,7 @@ export default function App() {
   if (standaloneView) {
     return (
       <SettingsProvider>
-        <main className={`h-screen bg-shell text-ink ${mainClass}`}>
+        <main className={`h-screen bg-shell text-ink ${mainClass}`} style={heroLayoutStyle}>
           {routes}
         </main>
       </SettingsProvider>
@@ -147,7 +155,7 @@ export default function App() {
 
   return (
     <SettingsProvider>
-      <div className="flex h-screen overflow-hidden bg-shell text-ink">
+      <div className="flex h-screen overflow-hidden bg-shell text-ink" style={heroLayoutStyle}>
         <Sidebar
           currentUser={auth.user}
           onLogout={() => {

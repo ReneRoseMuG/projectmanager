@@ -72,7 +72,8 @@ describe("FormModal", () => {
     expect(footer).toHaveClass("shrink-0");
     expect(footer).not.toHaveClass("sticky");
     expect(tabWrapper?.nextElementSibling).toBe(bodyWrapper);
-    expect(screen.getByText("Projekte · Alpha")).toHaveClass("text-white/60");
+    expect(screen.getByText("Projekte").closest("div")).toHaveClass("text-white/60");
+    expect(screen.getByText("Alpha").closest("div")).toHaveClass("text-white/60");
     expect(screen.getByRole("button", { name: "ID PROJ-42 kopieren" })).toBeInTheDocument();
     expect(form).not.toHaveTextContent("›");
   });

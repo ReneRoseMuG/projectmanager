@@ -11,7 +11,7 @@ import { createEntityComment } from "../api/comments";
 import { Button } from "../components/ui/Button";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { EmptyState } from "../components/ui/EmptyState";
-import { PageHeader } from "../components/ui/PageHeader";
+import { PageHero } from "../components/ui/PageHero";
 import { TaskListSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { WikiBreadcrumb } from "../components/wiki/WikiBreadcrumb";
@@ -145,8 +145,9 @@ export function WikiPage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-6">
-      <PageHeader
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <PageHero
+        variant="list"
         title="Wiki"
         subtitle={wiki.loading ? "" : `${countPages(wiki.tree)} Seiten`}
         actions={
@@ -160,45 +161,47 @@ export function WikiPage() {
         }
       />
 
-      {wiki.loading ? (
-        <TaskListSkeleton />
-      ) : (
-        <div className="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
-          <WikiTree tree={wiki.tree} onCreate={openCreate} />
-          <div className="grid content-start gap-4">
-            {wiki.error ? (
-              <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">
-                {wiki.error}
-              </div>
-            ) : null}
-            <WikiBreadcrumb items={wiki.breadcrumb} />
-            {wiki.page ? (
-              <WikiPageDetail
-                page={wiki.page}
-                onSave={savePage}
-                onDelete={deletePage}
-                onEditMetadata={openEditMetadata}
-              />
-            ) : (
-              <EmptyState
-                icon={<FileText size={22} />}
-                title="Keine Wiki-Seite ausgewählt"
-                body="Wähle links eine Seite aus oder lege eine neue Wiki-Seite an."
-                tone="teal"
-                variant="tinted"
-                actions={[
-                  {
-                    label: "Neue Seite",
-                    onClick: () => openCreate(null),
-                    primary: true,
-                    icon: <Plus size={16} />,
-                  },
-                ]}
-              />
-            )}
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+        {wiki.loading ? (
+          <TaskListSkeleton />
+        ) : (
+          <div className="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
+            <WikiTree tree={wiki.tree} onCreate={openCreate} />
+            <div className="grid content-start gap-4">
+              {wiki.error ? (
+                <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">
+                  {wiki.error}
+                </div>
+              ) : null}
+              <WikiBreadcrumb items={wiki.breadcrumb} />
+              {wiki.page ? (
+                <WikiPageDetail
+                  page={wiki.page}
+                  onSave={savePage}
+                  onDelete={deletePage}
+                  onEditMetadata={openEditMetadata}
+                />
+              ) : (
+                <EmptyState
+                  icon={<FileText size={22} />}
+                  title="Keine Wiki-Seite ausgewählt"
+                  body="Wähle links eine Seite aus oder lege eine neue Wiki-Seite an."
+                  tone="teal"
+                  variant="tinted"
+                  actions={[
+                    {
+                      label: "Neue Seite",
+                      onClick: () => openCreate(null),
+                      primary: true,
+                      icon: <Plus size={16} />,
+                    },
+                  ]}
+                />
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <WikiPageForm
         open={formOpen}

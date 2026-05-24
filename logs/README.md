@@ -2,6 +2,10 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 24.05.26 | Feature       | Referenz-Kontext MCP Skill                   | ⚠️     |
+| 24.05.26 | Fix           | Projekt-Features-DnD                         | ✅     |
+| 24.05.26 | Fix           | Sidebar Hero Abstände                        | ✅     |
+| 24.05.26 | Feature       | PageHero Sidebar Alignment                   | ✅     |
 | 24.05.26 | Fix           | MCP Büro Anleitung                           | ✅     |
 | 24.05.26 | 2             | MCP Autostart Startpfade                     | ✅     |
 | 24.05.26 | 1             | ChatGPT MCP HTTP Auth                        | ✅     |

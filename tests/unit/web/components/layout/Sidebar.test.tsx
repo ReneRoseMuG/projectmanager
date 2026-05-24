@@ -218,9 +218,27 @@ describe("Sidebar", () => {
     renderSidebar(readerUser);
 
     const sidebar = screen.getByLabelText("Hauptnavigation");
+    const sidebarHero = screen.getByTestId("sidebar-hero");
+    const sidebarHeroLabel = screen.getByTestId("sidebar-hero-label");
+    const globalSearch = screen.getByTestId("sidebar-global-search");
+    const firstNavigationTitle = screen.getByText("Projekt Management");
 
     expect(sidebar).toHaveClass("w-fit");
     expect(sidebar).not.toHaveClass("min-w-60");
+    expect(sidebarHero).toHaveStyle({ height: "var(--hero-h, 128px)" });
+    expect(sidebarHero).toHaveClass("w-[calc(100%+2rem)]");
+    expect(sidebarHeroLabel).toHaveClass("items-center", "text-sm", "font-semibold");
+    expect(globalSearch).toHaveClass("my-2");
+    expect(firstNavigationTitle).toHaveClass("mt-0");
+    expect(
+      sidebarHero.compareDocumentPosition(globalSearch) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      globalSearch.compareDocumentPosition(firstNavigationTitle) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByPlaceholderText("Global suchen")).toBeInTheDocument();
     expect(screen.getByTitle("Navigation einklappen")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTitle("Navigation einklappen"));
