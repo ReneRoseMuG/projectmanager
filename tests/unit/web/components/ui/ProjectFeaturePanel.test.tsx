@@ -46,12 +46,17 @@ function renderProjectFeaturePanel({
   onViewModeChange = vi.fn(),
   onCreate = vi.fn(),
   onOpen = vi.fn(),
+  onStatusChange,
 }: {
   features?: Feature[];
   viewMode?: ViewMode;
   onViewModeChange?: (viewMode: ViewMode) => void;
   onCreate?: () => void;
   onOpen?: (feature: Feature) => void;
+  onStatusChange?: (
+    feature: Feature,
+    status: Feature["status"],
+  ) => void | Promise<unknown>;
 } = {}) {
   return render(
     <ProjectFeaturePanel
@@ -60,6 +65,7 @@ function renderProjectFeaturePanel({
       onViewModeChange={onViewModeChange}
       onCreate={onCreate}
       onOpen={onOpen}
+      onStatusChange={onStatusChange}
     />,
   );
 }
@@ -190,6 +196,16 @@ describe("ProjectFeaturePanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
     expect(onViewModeChange).toHaveBeenCalledWith("list");
+  });
+
+  it("aktiviert Drag-and-Drop für Statuswechsel wenn ein Handler übergeben wird", () => {
+    const onStatusChange = vi.fn();
+    const { container } = renderProjectFeaturePanel({ onStatusChange });
+
+    expect(container.querySelector("[data-dnd-enabled='true']")).toBeInTheDocument();
+    expect(container.querySelectorAll("[data-dnd-draggable='true']")).toHaveLength(
+      buildFeatureSet().length,
+    );
   });
 
   it("zeigt EmptyState wenn keine Features verknüpft sind", () => {

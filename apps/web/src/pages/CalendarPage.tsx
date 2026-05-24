@@ -5,7 +5,7 @@ import { CalendarView } from "../components/calendar/CalendarView";
 import { EventForm } from "../components/calendar/EventForm";
 import { UpcomingEvents } from "../components/calendar/UpcomingEvents";
 import { Button } from "../components/ui/Button";
-import { PageHeader } from "../components/ui/PageHeader";
+import { PageHero } from "../components/ui/PageHero";
 import { CalendarSkeleton } from "../components/calendar/CalendarSkeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
@@ -59,8 +59,9 @@ export function CalendarPage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-6">
-      <PageHeader
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <PageHero
+        variant="list"
         title="Kalender"
         subtitle={`${events.events.length} Termine`}
         actions={
@@ -74,53 +75,55 @@ export function CalendarPage() {
         }
       />
 
-      {events.error || calendarTasks.error ? (
-        <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
-          {events.error ?? calendarTasks.error}
-        </div>
-      ) : null}
-      {events.loading ||
-      calendarTasks.loading ||
-      projectsLoading ||
-      milestonesLoading ? (
-        <CalendarSkeleton />
-      ) : (
-        <>
-          <CalendarView
-            events={events.events}
-            tasks={calendarTasks.tasks}
-            onDateClick={openCreate}
-            onEventClick={(event) => {
-              setSelectedEvent(event);
-              setFormOpen(true);
-            }}
-            onEventMove={async (event, startTime, endTime) => {
-              try {
-                await events.updateEvent(event.id, {
-                  startTime,
-                  endTime,
-                  expectedVersion: event.version,
-                });
-                showToast({ tone: "success", title: "Termin verschoben" });
-              } catch (eventError) {
-                showToast({
-                  tone: "error",
-                  title: "Termin konnte nicht verschoben werden",
-                  message: errorMessage(eventError),
-                });
-                throw eventError;
-              }
-            }}
-          />
-          <UpcomingEvents
-            events={events.events}
-            onOpen={(event) => {
-              setSelectedEvent(event);
-              setFormOpen(true);
-            }}
-          />
-        </>
-      )}
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+        {events.error || calendarTasks.error ? (
+          <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
+            {events.error ?? calendarTasks.error}
+          </div>
+        ) : null}
+        {events.loading ||
+        calendarTasks.loading ||
+        projectsLoading ||
+        milestonesLoading ? (
+          <CalendarSkeleton />
+        ) : (
+          <>
+            <CalendarView
+              events={events.events}
+              tasks={calendarTasks.tasks}
+              onDateClick={openCreate}
+              onEventClick={(event) => {
+                setSelectedEvent(event);
+                setFormOpen(true);
+              }}
+              onEventMove={async (event, startTime, endTime) => {
+                try {
+                  await events.updateEvent(event.id, {
+                    startTime,
+                    endTime,
+                    expectedVersion: event.version,
+                  });
+                  showToast({ tone: "success", title: "Termin verschoben" });
+                } catch (eventError) {
+                  showToast({
+                    tone: "error",
+                    title: "Termin konnte nicht verschoben werden",
+                    message: errorMessage(eventError),
+                  });
+                  throw eventError;
+                }
+              }}
+            />
+            <UpcomingEvents
+              events={events.events}
+              onOpen={(event) => {
+                setSelectedEvent(event);
+                setFormOpen(true);
+              }}
+            />
+          </>
+        )}
+      </div>
       <EventForm
         open={formOpen}
         event={selectedEvent}

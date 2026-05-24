@@ -26,6 +26,7 @@ import type {
 } from "@taskmanager/shared-types";
 import { z } from "zod";
 import type { ProjectManagerApiClient } from "./api-client.js";
+import { buildReferenceContext } from "./reference-context.js";
 import { plainTextDocument } from "./rich-text.js";
 
 export type ParentType = "project" | "milestone";
@@ -396,6 +397,13 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       description: "Lädt ein Domänenobjekt anhand seines Kurzbezeichners, z. B. TASK-10, FEAT-3 oder PROJ-1.",
       inputSchema: referenceSchema,
       execute: async ({ reference }) => client.get(referencePath(reference))
+    }),
+    defineTool({
+      name: "get_reference_context",
+      title: "Objektkontext per Referenz laden",
+      description: "Lädt ein Projekt-Manager-Objekt anhand seiner Referenz inklusive rekursiver Kinder, Notes, Attachments, Comments und Relationen.",
+      inputSchema: referenceSchema,
+      execute: async ({ reference }) => buildReferenceContext(client, reference)
     }),
     defineTool({
       name: "list_catalogs",

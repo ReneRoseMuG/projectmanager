@@ -20,6 +20,10 @@ interface ProjectFeaturePanelProps {
   onViewModeChange: (viewMode: ViewMode) => void;
   onCreate: () => void;
   onOpen: (feature: Feature) => void;
+  onStatusChange?: (
+    feature: Feature,
+    status: Feature["status"],
+  ) => void | Promise<unknown>;
 }
 
 function sortFeatures(features: Feature[]) {
@@ -57,6 +61,7 @@ export function ProjectFeaturePanel({
   onViewModeChange,
   onCreate,
   onOpen,
+  onStatusChange,
 }: ProjectFeaturePanelProps) {
   const [searchValue, setSearchValue] = useState("");
   const sortedFeatures = useMemo(() => sortFeatures(features), [features]);
@@ -74,6 +79,7 @@ export function ProjectFeaturePanel({
       addLabel="Neues Feature"
       statusKey="status"
       statusCatalogKind="featureStatus"
+      onItemStatusChange={onStatusChange}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       emptyState={

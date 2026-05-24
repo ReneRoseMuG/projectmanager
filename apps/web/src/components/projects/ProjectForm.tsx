@@ -593,6 +593,25 @@ export function ProjectForm({
     }
   };
 
+  const updateProjectFeatureStatus = async (
+    feature: Feature,
+    status: Feature["status"],
+  ) => {
+    try {
+      await allFeatures.updateFeature(feature.id, {
+        status,
+        expectedVersion: feature.version,
+      });
+    } catch (featureError) {
+      showToast({
+        tone: "error",
+        title: "Featurestatus konnte nicht geändert werden",
+        message: errorMessage(featureError),
+      });
+      throw featureError;
+    }
+  };
+
   const visibleTabs = project
     ? baseTabs.filter((tab) => tab.value !== "journal" || canReadJournal)
     : baseTabs.filter(
@@ -836,6 +855,7 @@ export function ProjectForm({
                       `/features/${feature.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
                     )
                   }
+                  onStatusChange={updateProjectFeatureStatus}
                 />
               )
             ) : (

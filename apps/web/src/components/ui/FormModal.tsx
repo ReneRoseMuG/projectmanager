@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from "react";
 import { Button } from "./Button";
 import { CopyReferenceButton } from "./CopyReferenceButton";
 import { Modal } from "./Modal";
+import { PageHero } from "./PageHero";
 
 interface FormModalProps {
   open: boolean;
@@ -62,34 +63,15 @@ export function FormModal({
       }
       onSubmit={submit}
     >
-      <header
-        className={`relative overflow-hidden bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6 ${isPage ? "" : "shrink-0"}`}
-      >
-        <div className="pointer-events-none absolute -right-8 -top-32 h-80 w-80 rounded-full bg-white/12 blur-sm" />
-        <div className="relative flex items-start justify-between gap-4">
-          <div className="grid gap-2">
-            {breadcrumb.length > 0 ? (
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/60">
-                {breadcrumb.join(" · ")}
-              </p>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-3">
-              {icon ? (
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/12 text-white">
-                  {icon}
-                </span>
-              ) : null}
-              <div>
-                <h2 className="text-2xl font-bold tracking-normal">{title}</h2>
-                {headerMeta ? (
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {headerMeta}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
+      <PageHero
+        variant="detail"
+        title={title}
+        breadcrumb={breadcrumb}
+        icon={icon}
+        metaPills={headerMeta}
+        fixedHeight={isPage}
+        actions={
+          <>
             {objectReference ? (
               <CopyReferenceButton
                 reference={objectReference}
@@ -116,9 +98,9 @@ export function FormModal({
             >
               <X size={18} />
             </button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       {tabBar ? (
         <div

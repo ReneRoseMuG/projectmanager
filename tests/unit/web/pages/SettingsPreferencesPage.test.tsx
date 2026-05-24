@@ -82,7 +82,8 @@ describe("SettingsPreferencesPage", () => {
     renderPage();
 
     expect(screen.getByRole("heading", { name: "Präferenzen" })).toHaveClass(
-      "font-semibold",
+      "font-bold",
+      "text-white",
     );
     expect(
       screen.getByRole("heading", { name: "Mein Profil" }),

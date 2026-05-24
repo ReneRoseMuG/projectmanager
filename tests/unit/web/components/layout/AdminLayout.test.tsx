@@ -28,7 +28,7 @@ afterEach(() => {
 describe("AdminLayout", () => {
   it("rendert die Admin-Unterpunkte als Inline-Navigation", () => {
     render(
-      <MemoryRouter initialEntries={["/admin/users"]}>
+      <MemoryRouter initialEntries={["/admin/catalogs"]}>
         <AdminLayout>
           <div>Admin-Inhalt</div>
         </AdminLayout>
@@ -39,6 +39,19 @@ describe("AdminLayout", () => {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
     expect(screen.getByText("Admin-Inhalt")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Benutzer" })).toHaveClass("bg-steel-700", "text-white");
+    expect(screen.getByRole("link", { name: "Kataloge" })).toHaveClass("bg-steel-700", "text-white");
+  });
+
+  it("lässt Full-Bleed-Adminseiten ihre eigene Navigation rendern", () => {
+    render(
+      <MemoryRouter initialEntries={["/admin/users"]}>
+        <AdminLayout>
+          <div>Admin-Inhalt</div>
+        </AdminLayout>
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByRole("link", { name: "Benutzer" })).not.toBeInTheDocument();
+    expect(screen.getByText("Admin-Inhalt")).toBeInTheDocument();
   });
 });

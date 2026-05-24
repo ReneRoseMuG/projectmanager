@@ -1,15 +1,17 @@
 import { Edit3, Plus, Trash2, Users as UsersIcon } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AdminNavigation } from "../../components/layout/AdminLayout";
 import { EmptyState } from "../../components/ui/EmptyState";
-import { PageHeader } from "../../components/ui/PageHeader";
+import { PageHero } from "../../components/ui/PageHero";
 import { useAdminUsers } from "../../hooks/useAdminUsers";
 
 export function UsersPage() {
   const { users, loading, error, deleteUser, pending, mutationError } = useAdminUsers();
 
   return (
-    <section className="mx-auto grid max-w-6xl gap-5">
-      <PageHeader
+    <section className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <PageHero
+        variant="list"
         title="Benutzer"
         subtitle="Administration"
         actions={
@@ -19,9 +21,11 @@ export function UsersPage() {
         </Link>
         }
       />
-      {error || mutationError ? <p className="rounded-md border border-crimson/30 bg-crimson/5 px-3 py-2 text-sm text-crimson">{error ?? mutationError}</p> : null}
-      <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <table className="w-full min-w-[720px] text-left text-sm">
+      <AdminNavigation />
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-5 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+        {error || mutationError ? <p className="rounded-md border border-crimson/30 bg-crimson/5 px-3 py-2 text-sm text-crimson">{error ?? mutationError}</p> : null}
+        <div className="overflow-hidden rounded-lg border border-line bg-white">
+          <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-steel-50 text-xs font-semibold uppercase text-steel-500">
             <tr>
               <th className="px-4 py-3">Name</th>
@@ -71,7 +75,8 @@ export function UsersPage() {
               ))
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </section>
   );

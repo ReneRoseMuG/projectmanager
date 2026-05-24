@@ -10,7 +10,7 @@ import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { FormField } from "../components/ui/FormField";
 import { Input } from "../components/ui/Input";
-import { PageHeader } from "../components/ui/PageHeader";
+import { PageHero } from "../components/ui/PageHero";
 import { Section } from "../components/ui/Section";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessageAsync } from "../hooks/errors";
@@ -268,36 +268,42 @@ export function SettingsPreferencesPage() {
   );
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-5">
-      <PageHeader title="Präferenzen" subtitle={`${settings.length} Einstellungen`} />
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <PageHero
+        variant="list"
+        title="Präferenzen"
+        subtitle={`${settings.length} Einstellungen`}
+      />
 
-      {settingsState.error ? (
-        <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">
-          {settingsState.error}
-        </div>
-      ) : null}
-      {settingsState.loading ? (
-        <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center text-sm text-steel-500">
-          Einstellungen werden geladen.
-        </div>
-      ) : null}
+      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-5 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+        {settingsState.error ? (
+          <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">
+            {settingsState.error}
+          </div>
+        ) : null}
+        {settingsState.loading ? (
+          <div className="rounded-lg border border-dashed border-line bg-white p-8 text-center text-sm text-steel-500">
+            Einstellungen werden geladen.
+          </div>
+        ) : null}
 
-      {!settingsState.loading ? (
-        <>
-          <SettingsList
-            settings={settings}
-            scopeType="USER"
-            title="Mein Profil"
-          />
-          {adminAccess ? (
+        {!settingsState.loading ? (
+          <>
             <SettingsList
               settings={settings}
-              scopeType="GLOBAL"
-              title="Globale Defaults"
+              scopeType="USER"
+              title="Mein Profil"
             />
-          ) : null}
-        </>
-      ) : null}
+            {adminAccess ? (
+              <SettingsList
+                settings={settings}
+                scopeType="GLOBAL"
+                title="Globale Defaults"
+              />
+            ) : null}
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { addTicketRelation, createOwnerTicket, createSubTicket, createTicketNote
 import { MilestoneListBoardView } from "../components/milestones/MilestoneListBoardView";
 import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
 import { TicketForm, type TicketFormInput } from "../components/tickets/TicketForm";
-import { PageHeader } from "../components/ui/PageHeader";
+import { PageHero } from "../components/ui/PageHero";
 import { ProjectMilestoneFilterBar } from "../components/ui/ProjectMilestoneFilterBar";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { useToast } from "../components/ui/ToastProvider";
@@ -232,38 +232,41 @@ export function MilestonesPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-6">
-      <PageHeader
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <PageHero
+        variant="list"
         title="Meilensteine"
         subtitle={`${milestones.milestones.length} Einträge`}
       />
 
-      {milestones.error || projects.error ? (
-        <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
-          {milestones.error ?? projects.error}
-        </div>
-      ) : null}
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+        {milestones.error || projects.error ? (
+          <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
+            {milestones.error ?? projects.error}
+          </div>
+        ) : null}
 
-      <MilestoneListBoardView
-        milestones={milestones.milestones}
-        loading={milestones.loading || projects.loading}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onCreate={openCreate}
-        onEdit={openMilestone}
-        onDelete={(milestone) => void deleteMilestone(milestone)}
-        onStatusChange={updateMilestoneStatus}
-        onDueDateChange={updateMilestoneDueDate}
-        onCreateTask={canCreateTasks ? (milestone) => setCreateTaskForMilestone(milestone) : undefined}
-        onCreateTicket={canCreateTickets ? (milestone) => setCreateTicketForMilestone(milestone) : undefined}
-        filters={
-          <ProjectMilestoneFilterBar
-            projects={projects.projects}
-            projectId={projectId}
-            onProjectChange={updateProjectFilter}
-          />
-        }
-      />
+        <MilestoneListBoardView
+          milestones={milestones.milestones}
+          loading={milestones.loading || projects.loading}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onCreate={openCreate}
+          onEdit={openMilestone}
+          onDelete={(milestone) => void deleteMilestone(milestone)}
+          onStatusChange={updateMilestoneStatus}
+          onDueDateChange={updateMilestoneDueDate}
+          onCreateTask={canCreateTasks ? (milestone) => setCreateTaskForMilestone(milestone) : undefined}
+          onCreateTicket={canCreateTickets ? (milestone) => setCreateTicketForMilestone(milestone) : undefined}
+          filters={
+            <ProjectMilestoneFilterBar
+              projects={projects.projects}
+              projectId={projectId}
+              onProjectChange={updateProjectFilter}
+            />
+          }
+        />
+      </div>
       <TaskForm
         open={createTaskForMilestone !== null}
         owner={createTaskOwner ?? undefined}

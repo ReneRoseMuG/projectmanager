@@ -3,10 +3,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CloudDownload, DatabaseBackup, FolderOpen, HardDrive, RefreshCw, Server } from "lucide-react";
 import { useState } from "react";
 import { applyRemoteDump, previewRemoteDump, saveLocalDump } from "../api/dumps";
+import { AdminNavigation } from "../components/layout/AdminLayout";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
-import { PageHeader } from "../components/ui/PageHeader";
+import { PageHero } from "../components/ui/PageHero";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { useLocalDumpStatus, useRemoteDumpStatus } from "../hooks/useLocalDumpStatus";
 import { useHasPermission } from "../hooks/usePermissions";
@@ -126,8 +127,9 @@ export function SettingsBackupPage() {
   const remoteFiles = remoteStatus.status?.files ?? [];
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-5">
-      <PageHeader
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <PageHero
+        variant="list"
         title="Sicherung"
         subtitle="Lokale Dumps mit SFTP-Kopie"
         actions={
@@ -145,6 +147,9 @@ export function SettingsBackupPage() {
         }
       />
 
+      <AdminNavigation />
+
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-5 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="rounded-md border border-line bg-white p-4 shadow-sm">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -296,6 +301,7 @@ export function SettingsBackupPage() {
           Import {applyResult.importStatus}. Tabellen: {applyResult.tablesRestored}. Verifikation: {applyResult.verificationPassed ? "bestanden" : "fehlgeschlagen"}.
         </section>
       )}
+      </div>
     </div>
   );
 }

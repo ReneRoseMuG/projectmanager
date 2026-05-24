@@ -38,6 +38,8 @@ Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt u
 | `get_feature` | Liest ein Feature inklusive Content. | `id` | Feature |
 | `list_use_cases` | Listet Use Cases eines Features. | `featureId` | Use-Case-Liste |
 | `get_use_case` | Liest einen Use Case inklusive Content. | `id` | Use Case |
+| `resolve_reference` | Lädt ein Einzelobjekt anhand einer Kurzreferenz. | `reference`, z. B. `TASK-10` | Projekt, Meilenstein, Aufgabe, Ticket, Feature oder Use Case |
+| `get_reference_context` | Lädt ein Objekt anhand einer Referenz inklusive rekursiver Kinder und Supportobjekte. | `reference`, z. B. `MS-12` oder `Meilenstein ID 12` | Kontextbaum mit `root`, `children`, `support` und `warnings` |
 | `list_catalogs` | Liest Status-, Prioritäts- und Tickettyp-Kataloge als Lookup für Schreibtools. | keine | Katalogeinträge |
 | `list_users` | Listet aktive Nutzeroptionen für Assignee- und Reporter-Felder. | keine | Nutzeroptionen |
 
