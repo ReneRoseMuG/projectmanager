@@ -9,10 +9,11 @@ async function getCalendarTasks(): Promise<Task[]> {
   return getTasks();
 }
 
-export function useCalendarTasks() {
+export function useCalendarTasks(enabled = true) {
   const tasksQuery = useQuery({
     queryKey: queryKeys.calendarTasks.list(),
-    queryFn: getCalendarTasks
+    queryFn: getCalendarTasks,
+    enabled
   });
 
   const reload = useCallback(async () => {

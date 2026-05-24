@@ -21,7 +21,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
 
   const from =
-    (location.state as LocationState | null)?.from?.pathname ?? "/projects";
+    (location.state as LocationState | null)?.from?.pathname ?? "/";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -1,6 +1,14 @@
-import type { DumpBackupApplyResult, DumpBackupPreviewResult, DumpBackupSaveResult, DumpRemoteBackupFile } from "@taskmanager/shared-types";
+import type {
+  DumpBackupApplyResult,
+  DumpBackupPreviewResult,
+  DumpBackupSaveResult,
+  DumpIncrementalSyncApplyResult,
+  DumpIncrementalSyncPreviewResult,
+  DumpIncrementalSyncResult,
+  DumpRemoteBackupFile
+} from "@taskmanager/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CloudDownload, DatabaseBackup, FolderOpen, HardDrive, RefreshCw, Server } from "lucide-react";
+import { AlertTriangle, CloudDownload, CloudUpload, DatabaseBackup, FolderOpen, HardDrive, RefreshCw, Server } from "lucide-react";
 import { useState } from "react";
 import { applyRemoteDump, previewRemoteDump, saveLocalDump } from "../api/dumps";
 import { AdminNavigation } from "../components/layout/AdminLayout";
@@ -9,7 +17,7 @@ import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { PageHero } from "../components/ui/PageHero";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
-import { useLocalDumpStatus, useRemoteDumpStatus } from "../hooks/useLocalDumpStatus";
+import { useIncrementalRemoteSync, useLocalDumpStatus, useRemoteDumpStatus } from "../hooks/useLocalDumpStatus";
 import { useHasPermission } from "../hooks/usePermissions";
 import { invalidateWikiImportData } from "../queries/invalidation";
 
@@ -35,13 +43,23 @@ function readinessTone(readiness: DumpBackupPreviewResult["transferReadiness"]) 
   return "crimson";
 }
 
+function syncReadinessTone(readiness: DumpIncrementalSyncPreviewResult["transferReadiness"]) {
+  if (readiness === "ready") return "fern";
+  if (readiness === "warning") return "mustard";
+  return "crimson";
+}
+
 export function SettingsBackupPage() {
   const { confirm } = useConfirm();
   const queryClient = useQueryClient();
   const canWriteDumps = useHasPermission("dumps", "write");
   const backupStatus = useLocalDumpStatus();
   const remoteStatus = useRemoteDumpStatus();
+  const incrementalSync = useIncrementalRemoteSync();
   const [saveResult, setSaveResult] = useState<DumpBackupSaveResult | null>(null);
+  const [syncResult, setSyncResult] = useState<DumpIncrementalSyncResult | null>(null);
+  const [syncPreview, setSyncPreview] = useState<DumpIncrementalSyncPreviewResult | null>(null);
+  const [syncApplyResult, setSyncApplyResult] = useState<DumpIncrementalSyncApplyResult | null>(null);
   const [preview, setPreview] = useState<DumpBackupPreviewResult | null>(null);
   const [applyResult, setApplyResult] = useState<DumpBackupApplyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +76,7 @@ export function SettingsBackupPage() {
     setSaving(true);
     setError(null);
     setSaveResult(null);
+    setSyncResult(null);
     try {
       setSaveResult(await saveLocalDump());
       await refreshStatus();
@@ -77,6 +96,58 @@ export function SettingsBackupPage() {
       setError(errorMessage(err));
     } finally {
       setRefreshing(false);
+    }
+  }
+
+  async function handleIncrementalSync() {
+    setError(null);
+    setSyncResult(null);
+    setSyncPreview(null);
+    setSyncApplyResult(null);
+    try {
+      const result = await incrementalSync.runSync();
+      setSyncResult(result);
+      await refreshStatus();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  async function handleIncrementalSyncImport() {
+    setError(null);
+    setSyncPreview(null);
+    setSyncApplyResult(null);
+    try {
+      const nextPreview = await incrementalSync.previewSync();
+      setSyncPreview(nextPreview);
+      if (nextPreview.transferReadiness === "blocked") {
+        return;
+      }
+
+      const approved = await confirm({
+        title: "Sync-Stand importieren?",
+        body: (
+          <span>
+            Der Remote-Stand {nextPreview.dumpId} überschreibt die lokalen Daten. Vor dem Import wird automatisch eine lokale Sicherung angelegt.
+          </span>
+        ),
+        severity: "danger",
+        confirmLabel: "Ja",
+        cancelLabel: "Nein"
+      });
+      if (!approved) {
+        return;
+      }
+
+      setSyncApplyResult(
+        await incrementalSync.applySync({
+          manifestHash: nextPreview.manifestHash,
+          confirmed: true
+        })
+      );
+      await refreshStatus();
+    } catch (err) {
+      setError(errorMessage(err));
     }
   }
 
@@ -137,6 +208,12 @@ export function SettingsBackupPage() {
           <Button variant="primary" icon={<DatabaseBackup size={16} />} loading={saving} disabled={!canWriteDumps} onClick={() => void handleSave()}>
             Sichern
           </Button>
+          <Button icon={<CloudUpload size={16} />} loading={incrementalSync.syncing} disabled={!canWriteDumps} onClick={() => void handleIncrementalSync()}>
+            Sync
+          </Button>
+          <Button icon={<CloudDownload size={16} />} loading={incrementalSync.previewing || incrementalSync.applying} disabled={!canWriteDumps} onClick={() => void handleIncrementalSyncImport()}>
+            Sync importieren
+          </Button>
           <Button icon={<CloudDownload size={16} />} loading={importingFileId === "__latest__"} disabled={!canWriteDumps || !remoteStatus.status?.latestFile} onClick={() => void handleRemoteImport()}>
             Neueste importieren
           </Button>
@@ -196,6 +273,28 @@ export function SettingsBackupPage() {
       </div>
 
       {error && <section className="rounded-md border border-crimson/20 bg-crimson/10 p-3 text-sm text-crimson">{error}</section>}
+
+      {syncResult && (
+        <section className={`rounded-md border p-4 shadow-sm ${syncResult.success ? "border-line bg-white" : "border-crimson/20 bg-crimson/10"}`}>
+          <div className="mb-2 flex items-center gap-2">
+            <CloudUpload size={18} />
+            <h2 className="text-base font-semibold">Letzter Sync</h2>
+          </div>
+          <div className="grid gap-2 text-sm text-steel-600 md:grid-cols-4">
+            <span>Tabellen: {syncResult.tablesUpdated ? "aktualisiert" : "unverändert"}</span>
+            <span>Hochgeladen: {syncResult.filesUploaded}</span>
+            <span>Gelöscht: {syncResult.filesDeleted}</span>
+            <span>Remote-Dateien: {syncResult.totalRemoteFiles}</span>
+          </div>
+          {syncResult.error && <p className="mt-3 rounded-md border border-crimson/20 bg-crimson/10 p-2 text-sm text-crimson">{syncResult.error}</p>}
+          {syncResult.filesDeleteFailed > 0 && <p className="mt-3 rounded-md border border-mustard/25 bg-mustard/10 p-2 text-sm text-mustard-dark">Nicht gelöscht: {syncResult.filesDeleteFailed}</p>}
+          {syncResult.warnings.map((warning) => (
+            <p key={warning} className="mt-3 rounded-md border border-mustard/25 bg-mustard/10 p-2 text-sm text-mustard-dark">
+              {warning}
+            </p>
+          ))}
+        </section>
+      )}
 
       {saveResult && (
         <section className="rounded-md border border-line bg-white p-4 shadow-sm">
@@ -263,6 +362,40 @@ export function SettingsBackupPage() {
         )}
       </section>
 
+      {syncPreview && (
+        <section className="rounded-md border border-line bg-white p-4 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={18} />
+              <h2 className="text-base font-semibold">Letzte Sync-Prüfung</h2>
+            </div>
+            <Badge tone={syncReadinessTone(syncPreview.transferReadiness)}>{syncPreview.transferReadiness}</Badge>
+          </div>
+
+          <div className="grid gap-2 text-sm text-steel-600 md:grid-cols-4">
+            <span>{syncPreview.dumpId}</span>
+            <span>{syncPreview.expectedTables.length} Tabellen</span>
+            <span>{syncPreview.totalFiles} Dateien</span>
+            <span>{megabytes(syncPreview.totalBytes)}</span>
+          </div>
+
+          {(syncPreview.warnings.length > 0 || syncPreview.blockingIssues.length > 0) && (
+            <div className="mt-4 grid gap-2">
+              {syncPreview.warnings.map((warning) => (
+                <p key={warning} className="rounded-md border border-mustard/25 bg-mustard/10 p-2 text-sm text-mustard-dark">
+                  {warning}
+                </p>
+              ))}
+              {syncPreview.blockingIssues.map((issue) => (
+                <p key={issue} className="rounded-md border border-crimson/20 bg-crimson/10 p-2 text-sm text-crimson">
+                  {issue}
+                </p>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {preview && (
         <section className="rounded-md border border-line bg-white p-4 shadow-sm">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -299,6 +432,11 @@ export function SettingsBackupPage() {
       {applyResult && (
         <section className="rounded-md border border-fern/20 bg-fern/10 p-4 text-sm text-fern">
           Import {applyResult.importStatus}. Tabellen: {applyResult.tablesRestored}. Verifikation: {applyResult.verificationPassed ? "bestanden" : "fehlgeschlagen"}.
+        </section>
+      )}
+      {syncApplyResult && (
+        <section className="rounded-md border border-fern/20 bg-fern/10 p-4 text-sm text-fern">
+          Sync-Import {syncApplyResult.importStatus}. Tabellen: {syncApplyResult.tablesRestored}. Verifikation: {syncApplyResult.verificationPassed ? "bestanden" : "fehlgeschlagen"}.
         </section>
       )}
       </div>

@@ -124,7 +124,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
       schema: { params: idParamSchema, response: { 204: { type: "null" } } }
     },
     async (request, reply) => {
-      await openAttachment(app.db, request.params.id, app.fileOpener);
+      await openAttachment(app.db, request.params.id, app.fileOpener, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

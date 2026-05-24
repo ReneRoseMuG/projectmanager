@@ -34,6 +34,7 @@ import { registerUseCasesRoutes } from "./routes/use-cases.js";
 import { registerWikiRoutes } from "./routes/wiki.js";
 import { config } from "./config.js";
 import { openFileWithDefaultApp } from "./services/file-opener.service.js";
+import { stopAllAttachmentWatchers } from "./services/attachment-watcher.service.js";
 import { createRealtimeEventBus } from "./services/realtime-event-bus.service.js";
 import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
 import { seedAuthData } from "./services/auth.service.js";
@@ -53,6 +54,9 @@ export async function buildApp(
   app.decorate("fileOpener", openFileWithDefaultApp);
   app.decorate("realtimeBus", createRealtimeEventBus());
   app.setErrorHandler(errorHandler);
+  app.addHook("onClose", async () => {
+    stopAllAttachmentWatchers();
+  });
 
   await registerCors(app);
   await registerAuthPlugins(app);

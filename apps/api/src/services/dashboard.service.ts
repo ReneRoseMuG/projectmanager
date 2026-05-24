@@ -23,18 +23,20 @@ const systemDashboardTemplates: Array<{ templateKey: string; name: string; conte
   { templateKey: "system.global.default", name: "Standard: Gesamtübersicht", context: "global", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.global] },
   { templateKey: "system.project.default", name: "Standard: Projektübersicht", context: "project", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.project] },
   { templateKey: "system.milestone.default", name: "Standard: Meilensteinübersicht", context: "milestone", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.milestone] },
-  { templateKey: "system.task.default", name: "Standard: Aufgabenübersicht", context: "task", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.task] }
+  { templateKey: "system.task.default", name: "Standard: Aufgabenübersicht", context: "task", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.task] },
+  { templateKey: "system.home.default", name: "Standard: Startseite", context: "home", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.home] }
 ];
 
 function isDashboardContext(value: string): value is DashboardContext {
-  return value === "global" || value === "project" || value === "milestone" || value === "task";
+  return value === "global" || value === "project" || value === "milestone" || value === "task" || value === "home";
 }
 
 function isDashboardWidgetId(value: string): value is DashboardWidgetId {
   return (DASHBOARD_ALLOWED_WIDGETS.global as readonly string[]).includes(value) ||
     (DASHBOARD_ALLOWED_WIDGETS.project as readonly string[]).includes(value) ||
     (DASHBOARD_ALLOWED_WIDGETS.milestone as readonly string[]).includes(value) ||
-    (DASHBOARD_ALLOWED_WIDGETS.task as readonly string[]).includes(value);
+    (DASHBOARD_ALLOWED_WIDGETS.task as readonly string[]).includes(value) ||
+    (DASHBOARD_ALLOWED_WIDGETS.home as readonly string[]).includes(value);
 }
 
 function canAdminDashboards(currentUser: CurrentUser): boolean {

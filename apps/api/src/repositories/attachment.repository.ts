@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { attachments } from "../db/schema.js";
 
@@ -44,5 +44,18 @@ export const attachmentRepository = {
       return 0;
     }
     return database.delete(attachments).where(inArray(attachments.id, uniqueIds)).run().changes;
+  },
+
+  updateSizeAndVersion(database: DbSession, id: number, data: { size: number; updatedBy: number | null }): void {
+    database
+      .update(attachments)
+      .set({
+        size: data.size,
+        updatedBy: data.updatedBy,
+        updatedAt: nowIso(),
+        version: sql`${attachments.version} + 1`
+      })
+      .where(eq(attachments.id, id))
+      .run();
   }
 };

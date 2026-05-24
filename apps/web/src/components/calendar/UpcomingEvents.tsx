@@ -7,7 +7,7 @@ import { ItemRow } from "../ui/ItemRow";
 
 interface UpcomingEventsProps {
   events: CalendarEvent[];
-  onOpen: (event: CalendarEvent) => void;
+  onOpen?: (event: CalendarEvent) => void;
 }
 
 export function UpcomingEvents({ events, onOpen }: UpcomingEventsProps) {
@@ -39,7 +39,7 @@ export function UpcomingEvents({ events, onOpen }: UpcomingEventsProps) {
                 title={event.title}
                 description={description}
                 meta={<span className="text-xs font-semibold text-steel-600">{formatHumanDate(event.startTime)}</span>}
-                onOpen={() => onOpen(event)}
+                onOpen={onOpen ? () => onOpen(event) : undefined}
               />
             );
           })}

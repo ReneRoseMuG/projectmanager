@@ -20,6 +20,10 @@ interface DashboardViewProps {
   showHeader?: boolean;
 }
 
+interface DashboardShortcutProps {
+  showHeader?: boolean;
+}
+
 function DashboardLoading() {
   return (
     <div className="grid gap-4">
@@ -145,8 +149,12 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
   );
 }
 
-export function GlobalDashboard() {
-  return <DashboardView context="global" showHeader />;
+export function GlobalDashboard({ showHeader = true }: DashboardShortcutProps = {}) {
+  return <DashboardView context="global" showHeader={showHeader} />;
+}
+
+export function HomeDashboard({ showHeader = false }: DashboardShortcutProps = {}) {
+  return <DashboardView context="home" showHeader={showHeader} title="Startseiten-Dashboard" />;
 }
 
 export function ProjectDashboard({ projectId }: { projectId: number }) {

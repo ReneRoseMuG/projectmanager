@@ -27,6 +27,7 @@ import { attachmentRepository, type AttachmentRecord } from "../repositories/att
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { badRequest, internalError, notFound } from "../utils/errors.js";
 import { removeAttachmentPreviews } from "./attachment-preview.service.js";
+import { watchAttachmentForChanges } from "./attachment-watcher.service.js";
 import type { FileOpener } from "./file-opener.service.js";
 import {
   buildDeleteSummary,
@@ -747,7 +748,7 @@ export async function deleteAttachment(database: DbClient, id: number, actor?: J
   await removeAttachmentFiles([record]);
 }
 
-export async function openAttachment(database: DbClient, id: number, fileOpener: FileOpener): Promise<void> {
+export async function openAttachment(database: DbClient, id: number, fileOpener: FileOpener, actor?: JournalActor | null): Promise<void> {
   const record = attachmentRepository.findById(database, id);
   if (!record) {
     throw notFound(`Attachment with id ${id} not found`);
@@ -764,4 +765,5 @@ export async function openAttachment(database: DbClient, id: number, fileOpener:
   } catch {
     throw internalError("Datei konnte nicht geöffnet werden.");
   }
+  watchAttachmentForChanges(database, record.id, diskPath, actor?.actorUserId ?? null);
 }

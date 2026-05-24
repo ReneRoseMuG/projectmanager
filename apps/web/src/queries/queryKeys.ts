@@ -120,7 +120,8 @@ export const queryKeys = {
   dumps: {
     root: ["dumps"] as const,
     localStatus: () => [...queryKeys.dumps.root, "localStatus"] as const,
-    remoteStatus: () => [...queryKeys.dumps.root, "remoteStatus"] as const
+    remoteStatus: () => [...queryKeys.dumps.root, "remoteStatus"] as const,
+    remoteSyncPreview: () => [...queryKeys.dumps.root, "remoteSyncPreview"] as const
   },
   tickets: {
     root: ["tickets"] as const,

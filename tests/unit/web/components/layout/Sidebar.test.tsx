@@ -53,7 +53,7 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderSidebar(currentUser?: CurrentUser | null) {
+function renderSidebar(currentUser?: CurrentUser | null, initialPath = "/projects") {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -63,7 +63,7 @@ function renderSidebar(currentUser?: CurrentUser | null) {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/projects"]}>
+      <MemoryRouter initialEntries={[initialPath]}>
         <Sidebar currentUser={currentUser} />
         <LocationProbe />
       </MemoryRouter>
@@ -117,6 +117,15 @@ const readerUser: CurrentUser = {
   requiresPasswordSetup: false,
 };
 
+const projectReaderUser: CurrentUser = {
+  ...readerUser,
+  role: {
+    ...readerUser.role,
+    permissions: [{ id: 4, roleId: 2, resource: "projects", action: "read" }],
+  },
+  permissions: [{ id: 4, roleId: 2, resource: "projects", action: "read" }],
+};
+
 beforeEach(() => {
   window.localStorage.clear();
   vi.spyOn(window, "open").mockImplementation(() => null);
@@ -149,6 +158,7 @@ describe("Sidebar", () => {
     expect(screen.queryByText("Lokal")).not.toBeInTheDocument();
 
     for (const section of [
+      "Start",
       "Projekt Management",
       "Projekt Dokumentation",
       "Information",
@@ -158,6 +168,7 @@ describe("Sidebar", () => {
     }
 
     for (const label of [
+      "Startseite",
       "Projekte",
       "Meilensteine",
       "Aufgaben",
@@ -206,6 +217,34 @@ describe("Sidebar", () => {
     );
   });
 
+  it("öffnet die Startseite in einem neuen Standalone-Tab", () => {
+    renderSidebar(readerUser);
+
+    fireEvent.click(screen.getByTitle("Startseite in neuem Tab öffnen"));
+
+    expect(window.open).toHaveBeenCalledWith(
+      "/?standalone=1",
+      "_blank",
+    );
+  });
+
+  it("markiert die Startseite nur auf der Root-Route aktiv", () => {
+    renderSidebar(readerUser, "/");
+
+    const startLink = screen.getByText("Startseite").closest("a");
+    const projectsLink = screen.getByText("Projekte").closest("a");
+
+    expect(startLink).toHaveClass("border-white/25", "bg-white/10");
+    expect(projectsLink).toHaveClass("border-white/10", "bg-white/[0.04]");
+  });
+
+  it("blendet die Startseite ohne Dashboard-Leserecht aus", () => {
+    renderSidebar(projectReaderUser);
+
+    expect(screen.queryByText("Startseite")).not.toBeInTheDocument();
+    expect(screen.getByText("Projekte")).toBeInTheDocument();
+  });
+
   it("ändert beim Button-Klick nicht die aktuelle Route", () => {
     renderSidebar(readerUser);
 
@@ -221,7 +260,7 @@ describe("Sidebar", () => {
     const sidebarHero = screen.getByTestId("sidebar-hero");
     const sidebarHeroLabel = screen.getByTestId("sidebar-hero-label");
     const globalSearch = screen.getByTestId("sidebar-global-search");
-    const firstNavigationTitle = screen.getByText("Projekt Management");
+    const firstNavigationTitle = screen.getByText("Start");
 
     expect(sidebar).toHaveClass("w-fit");
     expect(sidebar).not.toHaveClass("min-w-60");
@@ -263,6 +302,7 @@ describe("Sidebar", () => {
     expect(screen.getByLabelText("Hauptnavigation")).toHaveClass("w-16");
     expect(screen.getByTitle("Navigation aufklappen")).toBeInTheDocument();
     expect(screen.queryByText("Projekt Management")).not.toBeInTheDocument();
+    expect(screen.queryByText("Start")).not.toBeInTheDocument();
     expect(
       screen.queryByPlaceholderText("Global suchen"),
     ).not.toBeInTheDocument();
@@ -276,6 +316,7 @@ describe("Sidebar", () => {
     expect(screen.queryByText("Projekt Management")).not.toBeInTheDocument();
     expect(screen.queryByText("Projekt Dokumentation")).not.toBeInTheDocument();
     expect(screen.queryByText("Information")).not.toBeInTheDocument();
+    expect(screen.queryByText("Start")).not.toBeInTheDocument();
     expect(screen.queryByText("Einstellungen")).not.toBeInTheDocument();
     expect(
       screen.queryByPlaceholderText("Global suchen"),

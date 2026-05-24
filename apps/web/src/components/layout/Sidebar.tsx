@@ -11,6 +11,7 @@ import {
   Flag,
   FolderKanban,
   History,
+  Home,
   Library,
   LayoutDashboard,
   ListTodo,
@@ -58,6 +59,15 @@ const projectManagementItems: NavigationItem[] = [
   },
   { to: "/tasks", label: "Aufgaben", icon: ListTodo, resource: "tasks" },
   { to: "/tickets", label: "Tickets", icon: Bug, resource: "tickets" },
+];
+
+const homeItems: NavigationItem[] = [
+  {
+    to: "/",
+    label: "Startseite",
+    icon: Home,
+    resource: "dashboards",
+  },
 ];
 
 const documentationItems: NavigationItem[] = [
@@ -191,6 +201,7 @@ function NavigationLinks({
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={item.to === "/"}
                 title={item.label}
                 className={({ isActive }) => navLinkClassCollapsed(isActive)}
               >
@@ -218,6 +229,7 @@ function NavigationLinks({
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.to === "/"}
               title={item.label}
               className={({ isActive }) => navLinkClass(isActive)}
             >
@@ -293,6 +305,7 @@ function NavigationMenu({
               <Fragment key={item.to}>
                 <NavLink
                   to={item.to}
+                  end={item.to === "/"}
                   title={item.label}
                   className={({ isActive }) => navLinkClass(isActive)}
                 >
@@ -350,6 +363,11 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
         },
       ];
   const navigationSections: NavigationSectionConfig[] = [
+    {
+      label: "Start",
+      items: homeItems,
+      allowStandalone: true,
+    },
     {
       label: "Projekt Management",
       items: projectManagementItems,

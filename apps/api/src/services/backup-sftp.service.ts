@@ -1,4 +1,5 @@
 import SftpClient from "ssh2-sftp-client";
+import path from "node:path";
 import { config } from "../config.js";
 
 export interface RemoteBackupFileInfo {
@@ -30,6 +31,9 @@ export interface BackupSftpClient {
   list(remoteFilePath: string): Promise<Array<{ type: string; name: string; size: number; modifyTime: number }>>;
   get(remotePath: string): Promise<string | NodeJS.WritableStream | Buffer>;
   put(input: Buffer, remoteFilePath: string): Promise<string>;
+  delete(remotePath: string): Promise<unknown>;
+  mkdir(remotePath: string, recursive?: boolean): Promise<unknown>;
+  stat(remotePath: string): Promise<unknown>;
   end(): Promise<boolean>;
 }
 
@@ -41,8 +45,37 @@ export function setBackupSftpClientFactoryForTests(factory: BackupSftpClientFact
   clientFactory = factory ?? (() => new SftpClient() as BackupSftpClient);
 }
 
+function remoteRootPath(): string {
+  return config.backupSftpRemoteDir.replace(/\/+$/, "");
+}
+
+function normalizeRemoteRelativePath(relativePath: string): string {
+  const normalized = relativePath.replace(/\\/g, "/");
+  if (normalized.length === 0 || normalized.startsWith("/") || path.posix.isAbsolute(normalized)) {
+    throw new Error("Remote backup path must be relative");
+  }
+  const parts = normalized.split("/");
+  if (parts.some((part) => part.length === 0 || part === "." || part === "..")) {
+    throw new Error("Remote backup path contains unsafe segments");
+  }
+  return parts.join("/");
+}
+
+function remoteNestedPath(relativePath: string): string {
+  return `${remoteRootPath()}/${normalizeRemoteRelativePath(relativePath)}`;
+}
+
+function remoteParentPath(remoteFilePath: string): string {
+  const index = remoteFilePath.lastIndexOf("/");
+  return index === -1 ? remoteRootPath() : remoteFilePath.slice(0, index);
+}
+
 function remotePath(filename: string): string {
-  return `${config.backupSftpRemoteDir.replace(/\/+$/, "")}/${filename}`;
+  return remoteNestedPath(filename);
+}
+
+async function ensureRemoteDirectory(client: BackupSftpClient, remoteDirectory: string): Promise<void> {
+  await client.mkdir(remoteDirectory, true);
 }
 
 export function getBackupSftpReadiness(): BackupSftpReadiness {
@@ -123,6 +156,7 @@ export async function listBackupSftpFiles(): Promise<RemoteBackupFileInfo[]> {
 export async function uploadBackupSftpFile(filename: string, buffer: Buffer): Promise<RemoteBackupFileInfo> {
   return withSftpClient(async (client) => {
     const targetPath = remotePath(filename);
+    await ensureRemoteDirectory(client, remoteParentPath(targetPath));
     await client.put(buffer, targetPath);
     return {
       name: filename,
@@ -140,5 +174,41 @@ export async function downloadBackupSftpFile(filename: string): Promise<Buffer> 
       throw new Error("SFTP download did not return a buffer");
     }
     return result;
+  });
+}
+
+export async function downloadBackupSftpTextFile(filename: string): Promise<string> {
+  return (await downloadBackupSftpFile(filename)).toString("utf8");
+}
+
+export async function uploadBackupSftpFileAtPath(relativePath: string, buffer: Buffer): Promise<RemoteBackupFileInfo> {
+  return withSftpClient(async (client) => {
+    const normalizedPath = normalizeRemoteRelativePath(relativePath);
+    const targetPath = remoteNestedPath(normalizedPath);
+    await ensureRemoteDirectory(client, remoteParentPath(targetPath));
+    await client.put(buffer, targetPath);
+    return {
+      name: normalizedPath,
+      path: targetPath,
+      sizeBytes: buffer.byteLength,
+      modifiedTime: new Date().toISOString()
+    };
+  });
+}
+
+export async function deleteBackupSftpFile(relativePath: string): Promise<void> {
+  return withSftpClient(async (client) => {
+    await client.delete(remoteNestedPath(relativePath));
+  });
+}
+
+export async function backupSftpFileExists(relativePath: string): Promise<boolean> {
+  return withSftpClient(async (client) => {
+    try {
+      await client.stat(remoteNestedPath(relativePath));
+      return true;
+    } catch {
+      return false;
+    }
   });
 }

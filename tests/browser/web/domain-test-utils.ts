@@ -113,7 +113,7 @@ export async function authenticatedGoto(page: Page, path: string) {
     await page.getByLabel("Passwort").fill("password123");
     await page.getByRole("button", { name: "Anmelden" }).click();
     await expect(
-      page.getByRole("heading", { name: "Projekte", exact: true }),
+      page.getByRole("heading", { name: "Startseite", exact: true }),
     ).toBeVisible();
     authenticatedPages.add(page);
   }

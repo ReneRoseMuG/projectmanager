@@ -28,6 +28,7 @@ import { vitestRuntimeRoot } from "../../../apps/api/src/runtime-safety.js";
 import { config } from "../../../apps/api/src/config.js";
 import {
   applyLocalDump,
+  applyIncrementalRemoteSync,
   applyRemoteDump,
   buildDumpArchive,
   DUMP_TABLE_KEYS,
@@ -35,6 +36,8 @@ import {
   getLocalBackupStatus,
   getRemoteBackupStatus,
   inspectDumpArchive,
+  performIncrementalSftpSync,
+  previewIncrementalRemoteSync,
   previewLatestLocalDump,
   previewRemoteDump,
   saveDumpToLocalBackup
@@ -73,6 +76,11 @@ interface RemoteMockFile {
 
 function configureMockSftp(remoteFiles: Map<string, RemoteMockFile>): void {
   const remoteDir = "/remote/backups";
+  const remotePrefix = `${remoteDir.replace(/\/+$/, "")}/`;
+  const remoteKey = (remotePath: string): string => {
+    const normalized = remotePath.replace(/\\/g, "/");
+    return normalized.startsWith(remotePrefix) ? normalized.slice(remotePrefix.length) : path.basename(normalized);
+  };
   config.backupSftpEnabled = true;
   config.backupSftpHost = "sftp.test";
   config.backupSftpPort = 22;
@@ -94,7 +102,7 @@ function configureMockSftp(remoteFiles: Map<string, RemoteMockFile>): void {
       }));
     },
     async get(remotePath) {
-      const name = path.basename(remotePath);
+      const name = remoteKey(remotePath);
       const file = remoteFiles.get(name);
       if (!file) {
         throw new Error("Remote file missing");
@@ -102,11 +110,24 @@ function configureMockSftp(remoteFiles: Map<string, RemoteMockFile>): void {
       return file.buffer;
     },
     async put(input, remotePath) {
-      remoteFiles.set(path.basename(remotePath), {
+      remoteFiles.set(remoteKey(remotePath), {
         buffer: input,
         modifiedAt: Date.now()
       });
       return remotePath;
+    },
+    async delete(remotePath) {
+      remoteFiles.delete(remoteKey(remotePath));
+    },
+    async mkdir() {
+      return remoteDir;
+    },
+    async stat(remotePath) {
+      const file = remoteFiles.get(remoteKey(remotePath));
+      if (!file) {
+        throw new Error("Remote file missing");
+      }
+      return { size: file.buffer.byteLength };
     },
     async end() {
       return true;
@@ -429,6 +450,11 @@ describe("Local backup status", () => {
       const admin = supertest.agent(app.server);
       await admin.post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
       await admin.post("/api/dumps/local/save").expect(200);
+      const remoteFiles = new Map<string, RemoteMockFile>();
+      configureMockSftp(remoteFiles);
+      const syncResponse = await admin.post("/api/dumps/remote/sync").expect(200);
+      expect(syncResponse.body.success).toBe(true);
+      await admin.get("/api/dumps/remote/sync/preview").expect(200);
 
       const roles = await admin.get("/api/admin/roles").expect(200);
       const readerRole = roles.body.find((role: { key: string }) => role.key === "reader") as { id: number };
@@ -441,7 +467,10 @@ describe("Local backup status", () => {
       await reader.post("/api/auth/login").send({ email: "dump-reader@example.test", password: "password123" }).expect(200);
       await reader.get("/api/dumps/local/status").expect(200);
       await reader.get("/api/dumps/local/latest/preview").expect(200);
+      await reader.get("/api/dumps/remote/sync/preview").expect(200);
       await reader.post("/api/dumps/local/save").expect(403);
+      await reader.post("/api/dumps/remote/sync").expect(403);
+      await reader.post("/api/dumps/remote/sync/apply").send({ manifestHash: "abc123", confirmed: true }).expect(403);
     } finally {
       config.adminInitialPassword = originalAdminInitialPassword;
       await app.close();
@@ -492,6 +521,71 @@ describe("Remote SFTP backup status", () => {
 
     const status = await getRemoteBackupStatus(testDb.sqlite);
     expect(status.latestFile?.imported).toBe(true);
+  });
+});
+
+describe("Incremental SFTP sync", () => {
+  it("überträgt beim ersten Sync alles und beim unveränderten Folgelauf nichts", async () => {
+    const remoteFiles = new Map<string, RemoteMockFile>();
+    configureMockSftp(remoteFiles);
+
+    const first = await performIncrementalSftpSync(testDb.sqlite);
+
+    expect(first).toMatchObject({
+      success: true,
+      tablesUpdated: true,
+      filesDeleted: 0,
+      filesDeleteFailed: 0
+    });
+    expect(first.filesUploaded).toBeGreaterThan(0);
+    expect(remoteFiles.has("data.json")).toBe(true);
+    expect(remoteFiles.has("manifest.json")).toBe(true);
+    expect(remoteFiles.has("uploads/project-file.txt")).toBe(true);
+    expect(remoteFiles.has("content/wiki/root.md")).toBe(true);
+
+    const remoteSnapshot = new Map(remoteFiles);
+    const second = await performIncrementalSftpSync(testDb.sqlite);
+
+    expect(second).toMatchObject({
+      success: true,
+      tablesUpdated: false,
+      filesUploaded: 0,
+      filesDeleted: 0,
+      filesDeleteFailed: 0
+    });
+    expect(remoteFiles).toEqual(remoteSnapshot);
+  });
+
+  it("synchronisiert Tabellen, neue Dateien, geänderte Dateien und gelöschte Dateien und stellt den Stand wieder her", async () => {
+    const remoteFiles = new Map<string, RemoteMockFile>();
+    configureMockSftp(remoteFiles);
+    await performIncrementalSftpSync(testDb.sqlite);
+
+    mutateLocalState();
+    const expected = collectSnapshot();
+    const result = await performIncrementalSftpSync(testDb.sqlite);
+
+    expect(result.success).toBe(true);
+    expect(result.tablesUpdated).toBe(true);
+    expect(result.filesUploaded).toBeGreaterThanOrEqual(3);
+    expect(result.filesDeleted).toBe(1);
+    expect(remoteFiles.has("uploads/extra.txt")).toBe(true);
+    expect(remoteFiles.has("content/wiki/root.md")).toBe(false);
+
+    testDb.sqlite.prepare("UPDATE projects SET name = 'Bürostand' WHERE id = 1").run();
+    fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "Bürodatei", "utf8");
+    fs.rmSync(path.join(uploadDir, "extra.txt"), { force: true });
+    expect(collectSnapshot()).not.toEqual(expected);
+
+    const preview = await previewIncrementalRemoteSync();
+    expect(preview.transferReadiness).toBe("ready");
+    const applyResult = await applyIncrementalRemoteSync(testDb.sqlite, {
+      manifestHash: preview.manifestHash,
+      confirmed: true
+    });
+
+    expect(applyResult.verificationPassed).toBe(true);
+    expect(collectSnapshot()).toEqual(expected);
   });
 });
 

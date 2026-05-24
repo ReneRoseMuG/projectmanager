@@ -15,11 +15,12 @@ function rangeKey(range?: { from?: string; to?: string }): string {
   return `${range?.from ?? "open"}:${range?.to ?? "open"}`;
 }
 
-export function useEvents(range?: { from?: string; to?: string }) {
+export function useEvents(range?: { from?: string; to?: string }, enabled = true) {
   const queryClient = useQueryClient();
   const eventsQuery = useQuery({
     queryKey: queryKeys.events.list(rangeKey(range)),
-    queryFn: () => getEvents(range)
+    queryFn: () => getEvents(range),
+    enabled
   });
 
   const reload = useCallback(async () => {

@@ -138,7 +138,7 @@ export function getSettingDefinition(key: string): SettingDefinition | undefined
 
 export const settingDefinitions = Object.values(settingsRegistry) as SettingDefinition[];
 
-export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task"] as const;
+export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home"] as const;
 export const DASHBOARD_OWNER_TYPES = ["project", "milestone", "task"] as const;
 export const DASHBOARD_WIDGET_IDS = [
   "taskStatusReport",
@@ -250,7 +250,8 @@ export const DASHBOARD_ALLOWED_WIDGETS = {
   global: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks"],
   project: ["taskStatusReport", "ticketStatusReport", "milestoneProgress", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "globalJournal", "overdueTasks"],
   milestone: ["taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal"],
-  task: ["taskStatusReport", "taskJournal", "commentJournal", "attachmentJournal"]
+  task: ["taskStatusReport", "taskJournal", "commentJournal", "attachmentJournal"],
+  home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks"]
 } as const satisfies Record<DashboardContext, readonly DashboardWidgetId[]>;
 
 export const DEFAULT_DASHBOARD_LAYOUTS = {
@@ -286,6 +287,10 @@ export const DEFAULT_DASHBOARD_LAYOUTS = {
     { widgetId: "taskJournal", col: 0, row: 1, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
     { widgetId: "commentJournal", col: 1, row: 1, colSpan: 1, params: { limit: 10 } },
     { widgetId: "attachmentJournal", col: 0, row: 2, colSpan: 2, params: { limit: 10 } }
+  ],
+  home: [
+    { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1 },
+    { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 }
   ]
 } as const satisfies Record<DashboardContext, readonly DashboardWidgetLayout[]>;
 
@@ -1050,6 +1055,18 @@ export interface DumpRemoteUploadResult {
   error: string | null;
 }
 
+export interface DumpIncrementalSyncResult {
+  success: boolean;
+  error: string | null;
+  tablesUpdated: boolean;
+  filesUploaded: number;
+  filesDeleted: number;
+  filesDeleteFailed: number;
+  totalRemoteFiles: number;
+  syncedAt: string;
+  warnings: string[];
+}
+
 export interface DumpBackupSaveResult {
   dumpId: string;
   filename: string;
@@ -1090,9 +1107,44 @@ export interface DumpRemoteBackupApplyRequest {
   confirmed: boolean;
 }
 
+export interface DumpIncrementalSyncPreviewResult {
+  manifestHash: string;
+  dumpId: string;
+  remoteDirectory: string;
+  targetDatabasePath: string;
+  transferReadiness: DumpReadiness;
+  blockingIssues: string[];
+  warnings: string[];
+  manifestPresent: boolean;
+  schemaRevision: string | null;
+  syncedAt: string;
+  expectedTables: DumpTableSummary[];
+  expectedFileRoots: DumpFileRootSummary[];
+  totalFiles: number;
+  totalBytes: number;
+}
+
+export interface DumpIncrementalSyncApplyRequest {
+  manifestHash: string;
+  confirmed: boolean;
+}
+
 export interface DumpBackupApplyResult {
   dumpId: string;
   backupFile: DumpBackupFile;
+  targetBackupPath: string;
+  verificationPassed: boolean;
+  importStatus: DumpImportStatus;
+  tablesRestored: number;
+  fileRootsRestored: DumpFileRootSummary[];
+  warnings: string[];
+  blockingIssues: string[];
+}
+
+export interface DumpIncrementalSyncApplyResult {
+  dumpId: string;
+  manifestHash: string;
+  remoteDirectory: string;
   targetBackupPath: string;
   verificationPassed: boolean;
   importStatus: DumpImportStatus;

@@ -208,3 +208,6 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
   ]);
 }
 
+export async function invalidateDumps(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.dumps.root]);
+}

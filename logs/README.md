@@ -2,6 +2,9 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 24.05.26 | Fix           | MCP Dev Start                                | ✅     |
+| 24.05.26 | Feature       | MS-12 Backup und Sync                        | ✅     |
+| 24.05.26 | Feature       | TASK-49 App-Startseite                       | ⚠️     |
 | 24.05.26 | Feature       | Referenz-Kontext MCP Skill                   | ⚠️     |
 | 24.05.26 | Fix           | Projekt-Features-DnD                         | ✅     |
 | 24.05.26 | Fix           | Sidebar Hero Abstände                        | ✅     |

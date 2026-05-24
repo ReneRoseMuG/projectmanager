@@ -80,6 +80,48 @@ describe("Dashboard API", () => {
       .expect(403);
   });
 
+  it("erzeugt das Startseiten-Dashboard für den home-Kontext und validiert erlaubte Widgets", async () => {
+    await supertest(app.server).get("/api/dashboards?context=home").expect(401);
+    const reader = await createUser(app, "reader", "dashboard.home.reader@example.test");
+
+    const list = await reader.get("/api/dashboards?context=home").expect(200);
+
+    expect(list.body.globalDefaultDashboardId).toEqual(expect.any(Number));
+    expect(list.body.dashboards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Standard: Startseite",
+          context: "home",
+          isSystem: true,
+          widgets: expect.arrayContaining([
+            expect.objectContaining({ widgetId: "taskStatusReport" }),
+            expect.objectContaining({ widgetId: "ticketStatusReport" })
+          ])
+        })
+      ])
+    );
+
+    const editor = await createUser(app, "editor", "dashboard.home.editor@example.test");
+    await editor
+      .post("/api/dashboards")
+      .send({ name: "Falsche Startseite", context: "home", widgets: [{ widgetId: "milestoneProgress", col: 0, row: 0, colSpan: 2 }] })
+      .expect(400);
+
+    const created = await editor
+      .post("/api/dashboards")
+      .send({
+        name: "Meine Startseite",
+        context: "home",
+        widgets: [
+          { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1 },
+          { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 }
+        ]
+      })
+      .expect(201);
+
+    expect(created.body).toMatchObject({ name: "Meine Startseite", context: "home", isSystem: false, version: 1 });
+  });
+
   it("verwaltet persönliche Editor-Dashboards versioniert und setzt USER-Defaults", async () => {
     const editor = await createUser(app, "editor", "dashboard.editor@example.test");
 

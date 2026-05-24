@@ -20,6 +20,13 @@ import path from "node:path";
 import supertest from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
+  getActiveAttachmentWatcherCountForTests,
+  setAttachmentWatcherPollIntervalForTests,
+  setAttachmentWatcherSettleDelayForTests,
+  setAttachmentWatcherTimeoutForTests,
+  stopAllAttachmentWatchers
+} from "../../../apps/api/src/services/attachment-watcher.service.js";
+import {
   buildTestApp,
   createFeature,
   createMilestone,
@@ -33,6 +40,17 @@ import {
 
 const uploadDir = path.join(os.tmpdir(), `taskmanager-api-attachments-${process.pid}`);
 const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-attachment-previews-${process.pid}`);
+
+async function waitForCondition(assertion: () => boolean, timeoutMs = 1000): Promise<void> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (assertion()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error("Condition was not met in time");
+}
 
 describe("Attachments API", () => {
   let testDb: TestDb;
@@ -64,6 +82,10 @@ describe("Attachments API", () => {
   });
 
   afterEach(async () => {
+    stopAllAttachmentWatchers();
+    setAttachmentWatcherPollIntervalForTests(null);
+    setAttachmentWatcherSettleDelayForTests(null);
+    setAttachmentWatcherTimeoutForTests(null);
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
     await fs.mkdir(uploadDir, { recursive: true });
@@ -246,6 +268,56 @@ describe("Attachments API", () => {
     expect(openedPaths).toHaveLength(1);
     expect(path.isAbsolute(openedPaths[0] ?? "")).toBe(true);
     expect(path.relative(uploadDir, openedPaths[0] ?? "")).toBe(upload.body.filename);
+  });
+
+  it("POST /api/attachments/:id/open aktualisiert Metadaten nach externer Dateiänderung", async () => {
+    const project = await createProject(app);
+    const upload = await supertest(app.server)
+      .post(`/api/projects/${project.id}/attachments`)
+      .attach("file", Buffer.from("vorher"), { filename: "watch.txt", contentType: "text/plain" })
+      .expect(201);
+    const before = testDb.sqlite.prepare("SELECT size, version, updated_at FROM attachments WHERE id = ?").get(upload.body.id) as {
+      size: number;
+      version: number;
+      updated_at: string;
+    };
+
+    setAttachmentWatcherPollIntervalForTests(20);
+    await supertest(app.server).post(`/api/attachments/${upload.body.id}/open`).expect(204);
+    expect(getActiveAttachmentWatcherCountForTests()).toBe(1);
+    const diskPath = openedPaths[0] as string;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await fs.writeFile(diskPath, "nachher-groesser", "utf8");
+
+    await waitForCondition(() => getActiveAttachmentWatcherCountForTests() === 0, 3000);
+    const after = testDb.sqlite.prepare("SELECT size, version FROM attachments WHERE id = ?").get(upload.body.id) as {
+      size: number;
+      version: number;
+    };
+    expect(after).toMatchObject({
+      size: Buffer.byteLength("nachher-groesser"),
+      version: before.version + 1
+    });
+    expect(getActiveAttachmentWatcherCountForTests()).toBe(0);
+  });
+
+  it("beendet Attachment-Watcher nach Timeout ohne späteres Metadaten-Update", async () => {
+    setAttachmentWatcherTimeoutForTests(30);
+    setAttachmentWatcherPollIntervalForTests(20);
+    const project = await createProject(app);
+    const upload = await supertest(app.server)
+      .post(`/api/projects/${project.id}/attachments`)
+      .attach("file", Buffer.from("timeout"), { filename: "timeout.txt", contentType: "text/plain" })
+      .expect(201);
+    const before = testDb.sqlite.prepare("SELECT size, version FROM attachments WHERE id = ?").get(upload.body.id) as { size: number; version: number };
+
+    await supertest(app.server).post(`/api/attachments/${upload.body.id}/open`).expect(204);
+    await waitForCondition(() => getActiveAttachmentWatcherCountForTests() === 0);
+    await fs.writeFile(path.join(uploadDir, upload.body.filename), "timeout-geändert", "utf8");
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    const after = testDb.sqlite.prepare("SELECT size, version FROM attachments WHERE id = ?").get(upload.body.id) as { size: number; version: number };
+    expect(after).toEqual(before);
   });
 
   it("POST /api/attachments/:id/open gibt 404 fuer unbekanntes Attachment zurueck", async () => {

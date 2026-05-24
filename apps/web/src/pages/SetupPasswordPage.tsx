@@ -24,7 +24,7 @@ export function SetupPasswordPage() {
     }
     try {
       await setInitialPassword({ password });
-      navigate("/projects", { replace: true });
+      navigate("/", { replace: true });
     } catch (caught) {
       setError(await errorMessageAsync(caught));
     }
