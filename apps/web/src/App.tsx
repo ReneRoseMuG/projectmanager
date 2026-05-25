@@ -29,9 +29,7 @@ import { TicketDetailPage } from "./pages/TicketDetailPage";
 import { TaskDetailPage } from "./pages/TaskDetailPage";
 import { UseCaseDetailPage } from "./pages/UseCaseDetailPage";
 import { WikiPage } from "./pages/WikiPage";
-import { RoleDetailPage } from "./pages/admin/RoleDetailPage";
 import { RolesPage } from "./pages/admin/RolesPage";
-import { UserDetailPage } from "./pages/admin/UserDetailPage";
 import { UsersPage } from "./pages/admin/UsersPage";
 import { useAuth } from "./hooks/useAuth";
 import { hasPermission } from "./hooks/usePermissions";
@@ -49,7 +47,7 @@ function isFullBleedRoute(pathname: string): boolean {
     /^\/(?:projects|milestones|tasks|tickets|features|use-cases|backlog)(?:\/|$)/.test(pathname) ||
     /^\/(?:wiki|calendar|journal)(?:\/|$)/.test(pathname) ||
     /^\/settings\/preferences\/?$/.test(pathname) ||
-    /^\/admin\/(?:backup|users|roles)\/?$/.test(pathname)
+    /^\/admin(?:\/|$)/.test(pathname)
   );
 }
 
@@ -132,11 +130,11 @@ export default function App() {
       <Route path="/admin/tags" element={adminAccess ? <AdminLayout><SettingsTagsPage /></AdminLayout> : <ForbiddenPage />} />
       <Route path="/admin/backup" element={adminAccess && backupAccess ? <AdminLayout><SettingsBackupPage /></AdminLayout> : <ForbiddenPage />} />
       <Route path="/admin/users" element={adminAccess ? <AdminLayout><UsersPage /></AdminLayout> : <ForbiddenPage />} />
-      <Route path="/admin/users/new" element={adminAccess ? <AdminLayout><UserDetailPage /></AdminLayout> : <ForbiddenPage />} />
-      <Route path="/admin/users/:id" element={adminAccess ? <AdminLayout><UserDetailPage /></AdminLayout> : <ForbiddenPage />} />
+      <Route path="/admin/users/new" element={adminAccess ? <Navigate to="/admin/users" replace /> : <ForbiddenPage />} />
+      <Route path="/admin/users/:id" element={adminAccess ? <Navigate to="/admin/users" replace /> : <ForbiddenPage />} />
       <Route path="/admin/roles" element={adminAccess ? <AdminLayout><RolesPage /></AdminLayout> : <ForbiddenPage />} />
-      <Route path="/admin/roles/new" element={adminAccess ? <AdminLayout><RoleDetailPage /></AdminLayout> : <ForbiddenPage />} />
-      <Route path="/admin/roles/:id" element={adminAccess ? <AdminLayout><RoleDetailPage /></AdminLayout> : <ForbiddenPage />} />
+      <Route path="/admin/roles/new" element={adminAccess ? <Navigate to="/admin/roles" replace /> : <ForbiddenPage />} />
+      <Route path="/admin/roles/:id" element={adminAccess ? <Navigate to="/admin/roles" replace /> : <ForbiddenPage />} />
       <Route path="/setup-password" element={<Navigate to="/" replace />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/forbidden" element={<ForbiddenPage />} />

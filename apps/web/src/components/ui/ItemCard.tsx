@@ -9,6 +9,7 @@ interface ItemCardProps {
   onEdit?: () => void;
   extraMenuItems?: ActionMenuItem[];
   onDelete?: () => void;
+  deleteDisabled?: boolean;
   header: ReactNode;
   body?: ReactNode;
   footer?: ReactNode;
@@ -23,6 +24,7 @@ export function ItemCard({
   onEdit,
   extraMenuItems = [],
   onDelete,
+  deleteDisabled = false,
   header,
   body,
   footer,
@@ -66,6 +68,7 @@ export function ItemCard({
                         icon: <Trash2 size={16} />,
                         onClick: onDelete,
                         danger: true,
+                        disabled: deleteDisabled,
                       },
                     ]
                   : []),

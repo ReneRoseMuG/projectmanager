@@ -11,7 +11,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CloudDownload, CloudUpload, DatabaseBackup, FolderOpen, HardDrive, RefreshCw, Server } from "lucide-react";
 import { useState } from "react";
 import { applyRemoteDump, previewRemoteDump, saveLocalDump } from "../api/dumps";
-import { AdminNavigation } from "../components/layout/AdminLayout";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -200,33 +199,30 @@ export function SettingsBackupPage() {
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       <PageHero
-        variant="list"
+        variant="detail"
         title="Sicherung"
-        subtitle="Lokale Dumps mit SFTP-Kopie"
-        actions={
-          <div className="flex flex-wrap gap-2">
-          <Button variant="primary" icon={<DatabaseBackup size={16} />} loading={saving} disabled={!canWriteDumps} onClick={() => void handleSave()}>
-            Sichern
-          </Button>
-          <Button icon={<CloudUpload size={16} />} loading={incrementalSync.syncing} disabled={!canWriteDumps} onClick={() => void handleIncrementalSync()}>
-            Sync
-          </Button>
-          <Button icon={<CloudDownload size={16} />} loading={incrementalSync.previewing || incrementalSync.applying} disabled={!canWriteDumps} onClick={() => void handleIncrementalSyncImport()}>
-            Sync importieren
-          </Button>
-          <Button icon={<CloudDownload size={16} />} loading={importingFileId === "__latest__"} disabled={!canWriteDumps || !remoteStatus.status?.latestFile} onClick={() => void handleRemoteImport()}>
-            Neueste importieren
-          </Button>
-          <Button icon={<RefreshCw size={16} />} loading={refreshing} onClick={() => void handleRefresh()}>
-            Aktualisieren
-          </Button>
-          </div>
-        }
+        icon={<DatabaseBackup size={22} />}
       />
 
-      <AdminNavigation />
+      <div className="flex shrink-0 flex-wrap gap-2 border-b border-line bg-white p-5">
+        <Button variant="primary" icon={<DatabaseBackup size={16} />} loading={saving} disabled={!canWriteDumps} onClick={() => void handleSave()}>
+          Sichern
+        </Button>
+        <Button variant="secondary" icon={<CloudUpload size={16} />} loading={incrementalSync.syncing} disabled={!canWriteDumps} onClick={() => void handleIncrementalSync()}>
+          Sync
+        </Button>
+        <Button variant="secondary" icon={<CloudDownload size={16} />} loading={incrementalSync.previewing || incrementalSync.applying} disabled={!canWriteDumps} onClick={() => void handleIncrementalSyncImport()}>
+          Sync importieren
+        </Button>
+        <Button variant="secondary" icon={<CloudDownload size={16} />} loading={importingFileId === "__latest__"} disabled={!canWriteDumps || !remoteStatus.status?.latestFile} onClick={() => void handleRemoteImport()}>
+          Neueste importieren
+        </Button>
+        <Button variant="secondary" icon={<RefreshCw size={16} />} loading={refreshing} onClick={() => void handleRefresh()}>
+          Aktualisieren
+        </Button>
+      </div>
 
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-5 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+      <div className="flex min-h-0 w-full flex-1 flex-col gap-6 overflow-auto bg-white p-5">
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="rounded-md border border-line bg-white p-4 shadow-sm">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

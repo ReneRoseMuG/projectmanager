@@ -7,6 +7,7 @@ export interface ActionMenuItem {
   icon: ReactNode;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
 }
 
 interface ActionMenuProps {
@@ -98,11 +99,15 @@ export function ActionMenu({ items, ariaLabel = "Aktionen", objectReference }: A
               key={item.label}
               type="button"
               role="menuitem"
-              className={`flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm font-medium transition hover:bg-steel-50 ${
-                item.danger ? "text-crimson hover:bg-crimson/5" : "text-ink"
+              disabled={item.disabled}
+              className={`flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                item.danger ? "text-crimson hover:bg-crimson/5" : "text-ink hover:bg-steel-50"
               }`}
               onClick={(event) => {
                 event.stopPropagation();
+                if (item.disabled) {
+                  return;
+                }
                 setOpen(false);
                 item.onClick();
               }}

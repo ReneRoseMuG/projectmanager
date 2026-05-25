@@ -1,5 +1,5 @@
 import type { CatalogEntry, CatalogKind } from "@taskmanager/shared-types";
-import { Check, ListChecks, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { errorMessage } from "../../hooks/errors";
 import { useCatalogs } from "../../hooks/useCatalogs";
@@ -13,7 +13,7 @@ import { Input } from "../ui/Input";
 import { Section } from "../ui/Section";
 import { useToast } from "../ui/ToastProvider";
 
-const groups: Array<{ kind: CatalogKind; title: string; createLabel: string }> =
+export const catalogGroups: Array<{ kind: CatalogKind; title: string; createLabel: string }> =
   [
     {
       kind: "workStatus",
@@ -312,7 +312,11 @@ function CatalogRow({
   );
 }
 
-export function CatalogManager() {
+interface CatalogManagerProps {
+  activeKind?: CatalogKind;
+}
+
+export function CatalogManager({ activeKind }: CatalogManagerProps = {}) {
   const catalogs = useCatalogs();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -320,7 +324,7 @@ export function CatalogManager() {
   const canDelete = useHasPermission("catalogs", "delete");
   const grouped = useMemo(
     () =>
-      groups.map((group) => ({
+      catalogGroups.map((group) => ({
         ...group,
         entries: catalogs.entries
           .filter((entry) => entry.kind === group.kind)
@@ -332,6 +336,9 @@ export function CatalogManager() {
       })),
     [catalogs.entries],
   );
+  const visibleGroups = activeKind
+    ? grouped.filter((group) => group.kind === activeKind)
+    : grouped;
 
   const createEntry = async (
     kind: CatalogKind,
@@ -398,52 +405,33 @@ export function CatalogManager() {
   };
 
   return (
-    <div className="mx-auto grid max-w-[1080px] gap-4">
-      <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
-        <header className="bg-gradient-to-br from-steel-700 to-teal px-5 py-5 text-white">
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/12">
-              <ListChecks size={21} />
-            </span>
-            <div>
-              <h1 className="text-2xl font-bold tracking-normal">
-                Kataloge verwalten
-              </h1>
-              <p className="text-sm text-white/75">
-                {catalogs.entries.length} Einträge
-              </p>
-            </div>
-          </div>
-        </header>
-        <div className="grid gap-5 p-4 md:p-5">
-          {catalogs.error ? (
-            <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">
-              {catalogs.error}
-            </div>
-          ) : null}
-          {catalogs.loading ? (
-            <div className="rounded-lg border border-dashed border-line bg-shell/60 p-8 text-center text-sm text-steel-500">
-              Kataloge werden geladen.
-            </div>
-          ) : null}
-          {!catalogs.loading
-            ? grouped.map((group) => (
-                <CatalogGroup
-                  key={group.kind}
-                  kind={group.kind}
-                  title={group.title}
-                  createLabel={group.createLabel}
-                  entries={group.entries}
-                  canWrite={canWrite}
-                  canDelete={canDelete}
-                  onCreate={createEntry}
-                  onUpdate={updateEntry}
-                  onDelete={deleteEntry}
-                />
-              ))
-            : null}
+    <div className="grid gap-5">
+      {catalogs.error ? (
+        <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">
+          {catalogs.error}
         </div>
-      </section>
+      ) : null}
+      {catalogs.loading ? (
+        <div className="rounded-lg border border-dashed border-line bg-shell/60 p-8 text-center text-sm text-steel-500">
+          Kataloge werden geladen.
+        </div>
+      ) : null}
+      {!catalogs.loading
+        ? visibleGroups.map((group) => (
+            <CatalogGroup
+              key={group.kind}
+              kind={group.kind}
+              title={group.title}
+              createLabel={group.createLabel}
+              entries={group.entries}
+              canWrite={canWrite}
+              canDelete={canDelete}
+              onCreate={createEntry}
+              onUpdate={updateEntry}
+              onDelete={deleteEntry}
+            />
+          ))
+        : null}
     </div>
   );
 }
