@@ -19,13 +19,14 @@
  * 11. CommentThread im Kommentare-Tab sichtbar.
  * 12. AttachmentList im Dateien-Tab sichtbar (sofern Tab vorhanden).
  * 13. Meilenstein-Karten im Projekt-Tab bieten Aufgabe/Ticket-Erstellung nur mit Schreibrechten an.
+ * 14. Projekt-Wiki kann im Details-Tab gesetzt, geöffnet und entfernt werden.
  *
  * Fehlerfälle:
  * - Ohne `tasks:write` und `tickets:write` dürfen die Create-Aktionen im Meilenstein-Menü nicht sichtbar sein.
  */
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
-import { addPendingComment, changeInput, clickTab, feature, formTestMocks, getFileInput, project, renderWithProviders } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
+import { addPendingComment, changeInput, clickTab, feature, formTestMocks, getFileInput, project, renderWithProviders, wikiPage } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { ProjectForm } from "../../../../../apps/web/src/components/projects/ProjectForm";
 
 function changeTitleInForm(heading: string, value: string) {
@@ -72,6 +73,50 @@ describe("ProjectForm", () => {
     renderWithProviders(<ProjectForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.getByTestId("project-description-view")).toHaveAttribute("data-image-upload", "disabled");
+  });
+
+  it("verknüpft eine Wiki-Seite im Details-Tab", async () => {
+    formTestMocks.setProjectWikiPage.mockResolvedValue({
+      ...project,
+      wikiPageId: wikiPage.id,
+      version: project.version + 1
+    });
+    renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByText("Keine Wiki-Seite verknüpft")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Wiki-Seite verknüpfen" }));
+    expect(screen.getByRole("heading", { name: "Wiki-Seite verknüpfen" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
+
+    await waitFor(() =>
+      expect(formTestMocks.setProjectWikiPage).toHaveBeenCalledWith(
+        wikiPage.id,
+      ),
+    );
+  });
+
+  it("zeigt die verknüpfte Wiki-Seite als Link und entfernt die Relation", async () => {
+    const projectWithWiki = { ...project, wikiPageId: wikiPage.id };
+    formTestMocks.setProjectWikiPage.mockResolvedValue({
+      ...projectWithWiki,
+      wikiPageId: null,
+      version: project.version + 1
+    });
+    renderWithProviders(<ProjectForm open project={projectWithWiki} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    const wikiLink = screen.getByRole("link", { name: /Wiki Startseite/ });
+    expect(wikiLink).toHaveAttribute("href", `/wiki/${wikiPage.id}`);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `Wiki-Seite ${wikiPage.title} entfernen`
+      })
+    );
+
+    await waitFor(() =>
+      expect(formTestMocks.setProjectWikiPage).toHaveBeenCalledWith(null),
+    );
   });
 
   it("zeigt im Create-Modus alle erwarteten Verwaltungs-Tabs ohne Import", () => {

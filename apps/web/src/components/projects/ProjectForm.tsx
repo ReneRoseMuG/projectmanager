@@ -43,6 +43,7 @@ import { useFeatures } from "../../hooks/useFeatures";
 import { useMilestones } from "../../hooks/useMilestones";
 import { useNotes } from "../../hooks/useNotes";
 import { useProjectFeatureLinks } from "../../hooks/useDocLinks";
+import { useProjectWikiRelation } from "../../hooks/useProjectWikiRelation";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
@@ -92,6 +93,7 @@ import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 import { useHasPermission } from "../../hooks/usePermissions";
+import { ProjectWikiPanel } from "./ProjectWikiPanel";
 
 interface ProjectFormProps {
   open: boolean;
@@ -206,6 +208,7 @@ export function ProjectForm({
   const backlog = useBacklog(projectId);
   const catalogs = useCatalogs();
   const notes = useNotes(projectId ? { type: "project", id: projectId } : null);
+  const projectWikiRelation = useProjectWikiRelation(project);
   const attachments = useAttachments(
     projectId ? { type: "project", id: projectId } : null,
   );
@@ -610,6 +613,29 @@ export function ProjectForm({
     }
   };
 
+  const setProjectWikiPage = async (wikiPageId: number | null) => {
+    try {
+      await projectWikiRelation.setProjectWikiPageId(wikiPageId);
+      showToast({
+        tone: "success",
+        title:
+          wikiPageId === null
+            ? "Wiki-Verknüpfung entfernt"
+            : "Wiki-Seite verknüpft",
+      });
+    } catch (wikiError) {
+      showToast({
+        tone: "error",
+        title:
+          wikiPageId === null
+            ? "Wiki-Verknüpfung konnte nicht entfernt werden"
+            : "Wiki-Seite konnte nicht verknüpft werden",
+        message: errorMessage(wikiError),
+      });
+      throw wikiError;
+    }
+  };
+
   const visibleTabs = project
     ? baseTabs.filter((tab) => tab.value !== "journal" || canReadJournal)
     : baseTabs.filter(
@@ -795,6 +821,13 @@ export function ProjectForm({
             <Section title="Tags">
               <TagPicker selected={selectedTags} onChange={setSelectedTags} />
             </Section>
+            {project ? (
+              <ProjectWikiPanel
+                wikiPageId={projectWikiRelation.wikiPageId}
+                saving={projectWikiRelation.saving}
+                onChange={setProjectWikiPage}
+              />
+            ) : null}
           </>
         ) : null}
 

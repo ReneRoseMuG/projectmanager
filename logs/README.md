@@ -2,6 +2,8 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 25.05.26 | Fix           | MCP-Keys angleichen                          | ✅     |
+| 25.05.26 | Feature       | Project Wiki UI                              | ⚠️     |
 | 25.05.26 | Fix           | ProjectDetails Feature-Link-Button           | ✅     |
 | 25.05.26 | Fix           | MCP-Lokalkonfiguration                       | ⚠️     |
 | 25.05.26 | Feature       | TASK-61 Wiki-Projektbezug                    | ✅     |

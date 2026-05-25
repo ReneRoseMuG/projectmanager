@@ -10,7 +10,8 @@ import type {
   Task,
   Ticket,
   TicketDetail,
-  UseCase
+  UseCase,
+  WikiPage
 } from "@taskmanager/shared-types";
 import { fireEvent, screen } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
@@ -46,6 +47,7 @@ const ownerFormMocks = vi.hoisted(() => ({
   createBacklogItem: vi.fn(),
   updateBacklogItem: vi.fn(),
   removeBacklogItem: vi.fn(),
+  setProjectWikiPage: vi.fn(),
   previewImport: vi.fn(),
   runImport: vi.fn(),
   hasPermission: vi.fn()
@@ -94,6 +96,30 @@ const fixtures = vi.hoisted(() => {
     doneTaskCount: 0,
     totalTaskCount: 1,
     tags: []
+  };
+  const wikiPage = {
+    id: 25,
+    parentId: null,
+    title: "Wiki Startseite",
+    content: "<p>Projekt-Wiki</p>",
+    contentPath: null,
+    sortOrder: 1,
+    childCount: 1,
+    version: 1,
+    createdAt: "2026-05-18T08:00:00.000Z",
+    updatedAt: "2026-05-18T09:00:00.000Z"
+  };
+  const childWikiPage = {
+    id: 26,
+    parentId: wikiPage.id,
+    title: "Wiki Unterseite",
+    content: "<p>Unterseite</p>",
+    contentPath: null,
+    sortOrder: 2,
+    childCount: 0,
+    version: 1,
+    createdAt: "2026-05-18T08:00:00.000Z",
+    updatedAt: "2026-05-18T09:00:00.000Z"
   };
   const milestone = {
     id: 35,
@@ -204,7 +230,7 @@ const fixtures = vi.hoisted(() => {
     subTickets: [{ ...ticket, id: 52, parentId: ticket.id, title: "Sub-Ticket Alpha", subTicketCount: 0 }]
   };
 
-  return { attachment, comment, feature, milestone, note, project, task, taskDetail, ticket, ticketDetail, useCase };
+  return { attachment, childWikiPage, comment, feature, milestone, note, project, task, taskDetail, ticket, ticketDetail, useCase, wikiPage };
 });
 
 vi.mock("../../../../../apps/web/src/api/tickets", () => ({
@@ -220,6 +246,7 @@ export const task = fixtures.task as Task;
 export const ticket = fixtures.ticket as Ticket;
 export const ticketDetail = fixtures.ticketDetail as TicketDetail;
 export const formTestMocks = ownerFormMocks;
+export const wikiPage = fixtures.wikiPage as WikiPage;
 
 vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
   RichTextInlineField({
@@ -523,6 +550,42 @@ vi.mock("../../../../../apps/web/src/hooks/useTickets", () => ({
   }
 }));
 
+vi.mock("../../../../../apps/web/src/hooks/useProjectWikiRelation", () => ({
+  useProjectWikiRelation(targetProject?: Project | null) {
+    return {
+      wikiPageId: targetProject?.wikiPageId ?? null,
+      saving: false,
+      setProjectWikiPageId: ownerFormMocks.setProjectWikiPage
+    };
+  }
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useWiki", () => ({
+  useWiki(pageId?: number) {
+    const root = {
+      ...fixtures.wikiPage,
+      children: [{ ...fixtures.childWikiPage, children: [] }]
+    };
+    const page =
+      pageId === fixtures.childWikiPage.id
+        ? fixtures.childWikiPage
+        : pageId === fixtures.wikiPage.id
+          ? fixtures.wikiPage
+          : null;
+    return {
+      tree: [root],
+      page,
+      breadcrumb: [],
+      loading: false,
+      error: null,
+      reload: vi.fn().mockResolvedValue(undefined),
+      createWikiPage: vi.fn(),
+      updateWikiPage: vi.fn(),
+      removeWikiPage: vi.fn()
+    };
+  }
+}));
+
 vi.mock("../../../../../apps/web/src/hooks/useBacklog", () => ({
   useBacklog() {
     return {
@@ -611,6 +674,7 @@ beforeEach(() => {
   ownerFormMocks.createBacklogItem.mockResolvedValue(undefined);
   ownerFormMocks.updateBacklogItem.mockResolvedValue(undefined);
   ownerFormMocks.removeBacklogItem.mockResolvedValue(undefined);
+  ownerFormMocks.setProjectWikiPage.mockResolvedValue(fixtures.project);
   ownerFormMocks.previewImport.mockResolvedValue(null);
   ownerFormMocks.runImport.mockResolvedValue(null);
 });
