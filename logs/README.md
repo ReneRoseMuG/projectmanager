@@ -2,6 +2,10 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 25.05.26 | Fix           | Admin Nav Kontrast                           | ✅     |
+| 25.05.26 | Fix           | Admin Nav Icons                              | ✅     |
+| 25.05.26 | Fix           | Admin Sidebar Hero Meta                      | ✅     |
+| 25.05.26 | Feature       | Admin Sidebar Detail Layout                  | ✅     |
 | 25.05.26 | Fix           | MCP-Keys angleichen                          | ✅     |
 | 25.05.26 | Feature       | Project Wiki UI                              | ⚠️     |
 | 25.05.26 | Fix           | ProjectDetails Feature-Link-Button           | ✅     |

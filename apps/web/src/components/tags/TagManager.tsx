@@ -1,5 +1,5 @@
 import type { Tag } from "@taskmanager/shared-types";
-import { Check, GitMerge, Pencil, Plus, Search, Tag as TagIcon, Trash2, X } from "lucide-react";
+import { Check, GitMerge, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { deleteTag, updateTag } from "../../api/tags";
 import { errorMessage } from "../../hooks/errors";
@@ -129,20 +129,7 @@ export function TagManager() {
   };
 
   return (
-    <div className="mx-auto grid max-w-[920px] gap-4">
-      <section className="overflow-hidden rounded-lg border border-line bg-white shadow-panel">
-        <header className="bg-gradient-to-br from-magenta to-magenta/75 px-5 py-5 text-white">
-          <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/12">
-              <TagIcon size={21} />
-            </span>
-            <div>
-              <h1 className="text-2xl font-bold tracking-normal">Tags verwalten</h1>
-              <p className="text-sm text-white/75">{tags.tags.length} Tags · genutzt in 0 Projekten, 0 Tasks, 0 Notizen</p>
-            </div>
-          </div>
-        </header>
-        <div className="grid gap-4 p-4 md:p-5">
+    <div className="grid gap-4">
           <Section>
             <h2 className="mb-3 text-sm font-bold uppercase text-steel-500">Neuer Tag</h2>
             <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
@@ -192,8 +179,6 @@ export function TagManager() {
             <span className="rounded-md bg-tangerine/10 px-2 py-1 text-tangerine">Tangerine: Prüfung</span>
             <span className="rounded-md bg-magenta/10 px-2 py-1 text-magenta">Magenta: Sammlung</span>
           </section>
-        </div>
-      </section>
     </div>
   );
 }

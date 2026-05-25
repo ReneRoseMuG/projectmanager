@@ -2,21 +2,31 @@
 
 /**
  * Test Scope:
- * AdminLayout
+ *
+ * Test-Ebene:
+ * - Unit
+ *
+ * Realitätsgrad:
+ * - Echte React-Komponenten mit MemoryRouter, keine API- oder DB-Zugriffe.
+ *
+ * Mock-Entscheidung:
+ * - Keine Mocks; die Router-Position ist der echte Ausgangszustand.
+ *
+ * Isolation:
+ * - jsdom ohne Dateisystem- oder Datenbankzugriff.
  *
  * Abgedeckte Regeln:
- * - Admin-Unterpunkte werden als Inline-Navigation der Adminseite gerendert.
- * - Der aktive Admin-Unterpunkt wird visuell hervorgehoben.
+ * - Admin-Unterpunkte werden in der dunklen inneren Icon-Sidebar gerendert.
+ * - Der aktive Admin-Unterpunkt wird je nach aktuellem Pfad hervorgehoben.
  *
  * Fehlerfälle:
- * - Admin-Unterpunkte dürfen nicht aus der Inline-Navigation verschwinden.
+ * - Full-Bleed-Adminseiten dürfen die innere Sidebar nicht mehr überspringen.
  *
  * Ziel:
- * Die neue Admin-Navigationsgruppierung absichern.
+ * Die Admin-Navigationsumstellung von horizontalen Tabs auf innere Sidebar absichern.
  */
 import "@testing-library/jest-dom/vitest";
-import { screen } from "@testing-library/dom";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import { AdminLayout } from "../../../../../apps/web/src/components/layout/AdminLayout";
@@ -26,32 +36,45 @@ afterEach(() => {
 });
 
 describe("AdminLayout", () => {
-  it("rendert die Admin-Unterpunkte als Inline-Navigation", () => {
+  it("rendert die Admin-Unterpunkte in der inneren Sidebar", () => {
     render(
       <MemoryRouter initialEntries={["/admin/catalogs"]}>
         <AdminLayout>
           <div>Admin-Inhalt</div>
         </AdminLayout>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
+    expect(screen.getByRole("navigation", { name: "Admin-Bereich" })).toBeInTheDocument();
     for (const label of ["Kataloge", "Tags", "Sicherung", "Benutzer", "Rollen"]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
     expect(screen.getByText("Admin-Inhalt")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Kataloge" })).toHaveClass("bg-steel-700", "text-white");
+    expect(screen.getByText("Admin")).toHaveClass("uppercase", "text-white/45");
+    const activeCatalogLink = screen.getByRole("link", { name: "Kataloge" });
+    const activeCatalogIcon = activeCatalogLink.querySelector(".admin-sidebar-icon");
+    const inactiveTagsLink = screen.getByRole("link", { name: "Tags" });
+
+    expect(activeCatalogLink).toHaveClass("admin-sidebar-link-active", "bg-white/10", "text-white");
+    expect(inactiveTagsLink).toHaveClass("text-white");
+    expect(inactiveTagsLink).not.toHaveClass("text-white/70");
+    expect(activeCatalogIcon).toHaveClass("admin-sidebar-icon");
   });
 
-  it("lässt Full-Bleed-Adminseiten ihre eigene Navigation rendern", () => {
+  it("rendert die Sidebar auch auf Benutzerseiten", () => {
     render(
       <MemoryRouter initialEntries={["/admin/users"]}>
         <AdminLayout>
           <div>Admin-Inhalt</div>
         </AdminLayout>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
 
-    expect(screen.queryByRole("link", { name: "Benutzer" })).not.toBeInTheDocument();
+    const activeUsersLink = screen.getByRole("link", { name: "Benutzer" });
+    const activeUsersIcon = activeUsersLink.querySelector(".admin-sidebar-icon");
+
+    expect(activeUsersLink).toHaveClass("admin-sidebar-link-active", "bg-white/10", "text-white");
+    expect(activeUsersIcon).toHaveClass("admin-sidebar-icon");
     expect(screen.getByText("Admin-Inhalt")).toBeInTheDocument();
   });
 });

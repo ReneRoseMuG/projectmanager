@@ -17,7 +17,7 @@ test("Admin legt Benutzer in der UI an; Nicht-Admin sieht keine Administration",
   await authenticatedGoto(page, "/admin/users");
 
   const email = `${uniqueTitle("reader").toLowerCase().replace(/[^a-z0-9]+/g, ".")}@example.test`;
-  await page.getByRole("link", { name: "Neu", exact: true }).click();
+  await page.getByRole("button", { name: "Neuer Benutzer" }).click();
   await page.getByLabel("Vorname").fill("Reader");
   await page.getByLabel("Nachname").fill("User");
   await page.getByLabel("E-Mail").fill(email);
@@ -25,7 +25,7 @@ test("Admin legt Benutzer in der UI an; Nicht-Admin sieht keine Administration",
   await page.getByLabel("Passwort").fill("password123");
   await page.getByRole("button", { name: "Speichern" }).click();
 
-  await expect(page.getByRole("heading", { name: "Benutzer bearbeiten" })).toBeVisible();
+  await expect(page.getByText(email)).toBeVisible();
   await page.getByRole("button", { name: "Abmelden" }).click();
   await expect(page.getByRole("button", { name: "Anmelden" })).toBeVisible();
   await page.getByLabel("E-Mail").fill(email);
