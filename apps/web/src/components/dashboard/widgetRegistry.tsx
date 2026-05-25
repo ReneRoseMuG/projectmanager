@@ -1,5 +1,5 @@
 import type { DashboardContext, DashboardWidgetId } from "@taskmanager/shared-types";
-import { Activity, Bug, CalendarClock, FileText, Flag, History, ListTodo, MessageSquare, Paperclip, type LucideIcon } from "lucide-react";
+import { Activity, Bug, CalendarClock, CalendarDays, ChevronRight, FileText, Flag, History, KanbanSquare, List, ListTodo, MessageSquare, Paperclip, type LucideIcon } from "lucide-react";
 
 export interface DashboardWidgetMeta {
   id: DashboardWidgetId;
@@ -62,6 +62,72 @@ export const dashboardWidgetRegistry: Record<DashboardWidgetId, DashboardWidgetM
     label: "Überfällige Aufgaben",
     description: "Zeigt offene Aufgaben mit überschrittenem Fälligkeitsdatum.",
     icon: FileText,
+  },
+  calendar: {
+    id: "calendar",
+    label: "Kalender",
+    description: "Monatsansicht mit Terminen und Aufgaben-Fälligkeiten.",
+    icon: CalendarDays,
+  },
+  upcomingEvents: {
+    id: "upcomingEvents",
+    label: "Nächste Termine",
+    description: "Zeigt die nächsten 4 anstehenden Termine.",
+    icon: CalendarClock,
+  },
+  taskBoard: {
+    id: "taskBoard",
+    label: "Aufgaben-Board",
+    description: "Kanban-Board der Aufgaben im aktuellen Kontext (nur Ansicht).",
+    icon: KanbanSquare,
+  },
+  taskList: {
+    id: "taskList",
+    label: "Aufgabenliste",
+    description: "Listenansicht der Aufgaben im aktuellen Kontext (nur Ansicht).",
+    icon: ListTodo,
+  },
+  ticketBoard: {
+    id: "ticketBoard",
+    label: "Ticket-Board",
+    description: "Kanban-Board der Tickets im aktuellen Kontext (nur Ansicht).",
+    icon: KanbanSquare,
+  },
+  ticketList: {
+    id: "ticketList",
+    label: "Ticketliste",
+    description: "Listenansicht der Tickets im aktuellen Kontext (nur Ansicht).",
+    icon: List,
+  },
+  milestoneBoard: {
+    id: "milestoneBoard",
+    label: "Meilenstein-Board",
+    description: "Kanban-Board der Meilensteine (nur Ansicht).",
+    icon: KanbanSquare,
+  },
+  milestoneList: {
+    id: "milestoneList",
+    label: "Meilensteinkarte",
+    description: "Listenansicht der Meilensteine (nur Ansicht).",
+    icon: Flag,
+  },
+  milestoneListView: {
+    id: "milestoneListView",
+    label: "Meilensteinliste",
+    description: "ListView der Meilensteine im aktuellen Kontext (nur Ansicht).",
+    icon: List,
+  },
+  projectBoard: {
+    id: "projectBoard",
+    label: "Projekt-Board",
+    description: "Kanban-Board der Projekte (nur Ansicht).",
+    icon: KanbanSquare,
+  },
+  projectList: {
+    id: "projectList",
+    label: "Projektliste",
+    description: "Listenansicht der Projekte (nur Ansicht).",
+    icon: ChevronRight,
   },
 };
 

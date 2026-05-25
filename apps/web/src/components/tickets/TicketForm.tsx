@@ -14,7 +14,7 @@ import type {
   UserOption,
 } from "@taskmanager/shared-types";
 import { useQuery } from "@tanstack/react-query";
-import { Bug, GitBranch, Link2, Paperclip, StickyNote } from "lucide-react";
+import { Bug, GitBranch, Link2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getTicketLinkCandidates, getTicketRelationCandidates, type TicketOwner } from "../../api/tickets";
@@ -63,7 +63,6 @@ import { PrioritySelect } from "../ui/PrioritySelect";
 import { RadioList } from "../ui/RadioList";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
-import { SectionHeader } from "../ui/SectionHeader";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusPill } from "../ui/StatusPill";
@@ -388,7 +387,7 @@ export function TicketForm({
 
         {activeTab === "details" ? (
           <>
-            <Section title="Basisdaten">
+            <Section>
               <div className="grid gap-4">
                 <FormField label="Titel" required>
                   <Input value={ticketTitle} onChange={(event) => setTicketTitle(event.target.value)} required autoFocus={!ticket} />
@@ -466,7 +465,7 @@ export function TicketForm({
         ) : null}
 
         {activeTab === "subTickets" ? (
-          <Section title="Sub-Tickets">
+          <Section>
             {ticket && loadedTicket ? (
               <div className="grid gap-4">
                 <div className="flex justify-end">
@@ -552,7 +551,7 @@ export function TicketForm({
               onOpen={(item) => onOpenTicket?.(item)}
             />
           ) : (
-            <Section title="Relationen">
+            <Section>
               <PendingRelationList
                 existingItems={pendingRelations.map((relation) => ({
                   id: relation.ticket.id,
@@ -575,7 +574,7 @@ export function TicketForm({
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section title="Kommentare">
+          <Section>
             {ticket && loadedTicket ? (
               <CommentThread
                 comments={loadedTicket.comments}
@@ -613,10 +612,6 @@ export function TicketForm({
 
         {activeTab === "notes" ? (
           <Section>
-            <div className="mb-4 flex items-center gap-2">
-              <StickyNote size={18} className="text-fern" />
-              <SectionHeader title="Notizen" />
-            </div>
             {ticket ? (
               <>
                 <NoteList
@@ -653,10 +648,6 @@ export function TicketForm({
 
         {activeTab === "attachments" ? (
           <Section>
-            <div className="mb-4 flex items-center gap-2">
-              <Paperclip size={18} className="text-fern" />
-              <SectionHeader title="Dateien" />
-            </div>
             {ticket ? (
               <div className="grid gap-4">
                 <AttachmentUploader size="sm" onUpload={uploadAttachment} />
@@ -702,7 +693,7 @@ export function TicketForm({
         ) : null}
 
         {activeTab === "journal" && ticket ? (
-          <Section title="Journal" fill>
+          <Section fill>
             <JournalPanel objectType="ticket" objectId={ticket.id} />
           </Section>
         ) : null}

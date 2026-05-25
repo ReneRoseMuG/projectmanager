@@ -48,6 +48,7 @@ function renderListBoardView({
   onSearchChange = vi.fn(),
   toolbarFilters,
   filters,
+  showToolbar = true,
 }: {
   mode?: ListBoardMode;
   viewItems?: TestItem[];
@@ -57,6 +58,7 @@ function renderListBoardView({
   onSearchChange?: (value: string) => void;
   toolbarFilters?: ReactNode;
   filters?: ReactNode;
+  showToolbar?: boolean;
 } = {}) {
   return render(
     <ListBoardView
@@ -69,6 +71,7 @@ function renderListBoardView({
       onSearchChange={onSearchChange}
       toolbarFilters={toolbarFilters}
       filters={filters}
+      showToolbar={showToolbar}
       emptyState={<div>Keine Einträge</div>}
       loading={loading}
       renderCard={(item) => (
@@ -270,6 +273,15 @@ describe("ListBoardView", () => {
     expect(
       screen.queryByRole("button", { name: "Anlegen" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("blendet die gesamte Toolbar bei showToolbar=false aus", () => {
+    renderListBoardView({ showToolbar: false });
+
+    expect(screen.queryByPlaceholderText("Suchen...")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Liste" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Kanban" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Anlegen" })).not.toBeInTheDocument();
   });
 
   it("Spalten-Button ruft onAddToColumn mit Status auf", () => {

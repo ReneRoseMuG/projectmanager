@@ -24,6 +24,7 @@ interface TicketListBoardViewProps {
   filters?: ReactNode;
   loading?: boolean;
   showToolbarAdd?: boolean;
+  readOnly?: boolean;
 }
 
 function toListBoardMode(viewMode: ViewMode): ListBoardMode {
@@ -57,6 +58,7 @@ export function TicketListBoardView({
   filters,
   loading = false,
   showToolbarAdd = true,
+  readOnly = false,
 }: TicketListBoardViewProps) {
   const catalogs = useCatalogs();
   const [searchValue, setSearchValue] = useState("");
@@ -84,22 +86,27 @@ export function TicketListBoardView({
     <ListBoardView
       items={visibleTickets}
       mode={toListBoardMode(viewMode)}
-      onModeChange={(mode) => onViewModeChange(toViewMode(mode))}
+      onModeChange={(mode) => {
+        if (!readOnly) {
+          onViewModeChange(toViewMode(mode));
+        }
+      }}
       onAdd={onAdd}
-      onAddToColumn={(columnStatus) =>
+      onAddToColumn={!readOnly ? (columnStatus) =>
         onAddStatus ? onAddStatus(columnStatus as Ticket["status"]) : onAdd()
-      }
+      : undefined}
       addLabel="Neues Ticket"
-      showToolbarAdd={showToolbarAdd}
+      showToolbar={!readOnly}
+      showToolbarAdd={!readOnly && showToolbarAdd}
       statusKey="status"
       statusCatalogKind="workStatus"
       statusColumns={statusColumns}
-      onItemStatusChange={onStatusChange ? (ticket, status) => onStatusChange(ticket, status as Ticket["status"]) : undefined}
+      onItemStatusChange={!readOnly && onStatusChange ? (ticket, status) => onStatusChange(ticket, status as Ticket["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       toolbarFilters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={tickets.length} />}
-      filters={filters}
-      secondaryAction={linkAction}
+      filters={readOnly ? undefined : filters}
+      secondaryAction={readOnly ? undefined : linkAction}
       loading={loading}
       emptyState={
         <EmptyState
@@ -111,16 +118,16 @@ export function TicketListBoardView({
         />
       }
       renderCard={(ticket) => (
-        <TicketCard ticket={ticket} onOpen={onOpen} onDelete={ticket.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
+        <TicketCard ticket={ticket} onOpen={onOpen} onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} />
       )}
       renderRow={(ticket) => (
         <TicketCard
           ticket={ticket}
           variant="row"
           onOpen={onOpen}
-          onDelete={ticket.visibleParent?.origin === "inherited" ? undefined : onDelete}
-          onStatusChange={onStatusChange}
-          onDueDateChange={onDueDateChange}
+          onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete}
+          onStatusChange={readOnly ? undefined : onStatusChange}
+          onDueDateChange={readOnly ? undefined : onDueDateChange}
         />
       )}
     />

@@ -7,24 +7,23 @@
  * - Unit, jsdom mit echter StartPage und MemoryRouter.
  *
  * Realitätsgrad:
- * - Echte Permission-Entscheidung über Hook-Double; Dashboard- und Kalenderkinder als Komponenten-Doubles.
+ * - Echte Permission-Entscheidung über Hook-Double; Dashboard-Kind als Komponenten-Double.
  *
  * Mock-Entscheidung:
- * - Server-State-Hooks und schwere Kalender-/Dashboard-Komponenten werden isoliert, weil diese Datei die Seitenverdrahtung prüft.
+ * - Schwere Dashboard-Komponente wird isoliert, weil diese Datei die Seitenverdrahtung prüft.
  *
  * Isolation:
  * - Keine DB- oder Dateisystemzugriffe.
  *
  * Abgedeckte Regeln:
- * - Die Startseite rendert Home-Dashboard und Kalender-Vorschau mit vorhandenen Leserechten.
+ * - Die Startseite rendert das Home-Dashboard.
  * - Ohne dashboards:read wird ein Forbidden-Zustand angezeigt.
- * - Ohne Kalender- und Aufgabenrechte bleiben die Queries deaktiviert.
  *
  * Fehlerfälle:
- * - Ungeschützter Root-Zugriff, unnötige Kalenderqueries ohne Rechte und fehlende Startseitenbereiche.
+ * - Ungeschützter Root-Zugriff und fehlendes Startseiten-Dashboard.
  *
  * Ziel:
- * Die neue Root-Seite gegen Permission- und Render-Regressions absichern.
+ * Die Root-Seite gegen Permission- und Render-Regressions absichern.
  */
 
 import "@testing-library/jest-dom/vitest";
@@ -36,11 +35,7 @@ import { StartPage } from "../../../../apps/web/src/pages/StartPage";
 const testState = vi.hoisted(() => ({
   permissions: {
     dashboards: true,
-    events: true,
-    tasks: true,
   } as Record<string, boolean>,
-  useEvents: vi.fn(),
-  useCalendarTasks: vi.fn(),
 }));
 
 vi.mock("../../../../apps/web/src/hooks/usePermissions", () => ({
@@ -49,29 +44,9 @@ vi.mock("../../../../apps/web/src/hooks/usePermissions", () => ({
   },
 }));
 
-vi.mock("../../../../apps/web/src/hooks/useEvents", () => ({
-  useEvents: testState.useEvents,
-}));
-
-vi.mock("../../../../apps/web/src/hooks/useCalendarTasks", () => ({
-  useCalendarTasks: testState.useCalendarTasks,
-}));
-
 vi.mock("../../../../apps/web/src/components/dashboard/DashboardView", () => ({
   HomeDashboard({ hideInlineHeader }: { hideInlineHeader?: boolean }) {
     return <div data-testid="home-dashboard" data-hide-inline-header={String(Boolean(hideInlineHeader))} />;
-  },
-}));
-
-vi.mock("../../../../apps/web/src/components/calendar/CalendarView", () => ({
-  CalendarView({ events, tasks, compact }: { events: unknown[]; tasks: unknown[]; compact?: boolean }) {
-    return <div data-testid="calendar-view">{`${compact ? "compact" : "full"}:${events.length}:${tasks.length}`}</div>;
-  },
-}));
-
-vi.mock("../../../../apps/web/src/components/calendar/UpcomingEvents", () => ({
-  UpcomingEvents({ events }: { events: unknown[] }) {
-    return <div data-testid="upcoming-events">{events.length}</div>;
   },
 }));
 
@@ -88,33 +63,18 @@ describe("StartPage", () => {
     vi.clearAllMocks();
     Object.assign(testState.permissions, {
       dashboards: true,
-      events: true,
-      tasks: true,
-    });
-    testState.useEvents.mockReturnValue({
-      events: [{ id: 1, title: "Starttermin" }],
-      loading: false,
-      error: null,
-    });
-    testState.useCalendarTasks.mockReturnValue({
-      tasks: [{ id: 2, title: "Startaufgabe" }],
-      loading: false,
-      error: null,
     });
   });
 
-  it("rendert Home-Dashboard und kompakte Kalender-Vorschau mit Leserechten", () => {
+  it("rendert das Home-Dashboard ohne alte Kalender-Vorschau", () => {
     renderStartPage();
 
     expect(screen.getByRole("heading", { name: "Startseite" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Dashboard" })).toHaveClass("text-sm", "font-semibold", "text-ink");
-    expect(screen.getByRole("heading", { name: "Kalender" })).toHaveClass("text-sm", "font-semibold", "text-ink");
     expect(screen.getByTestId("home-dashboard")).toBeInTheDocument();
     expect(screen.getByTestId("home-dashboard")).toHaveAttribute("data-hide-inline-header", "true");
     expect(screen.queryByText("Startseiten-Dashboard")).not.toBeInTheDocument();
-    expect(screen.queryByText("Kommende Termine und fällige Aufgaben.")).not.toBeInTheDocument();
-    expect(screen.getByTestId("calendar-view")).toHaveTextContent("compact:1:1");
-    expect(screen.getByTestId("upcoming-events")).toHaveTextContent("1");
+    expect(screen.queryByTestId("start-calendar-preview")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-dashboard-section")).not.toBeInTheDocument();
   });
 
   it("zeigt ohne Dashboard-Leserecht den Forbidden-Zustand", () => {
@@ -124,16 +84,5 @@ describe("StartPage", () => {
 
     expect(screen.getByText("403")).toBeInTheDocument();
     expect(screen.queryByTestId("home-dashboard")).not.toBeInTheDocument();
-  });
-
-  it("deaktiviert Kalenderqueries ohne Event- und Aufgabenrechte", () => {
-    testState.permissions.events = false;
-    testState.permissions.tasks = false;
-
-    renderStartPage();
-
-    expect(testState.useEvents).toHaveBeenCalledWith(undefined, false);
-    expect(testState.useCalendarTasks).toHaveBeenCalledWith(false);
-    expect(screen.getByText("Kalender nicht verfügbar")).toBeInTheDocument();
   });
 });

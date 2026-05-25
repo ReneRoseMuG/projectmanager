@@ -10,6 +10,7 @@ import type {
   DashboardWidgetParams,
   JournalListResponse,
   Milestone,
+  Project,
   RecentAttachment,
   RecentComment,
   Task,
@@ -19,6 +20,8 @@ import type {
 } from "@taskmanager/shared-types";
 import { api } from "./client";
 import { getJournalEntries, getObjectJournalEntries } from "./journal";
+import { getMilestones, getProjectMilestones } from "./milestones";
+import { getProjects } from "./projects";
 
 export type DashboardWidgetData =
   | TaskStats
@@ -26,6 +29,7 @@ export type DashboardWidgetData =
   | Task[]
   | Ticket[]
   | Milestone[]
+  | Project[]
   | RecentComment[]
   | RecentAttachment[]
   | JournalListResponse;
@@ -111,6 +115,22 @@ export async function getDashboardMilestones(owner?: DashboardOwner, limit = 10)
   return milestones.slice(0, limit);
 }
 
+export async function getDashboardMilestoneList(owner?: DashboardOwner, params: DashboardWidgetParams = {}): Promise<Milestone[]> {
+  const limit = params.limit ?? 10;
+  if (owner?.type === "project") {
+    return (await getProjectMilestones(owner.id)).slice(0, limit);
+  }
+  if (owner) {
+    return [];
+  }
+  return (await getMilestones()).slice(0, limit);
+}
+
+export async function getDashboardProjects(limit = 10): Promise<Project[]> {
+  const projects = await getProjects();
+  return projects.slice(0, limit);
+}
+
 export async function getDashboardRecentComments(owner?: DashboardOwner, limit = 10): Promise<RecentComment[]> {
   return api.get("comments/recent", { searchParams: widgetSearchParams(owner, { limit }) }).json<RecentComment[]>();
 }
@@ -150,6 +170,21 @@ export async function getDashboardWidgetData(widgetId: DashboardWidgetId, owner?
   }
   if (widgetId === "milestoneProgress") {
     return getDashboardMilestones(owner, params.limit ?? 10);
+  }
+  if (widgetId === "taskBoard" || widgetId === "taskList") {
+    return getDashboardRecentTasks(owner, params);
+  }
+  if (widgetId === "ticketBoard" || widgetId === "ticketList") {
+    return getDashboardRecentTickets(owner, params);
+  }
+  if (widgetId === "milestoneBoard" || widgetId === "milestoneList") {
+    return getDashboardMilestones(owner, params.limit ?? 10);
+  }
+  if (widgetId === "milestoneListView") {
+    return getDashboardMilestoneList(owner, params);
+  }
+  if (widgetId === "projectBoard" || widgetId === "projectList") {
+    return getDashboardProjects(params.limit ?? 10);
   }
   return getDashboardOverdueTasks(owner, params.limit);
 }

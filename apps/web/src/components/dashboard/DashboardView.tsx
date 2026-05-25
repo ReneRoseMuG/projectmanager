@@ -1,5 +1,5 @@
 import type { Dashboard, DashboardContext, DashboardOwner } from "@taskmanager/shared-types";
-import { LayoutDashboard, Pencil, Plus } from "lucide-react";
+import { LayoutDashboard, Pencil, Plus, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDashboards } from "../../hooks/useDashboards";
 import { useHasPermission } from "../../hooks/usePermissions";
@@ -46,6 +46,7 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
   const [selectedDashboardId, setSelectedDashboardId] = useState<number | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [builderDashboard, setBuilderDashboard] = useState<Dashboard | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const selectedDashboard = useMemo(
     () => dashboards.dashboards.find((dashboard) => dashboard.id === selectedDashboardId) ?? dashboards.dashboards.find((dashboard) => dashboard.id === dashboards.selectedDefaultId) ?? dashboards.dashboards[0] ?? null,
     [dashboards.dashboards, dashboards.selectedDefaultId, selectedDashboardId],
@@ -78,42 +79,70 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
     />
   ) : selectedDashboard ? (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3 rounded-lg border border-line bg-white p-4 shadow-sm">
-        <DashboardPicker dashboards={dashboards.dashboards} selectedDashboardId={selectedDashboard.id} onChange={setSelectedDashboardId} />
-        <div className="flex flex-wrap gap-2">
-          {canWrite ? (
-            <>
-              <Button icon={<Plus size={16} />} onClick={() => openBuilder(null)}>
-                Neues Dashboard
-              </Button>
-              <Button variant="primary" icon={<Pencil size={16} />} onClick={() => openBuilder(selectedDashboard)}>
-                Bearbeiten
-              </Button>
-            </>
-          ) : null}
+      {canWrite ? (
+        <div className="flex justify-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<SlidersHorizontal size={16} />}
+            onClick={() => setEditorOpen((open) => !open)}
+            aria-label="Tab-Editor"
+            title="Tab-Editor"
+          >
+            Tab-Editor
+          </Button>
         </div>
-      </div>
+      ) : null}
+      {editorOpen && canWrite ? (
+        <div className="grid w-full gap-3 rounded-lg border border-line bg-white p-4 shadow-sm">
+          <DashboardPicker dashboards={dashboards.dashboards} selectedDashboardId={selectedDashboard.id} onChange={setSelectedDashboardId} />
+          <div className="flex flex-wrap gap-2">
+            <Button icon={<Plus size={16} />} onClick={() => openBuilder(null)}>
+              Neues Dashboard
+            </Button>
+            <Button variant="primary" icon={<Pencil size={16} />} onClick={() => openBuilder(selectedDashboard)}>
+              Bearbeiten
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <DashboardGrid dashboard={selectedDashboard} owner={owner} />
     </>
   ) : (
-    <EmptyState
-      icon={<LayoutDashboard size={22} />}
-      title="Kein Dashboard vorhanden"
-      body={canWrite ? "Lege ein Dashboard an, um die Übersicht zu füllen." : "Für diesen Bereich ist noch kein Dashboard freigegeben."}
-      variant="tinted"
-      actions={
-        canWrite
-          ? [
-              {
-                label: "Dashboard anlegen",
-                primary: true,
-                icon: <Plus size={16} />,
-                onClick: () => openBuilder(null),
-              },
-            ]
-          : undefined
-      }
-    />
+    <>
+      {canWrite ? (
+        <div className="flex justify-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<SlidersHorizontal size={16} />}
+            onClick={() => openBuilder(null)}
+            aria-label="Tab-Editor"
+            title="Tab-Editor"
+          >
+            Tab-Editor
+          </Button>
+        </div>
+      ) : null}
+      <EmptyState
+        icon={<LayoutDashboard size={22} />}
+        title="Kein Dashboard vorhanden"
+        body={canWrite ? "Lege ein Dashboard an, um die Übersicht zu füllen." : "Für diesen Bereich ist noch kein Dashboard freigegeben."}
+        variant="tinted"
+        actions={
+          canWrite
+            ? [
+                {
+                  label: "Dashboard anlegen",
+                  primary: true,
+                  icon: <Plus size={16} />,
+                  onClick: () => openBuilder(null),
+                },
+              ]
+            : undefined
+        }
+      />
+    </>
   );
 
   return (
@@ -121,7 +150,7 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
       {showHeader ? (
         <PageHeader
           title={title}
-          subtitle={subtitle ?? "Projektstatus, Aufgaben, Tickets und Aktivität."}
+          subtitle={subtitle}
         />
       ) : hideInlineHeader ? null : (
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -160,13 +189,13 @@ export function HomeDashboard({ showHeader = false, hideInlineHeader = false }: 
 }
 
 export function ProjectDashboard({ projectId }: { projectId: number }) {
-  return <DashboardView context="project" owner={{ type: "project", id: projectId }} title="Projektübersicht" subtitle="Meilensteine, Aufgaben, Tickets und Aktivität für dieses Projekt." />;
+  return <DashboardView context="project" owner={{ type: "project", id: projectId }} title="Projektübersicht" hideInlineHeader />;
 }
 
 export function MilestoneDashboard({ milestoneId }: { milestoneId: number }) {
-  return <DashboardView context="milestone" owner={{ type: "milestone", id: milestoneId }} title="Meilensteinübersicht" subtitle="Aufgaben, Tickets und Aktivität für diesen Meilenstein." />;
+  return <DashboardView context="milestone" owner={{ type: "milestone", id: milestoneId }} title="Übersicht" hideInlineHeader />;
 }
 
 export function TaskDashboard({ taskId }: { taskId: number }) {
-  return <DashboardView context="task" owner={{ type: "task", id: taskId }} title="Aufgabenübersicht" subtitle="Unteraufgaben, Kommentare und Dateien für diese Aufgabe." />;
+  return <DashboardView context="task" owner={{ type: "task", id: taskId }} title="Aufgabenübersicht" hideInlineHeader />;
 }

@@ -9,8 +9,8 @@ test("Direktaufruf ohne Session landet beim Login und kehrt nach Login zur Route
   await page.getByLabel("Passwort").fill("password123");
   await page.getByRole("button", { name: "Anmelden" }).click();
 
-  await expect(page).toHaveURL(/\/projects$/);
-  await expect(page.getByRole("heading", { name: "Projekte", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { name: "Startseite", exact: true })).toBeVisible();
 });
 
 test("Admin legt Benutzer in der UI an; Nicht-Admin sieht keine Administration", async ({ page }) => {
@@ -33,7 +33,7 @@ test("Admin legt Benutzer in der UI an; Nicht-Admin sieht keine Administration",
   const readerLoginResponse = page.waitForResponse((response) => response.url().endsWith("/api/auth/login") && response.request().method() === "POST");
   await page.getByRole("button", { name: "Anmelden" }).click();
   await expect((await readerLoginResponse).status()).toBe(200);
-  await expect(page.getByRole("heading", { name: "Projekte", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Startseite", exact: true })).toBeVisible();
 
   await expect(page.getByText("Administration")).toHaveCount(0);
   await page.goto("/admin/users");

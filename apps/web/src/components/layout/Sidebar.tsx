@@ -10,7 +10,6 @@ import {
   History,
   Home,
   Library,
-  LayoutDashboard,
   ListTodo,
   LogOut,
   PanelLeftClose,
@@ -75,12 +74,6 @@ const documentationItems: NavigationItem[] = [
 ];
 
 const informationItems: NavigationItem[] = [
-  {
-    to: "/dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
-    resource: "dashboards",
-  },
   {
     to: "/calendar",
     label: "Kalender",

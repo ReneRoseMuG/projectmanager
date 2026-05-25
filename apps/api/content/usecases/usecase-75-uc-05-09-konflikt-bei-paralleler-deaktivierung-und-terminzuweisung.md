@@ -8,15 +8,8 @@
 <h2>Vorbedingungen</h2>
 <ul><li>Ein Mitarbeiter existiert und ist aktiv.</li><li>Ein Termin existiert.</li><li>Zwei Akteure sind gleichzeitig angemeldet.</li><li>Der Mitarbeiter ist im Terminformular auswählbar.</li></ul>
 <h2>Ablauf</h2>
-<p>1. Akteur A öffnet das Terminformular.<br>2. System lädt aktive Mitarbeiter zur Auswahl.<br>3. Akteur A wählt den Mitarbeiter aus.<br>4. Vor dem Speichern deaktiviert Akteur B denselben Mitarbeiter.<br>5. System setzt <code>is_active = false</code>.<br>6. Akteur A speichert den Termin.<br>7. System prüft beim Speichern:</p>
-<ul><li>ob alle ausgewählten Mitarbeiter weiterhin aktiv sind.</li></ul>
-<p>8. System erkennt, dass der Mitarbeiter deaktiviert wurde.<br>9. System blockiert den Speichervorgang.</p>
+<ol><li>Akteur A öffnet das Terminformular.</li><li>System lädt aktive Mitarbeiter zur Auswahl.</li><li>Akteur A wählt den Mitarbeiter aus.</li><li>Vor dem Speichern deaktiviert Akteur B denselben Mitarbeiter.</li><li>System setzt <code>is_active = false</code>.</li><li>Akteur A speichert den Termin.</li><li>System prüft beim Speichern:<ul><li>ob alle ausgewählten Mitarbeiter weiterhin aktiv sind.</li></ul></li><li>System erkennt, dass der Mitarbeiter deaktiviert wurde.</li><li>System blockiert den Speichervorgang.</li></ol>
 <h2>Alternativen</h2>
-<ul><li>Deaktivierung erfolgt nach erfolgreicher Termin-Speicherung →</li></ul>
-<p>Termin bleibt gültig, da Zuweisung vor Deaktivierung erfolgte.</p>
-<ul><li>Akteur A lädt das Formular neu →</li></ul>
-<p>Der deaktivierte Mitarbeiter erscheint nicht mehr in der Auswahl.</p>
-<ul><li>Einer der Akteure bricht ab →</li></ul>
-<p>Kein Konflikt.</p>
+<ul><li>Deaktivierung erfolgt nach erfolgreicher Termin-Speicherung → Termin bleibt gültig, da Zuweisung vor Deaktivierung erfolgte.</li><li>Akteur A lädt das Formular neu → Der deaktivierte Mitarbeiter erscheint nicht mehr in der Auswahl.</li><li>Einer der Akteure bricht ab → Kein Konflikt.</li></ul>
 <h2>Ergebnis</h2>
 <ul><li>Ein deaktivierter Mitarbeiter kann nicht neu einem Termin zugewiesen werden.</li><li>Das System antwortet mit HTTP 409 Conflict oder 400 Validation Error.</li><li>Die Fehlermeldung weist auf den zwischenzeitlich deaktivierten Mitarbeiter hin.</li><li>Es entsteht kein inkonsistenter Zustand.</li><li>Bereits bestehende Terminzuweisungen bleiben unverändert.</li><li>Historische Termine bleiben unverändert.</li></ul>

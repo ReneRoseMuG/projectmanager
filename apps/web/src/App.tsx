@@ -7,7 +7,6 @@ import { TopBar } from "./components/layout/TopBar";
 import { Spinner } from "./components/ui/Spinner";
 import { CalendarPage } from "./pages/CalendarPage";
 import { BacklogItemDetailPage } from "./pages/BacklogItemDetailPage";
-import { DashboardPage } from "./pages/DashboardPage";
 import { FeatureDetailPage } from "./pages/FeatureDetailPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
@@ -122,7 +121,6 @@ export default function App() {
       <Route path="/backlog/:id" element={<BacklogItemDetailPage />} />
       <Route path="/wiki" element={<WikiPage />} />
       <Route path="/wiki/:id" element={<WikiPage />} />
-      <Route path="/dashboard" element={<DashboardPage />} />
       <Route path="/calendar" element={<CalendarPage />} />
       <Route path="/journal" element={<JournalPage />} />
       <Route path="/settings/preferences" element={<SettingsPreferencesPage />} />

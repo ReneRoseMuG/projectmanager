@@ -40,7 +40,9 @@ describe("ProjectForm", () => {
   it("begrenzt nur den Details-Tab auf die frühere Formularbreite", () => {
     renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
-    const detailsBody = screen.getByText("Stammdaten").closest("section")?.parentElement;
+    expect(screen.queryByText("Stammdaten")).not.toBeInTheDocument();
+
+    const detailsBody = screen.getByDisplayValue(project.name).closest("section")?.parentElement;
     expect(detailsBody).toHaveClass("w-full", "max-w-7xl");
 
     clickTab("Aufgaben");
@@ -304,9 +306,10 @@ describe("ProjectForm", () => {
     expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("border-steel-900", "bg-steel-900", "text-white");
   });
 
-  it("zeigt im Edit-Modus CommentThread, NoteList, AttachmentList, Backlog und Import", () => {
+  it("zeigt im Edit-Modus CommentThread, NoteList, AttachmentList und Backlog ohne Import", () => {
     renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
+    expect(screen.queryByRole("button", { name: /^Import/ })).not.toBeInTheDocument();
     clickTab("Kommentare");
     expect(screen.getByTestId("comment-thread")).toHaveTextContent("Projekt:1");
     clickTab("Notizen");
@@ -316,8 +319,6 @@ describe("ProjectForm", () => {
     expect(screen.getByTestId("attachment-list")).toHaveTextContent("1");
     clickTab("Backlog");
     expect(screen.getByTestId("backlog-list")).toHaveTextContent("0");
-    clickTab("Import");
-    expect(screen.getByTestId("wiki-import-panel")).toBeInTheDocument();
   });
 
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {

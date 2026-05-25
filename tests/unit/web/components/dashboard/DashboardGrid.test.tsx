@@ -6,6 +6,7 @@
  * Abgedeckte Regeln:
  * - DashboardGrid rendert Widgets stabil nach Row/Column.
  * - Full-width-Widgets erhalten die zweispaltige Layoutklasse.
+ * - Widget-Zellen strecken sich auf die Zeilenhöhe.
  *
  * Fehlerfälle:
  * - Unscharfe Reihenfolge durch ungeordnete Widgetarrays.
@@ -55,5 +56,8 @@ describe("DashboardGrid", () => {
       "globalJournal"
     ]);
     expect(screen.getByText("globalJournal").parentElement).toHaveClass("xl:col-span-2");
+    for (const item of screen.getAllByTestId("mock-dashboard-widget")) {
+      expect(item.parentElement).toHaveClass("h-full");
+    }
   });
 });

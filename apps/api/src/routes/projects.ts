@@ -24,6 +24,7 @@ const projectPatchSchema = {
   additionalProperties: false,
   properties: {
     ...projectBodySchema.properties,
+    wikiPageId: { type: ["integer", "null"], minimum: 1 },
     ...expectedVersionPropertySchema
   }
 } as const;

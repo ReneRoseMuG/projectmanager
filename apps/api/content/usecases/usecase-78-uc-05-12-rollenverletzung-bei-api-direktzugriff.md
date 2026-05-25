@@ -8,13 +8,8 @@
 <h2>Vorbedingungen</h2>
 <ul><li>Ein Mitarbeiter existiert.</li><li>Der Akteur ist authentifiziert.</li><li>Der Akteur besitzt keine Änderungs- oder Adminrechte.</li></ul>
 <h2>Ablauf</h2>
-<p>1. Akteur sendet direkt einen API-Request:</p>
-<ul><li>POST <code>/employees</code></li><li>PATCH <code>/employees/:id</code></li><li>DELETE <code>/employees/:id</code></li><li>PATCH <code>/employees/:id/active</code></li></ul>
-<p>2. System prüft Rollenberechtigung.<br>3. System erkennt fehlende Berechtigung.<br>4. System blockiert die Operation.</p>
+<ol><li>Akteur sendet direkt einen API-Request:<ul><li>POST <code>/employees</code></li><li>PATCH <code>/employees/:id</code></li><li>DELETE <code>/employees/:id</code></li><li>PATCH <code>/employees/:id/active</code></li></ul></li><li>System prüft Rollenberechtigung.</li><li>System erkennt fehlende Berechtigung.</li><li>System blockiert die Operation.</li></ol>
 <h2>Alternativen</h2>
-<ul><li>Akteur ist nicht authentifiziert →</li></ul>
-<p>HTTP 401 Unauthorized.</p>
-<ul><li>Technischer Fehler →</li></ul>
-<p>HTTP 500.</p>
+<ul><li>Akteur ist nicht authentifiziert → HTTP 401 Unauthorized.</li><li>Technischer Fehler → HTTP 500.</li></ul>
 <h2>Ergebnis</h2>
 <ul><li>Keine Datenänderung erfolgt.</li><li>System antwortet mit HTTP 403 Forbidden.</li><li>Der Mitarbeiterbestand bleibt unverändert.</li><li>Es entstehen keine inkonsistenten Zustände.</li></ul>

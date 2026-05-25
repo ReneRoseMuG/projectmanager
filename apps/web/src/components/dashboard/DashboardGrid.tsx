@@ -12,11 +12,11 @@ function sortWidgets(widgets: DashboardWidgetLayout[]): DashboardWidgetLayout[] 
 
 export function DashboardGrid({ dashboard, owner }: DashboardGridProps) {
   return (
-    <div className="grid auto-rows-min grid-cols-1 gap-4 xl:grid-cols-2" data-testid="dashboard-grid">
+    <div className="grid auto-rows-min grid-cols-1 items-stretch gap-4 xl:grid-cols-2" data-testid="dashboard-grid">
       {sortWidgets(dashboard.widgets).map((widget) => (
         <div
           key={widget.widgetId}
-          className={widget.colSpan === 2 ? "xl:col-span-2" : ""}
+          className={`h-full ${widget.colSpan === 2 ? "xl:col-span-2" : ""}`}
           style={{ order: widget.row * 2 + widget.col }}
         >
           <DashboardWidgetCard widget={widget} owner={owner} />

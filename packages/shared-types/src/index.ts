@@ -149,7 +149,18 @@ export const DASHBOARD_WIDGET_IDS = [
   "commentJournal",
   "attachmentJournal",
   "milestoneProgress",
-  "overdueTasks"
+  "overdueTasks",
+  "calendar",
+  "upcomingEvents",
+  "taskBoard",
+  "taskList",
+  "ticketBoard",
+  "ticketList",
+  "milestoneBoard",
+  "milestoneList",
+  "milestoneListView",
+  "projectBoard",
+  "projectList"
 ] as const;
 
 export type DashboardContext = (typeof DASHBOARD_CONTEXTS)[number];
@@ -247,11 +258,11 @@ export interface RecentAttachment {
 }
 
 export const DASHBOARD_ALLOWED_WIDGETS = {
-  global: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks"],
-  project: ["taskStatusReport", "ticketStatusReport", "milestoneProgress", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "globalJournal", "overdueTasks"],
-  milestone: ["taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal"],
+  global: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
+  project: ["taskStatusReport", "ticketStatusReport", "milestoneProgress", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "globalJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView"],
+  milestone: ["taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList"],
   task: ["taskStatusReport", "taskJournal", "commentJournal", "attachmentJournal"],
-  home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks"]
+  home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"]
 } as const satisfies Record<DashboardContext, readonly DashboardWidgetId[]>;
 
 export const DEFAULT_DASHBOARD_LAYOUTS = {
@@ -290,7 +301,9 @@ export const DEFAULT_DASHBOARD_LAYOUTS = {
   ],
   home: [
     { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1 },
-    { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 }
+    { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 },
+    { widgetId: "calendar", col: 0, row: 1, colSpan: 1 },
+    { widgetId: "upcomingEvents", col: 1, row: 1, colSpan: 1 }
   ]
 } as const satisfies Record<DashboardContext, readonly DashboardWidgetLayout[]>;
 
@@ -537,6 +550,7 @@ export interface Project {
   color: string | null;
   startDate: string | null;
   dueDate: string | null;
+  wikiPageId: number | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -555,7 +569,7 @@ export interface ProjectInput {
   dueDate?: string | null;
 }
 
-export type ProjectUpdate = WithExpectedVersion<Partial<ProjectInput>>;
+export type ProjectUpdate = WithExpectedVersion<Partial<ProjectInput> & { wikiPageId?: number | null }>;
 
 export interface Milestone {
   id: number;
@@ -905,7 +919,6 @@ export type DraftNote = {
 export interface WikiPage {
   id: number;
   parentId: number | null;
-  projectId: number | null;
   title: string;
   content?: string;
   contentPath: string | null;
@@ -924,7 +937,6 @@ export interface WikiBreadcrumb {
 export interface WikiPageInput {
   title: string;
   parentId?: number | null;
-  projectId?: number | null;
   content?: string;
   sortOrder?: number;
 }

@@ -2,6 +2,24 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 25.05.26 | Fix           | ProjectDetails Feature-Link-Button           | ✅     |
+| 25.05.26 | Fix           | MCP-Lokalkonfiguration                       | ⚠️     |
+| 25.05.26 | Feature       | TASK-61 Wiki-Projektbezug                    | ✅     |
+| 25.05.26 | Fix / Feature | Korrektur Dashboard Meilensteinliste         | ✅     |
+| 25.05.26 | Fix / Feature | Dashboard Widget Detailnavigation            | ✅     |
+| 25.05.26 | Fix           | Dashboard Widget Zeilenhöhe                  | ✅     |
+| 25.05.26 | Fix           | Detail-Tabs Events und Import                | ✅     |
+| 25.05.26 | Fix / Feature | Tab-Headlines und Editor                     | ✅     |
+| 25.05.26 | Fix           | Meilenstein Übersicht Tabs                   | ✅     |
+| 25.05.26 | Fix           | Dashboard Editor Dropdown Ausblenden         | ✅     |
+| 25.05.26 | Fix           | Dashboard Editor Button Größe                | ✅     |
+| 24.05.26 | 7             | Dashboard Editor Toggle                      | ✅     |
+| 24.05.26 | 6             | Projekt Dashboard Kindobjekte                | ✅     |
+| 24.05.26 | 5             | Dashboard Route Entfernen                    | ✅     |
+| 24.05.26 | 4             | Startseite Reines Dashboard                  | ✅     |
+| 24.05.26 | 3             | Read-only Board/List Widgets                 | ✅     |
+| 24.05.26 | 2             | Kalender Dashboard Widgets                   | ✅     |
+| 24.05.26 | 1             | Dashboard Widget Registry                    | ✅     |
 | 24.05.26 | 53            | Startseite Sektion-Titel                     | ⚠️     |
 | 24.05.26 | 52            | Sidebar Edge Style                           | ⚠️     |
 | 24.05.26 | Fix           | MCP Dev Start                                | ✅     |

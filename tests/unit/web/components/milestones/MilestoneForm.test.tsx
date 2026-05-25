@@ -174,23 +174,6 @@ vi.mock("../../../../../apps/web/src/hooks/useEntityComments", () => ({
   }
 }));
 
-vi.mock("../../../../../apps/web/src/hooks/useEvents", () => ({
-  useEvents() {
-    return {
-      events: [],
-      createEvent: vi.fn().mockResolvedValue(null),
-      updateEvent: vi.fn().mockResolvedValue(null),
-      removeEvent: vi.fn().mockResolvedValue(undefined)
-    };
-  }
-}));
-
-vi.mock("../../../../../apps/web/src/hooks/useCalendarTasks", () => ({
-  useCalendarTasks() {
-    return { tasks: [], loading: false };
-  }
-}));
-
 const project: Project = {
   id: 30,
   name: "Projekt Alpha",
@@ -199,6 +182,7 @@ const project: Project = {
   color: "var(--color-steel-700)",
   startDate: null,
   dueDate: null,
+  wikiPageId: null,
   version: 1,
   createdAt: "2026-05-19T08:00:00.000Z",
   updatedAt: "2026-05-19T09:00:00.000Z",
@@ -249,11 +233,13 @@ afterEach(() => {
 });
 
 describe("MilestoneForm", () => {
-  it("zeigt den Stammdaten-Tab ohne Counter", () => {
+  it("zeigt den Details-Tab ohne Counter", () => {
     renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
-    expect(screen.getByRole("button", { name: "Stammdaten" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Stammdaten 0" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Details" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Details 0" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Events/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Stammdaten")).not.toBeInTheDocument();
   });
 
   it("bindet RichTextInlineField an die Beschreibung", async () => {

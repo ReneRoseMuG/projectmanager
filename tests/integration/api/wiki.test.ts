@@ -52,6 +52,7 @@ describe("Wiki API", () => {
 
     expect(res.body.parentId).toBeNull();
     expect(res.body).not.toHaveProperty("slug");
+    expect(res.body).not.toHaveProperty("projectId");
     expect(res.body.contentPath).toMatch(/content\/wiki\/wiki-page-\d+\.md/);
     expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# Einführung");
   });
@@ -67,6 +68,10 @@ describe("Wiki API", () => {
     expect(res.body.parentId).toBe(root.id);
     expect(res.body.contentPath).toMatch(/content\/wiki\/wiki-page-\d+\.md/);
     expect(fs.existsSync(resolveStoredContentPath(res.body.contentPath))).toBe(true);
+  });
+
+  it("Root-Seite mit projectId wird abgewiesen", async () => {
+    await supertest(app.server).post("/api/wiki").send({ title: "Alt", projectId: 1 }).expect(400);
   });
 
   it("GET Children gibt direkte Unterseiten zurück", async () => {
@@ -85,6 +90,7 @@ describe("Wiki API", () => {
     const res = await supertest(app.server).get(`/api/wiki/${page.id}`).expect(200);
 
     expect(res.body.content).toBe("# Detail");
+    expect(res.body).not.toHaveProperty("projectId");
   });
 
   it("Breadcrumb-Reihenfolge ist Root zuerst", async () => {
@@ -134,6 +140,12 @@ describe("Wiki API", () => {
     expect(fs.existsSync(resolveStoredContentPath(res.body.contentPath))).toBe(true);
   });
 
+  it("PATCH mit projectId wird abgewiesen", async () => {
+    const page = await createWikiPage(app, { title: "Wiki Project Legacy" });
+
+    await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ projectId: 1, expectedVersion: page.version }).expect(400);
+  });
+
   it("GET /api/wiki gibt Root-Seiten und ChildCount zurück", async () => {
     const root = await createWikiPage(app, { title: "Root List" });
     await createWikiPage(app, { title: "Child List", parentId: root.id });
@@ -143,6 +155,7 @@ describe("Wiki API", () => {
     expect(res.body).toHaveLength(1);
     expect(res.body[0].childCount).toBe(1);
     expect(res.body[0].content).toBeUndefined();
+    expect(res.body[0]).not.toHaveProperty("projectId");
   });
 
   it("Unbekannte Parent-Seite liefert 404", async () => {

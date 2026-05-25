@@ -12,7 +12,7 @@ import type {
   TicketStatus,
   TicketType,
 } from "@taskmanager/shared-types";
-import { ClipboardList, ListChecks, Paperclip, StickyNote } from "lucide-react";
+import { ClipboardList, ListChecks } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DraftFile } from "../../types";
@@ -57,7 +57,6 @@ import { Pill } from "../ui/Pill";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
-import { SectionHeader } from "../ui/SectionHeader";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusPill } from "../ui/StatusPill";
@@ -424,7 +423,7 @@ export function TaskForm({
 
         {activeTab === "details" ? (
           <>
-            <Section title="Basisdaten">
+            <Section>
               <div className="grid gap-4">
                 <FormField label="Titel" required>
                   <Input
@@ -477,7 +476,7 @@ export function TaskForm({
         ) : null}
 
         {activeTab === "subtasks" ? (
-          <Section title="Subtasks">
+          <Section>
             {task && loadedTask ? (
               <SubtaskList
                 subtasks={loadedTask.subtasks}
@@ -553,7 +552,7 @@ export function TaskForm({
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets" fill={Boolean(ticketOwner)}>
+          <Section fill={Boolean(ticketOwner)}>
             {ticketOwner ? (
               <OwnerTicketBoard owner={ticketOwner} />
             ) : (
@@ -604,7 +603,7 @@ export function TaskForm({
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section title="Kommentare">
+          <Section>
             {task && loadedTask ? (
               <CommentThread
                 comments={loadedTask.comments}
@@ -656,10 +655,6 @@ export function TaskForm({
 
         {activeTab === "notes" ? (
           <Section>
-            <div className="mb-4 flex items-center gap-2">
-              <StickyNote size={18} className="text-fern" />
-              <SectionHeader title="Notizen" />
-            </div>
             {task ? (
               <>
                 <NoteList
@@ -716,10 +711,6 @@ export function TaskForm({
 
         {activeTab === "attachments" ? (
           <Section>
-            <div className="mb-4 flex items-center gap-2">
-              <Paperclip size={18} className="text-fern" />
-              <SectionHeader title="Dateien" />
-            </div>
             {task ? (
               <div className="grid gap-4">
                 <AttachmentUploader size="sm" onUpload={uploadAttachment} />
@@ -776,7 +767,7 @@ export function TaskForm({
         ) : null}
 
         {activeTab === "journal" && task ? (
-          <Section title="Journal" fill>
+          <Section fill>
             <JournalPanel objectType="task" objectId={task.id} />
           </Section>
         ) : null}

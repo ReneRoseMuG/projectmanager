@@ -20,9 +20,8 @@ import {
   Flag,
   FolderKanban,
   Inbox,
+  Link2,
   ListTodo,
-  Paperclip,
-  StickyNote,
   Trash2,
 } from "lucide-react";
 import type { FormEvent } from "react";
@@ -47,7 +46,6 @@ import { useProjectFeatureLinks } from "../../hooks/useDocLinks";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
-import { useWikiImport } from "../../hooks/useWikiImport";
 import { objectReference } from "../../lib/references";
 import { invalidateTags } from "../../queries/invalidation";
 import {
@@ -61,7 +59,6 @@ import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { BacklogListBoardView } from "../backlog/BacklogListBoardView";
 import { ProjectDashboard } from "../dashboard/DashboardView";
 import { ProjectFeaturePanel } from "../features/ProjectFeaturePanel";
-import { WikiImportPanel } from "../imports/WikiImportPanel";
 import { JournalPanel } from "../journal/JournalPanel";
 import { MilestoneListBoardView } from "../milestones/MilestoneListBoardView";
 import { NoteEditor } from "../notes/NoteEditor";
@@ -89,7 +86,6 @@ import { PendingRelationList } from "../ui/PendingRelationList";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
-import { SectionHeader } from "../ui/SectionHeader";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusToggle } from "../ui/StatusToggle";
@@ -132,8 +128,7 @@ export type ProjectFormTab =
   | "notes"
   | "attachments"
   | "backlog"
-  | "journal"
-  | "import";
+  | "journal";
 
 const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "overview", label: "Übersicht" },
@@ -147,7 +142,6 @@ const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "attachments", label: "Dateien" },
   { value: "backlog", label: "Backlog" },
   { value: "journal", label: "Journal" },
-  { value: "import", label: "Import" },
 ];
 
 export function parseProjectFormTab(
@@ -216,7 +210,6 @@ export function ProjectForm({
     projectId ? { type: "project", id: projectId } : null,
   );
   const comments = useEntityComments("project", projectId);
-  const wikiImport = useWikiImport(projectId);
   const [activeTab, setActiveTab] = useState<ProjectFormTab>("details");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -231,7 +224,6 @@ export function ProjectForm({
     useState<ViewMode>("kanban");
   const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
   const canReadJournal = useHasPermission("journal", "read");
   const canCreateTasks = useHasPermission("tasks", "write");
   const canCreateTickets = useHasPermission("tickets", "write");
@@ -253,6 +245,12 @@ export function ProjectForm({
   const createTicketOwner = createTicketForMilestone ? { type: "milestone" as const, id: createTicketForMilestone.id } : null;
   const milestoneTaskActions = useTasks(createTaskOwner);
   const milestoneTicketActions = useTickets(createTicketOwner);
+  const featureLinkExcludeIds = project
+    ? featureLinks.features.map((feature) => feature.id)
+    : pendingFeatures.map((feature) => feature.id);
+  const hasAvailableFeaturesToLink = allFeatures.features.some(
+    (feature) => !featureLinkExcludeIds.includes(feature.id),
+  );
 
   const handleTabChange = (nextTab: ProjectFormTab) => {
     setActiveTab(nextTab);
@@ -561,38 +559,6 @@ export function ProjectForm({
     }
   };
 
-  const previewWikiImport = async () => {
-    try {
-      const report = await wikiImport.previewImport(wikiImportSourcePath);
-      if (report) {
-        showToast({ tone: "success", title: "Import-Vorschau erstellt" });
-      }
-    } catch (importError) {
-      showToast({
-        tone: "error",
-        title: "Import-Vorschau fehlgeschlagen",
-        message: errorMessage(importError),
-      });
-    }
-  };
-
-  const runWikiImport = async () => {
-    try {
-      const report = await wikiImport.runImport(wikiImportSourcePath);
-      if (report) {
-        await allFeatures.reload();
-        await featureLinks.reload();
-        showToast({ tone: "success", title: "Wiki importiert" });
-      }
-    } catch (importError) {
-      showToast({
-        tone: "error",
-        title: "Wiki-Import fehlgeschlagen",
-        message: errorMessage(importError),
-      });
-    }
-  };
-
   const updateProjectFeatureStatus = async (
     feature: Feature,
     status: Feature["status"],
@@ -612,10 +578,42 @@ export function ProjectForm({
     }
   };
 
+  const linkFeature = async (targetFeature: Feature) => {
+    if (!projectId) {
+      setPendingFeatures((items) =>
+        items.some((feature) => feature.id === targetFeature.id)
+          ? items
+          : [...items, targetFeature],
+      );
+      return true;
+    }
+
+    const currentFeatureIds = featureLinks.features.map((feature) => feature.id);
+    if (currentFeatureIds.includes(targetFeature.id)) {
+      return true;
+    }
+
+    try {
+      await featureLinks.setFeaturesForProject([
+        ...currentFeatureIds,
+        targetFeature.id,
+      ]);
+      showToast({ tone: "success", title: "Feature verknüpft" });
+      return true;
+    } catch (featureError) {
+      showToast({
+        tone: "error",
+        title: "Feature konnte nicht verknüpft werden",
+        message: errorMessage(featureError),
+      });
+      return false;
+    }
+  };
+
   const visibleTabs = project
     ? baseTabs.filter((tab) => tab.value !== "journal" || canReadJournal)
     : baseTabs.filter(
-        (tab) => tab.value !== "overview" && tab.value !== "import" && tab.value !== "journal",
+        (tab) => tab.value !== "overview" && tab.value !== "journal",
       );
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
@@ -750,7 +748,7 @@ export function ProjectForm({
 
         {activeTab === "details" ? (
           <>
-            <Section title="Stammdaten">
+            <Section>
               <div className="grid gap-4">
                 <FormField label="Projektname" required className="min-w-0">
                   <Input
@@ -801,7 +799,7 @@ export function ProjectForm({
         ) : null}
 
         {activeTab === "milestones" ? (
-          <Section title="Meilensteine" fill={Boolean(project)}>
+          <Section fill={Boolean(project)}>
             {project ? (
               <MilestoneListBoardView
                 milestones={milestones.milestones}
@@ -836,7 +834,7 @@ export function ProjectForm({
         ) : null}
 
         {activeTab === "features" ? (
-          <Section title="Features" fill={Boolean(project)}>
+          <Section fill={Boolean(project)}>
             {project ? (
               featureLinks.loading ? (
                 <TaskListSkeleton />
@@ -856,6 +854,17 @@ export function ProjectForm({
                     )
                   }
                   onStatusChange={updateProjectFeatureStatus}
+                  secondaryAction={
+                    <Button
+                      aria-label="Feature verknüpfen"
+                      title="Feature verknüpfen"
+                      variant="secondary"
+                      icon={<Link2 size={17} />}
+                      className="h-9 w-9 bg-transparent px-0"
+                      disabled={allFeatures.loading || !hasAvailableFeaturesToLink}
+                      onClick={() => setFeatureLinkOpen(true)}
+                    />
+                  }
                 />
               )
             ) : (
@@ -881,7 +890,7 @@ export function ProjectForm({
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section title="Aufgaben" fill={Boolean(project)}>
+          <Section fill={Boolean(project)}>
             {project ? (
               <OwnerTaskBoard owner={{ type: "project", id: project.id }} />
             ) : (
@@ -932,7 +941,7 @@ export function ProjectForm({
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets" fill={Boolean(project)}>
+          <Section fill={Boolean(project)}>
             {project ? (
               <OwnerTicketBoard owner={{ type: "project", id: project.id }} />
             ) : (
@@ -983,7 +992,7 @@ export function ProjectForm({
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section title="Kommentare">
+          <Section>
             {project ? (
               <CommentThread
                 comments={comments.comments}
@@ -1009,10 +1018,6 @@ export function ProjectForm({
 
         {activeTab === "notes" ? (
           <Section>
-            <div className="mb-4 flex items-center gap-2">
-              <StickyNote size={18} className="text-fern" />
-              <SectionHeader title="Notizen" />
-            </div>
             {project ? (
               <>
                 <NoteList
@@ -1044,10 +1049,6 @@ export function ProjectForm({
 
         {activeTab === "attachments" ? (
           <Section>
-            <div className="mb-4 flex items-center gap-2">
-              <Paperclip size={18} className="text-fern" />
-              <SectionHeader title="Dateien" />
-            </div>
             {project ? (
               <div className="grid gap-4">
                 <AttachmentUploader onUpload={uploadAttachment} />
@@ -1077,7 +1078,7 @@ export function ProjectForm({
         ) : null}
 
         {activeTab === "backlog" ? (
-          <Section title="Backlog" fill={Boolean(project)}>
+          <Section fill={Boolean(project)}>
             {project ? (
               backlog.loading || allFeatures.loading ? (
                 <TaskListSkeleton />
@@ -1112,20 +1113,8 @@ export function ProjectForm({
           </Section>
         ) : null}
 
-        {activeTab === "import" && project ? (
-          <WikiImportPanel
-            sourcePath={wikiImportSourcePath}
-            report={wikiImport.preview}
-            loading={wikiImport.loading}
-            error={wikiImport.error}
-            onSourcePathChange={setWikiImportSourcePath}
-            onPreview={() => void previewWikiImport()}
-            onRun={() => void runWikiImport()}
-          />
-        ) : null}
-
         {activeTab === "journal" && project ? (
-          <Section title="Journal" fill>
+          <Section fill>
             <JournalPanel objectType="project" objectId={project.id} />
           </Section>
         ) : null}
@@ -1134,8 +1123,8 @@ export function ProjectForm({
       <FeatureLinkDialog
         open={featureLinkOpen}
         features={allFeatures.features}
-        excludeIds={pendingFeatures.map((feature) => feature.id)}
-        onLink={(feature) => setPendingFeatures((items) => [...items, feature])}
+        excludeIds={featureLinkExcludeIds}
+        onLink={linkFeature}
         onClose={() => setFeatureLinkOpen(false)}
       />
       <TaskLinkDialog
@@ -1222,7 +1211,7 @@ function FeatureLinkDialog({
   open: boolean;
   features: Feature[];
   excludeIds: number[];
-  onLink: (feature: Feature) => void;
+  onLink: (feature: Feature) => Promise<boolean>;
   onClose: () => void;
 }) {
   const [selectedFeatureId, setSelectedFeatureId] = useState<number | "">("");
@@ -1237,7 +1226,7 @@ function FeatureLinkDialog({
     }
   }, [firstFeatureId, open]);
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
     event.preventDefault();
     const feature = availableFeatures.find(
@@ -1246,13 +1235,15 @@ function FeatureLinkDialog({
     if (!feature) {
       return;
     }
-    onLink(feature);
-    onClose();
+    const linked = await onLink(feature);
+    if (linked) {
+      onClose();
+    }
   };
 
   return (
     <Modal open={open} title="Feature verknüpfen" size="md" onClose={onClose}>
-      <form className="grid gap-4" onSubmit={submit}>
+      <form className="grid gap-4" onSubmit={(event) => void submit(event)}>
         <Select
           label="Feature"
           value={selectedFeatureId}

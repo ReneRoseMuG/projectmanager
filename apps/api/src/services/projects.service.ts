@@ -1,7 +1,7 @@
 import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { projects, projectTasks, tasks } from "../db/schema.js";
+import { projects, projectTasks, tasks, wikiPages } from "../db/schema.js";
 import { projectRepository, type ProjectRecord } from "../repositories/project.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
@@ -27,14 +27,35 @@ interface ProjectTaskCounts {
   totalTaskCount: number;
 }
 
-const projectJournalFields: Array<JournalFieldDefinition<ProjectRecord>> = [
-  { key: "name", label: "Name" },
-  { key: "description", label: "Beschreibung" },
-  { key: "status", label: "Status" },
-  { key: "color", label: "Farbe" },
-  { key: "startDate", label: "Startdatum" },
-  { key: "dueDate", label: "Enddatum" }
-];
+function wikiPageLabel(database: DbClient, wikiPageId: unknown): string | null {
+  if (typeof wikiPageId !== "number") {
+    return null;
+  }
+  const page = database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)).get();
+  return page?.title ?? `Wiki-Seite ${wikiPageId}`;
+}
+
+function ensureWikiPageExists(database: DbClient, wikiPageId: number | null | undefined): void {
+  if (wikiPageId === undefined || wikiPageId === null) {
+    return;
+  }
+  const page = database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)).get();
+  if (!page) {
+    throw notFound(`Wiki page with id ${wikiPageId} not found`);
+  }
+}
+
+function projectJournalFields(database: DbClient): Array<JournalFieldDefinition<ProjectRecord>> {
+  return [
+    { key: "name", label: "Name" },
+    { key: "description", label: "Beschreibung" },
+    { key: "status", label: "Status" },
+    { key: "color", label: "Farbe" },
+    { key: "startDate", label: "Startdatum" },
+    { key: "dueDate", label: "Enddatum" },
+    { key: "wikiPageId", label: "Wiki-Startseite", format: (value) => wikiPageLabel(database, value) }
+  ];
+}
 
 function emptyProjectTaskCounts(): ProjectTaskCounts {
   return {
@@ -53,6 +74,7 @@ function mapProject(database: DbClient, record: ProjectRecord, counts: ProjectTa
     color: record.color,
     startDate: record.startDate,
     dueDate: record.dueDate,
+    wikiPageId: record.wikiPageId,
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -166,6 +188,10 @@ export function updateProject(database: DbClient, id: number, input: ProjectUpda
   if (input.dueDate !== undefined) {
     values.dueDate = cleanNullable(input.dueDate) ?? null;
   }
+  if (input.wikiPageId !== undefined) {
+    ensureWikiPageExists(database, input.wikiPageId);
+    values.wikiPageId = input.wikiPageId;
+  }
 
   if (Object.keys(values).length === 0) {
     throw badRequest("No project fields provided");
@@ -181,7 +207,7 @@ export function updateProject(database: DbClient, id: number, input: ProjectUpda
       throw notFound(`Project with id ${id} not found`);
     }
     const journalObject = makeJournalObject("project", project.id, project.name);
-    const changes = buildJournalChanges(current, project, projectJournalFields);
+    const changes = buildJournalChanges(current, project, projectJournalFields(tx));
     recordJournalEntry(tx, {
       operation: "update",
       object: journalObject,

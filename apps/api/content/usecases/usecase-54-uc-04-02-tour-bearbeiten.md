@@ -10,7 +10,7 @@
 <h2>Vorbedingungen</h2>
 <ul><li>Die Tour existiert.</li><li>Der Akteur ist berechtigt.</li></ul>
 <h2>Ablauf</h2>
-<p>1. Der Akteur öffnet die Tourenverwaltung.<br>2. Der Akteur wählt eine Tour.<br>3. Das System zeigt die Tourdetails.<br>4. Der Akteur ändert bei Bedarf den Namen.<br>5. Der Akteur ändert bei Bedarf die Farbe.<br>6. Der Akteur bestätigt die Änderung.<br>7. Das System speichert die Änderung.<br>8. Das System aktualisiert die betroffenen Sichten.</p>
+<ol><li>Der Akteur öffnet die Tourenverwaltung.</li><li>Der Akteur wählt eine Tour.</li><li>Das System zeigt die Tourdetails.</li><li>Der Akteur ändert bei Bedarf den Namen.</li><li>Der Akteur ändert bei Bedarf die Farbe.</li><li>Der Akteur bestätigt die Änderung.</li><li>Das System speichert die Änderung.</li><li>Das System aktualisiert die betroffenen Sichten.</li></ol>
 <h2>Alternativen</h2>
 <ul><li>Abbruch durch den Akteur: Es wird keine Änderung gespeichert.</li><li>Technischer Konflikt: Das System blockiert die Speicherung mit Fehlermeldung.</li></ul>
 <h2>Ergebnis</h2>

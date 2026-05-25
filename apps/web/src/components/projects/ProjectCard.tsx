@@ -13,7 +13,7 @@ interface ProjectCardProps {
   project: Project;
   variant?: "card" | "row";
   onEdit: (project: Project) => void;
-  onDelete: (project: Project) => void;
+  onDelete?: (project: Project) => void;
   onStatusChange?: (project: Project, status: Project["status"]) => void | Promise<unknown>;
   onCreateMilestone?: () => void;
   onCreateTask?: () => void;
@@ -57,7 +57,7 @@ export function ProjectCard({ project, variant = "card", onEdit, onDelete, onSta
       onOpen={() => onEdit(project)}
       onEdit={() => onEdit(project)}
       extraMenuItems={createMenuItems}
-      onDelete={() => onDelete(project)}
+      onDelete={onDelete ? () => onDelete(project) : undefined}
     />
   );
 }

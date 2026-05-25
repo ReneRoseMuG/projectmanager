@@ -11,6 +11,13 @@ import { buildTestApp, createProject, createTask, createTestDb, truncateAll, typ
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function insertWikiPage(testDb: TestDb, title = "Projekt-Wiki"): number {
+  const result = testDb.sqlite
+    .prepare("INSERT INTO wiki_pages (title, sort_order, version, created_at, updated_at) VALUES (?, 0, 1, datetime('now'), datetime('now'))")
+    .run(title);
+  return Number(result.lastInsertRowid);
+}
+
 describe("Projects API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
@@ -119,6 +126,42 @@ describe("Projects API", () => {
 
     expect(res.body.name).toBe("Aktualisiert");
     expect(res.body.status).toBe("on_hold");
+  });
+
+  it("PATCH /api/projects/:id setzt Wiki-Startseite", async () => {
+    const project = await createProject(app);
+    const wikiPageId = insertWikiPage(testDb, "Projektstart");
+
+    const res = await supertest(app.server).patch(`/api/projects/${project.id}`).send({ wikiPageId, expectedVersion: project.version }).expect(200);
+
+    expect(res.body.wikiPageId).toBe(wikiPageId);
+  });
+
+  it("PATCH /api/projects/:id mit unbekannter Wiki-Startseite gibt 404 zurueck", async () => {
+    const project = await createProject(app);
+
+    await supertest(app.server).patch(`/api/projects/${project.id}`).send({ wikiPageId: 9999, expectedVersion: project.version }).expect(404);
+  });
+
+  it("PATCH /api/projects/:id loest Wiki-Startseite", async () => {
+    const project = await createProject(app);
+    const wikiPageId = insertWikiPage(testDb, "Zu loesen");
+    const linked = await supertest(app.server).patch(`/api/projects/${project.id}`).send({ wikiPageId, expectedVersion: project.version }).expect(200);
+
+    const res = await supertest(app.server).patch(`/api/projects/${project.id}`).send({ wikiPageId: null, expectedVersion: linked.body.version }).expect(200);
+
+    expect(res.body.wikiPageId).toBeNull();
+  });
+
+  it("DELETE /api/wiki/:id setzt Projekt-Wiki-Startseite auf null", async () => {
+    const project = await createProject(app);
+    const wikiPageId = insertWikiPage(testDb, "Cascade Wiki");
+    await supertest(app.server).patch(`/api/projects/${project.id}`).send({ wikiPageId, expectedVersion: project.version }).expect(200);
+
+    await supertest(app.server).delete(`/api/wiki/${wikiPageId}`).expect(204);
+
+    const res = await supertest(app.server).get(`/api/projects/${project.id}`).expect(200);
+    expect(res.body.wikiPageId).toBeNull();
   });
 
   it("PATCH /api/projects/:id mit unbekannter ID gibt 404 zurueck", async () => {

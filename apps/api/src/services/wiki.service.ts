@@ -1,7 +1,5 @@
 import type { JsonValue } from "@taskmanager/shared-types";
-import { eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { projects } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { wikiPageRepository, type WikiPageRecord, type WikiPageUpdateData } from "../repositories/wiki-page.repository.js";
@@ -31,7 +29,6 @@ import {
 
 export interface WikiPageInput {
   parentId?: number | null;
-  projectId?: number | null;
   title?: string;
   content?: string;
   sortOrder?: number;
@@ -41,7 +38,6 @@ export interface WikiPageInput {
 export interface WikiPageDto {
   id: number;
   parentId: number | null;
-  projectId: number | null;
   title: string;
   content?: string;
   contentPath: string | null;
@@ -66,7 +62,6 @@ function mapWikiPage(record: WikiPageRecord, childCount: number, content?: strin
   return {
     id: record.id,
     parentId: record.parentId,
-    projectId: record.projectId,
     title: record.title,
     content,
     contentPath: record.contentPath,
@@ -102,25 +97,6 @@ function ensureParentExists(database: DbClient, parentId: number | null | undefi
     throw badRequest("A wiki page cannot be its own parent");
   }
   getWikiPageRecord(database, parentId);
-}
-
-function ensureProjectExists(database: DbClient, projectId: number | null | undefined): void {
-  if (projectId === undefined || projectId === null) {
-    return;
-  }
-
-  const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
-  if (!project) {
-    throw notFound(`Project with id ${projectId} not found`);
-  }
-}
-
-function getProjectJournalObject(database: DbClient, projectId: number): JournalObjectRef {
-  const project = database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, projectId)).get();
-  if (!project) {
-    throw notFound(`Project with id ${projectId} not found`);
-  }
-  return makeJournalObject("project", project.id, project.name);
 }
 
 function readWikiContent(record: WikiPageRecord): string {
@@ -159,10 +135,7 @@ function buildContentChange(before: string, after: string): JournalChangeCreateD
 }
 
 function wikiContexts(database: DbClient, record: WikiPageRecord) {
-  return [
-    ...(record.projectId ? [makeJournalContext(getProjectJournalObject(database, record.projectId), "owner" as const)] : []),
-    ...(record.parentId ? [makeJournalContext(wikiJournalObject(getWikiPageRecord(database, record.parentId)), "parent" as const)] : [])
-  ];
+  return [...(record.parentId ? [makeJournalContext(wikiJournalObject(getWikiPageRecord(database, record.parentId)), "parent" as const)] : [])];
 }
 
 export function listRootWikiPages(database: DbClient): WikiPageDto[] {
@@ -182,13 +155,11 @@ export function getWikiPage(database: DbClient, id: number): WikiPageDto {
 export function createWikiPage(database: DbClient, input: WikiPageInput, actor?: JournalActor | null): WikiPageDto {
   const title = requireNonEmpty(input.title, "title");
   ensureParentExists(database, input.parentId);
-  ensureProjectExists(database, input.projectId);
 
   const created = wikiPageRepository.create(
     database,
     {
       parentId: input.parentId ?? null,
-      projectId: input.projectId ?? null,
       title,
       contentPath: null,
       sortOrder: input.sortOrder ?? 0
@@ -242,10 +213,6 @@ export function updateWikiPage(database: DbClient, id: number, input: WikiPageIn
     ensureParentExists(database, input.parentId, id);
     values.parentId = input.parentId;
   }
-  if (input.projectId !== undefined) {
-    ensureProjectExists(database, input.projectId);
-    values.projectId = input.projectId;
-  }
   if (input.sortOrder !== undefined) {
     values.sortOrder = input.sortOrder;
   }
@@ -277,11 +244,6 @@ export function updateWikiPage(database: DbClient, id: number, input: WikiPageIn
       throw notFound(`Wiki page with id ${id} not found`);
     }
     const relationFields: Array<JournalFieldDefinition<WikiPageRecord>> = [
-      {
-        key: "projectId",
-        label: "Projekt",
-        format: (value) => (typeof value === "number" ? getProjectJournalObject(database, value).label : null)
-      },
       {
         key: "parentId",
         label: "Übergeordnete Wiki-Seite",

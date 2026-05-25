@@ -76,7 +76,7 @@ interface UseCaseFormProps {
 export type UseCaseFormTab = "details" | "tasks" | "tickets" | "comments" | "journal";
 
 const tabs: Array<Tab<UseCaseFormTab>> = [
-  { value: "details", label: "Stammdaten" },
+  { value: "details", label: "Details" },
   { value: "tasks", label: "Aufgaben" },
   { value: "tickets", label: "Tickets" },
   { value: "comments", label: "Kommentare" },
@@ -371,7 +371,7 @@ export function UseCaseForm({
       >
         {activeTab === "details" ? (
           <>
-            <Section title="Stammdaten">
+            <Section>
               <FormField label="Titel" required className="min-w-0">
                 <Input
                   autoFocus
@@ -453,7 +453,7 @@ export function UseCaseForm({
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section title="Aufgaben" fill={Boolean(taskOwner)}>
+          <Section fill={Boolean(taskOwner)}>
             {taskOwner ? (
               <OwnerTaskBoard owner={taskOwner} />
             ) : (
@@ -504,7 +504,7 @@ export function UseCaseForm({
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets" fill={Boolean(ticketOwner)}>
+          <Section fill={Boolean(ticketOwner)}>
             {ticketOwner ? (
               <OwnerTicketBoard owner={ticketOwner} />
             ) : (
@@ -555,7 +555,7 @@ export function UseCaseForm({
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section title="Kommentare">
+          <Section>
             {useCase ? (
               <>
                 {comments.error ? (
@@ -587,7 +587,7 @@ export function UseCaseForm({
         ) : null}
 
         {activeTab === "journal" && useCase ? (
-          <Section title="Journal" fill>
+          <Section fill>
             <JournalPanel objectType="useCase" objectId={useCase.id} />
           </Section>
         ) : null}

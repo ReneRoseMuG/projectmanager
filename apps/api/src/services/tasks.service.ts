@@ -436,7 +436,14 @@ function listDashboardTasks(database: DbClient, owner?: DashboardTaskOwner): Tas
     return listSubtasks(database, owner.id);
   }
   if (owner.type === "project") {
-    return listOwnerTasks(database, { type: "project", id: owner.id });
+    const seen = new Set<number>();
+    return listOwnerTasks(database, { type: "project", id: owner.id }).filter((task) => {
+      if (seen.has(task.id)) {
+        return false;
+      }
+      seen.add(task.id);
+      return true;
+    });
   }
   return listOwnerTasks(database, { type: "milestone", id: owner.id });
 }

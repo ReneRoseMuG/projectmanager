@@ -341,15 +341,16 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(testDb.db.select().from(projectEvents).where(eq(projectEvents.eventId, eventId)).all()).toHaveLength(0);
     });
 
-    it("setzt projectId bei WikiPages auf null (WikiPages bleiben erhalten)", async () => {
+    it("behält WikiPage beim Löschen des verknüpften Projekts", async () => {
       const project = await createProject(app);
-      const wiki = await createWikiPage(app, { projectId: project.id });
+      const wiki = await createWikiPage(app);
+      await supertest(app.server).patch(`/api/projects/${project.id}`).send({ wikiPageId: wiki.id, expectedVersion: project.version }).expect(200);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
       const remaining = testDb.db.select().from(wikiPages).where(eq(wikiPages.id, wiki.id)).all();
       expect(remaining).toHaveLength(1);
-      expect(remaining[0].projectId).toBeNull();
+      expect(remaining[0].title).toBe(wiki.title);
     });
 
     it("entfernt project_features-Einträge, Feature selbst bleibt erhalten", async () => {

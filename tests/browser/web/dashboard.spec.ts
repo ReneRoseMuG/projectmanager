@@ -53,7 +53,8 @@ test.describe("Dashboards", () => {
 
       await expect(page.getByRole("button", { name: "Übersicht" })).toBeVisible();
       await page.getByRole("button", { name: "Übersicht" }).click();
-      await expect(page.getByRole("heading", { name: "Projektübersicht" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Tab-Editor" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Projektübersicht" })).toHaveCount(0);
       await expect(page.getByTestId("dashboard-widget-milestoneProgress")).toContainText(milestone.name);
       await expect(page.getByTestId("dashboard-widget-taskJournal")).toContainText(task.title);
       await expect(page.getByTestId("dashboard-widget-ticketJournal")).toContainText(ticket.title);
@@ -65,8 +66,9 @@ test.describe("Dashboards", () => {
   });
 
   test("speichert ein per Drag sortiertes persönliches Dashboard", async ({ page, request }) => {
-    await authenticatedGoto(page, "/dashboard");
+    await authenticatedGoto(page, "/");
 
+    await page.getByRole("button", { name: "Tab-Editor" }).click();
     await page.getByRole("button", { name: "Neues Dashboard" }).click();
     await expect(page.getByRole("heading", { name: "Dashboard-Editor" })).toBeVisible();
 

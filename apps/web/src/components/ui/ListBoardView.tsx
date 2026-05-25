@@ -19,7 +19,7 @@ import type {
   CatalogEntry,
   StatusCatalogKind,
 } from "@taskmanager/shared-types";
-import { CirclePlus, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import type { ViewMode } from "../../types";
@@ -54,6 +54,7 @@ interface ListBoardViewProps<T> {
   onAdd: () => void;
   onAddToColumn?: (status: string) => void;
   addLabel?: string;
+  showToolbar?: boolean;
   showToolbarAdd?: boolean;
   secondaryAction?: ReactNode;
   statusKey?: keyof T;
@@ -558,6 +559,7 @@ function ListBoardViewContent<T>({
   onAdd,
   onAddToColumn,
   addLabel = "Neu",
+  showToolbar = true,
   showToolbarAdd = true,
   secondaryAction,
   statusKey,
@@ -794,6 +796,7 @@ function ListBoardViewContent<T>({
       className="flex h-full min-h-[30rem] w-full min-w-0 flex-1 flex-col gap-4"
       data-testid="list-board-view"
     >
+      {showToolbar ? (
       <div className="grid w-full gap-3">
         <div className={`grid w-full grid-cols-1 items-center gap-3 ${toolbarFilters ? "md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]" : "md:grid-cols-[minmax(0,1fr)_auto]"}`}>
           <div className="flex min-w-0 justify-start">
@@ -807,7 +810,6 @@ function ListBoardViewContent<T>({
             </div>
           ) : null}
           <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 md:justify-end">
-            {secondaryAction}
             <ViewToggle
               value={toViewMode(mode)}
               onChange={(value) => onModeChange(toListBoardMode(value))}
@@ -822,6 +824,7 @@ function ListBoardViewContent<T>({
                 onClick={onAdd}
               />
             ) : null}
+            {secondaryAction}
           </div>
         </div>
         {filters ? (
@@ -830,6 +833,7 @@ function ListBoardViewContent<T>({
           </div>
         ) : null}
       </div>
+      ) : null}
 
       <div className="flex h-full min-h-0 w-full flex-1 flex-col">
         {loading ? <TaskListSkeleton /> : null}

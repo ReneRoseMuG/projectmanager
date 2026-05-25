@@ -10,7 +10,7 @@
 <h2>Vorbedingungen</h2>
 <ul><li>Die Tour existiert.</li><li>Der Akteur ist berechtigt.</li><li>Der Tour sind keine Termine zugeordnet.</li></ul>
 <h2>Ablauf</h2>
-<p>1. Der Akteur öffnet die Tourenverwaltung.<br>2. Der Akteur wählt eine Tour.<br>3. Der Akteur löst die Löschung aus.<br>4. Das System prüft erneut, ob Termine auf die Tour verweisen.<br>5. Das System löscht die Tour.<br>6. Das System löscht kaskadierend alle Tour-KW-Mitarbeiterzuordnungen.<br>7. Das System aktualisiert die betroffenen Sichten.</p>
+<ol><li>Der Akteur öffnet die Tourenverwaltung.</li><li>Der Akteur wählt eine Tour.</li><li>Der Akteur löst die Löschung aus.</li><li>Das System prüft erneut, ob Termine auf die Tour verweisen.</li><li>Das System löscht die Tour.</li><li>Das System löscht kaskadierend alle Tour-KW-Mitarbeiterzuordnungen.</li><li>Das System aktualisiert die betroffenen Sichten.</li></ol>
 <h2>Alternativen</h2>
 <ul><li>Die Tour enthält Termine: Das System blockiert die Löschung, die Tour bleibt erhalten.</li><li>Abbruch durch den Akteur: Es wird nichts gelöscht.</li></ul>
 <h2>Ergebnis</h2>

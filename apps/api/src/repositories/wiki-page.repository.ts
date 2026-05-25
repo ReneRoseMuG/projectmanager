@@ -5,7 +5,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type WikiPageRecord = typeof wikiPages.$inferSelect;
 export type WikiPageCreateData = Omit<typeof wikiPages.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type WikiPageUpdateData = Partial<Pick<WikiPageCreateData, "parentId" | "projectId" | "title" | "contentPath" | "sortOrder">>;
+export type WikiPageUpdateData = Partial<Pick<WikiPageCreateData, "parentId" | "title" | "contentPath" | "sortOrder">>;
 
 function nowIso(): string {
   return new Date().toISOString();

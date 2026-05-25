@@ -8,7 +8,7 @@
 <h2>Vorbedingungen</h2>
 <ul><li>Die Tour existiert.</li><li>Zwei berechtigte Akteure bearbeiten dieselbe Tour gleichzeitig.</li></ul>
 <h2>Ablauf</h2>
-<p>1. Akteur A öffnet die Tour.<br>2. Akteur B öffnet dieselbe Tour.<br>3. Akteur A ändert die Farbe und speichert.<br>4. Das System speichert die Änderung und erhöht die Version.<br>5. Akteur B speichert auf Basis des alten Versionsstands.<br>6. Das System erkennt den Versionskonflikt und blockiert die Speicherung.</p>
+<ol><li>Akteur A öffnet die Tour.</li><li>Akteur B öffnet dieselbe Tour.</li><li>Akteur A ändert die Farbe und speichert.</li><li>Das System speichert die Änderung und erhöht die Version.</li><li>Akteur B speichert auf Basis des alten Versionsstands.</li><li>Das System erkennt den Versionskonflikt und blockiert die Speicherung.</li></ol>
 <h2>Alternativen</h2>
 <ul><li>Akteur B speichert zuerst: Akteur A erhält bei späterem Speichern den Versionskonflikt.</li><li>Einer der Akteure bricht ab: Es wird nur die bestätigte Änderung gespeichert.</li></ul>
 <h2>Ergebnis</h2>

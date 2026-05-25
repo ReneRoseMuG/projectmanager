@@ -513,6 +513,16 @@ function listDashboardTickets(database: DbClient, owner?: DashboardTicketOwner):
   if (!owner) {
     return listTickets(database);
   }
+  if (owner.type === "project") {
+    const seen = new Set<number>();
+    return listOwnerTickets(database, owner).filter((ticket) => {
+      if (seen.has(ticket.id)) {
+        return false;
+      }
+      seen.add(ticket.id);
+      return true;
+    });
+  }
   return listOwnerTickets(database, owner);
 }
 

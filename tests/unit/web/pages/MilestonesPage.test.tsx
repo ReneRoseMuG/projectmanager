@@ -43,6 +43,7 @@ const hookMocks = vi.hoisted(() => ({
       color: null,
       startDate: null,
       dueDate: null,
+      wikiPageId: null,
       version: 1,
       createdAt: "2026-05-24T08:00:00.000Z",
       updatedAt: "2026-05-24T08:00:00.000Z",

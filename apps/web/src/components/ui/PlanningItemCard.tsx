@@ -25,7 +25,7 @@ interface PlanningItemCardProps {
   extraMenuItems?: ActionMenuItem[];
   onOpen: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
 }
 
 function progressValue(stats: PlanningTaskStats) {
@@ -66,6 +66,14 @@ function PlanningHeader({ title, subtitle, pills }: Pick<PlanningItemCardProps, 
   );
 }
 
+function actionItems(onEdit: () => void, extraMenuItems: ActionMenuItem[], onDelete?: () => void): ActionMenuItem[] {
+  return [
+    { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: onEdit },
+    ...extraMenuItems,
+    ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: onDelete, danger: true }] : []),
+  ];
+}
+
 export function PlanningItemCard({ title, description, accentColor, objectReference, icon, subtitle, pills, footerMeta, taskStats, variant = "card", extraMenuItems = [], onOpen, onEdit, onDelete }: PlanningItemCardProps) {
   if (variant === "row") {
     return (
@@ -100,11 +108,7 @@ export function PlanningItemCard({ title, description, accentColor, objectRefere
             actions={
               <ActionMenu
                 objectReference={objectReference}
-                items={[
-                  { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: onEdit },
-                  ...extraMenuItems,
-                  { label: "Löschen", icon: <Trash2 size={16} />, onClick: onDelete, danger: true }
-                ]}
+                items={actionItems(onEdit, extraMenuItems, onDelete)}
               />
             }
             actionsIncludeObjectReference

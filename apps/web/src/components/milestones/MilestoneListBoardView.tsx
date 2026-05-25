@@ -22,6 +22,7 @@ interface MilestoneListBoardViewProps {
   onCreateTask?: (milestone: Milestone) => void;
   onCreateTicket?: (milestone: Milestone) => void;
   filters?: ReactNode;
+  readOnly?: boolean;
 }
 
 function toListBoardMode(viewMode: ViewMode): ListBoardMode {
@@ -41,7 +42,7 @@ function matchesSearch(milestone: Milestone, searchValue: string) {
   return milestone.name.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
-export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onDelete, onStatusChange, onDueDateChange, onCreateTask, onCreateTicket, filters }: MilestoneListBoardViewProps) {
+export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onDelete, onStatusChange, onDueDateChange, onCreateTask, onCreateTicket, filters, readOnly = false }: MilestoneListBoardViewProps) {
   const catalogs = useCatalogs();
   const [internalViewMode, setInternalViewMode] = useState<ViewMode>("kanban");
   const [searchValue, setSearchValue] = useState("");
@@ -64,6 +65,9 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
   }));
 
   const changeMode = (mode: ListBoardMode) => {
+    if (readOnly) {
+      return;
+    }
     const nextViewMode = toViewMode(mode);
     if (viewMode === undefined) {
       setInternalViewMode(nextViewMode);
@@ -77,27 +81,29 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
       mode={toListBoardMode(currentViewMode)}
       onModeChange={changeMode}
       onAdd={onCreate}
-      onAddToColumn={onCreate}
+      onAddToColumn={readOnly ? undefined : onCreate}
       addLabel="Neuer Meilenstein"
+      showToolbar={!readOnly}
+      showToolbarAdd={!readOnly}
       statusKey="status"
       statusCatalogKind="workStatus"
       statusColumns={statusColumns}
-      onItemStatusChange={onStatusChange ? (milestone, status) => onStatusChange(milestone, status as Milestone["status"]) : undefined}
+      onItemStatusChange={!readOnly && onStatusChange ? (milestone, status) => onStatusChange(milestone, status as Milestone["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       toolbarFilters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={milestones.length} />}
-      filters={filters}
+      filters={readOnly ? undefined : filters}
       loading={loading}
       emptyState={<EmptyState icon={<Flag size={22} />} title="Keine Meilensteine" body="Lege Meilensteine an, um Projektziele und abhängige Arbeit zu bündeln." tone="teal" variant="tinted" />}
       renderCard={(milestone) => (
         <MilestoneCard
           milestone={milestone}
           onEdit={onEdit}
-          onDelete={onDelete}
-          onStatusChange={onStatusChange}
-          onDueDateChange={onDueDateChange}
-          onCreateTask={onCreateTask ? () => onCreateTask(milestone) : undefined}
-          onCreateTicket={onCreateTicket ? () => onCreateTicket(milestone) : undefined}
+          onDelete={readOnly ? undefined : onDelete}
+          onStatusChange={readOnly ? undefined : onStatusChange}
+          onDueDateChange={readOnly ? undefined : onDueDateChange}
+          onCreateTask={!readOnly && onCreateTask ? () => onCreateTask(milestone) : undefined}
+          onCreateTicket={!readOnly && onCreateTicket ? () => onCreateTicket(milestone) : undefined}
         />
       )}
       renderRow={(milestone) => (
@@ -105,11 +111,11 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
           milestone={milestone}
           variant="row"
           onEdit={onEdit}
-          onDelete={onDelete}
-          onStatusChange={onStatusChange}
-          onDueDateChange={onDueDateChange}
-          onCreateTask={onCreateTask ? () => onCreateTask(milestone) : undefined}
-          onCreateTicket={onCreateTicket ? () => onCreateTicket(milestone) : undefined}
+          onDelete={readOnly ? undefined : onDelete}
+          onStatusChange={readOnly ? undefined : onStatusChange}
+          onDueDateChange={readOnly ? undefined : onDueDateChange}
+          onCreateTask={!readOnly && onCreateTask ? () => onCreateTask(milestone) : undefined}
+          onCreateTicket={!readOnly && onCreateTicket ? () => onCreateTicket(milestone) : undefined}
         />
       )}
     />

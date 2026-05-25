@@ -17,6 +17,8 @@ interface ProjectListBoardViewProps {
   onCreateTicket?: (project: Project) => void;
   filters?: ReactNode;
   showToolbarAdd?: boolean;
+  readOnly?: boolean;
+  viewMode?: ListBoardMode;
 }
 
 function matchesSearch(project: Project, searchValue: string) {
@@ -41,6 +43,8 @@ export function ProjectListBoardView({
   onCreateTicket,
   filters,
   showToolbarAdd = true,
+  readOnly = false,
+  viewMode,
 }: ProjectListBoardViewProps) {
   const [mode, setMode] = useState<ListBoardMode>("board");
   const [searchValue, setSearchValue] = useState("");
@@ -52,18 +56,23 @@ export function ProjectListBoardView({
   return (
     <ListBoardView
       items={visibleProjects}
-      mode={mode}
-      onModeChange={setMode}
+      mode={viewMode ?? mode}
+      onModeChange={(nextMode) => {
+        if (!readOnly) {
+          setMode(nextMode);
+        }
+      }}
       onAdd={onCreate}
-      onAddToColumn={onCreate}
+      onAddToColumn={readOnly ? undefined : onCreate}
       addLabel="Neues Projekt"
-      showToolbarAdd={showToolbarAdd}
+      showToolbar={!readOnly}
+      showToolbarAdd={!readOnly && showToolbarAdd}
       statusKey="status"
       statusCatalogKind="workStatus"
-      onItemStatusChange={onStatusChange ? (project, status) => onStatusChange(project, status as Project["status"]) : undefined}
+      onItemStatusChange={!readOnly && onStatusChange ? (project, status) => onStatusChange(project, status as Project["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
-      toolbarFilters={filters}
+      toolbarFilters={readOnly ? undefined : filters}
       loading={loading}
       emptyState={
         <EmptyState
@@ -78,11 +87,11 @@ export function ProjectListBoardView({
         <ProjectCard
           project={project}
           onEdit={onEdit}
-          onDelete={onDelete}
-          onStatusChange={onStatusChange}
-          onCreateMilestone={onCreateMilestone ? () => onCreateMilestone(project) : undefined}
-          onCreateTask={onCreateTask ? () => onCreateTask(project) : undefined}
-          onCreateTicket={onCreateTicket ? () => onCreateTicket(project) : undefined}
+          onDelete={readOnly ? undefined : onDelete}
+          onStatusChange={readOnly ? undefined : onStatusChange}
+          onCreateMilestone={!readOnly && onCreateMilestone ? () => onCreateMilestone(project) : undefined}
+          onCreateTask={!readOnly && onCreateTask ? () => onCreateTask(project) : undefined}
+          onCreateTicket={!readOnly && onCreateTicket ? () => onCreateTicket(project) : undefined}
         />
       )}
       renderRow={(project) => (
@@ -90,11 +99,11 @@ export function ProjectListBoardView({
           project={project}
           variant="row"
           onEdit={onEdit}
-          onDelete={onDelete}
-          onStatusChange={onStatusChange}
-          onCreateMilestone={onCreateMilestone ? () => onCreateMilestone(project) : undefined}
-          onCreateTask={onCreateTask ? () => onCreateTask(project) : undefined}
-          onCreateTicket={onCreateTicket ? () => onCreateTicket(project) : undefined}
+          onDelete={readOnly ? undefined : onDelete}
+          onStatusChange={readOnly ? undefined : onStatusChange}
+          onCreateMilestone={!readOnly && onCreateMilestone ? () => onCreateMilestone(project) : undefined}
+          onCreateTask={!readOnly && onCreateTask ? () => onCreateTask(project) : undefined}
+          onCreateTicket={!readOnly && onCreateTicket ? () => onCreateTicket(project) : undefined}
         />
       )}
     />

@@ -252,8 +252,9 @@ function seedCompleteDataset(): void {
       VALUES (1, 'bug', 'Ticket Alpha', 'Ticket Beschreibung', 'open', 'high', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO use_cases (id, feature_id, title, status, description, content_path, sort_order, created_at, updated_at)
       VALUES (1, 1, 'Use Case Alpha', 'active', 'UC Beschreibung', 'content/usecases/usecase-1.md', 20, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO wiki_pages (id, parent_id, project_id, title, content_path, sort_order, created_at, updated_at)
-      VALUES (1, NULL, 1, 'Wiki Root', 'content/wiki/wiki-page-1.md', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO wiki_pages (id, parent_id, title, content_path, sort_order, created_at, updated_at)
+      VALUES (1, NULL, 'Wiki Root', 'content/wiki/wiki-page-1.md', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    UPDATE projects SET wiki_page_id = 1 WHERE id = 1;
     INSERT INTO comments (id, body, created_at)
       VALUES (1, 'Task Kommentar', '2026-05-17T08:00:00');
     INSERT INTO comments (id, body, created_at)

@@ -246,6 +246,7 @@ export const projects = sqliteTable("projects", {
   color: text("color").default("#6366f1"),
   startDate: text("start_date"),
   dueDate: text("due_date"),
+  wikiPageId: integer("wiki_page_id").references((): AnySQLiteColumn => wikiPages.id, { onDelete: "set null" }),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -687,7 +688,6 @@ export const featureRelations = sqliteTable(
 export const wikiPages = sqliteTable("wiki_pages", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   parentId: integer("parent_id").references((): AnySQLiteColumn => wikiPages.id, { onDelete: "restrict" }),
-  projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   contentPath: text("content_path"),
   sortOrder: integer("sort_order").notNull().default(0),

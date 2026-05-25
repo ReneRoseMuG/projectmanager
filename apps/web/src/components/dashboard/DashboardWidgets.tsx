@@ -4,6 +4,7 @@ import type {
   JournalEntry,
   JournalListResponse,
   Milestone,
+  Project,
   RecentAttachment,
   RecentComment,
   Task,
@@ -13,10 +14,20 @@ import type {
 } from "@taskmanager/shared-types";
 import { AlertTriangle, ExternalLink, Inbox } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useCalendarTasks } from "../../hooks/useCalendarTasks";
+import { useEvents } from "../../hooks/useEvents";
 import { useDashboardWidgetData } from "../../hooks/useDashboards";
+import { useHasPermission } from "../../hooks/usePermissions";
 import { catalogColor, catalogLabel } from "../../utils/catalogs";
 import { formatHumanDate } from "../../utils/date";
+import { CalendarSkeleton } from "../calendar/CalendarSkeleton";
+import { CalendarView } from "../calendar/CalendarView";
+import { UpcomingEvents } from "../calendar/UpcomingEvents";
+import { MilestoneListBoardView } from "../milestones/MilestoneListBoardView";
+import { ProjectListBoardView } from "../projects/ProjectListBoardView";
+import { TaskListBoardView } from "../tasks/TaskListBoardView";
+import { TicketListBoardView } from "../tickets/TicketListBoardView";
 import { EmptyState } from "../ui/EmptyState";
 import { PriorityBadge } from "../ui/PriorityBadge";
 import { ProgressBar } from "../ui/ProgressBar";
@@ -50,7 +61,12 @@ function dashboardPath(type: string, id: number): string {
   if (type === "useCase") {
     return `/use-cases/${id}`;
   }
-  return "/dashboard";
+  return "/";
+}
+
+function dashboardDetailPath(type: string, id: number, returnTo: string): string {
+  const params = new URLSearchParams({ returnTo });
+  return `${dashboardPath(type, id)}?${params.toString()}`;
 }
 
 function WidgetShell({
@@ -64,7 +80,7 @@ function WidgetShell({
   const Icon = meta.icon;
 
   return (
-    <section className="min-h-48 rounded-lg border border-line bg-white p-4 shadow-sm" data-testid={`dashboard-widget-${widget.widgetId}`}>
+    <section className="flex h-full min-h-48 flex-col rounded-lg border border-line bg-white p-4 shadow-sm" data-testid={`dashboard-widget-${widget.widgetId}`}>
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-steel-100 text-steel-700">
@@ -75,7 +91,9 @@ function WidgetShell({
           </div>
         </div>
       </header>
-      {children}
+      <div className="min-h-0 flex-1">
+        {children}
+      </div>
     </section>
   );
 }
@@ -273,8 +291,147 @@ function MilestoneRows({ milestones }: { milestones: Milestone[] | undefined }) 
   );
 }
 
+function CalendarWidget() {
+  const canReadEvents = useHasPermission("events", "read");
+  const canReadTasks = useHasPermission("tasks", "read");
+  const events = useEvents(undefined, canReadEvents);
+  const calendarTasks = useCalendarTasks(canReadTasks);
+
+  if (events.loading || calendarTasks.loading) {
+    return <CalendarSkeleton />;
+  }
+
+  return (
+    <CalendarView
+      events={canReadEvents ? events.events : []}
+      tasks={canReadTasks ? calendarTasks.tasks : []}
+      compact
+    />
+  );
+}
+
+function UpcomingEventsWidget() {
+  const canReadEvents = useHasPermission("events", "read");
+  const events = useEvents(undefined, canReadEvents);
+
+  if (events.loading) {
+    return <WidgetLoading />;
+  }
+
+  return <UpcomingEvents events={canReadEvents ? events.events : []} />;
+}
+
+function TaskBoardWidget({
+  tasks,
+  mode,
+  onOpen,
+}: {
+  tasks: Task[] | undefined;
+  mode: "kanban" | "list";
+  onOpen: (task: Task) => void;
+}) {
+  return (
+    <TaskListBoardView
+      tasks={tasks ?? []}
+      viewMode={mode}
+      onViewModeChange={() => undefined}
+      onAdd={() => undefined}
+      onOpen={onOpen}
+      onDelete={() => undefined}
+      readOnly
+    />
+  );
+}
+
+function TicketBoardWidget({
+  tickets,
+  mode,
+  onOpen,
+}: {
+  tickets: Ticket[] | undefined;
+  mode: "kanban" | "list";
+  onOpen: (ticket: Ticket) => void;
+}) {
+  return (
+    <TicketListBoardView
+      tickets={tickets ?? []}
+      viewMode={mode}
+      onViewModeChange={() => undefined}
+      onAdd={() => undefined}
+      onOpen={onOpen}
+      onDelete={() => undefined}
+      readOnly
+    />
+  );
+}
+
+function MilestoneBoardWidget({
+  milestones,
+  mode,
+  onOpen,
+}: {
+  milestones: Milestone[] | undefined;
+  mode: "kanban" | "list";
+  onOpen: (milestone: Milestone) => void;
+}) {
+  return (
+    <MilestoneListBoardView
+      milestones={milestones ?? []}
+      viewMode={mode}
+      onCreate={() => undefined}
+      onEdit={onOpen}
+      onDelete={() => undefined}
+      readOnly
+    />
+  );
+}
+
+function ProjectBoardWidget({
+  projects,
+  mode,
+  onOpen,
+}: {
+  projects: Project[] | undefined;
+  mode: "board" | "list";
+  onOpen: (project: Project) => void;
+}) {
+  return (
+    <ProjectListBoardView
+      projects={projects ?? []}
+      viewMode={mode}
+      onCreate={() => undefined}
+      onEdit={onOpen}
+      onDelete={() => undefined}
+      readOnly
+    />
+  );
+}
+
 export function DashboardWidgetCard({ widget, owner }: DashboardWidgetCardProps) {
-  const query = useDashboardWidgetData(widget, owner);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = `${location.pathname}${location.search}`;
+  const usesOwnData = widget.widgetId === "calendar" || widget.widgetId === "upcomingEvents";
+  const query = useDashboardWidgetData(widget, owner, !usesOwnData);
+  const navigateToDetail = (type: "task" | "ticket" | "milestone" | "project", id: number) => {
+    navigate(dashboardDetailPath(type, id, returnTo));
+  };
+
+  if (widget.widgetId === "calendar") {
+    return (
+      <WidgetShell widget={widget}>
+        <CalendarWidget />
+      </WidgetShell>
+    );
+  }
+
+  if (widget.widgetId === "upcomingEvents") {
+    return (
+      <WidgetShell widget={widget}>
+        <UpcomingEventsWidget />
+      </WidgetShell>
+    );
+  }
 
   if (query.loading) {
     return (
@@ -303,6 +460,15 @@ export function DashboardWidgetCard({ widget, owner }: DashboardWidgetCardProps)
       {widget.widgetId === "attachmentJournal" ? <AttachmentRows attachments={query.data as RecentAttachment[] | undefined} /> : null}
       {widget.widgetId === "milestoneProgress" ? <MilestoneRows milestones={query.data as Milestone[] | undefined} /> : null}
       {widget.widgetId === "overdueTasks" ? <TaskRows tasks={query.data as Task[] | undefined} emptyTitle="Keine überfälligen Aufgaben" /> : null}
+      {widget.widgetId === "taskBoard" ? <TaskBoardWidget tasks={query.data as Task[] | undefined} mode="kanban" onOpen={(task) => navigateToDetail("task", task.id)} /> : null}
+      {widget.widgetId === "taskList" ? <TaskBoardWidget tasks={query.data as Task[] | undefined} mode="list" onOpen={(task) => navigateToDetail("task", task.id)} /> : null}
+      {widget.widgetId === "ticketBoard" ? <TicketBoardWidget tickets={query.data as Ticket[] | undefined} mode="kanban" onOpen={(ticket) => navigateToDetail("ticket", ticket.id)} /> : null}
+      {widget.widgetId === "ticketList" ? <TicketBoardWidget tickets={query.data as Ticket[] | undefined} mode="list" onOpen={(ticket) => navigateToDetail("ticket", ticket.id)} /> : null}
+      {widget.widgetId === "milestoneBoard" ? <MilestoneBoardWidget milestones={query.data as Milestone[] | undefined} mode="kanban" onOpen={(milestone) => navigateToDetail("milestone", milestone.id)} /> : null}
+      {widget.widgetId === "milestoneList" ? <MilestoneBoardWidget milestones={query.data as Milestone[] | undefined} mode="list" onOpen={(milestone) => navigateToDetail("milestone", milestone.id)} /> : null}
+      {widget.widgetId === "milestoneListView" ? <MilestoneBoardWidget milestones={query.data as Milestone[] | undefined} mode="list" onOpen={(milestone) => navigateToDetail("milestone", milestone.id)} /> : null}
+      {widget.widgetId === "projectBoard" ? <ProjectBoardWidget projects={query.data as Project[] | undefined} mode="board" onOpen={(project) => navigateToDetail("project", project.id)} /> : null}
+      {widget.widgetId === "projectList" ? <ProjectBoardWidget projects={query.data as Project[] | undefined} mode="list" onOpen={(project) => navigateToDetail("project", project.id)} /> : null}
     </WidgetShell>
   );
 }

@@ -97,12 +97,20 @@ describe("Dashboard widget data API", () => {
     const recentTasks = await admin.get(`/api/tasks/recent?ownerType=project&ownerId=${project.body.id}&limit=10&sort=createdAt`).expect(200);
     expect(recentTasks.body.map((task: { title: string }) => task.title)).toEqual(expect.arrayContaining(["Projektaufgabe", "Meilensteinaufgabe"]));
 
+    const projectTaskStats = await admin.get(`/api/tasks/stats?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    expect(projectTaskStats.body.total).toBe(2);
+    expect(projectTaskStats.body.statusCounts).toMatchObject({ todo: 1, in_progress: 1 });
+
     const milestoneTickets = await admin.get(`/api/tickets/recent?ownerType=milestone&ownerId=${milestone.body.id}`).expect(200);
     expect(milestoneTickets.body.map((ticket: { title: string }) => ticket.title)).toEqual(["Meilensteinticket"]);
 
     const projectTickets = await admin.get(`/api/tickets/recent?ownerType=project&ownerId=${project.body.id}`).expect(200);
     expect(projectTickets.body.map((ticket: { title: string }) => ticket.title)).toEqual(expect.arrayContaining(["Projektticket", "Meilensteinticket"]));
     expect(projectTickets.body.map((ticket: { title: string }) => ticket.title)).not.toContain("Geschlossenes Projektticket");
+
+    const projectTicketStats = await admin.get(`/api/tickets/stats?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    expect(projectTicketStats.body.total).toBe(3);
+    expect(projectTicketStats.body.statusCounts).toMatchObject({ open: 2, ready_for_archive: 1 });
 
     const comments = await admin.get(`/api/comments/recent?ownerType=project&ownerId=${project.body.id}`).expect(200);
     expect(comments.body).toEqual(

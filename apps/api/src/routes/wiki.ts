@@ -1,6 +1,7 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from "fastify";
 import { createWikiPage, deleteWikiPage, getWikiBreadcrumb, getWikiPage, listRootWikiPages, listWikiChildren, updateWikiPage, type WikiPageInput } from "../services/wiki.service.js";
 import { createJournalActor } from "../services/journal.service.js";
+import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const wikiBodySchema = {
@@ -9,7 +10,6 @@ const wikiBodySchema = {
   additionalProperties: false,
   properties: {
     parentId: { type: ["integer", "null"], minimum: 1 },
-    projectId: { type: ["integer", "null"], minimum: 1 },
     title: { type: "string", minLength: 1 },
     content: { type: "string" },
     sortOrder: { type: "integer" }
@@ -25,6 +25,15 @@ const wikiPatchSchema = {
     ...expectedVersionPropertySchema
   }
 } as const;
+
+function rejectLegacyProjectId(request: FastifyRequest, _reply: FastifyReply, done: HookHandlerDoneFunction): void {
+  const body = request.body;
+  if (body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "projectId")) {
+    done(badRequest("WikiPage projectId is no longer supported"));
+    return;
+  }
+  done();
+}
 
 export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
   app.get("/wiki", { schema: { response: { 200: arrayResponseSchema } } }, async () => listRootWikiPages(app.db));
@@ -43,7 +52,7 @@ export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Body: WikiPageInput }>(
     "/wiki",
-    { schema: { body: wikiBodySchema, response: { 201: objectResponseSchema } } },
+    { preValidation: rejectLegacyProjectId, schema: { body: wikiBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => reply.status(201).send(createWikiPage(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
@@ -55,7 +64,7 @@ export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{ Params: { id: number }; Body: WikiPageInput }>(
     "/wiki/:id",
-    { schema: { params: idParamSchema, body: wikiPatchSchema, response: { 200: objectResponseSchema } } },
+    { preValidation: rejectLegacyProjectId, schema: { params: idParamSchema, body: wikiPatchSchema, response: { 200: objectResponseSchema } } },
     async (request) => updateWikiPage(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 

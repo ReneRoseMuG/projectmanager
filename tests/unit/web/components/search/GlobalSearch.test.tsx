@@ -54,6 +54,7 @@ const data: GlobalSearchData = {
       color: null,
       startDate: null,
       dueDate: null,
+      wikiPageId: null,
       version: 1,
       createdAt: "2026-05-22T00:00:00.000Z",
       updatedAt: "2026-05-22T00:00:00.000Z",

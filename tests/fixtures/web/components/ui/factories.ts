@@ -56,6 +56,7 @@ export function buildProject(overrides: Partial<Project> = {}): Project {
     color: "#4f46e5",
     startDate: "2026-01-01",
     dueDate: "2026-12-31",
+    wikiPageId: null,
     version: 1,
     createdAt,
     updatedAt,

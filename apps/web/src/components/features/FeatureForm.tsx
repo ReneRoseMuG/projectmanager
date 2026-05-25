@@ -18,7 +18,6 @@ import {
   FileText,
   FolderKanban,
   ListTodo,
-  Paperclip,
   Trash2,
 } from "lucide-react";
 import type { FormEvent } from "react";
@@ -66,7 +65,6 @@ import { PendingRelationList } from "../ui/PendingRelationList";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
-import { SectionHeader } from "../ui/SectionHeader";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusToggle } from "../ui/StatusToggle";
@@ -494,7 +492,7 @@ export function FeatureForm({
       >
         {activeTab === "details" ? (
           <>
-            <Section title="Stammdaten">
+            <Section>
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
                 <FormField label="Titel" required className="min-w-0">
                   <Input
@@ -545,7 +543,7 @@ export function FeatureForm({
         ) : null}
 
         {activeTab === "useCases" ? (
-          <Section title="Use Cases" fill={Boolean(feature)}>
+          <Section fill={Boolean(feature)}>
             {feature ? (
               useCases.loading ? (
                 <TaskListSkeleton />
@@ -591,7 +589,7 @@ export function FeatureForm({
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section title="Aufgaben" fill={Boolean(feature)}>
+          <Section fill={Boolean(feature)}>
             {feature ? (
               <OwnerTaskBoard owner={{ type: "feature", id: feature.id }} />
             ) : (
@@ -642,7 +640,7 @@ export function FeatureForm({
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets" fill={Boolean(feature)}>
+          <Section fill={Boolean(feature)}>
             {feature ? (
               <OwnerTicketBoard owner={{ type: "feature", id: feature.id }} />
             ) : (
@@ -693,7 +691,7 @@ export function FeatureForm({
         ) : null}
 
         {activeTab === "projects" ? (
-          <Section title="Projekte" fill={Boolean(feature)}>
+          <Section fill={Boolean(feature)}>
             {feature ? (
               <FeatureProjectPanel
                 projects={projectLinks.linkedProjects}
@@ -735,7 +733,7 @@ export function FeatureForm({
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section title="Kommentare">
+          <Section>
             {feature ? (
               <CommentThread
                 comments={comments.comments}
@@ -761,10 +759,6 @@ export function FeatureForm({
 
         {activeTab === "attachments" ? (
           <Section>
-            <div className="mb-4 flex items-center gap-2">
-              <Paperclip size={18} className="text-fern" />
-              <SectionHeader title="Dateien" />
-            </div>
             {feature ? (
               <div className="grid gap-4">
                 <AttachmentUploader onUpload={uploadAttachment} />
@@ -817,7 +811,7 @@ export function FeatureForm({
         ) : null}
 
         {activeTab === "journal" && feature ? (
-          <Section title="Journal" fill>
+          <Section fill>
             <JournalPanel objectType="feature" objectId={feature.id} />
           </Section>
         ) : null}

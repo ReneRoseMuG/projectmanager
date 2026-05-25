@@ -8,6 +8,7 @@ export interface TestProject {
   status: string;
   color: string | null;
   description: string | null;
+  wikiPageId: number | null;
   createdAt: string;
   updatedAt: string;
   openTaskCount: number;
@@ -141,7 +142,6 @@ export interface TestWikiPage {
   id: number;
   version: number;
   parentId: number | null;
-  projectId: number | null;
   title: string;
   content?: string;
   contentPath: string | null;
@@ -409,7 +409,7 @@ export async function createUseCase(
 
 export async function createWikiPage(
   app: FastifyInstance,
-  overrides: Partial<{ title: string; parentId: number | null; projectId: number | null; content: string }> = {}
+  overrides: Partial<{ title: string; parentId: number | null; content: string }> = {}
 ): Promise<TestWikiPage> {
   const body = {
     title: `Test Wiki ${Date.now()} ${Math.random().toString(36).slice(2, 7)}`,

@@ -1,5 +1,6 @@
 import type { Feature } from "@taskmanager/shared-types";
-import { BookOpen, Edit3 } from "lucide-react";
+import { BookOpen, Edit3, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import type { ViewMode } from "../../types";
@@ -20,10 +21,14 @@ interface ProjectFeaturePanelProps {
   onViewModeChange: (viewMode: ViewMode) => void;
   onCreate: () => void;
   onOpen: (feature: Feature) => void;
+  onRemove?: (feature: Feature) => void;
+  removeLabel?: string;
   onStatusChange?: (
     feature: Feature,
     status: Feature["status"],
   ) => void | Promise<unknown>;
+  secondaryAction?: ReactNode;
+  emptyBody?: ReactNode;
 }
 
 function sortFeatures(features: Feature[]) {
@@ -61,7 +66,11 @@ export function ProjectFeaturePanel({
   onViewModeChange,
   onCreate,
   onOpen,
+  onRemove,
+  removeLabel = "Entfernen",
   onStatusChange,
+  secondaryAction,
+  emptyBody = "Für dieses Projekt sind keine Features vorhanden.",
 }: ProjectFeaturePanelProps) {
   const [searchValue, setSearchValue] = useState("");
   const sortedFeatures = useMemo(() => sortFeatures(features), [features]);
@@ -77,6 +86,7 @@ export function ProjectFeaturePanel({
       onModeChange={(mode) => onViewModeChange(toViewMode(mode))}
       onAdd={onCreate}
       addLabel="Neues Feature"
+      secondaryAction={secondaryAction}
       statusKey="status"
       statusCatalogKind="featureStatus"
       onItemStatusChange={onStatusChange}
@@ -86,15 +96,15 @@ export function ProjectFeaturePanel({
         <EmptyState
           icon={<BookOpen size={22} />}
           title="Keine Features"
-          body="Für dieses Projekt sind keine Features vorhanden."
+          body={emptyBody}
           tone="violet"
           variant="tinted"
         />
       }
       renderCard={(feature) => (
-        <FeatureBoardCard feature={feature} onOpen={onOpen} />
+        <FeatureBoardCard feature={feature} onOpen={onOpen} onRemove={onRemove} removeLabel={removeLabel} />
       )}
-      renderRow={(feature) => <FeatureRow feature={feature} onOpen={onOpen} />}
+      renderRow={(feature) => <FeatureRow feature={feature} onOpen={onOpen} onRemove={onRemove} removeLabel={removeLabel} />}
     />
   );
 }
@@ -102,9 +112,13 @@ export function ProjectFeaturePanel({
 function FeatureBoardCard({
   feature,
   onOpen,
+  onRemove,
+  removeLabel,
 }: {
   feature: Feature;
   onOpen: (feature: Feature) => void;
+  onRemove?: (feature: Feature) => void;
+  removeLabel: string;
 }) {
   const catalogs = useCatalogs();
   const description = richTextToPlainText(feature.description);
@@ -116,6 +130,18 @@ function FeatureBoardCard({
       objectReference={objectReference("feature", feature.id)}
       onOpen={() => onOpen(feature)}
       onEdit={() => onOpen(feature)}
+      extraMenuItems={
+        onRemove
+          ? [
+              {
+                label: removeLabel,
+                icon: <Trash2 size={16} />,
+                onClick: () => onRemove(feature),
+                danger: true,
+              },
+            ]
+          : []
+      }
       header={
         <div className="grid gap-2">
           <h3 className="line-clamp-2 text-sm font-semibold text-ink">
@@ -139,9 +165,13 @@ function FeatureBoardCard({
 function FeatureRow({
   feature,
   onOpen,
+  onRemove,
+  removeLabel,
 }: {
   feature: Feature;
   onOpen: (feature: Feature) => void;
+  onRemove?: (feature: Feature) => void;
+  removeLabel: string;
 }) {
   const catalogs = useCatalogs();
   const description = richTextToPlainText(feature.description);
@@ -160,7 +190,22 @@ function FeatureRow({
         </>
       }
       actions={
-        <ActionMenu objectReference={objectReference("feature", feature.id)} items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(feature) }]} />
+        <ActionMenu
+          objectReference={objectReference("feature", feature.id)}
+          items={[
+            { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(feature) },
+            ...(onRemove
+              ? [
+                  {
+                    label: removeLabel,
+                    icon: <Trash2 size={16} />,
+                    onClick: () => onRemove(feature),
+                    danger: true,
+                  },
+                ]
+              : []),
+          ]}
+        />
       }
       actionsIncludeObjectReference
       onOpen={() => onOpen(feature)}

@@ -66,6 +66,7 @@ vi.mock("../../../../apps/web/src/hooks/useProjects", () => ({
         color: "var(--color-steel-700)",
         startDate: null,
         dueDate: null,
+        wikiPageId: null,
         version: 1,
         createdAt: "2026-05-20T08:00:00.000Z",
         updatedAt: "2026-05-20T08:00:00.000Z",

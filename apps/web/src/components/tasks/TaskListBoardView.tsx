@@ -1,4 +1,4 @@
-import type { Task, TaskBoardItem } from "@taskmanager/shared-types";
+import type { Task } from "@taskmanager/shared-types";
 import { ListTodo } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
@@ -11,7 +11,7 @@ import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { TaskCard } from "./TaskCard";
 
 interface TaskListBoardViewProps {
-  tasks: TaskBoardItem[];
+  tasks: Task[];
   viewMode: ViewMode;
   onViewModeChange: (viewMode: ViewMode) => void;
   onAdd: () => void;
@@ -23,6 +23,7 @@ interface TaskListBoardViewProps {
   linkAction?: ReactNode;
   filters?: ReactNode;
   showCreateActions?: boolean;
+  readOnly?: boolean;
   loading?: boolean;
 }
 
@@ -44,7 +45,7 @@ function matchesSearch(task: Task, searchValue: string) {
 }
 
 /** Task-specific ListBoardView adapter with status Kanban columns. */
-export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, onStatusChange, onDueDateChange, linkAction, filters, showCreateActions = true, loading = false }: TaskListBoardViewProps) {
+export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, onStatusChange, onDueDateChange, linkAction, filters, showCreateActions = true, readOnly = false, loading = false }: TaskListBoardViewProps) {
   const catalogs = useCatalogs();
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState<Task["status"] | "all">("all");
@@ -62,25 +63,30 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
     <ListBoardView
       items={visibleTasks}
       mode={toListBoardMode(viewMode)}
-      onModeChange={(mode) => onViewModeChange(toViewMode(mode))}
+      onModeChange={(mode) => {
+        if (!readOnly) {
+          onViewModeChange(toViewMode(mode));
+        }
+      }}
       onAdd={onAdd}
-      onAddToColumn={showCreateActions ? (columnStatus) => (onAddStatus ? onAddStatus(columnStatus as Task["status"]) : onAdd()) : undefined}
+      onAddToColumn={!readOnly && showCreateActions ? (columnStatus) => (onAddStatus ? onAddStatus(columnStatus as Task["status"]) : onAdd()) : undefined}
       addLabel="Neue Aufgabe"
-      showToolbarAdd={showCreateActions}
-      secondaryAction={linkAction}
+      showToolbar={!readOnly}
+      showToolbarAdd={!readOnly && showCreateActions}
+      secondaryAction={readOnly ? undefined : linkAction}
       statusKey="status"
       statusCatalogKind="workStatus"
       statusColumns={statusColumns}
-      onItemStatusChange={onStatusChange}
+      onItemStatusChange={readOnly ? undefined : onStatusChange}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       toolbarFilters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={tasks.length} />}
-      filters={filters}
+      filters={readOnly ? undefined : filters}
       loading={loading}
       showGroupedEmptyState={false}
       emptyState={<EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben" body="Für diesen Kontext sind noch keine Aufgaben vorhanden." tone="fern" variant="tinted" />}
-      renderCard={(task) => <TaskCard task={task} onOpen={onOpen} onDelete={task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />}
-      renderRow={(task) => <TaskCard task={task} variant="row" onOpen={onOpen} onDelete={task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />}
+      renderCard={(task) => <TaskCard task={task} onOpen={onOpen} onDelete={readOnly || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} />}
+      renderRow={(task) => <TaskCard task={task} variant="row" onOpen={onOpen} onDelete={readOnly || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} />}
     />
   );
 }

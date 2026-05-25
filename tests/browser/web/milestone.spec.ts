@@ -2,13 +2,11 @@
 import {
   authenticatedGoto,
   apiBaseUrl,
-  createEvent,
   createFeature,
   createMilestone,
   createProject,
   createTask,
   createTicket,
-  deleteEvent,
   deleteFeature,
   deleteProject,
   deleteTask,
@@ -26,7 +24,7 @@ import {
  * Abgedeckte Regeln:
  * - Meilensteine sind als Tab im Projektformular sichtbar und öffnen die kanonischen Routen `/milestones/new` und `/milestones/:id`.
  * - Neue Meilensteine schließen nach Speichern zurück zur Rücksprungroute.
- * - Das Meilensteinformular zeigt Stammdaten inklusive Projektzuordnung und alle Subviews mit echten API-Daten.
+ * - Das Meilensteinformular zeigt Details inklusive Projektzuordnung und alle Subviews mit echten API-Daten.
  * - Subviews reagieren auf Datenänderungen ohne Browser-Reload, insbesondere Kommentar-Counts nach Mutation.
  *
  * Fehlerfälle:
@@ -113,14 +111,12 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
     }
   });
 
-  test("Meilensteinformular zeigt Stammdaten und aktualisierte Subview-Mengen", async ({ page, request }) => {
+  test("Meilensteinformular zeigt Details und aktualisierte Subview-Mengen", async ({ page, request }) => {
     const project = await createProject(request, "E2E Milestone Detail Project");
     const milestone = await createMilestone(request, project.id, "E2E Milestone Detail");
     const feature = await createFeature(request, "E2E Milestone Feature");
     const task = await createTask(request, { type: "milestone", id: milestone.id }, "E2E Milestone Task");
     const ticket = await createTicket(request, { type: "milestone", id: milestone.id }, "E2E Milestone Ticket");
-    const event = await createEvent(request, "E2E Milestone Event", { owners: [{ type: "milestone", id: milestone.id }] });
-
     const featureResponse = await request.put(`${apiBaseUrl}/milestones/${milestone.id}/features`, { data: { featureIds: [feature.id] } });
     expect(featureResponse.ok()).toBeTruthy();
     const noteResponse = await request.post(`${apiBaseUrl}/milestones/${milestone.id}/notes`, { data: { title: "E2E Milestone Note", contentJson: { type: "doc" } } });
@@ -151,7 +147,7 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       await expect(milestoneForm.getByRole("button", { name: /Kommentare\s+1/ })).toBeVisible();
       await expect(milestoneForm.getByRole("button", { name: /Notizen\s+1/ })).toBeVisible();
       await expect(milestoneForm.getByRole("button", { name: /Dateien\s+1/ })).toBeVisible();
-      await expect(milestoneForm.getByRole("button", { name: /Events\s+1/ })).toBeVisible();
+      await expect(milestoneForm.getByRole("button", { name: /Events/ })).toHaveCount(0);
 
       await milestoneForm.getByRole("button", { name: /Features/ }).click();
       await expect(itemCard(milestoneForm, feature.title)).toBeVisible();
@@ -163,8 +159,6 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       await expect(milestoneForm).toContainText("E2E Milestone Note");
       await milestoneForm.getByRole("button", { name: /Dateien/ }).click();
       await expect(milestoneForm).toContainText("e2e-milestone.txt");
-      await milestoneForm.getByRole("button", { name: /Events/ }).click();
-      await expect(itemCard(milestoneForm, event.title)).toBeVisible();
 
       await milestoneForm.getByRole("button", { name: /Kommentare/ }).click();
       await fillRichText(milestoneForm, "comment-thread-body", "E2E Live Kommentar");
@@ -175,7 +169,6 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       await expect(milestoneForm.getByRole("button", { name: /Kommentare\s+2/ })).toBeVisible();
       await expect(milestoneForm).toContainText("E2E Live Kommentar");
     } finally {
-      await deleteEvent(request, event.id);
       await deleteProject(request, project.id);
       await deleteTask(request, task.id);
       await deleteTicket(request, ticket.id);

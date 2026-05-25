@@ -14,7 +14,7 @@ interface MilestoneCardProps {
   milestone: Milestone;
   variant?: "card" | "row";
   onEdit: (milestone: Milestone) => void;
-  onDelete: (milestone: Milestone) => void;
+  onDelete?: (milestone: Milestone) => void;
   onStatusChange?: (milestone: Milestone, status: Milestone["status"]) => void | Promise<unknown>;
   onDueDateChange?: (milestone: Milestone, dueDate: string | null) => void | Promise<unknown>;
   onCreateTask?: () => void;
@@ -53,7 +53,7 @@ export function MilestoneCard({ milestone, variant = "card", onEdit, onDelete, o
       onOpen={() => onEdit(milestone)}
       onEdit={() => onEdit(milestone)}
       extraMenuItems={createMenuItems}
-      onDelete={() => onDelete(milestone)}
+      onDelete={onDelete ? () => onDelete(milestone) : undefined}
     />
   );
 }

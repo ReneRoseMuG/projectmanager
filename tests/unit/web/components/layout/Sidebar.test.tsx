@@ -171,7 +171,6 @@ describe("Sidebar", () => {
       "Tickets",
       "Features",
       "Wiki",
-      "Dashboard",
       "Kalender",
       "Journal",
     ]) {
