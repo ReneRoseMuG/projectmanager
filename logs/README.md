@@ -2,6 +2,10 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 26.05.26 | 4             | TASK-95 Tests und Abnahme                    | ⚠️     |
+| 26.05.26 | 3             | TASK-95 Backup Progress UI                   | ✅     |
+| 26.05.26 | 2             | TASK-95 Realtime Progress Events             | ✅     |
+| 26.05.26 | 1             | TASK-95 SFTP Streaming Progress              | ✅     |
 | 26.05.26 | Feature       | Status-Kaskadierdialog                       | ✅     |
 | 26.05.26 | Fix           | Kommentar-Dialog Speichern                   | ✅     |
 | 26.05.26 | Fix           | Kommentar-Editor Modal                       | ✅     |

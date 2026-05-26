@@ -23,7 +23,7 @@ import fs from "node:fs";
 import path from "node:path";
 import supertest from "supertest";
 import unzipper from "unzipper";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { vitestRuntimeRoot } from "../../../apps/api/src/runtime-safety.js";
 import { config } from "../../../apps/api/src/config.js";
 import {
@@ -74,7 +74,37 @@ interface RemoteMockFile {
   modifiedAt: number;
 }
 
-function configureMockSftp(remoteFiles: Map<string, RemoteMockFile>): void {
+interface SftpMockMetrics {
+  clientFactoryCount: number;
+  connectCount: number;
+  endCount: number;
+  putPaths: string[];
+  deletePaths: string[];
+  streamPutCount: number;
+  failOnPutPath: string | null;
+}
+
+async function bufferFromSftpInput(input: Buffer | NodeJS.ReadableStream): Promise<Buffer> {
+  if (Buffer.isBuffer(input)) {
+    return input;
+  }
+  const chunks: Buffer[] = [];
+  for await (const chunk of input as AsyncIterable<Buffer | string>) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+function configureMockSftp(remoteFiles: Map<string, RemoteMockFile>): SftpMockMetrics {
+  const metrics: SftpMockMetrics = {
+    clientFactoryCount: 0,
+    connectCount: 0,
+    endCount: 0,
+    putPaths: [],
+    deletePaths: [],
+    streamPutCount: 0,
+    failOnPutPath: null
+  };
   const remoteDir = "/remote/backups";
   const remotePrefix = `${remoteDir.replace(/\/+$/, "")}/`;
   const remoteKey = (remotePath: string): string => {
@@ -89,8 +119,11 @@ function configureMockSftp(remoteFiles: Map<string, RemoteMockFile>): void {
   config.backupSftpRemoteDir = remoteDir;
   config.backupSftpProtectedConfirmed = true;
 
-  setBackupSftpClientFactoryForTests((): BackupSftpClient => ({
+  setBackupSftpClientFactoryForTests((): BackupSftpClient => {
+    metrics.clientFactoryCount += 1;
+    return {
     async connect() {
+      metrics.connectCount += 1;
       return undefined;
     },
     async list() {
@@ -110,14 +143,24 @@ function configureMockSftp(remoteFiles: Map<string, RemoteMockFile>): void {
       return file.buffer;
     },
     async put(input, remotePath) {
+      const key = remoteKey(remotePath);
+      metrics.putPaths.push(key);
+      if (!Buffer.isBuffer(input)) {
+        metrics.streamPutCount += 1;
+      }
+      if (metrics.failOnPutPath === key) {
+        throw new Error(`Configured SFTP put failure for ${key}`);
+      }
       remoteFiles.set(remoteKey(remotePath), {
-        buffer: input,
+        buffer: await bufferFromSftpInput(input),
         modifiedAt: Date.now()
       });
       return remotePath;
     },
     async delete(remotePath) {
-      remoteFiles.delete(remoteKey(remotePath));
+      const key = remoteKey(remotePath);
+      metrics.deletePaths.push(key);
+      remoteFiles.delete(key);
     },
     async mkdir() {
       return remoteDir;
@@ -130,9 +173,12 @@ function configureMockSftp(remoteFiles: Map<string, RemoteMockFile>): void {
       return { size: file.buffer.byteLength };
     },
     async end() {
+      metrics.endCount += 1;
       return true;
     }
-  }));
+  };
+  });
+  return metrics;
 }
 
 function quoteIdentifier(value: string): string {
@@ -482,13 +528,21 @@ describe("Local backup status", () => {
 describe("Remote SFTP backup status", () => {
   it("lädt lokal erzeugte Dump-Dateien in den konfigurierten SFTP-Ordner hoch", async () => {
     const remoteFiles = new Map<string, RemoteMockFile>();
-    configureMockSftp(remoteFiles);
+    const metrics = configureMockSftp(remoteFiles);
+    const phases: string[] = [];
 
-    const saveResult = await saveDumpToLocalBackup(testDb.sqlite);
+    const saveResult = await saveDumpToLocalBackup(testDb.sqlite, {
+      progressCallback: (event) => {
+        phases.push(event.phase);
+      }
+    });
 
     expect(saveResult.remoteUpload?.success).toBe(true);
     expect(saveResult.remoteUpload?.remoteFile?.name).toBe(saveResult.filename);
     expect(remoteFiles.has(saveResult.filename)).toBe(true);
+    expect(fs.existsSync(saveResult.filePath)).toBe(true);
+    expect(metrics.streamPutCount).toBe(1);
+    expect(phases).toEqual(expect.arrayContaining(["db_export", "archive", "local_save", "sftp_upload", "done"]));
 
     const status = await getRemoteBackupStatus(testDb.sqlite);
     expect(status.ready).toBe(true);
@@ -528,9 +582,14 @@ describe("Remote SFTP backup status", () => {
 describe("Incremental SFTP sync", () => {
   it("überträgt beim ersten Sync alles und beim unveränderten Folgelauf nichts", async () => {
     const remoteFiles = new Map<string, RemoteMockFile>();
-    configureMockSftp(remoteFiles);
+    const metrics = configureMockSftp(remoteFiles);
+    const phases: string[] = [];
 
-    const first = await performIncrementalSftpSync(testDb.sqlite);
+    const first = await performIncrementalSftpSync(testDb.sqlite, {
+      progressCallback: (event) => {
+        phases.push(event.phase);
+      }
+    });
 
     expect(first).toMatchObject({
       success: true,
@@ -543,8 +602,13 @@ describe("Incremental SFTP sync", () => {
     expect(remoteFiles.has("manifest.json")).toBe(true);
     expect(remoteFiles.has("uploads/project-file.txt")).toBe(true);
     expect(remoteFiles.has("content/wiki/root.md")).toBe(true);
+    expect(metrics.clientFactoryCount).toBe(1);
+    expect(metrics.connectCount).toBe(1);
+    expect(metrics.endCount).toBe(1);
+    expect(phases).toEqual(expect.arrayContaining(["manifest_fetch", "file_compare", "file_upload", "manifest_update", "done"]));
 
     const remoteSnapshot = new Map(remoteFiles);
+    const putCountAfterFirstSync = metrics.putPaths.length;
     const second = await performIncrementalSftpSync(testDb.sqlite);
 
     expect(second).toMatchObject({
@@ -555,15 +619,20 @@ describe("Incremental SFTP sync", () => {
       filesDeleteFailed: 0
     });
     expect(remoteFiles).toEqual(remoteSnapshot);
+    expect(metrics.clientFactoryCount).toBe(2);
+    expect(metrics.connectCount).toBe(2);
+    expect(metrics.endCount).toBe(2);
+    expect(metrics.putPaths).toHaveLength(putCountAfterFirstSync);
   });
 
   it("synchronisiert Tabellen, neue Dateien, geänderte Dateien und gelöschte Dateien und stellt den Stand wieder her", async () => {
     const remoteFiles = new Map<string, RemoteMockFile>();
-    configureMockSftp(remoteFiles);
+    const metrics = configureMockSftp(remoteFiles);
     await performIncrementalSftpSync(testDb.sqlite);
 
     mutateLocalState();
     const expected = collectSnapshot();
+    const connectionCountBeforeSecondSync = metrics.connectCount;
     const result = await performIncrementalSftpSync(testDb.sqlite);
 
     expect(result.success).toBe(true);
@@ -572,6 +641,8 @@ describe("Incremental SFTP sync", () => {
     expect(result.filesDeleted).toBe(1);
     expect(remoteFiles.has("uploads/extra.txt")).toBe(true);
     expect(remoteFiles.has("content/wiki/root.md")).toBe(false);
+    expect(metrics.connectCount).toBe(connectionCountBeforeSecondSync + 1);
+    expect(metrics.deletePaths).toContain("content/wiki/root.md");
 
     testDb.sqlite.prepare("UPDATE projects SET name = 'Bürostand' WHERE id = 1").run();
     fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "Bürodatei", "utf8");
@@ -587,6 +658,37 @@ describe("Incremental SFTP sync", () => {
 
     expect(applyResult.verificationPassed).toBe(true);
     expect(collectSnapshot()).toEqual(expected);
+  });
+
+  it("schließt die einzelne SFTP-Verbindung auch bei Upload-Fehlern", async () => {
+    const remoteFiles = new Map<string, RemoteMockFile>();
+    const metrics = configureMockSftp(remoteFiles);
+    await performIncrementalSftpSync(testDb.sqlite);
+    const manifestBeforeFailedSync = remoteFiles.get("manifest.json")?.buffer.toString("utf8");
+    mutateLocalState();
+    metrics.failOnPutPath = "uploads/project-file.txt";
+
+    const result = await performIncrementalSftpSync(testDb.sqlite);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Configured SFTP put failure");
+    expect(metrics.connectCount).toBe(2);
+    expect(metrics.endCount).toBe(2);
+    expect(remoteFiles.get("manifest.json")?.buffer.toString("utf8")).toBe(manifestBeforeFailedSync);
+  });
+
+  it("bricht den Sync nicht ab, wenn ein Progress-Callback fehlschlägt", async () => {
+    const remoteFiles = new Map<string, RemoteMockFile>();
+    configureMockSftp(remoteFiles);
+
+    const result = await performIncrementalSftpSync(testDb.sqlite, {
+      progressCallback: () => {
+        throw new Error("Subscriber failed");
+      }
+    });
+
+    expect(result.success).toBe(true);
+    expect(remoteFiles.has("manifest.json")).toBe(true);
   });
 });
 
@@ -647,6 +749,45 @@ describe("Local dump roundtrip", () => {
     expect(applyResult.verificationPassed).toBe(true);
     expect(collectSnapshot()).toEqual(before);
     await app.close();
+  });
+
+  it("liest ZIP-Dateien beim Import nur einmal für Hash und Staging", async () => {
+    const archive = await buildDumpArchive(testDb.sqlite);
+    const file = writeBackupFile(archive.filename, archive.buffer);
+    const preview = await inspectDumpArchive(archive.buffer, file);
+    const bufferCalls = new Map<string, number>();
+    const phases: string[] = [];
+    const originalOpenBuffer = unzipper.Open.buffer.bind(unzipper.Open);
+    const openBufferSpy = vi.spyOn(unzipper.Open, "buffer").mockImplementation(async (buffer: Buffer) => {
+      const directory = await originalOpenBuffer(buffer);
+      for (const entry of directory.files.filter((item) => (item.path.startsWith("uploads/") || item.path.startsWith("content/")) && !item.path.endsWith("/"))) {
+        const originalBuffer = entry.buffer.bind(entry);
+        entry.buffer = async () => {
+          bufferCalls.set(entry.path, (bufferCalls.get(entry.path) ?? 0) + 1);
+          return originalBuffer();
+        };
+      }
+      return directory;
+    });
+
+    try {
+      const applyResult = await applyLocalDump(testDb.sqlite, {
+        fileId: file.id,
+        fileHash: preview.fileHash,
+        confirmationPhrase: preview.confirmationPhrase
+      }, {
+        progressCallback: (event) => {
+          phases.push(event.phase);
+        }
+      });
+
+      expect(applyResult.verificationPassed).toBe(true);
+      expect(phases).toEqual(expect.arrayContaining(["staging", "db_restore", "file_swap", "verify", "done"]));
+      expect(bufferCalls.size).toBeGreaterThan(0);
+      expect([...bufferCalls.values()].every((count) => count === 1)).toBe(true);
+    } finally {
+      openBufferSpy.mockRestore();
+    }
   });
 
   it("behält lokalen Standardadmin, Setup-Status und Admin-Einstellungen beim Import", async () => {

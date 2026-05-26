@@ -1,10 +1,11 @@
 import type { FastifyInstance } from "fastify";
+import type { RealtimeEvent } from "@taskmanager/shared-types";
 import { config } from "../config.js";
 
 const keepAliveIntervalMs = 25000;
 
-function writeEvent(response: NodeJS.WritableStream, event: unknown): void {
-  response.write(`event: invalidate\n`);
+function writeEvent(response: NodeJS.WritableStream, event: RealtimeEvent): void {
+  response.write(`event: ${event.type}\n`);
   response.write(`data: ${JSON.stringify(event)}\n\n`);
 }
 

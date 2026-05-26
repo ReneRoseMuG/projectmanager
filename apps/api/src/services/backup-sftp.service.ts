@@ -1,4 +1,5 @@
 import SftpClient from "ssh2-sftp-client";
+import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
 
@@ -30,7 +31,7 @@ export interface BackupSftpClient {
   }): Promise<unknown>;
   list(remoteFilePath: string): Promise<Array<{ type: string; name: string; size: number; modifyTime: number }>>;
   get(remotePath: string): Promise<string | NodeJS.WritableStream | Buffer>;
-  put(input: Buffer, remoteFilePath: string): Promise<string>;
+  put(input: Buffer | NodeJS.ReadableStream, remoteFilePath: string): Promise<string>;
   delete(remotePath: string): Promise<unknown>;
   mkdir(remotePath: string, recursive?: boolean): Promise<unknown>;
   stat(remotePath: string): Promise<unknown>;
@@ -115,9 +116,8 @@ function assertBackupSftpReady(): void {
   }
 }
 
-async function withSftpClient<T>(operation: (client: BackupSftpClient) => Promise<T>): Promise<T> {
+export async function withSftpSession<T>(client: BackupSftpClient, operation: (client: BackupSftpClient) => Promise<T>): Promise<T> {
   assertBackupSftpReady();
-  const client = clientFactory();
   try {
     await client.connect({
       host: config.backupSftpHost,
@@ -133,6 +133,14 @@ async function withSftpClient<T>(operation: (client: BackupSftpClient) => Promis
   } finally {
     await client.end().catch(() => false);
   }
+}
+
+async function withSftpClient<T>(operation: (client: BackupSftpClient) => Promise<T>): Promise<T> {
+  return withSftpSession(clientFactory(), operation);
+}
+
+export async function batchSftpOperations<T>(operations: (client: BackupSftpClient) => Promise<T>): Promise<T> {
+  return withSftpClient(operations);
 }
 
 export async function listBackupSftpFiles(): Promise<RemoteBackupFileInfo[]> {
@@ -153,53 +161,76 @@ export async function listBackupSftpFiles(): Promise<RemoteBackupFileInfo[]> {
   });
 }
 
-export async function uploadBackupSftpFile(filename: string, buffer: Buffer): Promise<RemoteBackupFileInfo> {
-  return withSftpClient(async (client) => {
-    const targetPath = remotePath(filename);
-    await ensureRemoteDirectory(client, remoteParentPath(targetPath));
-    await client.put(buffer, targetPath);
-    return {
-      name: filename,
-      path: targetPath,
-      sizeBytes: buffer.byteLength,
-      modifiedTime: new Date().toISOString()
-    };
-  });
+function inputSizeBytes(input: Buffer | NodeJS.ReadableStream, sizeBytes?: number): number {
+  if (typeof sizeBytes === "number") {
+    return sizeBytes;
+  }
+  return Buffer.isBuffer(input) ? input.byteLength : 0;
+}
+
+export async function uploadBackupSftpFileInSession(client: BackupSftpClient, filename: string, input: Buffer | NodeJS.ReadableStream, sizeBytes?: number): Promise<RemoteBackupFileInfo> {
+  const targetPath = remotePath(filename);
+  await ensureRemoteDirectory(client, remoteParentPath(targetPath));
+  await client.put(input, targetPath);
+  return {
+    name: filename,
+    path: targetPath,
+    sizeBytes: inputSizeBytes(input, sizeBytes),
+    modifiedTime: new Date().toISOString()
+  };
+}
+
+export async function uploadBackupSftpFile(filename: string, input: Buffer | NodeJS.ReadableStream, sizeBytes?: number): Promise<RemoteBackupFileInfo> {
+  return withSftpClient(async (client) => uploadBackupSftpFileInSession(client, filename, input, sizeBytes));
+}
+
+export async function downloadBackupSftpFileInSession(client: BackupSftpClient, filename: string): Promise<Buffer> {
+  const result = await client.get(remotePath(filename));
+  if (!Buffer.isBuffer(result)) {
+    throw new Error("SFTP download did not return a buffer");
+  }
+  return result;
 }
 
 export async function downloadBackupSftpFile(filename: string): Promise<Buffer> {
-  return withSftpClient(async (client) => {
-    const result = await client.get(remotePath(filename));
-    if (!Buffer.isBuffer(result)) {
-      throw new Error("SFTP download did not return a buffer");
-    }
-    return result;
-  });
+  return withSftpClient(async (client) => downloadBackupSftpFileInSession(client, filename));
 }
 
 export async function downloadBackupSftpTextFile(filename: string): Promise<string> {
   return (await downloadBackupSftpFile(filename)).toString("utf8");
 }
 
-export async function uploadBackupSftpFileAtPath(relativePath: string, buffer: Buffer): Promise<RemoteBackupFileInfo> {
-  return withSftpClient(async (client) => {
-    const normalizedPath = normalizeRemoteRelativePath(relativePath);
-    const targetPath = remoteNestedPath(normalizedPath);
-    await ensureRemoteDirectory(client, remoteParentPath(targetPath));
-    await client.put(buffer, targetPath);
-    return {
-      name: normalizedPath,
-      path: targetPath,
-      sizeBytes: buffer.byteLength,
-      modifiedTime: new Date().toISOString()
-    };
-  });
+export async function downloadBackupSftpTextFileInSession(client: BackupSftpClient, filename: string): Promise<string> {
+  return (await downloadBackupSftpFileInSession(client, filename)).toString("utf8");
+}
+
+export async function uploadBackupSftpFileAtPathInSession(client: BackupSftpClient, relativePath: string, input: Buffer | NodeJS.ReadableStream, sizeBytes?: number): Promise<RemoteBackupFileInfo> {
+  const normalizedPath = normalizeRemoteRelativePath(relativePath);
+  const targetPath = remoteNestedPath(normalizedPath);
+  await ensureRemoteDirectory(client, remoteParentPath(targetPath));
+  await client.put(input, targetPath);
+  return {
+    name: normalizedPath,
+    path: targetPath,
+    sizeBytes: inputSizeBytes(input, sizeBytes),
+    modifiedTime: new Date().toISOString()
+  };
+}
+
+export async function uploadBackupSftpFileAtPath(relativePath: string, input: Buffer | NodeJS.ReadableStream, sizeBytes?: number): Promise<RemoteBackupFileInfo> {
+  return withSftpClient(async (client) => uploadBackupSftpFileAtPathInSession(client, relativePath, input, sizeBytes));
+}
+
+export async function uploadBackupSftpFileFromPath(filename: string, filePath: string, sizeBytes: number): Promise<RemoteBackupFileInfo> {
+  return uploadBackupSftpFile(filename, fs.createReadStream(filePath), sizeBytes);
+}
+
+export async function deleteBackupSftpFileInSession(client: BackupSftpClient, relativePath: string): Promise<void> {
+  await client.delete(remoteNestedPath(relativePath));
 }
 
 export async function deleteBackupSftpFile(relativePath: string): Promise<void> {
-  return withSftpClient(async (client) => {
-    await client.delete(remoteNestedPath(relativePath));
-  });
+  return withSftpClient(async (client) => deleteBackupSftpFileInSession(client, relativePath));
 }
 
 export async function backupSftpFileExists(relativePath: string): Promise<boolean> {

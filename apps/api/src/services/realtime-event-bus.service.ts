@@ -1,9 +1,9 @@
-import type { RealtimeInvalidationEvent } from "@taskmanager/shared-types";
+import type { RealtimeEvent } from "@taskmanager/shared-types";
 
-export type RealtimeEventSubscriber = (event: RealtimeInvalidationEvent) => void;
+export type RealtimeEventSubscriber = (event: RealtimeEvent) => void;
 
 export interface RealtimeEventBus {
-  publish(event: RealtimeInvalidationEvent): void;
+  publish(event: RealtimeEvent): void;
   subscribe(subscriber: RealtimeEventSubscriber): () => void;
   subscriberCount(): number;
 }

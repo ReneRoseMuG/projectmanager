@@ -408,6 +408,19 @@ export interface RealtimeInvalidationEvent {
   occurredAt: string;
 }
 
+export type BackupProgressOperation = "full_backup" | "incremental_sync" | "import";
+
+export interface BackupProgressEvent {
+  type: "backup_progress";
+  operation: BackupProgressOperation;
+  phase: string;
+  current: number;
+  total: number;
+  detail?: string;
+}
+
+export type RealtimeEvent = RealtimeInvalidationEvent | BackupProgressEvent;
+
 export interface AdminUser {
   id: number;
   firstName: string;

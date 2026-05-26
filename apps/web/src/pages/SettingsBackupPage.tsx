@@ -1,4 +1,5 @@
 import type {
+  BackupProgressEvent,
   DumpBackupApplyResult,
   DumpBackupPreviewResult,
   DumpBackupSaveResult,
@@ -8,14 +9,16 @@ import type {
   DumpRemoteBackupFile
 } from "@taskmanager/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CloudDownload, CloudUpload, DatabaseBackup, FolderOpen, HardDrive, RefreshCw, Server } from "lucide-react";
+import { Activity, AlertTriangle, CloudDownload, CloudUpload, DatabaseBackup, FolderOpen, HardDrive, RefreshCw, Server } from "lucide-react";
 import { useState } from "react";
 import { applyRemoteDump, previewRemoteDump, saveLocalDump } from "../api/dumps";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { PageHero } from "../components/ui/PageHero";
+import { ProgressBar } from "../components/ui/ProgressBar";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
+import { clearBackupProgress, useBackupProgress } from "../hooks/useBackupProgress";
 import { useIncrementalRemoteSync, useLocalDumpStatus, useRemoteDumpStatus } from "../hooks/useLocalDumpStatus";
 import { useHasPermission } from "../hooks/usePermissions";
 import { invalidateWikiImportData } from "../queries/invalidation";
@@ -48,6 +51,78 @@ function syncReadinessTone(readiness: DumpIncrementalSyncPreviewResult["transfer
   return "crimson";
 }
 
+const operationLabels: Record<BackupProgressEvent["operation"], string> = {
+  full_backup: "Vollsicherung",
+  incremental_sync: "Sync",
+  import: "Import"
+};
+
+const phaseLabels: Record<string, string> = {
+  db_export: "Datenbankexport",
+  archive: "Archiv",
+  local_save: "Lokal gespeichert",
+  sftp_upload: "SFTP-Upload",
+  manifest_fetch: "Manifest",
+  file_compare: "Vergleich",
+  file_upload: "Datei-Upload",
+  file_delete: "Datei-Löschung",
+  manifest_update: "Manifest-Update",
+  staging: "Staging",
+  db_restore: "DB-Wiederherstellung",
+  file_swap: "Dateitausch",
+  verify: "Verifikation",
+  done: "Abgeschlossen"
+};
+
+function progressValue(event: BackupProgressEvent): number {
+  if (event.phase === "done") {
+    return 100;
+  }
+  if (event.total <= 0) {
+    return 0;
+  }
+  return Math.round((event.current / event.total) * 100);
+}
+
+function progressLabel(event: BackupProgressEvent): string {
+  if (event.total <= 0) {
+    return event.phase === "done" ? "abgeschlossen" : "läuft";
+  }
+  return `${event.current}/${event.total}`;
+}
+
+function BackupProgressPanel({ events }: { events: BackupProgressEvent[] }) {
+  if (events.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
+      <div className="mb-3 flex items-center gap-2">
+        <Activity size={18} />
+        <h2 className="text-base font-semibold">Fortschritt</h2>
+      </div>
+      <div className="grid gap-3">
+        {events.map((event) => (
+          <div key={event.operation} className="grid gap-2 rounded-lg border border-line bg-steel-50 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink">{operationLabels[event.operation]}</p>
+                <p className="truncate text-xs text-steel-500">
+                  {phaseLabels[event.phase] ?? event.phase}
+                  {event.detail ? ` · ${event.detail}` : ""}
+                </p>
+              </div>
+              <Badge tone={event.phase === "done" ? "fern" : "teal"}>{progressLabel(event)}</Badge>
+            </div>
+            <ProgressBar value={progressValue(event)} size="sm" />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function SettingsBackupPage() {
   const { confirm } = useConfirm();
   const queryClient = useQueryClient();
@@ -55,6 +130,7 @@ export function SettingsBackupPage() {
   const backupStatus = useLocalDumpStatus();
   const remoteStatus = useRemoteDumpStatus();
   const incrementalSync = useIncrementalRemoteSync();
+  const backupProgress = useBackupProgress();
   const [saveResult, setSaveResult] = useState<DumpBackupSaveResult | null>(null);
   const [syncResult, setSyncResult] = useState<DumpIncrementalSyncResult | null>(null);
   const [syncPreview, setSyncPreview] = useState<DumpIncrementalSyncPreviewResult | null>(null);
@@ -72,6 +148,7 @@ export function SettingsBackupPage() {
   }
 
   async function handleSave() {
+    clearBackupProgress("full_backup");
     setSaving(true);
     setError(null);
     setSaveResult(null);
@@ -99,6 +176,7 @@ export function SettingsBackupPage() {
   }
 
   async function handleIncrementalSync() {
+    clearBackupProgress("incremental_sync");
     setError(null);
     setSyncResult(null);
     setSyncPreview(null);
@@ -113,6 +191,7 @@ export function SettingsBackupPage() {
   }
 
   async function handleIncrementalSyncImport() {
+    clearBackupProgress("import");
     setError(null);
     setSyncPreview(null);
     setSyncApplyResult(null);
@@ -151,6 +230,7 @@ export function SettingsBackupPage() {
   }
 
   async function handleRemoteImport(fileId?: string) {
+    clearBackupProgress("import");
     const importKey = fileId ?? "__latest__";
     setImportingFileId(importKey);
     setError(null);
@@ -195,6 +275,7 @@ export function SettingsBackupPage() {
   }
 
   const remoteFiles = remoteStatus.status?.files ?? [];
+  const progressEvents = Object.values(backupProgress.byOperation).filter((event): event is BackupProgressEvent => event !== null);
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
@@ -223,6 +304,7 @@ export function SettingsBackupPage() {
       </div>
 
       <div className="flex min-h-0 w-full flex-1 flex-col gap-6 overflow-auto bg-white p-5">
+      <BackupProgressPanel events={progressEvents} />
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="rounded-md border border-line bg-white p-4 shadow-sm">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
