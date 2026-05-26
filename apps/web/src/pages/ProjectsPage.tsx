@@ -22,6 +22,7 @@ import { useHasPermission } from "../hooks/usePermissions";
 import { useMilestones } from "../hooks/useMilestones";
 import { useProjects } from "../hooks/useProjects";
 import { useStandaloneView } from "../hooks/useStandaloneView";
+import { useStatusCascadeWorkflow } from "../hooks/useStatusCascadeWorkflow";
 import { useTasks } from "../hooks/useTasks";
 import { useTickets } from "../hooks/useTickets";
 import { invalidateTags } from "../queries/invalidation";
@@ -38,6 +39,7 @@ export function ProjectsPage() {
   const standalone = useStandaloneView();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const statusCascade = useStatusCascadeWorkflow();
   const canCreateMilestones = useHasPermission("milestones", "write");
   const canCreateTasks = useHasPermission("tasks", "write");
   const canCreateTickets = useHasPermission("tickets", "write");
@@ -102,7 +104,8 @@ export function ProjectsPage() {
 
   const updateProjectStatus = async (project: Project, status: ProjectStatus) => {
     try {
-      await updateProject(project.id, { status, expectedVersion: project.version });
+      const updated = await updateProject(project.id, { status, expectedVersion: project.version });
+      await statusCascade.startProjectCascade(project, updated);
     } catch (updateError) {
       showToast({ tone: "error", title: "Projektstatus konnte nicht geändert werden", message: errorMessage(updateError) });
       throw updateError;
@@ -332,6 +335,7 @@ export function ProjectsPage() {
         onSubmit={createTicket}
         onClose={() => setCreateTicketForProject(null)}
       />
+      {statusCascade.dialog}
     </div>
   );
 }

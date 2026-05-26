@@ -1,7 +1,7 @@
-import type { CommentInput, Tag, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+import type { CommentInput, CommentUpdate, Tag, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { createComment as createCommentRequest, deleteComment as deleteCommentRequest } from "../api/comments";
+import { createComment as createCommentRequest, deleteComment as deleteCommentRequest, updateComment as updateCommentRequest } from "../api/comments";
 import { createSubtask as createSubtaskRequest } from "../api/subtasks";
 import { setTaskTags } from "../api/tags";
 import { deleteTask, getTask, updateTask as updateTaskRequest } from "../api/tasks";
@@ -107,6 +107,16 @@ export function useTaskDetail(taskId: number | null) {
     }
   });
 
+  const updateCommentMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: CommentUpdate }) => updateCommentRequest(id, input),
+    onSuccess: async () => {
+      if (validTaskId !== undefined) {
+        await invalidateComments(queryClient, "task", validTaskId);
+      }
+      await invalidateTaskScope(queryClient, validTaskId);
+    }
+  });
+
   const updateTask = useCallback(
     async (input: TaskUpdate) => {
       if (validTaskId === undefined) {
@@ -160,6 +170,13 @@ export function useTaskDetail(taskId: number | null) {
     [removeCommentMutation]
   );
 
+  const updateComment = useCallback(
+    async (id: number, input: CommentUpdate) => {
+      return updateCommentMutation.mutateAsync({ id, input });
+    },
+    [updateCommentMutation]
+  );
+
   return {
     task: taskQuery.data ?? null,
     loading: taskQuery.isLoading,
@@ -171,6 +188,7 @@ export function useTaskDetail(taskId: number | null) {
     updateSubtask,
     removeSubtask,
     createComment,
+    updateComment,
     removeComment
   };
 }

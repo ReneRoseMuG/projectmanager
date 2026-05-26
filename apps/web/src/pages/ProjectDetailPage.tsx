@@ -23,6 +23,7 @@ import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useProjects } from "../hooks/useProjects";
+import { useStatusCascadeWorkflow } from "../hooks/useStatusCascadeWorkflow";
 import { withStandaloneView } from "../utils/standalone";
 import type { DraftFile } from "../types";
 
@@ -32,6 +33,7 @@ export function ProjectDetailPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const statusCascade = useStatusCascadeWorkflow();
   const isCreateMode = params.id === undefined;
   const projectId = isCreateMode ? undefined : Number(params.id);
   const { project, loading, createProject, updateProject, removeProject } =
@@ -58,6 +60,7 @@ export function ProjectDetailPage() {
           tagIds,
         );
         showToast({ tone: "success", title: "Projekt gespeichert" });
+        await statusCascade.startProjectCascade(project, updated);
         return updated;
       }
 
@@ -193,6 +196,7 @@ export function ProjectDetailPage() {
         onClose={closePage}
         onOpenInTab={openInTab}
       />
+      {statusCascade.dialog}
     </div>
   );
 }

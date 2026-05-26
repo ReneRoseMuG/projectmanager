@@ -160,6 +160,33 @@ describe("Comments API", () => {
     expect(res.body[1].body).toBe("Zweiter");
   });
 
+  it("PATCH /api/comments/:id aktualisiert einen Kommentar versioniert", async () => {
+    const project = await createProject(app);
+    const task = await createTask(app, project.id);
+    const comment = await createComment(app, task.id, { body: "# Alt" });
+
+    const res = await supertest(app.server)
+      .patch(`/api/comments/${comment.id}`)
+      .send({ body: "<h1>Neu</h1>", expectedVersion: comment.version })
+      .expect(200);
+
+    expect(res.body).toEqual(expect.objectContaining({ id: comment.id, body: "<h1>Neu</h1>", version: comment.version + 1 }));
+    const listed = await supertest(app.server).get(`/api/tasks/${task.id}/comments`).expect(200);
+    expect(listed.body[0]).toEqual(expect.objectContaining({ id: comment.id, body: "<h1>Neu</h1>", version: comment.version + 1 }));
+  });
+
+  it("PATCH /api/comments/:id verlangt expectedVersion und meldet Versionskonflikte", async () => {
+    const project = await createProject(app);
+    const task = await createTask(app, project.id);
+    const comment = await createComment(app, task.id);
+
+    await supertest(app.server).patch(`/api/comments/${comment.id}`).send({ body: "Ohne Version" }).expect(400);
+    await supertest(app.server)
+      .patch(`/api/comments/${comment.id}`)
+      .send({ body: "Konflikt", expectedVersion: comment.version + 1 })
+      .expect(409);
+  });
+
   it("DELETE /api/comments/:id loescht den Kommentar", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);

@@ -765,6 +765,7 @@ export function FeatureForm({
                 comments={comments.comments}
                 entityLabel="Feature"
                 onCreate={comments.createComment}
+                onUpdate={comments.updateComment}
                 onDelete={comments.removeComment}
               />
             ) : (

@@ -5,6 +5,7 @@
  *
  * Abgedeckte Regeln:
  * - RichTextInlineField rendert HTML-Leseansicht, Placeholder, readOnly und Edit-Zustand.
+ * - Markdown-Werte werden beim Öffnen roh an den Editor gegeben und als Editor-HTML committed.
  * - Im Edit-Zustand wird nur die feste Toolbar gerendert, keine zusätzliche Auswahl- oder Floating-Bar.
  * - TipTap wird im Test gemockt, die Leseansicht wird real gerendert.
  *
@@ -95,12 +96,14 @@ interface MockTransaction {
 }
 
 interface MockEditorConfig {
+  content?: string;
   editorProps?: {
     attributes?: Record<string, string>;
     transformPastedText?: (text: string) => string;
     handlePaste?: (view: MockPasteView, event: ClipboardEvent) => boolean;
   };
   onTransaction?: (input: { editor: MockEditor; transaction: MockTransaction }) => void;
+  onUpdate?: (input: { editor: MockEditor }) => void;
   onBlur?: (input: { editor: MockEditor }) => void;
 }
 
@@ -207,6 +210,13 @@ describe("RichTextInlineField", () => {
     expect(screen.getByTestId("field-view").innerHTML).toBe("<p><strong>Hallo</strong></p>");
   });
 
+  it("T-01b rendert Markdown-Werte als Text in der Leseansicht", () => {
+    renderWithProviders(<RichTextInlineField value={"# Titel\n\n<script>alert(1)</script>"} valueFormat="markdown" onChange={vi.fn()} testIdPrefix="field" />);
+
+    expect(screen.getByTestId("field-view")).toHaveTextContent("# Titel");
+    expect(screen.getByTestId("field-view").querySelector("script")).not.toBeInTheDocument();
+  });
+
   it("T-02 zeigt placeholder wenn value null ist", () => {
     renderWithProviders(<RichTextInlineField value={null} onChange={vi.fn()} placeholder="Text eingeben" testIdPrefix="field" />);
 
@@ -277,6 +287,23 @@ describe("RichTextInlineField", () => {
     expect(onChange).toHaveBeenCalledWith("<p>mock content</p>");
   });
 
+  it("T-10b öffnet Markdown-Werte roh im Editor und committed Editor-HTML", () => {
+    const onChange = vi.fn();
+    tiptapMock.html = "<h1>Titel</h1><p><strong>fett</strong></p>";
+    renderWithProviders(<RichTextInlineField value={"# Titel\n\n**fett**"} valueFormat="markdown" onChange={onChange} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByTestId("field-view"));
+    expect(tiptapMock.config?.content).toBe("# Titel\n\n**fett**");
+    const activeEditor = tiptapMock.editor;
+    if (activeEditor) {
+      act(() => {
+        tiptapMock.config?.onBlur?.({ editor: activeEditor });
+      });
+    }
+
+    expect(onChange).toHaveBeenCalledWith("<h1>Titel</h1><p><strong>fett</strong></p>");
+  });
+
   it("T-11 ruft onChange bei Escape mit originalValue auf", () => {
     const onChange = vi.fn();
     renderWithProviders(<RichTextInlineField value="<p>Original</p>" onChange={onChange} testIdPrefix="field" />);
@@ -286,6 +313,26 @@ describe("RichTextInlineField", () => {
 
     expect(onChange).toHaveBeenCalledWith("<p>Original</p>");
     expect(onChange).not.toHaveBeenCalledWith("<p>mock content</p>");
+  });
+
+  it("T-11b hält den Editor bei commitOnBlur=false offen und meldet Live-HTML", () => {
+    const onChange = vi.fn();
+    renderWithProviders(<RichTextInlineField value="<p>Original</p>" onChange={onChange} commitOnBlur={false} liveUpdate testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByTestId("field-view"));
+    tiptapMock.html = "<p>Live</p>";
+    const activeEditor = tiptapMock.editor;
+    if (!activeEditor) {
+      throw new Error("Editor mock was not created");
+    }
+
+    act(() => {
+      tiptapMock.config?.onUpdate?.({ editor: activeEditor });
+      tiptapMock.config?.onBlur?.({ editor: activeEditor });
+    });
+
+    expect(onChange).toHaveBeenCalledWith("<p>Live</p>");
+    expect(screen.getByTestId("field-editor")).toBeInTheDocument();
   });
 
   it("T-12 nutzt testIdPrefix für view und editor", () => {

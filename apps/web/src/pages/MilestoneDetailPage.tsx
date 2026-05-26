@@ -13,6 +13,7 @@ import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useMilestones } from "../hooks/useMilestones";
 import { useProjects } from "../hooks/useProjects";
+import { useStatusCascadeWorkflow } from "../hooks/useStatusCascadeWorkflow";
 import type { DraftFile } from "../types";
 import { withStandaloneView } from "../utils/standalone";
 
@@ -22,6 +23,7 @@ export function MilestoneDetailPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const statusCascade = useStatusCascadeWorkflow();
   const isCreateMode = params.id === undefined;
   const milestoneId = isCreateMode ? undefined : Number(params.id);
   const initialProjectIdParam = searchParams.get("projectId");
@@ -68,6 +70,7 @@ export function MilestoneDetailPage() {
           tagIds,
         );
         showToast({ tone: "success", title: "Meilenstein gespeichert" });
+        await statusCascade.startMilestoneCascade(milestone, updated);
         return updated;
       }
 
@@ -173,6 +176,7 @@ export function MilestoneDetailPage() {
         onClose={closePage}
         onOpenInTab={openInTab}
       />
+      {statusCascade.dialog}
     </div>
   );
 }

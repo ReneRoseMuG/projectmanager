@@ -1,10 +1,10 @@
 import type { Note } from "@taskmanager/shared-types";
-import { Plus, StickyNote } from "lucide-react";
+import { StickyNote } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
-import { SearchInput } from "../ui/SearchInput";
+import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { NoteCard } from "./NoteCard";
+import { NoteListViewItem } from "./NoteListViewItem";
 
 interface NoteListProps {
   notes: Note[];
@@ -13,32 +13,55 @@ interface NoteListProps {
   onDelete: (note: Note) => void;
 }
 
-export function NoteList({ notes, onCreate, onEdit, onDelete }: NoteListProps) {
-  const [searchValue, setSearchValue] = useState("");
-  const visibleNotes = useMemo(() => {
-    const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
-    if (!normalized) {
-      return notes;
-    }
+function matchesSearch(note: Note, searchValue: string) {
+  const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
+  if (!normalized) {
+    return true;
+  }
 
-    return notes.filter((note) => note.title.toLocaleLowerCase("de-DE").includes(normalized));
-  }, [notes, searchValue]);
+  return note.title.toLocaleLowerCase("de-DE").includes(normalized);
+}
+
+export function NoteList({ notes, onCreate, onEdit, onDelete }: NoteListProps) {
+  const [mode, setMode] = useState<ListBoardMode>("board");
+  const [searchValue, setSearchValue] = useState("");
+  const visibleNotes = useMemo(
+    () => notes.filter((note) => matchesSearch(note, searchValue)),
+    [notes, searchValue],
+  );
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SearchInput value={searchValue} onChange={setSearchValue} />
-        <Button aria-label="Neue Notiz" title="Neue Notiz" className="h-10 w-10" icon={<Plus size={17} />} variant="primary" onClick={() => void onCreate()} />
-      </div>
-      {visibleNotes.length === 0 ? (
-        <EmptyState icon={<StickyNote size={22} />} title="Keine Notizen" body="Erstelle eine Notiz, um Kontext und Entscheidungen festzuhalten." tone="violet" variant="tinted" />
-      ) : (
-        <div className="grid gap-3">
-          {visibleNotes.map((note) => (
-            <NoteCard key={note.id} note={note} onEdit={onEdit} onDelete={onDelete} />
-          ))}
-        </div>
+    <ListBoardView
+      items={visibleNotes}
+      mode={mode}
+      onModeChange={setMode}
+      onAdd={() => void onCreate()}
+      addLabel="Neue Notiz"
+      searchValue={searchValue}
+      onSearchChange={setSearchValue}
+      emptyState={
+        <EmptyState
+          icon={<StickyNote size={22} />}
+          title="Keine Notizen"
+          body="Erstelle eine Notiz, um Kontext und Entscheidungen festzuhalten."
+          tone="fern"
+          variant="tinted"
+        />
+      }
+      renderCard={(note) => (
+        <NoteCard
+          note={note}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       )}
-    </div>
+      renderRow={(note) => (
+        <NoteListViewItem
+          note={note}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      )}
+    />
   );
 }

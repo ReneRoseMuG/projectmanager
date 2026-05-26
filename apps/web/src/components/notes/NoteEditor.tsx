@@ -1,13 +1,20 @@
-import type { JsonObject, JsonValue, Note, NoteUpdate } from "@taskmanager/shared-types";
-import { Download, MoreHorizontal, Save, StickyNote, Trash2, X } from "lucide-react";
+import type { Note, NoteUpdate } from "@taskmanager/shared-types";
+import { Download, StickyNote, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
-import { Modal } from "../ui/Modal";
+import { FormModal } from "../ui/FormModal";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
+import {
+  escapeHtml,
+  htmlToNoteContent,
+  noteContentToEditorContent,
+  noteContentToExportHtml,
+  type NoteContentFormat,
+} from "./noteContent";
 
 interface NoteEditorProps {
   note: Note | null;
@@ -16,45 +23,8 @@ interface NoteEditorProps {
   onClose: () => void;
 }
 
-function isJsonRecord(value: JsonValue): value is Record<string, JsonValue> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function collectText(value: JsonValue): string[] {
-  if (!isJsonRecord(value)) {
-    return [];
-  }
-
-  if (typeof value.text === "string") {
-    return [value.text];
-  }
-
-  if (Array.isArray(value.content)) {
-    return value.content.flatMap(collectText);
-  }
-
-  return [];
-}
-
-function noteContentToHtml(value: JsonObject) {
-  if (typeof value.html === "string") {
-    return value.html;
-  }
-
-  const legacyText = collectText(value).join(" ").trim();
-  return legacyText ? `<p>${escapeHtml(legacyText)}</p>` : "";
-}
-
-function htmlToNoteContent(html: string): JsonObject {
-  return { html };
-}
-
-function exportNote(note: Note, title: string, content: string) {
-  const blob = new Blob([`<h1>${escapeHtml(title)}</h1>\n${content}\n`], { type: "text/html;charset=utf-8" });
+function exportNote(note: Note, title: string, content: string, contentFormat: NoteContentFormat) {
+  const blob = new Blob([`<h1>${escapeHtml(title)}</h1>\n${noteContentToExportHtml(content, contentFormat)}\n`], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -67,6 +37,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
   const { confirm } = useConfirm();
   const [title, setTitle] = useState("Ohne Titel");
   const [content, setContent] = useState("");
+  const [contentFormat, setContentFormat] = useState<NoteContentFormat>("html");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -74,8 +45,10 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
     if (!open || !note) {
       return;
     }
+    const nextContent = noteContentToEditorContent(note.contentJson);
     setTitle(note.title);
-    setContent(noteContentToHtml(note.contentJson));
+    setContent(nextContent.value);
+    setContentFormat(nextContent.format);
     setDirty(false);
   }, [note, open]);
 
@@ -89,7 +62,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
     }, 2000);
 
     return () => window.clearTimeout(timeout);
-  }, [content, dirty, note, open, title]);
+  }, [content, contentFormat, dirty, note, open, title]);
 
   const save = async () => {
     if (!note) {
@@ -97,7 +70,11 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
     }
     setSaving(true);
     try {
-      await onSave(note.id, { title, contentJson: htmlToNoteContent(content), expectedVersion: note.version });
+      await onSave(note.id, {
+        title,
+        contentJson: contentFormat === "html" ? htmlToNoteContent(content) : note.contentJson,
+        expectedVersion: note.version
+      });
       setDirty(false);
     } finally {
       setSaving(false);
@@ -106,6 +83,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    event.stopPropagation();
     await save();
     onClose();
   };
@@ -127,88 +105,67 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
   };
 
   return (
-    <Modal open={open && Boolean(note)} title="Notiz" size="xl" showHeader={false} bodyClassName="p-0" onClose={() => void requestClose()}>
-      {note ? (
-        <form className="flex max-h-[calc(100vh-64px)] flex-col bg-shell" onSubmit={submit}>
-          <header className="bg-gradient-to-br from-violet to-violet/75 px-5 py-5 text-white md:px-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="grid gap-2">
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-white/75">
-                  <span>Notizen</span>
-                  <span>›</span>
-                  <span>Bearbeiten</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/12">
-                    <StickyNote size={21} />
-                  </span>
-                  <div>
-                    <h2 className="text-2xl font-bold tracking-normal">{title || "Ohne Titel"}</h2>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button className="border-white/20 bg-white/10 text-white hover:bg-white/20" icon={<Download size={16} />} onClick={() => exportNote(note, title, content)}>
-                  Export HTML
-                </Button>
-                <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Mehr" title="Mehr">
-                  <MoreHorizontal size={18} />
-                </button>
-                <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Schließen" title="Schließen" onClick={() => void requestClose()}>
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
-          </header>
-
-          <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
-            <Section>
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem]">
-                <FormField label="Titel">
-                  <input
-                    className="h-11 rounded-md border border-line bg-white px-3 text-lg font-semibold outline-none transition focus:border-violet focus:ring-2 focus:ring-violet/15"
-                    value={title}
-                    required
-                    onChange={(event) => {
-                      setTitle(event.target.value);
-                      setDirty(true);
-                    }}
-                  />
-                </FormField>
-                <FormField label="Verknüpft mit">
-                  <select className="h-11 rounded-md border border-line bg-shell px-3 text-sm text-steel-600 outline-none" disabled>
-                    <option>Aktueller Kontext</option>
-                  </select>
-                </FormField>
-              </div>
-              <div className="mt-4 rounded-lg border border-dashed border-line bg-shell/60 p-3 text-sm text-steel-600">Tags für Notizen werden über die Kontextlisten gepflegt.</div>
-            </Section>
-
-            <Section>
-              <RichTextInlineField
-                value={content}
-                testIdPrefix="note-editor-content"
-                onChange={(value) => {
-                  setContent(value);
-                  setDirty(true);
-                }}
-              />
-            </Section>
+    <FormModal
+      open={open && Boolean(note)}
+      title={title || "Ohne Titel"}
+      icon={<StickyNote size={20} />}
+      breadcrumb={["Notizen", "Bearbeiten"]}
+      onSubmit={submit}
+      onClose={() => void requestClose()}
+      saving={saving}
+      submitLabel="Speichern"
+      cancelLabel="Schließen"
+      footerStart={
+        note ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="ghost" icon={<Download size={16} />} onClick={() => exportNote(note, title, content, contentFormat)}>
+              Export HTML
+            </Button>
+            <Button variant="ghost" className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={16} />} disabled>
+              Löschen
+            </Button>
           </div>
-
-          <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={16} />} disabled>
-                Löschen
-              </Button>
-              <Button onClick={() => void requestClose()}>Schließen</Button>
-              <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
-                Speichern
-              </Button>
+        ) : null
+      }
+    >
+      {note ? (
+        <>
+          <Section>
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem]">
+              <FormField label="Titel">
+                <input
+                  className="h-11 rounded-md border border-line bg-white px-3 text-lg font-semibold outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
+                  value={title}
+                  required
+                  onChange={(event) => {
+                    setTitle(event.target.value);
+                    setDirty(true);
+                  }}
+                />
+              </FormField>
+              <FormField label="Verknüpft mit">
+                <select className="h-11 rounded-md border border-line bg-white px-3 text-sm text-steel-600 outline-none" disabled>
+                  <option>Aktueller Kontext</option>
+                </select>
+              </FormField>
             </div>
-          </footer>
-        </form>
+            <div className="mt-4 rounded-lg border border-dashed border-line bg-shell/60 p-3 text-sm text-steel-600">Tags für Notizen werden über die Kontextlisten gepflegt.</div>
+          </Section>
+
+          <Section>
+            <RichTextInlineField
+              value={content}
+              valueFormat={contentFormat}
+              testIdPrefix="note-editor-content"
+              onChange={(value) => {
+                setContent(value);
+                setContentFormat("html");
+                setDirty(true);
+              }}
+            />
+          </Section>
+        </>
       ) : null}
-    </Modal>
+    </FormModal>
   );
 }

@@ -111,6 +111,14 @@ vi.mock("../../../../apps/web/src/hooks/useMilestones", () => ({
   }),
 }));
 
+vi.mock("../../../../apps/web/src/hooks/useStatusCascadeWorkflow", () => ({
+  useStatusCascadeWorkflow: () => ({
+    startProjectCascade: vi.fn().mockResolvedValue(undefined),
+    startMilestoneCascade: vi.fn().mockResolvedValue(undefined),
+    dialog: null,
+  }),
+}));
+
 beforeEach(() => {
   router.params = { id: "10" };
   router.search = "returnTo=%2Fprojects";

@@ -1,9 +1,10 @@
-import type { CommentInput, Tag, TicketInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
+import type { CommentInput, CommentUpdate, Tag, TicketInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
   createEntityComment as createEntityCommentRequest,
-  deleteEntityComment as deleteEntityCommentRequest
+  deleteEntityComment as deleteEntityCommentRequest,
+  updateComment as updateCommentRequest
 } from "../api/comments";
 import {
   addTicketRelation as addTicketRelationRequest,
@@ -145,6 +146,16 @@ export function useTicketDetail(ticketId: number | null) {
     }
   });
 
+  const updateCommentMutation = useMutation({
+    mutationFn: ({ commentId, input }: { commentId: number; input: CommentUpdate }) => updateCommentRequest(commentId, input),
+    onSuccess: async () => {
+      if (validTicketId !== undefined) {
+        await invalidateComments(queryClient, "ticket", validTicketId);
+      }
+      await invalidateTicketScope(queryClient, undefined, validTicketId);
+    }
+  });
+
   const updateTicket = useCallback(
     async (input: TicketUpdate) => {
       if (validTicketId === undefined) {
@@ -212,6 +223,13 @@ export function useTicketDetail(ticketId: number | null) {
     [removeCommentMutation]
   );
 
+  const updateComment = useCallback(
+    async (commentId: number, input: CommentUpdate) => {
+      return updateCommentMutation.mutateAsync({ commentId, input });
+    },
+    [updateCommentMutation]
+  );
+
   return {
     ticket: ticketQuery.data ?? null,
     loading: ticketQuery.isLoading,
@@ -225,6 +243,7 @@ export function useTicketDetail(ticketId: number | null) {
     addRelation,
     removeRelation,
     createComment,
+    updateComment,
     removeComment
   };
 }

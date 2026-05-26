@@ -141,7 +141,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
         {item ? (
           <>
             {comments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{comments.error}</div> : null}
-            <CommentThread comments={comments.comments} entityLabel="Backlog-Item" onCreate={comments.createComment} onDelete={comments.removeComment} />
+            <CommentThread comments={comments.comments} entityLabel="Backlog-Item" onCreate={comments.createComment} onUpdate={comments.updateComment} onDelete={comments.removeComment} />
           </>
         ) : (
           <PendingCommentList

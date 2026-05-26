@@ -44,6 +44,7 @@ import { useNotes } from "../../hooks/useNotes";
 import { useProjectFeatureLinks } from "../../hooks/useDocLinks";
 import { useProjectWikiRelation } from "../../hooks/useProjectWikiRelation";
 import { useCatalogs } from "../../hooks/useCatalogs";
+import { useStatusCascadeWorkflow } from "../../hooks/useStatusCascadeWorkflow";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { objectReference } from "../../lib/references";
@@ -194,6 +195,7 @@ export function ProjectForm({
   const projectId = project?.id;
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const statusCascade = useStatusCascadeWorkflow();
   const allFeatures = useFeatures();
   const milestones = useMilestones(null, projectId);
   const featureLinks = useProjectFeatureLinks(projectId);
@@ -359,6 +361,11 @@ export function ProjectForm({
     } finally {
       setDeleting(false);
     }
+  };
+
+  const updateMilestoneStatus = async (milestone: Milestone, nextStatus: Milestone["status"]) => {
+    const updated = await milestones.updateMilestone(milestone.id, { status: nextStatus, expectedVersion: milestone.version });
+    await statusCascade.startMilestoneCascade(milestone, updated);
   };
 
   const createNote = async () => {
@@ -859,7 +866,7 @@ export function ProjectForm({
                   )
                 }
                 onDelete={(milestone) => void deleteMilestone(milestone)}
-                onStatusChange={(milestone, status) => milestones.updateMilestone(milestone.id, { status, expectedVersion: milestone.version })}
+                onStatusChange={updateMilestoneStatus}
                 onDueDateChange={(milestone, dueDate) => milestones.updateMilestone(milestone.id, { dueDate, expectedVersion: milestone.version })}
                 onTagsChange={changeMilestoneTags}
                 onCreateTask={canCreateTasks ? (milestone) => setCreateTaskForMilestone(milestone) : undefined}
@@ -1030,6 +1037,7 @@ export function ProjectForm({
                 comments={comments.comments}
                 entityLabel="Projekt"
                 onCreate={comments.createComment}
+                onUpdate={comments.updateComment}
                 onDelete={comments.removeComment}
               />
             ) : (
@@ -1049,7 +1057,7 @@ export function ProjectForm({
         ) : null}
 
         {activeTab === "notes" ? (
-          <Section>
+          <Section fill={Boolean(project)}>
             {project ? (
               <>
                 <NoteList
@@ -1214,6 +1222,7 @@ export function ProjectForm({
         onSubmit={createMilestoneTicket}
         onClose={() => setCreateTicketForMilestone(null)}
       />
+      {statusCascade.dialog}
     </>
   );
 }

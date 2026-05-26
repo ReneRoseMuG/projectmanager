@@ -567,6 +567,7 @@ export function UseCaseForm({
                   comments={comments.comments}
                   entityLabel="Use Case"
                   onCreate={comments.createComment}
+                  onUpdate={comments.updateComment}
                   onDelete={comments.removeComment}
                 />
               </>

@@ -2,6 +2,17 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 26.05.26 | Feature       | Status-Kaskadierdialog                       | ✅     |
+| 26.05.26 | Fix           | Kommentar-Dialog Speichern                   | ✅     |
+| 26.05.26 | Fix           | Kommentar-Editor Modal                       | ✅     |
+| 26.05.26 | Feature       | Editierbare Kommentare                       | ✅     |
+| 26.05.26 | Fix           | Standard-Admin Rene Rose                     | ✅     |
+| 26.05.26 | Feature       | Notizen Board List Modal Editor              | ⚠️     |
+| 26.05.26 | Fix           | Claude Config UTF-8 BOM                      | ✅     |
+| 26.05.26 | Fix           | Claude Store MCP Konfig                      | ✅     |
+| 26.05.26 | Fix           | Claude Desktop MCP Büro                      | ✅     |
+| 26.05.26 | Feature       | MCP ChatGPT lokale Vorbereitung              | ⚠️     |
+| 26.05.26 | Fix           | Start-Abhängigkeiten                         | ✅     |
 | 26.05.26 | Fix           | CardFooterBar Untere Kartenkante             | ✅     |
 | 26.05.26 | Fix           | Standard-Admin Passwort DB                   | ✅     |
 | 26.05.26 | Fix           | Standard-Admin zurückgesetzt                 | ✅     |

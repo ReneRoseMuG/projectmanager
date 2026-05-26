@@ -772,6 +772,8 @@ export interface CommentInput {
   body: string;
 }
 
+export type CommentUpdate = WithExpectedVersion<CommentInput>;
+
 export interface Note {
   id: number;
   title: string;

@@ -648,6 +648,7 @@ export function MilestoneForm({
                 comments={comments.comments}
                 entityLabel="Meilenstein"
                 onCreate={comments.createComment}
+                onUpdate={comments.updateComment}
                 onDelete={comments.removeComment}
               />
             ) : (
@@ -661,7 +662,7 @@ export function MilestoneForm({
         ) : null}
 
         {activeTab === "notes" ? (
-          <Section>
+          <Section fill={Boolean(milestone)}>
             {milestone ? (
               <>
                 <NoteList

@@ -12,7 +12,7 @@
 // components/projects/ProjectForm.tsx             | description              | project-description
 // components/tasks/TaskForm.tsx                   | description              | task-description
 // components/tickets/TicketForm.tsx               | description              | ticket-description
-// components/ui/CommentThread.tsx                 | comment.body readOnly    | comment-thread-comment-${comment.id}-body
+// components/ui/CommentThread.tsx                 | comment.body             | comment-thread-comment-${comment.id}-body
 // components/ui/CommentThread.tsx                 | draft body               | comment-thread-body
 // components/usecases/UseCaseForm.tsx             | description              | use-case-description
 // components/usecases/UseCaseForm.tsx             | content                  | use-case-content
@@ -64,6 +64,8 @@ import { TldrawNode } from "./tldraw-node";
 interface RichTextInlineFieldProps {
   /** Current HTML value for the controlled field. */
   value: string | null | undefined;
+  /** Declares whether the value is already HTML or raw markdown/plain text. */
+  valueFormat?: RichTextValueFormat;
   /** Called on blur with the new HTML string. Does not persist directly. */
   onChange: (html: string) => void;
   /** Plain text placeholder shown when the field is empty. */
@@ -74,6 +76,10 @@ interface RichTextInlineFieldProps {
   toolbar?: RichTextToolbarVariant;
   /** Pure read view without editor mount or edit affordances. */
   readOnly?: boolean;
+  /** Keep the active editor mounted when focus leaves the field. */
+  commitOnBlur?: boolean;
+  /** Report editor HTML while typing instead of only on blur. */
+  liveUpdate?: boolean;
   /** Additional classes for the outer container. */
   className?: string;
   /** Unique prefix for data-testid attributes at each usage site. */
@@ -91,6 +97,9 @@ interface RichTextInlineEditorProps {
   clickPosition: ClickPosition | null;
   testIdPrefix?: string;
   onImageUpload?: (file: File) => Promise<string>;
+  commitOnBlur: boolean;
+  liveUpdate: boolean;
+  onLiveChange: (html: string) => void;
   onCommit: (html: string) => void;
   onCancel: () => void;
 }
@@ -105,6 +114,7 @@ interface ToolbarButtonProps {
 
 type RichTextToolbarVariant = "full" | "minimal" | "none";
 type ImageUploadHandler = (file: File) => Promise<string>;
+export type RichTextValueFormat = "html" | "markdown";
 
 interface ClickPosition {
   left: number;
@@ -117,11 +127,11 @@ function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function RichTextInlineField({ value, onChange, placeholder, minRows, toolbar = "full", readOnly = false, className = "", testIdPrefix, onImageUpload }: RichTextInlineFieldProps) {
+export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", testIdPrefix, onImageUpload }: RichTextInlineFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [originalValue, setOriginalValue] = useState("");
   const [clickPosition, setClickPosition] = useState<ClickPosition | null>(null);
-  const hasContent = hasVisibleHtmlContent(value);
+  const hasContent = valueFormat === "markdown" ? Boolean(value?.trim()) : hasVisibleHtmlContent(value);
   const minRowsStyle = useMemo(() => (minRows ? ({ "--rich-text-field-min-rows": minRows } as React.CSSProperties) : undefined), [minRows]);
   const minRowsClassName = minRows ? "rich-text-inline-min-rows" : "";
   const fieldChromeClassName = readOnly ? "" : "border border-line bg-shell/70 shadow-sm";
@@ -161,10 +171,13 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
           clickPosition={clickPosition}
           testIdPrefix={testIdPrefix}
           onImageUpload={onImageUpload}
+          commitOnBlur={commitOnBlur}
+          liveUpdate={liveUpdate}
+          onLiveChange={onChange}
           onCommit={handleCommit}
           onCancel={handleCancel}
         />
-      ) : hasContent ? (
+      ) : hasContent && valueFormat === "html" ? (
         <div
           className={cn(
             "rich-text-surface max-w-none rounded-md px-3 py-2 text-sm leading-relaxed transition-colors [&_li]:mb-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4",
@@ -177,6 +190,20 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
           onClick={readOnly ? undefined : handleActivate}
           dangerouslySetInnerHTML={{ __html: value ?? "" }}
         />
+      ) : hasContent ? (
+        <div
+          className={cn(
+            "rich-text-surface max-w-none whitespace-pre-wrap rounded-md px-3 py-2 text-sm leading-relaxed transition-colors",
+            minRowsClassName,
+            fieldChromeClassName,
+            fieldHoverClassName
+          )}
+          data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
+          style={minRowsStyle}
+          onClick={readOnly ? undefined : handleActivate}
+        >
+          {value}
+        </div>
       ) : (
         <div
           className={cn("rounded-md px-3 py-2 text-sm italic text-steel-500 transition-colors", minRowsClassName, fieldChromeClassName, fieldHoverClassName)}
@@ -197,7 +224,7 @@ export function RichTextInlineField({ value, onChange, placeholder, minRows, too
   );
 }
 
-function RichTextInlineEditor({ value, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, onCommit, onCancel }: RichTextInlineEditorProps) {
+function RichTextInlineEditor({ value, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, commitOnBlur, liveUpdate, onLiveChange, onCommit, onCancel }: RichTextInlineEditorProps) {
   const cancellingRef = useRef(false);
   const [imageUploadCount, setImageUploadCount] = useState(0);
   const { showToast } = useToast();
@@ -289,10 +316,19 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
       const { from, to } = transaction.selection;
       activeEditor.chain().selectAll().unsetColor().unsetMark("textStyle").setTextSelection({ from, to }).run();
     },
+    onUpdate: ({ editor: activeEditor }: { editor: Editor }) => {
+      if (liveUpdate) {
+        onLiveChange(activeEditor.getHTML());
+      }
+    },
     onBlur: ({ editor: activeEditor }: { editor: Editor }) => {
       if (cancellingRef.current) {
         cancellingRef.current = false;
         onCancel();
+        return;
+      }
+
+      if (!commitOnBlur) {
         return;
       }
 

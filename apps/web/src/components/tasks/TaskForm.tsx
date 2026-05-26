@@ -622,6 +622,20 @@ export function TaskForm({
                     throw commentError;
                   }
                 }}
+                onUpdate={async (id, input) => {
+                  try {
+                    await detail.updateComment(id, input);
+                    await detail.reload();
+                    showToast({ tone: "success", title: "Kommentar gespeichert" });
+                  } catch (commentError) {
+                    showToast({
+                      tone: "error",
+                      title: "Kommentar konnte nicht gespeichert werden",
+                      message: errorMessage(commentError),
+                    });
+                    throw commentError;
+                  }
+                }}
                 onDelete={async (id) => {
                   try {
                     await detail.removeComment(id);
@@ -654,7 +668,7 @@ export function TaskForm({
         ) : null}
 
         {activeTab === "notes" ? (
-          <Section>
+          <Section fill={Boolean(task)}>
             {task ? (
               <>
                 <NoteList

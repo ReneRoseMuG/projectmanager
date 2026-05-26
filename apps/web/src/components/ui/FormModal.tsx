@@ -15,6 +15,7 @@ interface FormModalProps {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void | Promise<void>;
   saving?: boolean;
   submitLabel?: string;
+  cancelLabel?: string;
   footerStart?: ReactNode;
   headerMeta?: ReactNode;
   variant?: "modal" | "page";
@@ -35,6 +36,7 @@ export function FormModal({
   onSubmit,
   saving = false,
   submitLabel = "Speichern",
+  cancelLabel = "Abbrechen",
   footerStart,
   headerMeta,
   variant = "modal",
@@ -126,7 +128,7 @@ export function FormModal({
       >
         <div className="flex flex-wrap items-center gap-2">{footerStart}</div>
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <Button onClick={onClose}>Abbrechen</Button>
+          <Button onClick={onClose}>{cancelLabel}</Button>
           <Button
             type="submit"
             variant="primary"

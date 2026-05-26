@@ -20,6 +20,7 @@ import { useMilestones } from "../hooks/useMilestones";
 import { useHasPermission } from "../hooks/usePermissions";
 import { useProjects } from "../hooks/useProjects";
 import { useStandaloneView } from "../hooks/useStandaloneView";
+import { useStatusCascadeWorkflow } from "../hooks/useStatusCascadeWorkflow";
 import { useTasks } from "../hooks/useTasks";
 import { useTickets } from "../hooks/useTickets";
 import { invalidateTags } from "../queries/invalidation";
@@ -47,6 +48,7 @@ export function MilestonesPage() {
   const standalone = useStandaloneView();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const statusCascade = useStatusCascadeWorkflow();
   const canCreateTasks = useHasPermission("tasks", "write");
   const canCreateTickets = useHasPermission("tickets", "write");
   const projects = useProjects();
@@ -106,7 +108,8 @@ export function MilestonesPage() {
 
   const updateMilestoneStatus = async (milestone: Milestone, status: Milestone["status"]) => {
     try {
-      await milestones.updateMilestone(milestone.id, { status, expectedVersion: milestone.version });
+      const updated = await milestones.updateMilestone(milestone.id, { status, expectedVersion: milestone.version });
+      await statusCascade.startMilestoneCascade(milestone, updated);
     } catch (milestoneError) {
       showToast({ tone: "error", title: "Meilensteinstatus konnte nicht geändert werden", message: errorMessage(milestoneError) });
       throw milestoneError;
@@ -291,6 +294,7 @@ export function MilestonesPage() {
         onSubmit={createTicket}
         onClose={() => setCreateTicketForMilestone(null)}
       />
+      {statusCascade.dialog}
     </div>
   );
 }

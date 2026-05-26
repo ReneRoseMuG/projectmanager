@@ -1,4 +1,4 @@
-import type { Comment, CommentEntityType, CommentInput, CommentOwner, JournalObjectType, RecentComment } from "@taskmanager/shared-types";
+import type { Comment, CommentEntityType, CommentInput, CommentOwner, CommentUpdate, JournalObjectType, RecentComment } from "@taskmanager/shared-types";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
 import {
@@ -30,8 +30,11 @@ import { notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
 import {
   buildDeleteSummary,
+  buildJournalChanges,
   buildLinkSummary,
   buildUnlinkSummary,
+  buildUpdateSummary,
+  type JournalFieldDefinition,
   makeJournalContext,
   makeJournalObject,
   objectTypeLabel,
@@ -49,6 +52,10 @@ const commentSelect = {
   createdAt: comments.createdAt,
   updatedAt: comments.updatedAt
 };
+
+const commentJournalFields: Array<JournalFieldDefinition<CommentRecord>> = [
+  { key: "body", label: "Kommentar" }
+];
 
 function mapComment(database: DbClient, record: CommentRecord): Comment {
   return {
@@ -606,6 +613,35 @@ export function linkEntityComment(database: DbClient, entityType: CommentEntityT
     });
   });
   return mapComment(database, comment);
+}
+
+export function updateComment(database: DbClient, id: number, input: CommentUpdate, actor?: JournalActor | null): Comment {
+  const body = requireNonEmpty(input.body, "body");
+  const updated = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const current = commentRepository.findById(tx, id);
+    if (!current) {
+      throw notFound(`Comment with id ${id} not found`);
+    }
+    const comment = commentRepository.update(tx, id, input.expectedVersion, { body }, actor?.actorUserId ?? undefined);
+    if (!comment) {
+      throw notFound(`Comment with id ${id} not found`);
+    }
+    const commentObject = commentJournalObject(comment);
+    const changes = buildJournalChanges(current, comment, commentJournalFields);
+    const owners = listCommentOwners(txDb, id);
+    recordJournalEntry(txDb, {
+      operation: "update",
+      object: commentObject,
+      summary: buildUpdateSummary(commentObject, changes),
+      actor,
+      changes,
+      contexts: owners.map((owner) => makeJournalContext(getOwnerJournalObject(txDb, owner), "owner"))
+    });
+    return comment;
+  });
+
+  return mapComment(database, updated);
 }
 
 export function deleteEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, id: number, actor?: JournalActor | null): void {

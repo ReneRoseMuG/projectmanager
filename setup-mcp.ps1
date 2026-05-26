@@ -1,5 +1,14 @@
 $ScriptDir = $PSScriptRoot
-$ConfigPath = "$env:APPDATA\Claude\claude_desktop_config.json"
+$ConfigPaths = @("$env:APPDATA\Claude\claude_desktop_config.json")
+$StoreClaudeRoot = "$env:LOCALAPPDATA\Packages"
+if (Test-Path $StoreClaudeRoot) {
+    Get-ChildItem $StoreClaudeRoot -Directory -Filter "Claude_*" | ForEach-Object {
+        $StoreConfigPath = Join-Path $_.FullName "LocalCache\Roaming\Claude\claude_desktop_config.json"
+        if ($ConfigPaths -notcontains $StoreConfigPath) {
+            $ConfigPaths += $StoreConfigPath
+        }
+    }
+}
 
 function Read-LocalEnv {
     param([string]$Path)
@@ -32,6 +41,17 @@ function Read-LocalEnv {
     return $values
 }
 
+function Write-JsonWithoutBom {
+    param(
+        [string]$Path,
+        [object]$Value
+    )
+
+    $json = $Value | ConvertTo-Json -Depth 10
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $json, $encoding)
+}
+
 $LocalEnv = Read-LocalEnv "$ScriptDir\.env.local"
 $ApiKey = $env:PROJECT_MANAGER_API_KEY
 if (-not $ApiKey) { $ApiKey = $env:API_KEY }
@@ -57,26 +77,30 @@ $McpEntry = [PSCustomObject]@{
     }
 }
 
-if (Test-Path $ConfigPath) {
-    $raw = Get-Content $ConfigPath -Raw -Encoding UTF8
-    $Config = $raw | ConvertFrom-Json
-} else {
-    Write-Host "No existing config found - creating new one."
-    $Config = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} }
+foreach ($ConfigPath in $ConfigPaths) {
+    if (Test-Path $ConfigPath) {
+        $raw = Get-Content $ConfigPath -Raw -Encoding UTF8
+        $Config = $raw | ConvertFrom-Json
+    } else {
+        Write-Host "No existing config found at $ConfigPath - creating new one."
+        $Config = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} }
+    }
+
+    if (-not ($Config.PSObject.Properties.Name -contains "mcpServers")) {
+        $Config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value ([PSCustomObject]@{})
+    }
+
+    if (Test-Path $ConfigPath) {
+        Copy-Item $ConfigPath "$ConfigPath.bak" -Force
+        Write-Host "Backup created: $ConfigPath.bak"
+    }
+
+    $Config.mcpServers | Add-Member -MemberType NoteProperty -Name "projekt-manager" -Value $McpEntry -Force
+
+    $dir = Split-Path $ConfigPath
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    Write-JsonWithoutBom $ConfigPath $Config
+    Write-Host "Updated Claude config: $ConfigPath"
 }
 
-if (-not ($Config.PSObject.Properties.Name -contains "mcpServers")) {
-    $Config | Add-Member -MemberType NoteProperty -Name "mcpServers" -Value ([PSCustomObject]@{})
-}
-
-if (Test-Path $ConfigPath) {
-    Copy-Item $ConfigPath "$ConfigPath.bak" -Force
-    Write-Host "Backup created: $ConfigPath.bak"
-}
-
-$Config.mcpServers | Add-Member -MemberType NoteProperty -Name "projekt-manager" -Value $McpEntry -Force
-
-$dir = Split-Path $ConfigPath
-if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-$Config | ConvertTo-Json -Depth 10 | Out-File $ConfigPath -Encoding UTF8
 Write-Host "Done! Please restart Claude Desktop."

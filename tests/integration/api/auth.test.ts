@@ -332,4 +332,36 @@ describe("Auth API", () => {
     await reader.put(`/api/tasks/${task.body.id}/tags`).send({ tagIds: [] }).expect(403);
     await reader.put(`/api/tickets/${ticket.body.id}/tags`).send({ tagIds: [] }).expect(403);
   });
+
+  it("schützt Kommentar-Updates über comments:write", async () => {
+    const admin = await loginAdmin(app);
+    const project = await admin.post("/api/projects").send({ name: "Kommentar-Projekt" }).expect(201);
+    const task = await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Kommentar-Aufgabe" }).expect(201);
+    const comment = await admin.post(`/api/tasks/${task.body.id}/comments`).send({ body: "Alter Kommentar" }).expect(201);
+
+    await supertest(app.server)
+      .patch(`/api/comments/${comment.body.id}`)
+      .send({ body: "Anonym blockiert", expectedVersion: comment.body.version })
+      .expect(401);
+
+    const updated = await admin
+      .patch(`/api/comments/${comment.body.id}`)
+      .send({ body: "Admin aktualisiert", expectedVersion: comment.body.version })
+      .expect(200);
+    expect(updated.body).toEqual(expect.objectContaining({ body: "Admin aktualisiert", version: comment.body.version + 1 }));
+
+    const roles = await admin.get("/api/admin/roles").expect(200);
+    const readerRole = roles.body.find((role: { key: string }) => role.key === "reader") as { id: number };
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Comment", lastName: "Reader", email: "comment-reader@example.test", roleId: readerRole.id, password: "password123", isActive: true })
+      .expect(201);
+
+    const reader = supertest.agent(app.server);
+    await reader.post("/api/auth/login").send({ email: "comment-reader@example.test", password: "password123" }).expect(200);
+    await reader
+      .patch(`/api/comments/${comment.body.id}`)
+      .send({ body: "Reader blockiert", expectedVersion: updated.body.version })
+      .expect(403);
+  });
 });

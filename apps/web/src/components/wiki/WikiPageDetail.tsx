@@ -75,7 +75,7 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
         {activeTab === "comments" ? (
           <Section title="Kommentare">
             {comments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{comments.error}</div> : null}
-            <CommentThread comments={comments.comments} entityLabel="Wiki-Seite" onCreate={comments.createComment} onDelete={comments.removeComment} />
+            <CommentThread comments={comments.comments} entityLabel="Wiki-Seite" onCreate={comments.createComment} onUpdate={comments.updateComment} onDelete={comments.removeComment} />
           </Section>
         ) : null}
         {activeTab === "journal" ? (

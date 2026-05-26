@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import type { CommentEntityType, CommentInput } from "@taskmanager/shared-types";
+import type { CommentEntityType, CommentInput, CommentUpdate } from "@taskmanager/shared-types";
 import { requireCurrentUser } from "../plugins/auth.js";
-import { createComment, createEntityComment, deleteComment, deleteEntityComment, linkEntityComment, listComments, listEntityComments, listRecentComments } from "../services/comments.service.js";
+import { createComment, createEntityComment, deleteComment, deleteEntityComment, linkEntityComment, listComments, listEntityComments, listRecentComments, updateComment } from "../services/comments.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema, taskIdParamSchema } from "../utils/route-schemas.js";
@@ -12,6 +12,16 @@ const commentBodySchema = {
   additionalProperties: false,
   properties: {
     body: { type: "string", minLength: 1 }
+  }
+} as const;
+
+const commentUpdateSchema = {
+  type: "object",
+  required: ["body", "expectedVersion"],
+  additionalProperties: false,
+  properties: {
+    body: { type: "string", minLength: 1 },
+    expectedVersion: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -108,6 +118,12 @@ export async function registerCommentsRoutes(app: FastifyInstance): Promise<void
       const comment = createComment(app.db, request.params.taskId, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(comment);
     }
+  );
+
+  app.patch<{ Params: { id: number }; Body: CommentUpdate }>(
+    "/comments/:id",
+    { schema: { params: idParamSchema, body: commentUpdateSchema, response: { 200: objectResponseSchema } } },
+    async (request) => updateComment(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number } }>(
