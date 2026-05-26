@@ -86,6 +86,9 @@ describe("Milestones API", () => {
       totalTaskCount: 0,
       ticketCount: 0,
       featureCount: 0,
+      attachmentCount: 0,
+      noteCount: 0,
+      commentCount: 0,
       tags: []
     });
 
@@ -176,13 +179,33 @@ describe("Milestones API", () => {
     expect(event.body.owners).toEqual([{ type: "milestone", id: milestone.id }]);
 
     const detail = await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(200);
-    expect(detail.body).toMatchObject({ taskCount: 2, openTaskCount: 1, doneTaskCount: 1, totalTaskCount: 2, ticketCount: 2, featureCount: 1 });
+    expect(detail.body).toMatchObject({
+      taskCount: 2,
+      openTaskCount: 1,
+      doneTaskCount: 1,
+      totalTaskCount: 2,
+      ticketCount: 2,
+      featureCount: 1,
+      attachmentCount: 1,
+      noteCount: 1,
+      commentCount: 1
+    });
 
     await supertest(app.server).delete(`/api/milestones/${milestone.id}/tasks/${task.id}`).expect(204);
     await supertest(app.server).delete(`/api/milestones/${milestone.id}/tickets/${ticket.id}`).expect(204);
 
     const reducedDetail = await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(200);
-    expect(reducedDetail.body).toMatchObject({ taskCount: 1, openTaskCount: 1, doneTaskCount: 0, totalTaskCount: 1, ticketCount: 1, featureCount: 1 });
+    expect(reducedDetail.body).toMatchObject({
+      taskCount: 1,
+      openTaskCount: 1,
+      doneTaskCount: 0,
+      totalTaskCount: 1,
+      ticketCount: 1,
+      featureCount: 1,
+      attachmentCount: 1,
+      noteCount: 1,
+      commentCount: 1
+    });
   });
 
   it("löscht Milestone-Supportobjekte, aber keine unabhängigen Fachobjekte", async () => {

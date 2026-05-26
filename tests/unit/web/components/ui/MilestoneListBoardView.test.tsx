@@ -37,6 +37,20 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   },
 }));
 
+vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
+  useHasPermission: () => true,
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useTags", () => ({
+  useTags: () => ({
+    tags: [{ id: 1, name: "Qualität", color: "#0f766e", version: 1 }],
+    loading: false,
+    error: null,
+    reload: async () => undefined,
+    createTag: async () => undefined,
+  }),
+}));
+
 function renderMilestoneList({
   milestones = buildMilestoneSet(),
   onCreate = vi.fn(),
@@ -84,6 +98,10 @@ describe("MilestoneListBoardView", () => {
       within(activeColumn).getByText("2 / 5 erledigt"),
     ).toBeInTheDocument();
     expect(within(activeColumn).getByText("3 offen")).toBeInTheDocument();
+    expect(
+      within(activeColumn).getByText("Aufgaben").compareDocumentPosition(within(activeColumn).getByLabelText("0 Anhänge")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(
       within(activeColumn).queryByText("5 Aufgaben"),
     ).not.toBeInTheDocument();

@@ -63,6 +63,9 @@ export function buildProject(overrides: Partial<Project> = {}): Project {
     openTaskCount: 3,
     doneTaskCount: 2,
     totalTaskCount: 5,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     tags: [buildTag()],
     ...overrides
   };
@@ -87,6 +90,9 @@ export function buildMilestone(overrides: Partial<Milestone> = {}): Milestone {
     totalTaskCount: 5,
     ticketCount: 1,
     featureCount: 2,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     tags: [buildTag()],
     ...overrides
   };

@@ -33,7 +33,7 @@ export function ProjectsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { projects, loading, error, updateProject, removeProject } = useProjects();
+  const { projects, loading, error, updateProject, updateProjectTags, removeProject } = useProjects();
   const catalogs = useCatalogs();
   const standalone = useStandaloneView();
   const { showToast } = useToast();
@@ -105,6 +105,15 @@ export function ProjectsPage() {
       await updateProject(project.id, { status, expectedVersion: project.version });
     } catch (updateError) {
       showToast({ tone: "error", title: "Projektstatus konnte nicht geändert werden", message: errorMessage(updateError) });
+      throw updateError;
+    }
+  };
+
+  const changeProjectTags = async (projectId: number, tagIds: number[]) => {
+    try {
+      await updateProjectTags(projectId, tagIds);
+    } catch (updateError) {
+      showToast({ tone: "error", title: "Projekt-Tags konnten nicht geändert werden", message: errorMessage(updateError) });
       throw updateError;
     }
   };
@@ -283,6 +292,7 @@ export function ProjectsPage() {
           onEdit={(project) => navigate(projectTarget(`/projects/${project.id}`))}
           onDelete={(project) => void deleteProject(project)}
           onStatusChange={updateProjectStatus}
+          onTagsChange={changeProjectTags}
           onCreateMilestone={canCreateMilestones ? (project) => setCreateMilestoneForProject(project) : undefined}
           onCreateTask={canCreateTasks ? (project) => setCreateTaskForProject(project) : undefined}
           onCreateTicket={canCreateTickets ? (project) => setCreateTicketForProject(project) : undefined}

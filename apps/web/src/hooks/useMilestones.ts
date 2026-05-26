@@ -74,6 +74,15 @@ export function useMilestones(milestoneId?: number | null, projectId?: number | 
     }
   });
 
+  const updateMilestoneTagsMutation = useMutation({
+    mutationFn: async ({ id, tagIds }: { id: number; tagIds: number[] }) => {
+      return setMilestoneTags(id, tagIds);
+    },
+    onSuccess: async (_tags, variables) => {
+      await invalidateMilestoneScope(queryClient, variables.id);
+    }
+  });
+
   const removeMilestoneMutation = useMutation({
     mutationFn: deleteMilestoneRequest,
     onSuccess: async () => {
@@ -95,6 +104,13 @@ export function useMilestones(milestoneId?: number | null, projectId?: number | 
     [updateMilestoneMutation]
   );
 
+  const updateMilestoneTags = useCallback(
+    async (id: number, tagIds: number[]) => {
+      await updateMilestoneTagsMutation.mutateAsync({ id, tagIds });
+    },
+    [updateMilestoneTagsMutation]
+  );
+
   const removeMilestone = useCallback(
     async (id: number) => {
       await removeMilestoneMutation.mutateAsync(id);
@@ -110,6 +126,7 @@ export function useMilestones(milestoneId?: number | null, projectId?: number | 
     reload,
     createMilestone,
     updateMilestone,
+    updateMilestoneTags,
     removeMilestone
   };
 }

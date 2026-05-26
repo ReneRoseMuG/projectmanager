@@ -12,6 +12,11 @@ export interface TestProject {
   createdAt: string;
   updatedAt: string;
   openTaskCount: number;
+  doneTaskCount: number;
+  totalTaskCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   tags: TestTag[];
 }
 
@@ -33,6 +38,9 @@ export interface TestMilestone {
   totalTaskCount: number;
   ticketCount: number;
   featureCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   tags: TestTag[];
 }
 

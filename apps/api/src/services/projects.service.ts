@@ -1,7 +1,7 @@
 import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { projects, projectTasks, tasks, wikiPages } from "../db/schema.js";
+import { projectAttachments, projectComments, projectNotes, projects, projectTasks, tasks, wikiPages } from "../db/schema.js";
 import { projectRepository, type ProjectRecord } from "../repositories/project.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
@@ -25,6 +25,9 @@ interface ProjectTaskCounts {
   openTaskCount: number;
   doneTaskCount: number;
   totalTaskCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
 }
 
 function wikiPageLabel(database: DbClient, wikiPageId: unknown): string | null {
@@ -61,7 +64,10 @@ function emptyProjectTaskCounts(): ProjectTaskCounts {
   return {
     openTaskCount: 0,
     doneTaskCount: 0,
-    totalTaskCount: 0
+    totalTaskCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0
   };
 }
 
@@ -81,6 +87,9 @@ function mapProject(database: DbClient, record: ProjectRecord, counts: ProjectTa
     openTaskCount: counts.openTaskCount,
     doneTaskCount: counts.doneTaskCount,
     totalTaskCount: counts.totalTaskCount,
+    attachmentCount: counts.attachmentCount,
+    noteCount: counts.noteCount,
+    commentCount: counts.commentCount,
     tags
   };
 }
@@ -111,6 +120,27 @@ function getProjectTaskCounts(database: DbClient, projectIds: number[]): Map<num
     } else {
       current.openTaskCount += 1;
     }
+    counts.set(row.projectId, current);
+  }
+
+  const attachmentRows = database.select({ projectId: projectAttachments.projectId }).from(projectAttachments).where(inArray(projectAttachments.projectId, projectIds)).all();
+  for (const row of attachmentRows) {
+    const current = counts.get(row.projectId) ?? emptyProjectTaskCounts();
+    current.attachmentCount += 1;
+    counts.set(row.projectId, current);
+  }
+
+  const noteRows = database.select({ projectId: projectNotes.projectId }).from(projectNotes).where(inArray(projectNotes.projectId, projectIds)).all();
+  for (const row of noteRows) {
+    const current = counts.get(row.projectId) ?? emptyProjectTaskCounts();
+    current.noteCount += 1;
+    counts.set(row.projectId, current);
+  }
+
+  const commentRows = database.select({ projectId: projectComments.projectId }).from(projectComments).where(inArray(projectComments.projectId, projectIds)).all();
+  for (const row of commentRows) {
+    const current = counts.get(row.projectId) ?? emptyProjectTaskCounts();
+    current.commentCount += 1;
     counts.set(row.projectId, current);
   }
 

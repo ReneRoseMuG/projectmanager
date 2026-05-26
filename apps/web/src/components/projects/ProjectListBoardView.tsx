@@ -1,6 +1,8 @@
 import type { Project } from "@taskmanager/shared-types";
 import { FolderKanban } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
+import { useHasPermission } from "../../hooks/usePermissions";
+import { useTags } from "../../hooks/useTags";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { ProjectCard } from "./ProjectCard";
@@ -12,6 +14,7 @@ interface ProjectListBoardViewProps {
   onEdit: (project: Project) => void;
   onDelete: (project: Project) => void;
   onStatusChange?: (project: Project, status: Project["status"]) => void | Promise<unknown>;
+  onTagsChange?: (projectId: number, tagIds: number[]) => void | Promise<void>;
   onCreateMilestone?: (project: Project) => void;
   onCreateTask?: (project: Project) => void;
   onCreateTicket?: (project: Project) => void;
@@ -38,6 +41,7 @@ export function ProjectListBoardView({
   onEdit,
   onDelete,
   onStatusChange,
+  onTagsChange,
   onCreateMilestone,
   onCreateTask,
   onCreateTicket,
@@ -46,12 +50,18 @@ export function ProjectListBoardView({
   readOnly = false,
   viewMode,
 }: ProjectListBoardViewProps) {
+  const canReadTags = useHasPermission("tags", "read");
+  const canWriteProjects = useHasPermission("projects", "write");
   const [mode, setMode] = useState<ListBoardMode>("board");
   const [searchValue, setSearchValue] = useState("");
   const visibleProjects = useMemo(
     () => projects.filter((project) => matchesSearch(project, searchValue)),
     [projects, searchValue],
   );
+  const tagEditingEnabled = !readOnly && canReadTags && canWriteProjects && Boolean(onTagsChange);
+  const tagController = useTags(tagEditingEnabled);
+  const editableTags = tagEditingEnabled ? tagController.tags : undefined;
+  const handleTagsChange = tagEditingEnabled ? onTagsChange : undefined;
 
   return (
     <ListBoardView
@@ -89,6 +99,8 @@ export function ProjectListBoardView({
           onEdit={onEdit}
           onDelete={readOnly ? undefined : onDelete}
           onStatusChange={readOnly ? undefined : onStatusChange}
+          allTags={editableTags}
+          onTagsChange={handleTagsChange}
           onCreateMilestone={!readOnly && onCreateMilestone ? () => onCreateMilestone(project) : undefined}
           onCreateTask={!readOnly && onCreateTask ? () => onCreateTask(project) : undefined}
           onCreateTicket={!readOnly && onCreateTicket ? () => onCreateTicket(project) : undefined}
@@ -101,6 +113,8 @@ export function ProjectListBoardView({
           onEdit={onEdit}
           onDelete={readOnly ? undefined : onDelete}
           onStatusChange={readOnly ? undefined : onStatusChange}
+          allTags={editableTags}
+          onTagsChange={handleTagsChange}
           onCreateMilestone={!readOnly && onCreateMilestone ? () => onCreateMilestone(project) : undefined}
           onCreateTask={!readOnly && onCreateTask ? () => onCreateTask(project) : undefined}
           onCreateTicket={!readOnly && onCreateTicket ? () => onCreateTicket(project) : undefined}

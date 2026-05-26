@@ -225,21 +225,21 @@ describe("Query invalidation integration", () => {
 
     await invalidateComments(queryClient, "project", projectId);
 
-    expectInvalidated(queryClient, ["projectComments", "globalSearch"]);
+    expectInvalidated(queryClient, ["projectsList", "projectDetail", "projectTasks", "projectBacklog", "projectFeatures", "projectComments", "globalSearch"]);
 
     queryClient.clear();
     seedKnownQueries(queryClient);
 
     await invalidateNotes(queryClient, "project", projectId);
 
-    expectInvalidated(queryClient, ["projectNotes", "globalSearch"]);
+    expectInvalidated(queryClient, ["projectsList", "projectDetail", "projectTasks", "projectBacklog", "projectFeatures", "projectNotes", "globalSearch"]);
 
     queryClient.clear();
     seedKnownQueries(queryClient);
 
     await invalidateAttachments(queryClient, "project", projectId);
 
-    expectInvalidated(queryClient, ["projectAttachments", "globalSearch"]);
+    expectInvalidated(queryClient, ["projectsList", "projectDetail", "projectTasks", "projectBacklog", "projectFeatures", "projectAttachments", "globalSearch"]);
 
     queryClient.clear();
     seedKnownQueries(queryClient);

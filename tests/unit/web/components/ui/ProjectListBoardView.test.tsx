@@ -37,6 +37,20 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   },
 }));
 
+vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
+  useHasPermission: () => true,
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useTags", () => ({
+  useTags: () => ({
+    tags: [{ id: 1, name: "Qualität", color: "#0f766e", version: 1 }],
+    loading: false,
+    error: null,
+    reload: async () => undefined,
+    createTag: async () => undefined,
+  }),
+}));
+
 const statusColumns = [
   { value: "active", label: "Aktiv" },
   { value: "on_hold", label: "Pausiert" },
@@ -172,6 +186,10 @@ describe("ProjectListBoardView", () => {
     expect(
       within(activeColumn as HTMLElement).getByText("3 offen"),
     ).toBeInTheDocument();
+    expect(
+      within(activeColumn as HTMLElement).getByText("Aufgaben").compareDocumentPosition(within(activeColumn as HTMLElement).getByLabelText("0 Anhänge")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(
       within(activeColumn as HTMLElement).queryByText("PA"),
     ).not.toBeInTheDocument();

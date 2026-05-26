@@ -522,7 +522,7 @@ describe("ListBoardView", () => {
     }
   });
 
-  it("equalisiert Board-Karten spaltenweise nach Status", () => {
+  it("equalisiert Board-Karten statusspaltenübergreifend", () => {
     const originalMeasure = HTMLElement.prototype.getBoundingClientRect;
     HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
       const text = this.textContent ?? "";
@@ -568,19 +568,12 @@ describe("ListBoardView", () => {
         />,
       );
 
-      const todoItems = container
-        .querySelector("[data-status-column-wrapper='todo']")
-        ?.querySelectorAll<HTMLElement>("[data-equal-item='true']");
-      const doneItems = container
-        .querySelector("[data-status-column-wrapper='done']")
-        ?.querySelectorAll<HTMLElement>("[data-equal-item='true']");
+      const boardItems = container.querySelectorAll<HTMLElement>("[data-list-board-layout='board'] [data-equal-item='true']");
 
-      expect(todoItems).toHaveLength(2);
-      todoItems?.forEach((wrapper) => {
-        expect(wrapper.style.height).toBe("72px");
+      expect(boardItems).toHaveLength(3);
+      boardItems.forEach((wrapper) => {
+        expect(wrapper.style.height).toBe("120px");
       });
-      expect(doneItems).toHaveLength(1);
-      expect(doneItems?.[0]?.style.height).toBe("120px");
     } finally {
       HTMLElement.prototype.getBoundingClientRect = originalMeasure;
     }

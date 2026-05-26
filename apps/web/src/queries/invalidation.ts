@@ -152,6 +152,12 @@ function commentOwnerKeys(entityType: CommentEntityType, entityId: number): Quer
   if (entityType === "useCase") {
     return [queryKeys.useCases.root, queryKeys.useCases.detail(entityId), queryKeys.features.root];
   }
+  if (entityType === "project") {
+    return [queryKeys.projects.root, queryKeys.projects.detail(entityId)];
+  }
+  if (entityType === "milestone") {
+    return [queryKeys.milestones.root, queryKeys.milestones.detail(entityId)];
+  }
   return [];
 }
 
@@ -161,6 +167,12 @@ function noteOwnerKeys(ownerType: NoteOwnerType, ownerId: number): QueryKey[] {
   }
   if (ownerType === "ticket") {
     return [queryKeys.tickets.root, queryKeys.tickets.detail(ownerId)];
+  }
+  if (ownerType === "project") {
+    return [queryKeys.projects.root, queryKeys.projects.detail(ownerId)];
+  }
+  if (ownerType === "milestone") {
+    return [queryKeys.milestones.root, queryKeys.milestones.detail(ownerId)];
   }
   return [];
 }
@@ -174,6 +186,12 @@ function attachmentOwnerKeys(ownerType: QueryOwnerType, ownerId: number): QueryK
   }
   if (ownerType === "feature") {
     return [queryKeys.features.root, queryKeys.features.detail(ownerId)];
+  }
+  if (ownerType === "project") {
+    return [queryKeys.projects.root, queryKeys.projects.detail(ownerId)];
+  }
+  if (ownerType === "milestone") {
+    return [queryKeys.milestones.root, queryKeys.milestones.detail(ownerId)];
   }
   return [];
 }

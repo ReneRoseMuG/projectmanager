@@ -1,7 +1,7 @@
 import type { Milestone, MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { milestoneFeatures, milestones, milestoneTasks, milestoneTickets, projects, tasks } from "../db/schema.js";
+import { milestoneAttachments, milestoneComments, milestoneFeatures, milestoneNotes, milestones, milestoneTasks, milestoneTickets, projects, tasks } from "../db/schema.js";
 import { milestoneRepository, type MilestoneRecord } from "../repositories/milestone.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
@@ -29,6 +29,9 @@ interface MilestoneCounts {
   totalTaskCount: number;
   ticketCount: number;
   featureCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
 }
 
 const milestoneJournalFields: Array<JournalFieldDefinition<MilestoneRecord>> = [
@@ -47,7 +50,10 @@ function emptyMilestoneCounts(): MilestoneCounts {
     doneTaskCount: 0,
     totalTaskCount: 0,
     ticketCount: 0,
-    featureCount: 0
+    featureCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0
   };
 }
 
@@ -70,6 +76,9 @@ function mapMilestone(database: DbClient, record: MilestoneRecord, counts: Miles
     totalTaskCount: counts.totalTaskCount,
     ticketCount: counts.ticketCount,
     featureCount: counts.featureCount,
+    attachmentCount: counts.attachmentCount,
+    noteCount: counts.noteCount,
+    commentCount: counts.commentCount,
     tags
   };
 }
@@ -133,6 +142,27 @@ function getMilestoneCounts(database: DbClient, milestoneIds: number[]): Map<num
   for (const row of featureRows) {
     const current = counts.get(row.milestoneId) ?? emptyMilestoneCounts();
     current.featureCount += 1;
+    counts.set(row.milestoneId, current);
+  }
+
+  const attachmentRows = database.select({ milestoneId: milestoneAttachments.milestoneId }).from(milestoneAttachments).where(inArray(milestoneAttachments.milestoneId, milestoneIds)).all();
+  for (const row of attachmentRows) {
+    const current = counts.get(row.milestoneId) ?? emptyMilestoneCounts();
+    current.attachmentCount += 1;
+    counts.set(row.milestoneId, current);
+  }
+
+  const noteRows = database.select({ milestoneId: milestoneNotes.milestoneId }).from(milestoneNotes).where(inArray(milestoneNotes.milestoneId, milestoneIds)).all();
+  for (const row of noteRows) {
+    const current = counts.get(row.milestoneId) ?? emptyMilestoneCounts();
+    current.noteCount += 1;
+    counts.set(row.milestoneId, current);
+  }
+
+  const commentRows = database.select({ milestoneId: milestoneComments.milestoneId }).from(milestoneComments).where(inArray(milestoneComments.milestoneId, milestoneIds)).all();
+  for (const row of commentRows) {
+    const current = counts.get(row.milestoneId) ?? emptyMilestoneCounts();
+    current.commentCount += 1;
     counts.set(row.milestoneId, current);
   }
 

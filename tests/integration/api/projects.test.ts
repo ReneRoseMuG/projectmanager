@@ -5,11 +5,17 @@
  */
 
 import type { FastifyInstance } from "fastify";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { buildTestApp, createProject, createTask, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
+import { config } from "../../../apps/api/src/config.js";
+import { buildTestApp, createNoteForProject, createProject, createTask, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const uploadDir = path.join(os.tmpdir(), `taskmanager-api-project-counts-${process.pid}`);
+const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-project-count-previews-${process.pid}`);
 
 function insertWikiPage(testDb: TestDb, title = "Projekt-Wiki"): number {
   const result = testDb.sqlite
@@ -21,17 +27,35 @@ function insertWikiPage(testDb: TestDb, title = "Projekt-Wiki"): number {
 describe("Projects API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
+  let originalUploadDir: string;
+  let originalPreviewCacheDir: string;
 
   beforeAll(async () => {
+    originalUploadDir = config.uploadDir;
+    originalPreviewCacheDir = config.previewCacheDir;
+    process.env.UPLOAD_DIR = uploadDir;
+    process.env.PREVIEW_CACHE_DIR = previewCacheDir;
+    config.uploadDir = uploadDir;
+    config.previewCacheDir = previewCacheDir;
     testDb = createTestDb();
-    app = await buildTestApp(testDb);
+    app = await buildTestApp(testDb, { enableMultipart: true });
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => {
+    truncateAll(testDb.sqlite);
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.mkdir(previewCacheDir, { recursive: true });
+  });
 
   afterAll(async () => {
     await app.close();
     testDb.sqlite.close();
+    config.uploadDir = originalUploadDir;
+    config.previewCacheDir = originalPreviewCacheDir;
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
   });
 
   it("GET /api/projects gibt leere Liste zurueck wenn keine Projekte existieren", async () => {
@@ -114,6 +138,26 @@ describe("Projects API", () => {
     expect(found.openTaskCount).toBe(2);
     expect(found.doneTaskCount).toBe(2);
     expect(found.totalTaskCount).toBe(4);
+  });
+
+  it("GET /api/projects zählt Support-Objekte für Karten-Footer", async () => {
+    const project = await createProject(app);
+
+    await createNoteForProject(app, project.id, { title: "Projekt-Notiz" });
+    await supertest(app.server).post(`/api/projects/${project.id}/comments`).send({ body: "Projekt-Kommentar" }).expect(201);
+    await supertest(app.server)
+      .post(`/api/projects/${project.id}/attachments`)
+      .attach("file", Buffer.from("Projekt-Datei"), { filename: "project.txt", contentType: "text/plain" })
+      .expect(201);
+
+    const res = await supertest(app.server).get("/api/projects").expect(200);
+    const found = res.body.find((item: { id: number }) => item.id === project.id);
+
+    expect(found).toMatchObject({
+      attachmentCount: 1,
+      noteCount: 1,
+      commentCount: 1
+    });
   });
 
   it("PATCH /api/projects/:id aktualisiert Name und Status", async () => {

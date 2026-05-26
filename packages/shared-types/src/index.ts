@@ -578,6 +578,9 @@ export interface Project {
   openTaskCount: number;
   doneTaskCount: number;
   totalTaskCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   tags: Tag[];
 }
 
@@ -610,6 +613,9 @@ export interface Milestone {
   totalTaskCount: number;
   ticketCount: number;
   featureCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   tags: Tag[];
 }
 

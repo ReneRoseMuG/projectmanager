@@ -449,6 +449,19 @@ export function ProjectForm({
     }
   };
 
+  const changeMilestoneTags = async (milestoneId: number, tagIds: number[]) => {
+    try {
+      await milestones.updateMilestoneTags(milestoneId, tagIds);
+    } catch (milestoneError) {
+      showToast({
+        tone: "error",
+        title: "Meilenstein-Tags konnten nicht geändert werden",
+        message: errorMessage(milestoneError),
+      });
+      throw milestoneError;
+    }
+  };
+
   const createMilestoneTask = async (input: TaskFormInput) => {
     const {
       tagIds,
@@ -848,6 +861,7 @@ export function ProjectForm({
                 onDelete={(milestone) => void deleteMilestone(milestone)}
                 onStatusChange={(milestone, status) => milestones.updateMilestone(milestone.id, { status, expectedVersion: milestone.version })}
                 onDueDateChange={(milestone, dueDate) => milestones.updateMilestone(milestone.id, { dueDate, expectedVersion: milestone.version })}
+                onTagsChange={changeMilestoneTags}
                 onCreateTask={canCreateTasks ? (milestone) => setCreateTaskForMilestone(milestone) : undefined}
                 onCreateTicket={canCreateTickets ? (milestone) => setCreateTicketForMilestone(milestone) : undefined}
               />

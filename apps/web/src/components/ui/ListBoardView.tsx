@@ -577,7 +577,6 @@ function ListBoardViewContent<T>({
   loading = false,
 }: ListBoardViewProps<T>) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const [equalItemHeight, setEqualItemHeight] = useState<number | undefined>();
   const [activeItem, setActiveItem] = useState<T | null>(null);
   const orderedStatusColumns = sortedStatusColumns(statusColumns);
   const hasStatusGrouping =
@@ -601,10 +600,9 @@ function ListBoardViewContent<T>({
   const dndEnabled = Boolean(
     onItemStatusChange && statusGrouped && !loading,
   );
-  const equalItemStyle = equalItemHeight ? { height: equalItemHeight } : undefined;
   const equalItemProps = {
     "data-equal-item": "true",
-    style: equalItemStyle,
+    style: undefined,
   };
   const activeStatusGroups = mode === "board" ? boardStatusGroups : listStatusGroups;
   const itemByDndId = useMemo(() => {
@@ -772,8 +770,7 @@ function ListBoardViewContent<T>({
 
   useLayoutEffect(() => {
     const root = rootRef.current;
-    if (!root || loading) {
-      setEqualItemHeight(undefined);
+    if (!root) {
       return;
     }
 
@@ -784,36 +781,40 @@ function ListBoardViewContent<T>({
     };
     const measureMaxHeight = (nodes: HTMLElement[]) =>
       Math.ceil(nodes.reduce((current, node) => Math.max(current, node.getBoundingClientRect().height), 0));
+    const applyHeight = (nodes: HTMLElement[], height: number) => {
+      nodes.forEach((node) => {
+        node.style.height = `${height}px`;
+      });
+    };
+    const allNodes = Array.from(root.querySelectorAll<HTMLElement>("[data-equal-item='true']"));
+    clearHeights(allNodes);
+
+    if (loading) {
+      return;
+    }
 
     if (boardByStatus) {
-      setEqualItemHeight(undefined);
       const columnWrappers = Array.from(root.querySelectorAll<HTMLElement>("[data-status-column-wrapper]"));
-      columnWrappers.forEach((columnWrapper) => {
-        if (columnWrapper.dataset.statusCollapsedWrapper === "true") {
-          return;
-        }
-
-        const columnNodes = Array.from(columnWrapper.querySelectorAll<HTMLElement>("[data-equal-item='true']"));
-        clearHeights(columnNodes);
-        const columnHeight = measureMaxHeight(columnNodes);
-        if (columnHeight > 0) {
-          columnNodes.forEach((node) => {
-            node.style.height = `${columnHeight}px`;
-          });
-        }
-      });
+      const boardNodes = columnWrappers.flatMap((columnWrapper) =>
+        columnWrapper.dataset.statusCollapsedWrapper === "true"
+          ? []
+          : Array.from(columnWrapper.querySelectorAll<HTMLElement>("[data-equal-item='true']"))
+      );
+      const boardHeight = measureMaxHeight(boardNodes);
+      if (boardHeight > 0) {
+        applyHeight(boardNodes, boardHeight);
+      }
       return;
     }
 
-    const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-equal-item='true']"));
-    if (nodes.length === 0) {
-      setEqualItemHeight(undefined);
+    if (allNodes.length === 0) {
       return;
     }
 
-    clearHeights(nodes);
-    const maxHeight = measureMaxHeight(nodes);
-    setEqualItemHeight(maxHeight > 0 ? maxHeight : undefined);
+    const maxHeight = measureMaxHeight(allNodes);
+    if (maxHeight > 0) {
+      applyHeight(allNodes, maxHeight);
+    }
   }, [boardByStatus, hasStatusGrouping, items, loading, mode]);
 
   return (

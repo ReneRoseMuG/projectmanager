@@ -2,6 +2,8 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 26.05.26 | Fix           | CardFooterBar Untere Kartenkante             | ✅     |
+| 26.05.26 | Fix           | Standard-Admin Passwort DB                   | ✅     |
 | 26.05.26 | Fix           | Standard-Admin zurückgesetzt                 | ✅     |
 | 26.05.26 | 65            | CardFooterBar Status-Footer                  | ⚠️     |
 | 26.05.26 | 64            | ItemCard Höhenangleichung                    | ✅     |

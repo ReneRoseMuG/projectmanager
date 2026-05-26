@@ -1,13 +1,13 @@
-import type { Project } from "@taskmanager/shared-types";
+import type { Project, Tag } from "@taskmanager/shared-types";
 import { Archive, Bug, Flag, FolderOpen, ListTodo } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { objectReference } from "../../lib/references";
 import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import type { ActionMenuItem } from "../ui/ActionMenu";
+import { CardFooterBar } from "../ui/CardFooterBar";
 import { PlanningItemCard } from "../ui/PlanningItemCard";
 import { StatusPill } from "../ui/StatusPill";
-import { TagFooter } from "../ui/TagFooter";
 
 interface ProjectCardProps {
   project: Project;
@@ -18,9 +18,11 @@ interface ProjectCardProps {
   onCreateMilestone?: () => void;
   onCreateTask?: () => void;
   onCreateTicket?: () => void;
+  allTags?: Tag[];
+  onTagsChange?: (projectId: number, tagIds: number[]) => void | Promise<void>;
 }
 
-export function ProjectCard({ project, variant = "card", onEdit, onDelete, onStatusChange, onCreateMilestone, onCreateTask, onCreateTicket }: ProjectCardProps) {
+export function ProjectCard({ project, variant = "card", onEdit, onDelete, onStatusChange, onCreateMilestone, onCreateTask, onCreateTicket, allTags, onTagsChange }: ProjectCardProps) {
   const catalogs = useCatalogs();
   const accent = catalogColor(catalogs.entries, "workStatus", project.status);
   const description = richTextToPlainText(project.description);
@@ -47,7 +49,17 @@ export function ProjectCard({ project, variant = "card", onEdit, onDelete, onSta
       pills={
         <StatusPill kind="workStatus" value={project.status} onChange={onStatusChange ? (status) => onStatusChange(project, status) : undefined} />
       }
-      footerMeta={<TagFooter tags={project.tags} />}
+      footerMeta={
+        <CardFooterBar
+          tags={project.tags}
+          allTags={allTags}
+          onTagsChange={onTagsChange ? (tagIds) => onTagsChange(project.id, tagIds) : undefined}
+          attachmentCount={project.attachmentCount}
+          noteCount={project.noteCount}
+          commentCount={project.commentCount}
+          bordered={variant !== "row"}
+        />
+      }
       taskStats={{
         openTasks: project.openTaskCount,
         doneTasks: project.doneTaskCount,

@@ -125,7 +125,12 @@ export function PlanningItemCard({ title, description, accentColor, objectRefere
       objectReference={objectReference}
       header={<PlanningHeader title={title} subtitle={subtitle} pills={pills} />}
       body={description ? <p className="line-clamp-3 text-sm text-steel-600">{description}</p> : null}
-      footer={<div className="grid gap-3">{footerMeta}<TaskProgress stats={taskStats} accentColor={accentColor} /></div>}
+      footer={
+        <div className="grid gap-3">
+          <TaskProgress stats={taskStats} accentColor={accentColor} />
+          {footerMeta}
+        </div>
+      }
       onOpen={onOpen}
       onEdit={onEdit}
       extraMenuItems={extraMenuItems}

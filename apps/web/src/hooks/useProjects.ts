@@ -61,6 +61,15 @@ export function useProjects(projectId?: number) {
     }
   });
 
+  const updateProjectTagsMutation = useMutation({
+    mutationFn: async ({ id, tagIds }: { id: number; tagIds: number[] }) => {
+      return setProjectTags(id, tagIds);
+    },
+    onSuccess: async (_tags, variables) => {
+      await invalidateProjectScope(queryClient, variables.id);
+    }
+  });
+
   const removeProjectMutation = useMutation({
     mutationFn: deleteProjectRequest,
     onSuccess: async () => {
@@ -82,6 +91,13 @@ export function useProjects(projectId?: number) {
     [updateProjectMutation]
   );
 
+  const updateProjectTags = useCallback(
+    async (id: number, tagIds: number[]) => {
+      await updateProjectTagsMutation.mutateAsync({ id, tagIds });
+    },
+    [updateProjectTagsMutation]
+  );
+
   const removeProject = useCallback(
     async (id: number) => {
       await removeProjectMutation.mutateAsync(id);
@@ -97,6 +113,7 @@ export function useProjects(projectId?: number) {
     reload,
     createProject,
     updateProject,
+    updateProjectTags,
     removeProject
   };
 }
