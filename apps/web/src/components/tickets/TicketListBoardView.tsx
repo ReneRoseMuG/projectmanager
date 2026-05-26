@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
 import { useCatalogs } from "../../hooks/useCatalogs";
+import { useHasPermission } from "../../hooks/usePermissions";
+import { useTags } from "../../hooks/useTags";
 import { catalogEntriesByKind } from "../../utils/catalogs";
 import { EmptyState } from "../ui/EmptyState";
 import { FilterChips } from "../ui/FilterChips";
@@ -20,6 +22,7 @@ interface TicketListBoardViewProps {
   onDelete: (ticket: Ticket) => void;
   onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>;
   onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>;
+  onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void>;
   linkAction?: ReactNode;
   filters?: ReactNode;
   loading?: boolean;
@@ -54,6 +57,7 @@ export function TicketListBoardView({
   onDelete,
   onStatusChange,
   onDueDateChange,
+  onTagsChange,
   linkAction,
   filters,
   loading = false,
@@ -61,6 +65,8 @@ export function TicketListBoardView({
   readOnly = false,
 }: TicketListBoardViewProps) {
   const catalogs = useCatalogs();
+  const canReadTags = useHasPermission("tags", "read");
+  const canWriteTickets = useHasPermission("tickets", "write");
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState<Ticket["status"] | "all">("all");
   const statusColumns = useMemo(
@@ -81,6 +87,10 @@ export function TicketListBoardView({
     color: column.color,
     count: tickets.filter((ticket) => ticket.status === column.value).length,
   }));
+  const tagEditingEnabled = !readOnly && canReadTags && canWriteTickets && Boolean(onTagsChange);
+  const tagController = useTags(tagEditingEnabled);
+  const editableTags = tagEditingEnabled ? tagController.tags : undefined;
+  const handleTagsChange = tagEditingEnabled ? onTagsChange : undefined;
 
   return (
     <ListBoardView
@@ -118,16 +128,18 @@ export function TicketListBoardView({
         />
       }
       renderCard={(ticket) => (
-        <TicketCard ticket={ticket} onOpen={onOpen} onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} />
+        <TicketCard ticket={ticket} allTags={editableTags} onOpen={onOpen} onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />
       )}
       renderRow={(ticket) => (
         <TicketCard
           ticket={ticket}
+          allTags={editableTags}
           variant="row"
           onOpen={onOpen}
           onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete}
           onStatusChange={readOnly ? undefined : onStatusChange}
           onDueDateChange={readOnly ? undefined : onDueDateChange}
+          onTagsChange={handleTagsChange}
         />
       )}
     />

@@ -51,6 +51,9 @@ export interface TestTask {
   updatedAt: string;
   tags: TestTag[];
   subtaskCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
 }
 
 export interface TestTicket {
@@ -74,6 +77,9 @@ export interface TestTicket {
   updatedAt: string;
   tags: TestTag[];
   subTicketCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
 }
 
 export interface TestTag {
@@ -120,6 +126,9 @@ export interface TestFeature {
   contentPath: string | null;
   sortOrder: number;
   useCaseCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -134,6 +143,9 @@ export interface TestUseCase {
   content?: string;
   contentPath: string | null;
   sortOrder: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   createdAt: string;
   updatedAt: string;
 }

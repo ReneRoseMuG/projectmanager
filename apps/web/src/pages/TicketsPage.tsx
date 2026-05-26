@@ -122,6 +122,15 @@ export function TicketsPage() {
     }
   };
 
+  const updateTicketTags = async (ticketId: number, tagIds: number[]) => {
+    try {
+      await tickets.updateTicketTags(ticketId, tagIds);
+    } catch (ticketError) {
+      showToast({ tone: "error", title: "Tickettags konnten nicht geÃ¤ndert werden", message: await errorMessageAsync(ticketError) });
+      throw ticketError;
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       <PageHero
@@ -148,6 +157,7 @@ export function TicketsPage() {
           onDelete={deleteTicket}
           onStatusChange={updateTicketStatus}
           onDueDateChange={updateTicketDueDate}
+          onTagsChange={updateTicketTags}
           filters={
             <ProjectMilestoneFilterBar
               projects={projects.projects}

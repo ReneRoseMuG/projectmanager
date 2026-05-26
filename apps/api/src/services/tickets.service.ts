@@ -13,7 +13,7 @@ import type {
 } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { featureTickets, features, milestoneTickets, milestones, projectTickets, projects, taskTickets, tasks, ticketRelations, tickets, useCases, useCaseTickets } from "../db/schema.js";
+import { featureTickets, features, milestoneTickets, milestones, projectTickets, projects, taskTickets, tasks, ticketAttachments, ticketComments, ticketNotes, ticketRelations, tickets, useCases, useCaseTickets } from "../db/schema.js";
 import { ticketRepository, type TicketRecord } from "../repositories/ticket.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
@@ -42,6 +42,17 @@ export type { TicketOwner };
 export type DashboardTicketOwner = { type: "project" | "milestone"; id: number };
 
 type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
+interface SupportCounts {
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
+}
+
+const emptySupportCounts: SupportCounts = {
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0
+};
 
 const ticketSelect = {
   id: tickets.id,
@@ -195,6 +206,40 @@ function getSubTicketCounts(database: DbClient, ticketIds: number[]): Map<number
     if (row.parentId !== null) {
       counts.set(row.parentId, (counts.get(row.parentId) ?? 0) + 1);
     }
+  }
+
+  return counts;
+}
+
+function getTicketSupportCounts(database: DbClient, ticketIds: number[]): Map<number, SupportCounts> {
+  const counts = new Map<number, SupportCounts>();
+  if (ticketIds.length === 0) {
+    return counts;
+  }
+
+  const ensureCounts = (ticketId: number): SupportCounts => {
+    const current = counts.get(ticketId);
+    if (current) {
+      return current;
+    }
+    const nextCounts = { ...emptySupportCounts };
+    counts.set(ticketId, nextCounts);
+    return nextCounts;
+  };
+
+  const attachmentRows = database.select({ ticketId: ticketAttachments.ticketId }).from(ticketAttachments).where(inArray(ticketAttachments.ticketId, ticketIds)).all();
+  for (const row of attachmentRows) {
+    ensureCounts(row.ticketId).attachmentCount += 1;
+  }
+
+  const noteRows = database.select({ ticketId: ticketNotes.ticketId }).from(ticketNotes).where(inArray(ticketNotes.ticketId, ticketIds)).all();
+  for (const row of noteRows) {
+    ensureCounts(row.ticketId).noteCount += 1;
+  }
+
+  const commentRows = database.select({ ticketId: ticketComments.ticketId }).from(ticketComments).where(inArray(ticketComments.ticketId, ticketIds)).all();
+  for (const row of commentRows) {
+    ensureCounts(row.ticketId).commentCount += 1;
   }
 
   return counts;
@@ -441,7 +486,8 @@ export function mapTicket(
   tags = getTicketTags(database, record.id),
   subTicketCount = getSubTicketCounts(database, [record.id]).get(record.id) ?? 0,
   position = record.position,
-  visibleParent?: VisibleParentContext | null
+  visibleParent?: VisibleParentContext | null,
+  supportCounts = getTicketSupportCounts(database, [record.id]).get(record.id) ?? emptySupportCounts
 ): Ticket {
   return {
     id: record.id,
@@ -464,6 +510,9 @@ export function mapTicket(
     updatedAt: record.updatedAt,
     tags,
     subTicketCount,
+    attachmentCount: supportCounts.attachmentCount,
+    noteCount: supportCounts.noteCount,
+    commentCount: supportCounts.commentCount,
     visibleParent
   };
 }
@@ -473,8 +522,9 @@ export function listTickets(database: DbClient): Ticket[] {
   const ids = rows.map((ticket) => ticket.id);
   const tagsByTicket = getTicketTagsMap(database, ids);
   const subTicketCounts = getSubTicketCounts(database, ids);
+  const supportCounts = getTicketSupportCounts(database, ids);
 
-  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0));
+  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0, ticket.position, undefined, supportCounts.get(ticket.id) ?? emptySupportCounts));
 }
 
 export function listTicketLinkCandidates(database: DbClient, owner: TicketOwner): Ticket[] {
@@ -491,8 +541,9 @@ export function listOwnerTickets(database: DbClient, owner: TicketOwner): Ticket
   const ids = rows.map((ticket) => ticket.id);
   const tagsByTicket = getTicketTagsMap(database, ids);
   const subTicketCounts = getSubTicketCounts(database, ids);
+  const supportCounts = getTicketSupportCounts(database, ids);
 
-  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0, ticket.boardPosition, ticket.visibleParent));
+  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0, ticket.boardPosition, ticket.visibleParent, supportCounts.get(ticket.id) ?? emptySupportCounts));
 }
 
 export function listProjectTickets(database: DbClient, projectId: number): Ticket[] {
@@ -505,8 +556,9 @@ export function listSubTickets(database: DbClient, parentId: number): Ticket[] {
   const ids = rows.map((ticket) => ticket.id);
   const tagsByTicket = getTicketTagsMap(database, ids);
   const subTicketCounts = getSubTicketCounts(database, ids);
+  const supportCounts = getTicketSupportCounts(database, ids);
 
-  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0));
+  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0, undefined, undefined, supportCounts.get(ticket.id) ?? emptySupportCounts));
 }
 
 function listDashboardTickets(database: DbClient, owner?: DashboardTicketOwner): Ticket[] {

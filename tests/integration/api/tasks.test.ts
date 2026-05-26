@@ -5,13 +5,18 @@
  */
 
 import type { FastifyInstance } from "fastify";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { config } from "../../../apps/api/src/config.js";
 import {
   buildTestApp,
   createComment,
   createFeature,
   createMilestone,
+  createNoteForTask,
   createProject,
   createSubtask,
   createTask,
@@ -21,20 +26,41 @@ import {
   type TestDb
 } from "../../fixtures/api/index.js";
 
+const uploadDir = path.join(os.tmpdir(), `taskmanager-api-task-counts-${process.pid}`);
+const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-task-count-previews-${process.pid}`);
+
 describe("Tasks API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
+  let originalUploadDir: string;
+  let originalPreviewCacheDir: string;
 
   beforeAll(async () => {
+    originalUploadDir = config.uploadDir;
+    originalPreviewCacheDir = config.previewCacheDir;
+    process.env.UPLOAD_DIR = uploadDir;
+    process.env.PREVIEW_CACHE_DIR = previewCacheDir;
+    config.uploadDir = uploadDir;
+    config.previewCacheDir = previewCacheDir;
     testDb = createTestDb();
-    app = await buildTestApp(testDb);
+    app = await buildTestApp(testDb, { enableMultipart: true });
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => {
+    truncateAll(testDb.sqlite);
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.mkdir(previewCacheDir, { recursive: true });
+  });
 
   afterAll(async () => {
     await app.close();
     testDb.sqlite.close();
+    config.uploadDir = originalUploadDir;
+    config.previewCacheDir = originalPreviewCacheDir;
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
   });
 
   it("POST /api/projects/:id/tasks erstellt eine neue Aufgabe", async () => {
@@ -91,6 +117,25 @@ describe("Tasks API", () => {
     expect(res.body).toHaveLength(1);
     expect(res.body[0].id).toBe(task.id);
     expect(res.body.find((item: { id: number }) => item.id === subtask.id)).toBeUndefined();
+  });
+
+  it("GET /api/projects/:id/tasks liefert Support-Counter fuer Aufgaben", async () => {
+    const project = await createProject(app);
+    const countedTask = await createTask(app, project.id, { title: "Mit Support" });
+    const emptyTask = await createTask(app, project.id, { title: "Ohne Support" });
+    await createNoteForTask(app, countedTask.id);
+    await createComment(app, countedTask.id);
+    await supertest(app.server)
+      .post(`/api/tasks/${countedTask.id}/attachments`)
+      .attach("file", Buffer.from("Task-Datei"), { filename: "task.txt", contentType: "text/plain" })
+      .expect(201);
+
+    const res = await supertest(app.server).get(`/api/projects/${project.id}/tasks`).expect(200);
+    const counted = res.body.find((task: { id: number }) => task.id === countedTask.id);
+    const empty = res.body.find((task: { id: number }) => task.id === emptyTask.id);
+
+    expect(counted).toMatchObject({ attachmentCount: 1, noteCount: 1, commentCount: 1 });
+    expect(empty).toMatchObject({ attachmentCount: 0, noteCount: 0, commentCount: 0 });
   });
 
   it("GET /api/projects/:id/tasks liefert direkte und Meilenstein-Aufgaben kumulativ", async () => {

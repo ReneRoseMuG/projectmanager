@@ -141,6 +141,19 @@ export function TasksPage() {
     }
   };
 
+  const updateTaskTags = async (taskId: number, tagIds: number[]) => {
+    try {
+      if (owner) {
+        await ownerTasks.updateTaskTags(taskId, tagIds);
+      } else {
+        await globalTasks.updateTaskTags(taskId, tagIds);
+      }
+    } catch (taskError) {
+      showToast({ tone: "error", title: "Aufgabentags konnten nicht geÃ¤ndert werden", message: errorMessage(taskError) });
+      throw taskError;
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       <PageHero
@@ -167,6 +180,7 @@ export function TasksPage() {
           onDelete={(task) => void deleteTask(task as TaskBoardItem)}
           onStatusChange={(task, status) => updateTaskStatus(task as TaskBoardItem, status)}
           onDueDateChange={(task, dueDate) => updateTaskDueDate(task as TaskBoardItem, dueDate)}
+          onTagsChange={updateTaskTags}
           showCreateActions={owner !== null}
           filters={
             <ProjectMilestoneFilterBar

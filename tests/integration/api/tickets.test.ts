@@ -17,6 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import supertest from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { config } from "../../../apps/api/src/config.js";
 import {
   buildTestApp,
   createFeature,
@@ -41,10 +42,16 @@ type TicketOwner = { type: "project" | "task" | "feature" | "useCase"; id: numbe
 describe("Tickets API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
+  let originalUploadDir: string;
+  let originalPreviewCacheDir: string;
 
   beforeAll(async () => {
+    originalUploadDir = config.uploadDir;
+    originalPreviewCacheDir = config.previewCacheDir;
     process.env.UPLOAD_DIR = uploadDir;
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
+    config.uploadDir = uploadDir;
+    config.previewCacheDir = previewCacheDir;
     testDb = createTestDb();
     app = await buildTestApp(testDb, { enableMultipart: true });
   });
@@ -61,6 +68,8 @@ describe("Tickets API", () => {
   afterAll(async () => {
     await app.close();
     testDb.sqlite.close();
+    config.uploadDir = originalUploadDir;
+    config.previewCacheDir = originalPreviewCacheDir;
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
   });
@@ -298,6 +307,24 @@ describe("Tickets API", () => {
 
     expect((res.body as TestTicket[]).map((ticket) => ticket.id)).toEqual(expect.arrayContaining([ownerTicket.id, globalTicket.id]));
     expect((res.body as TestTicket[]).map((ticket) => ticket.id)).not.toContain(subTicket.id);
+  });
+
+  it("GET /api/tickets liefert Support-Counter fuer Tickets", async () => {
+    const countedTicket = await createTicket(app, null, { title: "Mit Support" });
+    const emptyTicket = await createTicket(app, null, { title: "Ohne Support" });
+    await supertest(app.server).post(`/api/tickets/${countedTicket.id}/notes`).send({ title: "Ticket note" }).expect(201);
+    await supertest(app.server).post(`/api/tickets/${countedTicket.id}/comments`).send({ body: "Ticket comment" }).expect(201);
+    await supertest(app.server)
+      .post(`/api/tickets/${countedTicket.id}/attachments`)
+      .attach("file", Buffer.from("Ticket-Datei"), { filename: "ticket.txt", contentType: "text/plain" })
+      .expect(201);
+
+    const res = await supertest(app.server).get("/api/tickets").expect(200);
+    const counted = (res.body as TestTicket[]).find((ticket) => ticket.id === countedTicket.id);
+    const empty = (res.body as TestTicket[]).find((ticket) => ticket.id === emptyTicket.id);
+
+    expect(counted).toMatchObject({ attachmentCount: 1, noteCount: 1, commentCount: 1 });
+    expect(empty).toMatchObject({ attachmentCount: 0, noteCount: 0, commentCount: 0 });
   });
 
   it("GET /api/tickets/:id returns ticket detail", async () => {

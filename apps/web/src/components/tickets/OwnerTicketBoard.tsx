@@ -51,6 +51,15 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
     }
   };
 
+  const updateTicketTags = async (ticketId: number, tagIds: number[]) => {
+    try {
+      await ticketController.updateTicketTags(ticketId, tagIds);
+    } catch (ticketError) {
+      showToast({ tone: "error", title: "Tickettags konnten nicht geÃ¤ndert werden", message: await errorMessageAsync(ticketError) });
+      throw ticketError;
+    }
+  };
+
   return (
     <>
       <OwnerRelationBoard<Ticket>
@@ -74,6 +83,7 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
             onDelete={props.onDelete}
             onStatusChange={updateTicketStatus}
             onDueDateChange={updateTicketDueDate}
+            onTagsChange={updateTicketTags}
             linkAction={props.linkAction}
           />
         )}

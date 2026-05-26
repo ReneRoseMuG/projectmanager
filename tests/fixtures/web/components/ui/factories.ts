@@ -108,6 +108,9 @@ export function buildTask(overrides: Partial<TaskBoardItem> = {}): TaskBoardItem
     updatedAt,
     tags: [buildTag()],
     subtaskCount: 2,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     ...overrides
   };
 }
@@ -122,6 +125,9 @@ export function buildFeature(overrides: Partial<Feature> = {}): Feature {
     contentPath: "content/features/feature-login.md",
     sortOrder: 1,
     useCaseCount: 3,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     version: 1,
     createdAt,
     updatedAt,
@@ -139,6 +145,9 @@ export function buildUseCase(overrides: Partial<UseCase> = {}): UseCase {
     content: "Der Nutzer meldet sich mit gültigen Zugangsdaten an.",
     contentPath: "content/use-cases/uc-login-success.md",
     sortOrder: 1,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     version: 1,
     createdAt,
     updatedAt,
@@ -198,6 +207,9 @@ export function buildTicket(overrides: Partial<Ticket> = {}): Ticket {
     updatedAt,
     tags: [buildTag()],
     subTicketCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     ...overrides
   };
 }

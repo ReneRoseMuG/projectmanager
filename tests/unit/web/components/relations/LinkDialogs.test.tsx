@@ -50,7 +50,10 @@ const task: Task = {
   createdAt: "2026-05-22T08:00:00",
   updatedAt: "2026-05-22T08:00:00",
   tags: [],
-  subtaskCount: 0
+  subtaskCount: 0,
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0
 };
 
 const ticket: Ticket = {
@@ -73,7 +76,10 @@ const ticket: Ticket = {
   createdAt: "2026-05-22T08:00:00",
   updatedAt: "2026-05-22T08:00:00",
   tags: [],
-  subTicketCount: 0
+  subTicketCount: 0,
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0
 };
 
 function renderWithQuery(ui: ReactElement) {

@@ -71,6 +71,20 @@ describe("Use Cases API", () => {
     expect(res.body[0].content).toBeUndefined();
   });
 
+  it("GET Liste liefert Support-Counter fuer Use Cases", async () => {
+    const feature = await createFeature(app, { title: "Feature fuer Counter" });
+    const countedUseCase = await createUseCase(app, feature.id, { title: "Mit Support" });
+    const emptyUseCase = await createUseCase(app, feature.id, { title: "Ohne Support" });
+    await supertest(app.server).post(`/api/use-cases/${countedUseCase.id}/comments`).send({ body: "Use Case comment" }).expect(201);
+
+    const res = await supertest(app.server).get(`/api/features/${feature.id}/use-cases`).expect(200);
+    const counted = res.body.find((useCase: { id: number }) => useCase.id === countedUseCase.id);
+    const empty = res.body.find((useCase: { id: number }) => useCase.id === emptyUseCase.id);
+
+    expect(counted).toMatchObject({ attachmentCount: 0, noteCount: 0, commentCount: 1 });
+    expect(empty).toMatchObject({ attachmentCount: 0, noteCount: 0, commentCount: 0 });
+  });
+
   it("Use Case zu unbekanntem Feature liefert 404", async () => {
     await supertest(app.server).post("/api/features/9999/use-cases").send({ title: "UC" }).expect(404);
   });

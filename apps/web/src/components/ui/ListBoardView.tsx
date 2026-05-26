@@ -472,7 +472,7 @@ interface ItemWrapperBaseProps {
   className: string;
   equalItemProps: {
     "data-equal-item": string;
-    style: { minHeight: number } | undefined;
+    style: { height: number } | undefined;
   };
   children: ReactNode;
 }
@@ -601,7 +601,7 @@ function ListBoardViewContent<T>({
   const dndEnabled = Boolean(
     onItemStatusChange && statusGrouped && !loading,
   );
-  const equalItemStyle = equalItemHeight ? { minHeight: equalItemHeight } : undefined;
+  const equalItemStyle = equalItemHeight ? { height: equalItemHeight } : undefined;
   const equalItemProps = {
     "data-equal-item": "true",
     style: equalItemStyle,
@@ -777,16 +777,42 @@ function ListBoardViewContent<T>({
       return;
     }
 
+    const clearHeights = (nodes: HTMLElement[]) => {
+      nodes.forEach((node) => {
+        node.style.height = "";
+      });
+    };
+    const measureMaxHeight = (nodes: HTMLElement[]) =>
+      Math.ceil(nodes.reduce((current, node) => Math.max(current, node.getBoundingClientRect().height), 0));
+
+    if (boardByStatus) {
+      setEqualItemHeight(undefined);
+      const columnWrappers = Array.from(root.querySelectorAll<HTMLElement>("[data-status-column-wrapper]"));
+      columnWrappers.forEach((columnWrapper) => {
+        if (columnWrapper.dataset.statusCollapsedWrapper === "true") {
+          return;
+        }
+
+        const columnNodes = Array.from(columnWrapper.querySelectorAll<HTMLElement>("[data-equal-item='true']"));
+        clearHeights(columnNodes);
+        const columnHeight = measureMaxHeight(columnNodes);
+        if (columnHeight > 0) {
+          columnNodes.forEach((node) => {
+            node.style.height = `${columnHeight}px`;
+          });
+        }
+      });
+      return;
+    }
+
     const nodes = Array.from(root.querySelectorAll<HTMLElement>("[data-equal-item='true']"));
     if (nodes.length === 0) {
       setEqualItemHeight(undefined);
       return;
     }
 
-    nodes.forEach((node) => {
-      node.style.minHeight = "";
-    });
-    const maxHeight = Math.ceil(nodes.reduce((current, node) => Math.max(current, node.getBoundingClientRect().height), 0));
+    clearHeights(nodes);
+    const maxHeight = measureMaxHeight(nodes);
     setEqualItemHeight(maxHeight > 0 ? maxHeight : undefined);
   }, [boardByStatus, hasStatusGrouping, items, loading, mode]);
 

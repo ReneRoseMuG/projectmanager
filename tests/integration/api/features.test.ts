@@ -20,6 +20,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { config } from "../../../apps/api/src/config.js";
 import { resolveStoredContentPath, setContentBaseDir } from "../../../apps/api/src/services/content.service.js";
 import { buildTestApp, createFeature, createTestDb, createUseCase, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
@@ -27,24 +28,46 @@ describe("Features API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
   let tmpContentDir: string;
+  let originalUploadDir: string;
+  let originalPreviewCacheDir: string;
+  const uploadDir = path.join(os.tmpdir(), `taskmanager-api-feature-counts-${process.pid}`);
+  const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-feature-count-previews-${process.pid}`);
 
   beforeAll(async () => {
+    originalUploadDir = config.uploadDir;
+    originalPreviewCacheDir = config.previewCacheDir;
+    process.env.UPLOAD_DIR = uploadDir;
+    process.env.PREVIEW_CACHE_DIR = previewCacheDir;
+    config.uploadDir = uploadDir;
+    config.previewCacheDir = previewCacheDir;
     tmpContentDir = fs.mkdtempSync(path.join(os.tmpdir(), "taskmanager-content-"));
     setContentBaseDir(tmpContentDir);
     testDb = createTestDb();
-    app = await buildTestApp(testDb);
+    app = await buildTestApp(testDb, { enableMultipart: true });
   });
 
   beforeEach(() => {
     truncateAll(testDb.sqlite);
     fs.rmSync(tmpContentDir, { recursive: true, force: true });
     fs.mkdirSync(tmpContentDir, { recursive: true });
+    fs.rmSync(uploadDir, { recursive: true, force: true });
+    fs.rmSync(previewCacheDir, { recursive: true, force: true });
+    fs.mkdirSync(uploadDir, { recursive: true });
+    fs.mkdirSync(previewCacheDir, { recursive: true });
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    if (app) {
+      await app.close();
+    }
+    if (testDb) {
+      testDb.sqlite.close();
+    }
+    config.uploadDir = originalUploadDir;
+    config.previewCacheDir = originalPreviewCacheDir;
     fs.rmSync(tmpContentDir, { recursive: true, force: true });
+    fs.rmSync(uploadDir, { recursive: true, force: true });
+    fs.rmSync(previewCacheDir, { recursive: true, force: true });
   });
 
   it("POST erstellt Feature und Markdown-Datei", async () => {
@@ -79,6 +102,23 @@ describe("Features API", () => {
 
     expect(res.body).toHaveLength(1);
     expect(res.body[0].content).toBeUndefined();
+  });
+
+  it("GET Liste liefert Support-Counter fuer Features", async () => {
+    const countedFeature = await createFeature(app, { title: "Mit Support" });
+    const emptyFeature = await createFeature(app, { title: "Ohne Support" });
+    await supertest(app.server).post(`/api/features/${countedFeature.id}/comments`).send({ body: "Feature comment" }).expect(201);
+    await supertest(app.server)
+      .post(`/api/features/${countedFeature.id}/attachments`)
+      .attach("file", Buffer.from("Feature-Datei"), { filename: "feature.txt", contentType: "text/plain" })
+      .expect(201);
+
+    const res = await supertest(app.server).get("/api/features").expect(200);
+    const counted = res.body.find((feature: { id: number }) => feature.id === countedFeature.id);
+    const empty = res.body.find((feature: { id: number }) => feature.id === emptyFeature.id);
+
+    expect(counted).toMatchObject({ attachmentCount: 1, noteCount: 0, commentCount: 1 });
+    expect(empty).toMatchObject({ attachmentCount: 0, noteCount: 0, commentCount: 0 });
   });
 
   it("GET einzelnes Feature enthält Content", async () => {

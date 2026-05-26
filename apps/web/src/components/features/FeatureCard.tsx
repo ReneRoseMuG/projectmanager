@@ -5,6 +5,7 @@ import { objectReference } from "../../lib/references";
 import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
+import { CardFooterBar } from "../ui/CardFooterBar";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
 import { StatusPill } from "../ui/StatusPill";
@@ -38,6 +39,7 @@ export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onSta
             description={description}
             pills={<StatusPill kind="featureStatus" value={feature.status} onChange={onStatusChange ? (status) => onStatusChange(feature, status) : undefined} />}
             meta={<span className="text-xs font-semibold text-steel-500">{feature.useCaseCount} Use Cases</span>}
+            footer={<CardFooterBar tags={[]} attachmentCount={feature.attachmentCount} noteCount={feature.noteCount} commentCount={feature.commentCount} bordered={false} />}
             actions={<ActionMenu objectReference={objectReference("feature", feature.id)} items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: open }, { label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(feature), danger: true }]} />}
             actionsIncludeObjectReference
             onOpen={open}
@@ -56,7 +58,12 @@ export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onSta
       onDelete={() => onDelete(feature)}
       header={<FeatureCardHeader feature={feature} onStatusChange={onStatusChange} />}
       body={description ? <p className="line-clamp-3 text-sm text-steel-600">{description}</p> : null}
-      footer={<FeatureCardFooter feature={feature} />}
+      footer={
+        <div className="grid gap-3">
+          <FeatureCardFooter feature={feature} />
+          <CardFooterBar tags={[]} attachmentCount={feature.attachmentCount} noteCount={feature.noteCount} commentCount={feature.commentCount} />
+        </div>
+      }
     />
   );
 }
@@ -72,7 +79,7 @@ function FeatureCardHeader({ feature, onStatusChange }: { feature: Feature; onSt
 
 function FeatureCardFooter({ feature }: { feature: Feature }) {
   return (
-    <div className="group flex items-center justify-between gap-3 border-t border-line pt-3">
+    <div className="group flex items-center justify-between gap-3">
       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-steel-700">
         <FileText size={14} />
         {feature.useCaseCount} Use Cases

@@ -91,6 +91,9 @@ vi.mock("../../../../apps/web/src/hooks/useTaskDetail", () => ({
           updatedAt: "2026-05-20T08:00:00.000Z",
           tags: [],
           subtaskCount: 0,
+          attachmentCount: 0,
+          noteCount: 0,
+          commentCount: 0,
         }
       : null,
     loading: false,

@@ -139,16 +139,55 @@ export async function invalidateTicketScope(queryClient: QueryClient, owner?: Ti
   ]);
 }
 
+function commentOwnerKeys(entityType: CommentEntityType, entityId: number): QueryKey[] {
+  if (entityType === "task") {
+    return [queryKeys.tasks.root, queryKeys.tasks.detail(entityId)];
+  }
+  if (entityType === "ticket") {
+    return [queryKeys.tickets.root, queryKeys.tickets.detail(entityId)];
+  }
+  if (entityType === "feature") {
+    return [queryKeys.features.root, queryKeys.features.detail(entityId)];
+  }
+  if (entityType === "useCase") {
+    return [queryKeys.useCases.root, queryKeys.useCases.detail(entityId), queryKeys.features.root];
+  }
+  return [];
+}
+
+function noteOwnerKeys(ownerType: NoteOwnerType, ownerId: number): QueryKey[] {
+  if (ownerType === "task") {
+    return [queryKeys.tasks.root, queryKeys.tasks.detail(ownerId)];
+  }
+  if (ownerType === "ticket") {
+    return [queryKeys.tickets.root, queryKeys.tickets.detail(ownerId)];
+  }
+  return [];
+}
+
+function attachmentOwnerKeys(ownerType: QueryOwnerType, ownerId: number): QueryKey[] {
+  if (ownerType === "task") {
+    return [queryKeys.tasks.root, queryKeys.tasks.detail(ownerId)];
+  }
+  if (ownerType === "ticket") {
+    return [queryKeys.tickets.root, queryKeys.tickets.detail(ownerId)];
+  }
+  if (ownerType === "feature") {
+    return [queryKeys.features.root, queryKeys.features.detail(ownerId)];
+  }
+  return [];
+}
+
 export async function invalidateComments(queryClient: QueryClient, entityType: CommentEntityType, entityId: number): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.comments.entity(entityType, entityId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.comments.entity(entityType, entityId), ...commentOwnerKeys(entityType, entityId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateNotes(queryClient: QueryClient, ownerType: NoteOwnerType, ownerId: number): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.notes.owner(ownerType, ownerId), queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.notes.owner(ownerType, ownerId), ...noteOwnerKeys(ownerType, ownerId), queryKeys.globalSearch.root]);
 }
 
 export async function invalidateAttachments(queryClient: QueryClient, ownerType: QueryOwnerType, ownerId: number): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.attachments.owner(ownerType, ownerId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.attachments.owner(ownerType, ownerId), ...attachmentOwnerKeys(ownerType, ownerId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateTags(queryClient: QueryClient): Promise<void> {

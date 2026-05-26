@@ -1,7 +1,7 @@
 import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskStats, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { featureTasks, features, milestoneTasks, milestones, projectTasks, projects, tasks, useCases, useCaseTasks } from "../db/schema.js";
+import { featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks } from "../db/schema.js";
 import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
@@ -33,6 +33,17 @@ export type DashboardOverdueTaskOwner = { type: "project" | "milestone"; id: num
 
 type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "version" | "createdAt" | "updatedAt">;
 type OwnerTaskRecord = MappableTaskRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
+interface SupportCounts {
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
+}
+
+const emptySupportCounts: SupportCounts = {
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0
+};
 
 const taskSelect = {
   id: tasks.id,
@@ -62,7 +73,8 @@ export function mapTask(
   record: MappableTaskRecord,
   tags = getTaskTags(database, record.id),
   subtaskCount = getSubtaskCounts(database, [record.id]).get(record.id) ?? 0,
-  visibleParent?: VisibleParentContext | null
+  visibleParent?: VisibleParentContext | null,
+  supportCounts = getTaskSupportCounts(database, [record.id]).get(record.id) ?? emptySupportCounts
 ): Task {
   return {
     id: record.id,
@@ -78,13 +90,16 @@ export function mapTask(
     updatedAt: record.updatedAt,
     tags,
     subtaskCount,
+    attachmentCount: supportCounts.attachmentCount,
+    noteCount: supportCounts.noteCount,
+    commentCount: supportCounts.commentCount,
     visibleParent
   };
 }
 
-function mapTaskBoardItem(database: DbClient, record: OwnerTaskRecord, tags?: Task["tags"], subtaskCount?: number): TaskBoardItem {
+function mapTaskBoardItem(database: DbClient, record: OwnerTaskRecord, tags?: Task["tags"], subtaskCount?: number, supportCounts?: SupportCounts): TaskBoardItem {
   return {
-    ...mapTask(database, record, tags, subtaskCount, record.visibleParent),
+    ...mapTask(database, record, tags, subtaskCount, record.visibleParent, supportCounts),
     boardPosition: record.boardPosition
   };
 }
@@ -187,6 +202,40 @@ function getSubtaskCounts(database: DbClient, taskIds: number[]): Map<number, nu
     if (row.parentId !== null) {
       counts.set(row.parentId, (counts.get(row.parentId) ?? 0) + 1);
     }
+  }
+
+  return counts;
+}
+
+function getTaskSupportCounts(database: DbClient, taskIds: number[]): Map<number, SupportCounts> {
+  const counts = new Map<number, SupportCounts>();
+  if (taskIds.length === 0) {
+    return counts;
+  }
+
+  const ensureCounts = (taskId: number): SupportCounts => {
+    const current = counts.get(taskId);
+    if (current) {
+      return current;
+    }
+    const nextCounts = { ...emptySupportCounts };
+    counts.set(taskId, nextCounts);
+    return nextCounts;
+  };
+
+  const attachmentRows = database.select({ taskId: taskAttachments.taskId }).from(taskAttachments).where(inArray(taskAttachments.taskId, taskIds)).all();
+  for (const row of attachmentRows) {
+    ensureCounts(row.taskId).attachmentCount += 1;
+  }
+
+  const noteRows = database.select({ taskId: taskNotes.taskId }).from(taskNotes).where(inArray(taskNotes.taskId, taskIds)).all();
+  for (const row of noteRows) {
+    ensureCounts(row.taskId).noteCount += 1;
+  }
+
+  const commentRows = database.select({ taskId: taskComments.taskId }).from(taskComments).where(inArray(taskComments.taskId, taskIds)).all();
+  for (const row of commentRows) {
+    ensureCounts(row.taskId).commentCount += 1;
   }
 
   return counts;
@@ -397,8 +446,9 @@ export function listOwnerTasks(database: DbClient, owner: TaskOwner): TaskBoardI
   const ids = rows.map((task) => task.id);
   const tagsByTask = getTaskTagsMap(database, ids);
   const subtaskCounts = getSubtaskCounts(database, ids);
+  const supportCounts = getTaskSupportCounts(database, ids);
 
-  return rows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
+  return rows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, supportCounts.get(task.id) ?? emptySupportCounts));
 }
 
 export function listTasks(database: DbClient): Task[] {
@@ -406,8 +456,9 @@ export function listTasks(database: DbClient): Task[] {
   const ids = rows.map((task) => task.id);
   const tagsByTask = getTaskTagsMap(database, ids);
   const subtaskCounts = getSubtaskCounts(database, ids);
+  const supportCounts = getTaskSupportCounts(database, ids);
 
-  return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
+  return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, undefined, supportCounts.get(task.id) ?? emptySupportCounts));
 }
 
 export function listTaskLinkCandidates(database: DbClient, owner: TaskOwner): Task[] {
@@ -424,8 +475,9 @@ export function listSubtasks(database: DbClient, taskId: number): Task[] {
   const ids = rows.map((task) => task.id);
   const tagsByTask = getTaskTagsMap(database, ids);
   const subtaskCounts = getSubtaskCounts(database, ids);
+  const supportCounts = getTaskSupportCounts(database, ids);
 
-  return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0));
+  return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, undefined, supportCounts.get(task.id) ?? emptySupportCounts));
 }
 
 function listDashboardTasks(database: DbClient, owner?: DashboardTaskOwner): Task[] {

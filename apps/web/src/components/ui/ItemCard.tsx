@@ -32,7 +32,7 @@ export function ItemCard({
 }: ItemCardProps) {
   return (
     <article
-      className={`group/reference-card relative grid h-full min-w-0 max-w-full gap-3 overflow-visible rounded-lg border border-line bg-white p-5 shadow-sm transition duration-200 hover:z-30 hover:-translate-y-0.5 hover:shadow-panel focus-within:z-30 ${onOpen ? "cursor-pointer" : ""} ${className}`}
+      className={`group/reference-card relative flex h-full min-w-0 max-w-full flex-col gap-3 overflow-visible rounded-lg border border-line bg-white p-5 shadow-sm transition duration-200 hover:z-30 hover:-translate-y-0.5 hover:shadow-panel focus-within:z-30 ${onOpen ? "cursor-pointer" : ""} ${className}`}
       onDoubleClick={onOpen}
     >
       {accentColor ? (
@@ -41,7 +41,7 @@ export function ItemCard({
           style={{ backgroundColor: accentColor }}
         />
       ) : null}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex shrink-0 items-start justify-between gap-3">
         <div className="min-w-0">{header}</div>
         {objectReference || onEdit || extraMenuItems.length > 0 || onDelete ? (
           <div
@@ -77,7 +77,7 @@ export function ItemCard({
           </div>
         ) : null}
       </div>
-      {body ? <div className="min-w-0">{body}</div> : null}
+      {body ? <div className="min-h-0 min-w-0 flex-1">{body}</div> : null}
       {footer ? <footer className="mt-auto min-w-0">{footer}</footer> : null}
     </article>
   );

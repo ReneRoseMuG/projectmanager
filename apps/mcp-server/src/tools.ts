@@ -169,16 +169,16 @@ const updateTicketSchema = idSchema.extend({
 });
 const featureCreateSchema = z.object({
   title: z.string().min(1),
-  description: z.string().nullable().optional(),
-  content: z.string().optional(),
+  description: z.string().nullable().optional().describe("Zusammenfassung des redaktionellen Feature-Inhalts."),
+  content: z.string().optional().describe("Redaktioneller Hauptinhalt des Features."),
   status: z.string().min(1).optional(),
   sortOrder: z.number().int().optional()
 });
 const updateFeatureSchema = idSchema.extend({
   title: z.string().min(1).optional(),
   status: z.string().min(1).optional(),
-  description: z.string().nullable().optional(),
-  content: z.string().optional(),
+  description: z.string().nullable().optional().describe("Zusammenfassung des redaktionellen Feature-Inhalts."),
+  content: z.string().optional().describe("Redaktioneller Hauptinhalt des Features."),
   sortOrder: z.number().int().optional()
 });
 const useCaseCreateSchema = z.object({

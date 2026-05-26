@@ -33,12 +33,15 @@ export type JsonValue = JsonPrimitive | JsonValue[] | JsonObject;
 
 export const SETTING_SCOPE_TYPES = ["GLOBAL", "ROLE", "USER"] as const;
 export const SETTING_VALUE_TYPES = ["boolean", "number", "color", "enum", "string", "json"] as const;
+export const TOAST_POSITIONS = ["top-right", "top-left", "bottom-right", "bottom-left"] as const;
 
 export type SettingScopeType = (typeof SETTING_SCOPE_TYPES)[number];
 export type SettingValueType = (typeof SETTING_VALUE_TYPES)[number];
+export type ToastPosition = (typeof TOAST_POSITIONS)[number];
 
 export interface SettingConstraints {
   options?: readonly string[];
+  optionLabels?: Readonly<Record<string, string>>;
   min?: number;
   max?: number;
   step?: number;
@@ -80,6 +83,24 @@ export const settingsRegistry = {
     allowedScopes: ["GLOBAL", "USER"],
     constraints: { options: ["list", "kanban"] },
     validate: (value): value is "list" | "kanban" => value === "list" || value === "kanban"
+  },
+  "ui.toastPosition": {
+    key: "ui.toastPosition",
+    label: "Toast-Position",
+    description: "Steuert die globale Einblendposition von Toast-Benachrichtigungen.",
+    valueType: "enum",
+    defaultValue: "top-right",
+    allowedScopes: ["GLOBAL"],
+    constraints: {
+      options: TOAST_POSITIONS,
+      optionLabels: {
+        "top-right": "Oben rechts",
+        "top-left": "Oben links",
+        "bottom-right": "Unten rechts",
+        "bottom-left": "Unten links"
+      }
+    },
+    validate: (value): value is ToastPosition => typeof value === "string" && (TOAST_POSITIONS as readonly string[]).includes(value)
   }
 } as const satisfies Record<string, SettingDefinition>;
 
@@ -627,6 +648,9 @@ export interface Task {
   updatedAt: string;
   tags: Tag[];
   subtaskCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   visibleParent?: VisibleParentContext | null;
 }
 
@@ -673,6 +697,9 @@ export interface Ticket {
   updatedAt: string;
   tags: Tag[];
   subTicketCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   visibleParent?: VisibleParentContext | null;
 }
 
@@ -835,6 +862,9 @@ export interface Feature {
   contentPath: string | null;
   sortOrder: number;
   useCaseCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -875,6 +905,9 @@ export interface UseCase {
   content?: string;
   contentPath: string | null;
   sortOrder: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   version: number;
   createdAt: string;
   updatedAt: string;

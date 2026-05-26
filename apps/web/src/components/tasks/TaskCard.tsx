@@ -1,4 +1,4 @@
-import type { Task } from "@taskmanager/shared-types";
+import type { Tag, Task } from "@taskmanager/shared-types";
 import { CheckCircle2, Edit3, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { objectReference } from "../../lib/references";
@@ -6,25 +6,27 @@ import { catalogColor, isCatalogStatusClosed } from "../../utils/catalogs";
 import { isOverdue } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
+import { CardFooterBar } from "../ui/CardFooterBar";
 import { InlineDateField } from "../ui/InlineDateField";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
 import { ParentBadge } from "../ui/ParentBadge";
 import { PriorityBadge } from "../ui/PriorityBadge";
 import { StatusPill } from "../ui/StatusPill";
-import { TagFooter } from "../ui/TagFooter";
 
 interface TaskCardProps {
   task: Task;
+  allTags?: Tag[];
   compact?: boolean;
   variant?: "card" | "row";
   onOpen: (task: Task) => void;
   onDelete?: (task: Task) => void;
   onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>;
   onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>;
+  onTagsChange?: (taskId: number, tagIds: number[]) => void | Promise<void>;
 }
 
-export function TaskCard({ task, compact = false, variant = "card", onOpen, onDelete, onStatusChange, onDueDateChange }: TaskCardProps) {
+export function TaskCard({ task, allTags, compact = false, variant = "card", onOpen, onDelete, onStatusChange, onDueDateChange, onTagsChange }: TaskCardProps) {
   const catalogs = useCatalogs();
   const description = richTextToPlainText(task.description);
   const statusColor = catalogColor(catalogs.entries, "workStatus", task.status);
@@ -34,9 +36,9 @@ export function TaskCard({ task, compact = false, variant = "card", onOpen, onDe
     return (
       <>
         <div className="md:hidden">
-          <TaskCard task={task} compact={compact} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
+          <TaskCard task={task} allTags={allTags} compact={compact} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
         </div>
-        <TaskRow task={task} description={description} statusColor={statusColor} taskClosed={taskClosed} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} />
+        <TaskRow task={task} allTags={allTags} description={description} statusColor={statusColor} taskClosed={taskClosed} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
       </>
     );
   }
@@ -47,7 +49,7 @@ export function TaskCard({ task, compact = false, variant = "card", onOpen, onDe
       objectReference={objectReference("task", task.id)}
       header={<TaskCardHeader task={task} onStatusChange={onStatusChange} />}
       body={<TaskCardBody description={description} />}
-      footer={<TaskCardFooter task={task} taskClosed={taskClosed} onDueDateChange={onDueDateChange} />}
+      footer={<TaskCardFooter task={task} allTags={allTags} taskClosed={taskClosed} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />}
       onOpen={() => onOpen(task)}
       onEdit={() => onOpen(task)}
       onDelete={onDelete ? () => onDelete(task) : undefined}
@@ -72,14 +74,14 @@ function TaskCardBody({ description }: { description: string }) {
   return description ? <p className="line-clamp-3 text-xs text-steel-600">{description}</p> : null;
 }
 
-function TaskCardFooter({ task, taskClosed, onDueDateChange }: { task: Task; taskClosed: boolean; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown> }) {
+function TaskCardFooter({ task, allTags, taskClosed, onDueDateChange, onTagsChange }: { task: Task; allTags?: Tag[]; taskClosed: boolean; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (taskId: number, tagIds: number[]) => void | Promise<void> }) {
   const overdue = !taskClosed && isOverdue(task.dueDate);
   const hasMeta = task.subtaskCount > 0 || Boolean(task.dueDate);
 
   return (
     <div className="grid gap-3">
       {hasMeta ? (
-        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-2 text-xs text-steel-600">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-steel-600">
           {task.subtaskCount > 0 ? (
             <span className="inline-flex items-center gap-1">
               <CheckCircle2 size={14} />
@@ -91,15 +93,31 @@ function TaskCardFooter({ task, taskClosed, onDueDateChange }: { task: Task; tas
           ) : null}
         </div>
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <ParentBadge parent={task.visibleParent} />
-      </div>
-      <TagFooter tags={task.tags} />
+      <TaskSupportFooter task={task} allTags={allTags} onTagsChange={onTagsChange} />
     </div>
   );
 }
 
-function TaskRow({ task, description, statusColor, taskClosed, onOpen, onDelete, onStatusChange, onDueDateChange }: { task: Task; description: string; statusColor: string; taskClosed: boolean; onOpen: (task: Task) => void; onDelete?: (task: Task) => void; onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown> }) {
+function TaskSupportFooter({ task, allTags, onTagsChange, bordered = true }: { task: Task; allTags?: Tag[]; onTagsChange?: (taskId: number, tagIds: number[]) => void | Promise<void>; bordered?: boolean }) {
+  return (
+    <div className="grid min-w-0 gap-2">
+      <div className="flex flex-wrap gap-2">
+        <ParentBadge parent={task.visibleParent} />
+      </div>
+      <CardFooterBar
+        tags={task.tags}
+        allTags={allTags}
+        onTagsChange={onTagsChange ? (tagIds) => onTagsChange(task.id, tagIds) : undefined}
+        attachmentCount={task.attachmentCount}
+        noteCount={task.noteCount}
+        commentCount={task.commentCount}
+        bordered={bordered}
+      />
+    </div>
+  );
+}
+
+function TaskRow({ task, allTags, description, statusColor, taskClosed, onOpen, onDelete, onStatusChange, onDueDateChange, onTagsChange }: { task: Task; allTags?: Tag[]; description: string; statusColor: string; taskClosed: boolean; onOpen: (task: Task) => void; onDelete?: (task: Task) => void; onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (taskId: number, tagIds: number[]) => void | Promise<void> }) {
   const overdue = !taskClosed && isOverdue(task.dueDate);
 
   return (
@@ -120,7 +138,7 @@ function TaskRow({ task, description, statusColor, taskClosed, onOpen, onDelete,
             <InlineDateField value={task.dueDate} onChange={onDueDateChange ? (dueDate) => onDueDateChange(task, dueDate) : undefined} />
           </span>
         }
-        footer={<><ParentBadge parent={task.visibleParent} /><TagFooter tags={task.tags} /></>}
+        footer={<TaskSupportFooter task={task} allTags={allTags} onTagsChange={onTagsChange} bordered={false} />}
         actions={
           <ActionMenu
             objectReference={objectReference("task", task.id)}

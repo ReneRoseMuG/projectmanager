@@ -78,7 +78,10 @@ const data: GlobalSearchData = {
       createdAt: "2026-05-22T00:00:00.000Z",
       updatedAt: "2026-05-22T00:00:00.000Z",
       tags: [],
-      subtaskCount: 0
+      subtaskCount: 0,
+      attachmentCount: 0,
+      noteCount: 0,
+      commentCount: 0
     }
   ]
 };

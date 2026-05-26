@@ -51,6 +51,9 @@ const feature: Feature = {
   contentPath: null,
   sortOrder: 1,
   useCaseCount: 0,
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0,
   version: 3,
   createdAt: "2026-05-19T08:00:00.000Z",
   updatedAt: "2026-05-19T09:00:00.000Z"

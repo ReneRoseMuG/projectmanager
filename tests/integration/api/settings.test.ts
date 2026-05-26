@@ -138,6 +138,11 @@ describe("Settings API", () => {
       .put("/api/settings/values")
       .send({ key: "taskBoard.viewMode", scopeType: "GLOBAL", value: "kanban", expectedVersion: 0 })
       .expect(403);
+
+    await reader
+      .put("/api/settings/values")
+      .send({ key: "ui.toastPosition", scopeType: "GLOBAL", value: "bottom-left", expectedVersion: 0 })
+      .expect(403);
   });
 
   it("erlaubt Admins GLOBAL-Defaults, die für andere Nutzer wirksam werden", async () => {
@@ -153,5 +158,34 @@ describe("Settings API", () => {
 
     expect(taskSetting).toMatchObject({ resolvedValue: "kanban", resolvedScope: "GLOBAL", resolvedVersion: 1 });
     expect(taskSetting.values.GLOBAL?.value).toBe("kanban");
+  });
+  it("persistiert Toast-Position global und fällt bei ungültigem gespeicherten Wert zurück", async () => {
+    const admin = await loginAdmin(app);
+
+    const invalid = await admin
+      .put("/api/settings/values")
+      .send({ key: "ui.toastPosition", scopeType: "GLOBAL", value: "center", expectedVersion: 0 })
+      .expect(400);
+    expect(invalid.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
+
+    const savedResponse = await admin
+      .put("/api/settings/values")
+      .send({ key: "ui.toastPosition", scopeType: "GLOBAL", value: "bottom-left", expectedVersion: 0 })
+      .expect(200);
+    const savedToastSetting = settingByKey(savedResponse.body.settings as ResolvedSetting[], "ui.toastPosition");
+    expect(savedToastSetting).toMatchObject({ resolvedValue: "bottom-left", resolvedScope: "GLOBAL", resolvedVersion: 1 });
+    expect(savedToastSetting.values.GLOBAL?.value).toBe("bottom-left");
+
+    const reader = await createUser(app, "reader", "settings-toast-global@example.test");
+    const readerResponse = await reader.get("/api/settings/resolved").expect(200);
+    const readerToastSetting = settingByKey(readerResponse.body.settings as ResolvedSetting[], "ui.toastPosition");
+    expect(readerToastSetting).toMatchObject({ resolvedValue: "bottom-left", resolvedScope: "GLOBAL", resolvedVersion: 1 });
+
+    testDb.sqlite.prepare("UPDATE settings_values SET value_json = '\"center\"' WHERE setting_key = 'ui.toastPosition' AND scope_type = 'GLOBAL'").run();
+
+    const fallbackResponse = await reader.get("/api/settings/resolved").expect(200);
+    const fallbackToastSetting = settingByKey(fallbackResponse.body.settings as ResolvedSetting[], "ui.toastPosition");
+    expect(fallbackToastSetting).toMatchObject({ resolvedValue: "top-right", resolvedScope: "DEFAULT", resolvedVersion: null });
+    expect(fallbackToastSetting.values.GLOBAL).toBeUndefined();
   });
 });

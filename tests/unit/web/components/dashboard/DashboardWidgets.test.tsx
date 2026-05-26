@@ -69,6 +69,16 @@ vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
   useHasPermission: () => true,
 }));
 
+vi.mock("../../../../../apps/web/src/hooks/useTags", () => ({
+  useTags: () => ({
+    tags: [],
+    loading: false,
+    error: null,
+    reload: async () => undefined,
+    createTag: async () => undefined,
+  }),
+}));
+
 vi.mock("../../../../../apps/web/src/hooks/useCalendarTasks", () => ({
   useCalendarTasks: () => ({ tasks: [], loading: false }),
 }));

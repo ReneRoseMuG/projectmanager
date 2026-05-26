@@ -306,4 +306,30 @@ describe("Auth API", () => {
     await ticketReader.get(`/api/tickets/link-candidates?ownerType=project&ownerId=${project.body.id}`).expect(200);
     await ticketReader.get(`/api/tickets/${ticket.body.id}/relation-candidates`).expect(200);
   });
+
+  it("schützt Task- und Ticket-Tag-Zuweisungen über write-Rechte", async () => {
+    await supertest(app.server).put("/api/tasks/1/tags").send({ tagIds: [] }).expect(401);
+    await supertest(app.server).put("/api/tickets/1/tags").send({ tagIds: [] }).expect(401);
+
+    const admin = await loginAdmin(app);
+    const project = await admin.post("/api/projects").send({ name: "Tag-Projekt" }).expect(201);
+    const task = await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Tag-Aufgabe" }).expect(201);
+    const ticket = await admin.post(`/api/projects/${project.body.id}/tickets`).send({ title: "Tag-Ticket" }).expect(201);
+    const tag = await admin.post("/api/tags").send({ name: "Wichtig", color: "#0f766e" }).expect(201);
+
+    await admin.put(`/api/tasks/${task.body.id}/tags`).send({ tagIds: [tag.body.id] }).expect(200);
+    await admin.put(`/api/tickets/${ticket.body.id}/tags`).send({ tagIds: [tag.body.id] }).expect(200);
+
+    const roles = await admin.get("/api/admin/roles").expect(200);
+    const readerRole = roles.body.find((role: { key: string }) => role.key === "reader") as { id: number };
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Tag", lastName: "Reader", email: "tag-reader@example.test", roleId: readerRole.id, password: "password123", isActive: true })
+      .expect(201);
+
+    const reader = supertest.agent(app.server);
+    await reader.post("/api/auth/login").send({ email: "tag-reader@example.test", password: "password123" }).expect(200);
+    await reader.put(`/api/tasks/${task.body.id}/tags`).send({ tagIds: [] }).expect(403);
+    await reader.put(`/api/tickets/${ticket.body.id}/tags`).send({ tagIds: [] }).expect(403);
+  });
 });

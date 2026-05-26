@@ -39,6 +39,28 @@ const settings: ResolvedSetting[] = [
     resolvedScope: "DEFAULT",
     resolvedVersion: null,
   },
+  {
+    key: "ui.toastPosition",
+    label: "Toast-Position",
+    description:
+      "Steuert die globale Einblendposition von Toast-Benachrichtigungen.",
+    valueType: "enum",
+    constraints: {
+      options: ["top-right", "top-left", "bottom-right", "bottom-left"],
+      optionLabels: {
+        "top-right": "Oben rechts",
+        "top-left": "Oben links",
+        "bottom-right": "Unten rechts",
+        "bottom-left": "Unten links",
+      },
+    },
+    allowedScopes: ["GLOBAL"],
+    defaultValue: "top-right",
+    values: {},
+    resolvedValue: "top-right",
+    resolvedScope: "DEFAULT",
+    resolvedVersion: null,
+  },
 ];
 
 vi.mock("../../../../apps/web/src/hooks/useAuth", () => ({
@@ -52,6 +74,7 @@ vi.mock("../../../../apps/web/src/hooks/useAuth", () => ({
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useSettings", () => ({
+  useSetting: () => "top-right",
   useSettings: () => ({
     settings,
     loading: false,
@@ -91,6 +114,9 @@ describe("SettingsPreferencesPage", () => {
     expect(
       screen.queryByRole("heading", { name: "Globale Defaults" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Toast-Position" }),
+    ).not.toBeInTheDocument();
   });
 
   it("speichert Enum-Settings über den Settings-Hook", async () => {
@@ -118,6 +144,37 @@ describe("SettingsPreferencesPage", () => {
     expect(
       screen.getByRole("heading", { name: "Globale Defaults" }),
     ).toBeInTheDocument();
-    expect(screen.getAllByRole("combobox")).toHaveLength(2);
+    expect(
+      screen.getByRole("heading", { name: "Toast-Position" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("combobox")).toHaveLength(3);
+  });
+
+  it("speichert die Toast-Position als globales Admin-Setting", async () => {
+    adminAccess = true;
+    setSettingMock.mockResolvedValue({ settings });
+    renderPage();
+
+    const toastSelect = screen.getAllByRole("combobox").at(-1);
+    if (!toastSelect) {
+      throw new Error("Toast-Position select not found");
+    }
+
+    fireEvent.change(toastSelect, {
+      target: { value: "bottom-left" },
+    });
+    const saveButton = screen.getAllByRole("button", { name: "Speichern" }).at(-1);
+    if (!saveButton) {
+      throw new Error("Toast-Position save button not found");
+    }
+    fireEvent.click(saveButton);
+
+    await waitFor(() =>
+      expect(setSettingMock).toHaveBeenCalledWith({
+        key: "ui.toastPosition",
+        scopeType: "GLOBAL",
+        value: "bottom-left",
+      }),
+    );
   });
 });

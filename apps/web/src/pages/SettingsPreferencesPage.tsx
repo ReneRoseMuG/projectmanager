@@ -45,6 +45,10 @@ function displayValue(value: JsonValue): string {
   return JSON.stringify(value);
 }
 
+function optionLabel(setting: ResolvedSetting, option: string): string {
+  return setting.constraints?.optionLabels?.[option] ?? option;
+}
+
 function initialRawValue(
   setting: ResolvedSetting,
   scopeType: EditableScopeType,
@@ -161,7 +165,7 @@ function SettingScopeEditor({
           >
             {(setting.constraints?.options ?? []).map((option) => (
               <option key={option} value={option}>
-                {option}
+                {optionLabel(setting, option)}
               </option>
             ))}
           </select>

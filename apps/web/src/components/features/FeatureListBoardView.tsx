@@ -11,6 +11,7 @@ interface FeatureListBoardViewProps {
   onOpen: (feature: Feature) => void;
   onDelete: (feature: Feature) => void;
   onStatusChange?: (feature: Feature, status: Feature["status"]) => void | Promise<unknown>;
+  toolbarFilters?: React.ReactNode;
   filters?: React.ReactNode;
   showToolbarAdd?: boolean;
 }
@@ -30,6 +31,7 @@ export function FeatureListBoardView({
   onOpen,
   onDelete,
   onStatusChange,
+  toolbarFilters,
   filters,
   showToolbarAdd = true,
 }: FeatureListBoardViewProps) {
@@ -54,7 +56,8 @@ export function FeatureListBoardView({
       onItemStatusChange={onStatusChange ? (feature, status) => onStatusChange(feature, status as Feature["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
-      toolbarFilters={filters}
+      toolbarFilters={toolbarFilters}
+      filters={filters}
       emptyState={
         <EmptyState
           icon={<BookOpen size={22} />}

@@ -1,7 +1,7 @@
 import type { JsonValue } from "@taskmanager/shared-types";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { features } from "../db/schema.js";
+import { features, useCaseComments } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { useCaseRepository, type UseCaseRecord, type UseCaseUpdateData } from "../repositories/use-case.repository.js";
@@ -51,10 +51,25 @@ export interface UseCaseDto {
   content?: string;
   contentPath: string | null;
   sortOrder: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   version: number;
   createdAt: string;
   updatedAt: string;
 }
+
+interface UseCaseSupportCounts {
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
+}
+
+const emptyUseCaseSupportCounts: UseCaseSupportCounts = {
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0
+};
 
 const useCaseJournalFields: Array<JournalFieldDefinition<UseCaseRecord>> = [
   { key: "title", label: "Titel" },
@@ -67,7 +82,7 @@ function contentFilename(id: number): string {
   return buildFilename("usecase", id);
 }
 
-function mapUseCase(record: UseCaseRecord, content?: string): UseCaseDto {
+function mapUseCase(record: UseCaseRecord, content?: string, supportCounts = emptyUseCaseSupportCounts): UseCaseDto {
   return {
     id: record.id,
     featureId: record.featureId,
@@ -77,10 +92,37 @@ function mapUseCase(record: UseCaseRecord, content?: string): UseCaseDto {
     content,
     contentPath: record.contentPath,
     sortOrder: record.sortOrder,
+    attachmentCount: supportCounts.attachmentCount,
+    noteCount: supportCounts.noteCount,
+    commentCount: supportCounts.commentCount,
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
   };
+}
+
+function getUseCaseSupportCounts(database: DbClient, useCaseIds: number[]): Map<number, UseCaseSupportCounts> {
+  const counts = new Map<number, UseCaseSupportCounts>();
+  if (useCaseIds.length === 0) {
+    return counts;
+  }
+
+  const ensureCounts = (useCaseId: number): UseCaseSupportCounts => {
+    const current = counts.get(useCaseId);
+    if (current) {
+      return current;
+    }
+    const nextCounts = { ...emptyUseCaseSupportCounts };
+    counts.set(useCaseId, nextCounts);
+    return nextCounts;
+  };
+
+  const commentRows = database.select({ useCaseId: useCaseComments.useCaseId }).from(useCaseComments).where(inArray(useCaseComments.useCaseId, useCaseIds)).all();
+  for (const row of commentRows) {
+    ensureCounts(row.useCaseId).commentCount += 1;
+  }
+
+  return counts;
 }
 
 function ensureFeatureExists(database: DbClient, featureId: number): void {
@@ -143,12 +185,16 @@ function buildContentChange(before: string, after: string): JournalChangeCreateD
 
 export function listUseCases(database: DbClient, featureId: number): UseCaseDto[] {
   ensureFeatureExists(database, featureId);
-  return useCaseRepository.findByFeatureId(database, featureId).map((useCase) => mapUseCase(useCase));
+  const rows = useCaseRepository.findByFeatureId(database, featureId);
+  const ids = rows.map((useCase) => useCase.id);
+  const supportCounts = getUseCaseSupportCounts(database, ids);
+  return rows.map((useCase) => mapUseCase(useCase, undefined, supportCounts.get(useCase.id) ?? emptyUseCaseSupportCounts));
 }
 
 export function getUseCase(database: DbClient, id: number): UseCaseDto {
   const useCase = getUseCaseRecord(database, id);
-  return mapUseCase(useCase, readUseCaseContent(useCase));
+  const supportCounts = getUseCaseSupportCounts(database, [id]).get(id) ?? emptyUseCaseSupportCounts;
+  return mapUseCase(useCase, readUseCaseContent(useCase), supportCounts);
 }
 
 export function createUseCase(database: DbClient, featureId: number, input: UseCaseInput, actor?: JournalActor | null): UseCaseDto {
@@ -276,7 +322,8 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
   if (!updated) {
     throw notFound(`Use case with id ${id} not found`);
   }
-  return mapUseCase(updated, input.content ?? readUseCaseContent(updated));
+  const supportCounts = getUseCaseSupportCounts(database, [id]).get(id) ?? emptyUseCaseSupportCounts;
+  return mapUseCase(updated, input.content ?? readUseCaseContent(updated), supportCounts);
 }
 
 export function deleteUseCase(database: DbClient, id: number, actor?: JournalActor | null): void {

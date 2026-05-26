@@ -2,6 +2,17 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 26.05.26 | Fix           | Standard-Admin zurückgesetzt                 | ✅     |
+| 26.05.26 | 65            | CardFooterBar Status-Footer                  | ⚠️     |
+| 26.05.26 | 64            | ItemCard Höhenangleichung                    | ✅     |
+| 26.05.26 | Analyse       | MCP-ChatGPT stabiler Zugang                  | ⚠️     |
+| 26.05.26 | Feature       | TASK-63 Toast-Position Admin-Einstellungen   | ⚠️     |
+| 26.05.26 | Feature       | TASK-62 SelectParent Parent-Projekt          | ⚠️     |
+| 26.05.26 | Fix           | MCP Feature Feldhinweise                     | ✅     |
+| 26.05.26 | Fix           | Projekt Feature Zuordnung UI                 | ✅     |
+| 26.05.26 | Fix           | Sidebar globale Suche Placeholder            | ✅     |
+| 26.05.26 | Fix           | Features Projektfilter Position              | ✅     |
+| 26.05.26 | Fix           | Features Projektfilter                       | ✅     |
 | 25.05.26 | Fix           | Admin Nav Kontrast                           | ✅     |
 | 25.05.26 | Fix           | Admin Nav Icons                              | ✅     |
 | 25.05.26 | Fix           | Admin Sidebar Hero Meta                      | ✅     |

@@ -5,6 +5,7 @@ import { objectReference } from "../../lib/references";
 import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
+import { CardFooterBar } from "../ui/CardFooterBar";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
 import { StatusPill } from "../ui/StatusPill";
@@ -34,6 +35,7 @@ export function UseCaseCard({ useCase, variant = "card", onOpen, onStatusChange 
             title={useCase.title}
             description={description}
             pills={<StatusPill kind="featureStatus" value={useCase.status} onChange={onStatusChange ? (status) => onStatusChange(useCase, status) : undefined} />}
+            footer={<CardFooterBar tags={[]} attachmentCount={useCase.attachmentCount} noteCount={useCase.noteCount} commentCount={useCase.commentCount} bordered={false} />}
             actions={<ActionMenu objectReference={objectReference("useCase", useCase.id)} items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(useCase) }]} />}
             actionsIncludeObjectReference
             onOpen={() => onOpen(useCase)}
@@ -55,9 +57,12 @@ export function UseCaseCard({ useCase, variant = "card", onOpen, onStatusChange 
       }
       body={description ? <p className="line-clamp-3 text-xs text-steel-600">{description}</p> : null}
       footer={
-        <div className="flex items-center justify-between border-t border-line pt-2 text-[11px] font-semibold text-steel-500">
+        <div className="grid gap-3">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-steel-500">
           <span>Doppelklick zum Öffnen</span>
-          <span>#{useCase.sortOrder}</span>
+            <span>#{useCase.sortOrder}</span>
+          </div>
+          <CardFooterBar tags={[]} attachmentCount={useCase.attachmentCount} noteCount={useCase.noteCount} commentCount={useCase.commentCount} />
         </div>
       }
       onOpen={() => onOpen(useCase)}

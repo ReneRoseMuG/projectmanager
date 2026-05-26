@@ -5,6 +5,7 @@ import { ShellOverlays } from "./components/layout/ShellOverlays";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
 import { Spinner } from "./components/ui/Spinner";
+import { ToastProvider } from "./components/ui/ToastProvider";
 import { CalendarPage } from "./pages/CalendarPage";
 import { BacklogItemDetailPage } from "./pages/BacklogItemDetailPage";
 import { FeatureDetailPage } from "./pages/FeatureDetailPage";
@@ -145,30 +146,34 @@ export default function App() {
   if (standaloneView) {
     return (
       <SettingsProvider>
-        <main className={`h-screen bg-shell text-ink ${mainClass}`} style={heroLayoutStyle}>
-          {routes}
-        </main>
+        <ToastProvider>
+          <main className={`h-screen bg-shell text-ink ${mainClass}`} style={heroLayoutStyle}>
+            {routes}
+          </main>
+        </ToastProvider>
       </SettingsProvider>
     );
   }
 
   return (
     <SettingsProvider>
-      <div className="flex h-screen overflow-hidden bg-shell text-ink" style={heroLayoutStyle}>
-        <Sidebar
-          currentUser={auth.user}
-          onLogout={() => {
-            void auth.logout().then(() => navigate("/login", { replace: true }));
-          }}
-        />
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <TopBar />
-          <ShellOverlays />
-          <main className={mainClass}>
-            {routes}
-          </main>
+      <ToastProvider>
+        <div className="flex h-screen overflow-hidden bg-shell text-ink" style={heroLayoutStyle}>
+          <Sidebar
+            currentUser={auth.user}
+            onLogout={() => {
+              void auth.logout().then(() => navigate("/login", { replace: true }));
+            }}
+          />
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <TopBar />
+            <ShellOverlays />
+            <main className={mainClass}>
+              {routes}
+            </main>
+          </div>
         </div>
-      </div>
+      </ToastProvider>
     </SettingsProvider>
   );
 }

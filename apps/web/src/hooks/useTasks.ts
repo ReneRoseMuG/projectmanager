@@ -13,6 +13,7 @@ import {
   updateOwnerTaskBoard as updateOwnerTaskBoardRequest,
   updateTask as updateTaskRequest
 } from "../api/tasks";
+import { setTaskTags } from "../api/tags";
 import { invalidateFeatureScope, invalidateMilestoneScope, invalidateProjectScope, invalidateTaskScope, invalidateUseCaseScope } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
@@ -73,6 +74,13 @@ export function useGlobalTasks(enabled = true) {
     }
   });
 
+  const updateTaskTagsMutation = useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTaskTags(id, tagIds),
+    onSuccess: async (_tags, { id }) => {
+      await invalidateTaskScope(queryClient, id);
+    }
+  });
+
   const removeTaskMutation = useMutation({
     mutationFn: deleteTaskRequest,
     onSuccess: async (_result, id) => {
@@ -86,6 +94,7 @@ export function useGlobalTasks(enabled = true) {
     error: toQueryError(tasksQuery.error),
     reload,
     updateTask: (id: number, input: TaskUpdate) => updateTaskMutation.mutateAsync({ id, input }),
+    updateTaskTags: (id: number, tagIds: number[]) => updateTaskTagsMutation.mutateAsync({ id, tagIds }),
     removeTask: (id: number) => removeTaskMutation.mutateAsync(id)
   };
 }
@@ -146,6 +155,13 @@ export function useTasks(owner?: TaskOwner | null) {
     mutationFn: ({ id, input }: { id: number; input: TaskUpdate }) => updateTaskRequest(id, input),
     onSuccess: async (updated) => {
       await invalidateOwner(queryClient, validOwner, updated.id);
+    }
+  });
+
+  const updateTaskTagsMutation = useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTaskTags(id, tagIds),
+    onSuccess: async (_tags, { id }) => {
+      await invalidateOwner(queryClient, validOwner, id);
     }
   });
 
@@ -235,6 +251,13 @@ export function useTasks(owner?: TaskOwner | null) {
     [updateTaskStatusMutation]
   );
 
+  const updateTaskTags = useCallback(
+    async (id: number, tagIds: number[]) => {
+      return updateTaskTagsMutation.mutateAsync({ id, tagIds });
+    },
+    [updateTaskTagsMutation]
+  );
+
   const updateTaskBoard = useCallback(
     async (id: number, input: TaskBoardPositionInput) => {
       return updateTaskBoardMutation.mutateAsync({ id, input });
@@ -259,6 +282,7 @@ export function useTasks(owner?: TaskOwner | null) {
     unlinkTask,
     updateTask,
     updateTaskStatus,
+    updateTaskTags,
     updateTaskBoard,
     removeTask
   };

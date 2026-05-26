@@ -90,11 +90,7 @@ export function FeatureDetailPage() {
   ) => {
     const owner = { type: "feature" as const, id: featureId };
     try {
-      const projectIds =
-        initialProjectId !== undefined && Number.isFinite(initialProjectId)
-          ? [...new Set([...pending.projectIds, initialProjectId])]
-          : pending.projectIds;
-      for (const projectId of projectIds) {
+      for (const projectId of pending.projectIds) {
         const linkedFeatures = await getProjectFeatures(projectId);
         await setProjectFeatures(projectId, [
           ...new Set([

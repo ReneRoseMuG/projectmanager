@@ -275,7 +275,7 @@ function SidebarSearch({
         <input
           className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/45"
           value={value}
-          placeholder="Navigation durchsuchen"
+          placeholder="Alles durchsuchen"
           maxLength={15}
           onChange={(event) => {
             onChange(event.target.value);

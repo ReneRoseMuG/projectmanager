@@ -11,17 +11,19 @@
  *  5. Verknüpfen → kein API-Aufruf vor Submit.
  *  6. Neu erstellen → Draft erscheint in Pending-Liste.
  *  7. Pending-Item entfernen → aus Liste verschwunden.
- *  8. Submit → onSubmit aufgerufen → onPostCreate mit allen Pending-Daten aufgerufen.
- *  9. Schließen + neu öffnen → alle Pending-Listen leer (State-Reset).
+ *  8. Parent-Projekt im Details-Tab wird lokal vorgemerkt.
+ *  9. Submit → onSubmit aufgerufen → onPostCreate mit allen Pending-Daten aufgerufen.
+ * 10. Schließen + neu öffnen → alle Pending-Listen leer (State-Reset).
  *
  * Edit-Modus:
- * 10. OwnerTaskBoard / OwnerTicketBoard in Relation-Tabs sichtbar.
- * 11. CommentThread im Kommentare-Tab sichtbar.
- * 12. AttachmentList im Dateien-Tab sichtbar (sofern Tab vorhanden).
+ * 11. OwnerTaskBoard / OwnerTicketBoard in Relation-Tabs sichtbar.
+ * 12. CommentThread im Kommentare-Tab sichtbar.
+ * 13. AttachmentList im Dateien-Tab sichtbar (sofern Tab vorhanden).
+ * 14. Parent-Projekt im Details-Tab liest und schreibt die bestehende Projekt-Feature-Relation.
  */
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
-import { addPendingComment, changeInput, clickTab, feature, getFileInput, project, renderWithProviders, task, ticket } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
+import { addPendingComment, changeInput, clickTab, feature, formTestMocks, getFileInput, project, renderWithProviders, task, ticket } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { FeatureForm } from "../../../../../apps/web/src/components/features/FeatureForm";
 
 describe("FeatureForm", () => {
@@ -60,7 +62,6 @@ describe("FeatureForm", () => {
     expect(screen.getByRole("button", { name: /^Use Cases/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Aufgaben/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Tickets/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Projekte/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Kommentare/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Dateien/ })).toBeInTheDocument();
   });
@@ -95,13 +96,11 @@ describe("FeatureForm", () => {
     expect(screen.queryByTestId("owner-ticket-board")).not.toBeInTheDocument();
   });
 
-  it("zeigt im Projekte-Tab PendingRelationList", () => {
-    renderWithProviders(<FeatureForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
+  it("zeigt im Details-Tab die Parent-Projekt-Auswahl", () => {
+    renderWithProviders(<FeatureForm open initialProjectId={project.id} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
-    clickTab("Projekte");
-
-    expect(screen.getByText("Keine Projekte vorgemerkt")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Verknüpfen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Projekt Alpha/ })).toBeInTheDocument();
+    expect(screen.getByText("1 offene Aufgaben")).toBeInTheDocument();
   });
 
   it("zeigt im Kommentare-Tab PendingCommentList", () => {
@@ -145,7 +144,23 @@ describe("FeatureForm", () => {
     expect(screen.queryByText("Use Case Pending")).not.toBeInTheDocument();
   });
 
+  it("übergibt nach Entfernen kein Parent-Projekt im Create-Modus", async () => {
+    formTestMocks.hasPermission.mockImplementation((resource, action) => resource === "projects" && action === "write");
+    const createdFeature = { ...feature, id: 112, title: "Feature ohne Parent" };
+    const onSubmit = vi.fn().mockResolvedValue(createdFeature);
+    const onPostCreate = vi.fn().mockResolvedValue(undefined);
+
+    renderWithProviders(<FeatureForm open initialProjectId={project.id} onSubmit={onSubmit} onPostCreate={onPostCreate} onClose={vi.fn()} />);
+
+    changeInput(0, "Feature ohne Parent");
+    fireEvent.click(screen.getByRole("button", { name: "Projekt Alpha entfernen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Feature anlegen" }));
+
+    await waitFor(() => expect(onPostCreate).toHaveBeenCalledWith(createdFeature.id, expect.objectContaining({ projectIds: [] })));
+  });
+
   it("übergibt alle Pending-Daten nach Create an onPostCreate", async () => {
+    formTestMocks.hasPermission.mockImplementation((resource, action) => resource === "projects" && action === "write");
     const createdFeature = { ...feature, id: 111, title: "Neues Feature" };
     const onSubmit = vi.fn().mockResolvedValue(createdFeature);
     const onPostCreate = vi.fn().mockResolvedValue(undefined);
@@ -164,9 +179,6 @@ describe("FeatureForm", () => {
     clickTab("Tickets");
     fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
     fireEvent.click(screen.getByRole("button", { name: "Ticket wählen" }));
-    clickTab("Projekte");
-    fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
-    fireEvent.click(screen.getAllByRole("button", { name: "Verknüpfen" }).at(-1) as HTMLElement);
     clickTab("Kommentare");
     addPendingComment("Feature-Kommentar");
     clickTab("Dateien");
@@ -225,18 +237,43 @@ describe("FeatureForm", () => {
     expect(screen.getByTestId("owner-task-board")).toHaveTextContent(`feature:${feature.id}`);
   });
 
-  it("zeigt im Edit-Modus OwnerTicketBoard, FeatureProjectPanel, CommentThread und AttachmentList", () => {
+  it("zeigt im Edit-Modus OwnerTicketBoard, Parent-Projekt, CommentThread und AttachmentList", () => {
     renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
+    expect(screen.getByRole("button", { name: /Projekt Alpha/ })).toBeInTheDocument();
     clickTab("Tickets");
     expect(screen.getByTestId("owner-ticket-board")).toHaveTextContent(`feature:${feature.id}`);
-    clickTab("Projekte");
-    expect(screen.getByTestId("feature-project-panel")).toHaveTextContent("1");
     clickTab("Kommentare");
     expect(screen.getByTestId("comment-thread")).toHaveTextContent("Feature:1");
     clickTab("Dateien");
     expect(screen.getByTestId("attachment-uploader")).toBeInTheDocument();
     expect(screen.getByTestId("attachment-list")).toHaveTextContent("1");
+  });
+
+  it("setzt im Edit-Modus genau ein Parent-Projekt", async () => {
+    formTestMocks.hasPermission.mockImplementation((resource, action) => resource === "projects" && action === "write");
+    renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Projekt Alpha" }));
+    fireEvent.click(screen.getByRole("option", { name: /Projekt Alpha/ }));
+
+    await waitFor(() => expect(formTestMocks.setProjectsForFeature).toHaveBeenCalledWith([project.id]));
+  });
+
+  it("entfernt im Edit-Modus das Parent-Projekt", async () => {
+    formTestMocks.hasPermission.mockImplementation((resource, action) => resource === "projects" && action === "write");
+    renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Projekt Alpha entfernen" }));
+
+    await waitFor(() => expect(formTestMocks.setProjectsForFeature).toHaveBeenCalledWith([]));
+  });
+
+  it("deaktiviert die Parent-Projekt-Auswahl ohne projects:write", () => {
+    renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: /Projekt Alpha/ })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Projekt Alpha entfernen" })).not.toBeInTheDocument();
   });
 
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {

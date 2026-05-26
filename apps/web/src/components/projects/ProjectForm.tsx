@@ -20,7 +20,6 @@ import {
   Flag,
   FolderKanban,
   Inbox,
-  Link2,
   ListTodo,
   Trash2,
 } from "lucide-react";
@@ -251,9 +250,6 @@ export function ProjectForm({
   const featureLinkExcludeIds = project
     ? featureLinks.features.map((feature) => feature.id)
     : pendingFeatures.map((feature) => feature.id);
-  const hasAvailableFeaturesToLink = allFeatures.features.some(
-    (feature) => !featureLinkExcludeIds.includes(feature.id),
-  );
 
   const handleTabChange = (nextTab: ProjectFormTab) => {
     setActiveTab(nextTab);
@@ -887,17 +883,6 @@ export function ProjectForm({
                     )
                   }
                   onStatusChange={updateProjectFeatureStatus}
-                  secondaryAction={
-                    <Button
-                      aria-label="Feature verknüpfen"
-                      title="Feature verknüpfen"
-                      variant="secondary"
-                      icon={<Link2 size={17} />}
-                      className="h-9 w-9 bg-transparent px-0"
-                      disabled={allFeatures.loading || !hasAvailableFeaturesToLink}
-                      onClick={() => setFeatureLinkOpen(true)}
-                    />
-                  }
                 />
               )
             ) : (

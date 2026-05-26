@@ -35,6 +35,7 @@ const ownerFormMocks = vi.hoisted(() => ({
   removeNote: vi.fn(),
   createFeature: vi.fn(),
   setFeaturesForProject: vi.fn(),
+  setProjectsForFeature: vi.fn(),
   addProjectToFeature: vi.fn(),
   removeProjectFromFeature: vi.fn(),
   createComment: vi.fn(),
@@ -63,6 +64,9 @@ const fixtures = vi.hoisted(() => {
     contentPath: null,
     sortOrder: 1,
     useCaseCount: 1,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z"
@@ -76,6 +80,9 @@ const fixtures = vi.hoisted(() => {
     content: "<p>Inhalt</p>",
     contentPath: null,
     sortOrder: 1,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z"
@@ -155,7 +162,10 @@ const fixtures = vi.hoisted(() => {
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z",
     tags: [],
-    subtaskCount: 1
+    subtaskCount: 1,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0
   };
   const ticket = {
     id: 50,
@@ -178,7 +188,10 @@ const fixtures = vi.hoisted(() => {
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z",
     tags: [],
-    subTicketCount: 0
+    subTicketCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0
   };
   const comment = {
     id: 60,
@@ -514,6 +527,7 @@ vi.mock("../../../../../apps/web/src/hooks/useDocLinks", () => ({
       linkedProjects: [fixtures.project],
       projects: [fixtures.project],
       loading: false,
+      setProjectsForFeature: ownerFormMocks.setProjectsForFeature,
       addProjectToFeature: ownerFormMocks.addProjectToFeature,
       removeProjectFromFeature: ownerFormMocks.removeProjectFromFeature,
       reload: vi.fn().mockResolvedValue(undefined)
@@ -662,6 +676,7 @@ beforeEach(() => {
   ownerFormMocks.removeNote.mockResolvedValue(undefined);
   ownerFormMocks.createFeature.mockResolvedValue(fixtures.feature);
   ownerFormMocks.setFeaturesForProject.mockResolvedValue(undefined);
+  ownerFormMocks.setProjectsForFeature.mockResolvedValue(undefined);
   ownerFormMocks.addProjectToFeature.mockResolvedValue(undefined);
   ownerFormMocks.removeProjectFromFeature.mockResolvedValue(undefined);
   ownerFormMocks.createComment.mockResolvedValue(fixtures.comment);

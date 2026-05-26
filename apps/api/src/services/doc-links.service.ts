@@ -31,6 +31,9 @@ function mapFeature(row: MappableFeatureRecord, useCaseCount = 0): FeatureDto {
     sortOrder: row.sortOrder,
     version: row.version,
     useCaseCount,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt
   };

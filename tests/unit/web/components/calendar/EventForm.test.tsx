@@ -83,7 +83,10 @@ const tasks: Task[] = [
     createdAt: "2026-05-19T08:00:00.000Z",
     updatedAt: "2026-05-19T08:00:00.000Z",
     tags: [],
-    subtaskCount: 0
+    subtaskCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0
   },
   {
     id: 12,
@@ -98,7 +101,10 @@ const tasks: Task[] = [
     createdAt: "2026-05-19T08:00:00.000Z",
     updatedAt: "2026-05-19T08:00:00.000Z",
     tags: [],
-    subtaskCount: 0
+    subtaskCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0
   }
 ];
 

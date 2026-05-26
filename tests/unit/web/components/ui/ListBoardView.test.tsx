@@ -492,7 +492,7 @@ describe("ListBoardView", () => {
     expect(within(unknownSection).getByText("Card Gamma")).toBeInTheDocument();
   });
 
-  it("setzt für sichtbare Items eine einheitliche Mindesthöhe", () => {
+  it("setzt für sichtbare Items eine einheitliche Höhe", () => {
     const originalMeasure = HTMLElement.prototype.getBoundingClientRect;
     HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
       const height = this.textContent?.includes("Beta") ? 72 : 48;
@@ -515,8 +515,72 @@ describe("ListBoardView", () => {
 
       expect(wrappers).toHaveLength(items.length);
       wrappers.forEach((wrapper) => {
-        expect(wrapper.style.minHeight).toBe("72px");
+        expect(wrapper.style.height).toBe("72px");
       });
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = originalMeasure;
+    }
+  });
+
+  it("equalisiert Board-Karten spaltenweise nach Status", () => {
+    const originalMeasure = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+      const text = this.textContent ?? "";
+      const height = text.includes("Gamma") ? 120 : text.includes("Beta") ? 72 : 48;
+      return {
+        x: 0,
+        y: 0,
+        width: 320,
+        height,
+        top: 0,
+        right: 320,
+        bottom: height,
+        left: 0,
+        toJSON: () => ({}),
+      } as DOMRect;
+    };
+
+    try {
+      const { container } = render(
+        <ListBoardView
+          items={[
+            { id: 1, title: "Alpha", description: "Kurz", status: "todo" },
+            { id: 2, title: "Beta", description: "Mittel", status: "todo" },
+            { id: 3, title: "Gamma", description: "Lang", status: "done" },
+          ]}
+          mode="board"
+          onModeChange={vi.fn()}
+          onAdd={vi.fn()}
+          statusKey="status"
+          statusColumns={[
+            { value: "todo", label: "Offen" },
+            { value: "done", label: "Erledigt" },
+          ]}
+          renderCard={(item) => (
+            <ItemCard
+              header={<h3>Card {item.title}</h3>}
+              body={<p>{item.description}</p>}
+            />
+          )}
+          renderRow={(item) => (
+            <ItemRow title={`Row ${item.title}`} description={item.description} />
+          )}
+        />,
+      );
+
+      const todoItems = container
+        .querySelector("[data-status-column-wrapper='todo']")
+        ?.querySelectorAll<HTMLElement>("[data-equal-item='true']");
+      const doneItems = container
+        .querySelector("[data-status-column-wrapper='done']")
+        ?.querySelectorAll<HTMLElement>("[data-equal-item='true']");
+
+      expect(todoItems).toHaveLength(2);
+      todoItems?.forEach((wrapper) => {
+        expect(wrapper.style.height).toBe("72px");
+      });
+      expect(doneItems).toHaveLength(1);
+      expect(doneItems?.[0]?.style.height).toBe("120px");
     } finally {
       HTMLElement.prototype.getBoundingClientRect = originalMeasure;
     }
@@ -631,6 +695,26 @@ describe("ItemCard", () => {
     expect(card).toHaveClass("max-w-full");
     expect(card).toHaveClass("overflow-visible");
     expect(card).not.toHaveClass("overflow-hidden");
+  });
+
+  it("nutzt eine Flex-Struktur mit wachsendem Body und untenliegendem Footer", () => {
+    render(
+      <ItemCard
+        header={<h3>Alpha</h3>}
+        body={<p>Body</p>}
+        footer={<span>Footer</span>}
+      />,
+    );
+
+    const card = screen.getByText("Alpha").closest("article");
+    const headerWrapper = screen.getByText("Alpha").closest("div")?.parentElement;
+    const bodyWrapper = screen.getByText("Body").closest("div");
+    const footer = screen.getByText("Footer").closest("footer");
+
+    expect(card).toHaveClass("flex", "flex-col", "h-full");
+    expect(headerWrapper).toHaveClass("shrink-0");
+    expect(bodyWrapper).toHaveClass("flex-1", "min-h-0");
+    expect(footer).toHaveClass("mt-auto");
   });
 });
 

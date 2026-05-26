@@ -38,6 +38,20 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   }
 }));
 
+vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
+  useHasPermission: () => true
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useTags", () => ({
+  useTags: () => ({
+    tags: [{ id: 99, name: "Test-Tag", color: "#0f766e", version: 1 }],
+    loading: false,
+    error: null,
+    reload: async () => undefined,
+    createTag: async () => ({ id: 100, name: "Neu", color: "#0f766e", version: 1 })
+  })
+}));
+
 const statusColumns = [
   { value: "active", label: "Aktiv" },
   { value: "on_hold", label: "Pausiert" },

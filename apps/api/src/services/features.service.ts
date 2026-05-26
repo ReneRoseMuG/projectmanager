@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { JsonValue } from "@taskmanager/shared-types";
 import type { DbClient } from "../db/client.js";
-import { useCases } from "../db/schema.js";
+import { featureAttachments, featureComments, useCases } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import { featureRepository, type FeatureRecord, type FeatureUpdateData } from "../repositories/feature.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
@@ -52,9 +52,24 @@ export interface FeatureDto {
   sortOrder: number;
   version: number;
   useCaseCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   createdAt: string;
   updatedAt: string;
 }
+
+interface FeatureSupportCounts {
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
+}
+
+const emptyFeatureSupportCounts: FeatureSupportCounts = {
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0
+};
 
 const featureJournalFields: Array<JournalFieldDefinition<FeatureRecord>> = [
   { key: "title", label: "Titel" },
@@ -67,7 +82,7 @@ function contentFilename(id: number): string {
   return buildFilename("feature", id);
 }
 
-function mapFeature(record: FeatureRecord, useCaseCount: number, content?: string): FeatureDto {
+function mapFeature(record: FeatureRecord, useCaseCount: number, content?: string, supportCounts = emptyFeatureSupportCounts): FeatureDto {
   return {
     id: record.id,
     title: record.title,
@@ -78,6 +93,9 @@ function mapFeature(record: FeatureRecord, useCaseCount: number, content?: strin
     sortOrder: record.sortOrder,
     version: record.version,
     useCaseCount,
+    attachmentCount: supportCounts.attachmentCount,
+    noteCount: supportCounts.noteCount,
+    commentCount: supportCounts.commentCount,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
   };
@@ -93,6 +111,35 @@ function getUseCaseCounts(database: DbClient): Map<number, number> {
 
   for (const row of rows) {
     counts.set(row.featureId, (counts.get(row.featureId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+function getFeatureSupportCounts(database: DbClient, featureIds: number[]): Map<number, FeatureSupportCounts> {
+  const counts = new Map<number, FeatureSupportCounts>();
+  if (featureIds.length === 0) {
+    return counts;
+  }
+
+  const ensureCounts = (featureId: number): FeatureSupportCounts => {
+    const current = counts.get(featureId);
+    if (current) {
+      return current;
+    }
+    const nextCounts = { ...emptyFeatureSupportCounts };
+    counts.set(featureId, nextCounts);
+    return nextCounts;
+  };
+
+  const attachmentRows = database.select({ featureId: featureAttachments.featureId }).from(featureAttachments).where(inArray(featureAttachments.featureId, featureIds)).all();
+  for (const row of attachmentRows) {
+    ensureCounts(row.featureId).attachmentCount += 1;
+  }
+
+  const commentRows = database.select({ featureId: featureComments.featureId }).from(featureComments).where(inArray(featureComments.featureId, featureIds)).all();
+  for (const row of commentRows) {
+    ensureCounts(row.featureId).commentCount += 1;
   }
 
   return counts;
@@ -144,13 +191,16 @@ function buildContentChange(before: string, after: string): JournalChangeCreateD
 export function listFeatures(database: DbClient): FeatureDto[] {
   const rows = featureRepository.findAll(database);
   const counts = getUseCaseCounts(database);
+  const ids = rows.map((feature) => feature.id);
+  const supportCounts = getFeatureSupportCounts(database, ids);
 
-  return rows.map((feature) => mapFeature(feature, counts.get(feature.id) ?? 0));
+  return rows.map((feature) => mapFeature(feature, counts.get(feature.id) ?? 0, undefined, supportCounts.get(feature.id) ?? emptyFeatureSupportCounts));
 }
 
 export function getFeature(database: DbClient, id: number): FeatureDto {
   const feature = getFeatureRecord(database, id);
-  return mapFeature(feature, countUseCases(database, id), readFeatureContent(feature));
+  const supportCounts = getFeatureSupportCounts(database, [id]).get(id) ?? emptyFeatureSupportCounts;
+  return mapFeature(feature, countUseCases(database, id), readFeatureContent(feature), supportCounts);
 }
 
 export function createFeature(database: DbClient, input: FeatureInput, actor?: JournalActor | null): FeatureDto {
@@ -267,7 +317,8 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
   if (!updated) {
     throw notFound(`Feature with id ${id} not found`);
   }
-  return mapFeature(updated, countUseCases(database, id), input.content ?? readFeatureContent(updated));
+  const supportCounts = getFeatureSupportCounts(database, [id]).get(id) ?? emptyFeatureSupportCounts;
+  return mapFeature(updated, countUseCases(database, id), input.content ?? readFeatureContent(updated), supportCounts);
 }
 
 export async function deleteFeature(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {

@@ -51,6 +51,15 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
     }
   };
 
+  const updateTaskTags = async (taskId: number, tagIds: number[]) => {
+    try {
+      await taskController.updateTaskTags(taskId, tagIds);
+    } catch (taskError) {
+      showToast({ tone: "error", title: "Aufgabentags konnten nicht geÃ¤ndert werden", message: errorMessage(taskError) });
+      throw taskError;
+    }
+  };
+
   return (
     <>
       <OwnerRelationBoard<TaskBoardItem>
@@ -74,6 +83,7 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
             onDelete={(task) => props.onDelete(task as TaskBoardItem)}
             onStatusChange={(task, status) => updateTaskStatus(task as TaskBoardItem, status)}
             onDueDateChange={(task, dueDate) => updateTaskDueDate(task as TaskBoardItem, dueDate)}
+            onTagsChange={updateTaskTags}
             linkAction={props.linkAction}
           />
         )}
