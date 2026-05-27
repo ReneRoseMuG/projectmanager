@@ -20,8 +20,13 @@ interface WeekCalendarProps {
 
 const fallbackAccent = "var(--color-steel-700)";
 const dayPlanAccent = "var(--color-teal)";
-const milestoneAccent = "var(--color-tangerine)";
-const taskAccent = "var(--color-mustard)";
+const milestoneAccent = "var(--color-violet)";
+const taskAccent = "var(--color-tangerine)";
+const neutralEventAccents = new Set(["#6366f1", fallbackAccent]);
+
+function contextualAccent(eventColor: string | null, fallback: string): string {
+  return eventColor && !neutralEventAccents.has(eventColor) ? eventColor : fallback;
+}
 
 function toDateKey(date: Date): string {
   return format(date, "yyyy-MM-dd");
@@ -76,7 +81,7 @@ export function moveEventToDate(event: CalendarEvent, targetDate: string): { sta
   };
 }
 
-export function resolveEventContext(event: CalendarEvent, projects: Project[] = [], milestones: Milestone[] = []): EventContext {
+export function resolveEventContext(event: CalendarEvent, projects: Project[] = [], milestones: Milestone[] = [], tasks: Task[] = []): EventContext {
   const owners = event.owners;
   const projectOwner = owners.find((owner) => owner.type === "project");
   const milestoneOwner = owners.find((owner) => owner.type === "milestone");
@@ -87,8 +92,9 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
     const project = projects.find((candidate) => candidate.id === projectOwner.id);
     return {
       label: project?.name ?? `Projekt #${projectOwner.id}`,
-      accentColor: event.color ?? project?.color ?? fallbackAccent,
-      ownerType: "project"
+      accentColor: contextualAccent(event.color, project?.color ?? fallbackAccent),
+      ownerType: "project",
+      assignee: null
     };
   }
 
@@ -97,31 +103,36 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
     const project = milestone ? projects.find((candidate) => candidate.id === milestone.projectId) : undefined;
     return {
       label: milestone?.name ?? `Meilenstein #${milestoneOwner.id}`,
-      accentColor: event.color ?? milestone?.color ?? project?.color ?? milestoneAccent,
-      ownerType: "milestone"
+      accentColor: contextualAccent(event.color, milestone?.color ?? project?.color ?? milestoneAccent),
+      ownerType: "milestone",
+      assignee: null
     };
   }
 
   if (taskOwner) {
+    const task = tasks.find((candidate) => candidate.id === taskOwner.id);
     return {
-      label: `Aufgabe #${taskOwner.id}`,
-      accentColor: event.color ?? taskAccent,
-      ownerType: "task"
+      label: task?.title ?? `Aufgabe #${taskOwner.id}`,
+      accentColor: contextualAccent(event.color, taskAccent),
+      ownerType: "task",
+      assignee: task?.assignee ?? null
     };
   }
 
   if (dayPlanOwner) {
     return {
       label: "Tagesplan",
-      accentColor: event.color ?? dayPlanAccent,
-      ownerType: "dayPlan"
+      accentColor: contextualAccent(event.color, dayPlanAccent),
+      ownerType: "dayPlan",
+      assignee: null
     };
   }
 
   return {
     label: "Ohne Kontext",
     accentColor: event.color ?? fallbackAccent,
-    ownerType: "none"
+    ownerType: "none",
+    assignee: null
   };
 }
 
@@ -147,6 +158,7 @@ function WeekDayColumn({
   date,
   events,
   tasks,
+  allTasks,
   projects,
   milestones,
   activeEventId,
@@ -156,6 +168,7 @@ function WeekDayColumn({
   date: string;
   events: CalendarEvent[];
   tasks: Task[];
+  allTasks: Task[];
   projects: Project[];
   milestones: Milestone[];
   activeEventId: number | null;
@@ -196,7 +209,7 @@ function WeekDayColumn({
           <WeekEventTile
             key={event.id}
             event={event}
-            context={resolveEventContext(event, projects, milestones)}
+            context={resolveEventContext(event, projects, milestones, allTasks)}
             timeLabel={calendarTimeLabel(event)}
             dragging={activeEventId === event.id}
             onClick={onEventClick}
@@ -267,6 +280,7 @@ export function WeekCalendar({ events, tasks, projects = [], milestones = [], in
               date={date}
               events={dayEvents[date] ?? []}
               tasks={dayTasks[date] ?? []}
+              allTasks={tasks}
               projects={projects}
               milestones={milestones}
               activeEventId={activeEvent?.id ?? null}
@@ -279,7 +293,7 @@ export function WeekCalendar({ events, tasks, projects = [], milestones = [], in
           {activeEvent ? (
             <WeekEventTile
               event={activeEvent}
-              context={resolveEventContext(activeEvent, projects, milestones)}
+              context={resolveEventContext(activeEvent, projects, milestones, tasks)}
               timeLabel={calendarTimeLabel(activeEvent)}
               overlay
             />

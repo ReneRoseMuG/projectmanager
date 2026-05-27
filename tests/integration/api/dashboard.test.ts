@@ -3,6 +3,7 @@
  *
  * Abgedeckte Regeln:
  * - Dashboard-Listen erzeugen System-Standarddashboards je Kontext.
+ * - Der Kalender-Kontext erzeugt ein anpassbares Standarddashboard mit interaktivem Kalender-Widget.
  * - Leser dürfen Dashboards lesen, aber nicht erstellen.
  * - Editoren dürfen eigene Dashboards speichern und persönliche Standards setzen.
  * - Nur Admins dürfen System-Dashboards und globale Standards verwalten.
@@ -120,6 +121,49 @@ describe("Dashboard API", () => {
       .expect(201);
 
     expect(created.body).toMatchObject({ name: "Meine Startseite", context: "home", isSystem: false, version: 1 });
+  });
+
+  it("erzeugt das Kalender-Dashboard und validiert dessen Widget-Katalog", async () => {
+    await supertest(app.server).get("/api/dashboards?context=calendar").expect(401);
+    const reader = await createUser(app, "reader", "dashboard.calendar.reader@example.test");
+
+    const list = await reader.get("/api/dashboards?context=calendar").expect(200);
+
+    expect(list.body.globalDefaultDashboardId).toEqual(expect.any(Number));
+    expect(list.body.dashboards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Standard: Kalender",
+          context: "calendar",
+          isSystem: true,
+          widgets: expect.arrayContaining([
+            expect.objectContaining({ widgetId: "calendar", colSpan: 2 }),
+            expect.objectContaining({ widgetId: "upcomingEvents" }),
+            expect.objectContaining({ widgetId: "overdueTasks" })
+          ])
+        })
+      ])
+    );
+
+    const editor = await createUser(app, "editor", "dashboard.calendar.editor@example.test");
+    await editor
+      .post("/api/dashboards")
+      .send({ name: "Falscher Kalender", context: "calendar", widgets: [{ widgetId: "milestoneProgress", col: 0, row: 0, colSpan: 2 }] })
+      .expect(400);
+
+    const created = await editor
+      .post("/api/dashboards")
+      .send({
+        name: "Mein Kalender",
+        context: "calendar",
+        widgets: [
+          { widgetId: "calendar", col: 0, row: 0, colSpan: 2 },
+          { widgetId: "upcomingEvents", col: 0, row: 1, colSpan: 1 }
+        ]
+      })
+      .expect(201);
+
+    expect(created.body).toMatchObject({ name: "Mein Kalender", context: "calendar", isSystem: false, version: 1 });
   });
 
   it("verwaltet persönliche Editor-Dashboards versioniert und setzt USER-Defaults", async () => {

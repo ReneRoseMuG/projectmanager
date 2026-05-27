@@ -1,167 +1,56 @@
-import type { CalendarEvent, EventInput } from "@taskmanager/shared-types";
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { EventForm } from "../components/calendar/EventForm";
-import { WeekCalendar } from "../components/calendar/WeekCalendar";
+import { CalendarDashboardProvider, useCalendarDashboard } from "../components/calendar/CalendarDashboardProvider";
+import { DashboardView } from "../components/dashboard/DashboardView";
 import { Button } from "../components/ui/Button";
 import { PageHero } from "../components/ui/PageHero";
-import { CalendarSkeleton } from "../components/calendar/CalendarSkeleton";
-import { useToast } from "../components/ui/ToastProvider";
-import { errorMessage } from "../hooks/errors";
-import { useCalendarTasks } from "../hooks/useCalendarTasks";
-import { useEvents } from "../hooks/useEvents";
-import { useMilestones } from "../hooks/useMilestones";
-import { useProjects } from "../hooks/useProjects";
+import { useHasPermission } from "../hooks/usePermissions";
+import { ForbiddenPage } from "./ForbiddenPage";
 
-export function CalendarPage() {
-  const { showToast } = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const projectController = useProjects();
-  const { projects, loading: projectsLoading } = projectController;
-  const milestoneController = useMilestones();
-  const { milestones, loading: milestonesLoading } = milestoneController;
-  const calendarTasks = useCalendarTasks();
-  const events = useEvents();
-  const [formOpen, setFormOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null,
-  );
-  const [initialDate, setInitialDate] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (events.loading) {
-      return;
-    }
-    const eventId = Number(searchParams.get("eventId"));
-    if (!Number.isInteger(eventId) || eventId < 1) {
-      return;
-    }
-    const event = events.events.find((candidate) => candidate.id === eventId);
-    if (event) {
-      setSelectedEvent(event);
-      setFormOpen(true);
-    }
-    const nextSearchParams = new URLSearchParams(searchParams);
-    nextSearchParams.delete("eventId");
-    setSearchParams(nextSearchParams, { replace: true });
-  }, [events.events, events.loading, searchParams, setSearchParams]);
-
-  const openCreate = (date?: string) => {
-    setSelectedEvent(null);
-    setInitialDate(date ?? new Date().toISOString());
-    setFormOpen(true);
-  };
-
-  const submit = async (input: EventInput, eventId?: number) => {
-    try {
-      if (eventId) {
-        const expectedVersion =
-          selectedEvent?.id === eventId ? selectedEvent.version : undefined;
-        if (!expectedVersion) {
-          throw new Error("Event version is missing");
-        }
-        await events.updateEvent(eventId, { ...input, expectedVersion });
-        showToast({ tone: "success", title: "Termin aktualisiert" });
-        return;
-      }
-      await events.createEvent(input);
-      showToast({ tone: "success", title: "Termin erstellt" });
-    } catch (eventError) {
-      showToast({
-        tone: "error",
-        title: "Termin konnte nicht gespeichert werden",
-        message: errorMessage(eventError),
-      });
-      throw eventError;
-    }
-  };
+function CalendarDashboardPageContent() {
+  const calendar = useCalendarDashboard();
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       <PageHero
         variant="list"
         title="Kalender"
-        subtitle={`${events.events.length} Termine`}
+        subtitle={`${calendar.events.length} Termine`}
         actions={
-          <Button
-            variant="primary"
-            icon={<Plus size={17} />}
-            onClick={() => openCreate()}
-          >
-            Neuer Termin
-          </Button>
+          calendar.canWriteEvents ? (
+            <Button
+              variant="primary"
+              icon={<Plus size={17} />}
+              onClick={() => calendar.openCreate()}
+            >
+              Neuer Termin
+            </Button>
+          ) : undefined
         }
       />
 
       <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
-        {events.error || calendarTasks.error ? (
+        {calendar.error ? (
           <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
-            {events.error ?? calendarTasks.error}
+            {calendar.error}
           </div>
         ) : null}
-        {events.loading ||
-        calendarTasks.loading ||
-        projectsLoading ||
-        milestonesLoading ? (
-          <CalendarSkeleton />
-        ) : (
-          <>
-            <WeekCalendar
-              events={events.events}
-              tasks={calendarTasks.tasks}
-              projects={projects}
-              milestones={milestones}
-              onDateClick={openCreate}
-              onEventClick={(event) => {
-                setSelectedEvent(event);
-                setFormOpen(true);
-              }}
-              onEventMove={async (event, startTime, endTime) => {
-                try {
-                  await events.updateEvent(event.id, {
-                    startTime,
-                    endTime,
-                    expectedVersion: event.version,
-                  });
-                  showToast({ tone: "success", title: "Termin verschoben" });
-                } catch (eventError) {
-                  showToast({
-                    tone: "error",
-                    title: "Termin konnte nicht verschoben werden",
-                    message: errorMessage(eventError),
-                  });
-                  throw eventError;
-                }
-              }}
-            />
-          </>
-        )}
+        <DashboardView context="calendar" hideInlineHeader />
       </div>
-      <EventForm
-        open={formOpen}
-        event={selectedEvent}
-        initialDate={initialDate}
-        projects={projects}
-        milestones={milestones}
-        tasks={calendarTasks.tasks}
-        onSubmit={submit}
-        onDelete={async (event) => {
-          try {
-            await events.removeEvent(event.id);
-            setFormOpen(false);
-            showToast({ tone: "success", title: "Termin gelöscht" });
-          } catch (eventError) {
-            showToast({
-              tone: "error",
-              title: "Termin konnte nicht gelöscht werden",
-              message: errorMessage(eventError),
-            });
-            throw eventError;
-          }
-        }}
-        onClose={() => setFormOpen(false)}
-      />
     </div>
+  );
+}
+
+export function CalendarPage() {
+  const canReadDashboards = useHasPermission("dashboards", "read");
+  const canReadEvents = useHasPermission("events", "read");
+
+  if (!canReadDashboards || !canReadEvents) {
+    return <ForbiddenPage />;
+  }
+
+  return (
+    <CalendarDashboardProvider>
+      <CalendarDashboardPageContent />
+    </CalendarDashboardProvider>
   );
 }

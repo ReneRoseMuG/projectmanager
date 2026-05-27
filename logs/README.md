@@ -2,6 +2,9 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 27.05.26 | Fix           | Web-Testdrift                                | ✅     |
+| 27.05.26 | 1             | Kalender-Dashboard und WeekEventTile-Design  | ⚠️     |
+| 27.05.26 | Fix           | Migrationen ausführen                        | ⚠️     |
 | 27.05.26 | 3             | MS-20 Tests und Abnahme                      | ⚠️     |
 | 27.05.26 | 2             | MS-20 Tagesplan und Wochenkalender UI        | ✅     |
 | 27.05.26 | 1             | MS-20 Day-Plans Backend                      | ✅     |

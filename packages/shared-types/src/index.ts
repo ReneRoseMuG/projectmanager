@@ -159,7 +159,7 @@ export function getSettingDefinition(key: string): SettingDefinition | undefined
 
 export const settingDefinitions = Object.values(settingsRegistry) as SettingDefinition[];
 
-export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home"] as const;
+export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar"] as const;
 export const DASHBOARD_OWNER_TYPES = ["project", "milestone", "task"] as const;
 export const DASHBOARD_WIDGET_IDS = [
   "taskStatusReport",
@@ -284,7 +284,8 @@ export const DASHBOARD_ALLOWED_WIDGETS = {
   project: ["taskStatusReport", "ticketStatusReport", "milestoneProgress", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "globalJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView"],
   milestone: ["taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList"],
   task: ["taskStatusReport", "taskJournal", "commentJournal", "attachmentJournal"],
-  home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"]
+  home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
+  calendar: ["calendar", "upcomingEvents", "overdueTasks", "taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"]
 } as const satisfies Record<DashboardContext, readonly DashboardWidgetId[]>;
 
 export const DEFAULT_DASHBOARD_LAYOUTS = {
@@ -326,6 +327,11 @@ export const DEFAULT_DASHBOARD_LAYOUTS = {
     { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 },
     { widgetId: "calendar", col: 0, row: 1, colSpan: 1 },
     { widgetId: "upcomingEvents", col: 1, row: 1, colSpan: 1 }
+  ],
+  calendar: [
+    { widgetId: "calendar", col: 0, row: 0, colSpan: 2 },
+    { widgetId: "upcomingEvents", col: 0, row: 1, colSpan: 1 },
+    { widgetId: "overdueTasks", col: 1, row: 1, colSpan: 1, params: { limit: 10 } }
   ]
 } as const satisfies Record<DashboardContext, readonly DashboardWidgetLayout[]>;
 

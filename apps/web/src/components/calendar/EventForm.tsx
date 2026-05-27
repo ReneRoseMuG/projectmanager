@@ -24,6 +24,7 @@ interface EventFormProps {
   tasks: Task[];
   onSubmit: (input: EventInput, eventId?: number) => Promise<void>;
   onDelete: (event: CalendarEvent) => Promise<void>;
+  canDelete?: boolean;
   onClose: () => void;
 }
 
@@ -56,7 +57,7 @@ function toggleId(values: number[], id: number): number[] {
   return values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
 }
 
-export function EventForm({ open, event, initialDate, initialOwners, projects, milestones = [], tasks, onSubmit, onDelete, onClose }: EventFormProps) {
+export function EventForm({ open, event, initialDate, initialOwners, projects, milestones = [], tasks, onSubmit, onDelete, canDelete = true, onClose }: EventFormProps) {
   const canReadJournal = useHasPermission("journal", "read");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -209,7 +210,7 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
         <ColorPicker value={color} onChange={setColor} swatches={colors} />
       </Section>
 
-      {event ? (
+      {event && canDelete ? (
         <Section title="Gefahrenzone">
           <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => void onDelete(event).catch(() => undefined)}>
             Löschen

@@ -19,7 +19,7 @@ export function DashboardGrid({ dashboard, owner }: DashboardGridProps) {
           className={`h-full ${widget.colSpan === 2 ? "xl:col-span-2" : ""}`}
           style={{ order: widget.row * 2 + widget.col }}
         >
-          <DashboardWidgetCard widget={widget} owner={owner} />
+          <DashboardWidgetCard widget={widget} owner={owner} context={dashboard.context} />
         </div>
       ))}
     </div>

@@ -319,6 +319,7 @@ describe("Query invalidation integration", () => {
       "projectAttachments",
       "taskAttachments",
       "attachmentPreview",
+      "eventsList",
       "tagsList",
       "wikiTree",
       "wikiDetail",

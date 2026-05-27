@@ -192,7 +192,7 @@ describe("Sidebar", () => {
     expect(featuresTabButton).not.toHaveClass("opacity-0");
     expect(featuresTabButton.closest("a")).toBe(featuresLink);
     expect(screen.getByTestId("sidebar-global-search")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Navigation durchsuchen")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Alles durchsuchen")).toBeInTheDocument();
     expect(screen.getByTestId("sidebar-user")).toHaveTextContent("Reader, Test");
     expect(
       screen.queryByTitle("Meine Einstellungen in neuem Tab öffnen"),
@@ -271,7 +271,7 @@ describe("Sidebar", () => {
       globalSearch.compareDocumentPosition(settingsLink) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(screen.getByPlaceholderText("Navigation durchsuchen")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Alles durchsuchen")).toBeInTheDocument();
     expect(screen.getByTitle("Navigation einklappen")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTitle("Navigation einklappen"));
@@ -298,7 +298,7 @@ describe("Sidebar", () => {
     expect(screen.queryByText("Projekt Management")).not.toBeInTheDocument();
     expect(screen.queryByText("Start")).not.toBeInTheDocument();
     expect(
-      screen.queryByPlaceholderText("Navigation durchsuchen"),
+      screen.queryByPlaceholderText("Alles durchsuchen"),
     ).not.toBeInTheDocument();
   });
 
@@ -313,7 +313,7 @@ describe("Sidebar", () => {
     expect(screen.queryByText("Start")).not.toBeInTheDocument();
     expect(screen.queryByText("Einstellungen")).not.toBeInTheDocument();
     expect(
-      screen.queryByPlaceholderText("Navigation durchsuchen"),
+      screen.queryByPlaceholderText("Alles durchsuchen"),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Features")).not.toBeInTheDocument();
     expect(screen.getByTitle("Features")).toBeInTheDocument();

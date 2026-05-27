@@ -137,6 +137,7 @@ export const dashboardContextLabels: Record<DashboardContext, string> = {
   milestone: "Meilensteinübersicht",
   task: "Aufgabenübersicht",
   home: "Startseite",
+  calendar: "Kalender",
 };
 
 export function dashboardWidgetLabel(widgetId: DashboardWidgetId): string {

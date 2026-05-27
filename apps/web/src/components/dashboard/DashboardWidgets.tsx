@@ -1,5 +1,6 @@
 import type {
   DashboardOwner,
+  DashboardContext,
   DashboardWidgetLayout,
   JournalEntry,
   JournalListResponse,
@@ -22,8 +23,10 @@ import { useHasPermission } from "../../hooks/usePermissions";
 import { catalogColor, catalogLabel } from "../../utils/catalogs";
 import { formatHumanDate } from "../../utils/date";
 import { CalendarSkeleton } from "../calendar/CalendarSkeleton";
+import { useOptionalCalendarDashboard } from "../calendar/CalendarDashboardProvider";
 import { CalendarView } from "../calendar/CalendarView";
 import { UpcomingEvents } from "../calendar/UpcomingEvents";
+import { WeekCalendar } from "../calendar/WeekCalendar";
 import { MilestoneListBoardView } from "../milestones/MilestoneListBoardView";
 import { ProjectListBoardView } from "../projects/ProjectListBoardView";
 import { TaskListBoardView } from "../tasks/TaskListBoardView";
@@ -40,6 +43,7 @@ import { dashboardWidgetRegistry } from "./widgetRegistry";
 interface DashboardWidgetCardProps {
   widget: DashboardWidgetLayout;
   owner?: DashboardOwner;
+  context?: DashboardContext;
 }
 
 function dashboardPath(type: string, id: number): string {
@@ -316,6 +320,34 @@ function CalendarWidget() {
   );
 }
 
+function InteractiveCalendarWidget() {
+  const calendar = useOptionalCalendarDashboard();
+
+  if (!calendar) {
+    return <WidgetError message="Kalenderdaten sind nicht verfügbar." />;
+  }
+
+  if (calendar.loading) {
+    return <CalendarSkeleton />;
+  }
+
+  if (calendar.error) {
+    return <WidgetError message={calendar.error} />;
+  }
+
+  return (
+    <WeekCalendar
+      events={calendar.events}
+      tasks={calendar.tasks}
+      projects={calendar.projects}
+      milestones={calendar.milestones}
+      onDateClick={calendar.canWriteEvents ? calendar.openCreate : undefined}
+      onEventClick={calendar.canWriteEvents ? calendar.openEvent : undefined}
+      onEventMove={calendar.canWriteEvents ? calendar.moveEvent : undefined}
+    />
+  );
+}
+
 function UpcomingEventsWidget() {
   const canReadEvents = useHasPermission("events", "read");
   const events = useEvents(undefined, canReadEvents);
@@ -413,7 +445,7 @@ function ProjectBoardWidget({
   );
 }
 
-export function DashboardWidgetCard({ widget, owner }: DashboardWidgetCardProps) {
+export function DashboardWidgetCard({ widget, owner, context }: DashboardWidgetCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
@@ -424,6 +456,14 @@ export function DashboardWidgetCard({ widget, owner }: DashboardWidgetCardProps)
   };
 
   if (widget.widgetId === "calendar") {
+    if (context === "calendar") {
+      return (
+        <section className="h-full" data-testid={`dashboard-widget-${widget.widgetId}`}>
+          <InteractiveCalendarWidget />
+        </section>
+      );
+    }
+
     return (
       <WidgetShell widget={widget}>
         <CalendarWidget />

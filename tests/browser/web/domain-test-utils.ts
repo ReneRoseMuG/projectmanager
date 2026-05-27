@@ -41,6 +41,7 @@ export interface UseCaseFixture {
 export interface TaskFixture {
   id: number;
   title: string;
+  assignee?: string | null;
 }
 
 export interface TicketFixture {
@@ -284,6 +285,7 @@ export async function createTask(
     description: string;
     status: string;
     priority: string;
+    assignee: string;
     dueDate: string;
   }> = {},
 ) {
@@ -298,6 +300,7 @@ export async function createTask(
           input.description ?? "<p>E2E Aufgabenbeschreibung vollständig</p>",
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.priority !== undefined ? { priority: input.priority } : {}),
+        ...(input.assignee !== undefined ? { assignee: input.assignee } : {}),
         dueDate: input.dueDate ?? "2026-05-29",
       },
     },

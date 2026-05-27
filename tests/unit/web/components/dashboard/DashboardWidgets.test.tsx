@@ -84,6 +84,21 @@ vi.mock("../../../../../apps/web/src/hooks/useCalendarTasks", () => ({
   useCalendarTasks: () => ({ tasks: [], loading: false }),
 }));
 
+vi.mock("../../../../../apps/web/src/components/calendar/CalendarDashboardProvider", () => ({
+  useOptionalCalendarDashboard: () => ({
+    events: [],
+    tasks: [],
+    projects: [],
+    milestones: [],
+    loading: false,
+    error: null,
+    canWriteEvents: true,
+    openCreate: vi.fn(),
+    openEvent: vi.fn(),
+    moveEvent: vi.fn(),
+  }),
+}));
+
 vi.mock("../../../../../apps/web/src/hooks/useEvents", () => ({
   useEvents: () => ({ events: [], loading: false }),
 }));
@@ -94,6 +109,10 @@ vi.mock("../../../../../apps/web/src/components/calendar/CalendarSkeleton", () =
 
 vi.mock("../../../../../apps/web/src/components/calendar/CalendarView", () => ({
   CalendarView: () => <div data-testid="calendar-view" />,
+}));
+
+vi.mock("../../../../../apps/web/src/components/calendar/WeekCalendar", () => ({
+  WeekCalendar: () => <div data-testid="week-calendar" />,
 }));
 
 vi.mock("../../../../../apps/web/src/components/calendar/UpcomingEvents", () => ({
@@ -171,7 +190,7 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}|${returnTo}`}</div>;
 }
 
-function renderWithRouter(widgetId: DashboardWidgetId, data: unknown): void {
+function renderWithRouter(widgetId: DashboardWidgetId, data: unknown, context?: "calendar"): void {
   const widget: DashboardWidgetLayout = {
     widgetId,
     col: 0,
@@ -184,7 +203,7 @@ function renderWithRouter(widgetId: DashboardWidgetId, data: unknown): void {
 
   render(
     <MemoryRouter initialEntries={["/projects/99?tab=overview"]}>
-      <DashboardWidgetCard widget={widget} owner={{ type: "project", id: 99 }} />
+      <DashboardWidgetCard widget={widget} owner={{ type: "project", id: 99 }} context={context} />
       <LocationProbe />
     </MemoryRouter>,
   );
@@ -219,6 +238,13 @@ describe("DashboardWidgetCard", () => {
   it("trennt die bestehende Meilensteinkarte vom neuen Meilensteinlisten-Widget", () => {
     expect(dashboardWidgetRegistry.milestoneList.label).toBe("Meilensteinkarte");
     expect(dashboardWidgetRegistry.milestoneListView.label).toBe("Meilensteinliste");
+  });
+
+  it("rendert das Kalender-Widget im Kalender-Kontext als interaktive Wochenansicht", () => {
+    renderWithRouter("calendar", undefined, "calendar");
+
+    expect(screen.getByTestId("week-calendar")).toBeInTheDocument();
+    expect(screen.queryByTestId("calendar-view")).not.toBeInTheDocument();
   });
 
   it("verlinkt Wiki- und Backlog-Kommentare zur passenden Detailseite", () => {

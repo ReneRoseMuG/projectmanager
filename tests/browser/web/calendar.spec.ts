@@ -37,6 +37,7 @@ import {
 async function openCalendar(page: Page) {
   await authenticatedGoto(page, "/calendar");
   await expect(page.getByRole("heading", { name: "Kalender" })).toBeVisible();
+  await expect(page.getByTestId("dashboard-view-calendar")).toBeVisible();
 }
 
 function eventByTitle(page: Page, title: string) {
@@ -146,6 +147,7 @@ test.describe("Kalender-Events", () => {
       request,
       { type: "project", id: project.id },
       "E2E Calendar Task",
+      { assignee: "Ada Lovelace" },
     );
     const title = uniqueTitle("E2E Calendar Task Event");
     let eventId: number | null = null;
@@ -157,6 +159,9 @@ test.describe("Kalender-Events", () => {
       });
       eventId = event.id;
       expect(event.owners).toEqual([{ type: "task", id: task.id }]);
+      const tile = page.getByTestId(`week-event-${event.id}`);
+      await expect(tile).toContainText("AL");
+      expect(await tile.evaluate((element) => element.getAttribute("style") ?? "")).toContain("border-left: 4px solid var(--color-tangerine)");
     } finally {
       await deleteEvent(request, eventId);
       await deleteEventsByTitle(request, title);
@@ -236,7 +241,7 @@ test.describe("Kalender-Events", () => {
       await authenticatedGoto(page, `/calendar?eventId=${event.id}`);
       const form = formPage(page, "Termin bearbeiten");
       await expect(form).toBeVisible();
-      await expect(form.getByDisplayValue(event.title)).toBeVisible();
+      await expect(form.locator("input[required]").first()).toHaveValue(event.title);
     } finally {
       await deleteEvent(request, event.id);
     }

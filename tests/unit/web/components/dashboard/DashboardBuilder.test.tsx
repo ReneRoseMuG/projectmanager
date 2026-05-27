@@ -5,6 +5,7 @@
  *
  * Abgedeckte Regeln:
  * - DashboardBuilder aktualisiert persönliche Dashboards versioniert.
+ * - Kalender-Dashboards starten mit interaktivem Kalender und passenden Zusatzwidgets.
  * - Nicht-Admins speichern System-Dashboards nur als persönliche Kopie.
  * - Widget-Auswahl und Layoutparameter werden in den Save-Payload übernommen.
  *
@@ -121,5 +122,30 @@ describe("DashboardBuilder", () => {
 
     await waitFor(() => expect(onCreate).toHaveBeenCalled());
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ name: "Standard Kopie", isSystem: false }));
+  });
+
+  it("initialisiert Kalender-Dashboards mit Kalender, nächsten Terminen und überfälligen Aufgaben", () => {
+    renderWithProviders(
+      <DashboardBuilder
+        open
+        context="calendar"
+        dashboard={null}
+        canAdmin={false}
+        saving={false}
+        userDefaultVersion={0}
+        globalDefaultVersion={1}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+        onSetDefault={vi.fn()}
+      />
+    );
+
+    expect(screen.getByDisplayValue("Mein Kalender")).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-builder-widget-calendar")).toHaveTextContent("Kalender");
+    expect(screen.getByTestId("dashboard-builder-widget-upcomingEvents")).toHaveTextContent("Nächste Termine");
+    expect(screen.getByTestId("dashboard-builder-widget-overdueTasks")).toHaveTextContent("Überfällige Aufgaben");
   });
 });

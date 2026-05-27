@@ -35,6 +35,7 @@ interface NavigationItem {
   label: string;
   icon: LucideIcon;
   resource?: AuthResource;
+  resources?: AuthResource[];
 }
 
 interface NavigationSectionConfig {
@@ -79,7 +80,7 @@ const informationItems: NavigationItem[] = [
     to: "/calendar",
     label: "Kalender",
     icon: CalendarDays,
-    resource: "events",
+    resources: ["events", "dashboards"],
   },
   {
     to: "/day-plan",
@@ -182,8 +183,13 @@ function canReadItem(
   user: CurrentUser | null | undefined,
   item: NavigationItem,
 ): boolean {
+  if (user === undefined) {
+    return true;
+  }
+  if (item.resources) {
+    return item.resources.every((resource) => hasPermission(user, resource, "read"));
+  }
   return (
-    user === undefined ||
     item.resource === undefined ||
     hasPermission(user, item.resource, "read")
   );
