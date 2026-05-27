@@ -228,4 +228,17 @@ test.describe("Kalender-Events", () => {
       await deleteEvent(request, event.id);
     }
   });
+
+  test("öffnet Terminformular über Event-Deep-Link", async ({ page, request }) => {
+    const event = await createEvent(request, "E2E Calendar Push Target");
+
+    try {
+      await authenticatedGoto(page, `/calendar?eventId=${event.id}`);
+      const form = formPage(page, "Termin bearbeiten");
+      await expect(form).toBeVisible();
+      await expect(form.getByDisplayValue(event.title)).toBeVisible();
+    } finally {
+      await deleteEvent(request, event.id);
+    }
+  });
 });

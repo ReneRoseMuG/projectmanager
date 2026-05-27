@@ -352,6 +352,7 @@ interface RecentCommentRow {
   id: number;
   body: string;
   createdAt: string;
+  updatedAt: string;
   authorFullName: string | null;
   authorEmail: string | null;
   entityType: JournalObjectType;
@@ -428,6 +429,7 @@ function recentProjectCommentRows(database: DbClient, ids: number[], mineUserId?
       id: comments.id,
       body: comments.body,
       createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
       authorFullName: users.fullName,
       authorEmail: users.email,
       entityId: projects.id,
@@ -438,7 +440,7 @@ function recentProjectCommentRows(database: DbClient, ids: number[], mineUserId?
     .innerJoin(projects, eq(projectComments.projectId, projects.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(projectComments.projectId, ids) : and(inArray(projectComments.projectId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.createdAt), desc(comments.id))
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
     .all()
     .map((row) => ({ ...row, entityType: "project" as const }));
 }
@@ -452,6 +454,7 @@ function recentMilestoneCommentRows(database: DbClient, ids: number[], mineUserI
       id: comments.id,
       body: comments.body,
       createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
       authorFullName: users.fullName,
       authorEmail: users.email,
       entityId: milestones.id,
@@ -462,9 +465,109 @@ function recentMilestoneCommentRows(database: DbClient, ids: number[], mineUserI
     .innerJoin(milestones, eq(milestoneComments.milestoneId, milestones.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(milestoneComments.milestoneId, ids) : and(inArray(milestoneComments.milestoneId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.createdAt), desc(comments.id))
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
     .all()
     .map((row) => ({ ...row, entityType: "milestone" as const }));
+}
+
+function recentFeatureCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: comments.id,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: features.id,
+      entityLabel: features.title
+    })
+    .from(featureComments)
+    .innerJoin(comments, eq(featureComments.commentId, comments.id))
+    .innerJoin(features, eq(featureComments.featureId, features.id))
+    .leftJoin(users, eq(comments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(featureComments.featureId, ids) : and(inArray(featureComments.featureId, ids), eq(comments.createdBy, mineUserId)))
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .all()
+    .map((row) => ({ ...row, entityType: "feature" as const }));
+}
+
+function recentUseCaseCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: comments.id,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: useCases.id,
+      entityLabel: useCases.title
+    })
+    .from(useCaseComments)
+    .innerJoin(comments, eq(useCaseComments.commentId, comments.id))
+    .innerJoin(useCases, eq(useCaseComments.useCaseId, useCases.id))
+    .leftJoin(users, eq(comments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(useCaseComments.useCaseId, ids) : and(inArray(useCaseComments.useCaseId, ids), eq(comments.createdBy, mineUserId)))
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .all()
+    .map((row) => ({ ...row, entityType: "useCase" as const }));
+}
+
+function recentBacklogItemCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: comments.id,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: backlogItems.id,
+      entityLabel: backlogItems.title
+    })
+    .from(backlogItemComments)
+    .innerJoin(comments, eq(backlogItemComments.commentId, comments.id))
+    .innerJoin(backlogItems, eq(backlogItemComments.backlogItemId, backlogItems.id))
+    .leftJoin(users, eq(comments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(backlogItemComments.backlogItemId, ids) : and(inArray(backlogItemComments.backlogItemId, ids), eq(comments.createdBy, mineUserId)))
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .all()
+    .map((row) => ({ ...row, entityType: "backlogItem" as const }));
+}
+
+function recentWikiPageCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: comments.id,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: wikiPages.id,
+      entityLabel: wikiPages.title
+    })
+    .from(wikiPageComments)
+    .innerJoin(comments, eq(wikiPageComments.commentId, comments.id))
+    .innerJoin(wikiPages, eq(wikiPageComments.wikiPageId, wikiPages.id))
+    .leftJoin(users, eq(comments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(wikiPageComments.wikiPageId, ids) : and(inArray(wikiPageComments.wikiPageId, ids), eq(comments.createdBy, mineUserId)))
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .all()
+    .map((row) => ({ ...row, entityType: "wikiPage" as const }));
 }
 
 function recentTaskCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
@@ -476,6 +579,7 @@ function recentTaskCommentRows(database: DbClient, ids: number[], mineUserId?: n
       id: comments.id,
       body: comments.body,
       createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
       authorFullName: users.fullName,
       authorEmail: users.email,
       entityId: tasks.id,
@@ -486,7 +590,7 @@ function recentTaskCommentRows(database: DbClient, ids: number[], mineUserId?: n
     .innerJoin(tasks, eq(taskComments.taskId, tasks.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(taskComments.taskId, ids) : and(inArray(taskComments.taskId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.createdAt), desc(comments.id))
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
     .all()
     .map((row) => ({ ...row, entityType: "task" as const }));
 }
@@ -500,6 +604,7 @@ function recentTicketCommentRows(database: DbClient, ids: number[], mineUserId?:
       id: comments.id,
       body: comments.body,
       createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
       authorFullName: users.fullName,
       authorEmail: users.email,
       entityId: tickets.id,
@@ -510,7 +615,7 @@ function recentTicketCommentRows(database: DbClient, ids: number[], mineUserId?:
     .innerJoin(tickets, eq(ticketComments.ticketId, tickets.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(ticketComments.ticketId, ids) : and(inArray(ticketComments.ticketId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.createdAt), desc(comments.id))
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
     .all()
     .map((row) => ({ ...row, entityType: "ticket" as const }));
 }
@@ -539,21 +644,39 @@ function recentOwnCommentRows(database: DbClient, userId: number): RecentComment
   return [
     ...recentProjectCommentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id), userId),
     ...recentMilestoneCommentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id), userId),
+    ...recentFeatureCommentRows(database, database.select({ id: features.id }).from(features).all().map((row) => row.id), userId),
+    ...recentUseCaseCommentRows(database, database.select({ id: useCases.id }).from(useCases).all().map((row) => row.id), userId),
+    ...recentBacklogItemCommentRows(database, database.select({ id: backlogItems.id }).from(backlogItems).all().map((row) => row.id), userId),
+    ...recentWikiPageCommentRows(database, database.select({ id: wikiPages.id }).from(wikiPages).all().map((row) => row.id), userId),
     ...recentTaskCommentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id), userId),
     ...recentTicketCommentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id), userId)
   ];
 }
 
-export function listRecentComments(database: DbClient, options: { owner?: RecentCommentOwner; currentUserId: number; limit?: number }): RecentComment[] {
+function recentAllCommentRows(database: DbClient): RecentCommentRow[] {
+  return [
+    ...recentProjectCommentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id)),
+    ...recentMilestoneCommentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id)),
+    ...recentFeatureCommentRows(database, database.select({ id: features.id }).from(features).all().map((row) => row.id)),
+    ...recentUseCaseCommentRows(database, database.select({ id: useCases.id }).from(useCases).all().map((row) => row.id)),
+    ...recentBacklogItemCommentRows(database, database.select({ id: backlogItems.id }).from(backlogItems).all().map((row) => row.id)),
+    ...recentWikiPageCommentRows(database, database.select({ id: wikiPages.id }).from(wikiPages).all().map((row) => row.id)),
+    ...recentTaskCommentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id)),
+    ...recentTicketCommentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id))
+  ];
+}
+
+export function listRecentComments(database: DbClient, options: { owner?: RecentCommentOwner; currentUserId: number; limit?: number; mine?: boolean }): RecentComment[] {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
-  const rows = options.owner ? recentCommentRowsForOwner(database, options.owner) : recentOwnCommentRows(database, options.currentUserId);
+  const rows = options.owner ? recentCommentRowsForOwner(database, options.owner) : options.mine === true ? recentOwnCommentRows(database, options.currentUserId) : recentAllCommentRows(database);
   return rows
-    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime() || right.id - left.id)
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime() || right.id - left.id)
     .slice(0, limit)
     .map((row) => ({
       id: row.id,
       body: row.body,
       createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
       authorName: authorName(row),
       entityType: row.entityType,
       entityId: row.entityId,

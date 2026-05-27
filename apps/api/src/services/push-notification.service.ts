@@ -1,0 +1,143 @@
+import type { PushSubscriptionInput, PushSubscriptionStatus, PushVapidKeyResponse } from "@taskmanager/shared-types";
+import webpush from "web-push";
+import type { AppConfig } from "../config.js";
+import type { DbClient } from "../db/client.js";
+import { notificationRepository } from "../repositories/notification.repository.js";
+import { pushSubscriptionRepository, type PushSubscriptionRecord } from "../repositories/push-subscription.repository.js";
+import { badRequest } from "../utils/errors.js";
+import { listDueNotificationEvents, listNotificationRecipients, type NotificationLogger } from "./notification.service.js";
+
+interface PushNotificationOptions {
+  now?: Date;
+  logger?: NotificationLogger;
+  sendNotification?: (subscription: webpush.PushSubscription, payload: string) => Promise<unknown>;
+}
+
+function nowIso(now: Date): string {
+  return now.toISOString();
+}
+
+function normalizeSubscription(input: PushSubscriptionInput): PushSubscriptionInput {
+  const endpoint = input.endpoint.trim();
+  const p256dh = input.keys.p256dh.trim();
+  const auth = input.keys.auth.trim();
+  if (!endpoint || !p256dh || !auth) {
+    throw badRequest("Push subscription is incomplete");
+  }
+  return { endpoint, keys: { p256dh, auth } };
+}
+
+function mapWebPushSubscription(record: PushSubscriptionRecord): webpush.PushSubscription {
+  return {
+    endpoint: record.endpoint,
+    keys: {
+      p256dh: record.p256dh,
+      auth: record.auth
+    }
+  };
+}
+
+function subscriptionStatus(records: PushSubscriptionRecord[]): PushSubscriptionStatus {
+  return {
+    subscribed: records.length > 0,
+    endpoint: records[0]?.endpoint ?? null
+  };
+}
+
+function isGoneError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "statusCode" in error && (error as { statusCode?: unknown }).statusCode === 410;
+}
+
+function configureWebPush(appConfig: AppConfig): boolean {
+  if (!appConfig.webPushEnabled || !appConfig.vapidPublicKey || !appConfig.vapidPrivateKey || !appConfig.vapidSubject) {
+    return false;
+  }
+  webpush.setVapidDetails(appConfig.vapidSubject, appConfig.vapidPublicKey, appConfig.vapidPrivateKey);
+  return true;
+}
+
+function pushPayload(event: { id: number; title: string; reminderMinutes: number }): string {
+  return JSON.stringify({
+    title: `Termin in ${event.reminderMinutes} Minuten`,
+    body: event.title,
+    url: `/calendar?eventId=${event.id}`
+  });
+}
+
+export function getPushVapidKey(appConfig: AppConfig): PushVapidKeyResponse {
+  return {
+    publicKey: appConfig.vapidPublicKey,
+    enabled: Boolean(appConfig.webPushEnabled && appConfig.vapidPublicKey)
+  };
+}
+
+export function subscribeToPushNotifications(database: DbClient, userId: number, input: PushSubscriptionInput): PushSubscriptionStatus {
+  const normalized = normalizeSubscription(input);
+  pushSubscriptionRepository.upsert(database, {
+    userId,
+    endpoint: normalized.endpoint,
+    p256dh: normalized.keys.p256dh,
+    auth: normalized.keys.auth
+  });
+  return getPushSubscriptionStatus(database, userId);
+}
+
+export function unsubscribeFromPushNotifications(database: DbClient, userId: number, endpoint: string): PushSubscriptionStatus {
+  const normalizedEndpoint = endpoint.trim();
+  if (!normalizedEndpoint) {
+    throw badRequest("endpoint is required");
+  }
+  pushSubscriptionRepository.deleteForUser(database, userId, normalizedEndpoint);
+  return getPushSubscriptionStatus(database, userId);
+}
+
+export function getPushSubscriptionStatus(database: DbClient, userId: number): PushSubscriptionStatus {
+  return subscriptionStatus(pushSubscriptionRepository.findByUser(database, userId));
+}
+
+export async function sendPendingPushNotifications(database: DbClient, appConfig: AppConfig, options: PushNotificationOptions = {}): Promise<void> {
+  if (!appConfig.notificationsEnabled || !configureWebPush(appConfig)) {
+    return;
+  }
+
+  const sendNotification = options.sendNotification ?? webpush.sendNotification;
+  const now = options.now ?? new Date();
+  const dueEvents = listDueNotificationEvents(database, now);
+  const recipients = listNotificationRecipients(database);
+
+  for (const event of dueEvents) {
+    for (const recipient of recipients) {
+      if (notificationRepository.wasSent(database, { eventId: event.id, userId: recipient.id, channel: "push", reminderMinutes: event.reminderMinutes })) {
+        continue;
+      }
+      const subscriptions = pushSubscriptionRepository.findByUser(database, recipient.id);
+      if (subscriptions.length === 0) {
+        continue;
+      }
+
+      let delivered = false;
+      for (const subscription of subscriptions) {
+        try {
+          await sendNotification(mapWebPushSubscription(subscription), pushPayload(event));
+          delivered = true;
+        } catch (error) {
+          if (isGoneError(error)) {
+            pushSubscriptionRepository.deleteByEndpoint(database, subscription.endpoint);
+            continue;
+          }
+          options.logger?.error({ error, channel: "push", eventId: event.id, userId: recipient.id }, "Push notification failed");
+        }
+      }
+
+      if (delivered) {
+        notificationRepository.recordSent(database, {
+          eventId: event.id,
+          userId: recipient.id,
+          channel: "push",
+          reminderMinutes: event.reminderMinutes,
+          sentAt: nowIso(now)
+        });
+      }
+    }
+  }
+}

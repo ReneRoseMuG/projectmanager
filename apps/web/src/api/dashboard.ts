@@ -108,7 +108,10 @@ export async function getDashboardRecentTickets(owner?: DashboardOwner, params: 
 }
 
 export async function getDashboardMilestones(owner?: DashboardOwner, limit = 10): Promise<Milestone[]> {
-  if (!owner || owner.type !== "project") {
+  if (!owner) {
+    return (await getMilestones()).slice(0, limit);
+  }
+  if (owner.type !== "project") {
     return [];
   }
   const milestones = await api.get(`projects/${owner.id}/milestones`).json<Milestone[]>();

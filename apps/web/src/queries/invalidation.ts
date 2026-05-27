@@ -41,6 +41,7 @@ export async function invalidateProjectScope(queryClient: QueryClient, projectId
     queryKeys.dashboards.root,
     queryKeys.calendarTasks.root,
     queryKeys.events.root,
+    queryKeys.dayPlans.root,
     queryKeys.globalSearch.root,
     ...(projectId !== undefined ? [queryKeys.projects.detail(projectId)] : [])
   ]);
@@ -56,6 +57,7 @@ export async function invalidateMilestoneScope(queryClient: QueryClient, milesto
     queryKeys.dashboards.root,
     queryKeys.calendarTasks.root,
     queryKeys.events.root,
+    queryKeys.dayPlans.root,
     queryKeys.globalSearch.root,
     ...(milestoneId !== undefined ? [queryKeys.milestones.detail(milestoneId)] : []),
     ...(projectId !== undefined ? [queryKeys.projects.detail(projectId), queryKeys.milestones.byProject(projectId)] : [])
@@ -70,6 +72,7 @@ export async function invalidateTaskScope(queryClient: QueryClient, taskId?: num
     queryKeys.dashboards.root,
     queryKeys.calendarTasks.root,
     queryKeys.events.root,
+    queryKeys.dayPlans.root,
     queryKeys.globalSearch.root,
     ...(taskId !== undefined ? [queryKeys.tasks.detail(taskId)] : [])
   ]);
@@ -230,12 +233,27 @@ export async function invalidateSettings(queryClient: QueryClient): Promise<void
   await invalidateMany(queryClient, [queryKeys.settings.root]);
 }
 
+export async function invalidatePushNotifications(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.pushNotifications.root]);
+}
+
 export async function invalidateWiki(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.wiki.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateEvents(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.events.root, queryKeys.dashboards.root]);
+  await invalidateMany(queryClient, [queryKeys.events.root, queryKeys.dayPlans.root, queryKeys.dashboards.root]);
+}
+
+export async function invalidateDayPlan(queryClient: QueryClient, date?: string): Promise<void> {
+  await invalidateMany(queryClient, [
+    queryKeys.dayPlans.root,
+    queryKeys.tasks.root,
+    queryKeys.calendarTasks.root,
+    queryKeys.events.root,
+    queryKeys.dashboards.root,
+    ...(date !== undefined ? [queryKeys.dayPlans.detail(date)] : [])
+  ]);
 }
 
 export async function invalidateWikiImportData(queryClient: QueryClient): Promise<void> {
@@ -252,10 +270,13 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.catalogs.root,
     queryKeys.wiki.root,
     queryKeys.calendarTasks.root,
+    queryKeys.events.root,
+    queryKeys.dayPlans.root,
     queryKeys.tickets.root,
     queryKeys.dashboards.root,
     queryKeys.settings.root,
     queryKeys.dumps.root,
+    queryKeys.pushNotifications.root,
     queryKeys.journal.root,
     queryKeys.auth.root,
     queryKeys.adminUsers.root,

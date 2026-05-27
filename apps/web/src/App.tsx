@@ -8,6 +8,7 @@ import { Spinner } from "./components/ui/Spinner";
 import { ToastProvider } from "./components/ui/ToastProvider";
 import { CalendarPage } from "./pages/CalendarPage";
 import { BacklogItemDetailPage } from "./pages/BacklogItemDetailPage";
+import { DayPlanPage } from "./pages/DayPlanPage";
 import { FeatureDetailPage } from "./pages/FeatureDetailPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
@@ -46,7 +47,7 @@ function isFullBleedRoute(pathname: string): boolean {
   return (
     pathname === "/" ||
     /^\/(?:projects|milestones|tasks|tickets|features|use-cases|backlog)(?:\/|$)/.test(pathname) ||
-    /^\/(?:wiki|calendar|journal)(?:\/|$)/.test(pathname) ||
+    /^\/(?:wiki|calendar|day-plan|journal)(?:\/|$)/.test(pathname) ||
     /^\/settings\/preferences\/?$/.test(pathname) ||
     /^\/admin(?:\/|$)/.test(pathname)
   );
@@ -93,6 +94,7 @@ export default function App() {
   const adminAccess = hasAdminAccess(auth.user);
   const backupAccess = hasPermission(auth.user, "dumps", "read");
   const dashboardAccess = hasPermission(auth.user, "dashboards", "read");
+  const dayPlanAccess = hasPermission(auth.user, "dayPlans", "read");
   const fullBleedRoute = isFullBleedRoute(location.pathname);
   const standaloneView = isStandaloneSearch(location.search);
   const mainClass = `flex min-h-0 min-w-0 flex-1 flex-col ${fullBleedRoute ? "overflow-hidden p-0" : "overflow-auto p-4 md:p-6"}`;
@@ -121,6 +123,7 @@ export default function App() {
       <Route path="/wiki" element={<WikiPage />} />
       <Route path="/wiki/:id" element={<WikiPage />} />
       <Route path="/calendar" element={<CalendarPage />} />
+      <Route path="/day-plan" element={dayPlanAccess ? <DayPlanPage /> : <ForbiddenPage />} />
       <Route path="/journal" element={<JournalPage />} />
       <Route path="/settings/preferences" element={<SettingsPreferencesPage />} />
       <Route path="/settings/catalogs" element={adminAccess ? <Navigate to="/admin/catalogs" replace /> : <ForbiddenPage />} />

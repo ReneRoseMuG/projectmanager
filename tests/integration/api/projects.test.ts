@@ -1,7 +1,7 @@
 /**
  * Test Scope: Projects API
  *
- * Covers project CRUD, defaults, task counts, timestamps, and cascade behavior.
+ * Covers project CRUD, defaults, card-footer counts, timestamps, and cascade behavior.
  */
 
 import type { FastifyInstance } from "fastify";
@@ -11,7 +11,7 @@ import path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { config } from "../../../apps/api/src/config.js";
-import { buildTestApp, createNoteForProject, createProject, createTask, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
+import { buildTestApp, createMilestone, createNoteForProject, createProject, createTask, createTestDb, createTicket, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const uploadDir = path.join(os.tmpdir(), `taskmanager-api-project-counts-${process.pid}`);
@@ -74,7 +74,9 @@ describe("Projects API", () => {
       description: "Beschreibung",
       status: "active",
       color: "#123456",
+      milestoneCount: 0,
       openTaskCount: 0,
+      ticketCount: 0,
       tags: []
     });
     expect(res.body.id).toEqual(expect.any(Number));
@@ -94,7 +96,9 @@ describe("Projects API", () => {
     expect(res.body.status).toBe("active");
     expect(res.body.color).toBe("#6366f1");
     expect(res.body.description).toBeNull();
+    expect(res.body.milestoneCount).toBe(0);
     expect(res.body.openTaskCount).toBe(0);
+    expect(res.body.ticketCount).toBe(0);
     expect(res.body.tags).toEqual([]);
   });
 
@@ -138,6 +142,26 @@ describe("Projects API", () => {
     expect(found.openTaskCount).toBe(2);
     expect(found.doneTaskCount).toBe(2);
     expect(found.totalTaskCount).toBe(4);
+  });
+
+  it("GET /api/projects zählt Meilensteine und Tickets für Karten-Footer", async () => {
+    const project = await createProject(app);
+    const otherProject = await createProject(app, { name: "Anderes Projekt" });
+
+    await createMilestone(app, project.id, { name: "Meilenstein A" });
+    await createMilestone(app, project.id, { name: "Meilenstein B" });
+    await createMilestone(app, otherProject.id, { name: "Fremder Meilenstein" });
+    await createTicket(app, { type: "project", id: project.id }, { title: "Ticket A" });
+    await createTicket(app, { type: "project", id: project.id }, { title: "Ticket B" });
+    await createTicket(app, { type: "project", id: otherProject.id }, { title: "Fremdes Ticket" });
+
+    const res = await supertest(app.server).get("/api/projects").expect(200);
+    const found = res.body.find((item: { id: number }) => item.id === project.id);
+
+    expect(found).toMatchObject({
+      milestoneCount: 2,
+      ticketCount: 2
+    });
   });
 
   it("GET /api/projects zählt Support-Objekte für Karten-Footer", async () => {

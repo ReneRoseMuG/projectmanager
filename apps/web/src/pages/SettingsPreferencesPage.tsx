@@ -13,6 +13,7 @@ import { Input } from "../components/ui/Input";
 import { PageHero } from "../components/ui/PageHero";
 import { Section } from "../components/ui/Section";
 import { useToast } from "../components/ui/ToastProvider";
+import { PushNotificationsPanel } from "../components/settings/PushNotificationsPanel";
 import { errorMessageAsync } from "../hooks/errors";
 import { useAuth } from "../hooks/useAuth";
 import { useSettings } from "../hooks/useSettings";
@@ -27,6 +28,18 @@ function hasSettingsAdminAccess(
       (permission) =>
         (permission.resource === "*" || permission.resource === "settings") &&
         (permission.action === "*" || permission.action === "admin"),
+    ),
+  );
+}
+
+function hasNotificationWriteAccess(
+  user: ReturnType<typeof useAuth>["user"],
+): boolean {
+  return Boolean(
+    user?.permissions.some(
+      (permission) =>
+        (permission.resource === "*" || permission.resource === "notifications") &&
+        (permission.action === "*" || permission.action === "write" || permission.action === "admin"),
     ),
   );
 }
@@ -266,6 +279,7 @@ export function SettingsPreferencesPage() {
   const auth = useAuth();
   const settingsState = useSettings();
   const adminAccess = hasSettingsAdminAccess(auth.user);
+  const notificationAccess = hasNotificationWriteAccess(auth.user);
   const settings = useMemo(
     () => settingsState.settings,
     [settingsState.settings],
@@ -293,6 +307,7 @@ export function SettingsPreferencesPage() {
 
         {!settingsState.loading ? (
           <>
+            {notificationAccess ? <PushNotificationsPanel /> : null}
             <SettingsList
               settings={settings}
               scopeType="USER"

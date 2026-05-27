@@ -99,6 +99,11 @@ export const queryKeys = {
     root: ["settings"] as const,
     resolved: () => [...queryKeys.settings.root, "resolved"] as const
   },
+  pushNotifications: {
+    root: ["pushNotifications"] as const,
+    vapidKey: () => [...queryKeys.pushNotifications.root, "vapidKey"] as const,
+    status: () => [...queryKeys.pushNotifications.root, "status"] as const
+  },
   wiki: {
     root: ["wiki"] as const,
     tree: () => [...queryKeys.wiki.root, "tree"] as const,
@@ -107,6 +112,10 @@ export const queryKeys = {
   events: {
     root: ["events"] as const,
     list: (rangeKey: string) => [...queryKeys.events.root, "list", rangeKey] as const
+  },
+  dayPlans: {
+    root: ["dayPlans"] as const,
+    detail: (date: string) => [...queryKeys.dayPlans.root, "detail", date] as const
   },
   journal: {
     root: ["journal"] as const,

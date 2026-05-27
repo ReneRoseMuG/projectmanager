@@ -90,6 +90,7 @@ interface RichTextInlineFieldProps {
 
 interface RichTextInlineEditorProps {
   value: string;
+  valueFormat: RichTextValueFormat;
   originalValue: string;
   placeholder?: string;
   minRows?: number;
@@ -164,6 +165,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
       {isEditing ? (
         <RichTextInlineEditor
           value={value ?? ""}
+          valueFormat={valueFormat}
           originalValue={originalValue}
           placeholder={placeholder}
           minRows={minRows}
@@ -224,7 +226,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
   );
 }
 
-function RichTextInlineEditor({ value, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, commitOnBlur, liveUpdate, onLiveChange, onCommit, onCancel }: RichTextInlineEditorProps) {
+function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, commitOnBlur, liveUpdate, onLiveChange, onCommit, onCancel }: RichTextInlineEditorProps) {
   const cancellingRef = useRef(false);
   const [imageUploadCount, setImageUploadCount] = useState(0);
   const { showToast } = useToast();
@@ -335,6 +337,16 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
       onCommit(activeEditor.getHTML());
     }
   });
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    if (liveUpdate && valueFormat === "markdown") {
+      onLiveChange(editor.getHTML());
+    }
+  }, [editor, liveUpdate, onLiveChange, valueFormat]);
 
   useEffect(() => {
     if (!editor) {

@@ -50,6 +50,10 @@ export function MilestoneCard({ milestone, variant = "card", onEdit, onDelete, o
           tags={milestone.tags}
           allTags={allTags}
           onTagsChange={onTagsChange ? (tagIds) => onTagsChange(milestone.id, tagIds) : undefined}
+          leadingCounters={[
+            { icon: <ListTodo size={14} aria-hidden="true" />, value: milestone.totalTaskCount, label: "Aufgaben" },
+            { icon: <Bug size={14} aria-hidden="true" />, value: milestone.ticketCount, label: "Tickets" }
+          ]}
           attachmentCount={milestone.attachmentCount}
           noteCount={milestone.noteCount}
           commentCount={milestone.commentCount}

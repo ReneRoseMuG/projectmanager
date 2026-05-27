@@ -57,6 +57,7 @@ describe("Events API", () => {
       endTime: "2026-06-01T11:00:00",
       isAllDay: false,
       color: "#123456",
+      reminderMinutes: 60,
       owners: [],
       version: 1
     });
@@ -76,6 +77,19 @@ describe("Events API", () => {
       .post("/api/events")
       .send({ title: "Falsch", startTime: "2026-06-01T12:00:00", endTime: "2026-06-01T11:00:00" })
       .expect(400);
+  });
+
+  it("POST und PATCH speichern reminderMinutes", async () => {
+    const event = await createEvent(app, { reminderMinutes: 15 });
+    expect(event.reminderMinutes).toBe(15);
+
+    const res = await supertest(app.server)
+      .patch(`/api/events/${event.id}`)
+      .send({ reminderMinutes: 1440, expectedVersion: event.version })
+      .expect(200);
+
+    expect(res.body.reminderMinutes).toBe(1440);
+    expect(res.body.version).toBe(event.version + 1);
   });
 
   it("POST mit Project-Owner schreibt project_events und liefert owners", async () => {

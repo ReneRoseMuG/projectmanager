@@ -38,7 +38,7 @@ test.describe("Startseite", () => {
       await authenticatedGoto(page, "/");
 
       await expect(page.getByTestId("dashboard-view-home")).toBeVisible();
-      await page.getByRole("button", { name: "Tab-Editor" }).click();
+      await page.getByRole("button", { name: "Anpassen" }).click();
       await page.getByRole("button", { name: "Neues Dashboard" }).click();
       await expect(page.getByRole("heading", { name: "Dashboard-Editor" })).toBeVisible();
 

@@ -5,6 +5,7 @@ import { check, index, integer, real, sqliteTable, text, uniqueIndex } from "dri
 export const WORK_STATUSES = ["active", "on_hold", "completed", "archived", "todo", "open", "in_progress", "in_review", "done", "resolved", "closed", "rejected"] as const;
 export const PROJECT_STATUSES = WORK_STATUSES;
 export const TASK_STATUSES = WORK_STATUSES;
+export const DAY_PLAN_STATUSES = ["open", "completed"] as const;
 export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export const FEATURE_STATUSES = ["draft", "active", "done", "archived"] as const;
 export const FEATURE_RELATION_TYPES = ["related", "depends_on", "consumed_by"] as const;
@@ -16,6 +17,7 @@ export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority", "ticket
 export const SETTING_SCOPE_TYPES = ["GLOBAL", "ROLE", "USER"] as const;
 export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home"] as const;
 export const DASHBOARD_DEFAULT_SCOPE_TYPES = ["GLOBAL", "USER"] as const;
+export const NOTIFICATION_CHANNELS = ["email", "push"] as const;
 export const JOURNAL_OBJECT_TYPES = [
   "project",
   "milestone",
@@ -26,6 +28,7 @@ export const JOURNAL_OBJECT_TYPES = [
   "backlogItem",
   "ticket",
   "event",
+  "dayPlan",
   "tag",
   "note",
   "attachment",
@@ -290,6 +293,28 @@ export const tasks = sqliteTable(
     createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
     updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
   }
+);
+
+export const dayPlans = sqliteTable(
+  "day_plans",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    date: text("date").notNull(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", { enum: DAY_PLAN_STATUSES }).notNull().default("open"),
+    notes: text("notes"),
+    version: integer("version").notNull().default(1),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    dayPlansUserDateUnique: uniqueIndex("day_plans_user_date_unique").on(table.userId, table.date),
+    dayPlansDateIdx: index("day_plans_date_idx").on(table.date)
+  })
 );
 
 export const comments = sqliteTable("comments", {
@@ -582,12 +607,53 @@ export const events = sqliteTable("events", {
   endTime: text("end_time").notNull(),
   isAllDay: integer("is_all_day", { mode: "boolean" }).notNull().default(false),
   color: text("color").default("#6366f1"),
+  reminderMinutes: integer("reminder_minutes").notNull().default(60),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
+
+export const sentNotifications = sqliteTable(
+  "sent_notifications",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    channel: text("channel", { enum: NOTIFICATION_CHANNELS }).notNull(),
+    reminderMinutes: integer("reminder_minutes").notNull(),
+    sentAt: text("sent_at").notNull()
+  },
+  (table) => ({
+    sentNotificationsUnique: uniqueIndex("sent_notifications_event_user_channel_reminder_unique").on(table.eventId, table.userId, table.channel, table.reminderMinutes),
+    sentNotificationsEventIdx: index("sent_notifications_event_idx").on(table.eventId),
+    sentNotificationsUserIdx: index("sent_notifications_user_idx").on(table.userId)
+  })
+);
+
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    pushSubscriptionsEndpointUnique: uniqueIndex("push_subscriptions_endpoint_unique").on(table.endpoint),
+    pushSubscriptionsUserIdx: index("push_subscriptions_user_idx").on(table.userId)
+  })
+);
 
 export const projectEvents = sqliteTable(
   "project_events",
@@ -631,6 +697,22 @@ export const milestoneEvents = sqliteTable(
   },
   (table) => ({
     milestoneEventUnique: uniqueIndex("milestone_events_parent_event_unique").on(table.milestoneId, table.eventId)
+  })
+);
+
+export const dayPlanEvents = sqliteTable(
+  "day_plan_events",
+  {
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => dayPlans.id, { onDelete: "cascade" }),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    dayPlanEventUnique: uniqueIndex("day_plan_events_owner_event_unique").on(table.ownerId, table.eventId)
   })
 );
 
@@ -770,6 +852,22 @@ export const milestoneTasks = sqliteTable(
   },
   (table) => ({
     milestoneTaskUnique: uniqueIndex("milestone_tasks_owner_task_unique").on(table.ownerId, table.taskId)
+  })
+);
+
+export const dayPlanTasks = sqliteTable(
+  "day_plan_tasks",
+  {
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => dayPlans.id, { onDelete: "cascade" }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    dayPlanTaskUnique: uniqueIndex("day_plan_tasks_owner_task_unique").on(table.ownerId, table.taskId)
   })
 );
 

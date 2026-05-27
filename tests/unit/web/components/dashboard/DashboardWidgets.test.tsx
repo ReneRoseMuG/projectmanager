@@ -17,6 +17,7 @@
  *
  * Abgedeckte Regeln:
  * - Alle Dashboard-Board/List-Widgets navigieren per Doppelklick zur passenden Detailroute.
+ * - Kommentar-Widgets verlinken auch Wiki- und Backlog-Träger korrekt.
  * - Das neue Milestone-Listenwidget ist als „Meilensteinliste“ im Widget-Katalog benannt.
  *
  * Fehlerfälle:
@@ -27,7 +28,7 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import type { DashboardWidgetId, DashboardWidgetLayout, Milestone, Project, Task, Ticket } from "@taskmanager/shared-types";
+import type { DashboardWidgetId, DashboardWidgetLayout, Milestone, Project, RecentComment, Task, Ticket } from "@taskmanager/shared-types";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -218,5 +219,35 @@ describe("DashboardWidgetCard", () => {
   it("trennt die bestehende Meilensteinkarte vom neuen Meilensteinlisten-Widget", () => {
     expect(dashboardWidgetRegistry.milestoneList.label).toBe("Meilensteinkarte");
     expect(dashboardWidgetRegistry.milestoneListView.label).toBe("Meilensteinliste");
+  });
+
+  it("verlinkt Wiki- und Backlog-Kommentare zur passenden Detailseite", () => {
+    const comments: RecentComment[] = [
+      {
+        id: 1,
+        body: "Wiki-Kommentar",
+        createdAt: "2026-05-27T06:00:00.000Z",
+        updatedAt: "2026-05-27T06:05:00.000Z",
+        authorName: "Admin",
+        entityType: "wikiPage",
+        entityId: 51,
+        entityLabel: "Wiki Seite"
+      },
+      {
+        id: 2,
+        body: "Backlog-Kommentar",
+        createdAt: "2026-05-27T06:00:00.000Z",
+        updatedAt: "2026-05-27T06:05:00.000Z",
+        authorName: "Admin",
+        entityType: "backlogItem",
+        entityId: 61,
+        entityLabel: "Backlog Eintrag"
+      }
+    ];
+
+    renderWithRouter("commentJournal", comments);
+
+    expect(screen.getByText("Wiki Seite").closest("a")).toHaveAttribute("href", "/wiki/51");
+    expect(screen.getByText("Backlog Eintrag").closest("a")).toHaveAttribute("href", "/backlog/61");
   });
 });

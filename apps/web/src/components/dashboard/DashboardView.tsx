@@ -86,10 +86,10 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
             size="sm"
             icon={<SlidersHorizontal size={16} />}
             onClick={() => setEditorOpen((open) => !open)}
-            aria-label="Tab-Editor"
-            title="Tab-Editor"
+            aria-label="Anpassen"
+            title="Anpassen"
           >
-            Tab-Editor
+            Anpassen
           </Button>
         </div>
       ) : null}
@@ -117,10 +117,10 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
             size="sm"
             icon={<SlidersHorizontal size={16} />}
             onClick={() => openBuilder(null)}
-            aria-label="Tab-Editor"
-            title="Tab-Editor"
+            aria-label="Anpassen"
+            title="Anpassen"
           >
-            Tab-Editor
+            Anpassen
           </Button>
         </div>
       ) : null}

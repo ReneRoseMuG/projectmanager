@@ -3,11 +3,11 @@
  *
  * Abgedeckte Regeln:
  * - MilestoneListBoardView rendert Meilensteine mit gemeinsamer Projekt-/Meilenstein-Kartenbasis.
- * - Karten und Listenzeilen zeigen den Aufgaben-Fortschritt mit Label Aufgaben.
+ * - Karten und Listenzeilen zeigen den Aufgaben-Fortschritt und die Footer-Counter.
  * - Statusfilter werden in der gemeinsamen Toolbar angeboten.
  *
  * Fehlerfälle:
- * - Enge Kartenfooter dürfen keine separaten Aufgaben-/Ticket-/Feature-Badges rendern.
+ * - Enge Kartenfooter dürfen keine separaten Feature-Badges rendern.
  * - Listenmodus darf keine technischen Metadaten erzwingen.
  *
  * Ziel:
@@ -83,7 +83,7 @@ afterEach(() => {
 });
 
 describe("MilestoneListBoardView", () => {
-  it("rendert Board-Karten mit Aufgaben-Progress und ohne enge Count-Badges", () => {
+  it("rendert Board-Karten mit Aufgaben-Progress und fachlichen Footer-Countern", () => {
     const milestones = buildMilestoneSet();
     const { container } = renderMilestoneList({ milestones });
 
@@ -102,12 +102,9 @@ describe("MilestoneListBoardView", () => {
       within(activeColumn).getByText("Aufgaben").compareDocumentPosition(within(activeColumn).getByLabelText("0 Anhänge")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(
-      within(activeColumn).queryByText("5 Aufgaben"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(activeColumn).queryByText("1 Tickets"),
-    ).not.toBeInTheDocument();
+    const taskCounter = within(activeColumn).getByLabelText("5 Aufgaben");
+    const ticketCounter = within(activeColumn).getByLabelText("1 Tickets");
+    expect(taskCounter.compareDocumentPosition(ticketCounter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(
       within(activeColumn).queryByText("2 Features"),
     ).not.toBeInTheDocument();

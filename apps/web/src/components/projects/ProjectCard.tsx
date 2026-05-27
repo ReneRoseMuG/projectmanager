@@ -54,6 +54,11 @@ export function ProjectCard({ project, variant = "card", onEdit, onDelete, onSta
           tags={project.tags}
           allTags={allTags}
           onTagsChange={onTagsChange ? (tagIds) => onTagsChange(project.id, tagIds) : undefined}
+          leadingCounters={[
+            { icon: <Flag size={14} aria-hidden="true" />, value: project.milestoneCount, label: "Meilensteine" },
+            { icon: <ListTodo size={14} aria-hidden="true" />, value: project.totalTaskCount, label: "Aufgaben" },
+            { icon: <Bug size={14} aria-hidden="true" />, value: project.ticketCount, label: "Tickets" }
+          ]}
           attachmentCount={project.attachmentCount}
           noteCount={project.noteCount}
           commentCount={project.commentCount}

@@ -61,6 +61,7 @@ function seedDefaultAuth(sqlite: Database.Database): void {
   sqlite.prepare("INSERT INTO permissions (role_id, resource, action) SELECT id, '*', 'read' FROM roles WHERE key = 'editor'").run();
   sqlite.prepare("INSERT INTO permissions (role_id, resource, action) SELECT id, '*', 'write' FROM roles WHERE key = 'editor'").run();
   sqlite.prepare("INSERT INTO permissions (role_id, resource, action) SELECT id, '*', 'read' FROM roles WHERE key = 'reader'").run();
+  sqlite.prepare("INSERT INTO permissions (role_id, resource, action) SELECT id, 'notifications', 'write' FROM roles WHERE key = 'reader'").run();
   sqlite
     .prepare(
       "INSERT INTO users (name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at) SELECT '', 'Test', 'Admin', 'admin@local', '$2b$12$6i0aEyMqgUs3z.zKCqvpQexCgDxZk17O0lNs8ChHO4Iy87/pDp40q', id, 1, 1, datetime('now'), datetime('now') FROM roles WHERE key = 'admin'"
@@ -125,6 +126,7 @@ export function truncateAll(sqlite: Database.Database): void {
     "dashboard_defaults",
     "dashboard_widgets",
     "dashboards",
+    "push_subscriptions",
     "journal_entry_contexts",
     "journal_entry_changes",
     "journal_entries",
@@ -134,6 +136,7 @@ export function truncateAll(sqlite: Database.Database): void {
     "catalog_entries",
     "use_case_tasks",
     "feature_tasks",
+    "day_plan_tasks",
     "milestone_tasks",
     "project_tasks",
     "ticket_comments",
@@ -173,12 +176,15 @@ export function truncateAll(sqlite: Database.Database): void {
     "task_notes",
     "project_notes",
     "attachments",
+    "sent_notifications",
+    "day_plan_events",
     "task_events",
     "project_events",
     "events",
     "tickets",
     "tasks",
     "notes",
+    "day_plans",
     "tags",
     "milestones",
     "projects"

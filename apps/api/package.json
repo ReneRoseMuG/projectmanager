@@ -30,16 +30,22 @@
     "dotenv": "^16.4.5",
     "drizzle-orm": "^1.0.0-rc.3",
     "fastify": "^5.8.5",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.9",
     "ssh2-sftp-client": "^12.1.1",
-    "unzipper": "^0.12.3"
+    "unzipper": "^0.12.3",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.14.10",
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^8.0.0",
     "@types/ssh2-sftp-client": "^9.0.6",
     "@types/supertest": "^6.0.3",
     "@types/unzipper": "^0.10.11",
+    "@types/web-push": "^3.6.4",
     "@typescript-eslint/eslint-plugin": "^7.16.0",
     "@typescript-eslint/parser": "^7.16.0",
     "drizzle-kit": "^1.0.0-rc.3",

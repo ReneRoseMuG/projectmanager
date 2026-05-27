@@ -99,9 +99,14 @@ const fixtures = vi.hoisted(() => {
     version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z",
+    milestoneCount: 1,
     openTaskCount: 1,
     doneTaskCount: 0,
     totalTaskCount: 1,
+    ticketCount: 1,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     tags: []
   };
   const wikiPage = {

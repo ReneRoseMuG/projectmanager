@@ -11,9 +11,11 @@ export interface TestProject {
   wikiPageId: number | null;
   createdAt: string;
   updatedAt: string;
+  milestoneCount: number;
   openTaskCount: number;
   doneTaskCount: number;
   totalTaskCount: number;
+  ticketCount: number;
   attachmentCount: number;
   noteCount: number;
   commentCount: number;
@@ -114,6 +116,7 @@ export interface TestEvent {
   endTime: string;
   isAllDay: boolean;
   color: string | null;
+  reminderMinutes: number;
   version: number;
 }
 
@@ -379,6 +382,7 @@ export async function createEvent(
     startTime: string;
     endTime: string;
     isAllDay: boolean;
+    reminderMinutes: number;
     owners: Array<{ type: "project" | "milestone" | "task"; id: number }>;
     color: string | null;
   }> = {}
@@ -388,6 +392,7 @@ export async function createEvent(
     startTime: "2026-06-01T10:00:00",
     endTime: "2026-06-01T11:00:00",
     isAllDay: false,
+    reminderMinutes: 60,
     color: "#6366f1",
     ...overrides
   };

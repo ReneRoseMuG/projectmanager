@@ -101,7 +101,7 @@ export async function registerCommentsRoutes(app: FastifyInstance): Promise<void
     { schema: { querystring: recentCommentsQuerySchema, response: { 200: arrayResponseSchema } } },
     async (request) => {
       const currentUser = requireCurrentUser(request);
-      return listRecentComments(app.db, { owner: recentCommentOwnerFromQuery(request.query), currentUserId: currentUser.id, limit: request.query.limit });
+      return listRecentComments(app.db, { owner: recentCommentOwnerFromQuery(request.query), currentUserId: currentUser.id, limit: request.query.limit, mine: request.query.mine });
     }
   );
 

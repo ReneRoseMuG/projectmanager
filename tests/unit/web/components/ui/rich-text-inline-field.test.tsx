@@ -6,6 +6,7 @@
  * Abgedeckte Regeln:
  * - RichTextInlineField rendert HTML-Leseansicht, Placeholder, readOnly und Edit-Zustand.
  * - Markdown-Werte werden beim Öffnen roh an den Editor gegeben und als Editor-HTML committed.
+ * - Legacy-Markdown wird im Live-Update-Modus direkt als Editor-HTML in den Formular-State übernommen.
  * - Im Edit-Zustand wird nur die feste Toolbar gerendert, keine zusätzliche Auswahl- oder Floating-Bar.
  * - TipTap wird im Test gemockt, die Leseansicht wird real gerendert.
  *
@@ -332,6 +333,18 @@ describe("RichTextInlineField", () => {
     });
 
     expect(onChange).toHaveBeenCalledWith("<p>Live</p>");
+    expect(screen.getByTestId("field-editor")).toBeInTheDocument();
+  });
+
+  it("T-11c übernimmt Legacy-Markdown bei liveUpdate direkt als Editor-HTML", async () => {
+    const onChange = vi.fn();
+    tiptapMock.html = "<h1>Titel</h1><p><strong>fett</strong></p>";
+    renderWithProviders(<RichTextInlineField value={"# Titel\n\n**fett**"} valueFormat="markdown" onChange={onChange} commitOnBlur={false} liveUpdate testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByTestId("field-view"));
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith("<h1>Titel</h1><p><strong>fett</strong></p>"));
+    expect(tiptapMock.config?.content).toBe("# Titel\n\n**fett**");
     expect(screen.getByTestId("field-editor")).toBeInTheDocument();
   });
 

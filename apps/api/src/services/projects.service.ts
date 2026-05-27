@@ -1,7 +1,7 @@
 import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { projectAttachments, projectComments, projectNotes, projects, projectTasks, tasks, wikiPages } from "../db/schema.js";
+import { milestones, projectAttachments, projectComments, projectNotes, projects, projectTasks, projectTickets, tasks, wikiPages } from "../db/schema.js";
 import { projectRepository, type ProjectRecord } from "../repositories/project.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
@@ -21,10 +21,12 @@ import { deleteMilestoneOwnedSupportForProjectIds } from "./milestones.service.j
 import { deleteProjectNotesForIds } from "./notes.service.js";
 import { getProjectTags, getProjectTagsMap } from "./tags.service.js";
 
-interface ProjectTaskCounts {
+interface ProjectCounts {
+  milestoneCount: number;
   openTaskCount: number;
   doneTaskCount: number;
   totalTaskCount: number;
+  ticketCount: number;
   attachmentCount: number;
   noteCount: number;
   commentCount: number;
@@ -60,18 +62,20 @@ function projectJournalFields(database: DbClient): Array<JournalFieldDefinition<
   ];
 }
 
-function emptyProjectTaskCounts(): ProjectTaskCounts {
+function emptyProjectCounts(): ProjectCounts {
   return {
+    milestoneCount: 0,
     openTaskCount: 0,
     doneTaskCount: 0,
     totalTaskCount: 0,
+    ticketCount: 0,
     attachmentCount: 0,
     noteCount: 0,
     commentCount: 0
   };
 }
 
-function mapProject(database: DbClient, record: ProjectRecord, counts: ProjectTaskCounts = emptyProjectTaskCounts(), tags = getProjectTags(database, record.id)): Project {
+function mapProject(database: DbClient, record: ProjectRecord, counts: ProjectCounts = emptyProjectCounts(), tags = getProjectTags(database, record.id)): Project {
   return {
     id: record.id,
     name: record.name,
@@ -84,9 +88,11 @@ function mapProject(database: DbClient, record: ProjectRecord, counts: ProjectTa
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+    milestoneCount: counts.milestoneCount,
     openTaskCount: counts.openTaskCount,
     doneTaskCount: counts.doneTaskCount,
     totalTaskCount: counts.totalTaskCount,
+    ticketCount: counts.ticketCount,
     attachmentCount: counts.attachmentCount,
     noteCount: counts.noteCount,
     commentCount: counts.commentCount,
@@ -94,14 +100,21 @@ function mapProject(database: DbClient, record: ProjectRecord, counts: ProjectTa
   };
 }
 
-function getProjectTaskCounts(database: DbClient, projectIds: number[]): Map<number, ProjectTaskCounts> {
-  const counts = new Map<number, ProjectTaskCounts>();
+function getProjectCounts(database: DbClient, projectIds: number[]): Map<number, ProjectCounts> {
+  const counts = new Map<number, ProjectCounts>();
   if (projectIds.length === 0) {
     return counts;
   }
 
   for (const projectId of projectIds) {
-    counts.set(projectId, emptyProjectTaskCounts());
+    counts.set(projectId, emptyProjectCounts());
+  }
+
+  const milestoneRows = database.select({ projectId: milestones.projectId }).from(milestones).where(inArray(milestones.projectId, projectIds)).all();
+  for (const row of milestoneRows) {
+    const current = counts.get(row.projectId) ?? emptyProjectCounts();
+    current.milestoneCount += 1;
+    counts.set(row.projectId, current);
   }
 
   const rows = database
@@ -113,7 +126,7 @@ function getProjectTaskCounts(database: DbClient, projectIds: number[]): Map<num
   const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
 
   for (const row of rows) {
-    const current = counts.get(row.projectId) ?? emptyProjectTaskCounts();
+    const current = counts.get(row.projectId) ?? emptyProjectCounts();
     current.totalTaskCount += 1;
     if (closedStatusKeys.has(row.status)) {
       current.doneTaskCount += 1;
@@ -123,23 +136,30 @@ function getProjectTaskCounts(database: DbClient, projectIds: number[]): Map<num
     counts.set(row.projectId, current);
   }
 
+  const ticketRows = database.select({ projectId: projectTickets.ownerId }).from(projectTickets).where(inArray(projectTickets.ownerId, projectIds)).all();
+  for (const row of ticketRows) {
+    const current = counts.get(row.projectId) ?? emptyProjectCounts();
+    current.ticketCount += 1;
+    counts.set(row.projectId, current);
+  }
+
   const attachmentRows = database.select({ projectId: projectAttachments.projectId }).from(projectAttachments).where(inArray(projectAttachments.projectId, projectIds)).all();
   for (const row of attachmentRows) {
-    const current = counts.get(row.projectId) ?? emptyProjectTaskCounts();
+    const current = counts.get(row.projectId) ?? emptyProjectCounts();
     current.attachmentCount += 1;
     counts.set(row.projectId, current);
   }
 
   const noteRows = database.select({ projectId: projectNotes.projectId }).from(projectNotes).where(inArray(projectNotes.projectId, projectIds)).all();
   for (const row of noteRows) {
-    const current = counts.get(row.projectId) ?? emptyProjectTaskCounts();
+    const current = counts.get(row.projectId) ?? emptyProjectCounts();
     current.noteCount += 1;
     counts.set(row.projectId, current);
   }
 
   const commentRows = database.select({ projectId: projectComments.projectId }).from(projectComments).where(inArray(projectComments.projectId, projectIds)).all();
   for (const row of commentRows) {
-    const current = counts.get(row.projectId) ?? emptyProjectTaskCounts();
+    const current = counts.get(row.projectId) ?? emptyProjectCounts();
     current.commentCount += 1;
     counts.set(row.projectId, current);
   }
@@ -150,7 +170,7 @@ function getProjectTaskCounts(database: DbClient, projectIds: number[]): Map<num
 export function listProjects(database: DbClient): Project[] {
   const rows = database.select().from(projects).orderBy(desc(projects.createdAt)).all();
   const ids = rows.map((project) => project.id);
-  const counts = getProjectTaskCounts(database, ids);
+  const counts = getProjectCounts(database, ids);
   const tagsByProject = getProjectTagsMap(database, ids);
 
   return rows.map((project) => mapProject(database, project, counts.get(project.id), tagsByProject.get(project.id) ?? []));
@@ -162,7 +182,7 @@ export function getProject(database: DbClient, id: number): Project {
     throw notFound(`Project with id ${id} not found`);
   }
 
-  const counts = getProjectTaskCounts(database, [id]);
+  const counts = getProjectCounts(database, [id]);
   return mapProject(database, project, counts.get(id));
 }
 
@@ -193,7 +213,7 @@ export function createProject(database: DbClient, input: ProjectInput, actor?: J
     return project;
   });
 
-  return mapProject(database, created, emptyProjectTaskCounts(), []);
+  return mapProject(database, created, emptyProjectCounts(), []);
 }
 
 export function updateProject(database: DbClient, id: number, input: ProjectUpdate, actor?: JournalActor | null): Project {
@@ -251,7 +271,7 @@ export function updateProject(database: DbClient, id: number, input: ProjectUpda
     throw notFound(`Project with id ${id} not found`);
   }
 
-  const counts = getProjectTaskCounts(database, [id]);
+  const counts = getProjectCounts(database, [id]);
   return mapProject(database, updated, counts.get(id));
 }
 

@@ -9,7 +9,7 @@ const eventOwnerSchema = {
   required: ["type", "id"],
   additionalProperties: false,
   properties: {
-    type: { type: "string", enum: ["project", "milestone", "task"] },
+    type: { type: "string", enum: ["project", "milestone", "task", "dayPlan"] },
     id: { type: "integer", minimum: 1 }
   }
 } as const;
@@ -25,6 +25,7 @@ const eventBodySchema = {
     endTime: { type: "string" },
     isAllDay: { type: "boolean" },
     color: { type: ["string", "null"] },
+    reminderMinutes: { type: "integer", minimum: 1 },
     owners: {
       type: "array",
       items: eventOwnerSchema

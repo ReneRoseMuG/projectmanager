@@ -524,6 +524,33 @@ function recentMilestoneAttachmentRows(database: DbClient, ids: number[], mineUs
     .map((row) => mapRecentAttachmentRow(row, "milestone"));
 }
 
+function recentFeatureAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: attachments.id,
+      filename: attachments.originalName,
+      storageFilename: attachments.filename,
+      mimetype: attachments.mimetype,
+      fileSize: attachments.size,
+      createdAt: attachments.createdAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: features.id,
+      entityLabel: features.title
+    })
+    .from(featureAttachments)
+    .innerJoin(attachments, eq(featureAttachments.attachmentId, attachments.id))
+    .innerJoin(features, eq(featureAttachments.featureId, features.id))
+    .leftJoin(users, eq(attachments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(featureAttachments.featureId, ids) : and(inArray(featureAttachments.featureId, ids), eq(attachments.createdBy, mineUserId)))
+    .orderBy(desc(attachments.createdAt), desc(attachments.id))
+    .all()
+    .map((row) => mapRecentAttachmentRow(row, "feature"));
+}
+
 function recentTaskAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
   if (ids.length === 0) {
     return [];
@@ -602,14 +629,25 @@ function recentOwnAttachmentRows(database: DbClient, userId: number): RecentAtta
   return [
     ...recentProjectAttachmentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id), userId),
     ...recentMilestoneAttachmentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id), userId),
+    ...recentFeatureAttachmentRows(database, database.select({ id: features.id }).from(features).all().map((row) => row.id), userId),
     ...recentTaskAttachmentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id), userId),
     ...recentTicketAttachmentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id), userId)
   ];
 }
 
-export function listRecentAttachments(database: DbClient, options: { owner?: RecentAttachmentOwner; currentUserId: number; limit?: number }): RecentAttachment[] {
+function recentAllAttachmentRows(database: DbClient): RecentAttachmentRow[] {
+  return [
+    ...recentProjectAttachmentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id)),
+    ...recentMilestoneAttachmentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id)),
+    ...recentFeatureAttachmentRows(database, database.select({ id: features.id }).from(features).all().map((row) => row.id)),
+    ...recentTaskAttachmentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id)),
+    ...recentTicketAttachmentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id))
+  ];
+}
+
+export function listRecentAttachments(database: DbClient, options: { owner?: RecentAttachmentOwner; currentUserId: number; limit?: number; mine?: boolean }): RecentAttachment[] {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
-  const rows = options.owner ? recentAttachmentRowsForOwner(database, options.owner) : recentOwnAttachmentRows(database, options.currentUserId);
+  const rows = options.owner ? recentAttachmentRowsForOwner(database, options.owner) : options.mine === true ? recentOwnAttachmentRows(database, options.currentUserId) : recentAllAttachmentRows(database);
   return rows
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime() || right.id - left.id)
     .slice(0, limit)

@@ -3,7 +3,7 @@
  *
  * Abgedeckte Regeln:
  * - ProjectListBoardView rendert Statusspalten, Karten, Listenzeilen und Toolbar über ListBoardView.
- * - Projekt-Karten und -Zeilen zeigen erwartete Controls, Dimensionen und Statuszuordnung.
+ * - Projekt-Karten und -Zeilen zeigen erwartete Controls, Footer-Counter, Dimensionen und Statuszuordnung.
  *
  * Fehlerfälle:
  * - Leere Projektlisten müssen den EmptyState ohne Karten oder Zeilen anzeigen.
@@ -190,6 +190,11 @@ describe("ProjectListBoardView", () => {
       within(activeColumn as HTMLElement).getByText("Aufgaben").compareDocumentPosition(within(activeColumn as HTMLElement).getByLabelText("0 Anhänge")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    const milestoneCounter = within(activeColumn as HTMLElement).getByLabelText("2 Meilensteine");
+    const taskCounter = within(activeColumn as HTMLElement).getByLabelText("5 Aufgaben");
+    const ticketCounter = within(activeColumn as HTMLElement).getByLabelText("1 Tickets");
+    expect(milestoneCounter.compareDocumentPosition(taskCounter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(taskCounter.compareDocumentPosition(ticketCounter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(
       within(activeColumn as HTMLElement).queryByText("PA"),
     ).not.toBeInTheDocument();

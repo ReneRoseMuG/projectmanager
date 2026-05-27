@@ -2,6 +2,20 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 27.05.26 | 3             | MS-20 Tests und Abnahme                      | ⚠️     |
+| 27.05.26 | 2             | MS-20 Tagesplan und Wochenkalender UI        | ✅     |
+| 27.05.26 | 1             | MS-20 Day-Plans Backend                      | ✅     |
+| 27.05.26 | Fix / Feature | Footer-Counter Erweiterung                   | ✅     |
+| 27.05.26 | Fix           | Dashboard Widget Kontexte                    | ✅     |
+| 27.05.26 | 4             | MS-14 Tests und Abnahme                      | ⚠️     |
+| 27.05.26 | Fix           | Startseite Button Anpassen                   | ✅     |
+| 27.05.26 | 3             | MS-14 Frontend Integration                   | ✅     |
+| 27.05.26 | 2             | MS-14 Backend Versand und API                | ✅     |
+| 27.05.26 | 1             | MS-14 Datenmodell und Config                 | ✅     |
+| 27.05.26 | Fix           | Kommentar Markdown HTML                      | ✅     |
+| 27.05.26 | Fix           | Vollbackup Beschleunigung                   | ✅     |
+| 27.05.26 | Fix           | Backup Varianten Container                  | ✅     |
+| 26.05.26 | Fix           | Backup UI Ordnung                           | ✅     |
 | 26.05.26 | 4             | TASK-95 Tests und Abnahme                    | ⚠️     |
 | 26.05.26 | 3             | TASK-95 Backup Progress UI                   | ✅     |
 | 26.05.26 | 2             | TASK-95 Realtime Progress Events             | ✅     |

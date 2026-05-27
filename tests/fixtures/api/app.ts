@@ -47,6 +47,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerSubtasksRoutes } = await import("../../../apps/api/src/routes/subtasks.js");
   const { registerCatalogRoutes } = await import("../../../apps/api/src/routes/catalogs.js");
   const { registerCommentsRoutes } = await import("../../../apps/api/src/routes/comments.js");
+  const { registerDayPlanRoutes } = await import("../../../apps/api/src/routes/day-plans.js");
   const { registerDashboardRoutes } = await import("../../../apps/api/src/routes/dashboard.js");
   const { registerTagsRoutes } = await import("../../../apps/api/src/routes/tags.js");
   const { registerSettingsRoutes } = await import("../../../apps/api/src/routes/settings.js");
@@ -55,6 +56,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerUserRoutes } = await import("../../../apps/api/src/routes/users.js");
   const { registerMultipart } = await import("../../../apps/api/src/plugins/multipart.js");
   const { registerEventsRoutes } = await import("../../../apps/api/src/routes/events.js");
+  const { registerPushRoutes } = await import("../../../apps/api/src/routes/push.js");
   const { registerFeaturesRoutes } = await import("../../../apps/api/src/routes/features.js");
   const { registerHealthRoutes } = await import("../../../apps/api/src/routes/health.js");
   const { registerUseCasesRoutes } = await import("../../../apps/api/src/routes/use-cases.js");
@@ -96,6 +98,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerCatalogRoutes, { prefix: "/api" });
   await app.register(registerCommentsRoutes, { prefix: "/api" });
   await app.register(registerDashboardRoutes, { prefix: "/api" });
+  await app.register(registerDayPlanRoutes, { prefix: "/api" });
   await app.register(registerTagsRoutes, { prefix: "/api" });
   await app.register(registerSettingsRoutes, { prefix: "/api" });
   await app.register(registerNotesRoutes, { prefix: "/api" });
@@ -106,6 +109,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerTicketsRoutes, { prefix: "/api" });
   await app.register(registerUserRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
+  await app.register(registerPushRoutes, { prefix: "/api" });
   if (!options.enableAuth) {
     await app.register(registerHealthRoutes, { prefix: "/api" });
   }

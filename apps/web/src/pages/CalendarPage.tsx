@@ -1,9 +1,9 @@
 import type { CalendarEvent, EventInput } from "@taskmanager/shared-types";
 import { Plus } from "lucide-react";
-import { useState } from "react";
-import { CalendarView } from "../components/calendar/CalendarView";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { EventForm } from "../components/calendar/EventForm";
-import { UpcomingEvents } from "../components/calendar/UpcomingEvents";
+import { WeekCalendar } from "../components/calendar/WeekCalendar";
 import { Button } from "../components/ui/Button";
 import { PageHero } from "../components/ui/PageHero";
 import { CalendarSkeleton } from "../components/calendar/CalendarSkeleton";
@@ -16,6 +16,7 @@ import { useProjects } from "../hooks/useProjects";
 
 export function CalendarPage() {
   const { showToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const projectController = useProjects();
   const { projects, loading: projectsLoading } = projectController;
   const milestoneController = useMilestones();
@@ -27,6 +28,24 @@ export function CalendarPage() {
     null,
   );
   const [initialDate, setInitialDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (events.loading) {
+      return;
+    }
+    const eventId = Number(searchParams.get("eventId"));
+    if (!Number.isInteger(eventId) || eventId < 1) {
+      return;
+    }
+    const event = events.events.find((candidate) => candidate.id === eventId);
+    if (event) {
+      setSelectedEvent(event);
+      setFormOpen(true);
+    }
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete("eventId");
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [events.events, events.loading, searchParams, setSearchParams]);
 
   const openCreate = (date?: string) => {
     setSelectedEvent(null);
@@ -88,9 +107,11 @@ export function CalendarPage() {
           <CalendarSkeleton />
         ) : (
           <>
-            <CalendarView
+            <WeekCalendar
               events={events.events}
               tasks={calendarTasks.tasks}
+              projects={projects}
+              milestones={milestones}
               onDateClick={openCreate}
               onEventClick={(event) => {
                 setSelectedEvent(event);
@@ -112,13 +133,6 @@ export function CalendarPage() {
                   });
                   throw eventError;
                 }
-              }}
-            />
-            <UpcomingEvents
-              events={events.events}
-              onOpen={(event) => {
-                setSelectedEvent(event);
-                setFormOpen(true);
               }}
             />
           </>

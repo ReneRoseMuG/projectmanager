@@ -21,6 +21,18 @@ export interface AppConfig {
   backupSftpPassword: string;
   backupSftpRemoteDir: string;
   backupSftpProtectedConfirmed: boolean;
+  notificationsEnabled: boolean;
+  notificationCron: string;
+  smtpEnabled: boolean;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPassword: string;
+  smtpFrom: string;
+  webPushEnabled: boolean;
+  vapidPublicKey: string;
+  vapidPrivateKey: string;
+  vapidSubject: string;
   adminEmail: string;
   adminFirstName: string;
   adminLastName: string;
@@ -60,6 +72,7 @@ function booleanFromEnv(value: string | undefined): boolean {
 
 const configuredSessionSecret = process.env.SESSION_SECRET?.trim();
 const configuredApiKey = process.env.API_KEY?.trim();
+const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim() || "admin@local";
 
 export const config: AppConfig = {
   databasePath: resolveFromApiRoot(process.env.DATABASE_PATH ?? "./data/taskmanager.sqlite"),
@@ -80,7 +93,19 @@ export const config: AppConfig = {
   backupSftpPassword: process.env.BACKUP_SFTP_PASSWORD ?? "",
   backupSftpRemoteDir: process.env.BACKUP_SFTP_REMOTE_DIR?.trim() ?? "",
   backupSftpProtectedConfirmed: booleanFromEnv(process.env.BACKUP_SFTP_PROTECTED_CONFIRMED),
-  adminEmail: process.env.ADMIN_EMAIL?.trim() || "admin@local",
+  notificationsEnabled: booleanFromEnv(process.env.NOTIFICATIONS_ENABLED),
+  notificationCron: process.env.NOTIFICATION_CRON?.trim() || "* * * * *",
+  smtpEnabled: booleanFromEnv(process.env.SMTP_ENABLED),
+  smtpHost: process.env.SMTP_HOST?.trim() ?? "",
+  smtpPort: numberFromEnv(process.env.SMTP_PORT, 587),
+  smtpUser: process.env.SMTP_USER?.trim() ?? "",
+  smtpPassword: process.env.SMTP_PASSWORD ?? "",
+  smtpFrom: process.env.SMTP_FROM?.trim() || configuredAdminEmail,
+  webPushEnabled: booleanFromEnv(process.env.WEB_PUSH_ENABLED),
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY?.trim() ?? "",
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY?.trim() ?? "",
+  vapidSubject: process.env.VAPID_SUBJECT?.trim() || `mailto:${configuredAdminEmail}`,
+  adminEmail: configuredAdminEmail,
   adminFirstName: process.env.ADMIN_FIRST_NAME?.trim() || "Admin",
   adminLastName: process.env.ADMIN_LAST_NAME?.trim() || "System",
   adminInitialPassword: process.env.ADMIN_INITIAL_PASSWORD?.trim() ? process.env.ADMIN_INITIAL_PASSWORD.trim() : null,

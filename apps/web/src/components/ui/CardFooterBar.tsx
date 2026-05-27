@@ -1,6 +1,6 @@
 import type { Tag } from "@taskmanager/shared-types";
 import { FileText, MessageCircle, Paperclip, Plus, Tag as TagIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type TagLabelMode = "full" | "short";
 
@@ -8,6 +8,7 @@ interface CardFooterBarProps {
   tags: Tag[];
   allTags?: Tag[];
   onTagsChange?: (tagIds: number[]) => void | Promise<void>;
+  leadingCounters?: CardFooterCounter[];
   attachmentCount?: number;
   noteCount?: number;
   commentCount?: number;
@@ -16,6 +17,12 @@ interface CardFooterBarProps {
 
 interface TagPillProps {
   tag: Tag;
+}
+
+export interface CardFooterCounter {
+  icon: ReactNode;
+  value: number;
+  label: string;
 }
 
 export function abbreviateTag(name: string, mode: TagLabelMode): string {
@@ -85,7 +92,7 @@ function TagPill({ tag }: TagPillProps) {
   );
 }
 
-function Counter({ icon, value, label }: { icon: JSX.Element; value: number; label: string }) {
+function Counter({ icon, value, label }: CardFooterCounter) {
   const counterClass = value > 0 ? "text-steel-500" : "text-steel-300";
   return (
     <span className={`inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs font-semibold ${counterClass}`} aria-label={`${value} ${label}`}>
@@ -99,6 +106,7 @@ export function CardFooterBar({
   tags,
   allTags,
   onTagsChange,
+  leadingCounters = [],
   attachmentCount = 0,
   noteCount = 0,
   commentCount = 0,
@@ -110,6 +118,12 @@ export function CardFooterBar({
   const propTagIds = useMemo(() => tags.map((tag) => tag.id), [tags]);
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>(propTagIds);
   const canEditTags = Boolean(onTagsChange && allTags && allTags.length > 0);
+  const supportCounters: CardFooterCounter[] = [
+    { icon: <Paperclip size={14} aria-hidden="true" />, value: attachmentCount, label: "Anhänge" },
+    { icon: <FileText size={14} aria-hidden="true" />, value: noteCount, label: "Notizen" },
+    { icon: <MessageCircle size={14} aria-hidden="true" />, value: commentCount, label: "Kommentare" }
+  ];
+  const counters = [...leadingCounters, ...supportCounters];
   const visibleTags = useMemo(() => {
     if (!allTags || allTags.length === 0) {
       return tags;
@@ -171,6 +185,35 @@ export function CardFooterBar({
     }
   };
 
+  const tagList = (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+      {visibleTags.map((tag) => (
+        <TagPill key={tag.id} tag={tag} />
+      ))}
+      {canEditTags ? (
+        <button
+          type="button"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-line bg-white text-steel-600 shadow-sm transition hover:border-steel-300 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label="Tags bearbeiten"
+          title="Tags bearbeiten"
+          aria-expanded={pickerOpen}
+          disabled={pending}
+          onClick={() => setPickerOpen((open) => !open)}
+        >
+          <Plus size={15} aria-hidden="true" />
+        </button>
+      ) : null}
+    </div>
+  );
+
+  const counterList = (
+    <div className="flex shrink-0 items-center gap-1">
+      {counters.map((counter) => (
+        <Counter key={counter.label} {...counter} />
+      ))}
+    </div>
+  );
+
   return (
     <div
       ref={rootRef}
@@ -178,30 +221,8 @@ export function CardFooterBar({
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
     >
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-        {visibleTags.map((tag) => (
-          <TagPill key={tag.id} tag={tag} />
-        ))}
-        {canEditTags ? (
-          <button
-            type="button"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-line bg-white text-steel-600 shadow-sm transition hover:border-steel-300 hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
-            aria-label="Tags bearbeiten"
-            title="Tags bearbeiten"
-            aria-expanded={pickerOpen}
-            disabled={pending}
-            onClick={() => setPickerOpen((open) => !open)}
-          >
-            <Plus size={15} aria-hidden="true" />
-          </button>
-        ) : null}
-      </div>
-
-      <div className="flex shrink-0 items-center gap-1">
-        <Counter icon={<Paperclip size={14} aria-hidden="true" />} value={attachmentCount} label="Anhänge" />
-        <Counter icon={<FileText size={14} aria-hidden="true" />} value={noteCount} label="Notizen" />
-        <Counter icon={<MessageCircle size={14} aria-hidden="true" />} value={commentCount} label="Kommentare" />
-      </div>
+      {tagList}
+      {counterList}
 
       {canEditTags && pickerOpen ? (
         <div className="absolute bottom-full left-0 z-40 mb-2 grid w-56 gap-1 rounded-lg border border-line bg-white p-2 shadow-panel">

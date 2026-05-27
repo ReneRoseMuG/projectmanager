@@ -1,7 +1,7 @@
 import type { Event, EventInput, EventOwner, EventUpdate } from "@taskmanager/shared-types";
 import { and, eq, gte, lte } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { events, milestoneEvents, milestones, projectEvents, projects, taskEvents, tasks } from "../db/schema.js";
+import { dayPlanEvents, dayPlans, events, milestoneEvents, milestones, projectEvents, projects, taskEvents, tasks } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
@@ -26,7 +26,8 @@ const eventJournalFields: Array<JournalFieldDefinition<EventRecord>> = [
   { key: "startTime", label: "Startzeit" },
   { key: "endTime", label: "Endzeit" },
   { key: "isAllDay", label: "Ganztägig" },
-  { key: "color", label: "Farbe" }
+  { key: "color", label: "Farbe" },
+  { key: "reminderMinutes", label: "Erinnerung" }
 ];
 
 function listEventOwners(database: DbClient, eventId: number): EventOwner[] {
@@ -51,7 +52,14 @@ function listEventOwners(database: DbClient, eventId: number): EventOwner[] {
     .all()
     .map((row) => ({ type: "milestone" as const, id: row.id }));
 
-  return [...projectOwners, ...taskOwners, ...milestoneOwners];
+  const dayPlanOwners = database
+    .select({ id: dayPlanEvents.ownerId })
+    .from(dayPlanEvents)
+    .where(eq(dayPlanEvents.eventId, eventId))
+    .all()
+    .map((row) => ({ type: "dayPlan" as const, id: row.id }));
+
+  return [...projectOwners, ...taskOwners, ...milestoneOwners, ...dayPlanOwners];
 }
 
 function mapEvent(database: DbClient, record: EventRecord): Event {
@@ -64,6 +72,7 @@ function mapEvent(database: DbClient, record: EventRecord): Event {
     endTime: record.endTime,
     isAllDay: record.isAllDay,
     color: record.color,
+    reminderMinutes: record.reminderMinutes,
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
@@ -78,7 +87,7 @@ function normalizeOwners(owners: EventOwner[] | undefined): EventOwner[] {
   const result: EventOwner[] = [];
   const seen = new Set<string>();
   for (const owner of owners) {
-    if ((owner.type !== "project" && owner.type !== "task" && owner.type !== "milestone") || !Number.isInteger(owner.id) || owner.id < 1) {
+    if ((owner.type !== "project" && owner.type !== "task" && owner.type !== "milestone" && owner.type !== "dayPlan") || !Number.isInteger(owner.id) || owner.id < 1) {
       throw badRequest("Invalid event owner");
     }
 
@@ -112,14 +121,23 @@ function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
   }
 }
 
+function ensureDayPlanExists(database: DbClient, dayPlanId: number): void {
+  const dayPlan = database.select({ id: dayPlans.id }).from(dayPlans).where(eq(dayPlans.id, dayPlanId)).get();
+  if (!dayPlan) {
+    throw notFound(`Day plan with id ${dayPlanId} not found`);
+  }
+}
+
 function ensureOwnersExist(database: DbClient, owners: EventOwner[]): void {
   for (const owner of owners) {
     if (owner.type === "project") {
       ensureProjectExists(database, owner.id);
     } else if (owner.type === "task") {
       ensureTaskExists(database, owner.id);
-    } else {
+    } else if (owner.type === "milestone") {
       ensureMilestoneExists(database, owner.id);
+    } else {
+      ensureDayPlanExists(database, owner.id);
     }
   }
 }
@@ -132,6 +150,10 @@ function getOwnerJournalObject(database: DbClient, owner: EventOwner): JournalOb
   if (owner.type === "milestone") {
     const milestone = database.select({ id: milestones.id, name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
     return makeJournalObject("milestone", owner.id, milestone?.name ?? `Meilenstein ${owner.id}`);
+  }
+  if (owner.type === "dayPlan") {
+    const dayPlan = database.select({ id: dayPlans.id, date: dayPlans.date }).from(dayPlans).where(eq(dayPlans.id, owner.id)).get();
+    return makeJournalObject("dayPlan", owner.id, dayPlan?.date ? `Tagesplan ${dayPlan.date}` : `Tagesplan ${owner.id}`);
   }
   const task = database.select({ id: tasks.id, title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)).get();
   return makeJournalObject("task", owner.id, task?.title ?? `Aufgabe ${owner.id}`);
@@ -156,6 +178,11 @@ function insertEventOwner(database: DbClient, eventId: number, owner: EventOwner
     return;
   }
 
+  if (owner.type === "dayPlan") {
+    database.insert(dayPlanEvents).values({ ownerId: owner.id, eventId }).onConflictDoNothing().run();
+    return;
+  }
+
   database.insert(taskEvents).values({ taskId: owner.id, eventId }).onConflictDoNothing().run();
 }
 
@@ -163,6 +190,7 @@ function replaceEventOwners(database: DbClient, event: EventRecord, owners: Even
   database.delete(projectEvents).where(eq(projectEvents.eventId, event.id)).run();
   database.delete(taskEvents).where(eq(taskEvents.eventId, event.id)).run();
   database.delete(milestoneEvents).where(eq(milestoneEvents.eventId, event.id)).run();
+  database.delete(dayPlanEvents).where(eq(dayPlanEvents.eventId, event.id)).run();
   for (const owner of owners) {
     insertEventOwner(database, event.id, owner);
   }
@@ -172,6 +200,16 @@ function ensureDateRange(startTime: string, endTime: string): void {
   if (new Date(startTime).getTime() > new Date(endTime).getTime()) {
     throw badRequest("endTime must be after startTime");
   }
+}
+
+function normalizeReminderMinutes(value: number | undefined): number {
+  if (value === undefined) {
+    return 60;
+  }
+  if (!Number.isInteger(value) || value < 1) {
+    throw badRequest("reminderMinutes must be a positive integer");
+  }
+  return value;
 }
 
 export function listEvents(database: DbClient, query: { from?: string; to?: string }): Event[] {
@@ -190,6 +228,7 @@ export function listEvents(database: DbClient, query: { from?: string; to?: stri
 export function createEvent(database: DbClient, input: EventInput, actor?: JournalActor | null): Event {
   const title = requireNonEmpty(input.title, "title");
   const owners = normalizeOwners(input.owners);
+  const reminderMinutes = normalizeReminderMinutes(input.reminderMinutes);
   ensureDateRange(input.startTime, input.endTime);
   ensureOwnersExist(database, owners);
 
@@ -205,6 +244,7 @@ export function createEvent(database: DbClient, input: EventInput, actor?: Journ
         endTime: input.endTime,
         isAllDay: input.isAllDay ?? false,
         color: input.color ?? "#6366f1",
+        reminderMinutes,
         createdAt: now,
         updatedAt: now
       })
@@ -263,6 +303,9 @@ export function updateEvent(database: DbClient, id: number, input: EventUpdate, 
   }
   if (input.color !== undefined) {
     values.color = input.color;
+  }
+  if (input.reminderMinutes !== undefined) {
+    values.reminderMinutes = normalizeReminderMinutes(input.reminderMinutes);
   }
 
   const ownersSpecified = input.owners !== undefined;

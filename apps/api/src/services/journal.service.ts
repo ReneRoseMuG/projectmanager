@@ -68,6 +68,7 @@ const objectTypeLabels: Record<JournalObjectType, string> = {
   backlogItem: "Backlog-Eintrag",
   ticket: "Ticket",
   event: "Termin",
+  dayPlan: "Tagesplan",
   tag: "Tag",
   note: "Notiz",
   attachment: "Datei",

@@ -29,7 +29,10 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<"admin" | "editor" | "reader", Perm
     { resource: "*", action: "read" },
     { resource: "*", action: "write" }
   ],
-  reader: [{ resource: "*", action: "read" }]
+  reader: [
+    { resource: "*", action: "read" },
+    { resource: "notifications", action: "write" }
+  ]
 };
 
 export const SYSTEM_ROLES = [

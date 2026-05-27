@@ -83,7 +83,7 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     { schema: { querystring: recentAttachmentsQuerySchema, response: { 200: arrayResponseSchema } } },
     async (request) => {
       const currentUser = requireCurrentUser(request);
-      return listRecentAttachments(app.db, { owner: recentAttachmentOwnerFromQuery(request.query), currentUserId: currentUser.id, limit: request.query.limit });
+      return listRecentAttachments(app.db, { owner: recentAttachmentOwnerFromQuery(request.query), currentUserId: currentUser.id, limit: request.query.limit, mine: request.query.mine });
     }
   );
 

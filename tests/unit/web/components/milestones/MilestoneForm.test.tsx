@@ -186,9 +186,14 @@ const project: Project = {
   version: 1,
   createdAt: "2026-05-19T08:00:00.000Z",
   updatedAt: "2026-05-19T09:00:00.000Z",
+  milestoneCount: 1,
   openTaskCount: 0,
   doneTaskCount: 0,
   totalTaskCount: 0,
+  ticketCount: 0,
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0,
   tags: []
 };
 
@@ -216,6 +221,9 @@ const milestone: Milestone = {
   totalTaskCount: 0,
   ticketCount: 0,
   featureCount: 0,
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0,
   tags: []
 };
 

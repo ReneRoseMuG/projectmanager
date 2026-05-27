@@ -3,6 +3,7 @@ import {
   Activity,
   BookOpen,
   Bug,
+  CalendarCheck,
   CalendarDays,
   ExternalLink,
   Flag,
@@ -79,6 +80,12 @@ const informationItems: NavigationItem[] = [
     label: "Kalender",
     icon: CalendarDays,
     resource: "events",
+  },
+  {
+    to: "/day-plan",
+    label: "Tagesplan",
+    icon: CalendarCheck,
+    resource: "dayPlans",
   },
   { to: "/journal", label: "Journal", icon: History, resource: "journal" },
 ];

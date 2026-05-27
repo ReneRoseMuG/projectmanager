@@ -61,6 +61,12 @@ function dashboardPath(type: string, id: number): string {
   if (type === "useCase") {
     return `/use-cases/${id}`;
   }
+  if (type === "wikiPage") {
+    return `/wiki/${id}`;
+  }
+  if (type === "backlogItem") {
+    return `/backlog/${id}`;
+  }
   return "/";
 }
 
@@ -231,7 +237,7 @@ function CommentRows({ comments }: { comments: RecentComment[] | undefined }) {
         <Link key={comment.id} to={dashboardPath(comment.entityType, comment.entityId)} className="grid gap-1 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex items-center justify-between gap-3">
             <span className="truncate text-sm font-semibold text-ink">{comment.entityLabel}</span>
-            <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(comment.createdAt)}</span>
+            <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(comment.updatedAt)}</span>
           </div>
           <p className="line-clamp-2 text-xs text-steel-600">{comment.body}</p>
           <p className="text-xs text-steel-400">{comment.authorName}</p>

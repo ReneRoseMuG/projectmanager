@@ -258,6 +258,7 @@ export interface RecentComment {
   id: number;
   body: string;
   createdAt: string;
+  updatedAt: string;
   authorName: string;
   entityType: JournalObjectType;
   entityId: number;
@@ -334,7 +335,7 @@ export interface ApiErrorPayload {
   statusCode: number;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "catalogs", "tags", "journal", "dashboards", "dumps", "settings", "realtime", "users", "roles"] as const;
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "dumps", "settings", "realtime", "users", "roles"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";
@@ -392,6 +393,7 @@ export const REALTIME_INVALIDATION_SCOPES = [
   "tags",
   "catalogs",
   "events",
+  "dayPlans",
   "dashboards",
   "settings",
   "dumps",
@@ -518,6 +520,7 @@ export const JOURNAL_OBJECT_TYPES = [
   "backlogItem",
   "ticket",
   "event",
+  "dayPlan",
   "tag",
   "note",
   "attachment",
@@ -588,9 +591,11 @@ export interface Project {
   version: number;
   createdAt: string;
   updatedAt: string;
+  milestoneCount: number;
   openTaskCount: number;
   doneTaskCount: number;
   totalTaskCount: number;
+  ticketCount: number;
   attachmentCount: number;
   noteCount: number;
   commentCount: number;
@@ -853,6 +858,7 @@ export interface Event {
   endTime: string;
   isAllDay: boolean;
   color: string | null;
+  reminderMinutes: number;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -860,7 +866,7 @@ export interface Event {
 
 export type CalendarEvent = Event;
 
-export type EventOwner = { type: "project" | "milestone" | "task"; id: number };
+export type EventOwner = { type: "project" | "milestone" | "task" | "dayPlan"; id: number };
 
 export interface EventInput {
   title: string;
@@ -869,10 +875,55 @@ export interface EventInput {
   endTime: string;
   isAllDay?: boolean;
   color?: string | null;
+  reminderMinutes?: number;
   owners?: EventOwner[];
 }
 
 export type EventUpdate = WithExpectedVersion<Partial<EventInput>>;
+
+export const DAY_PLAN_STATUSES = ["open", "completed"] as const;
+
+export type DayPlanStatus = (typeof DAY_PLAN_STATUSES)[number];
+
+export interface DayPlan {
+  id: number;
+  date: string;
+  userId: number;
+  status: DayPlanStatus;
+  notes: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  tasks: TaskBoardItem[];
+  events: CalendarEvent[];
+}
+
+export interface DayPlanPatchInput {
+  status?: DayPlanStatus;
+  notes?: string | null;
+}
+
+export type DayPlanUpdate = WithExpectedVersion<DayPlanPatchInput>;
+
+export interface PushSubscriptionKeysInput {
+  p256dh: string;
+  auth: string;
+}
+
+export interface PushSubscriptionInput {
+  endpoint: string;
+  keys: PushSubscriptionKeysInput;
+}
+
+export interface PushSubscriptionStatus {
+  subscribed: boolean;
+  endpoint: string | null;
+}
+
+export interface PushVapidKeyResponse {
+  publicKey: string;
+  enabled: boolean;
+}
 
 export interface Feature {
   id: number;

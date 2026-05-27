@@ -1,7 +1,7 @@
 import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskStats, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks } from "../db/schema.js";
+import { dayPlanTasks, featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks } from "../db/schema.js";
 import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
@@ -281,6 +281,10 @@ function taskDeleteBlockers(database: DbClient, taskIds: number[]): string[] {
   }
   if (database.select({ taskId: useCaseTasks.taskId }).from(useCaseTasks).where(inArray(useCaseTasks.taskId, taskIds)).get()) {
     blockers.push("Use-Case-Verknüpfungen");
+  }
+
+  if (database.select({ taskId: dayPlanTasks.taskId }).from(dayPlanTasks).where(inArray(dayPlanTasks.taskId, taskIds)).get()) {
+    blockers.push("Tagesplan-VerknÃ¼pfungen");
   }
 
   return blockers;

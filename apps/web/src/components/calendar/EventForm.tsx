@@ -47,6 +47,11 @@ function ownerIds(event: CalendarEvent | null, initialOwners: EventOwner[] | und
   return owners.filter((owner) => owner.type === type).map((owner) => owner.id);
 }
 
+function preservedOwners(event: CalendarEvent | null, initialOwners: EventOwner[] | undefined): EventOwner[] {
+  const owners = event?.owners ?? initialOwners ?? [];
+  return owners.filter((owner) => owner.type !== "project" && owner.type !== "milestone" && owner.type !== "task");
+}
+
 function toggleId(values: number[], id: number): number[] {
   return values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
 }
@@ -59,6 +64,7 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
   const [endTime, setEndTime] = useState("");
   const [isAllDay, setIsAllDay] = useState(false);
   const [color, setColor] = useState(colors[0] ?? "var(--color-steel-700)");
+  const [reminderMinutes, setReminderMinutes] = useState(60);
   const [projectIds, setProjectIds] = useState<number[]>([]);
   const [milestoneIds, setMilestoneIds] = useState<number[]>([]);
   const [taskIds, setTaskIds] = useState<number[]>([]);
@@ -75,6 +81,7 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
     setEndTime(event ? toDateTimeLocalInput(event.endTime) : dateAtHour(initialDate ?? new Date().toISOString(), 10));
     setIsAllDay(event?.isAllDay ?? false);
     setColor(event?.color ?? colors[0] ?? "var(--color-steel-700)");
+    setReminderMinutes(event?.reminderMinutes ?? 60);
     setProjectIds(ownerIds(event, initialOwners, "project"));
     setMilestoneIds(ownerIds(event, initialOwners, "milestone"));
     setTaskIds(ownerIds(event, initialOwners, "task"));
@@ -92,7 +99,9 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
           endTime: fromDateTimeLocalInput(endTime),
           isAllDay,
           color,
+          reminderMinutes,
           owners: [
+            ...preservedOwners(event, initialOwners),
             ...projectIds.map((id) => ({ type: "project" as const, id })),
             ...milestoneIds.map((id) => ({ type: "milestone" as const, id })),
             ...taskIds.map((id) => ({ type: "task" as const, id }))
@@ -135,6 +144,17 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
         <div className="grid gap-4 lg:grid-cols-3">
           <DatePicker label="Start" mode="datetime-local" value={startTime} onChange={(inputEvent) => setStartTime(inputEvent.target.value)} />
           <DatePicker label="Ende" mode="datetime-local" value={endTime} onChange={(inputEvent) => setEndTime(inputEvent.target.value)} />
+          <FormField label="Erinnerung">
+            <select
+              className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
+              value={reminderMinutes}
+              onChange={(inputEvent) => setReminderMinutes(Number(inputEvent.target.value))}
+            >
+              <option value={15}>15 Minuten vorher</option>
+              <option value={60}>1 Stunde vorher</option>
+              <option value={1440}>1 Tag vorher</option>
+            </select>
+          </FormField>
         </div>
       </Section>
 

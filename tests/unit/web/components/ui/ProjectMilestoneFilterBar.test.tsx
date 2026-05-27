@@ -34,9 +34,14 @@ const projects: Project[] = [
     version: 1,
     createdAt: "2026-05-22T08:00:00",
     updatedAt: "2026-05-22T08:00:00",
+    milestoneCount: 1,
     openTaskCount: 0,
     doneTaskCount: 0,
     totalTaskCount: 0,
+    ticketCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     tags: []
   },
   {
@@ -51,9 +56,14 @@ const projects: Project[] = [
     version: 1,
     createdAt: "2026-05-22T08:00:00",
     updatedAt: "2026-05-22T08:00:00",
+    milestoneCount: 1,
     openTaskCount: 0,
     doneTaskCount: 0,
     totalTaskCount: 0,
+    ticketCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     tags: []
   }
 ];
@@ -77,6 +87,9 @@ const milestones: Milestone[] = [
     totalTaskCount: 0,
     ticketCount: 0,
     featureCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     tags: []
   },
   {
@@ -97,6 +110,9 @@ const milestones: Milestone[] = [
     totalTaskCount: 0,
     ticketCount: 0,
     featureCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     tags: []
   }
 ];

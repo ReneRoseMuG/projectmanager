@@ -45,9 +45,14 @@ const projects: Project[] = [
     version: 1,
     createdAt: "2026-05-19T08:00:00.000Z",
     updatedAt: "2026-05-19T08:00:00.000Z",
+    milestoneCount: 0,
     openTaskCount: 0,
     doneTaskCount: 0,
     totalTaskCount: 0,
+    ticketCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     tags: []
   },
   {
@@ -62,9 +67,14 @@ const projects: Project[] = [
     version: 1,
     createdAt: "2026-05-19T08:00:00.000Z",
     updatedAt: "2026-05-19T08:00:00.000Z",
+    milestoneCount: 0,
     openTaskCount: 0,
     doneTaskCount: 0,
     totalTaskCount: 0,
+    ticketCount: 0,
+    attachmentCount: 0,
+    noteCount: 0,
+    commentCount: 0,
     tags: []
   }
 ];
@@ -120,6 +130,7 @@ const event: CalendarEvent = {
   endTime: "2026-06-01T11:00:00.000Z",
   isAllDay: false,
   color: "#123456",
+  reminderMinutes: 60,
   version: 3,
   createdAt: "2026-05-19T08:00:00.000Z",
   updatedAt: "2026-05-19T08:00:00.000Z"
@@ -154,12 +165,14 @@ describe("EventForm", () => {
     fireEvent.click(screen.getByLabelText("Projekt A"));
     fireEvent.click(screen.getByLabelText("Projekt B"));
     fireEvent.click(screen.getByLabelText("Aufgabe A"));
+    fireEvent.change(screen.getByLabelText("Erinnerung"), { target: { value: "1440" } });
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Neuer Termin",
+          reminderMinutes: 1440,
           owners: [
             { type: "project", id: 1 },
             { type: "project", id: 2 },
@@ -180,5 +193,35 @@ describe("EventForm", () => {
     expect(screen.getByLabelText("Projekt B")).toBeChecked();
     expect(screen.getByLabelText("Aufgabe A")).not.toBeChecked();
     expect(screen.getByLabelText("Aufgabe B")).toBeChecked();
+  });
+
+  it("erhaelt DayPlan-Owner beim Bearbeiten eines Tagesplan-Termins", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <EventForm
+        open
+        event={{ ...event, owners: [...event.owners, { type: "dayPlan", id: 7 }] }}
+        projects={projects}
+        tasks={tasks}
+        onSubmit={onSubmit}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owners: expect.arrayContaining([
+            { type: "dayPlan", id: 7 },
+            { type: "project", id: 2 },
+            { type: "task", id: 12 }
+          ])
+        }),
+        event.id
+      )
+    );
   });
 });

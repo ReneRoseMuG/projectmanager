@@ -4,7 +4,7 @@
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - CardFooterBar rendert Tags, Support-Counter und optionalen Tag-Picker ohne eigene Datenabfragen.
+ * - CardFooterBar rendert Tags, fachliche Counter, Support-Counter und optionalen Tag-Picker ohne eigene Datenabfragen.
  * - Tag-Abkürzungen bleiben deterministisch für Einwort-, Mehrwort-, Leerstring- und Full-Fälle.
  *
  * Fehlerfälle:
@@ -43,10 +43,22 @@ describe("abbreviateTag", () => {
 
 describe("CardFooterBar", () => {
   it("rendert Tags und Counter mit schwacher Null-Darstellung", () => {
-    render(<CardFooterBar tags={[tags[0]!]} attachmentCount={2} noteCount={0} commentCount={1} />);
+    render(
+      <CardFooterBar
+        tags={[tags[0]!]}
+        leadingCounters={[{ icon: <span aria-hidden="true">M</span>, value: 3, label: "Meilensteine" }]}
+        attachmentCount={2}
+        noteCount={0}
+        commentCount={1}
+      />
+    );
 
     expect(screen.getAllByText("Backend")[0]).toBeInTheDocument();
-    expect(screen.getByLabelText("2 Anhänge")).toHaveClass("text-steel-500");
+    const leadingCounter = screen.getByLabelText("3 Meilensteine");
+    const attachmentCounter = screen.getByLabelText("2 Anhänge");
+    expect(leadingCounter).toHaveClass("text-steel-500");
+    expect(leadingCounter.compareDocumentPosition(attachmentCounter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(attachmentCounter).toHaveClass("text-steel-500");
     expect(screen.getByLabelText("0 Notizen")).toHaveClass("text-steel-300");
     expect(screen.getByLabelText("1 Kommentare")).toHaveClass("text-steel-500");
   });
