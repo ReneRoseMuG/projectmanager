@@ -1,9 +1,8 @@
 import type { Dashboard, DashboardContext, DashboardOwner } from "@taskmanager/shared-types";
-import { LayoutDashboard, Pencil, Plus, SlidersHorizontal } from "lucide-react";
+import { LayoutDashboard, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useDashboards } from "../../hooks/useDashboards";
+import { dashboardOwnerKey, useDashboards } from "../../hooks/useDashboards";
 import { useHasPermission } from "../../hooks/usePermissions";
-import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { PageHeader } from "../ui/PageHeader";
 import { Skeleton } from "../ui/Skeleton";
@@ -46,7 +45,9 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
   const [selectedDashboardId, setSelectedDashboardId] = useState<number | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [builderDashboard, setBuilderDashboard] = useState<Dashboard | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
+  const ownerKey = dashboardOwnerKey(owner);
+  const selectionStorageKey = `dashboard:selected:${context}:${ownerKey}`;
+  const collapsedStorageKey = `dashboard:picker:${context}:${ownerKey}`;
   const selectedDashboard = useMemo(
     () => dashboards.dashboards.find((dashboard) => dashboard.id === selectedDashboardId) ?? dashboards.dashboards.find((dashboard) => dashboard.id === dashboards.selectedDefaultId) ?? dashboards.dashboards[0] ?? null,
     [dashboards.dashboards, dashboards.selectedDefaultId, selectedDashboardId],
@@ -59,8 +60,17 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
     if (selectedDashboardId !== null && dashboards.dashboards.some((dashboard) => dashboard.id === selectedDashboardId)) {
       return;
     }
-    setSelectedDashboardId(dashboards.selectedDefaultId);
-  }, [dashboards.dashboards, dashboards.loading, dashboards.selectedDefaultId, selectedDashboardId]);
+    const storedValue = window.localStorage.getItem(selectionStorageKey);
+    const storedId = storedValue ? Number(storedValue) : null;
+    const storedDashboard = storedId !== null ? dashboards.dashboards.find((dashboard) => dashboard.id === storedId) : null;
+    setSelectedDashboardId(storedDashboard?.id ?? dashboards.selectedDefaultId);
+  }, [dashboards.dashboards, dashboards.loading, dashboards.selectedDefaultId, selectedDashboardId, selectionStorageKey]);
+
+  useEffect(() => {
+    if (selectedDashboardId !== null) {
+      window.localStorage.setItem(selectionStorageKey, String(selectedDashboardId));
+    }
+  }, [selectedDashboardId, selectionStorageKey]);
 
   const openBuilder = (dashboard: Dashboard | null) => {
     setBuilderDashboard(dashboard);
@@ -79,51 +89,22 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
     />
   ) : selectedDashboard ? (
     <>
-      {canWrite ? (
-        <div className="flex justify-end">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<SlidersHorizontal size={16} />}
-            onClick={() => setEditorOpen((open) => !open)}
-            aria-label="Anpassen"
-            title="Anpassen"
-          >
-            Anpassen
-          </Button>
-        </div>
-      ) : null}
-      {editorOpen && canWrite ? (
-        <div className="grid w-full gap-3 rounded-lg border border-line bg-white p-4 shadow-sm">
-          <DashboardPicker dashboards={dashboards.dashboards} selectedDashboardId={selectedDashboard.id} onChange={setSelectedDashboardId} />
-          <div className="flex flex-wrap gap-2">
-            <Button icon={<Plus size={16} />} onClick={() => openBuilder(null)}>
-              Neues Dashboard
-            </Button>
-            <Button variant="primary" icon={<Pencil size={16} />} onClick={() => openBuilder(selectedDashboard)}>
-              Bearbeiten
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      <DashboardPicker
+        dashboards={dashboards.dashboards}
+        selectedDashboard={selectedDashboard}
+        selectedDashboardId={selectedDashboard.id}
+        canWrite={canWrite}
+        collapsedStorageKey={collapsedStorageKey}
+        saving={dashboards.saving}
+        onChange={setSelectedDashboardId}
+        onCreate={() => openBuilder(null)}
+        onEdit={openBuilder}
+        onSetDefault={(dashboard) => dashboards.setDefault(dashboard.id, "USER", dashboards.userDefaultVersion).then(() => undefined)}
+      />
       <DashboardGrid dashboard={selectedDashboard} owner={owner} />
     </>
   ) : (
     <>
-      {canWrite ? (
-        <div className="flex justify-end">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<SlidersHorizontal size={16} />}
-            onClick={() => openBuilder(null)}
-            aria-label="Anpassen"
-            title="Anpassen"
-          >
-            Anpassen
-          </Button>
-        </div>
-      ) : null}
       <EmptyState
         icon={<LayoutDashboard size={22} />}
         title="Kein Dashboard vorhanden"

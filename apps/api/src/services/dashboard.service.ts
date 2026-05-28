@@ -1,5 +1,6 @@
 import {
   DASHBOARD_ALLOWED_WIDGETS,
+  DASHBOARD_CONTEXTS,
   DEFAULT_DASHBOARD_LAYOUTS,
   type CurrentUser,
   type Dashboard,
@@ -25,20 +26,16 @@ const systemDashboardTemplates: Array<{ templateKey: string; name: string; conte
   { templateKey: "system.milestone.default", name: "Standard: Meilensteinübersicht", context: "milestone", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.milestone] },
   { templateKey: "system.task.default", name: "Standard: Aufgabenübersicht", context: "task", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.task] },
   { templateKey: "system.home.default", name: "Standard: Startseite", context: "home", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.home] },
-  { templateKey: "system.calendar.default", name: "Standard: Kalender", context: "calendar", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.calendar] }
+  { templateKey: "system.calendar.default", name: "Standard: Kalender", context: "calendar", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.calendar] },
+  { templateKey: "system.dayPlan.default", name: "Standard: Persönliche Planung", context: "dayPlan", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.dayPlan] }
 ];
 
 function isDashboardContext(value: string): value is DashboardContext {
-  return value === "global" || value === "project" || value === "milestone" || value === "task" || value === "home" || value === "calendar";
+  return (DASHBOARD_CONTEXTS as readonly string[]).includes(value);
 }
 
 function isDashboardWidgetId(value: string): value is DashboardWidgetId {
-  return (DASHBOARD_ALLOWED_WIDGETS.global as readonly string[]).includes(value) ||
-    (DASHBOARD_ALLOWED_WIDGETS.project as readonly string[]).includes(value) ||
-    (DASHBOARD_ALLOWED_WIDGETS.milestone as readonly string[]).includes(value) ||
-    (DASHBOARD_ALLOWED_WIDGETS.task as readonly string[]).includes(value) ||
-    (DASHBOARD_ALLOWED_WIDGETS.home as readonly string[]).includes(value) ||
-    (DASHBOARD_ALLOWED_WIDGETS.calendar as readonly string[]).includes(value);
+  return Object.values(DASHBOARD_ALLOWED_WIDGETS).some((widgets) => (widgets as readonly string[]).includes(value));
 }
 
 function canAdminDashboards(currentUser: CurrentUser): boolean {

@@ -15,7 +15,7 @@ export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_repro
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
 export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority", "ticketType"] as const;
 export const SETTING_SCOPE_TYPES = ["GLOBAL", "ROLE", "USER"] as const;
-export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar"] as const;
+export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar", "dayPlan"] as const;
 export const DASHBOARD_DEFAULT_SCOPE_TYPES = ["GLOBAL", "USER"] as const;
 export const NOTIFICATION_CHANNELS = ["email", "push"] as const;
 export const JOURNAL_OBJECT_TYPES = [
@@ -304,7 +304,6 @@ export const dayPlans = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     status: text("status", { enum: DAY_PLAN_STATUSES }).notNull().default("open"),
-    notes: text("notes"),
     version: integer("version").notNull().default(1),
     createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
     updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -369,6 +368,21 @@ export const taskComments = sqliteTable(
   },
   (table) => ({
     taskCommentUnique: uniqueIndex("task_comments_parent_comment_unique").on(table.taskId, table.commentId)
+  })
+);
+
+export const dayPlanComments = sqliteTable(
+  "day_plan_comments",
+  {
+    dayPlanId: integer("day_plan_id")
+      .notNull()
+      .references(() => dayPlans.id, { onDelete: "cascade" }),
+    commentId: integer("comment_id")
+      .notNull()
+      .references(() => comments.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    dayPlanCommentUnique: uniqueIndex("day_plan_comments_owner_comment_unique").on(table.dayPlanId, table.commentId)
   })
 );
 
@@ -507,6 +521,21 @@ export const taskNotes = sqliteTable("task_notes", {
     .notNull()
     .references(() => notes.id, { onDelete: "cascade" })
 });
+
+export const dayPlanNotes = sqliteTable(
+  "day_plan_notes",
+  {
+    dayPlanId: integer("day_plan_id")
+      .notNull()
+      .references(() => dayPlans.id, { onDelete: "cascade" }),
+    noteId: integer("note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    dayPlanNoteUnique: uniqueIndex("day_plan_notes_owner_note_unique").on(table.dayPlanId, table.noteId)
+  })
+);
 
 export const attachments = sqliteTable(
   "attachments",

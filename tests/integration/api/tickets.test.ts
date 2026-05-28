@@ -211,6 +211,7 @@ describe("Tickets API", () => {
     const secondProject = await createProject(app, { name: "Zweites Projekt" });
     const foreignTicket = await createTicket(app, firstProject.id, { title: "Fremdes Ticket" });
     const neutralTicket = await createTicket(app, null, { title: "Neutrales Ticket" });
+    const closedNeutralTicket = await createTicket(app, null, { title: "Geschlossenes Ticket", status: "resolved" });
     const linkedTicket = await createTicket(app, secondProject.id, { title: "Schon verknüpftes Ticket" });
 
     const res = await supertest(app.server).get(`/api/tickets/link-candidates?ownerType=project&ownerId=${secondProject.id}`).expect(200);
@@ -218,7 +219,23 @@ describe("Tickets API", () => {
     const ids = (res.body as TestTicket[]).map((ticket) => ticket.id);
     expect(ids).toContain(neutralTicket.id);
     expect(ids).not.toContain(foreignTicket.id);
+    expect(ids).not.toContain(closedNeutralTicket.id);
     expect(ids).not.toContain(linkedTicket.id);
+    await supertest(app.server).post(`/api/projects/${secondProject.id}/tickets/${closedNeutralTicket.id}`).expect(400);
+  });
+
+  it("GET /api/tickets/link-candidates und Milestone-Link ignorieren geschlossene Tickets", async () => {
+    const project = await createProject(app, { name: "Ticket-Milestone-Projekt" });
+    const milestone = await createMilestone(app, project.id, { name: "Ticket-Milestone" });
+    const closedTicket = await createTicket(app, null, { title: "Geschlossenes Milestone-Ticket", status: "resolved" });
+    const openTicket = await createTicket(app, null, { title: "Offenes Milestone-Ticket", status: "open" });
+
+    const res = await supertest(app.server).get(`/api/tickets/link-candidates?ownerType=milestone&ownerId=${milestone.id}`).expect(200);
+    const ids = (res.body as TestTicket[]).map((ticket) => ticket.id);
+
+    expect(ids).toContain(openTicket.id);
+    expect(ids).not.toContain(closedTicket.id);
+    await supertest(app.server).post(`/api/milestones/${milestone.id}/tickets/${closedTicket.id}`).expect(400);
   });
 
   it("GET /api/projects/:id/tickets liefert direkte und Meilenstein-Tickets kumulativ", async () => {
@@ -453,6 +470,7 @@ describe("Tickets API", () => {
     const source = await createTicket(app, firstProject.id, { title: "Source" });
     const foreignTarget = await createTicket(app, secondProject.id, { title: "Foreign target" });
     const neutralTarget = await createTicket(app, null, { title: "Neutral target" });
+    const closedTarget = await createTicket(app, null, { title: "Closed target", status: "resolved" });
     const relatedTarget = await createTicket(app, null, { title: "Related target" });
     await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send({ targetTicketId: relatedTarget.id, relationType: "related" }).expect(201);
 
@@ -461,7 +479,19 @@ describe("Tickets API", () => {
     const ids = (res.body as TestTicket[]).map((ticket) => ticket.id);
     expect(ids).toContain(neutralTarget.id);
     expect(ids).not.toContain(foreignTarget.id);
+    expect(ids).not.toContain(closedTarget.id);
     expect(ids).not.toContain(relatedTarget.id);
+    await supertest(app.server).post(`/api/tickets/${source.id}/relations`).send({ targetTicketId: closedTarget.id, relationType: "related" }).expect(400);
+  });
+
+  it("GET /api/tickets/:id/relation-candidates und Relation-POST ignorieren geschlossene Quell-Tickets", async () => {
+    const closedSource = await createTicket(app, null, { title: "Closed source", status: "resolved" });
+    const openTarget = await createTicket(app, null, { title: "Open target", status: "open" });
+
+    const res = await supertest(app.server).get(`/api/tickets/${closedSource.id}/relation-candidates`).expect(200);
+
+    expect((res.body as TestTicket[]).map((ticket) => ticket.id)).not.toContain(openTarget.id);
+    await supertest(app.server).post(`/api/tickets/${closedSource.id}/relations`).send({ targetTicketId: openTarget.id, relationType: "related" }).expect(400);
   });
 
   it("DELETE /api/tickets/:id blocks tickets with ticket relations until the relation is removed", async () => {

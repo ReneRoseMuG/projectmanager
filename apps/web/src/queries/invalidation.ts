@@ -161,6 +161,9 @@ function commentOwnerKeys(entityType: CommentEntityType, entityId: number): Quer
   if (entityType === "milestone") {
     return [queryKeys.milestones.root, queryKeys.milestones.detail(entityId)];
   }
+  if (entityType === "dayPlan") {
+    return [queryKeys.dayPlans.root];
+  }
   return [];
 }
 
@@ -176,6 +179,9 @@ function noteOwnerKeys(ownerType: NoteOwnerType, ownerId: number): QueryKey[] {
   }
   if (ownerType === "milestone") {
     return [queryKeys.milestones.root, queryKeys.milestones.detail(ownerId)];
+  }
+  if (ownerType === "dayPlan") {
+    return [queryKeys.dayPlans.root];
   }
   return [];
 }
@@ -204,7 +210,7 @@ export async function invalidateComments(queryClient: QueryClient, entityType: C
 }
 
 export async function invalidateNotes(queryClient: QueryClient, ownerType: NoteOwnerType, ownerId: number): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.notes.owner(ownerType, ownerId), ...noteOwnerKeys(ownerType, ownerId), queryKeys.globalSearch.root]);
+  await invalidateMany(queryClient, [queryKeys.notes.owner(ownerType, ownerId), ...noteOwnerKeys(ownerType, ownerId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
 export async function invalidateAttachments(queryClient: QueryClient, ownerType: QueryOwnerType, ownerId: number): Promise<void> {

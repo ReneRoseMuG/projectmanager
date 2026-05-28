@@ -1,6 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { JOURNAL_OBJECT_TYPES, JOURNAL_OPERATIONS, type JournalObjectType, type JournalOperation } from "@taskmanager/shared-types";
+import { requireCurrentUser } from "../plugins/auth.js";
+import { ensureDayPlanOwnedByUser } from "../services/day-plan.service.js";
 import { listJournalEntries, listObjectJournalEntries } from "../services/journal.service.js";
+import { badRequest } from "../utils/errors.js";
 import { objectResponseSchema } from "../utils/route-schemas.js";
 
 interface JournalQuerystring {
@@ -45,12 +48,27 @@ export async function registerJournalRoutes(app: FastifyInstance): Promise<void>
   app.get<{ Querystring: JournalQuerystring }>(
     "/journal",
     { schema: { querystring: journalQuerySchema, response: { 200: objectResponseSchema } } },
-    async (request) => listJournalEntries(app.db, request.query)
+    async (request) => {
+      if (request.query.objectType === "dayPlan") {
+        if (request.query.objectId === undefined) {
+          throw badRequest("objectId is required for dayPlan journal queries");
+        }
+        const currentUser = requireCurrentUser(request);
+        ensureDayPlanOwnedByUser(app.db, request.query.objectId, currentUser.id);
+      }
+      return listJournalEntries(app.db, request.query);
+    }
   );
 
   app.get<{ Params: { objectType: JournalObjectType; objectId: number }; Querystring: JournalQuerystring }>(
     "/journal/objects/:objectType/:objectId",
     { schema: { params: journalObjectParamsSchema, querystring: journalQuerySchema, response: { 200: objectResponseSchema } } },
-    async (request) => listObjectJournalEntries(app.db, request.params.objectType, request.params.objectId, request.query)
+    async (request) => {
+      if (request.params.objectType === "dayPlan") {
+        const currentUser = requireCurrentUser(request);
+        ensureDayPlanOwnedByUser(app.db, request.params.objectId, currentUser.id);
+      }
+      return listObjectJournalEntries(app.db, request.params.objectType, request.params.objectId, request.query);
+    }
   );
 }

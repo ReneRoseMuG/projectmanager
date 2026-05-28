@@ -1,11 +1,13 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { dayPlanEvents, dayPlans, dayPlanTasks, events, tasks } from "../db/schema.js";
+import { comments, dayPlanComments, dayPlanEvents, dayPlanNotes, dayPlans, dayPlanTasks, events, notes, tasks } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
 export type DayPlanRecord = typeof dayPlans.$inferSelect;
 export type DayPlanTaskRow = typeof tasks.$inferSelect & { boardPosition: number };
 export type DayPlanEventRow = typeof events.$inferSelect & { boardPosition: number };
+export type DayPlanNoteRow = Pick<typeof notes.$inferSelect, "id" | "title" | "contentJson" | "version" | "createdAt" | "updatedAt">;
+export type DayPlanCommentRow = typeof comments.$inferSelect;
 
 const taskSelect = {
   id: tasks.id,
@@ -40,6 +42,25 @@ const eventSelect = {
   createdAt: events.createdAt,
   updatedAt: events.updatedAt,
   boardPosition: dayPlanEvents.position
+};
+
+const noteSelect = {
+  id: notes.id,
+  title: notes.title,
+  contentJson: notes.contentJson,
+  version: notes.version,
+  createdAt: notes.createdAt,
+  updatedAt: notes.updatedAt
+};
+
+const commentSelect = {
+  id: comments.id,
+  body: comments.body,
+  version: comments.version,
+  createdBy: comments.createdBy,
+  updatedBy: comments.updatedBy,
+  createdAt: comments.createdAt,
+  updatedAt: comments.updatedAt
 };
 
 function nowIso(): string {
@@ -117,7 +138,43 @@ export const dayPlanRepository = {
     return database.delete(dayPlanEvents).where(and(eq(dayPlanEvents.ownerId, dayPlanId), eq(dayPlanEvents.eventId, eventId))).run().changes;
   },
 
-  update(database: DbClient, dayPlanId: number, expectedVersion: number, values: Partial<Pick<DayPlanRecord, "status" | "notes">>, actorUserId?: number): DayPlanRecord | undefined {
+  listNotes(database: DbClient, dayPlanId: number): DayPlanNoteRow[] {
+    return database
+      .select(noteSelect)
+      .from(dayPlanNotes)
+      .innerJoin(notes, eq(dayPlanNotes.noteId, notes.id))
+      .where(eq(dayPlanNotes.dayPlanId, dayPlanId))
+      .orderBy(desc(notes.updatedAt), desc(notes.id))
+      .all();
+  },
+
+  addNote(database: DbClient, dayPlanId: number, noteId: number): void {
+    database.insert(dayPlanNotes).values({ dayPlanId, noteId }).onConflictDoNothing().run();
+  },
+
+  removeNote(database: DbClient, dayPlanId: number, noteId: number): number {
+    return database.delete(dayPlanNotes).where(and(eq(dayPlanNotes.dayPlanId, dayPlanId), eq(dayPlanNotes.noteId, noteId))).run().changes;
+  },
+
+  listComments(database: DbClient, dayPlanId: number): DayPlanCommentRow[] {
+    return database
+      .select(commentSelect)
+      .from(dayPlanComments)
+      .innerJoin(comments, eq(dayPlanComments.commentId, comments.id))
+      .where(eq(dayPlanComments.dayPlanId, dayPlanId))
+      .orderBy(asc(comments.createdAt), asc(comments.id))
+      .all();
+  },
+
+  addComment(database: DbClient, dayPlanId: number, commentId: number): void {
+    database.insert(dayPlanComments).values({ dayPlanId, commentId }).onConflictDoNothing().run();
+  },
+
+  removeComment(database: DbClient, dayPlanId: number, commentId: number): number {
+    return database.delete(dayPlanComments).where(and(eq(dayPlanComments.dayPlanId, dayPlanId), eq(dayPlanComments.commentId, commentId))).run().changes;
+  },
+
+  update(database: DbClient, dayPlanId: number, expectedVersion: number, values: Partial<Pick<DayPlanRecord, "status">>, actorUserId?: number): DayPlanRecord | undefined {
     const current = this.findById(database, dayPlanId);
     if (!current) {
       return undefined;

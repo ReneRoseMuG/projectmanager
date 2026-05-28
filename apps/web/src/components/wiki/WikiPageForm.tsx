@@ -175,6 +175,10 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onPostCreate,
                   setPendingComments((items) => [...items, comment]);
                   setDirty(true);
                 }}
+                onUpdate={(index, comment) => {
+                  setPendingComments((items) => items.map((item, itemIndex) => (itemIndex === index ? comment : item)));
+                  setDirty(true);
+                }}
                 onRemove={(index) => {
                   setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index));
                   setDirty(true);

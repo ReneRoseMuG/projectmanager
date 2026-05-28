@@ -7,6 +7,7 @@
  * - RichTextInlineField rendert HTML-Leseansicht, Placeholder, readOnly und Edit-Zustand.
  * - Markdown-Werte werden beim Öffnen roh an den Editor gegeben und als Editor-HTML committed.
  * - Legacy-Markdown wird im Live-Update-Modus direkt als Editor-HTML in den Formular-State übernommen.
+ * - Eingefügter Markdown-Plain-Text wird zentral durch die Markdown-Extension in HTML konvertiert.
  * - Im Edit-Zustand wird nur die feste Toolbar gerendert, keine zusätzliche Auswahl- oder Floating-Bar.
  * - TipTap wird im Test gemockt, die Leseansicht wird real gerendert.
  *
@@ -112,6 +113,7 @@ const tiptapMock = vi.hoisted(() => ({
   editor: undefined as MockEditor | undefined,
   config: undefined as MockEditorConfig | undefined,
   chain: undefined as MockCommandChain | undefined,
+  markdownOptions: undefined as { html?: boolean; transformPastedText?: boolean } | undefined,
   html: "<p>mock content</p>"
 }));
 
@@ -191,6 +193,15 @@ vi.mock("../../../../../apps/web/src/components/ui/tldraw-node", () => ({
   }
 }));
 
+vi.mock("tiptap-markdown", () => ({
+  Markdown: {
+    configure: vi.fn((options: { html?: boolean; transformPastedText?: boolean }) => {
+      tiptapMock.markdownOptions = options;
+      return { name: "markdown", options };
+    })
+  }
+}));
+
 function renderWithProviders(ui: ReactElement) {
   return render(<ToastProvider>{ui}</ToastProvider>);
 }
@@ -201,6 +212,7 @@ afterEach(() => {
   tiptapMock.editor = undefined;
   tiptapMock.config = undefined;
   tiptapMock.chain = undefined;
+  tiptapMock.markdownOptions = undefined;
   tiptapMock.html = "<p>mock content</p>";
 });
 
@@ -412,6 +424,14 @@ describe("RichTextInlineField", () => {
     fireEvent.click(screen.getByTestId("field-view"));
 
     expect(tiptapMock.config?.editorProps?.transformPastedText?.("A\n\n\n\nB")).toBe("A\n\nB");
+  });
+
+  it("T-23b aktiviert Markdown-Konvertierung für eingefügten Plain-Text", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByTestId("field-view"));
+
+    expect(tiptapMock.markdownOptions).toEqual(expect.objectContaining({ html: true, transformPastedText: true }));
   });
 
   it("T-24 entfernt geerbte Farb- und TextStyle-Marks nach Paste-Transaktionen", () => {

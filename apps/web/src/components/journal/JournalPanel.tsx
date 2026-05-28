@@ -16,7 +16,7 @@ export const journalObjectLabels: Record<JournalObjectType, string> = {
   backlogItem: "Backlog-Eintrag",
   ticket: "Ticket",
   event: "Termin",
-  dayPlan: "Tagesplan",
+  dayPlan: "Persönliche Planung",
   tag: "Tag",
   note: "Notiz",
   attachment: "Datei",

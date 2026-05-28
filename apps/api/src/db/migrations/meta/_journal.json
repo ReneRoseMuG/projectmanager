@@ -232,6 +232,13 @@
       "when": 1780012800000,
       "tag": "0032_content_images",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1780012800001,
+      "tag": "0033_day_plan_notes_comments",
+      "breakpoints": true
     }
   ]
 }

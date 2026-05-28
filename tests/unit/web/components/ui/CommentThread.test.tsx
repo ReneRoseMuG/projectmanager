@@ -20,8 +20,16 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CommentThread } from "../../../../../apps/web/src/components/ui/CommentThread";
+
+const permissionMocks = vi.hoisted(() => ({
+  useHasPermission: vi.fn(),
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
+  useHasPermission: permissionMocks.useHasPermission,
+}));
 
 vi.mock(
   "../../../../../apps/web/src/components/ui/rich-text-inline-field",
@@ -97,6 +105,10 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+beforeEach(() => {
+  permissionMocks.useHasPermission.mockReturnValue(true);
+});
+
 describe("CommentThread", () => {
   it("zeigt EmptyState wenn comments=[]", () => {
     render(
@@ -124,7 +136,7 @@ describe("CommentThread", () => {
     expect(screen.getAllByText("17.05.26")).toHaveLength(2);
   });
 
-  it("öffnet die Bearbeitung im Modal beim Klick auf den Kommentarinhalt", () => {
+  it("öffnet die Bearbeitung im Modal über die Listenaktion", () => {
     render(
       <CommentThread
         comments={[comments[0]]}
@@ -134,22 +146,24 @@ describe("CommentThread", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("Erster Kommentar"));
+    fireEvent.click(screen.getByRole("button", { name: "Bearbeiten" }));
 
     expect(screen.getByRole("button", { name: "Speichern" })).toBeInTheDocument();
     expect(screen.getByLabelText("Kommentar bearbeiten")).toHaveValue("<p>Erster Kommentar</p>");
   });
 
-  it("onCreate wird mit body aufgerufen beim Absenden", async () => {
+  it("öffnet den Create-Dialog und ruft onCreate mit body auf", async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(
       <CommentThread comments={[]} onCreate={onCreate} onUpdate={vi.fn()} onDelete={vi.fn()} />,
     );
 
+    expect(screen.queryByLabelText("Kommentar schreiben")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Kommentar anlegen" }));
     fireEvent.change(screen.getByLabelText("Kommentar schreiben"), {
       target: { value: "<p>Neu</p>" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Kommentar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Anlegen" }));
 
     await waitFor(() =>
       expect(onCreate).toHaveBeenCalledWith({ body: "<p>Neu</p>" }),
@@ -162,7 +176,8 @@ describe("CommentThread", () => {
       <CommentThread comments={[]} onCreate={onCreate} onUpdate={vi.fn()} onDelete={vi.fn()} />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Kommentar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Kommentar anlegen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Anlegen" }));
 
     expect(onCreate).not.toHaveBeenCalled();
   });
@@ -242,6 +257,39 @@ describe("CommentThread", () => {
     fireEvent.click(deleteButton as HTMLElement);
 
     await waitFor(() => expect(onDelete).toHaveBeenCalledWith(2));
+  });
+
+  it("wechselt zwischen Listen- und Boardansicht", () => {
+    const { container } = render(
+      <CommentThread
+        comments={comments}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector("[data-testid='list-board-view']")).toBeInTheDocument();
+    expect(screen.queryByTestId("comment-thread-comment-1-body-view")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
+    expect(screen.getByTestId("comment-thread-comment-1-body-view")).toBeInTheDocument();
+  });
+
+  it("blendet Create/Edit/Delete ohne Kommentarberechtigungen aus", () => {
+    permissionMocks.useHasPermission.mockReturnValue(false);
+
+    render(
+      <CommentThread
+        comments={[comments[0]]}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Kommentar anlegen" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Bearbeiten" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Löschen" })).not.toBeInTheDocument();
   });
 
   it("entityLabel erscheint im EmptyState-Text", () => {

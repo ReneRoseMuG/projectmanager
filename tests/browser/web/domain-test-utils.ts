@@ -42,6 +42,8 @@ export interface TaskFixture {
   id: number;
   title: string;
   assignee?: string | null;
+  dueDate?: string | null;
+  version?: number;
 }
 
 export interface TicketFixture {

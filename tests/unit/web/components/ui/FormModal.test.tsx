@@ -15,7 +15,7 @@
  * Ziel:
  * Sicherstellen, dass die gemeinsame Formular-Shell Page- und Modal-Layout getrennt behandelt.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FormModal } from "../../../../../apps/web/src/components/ui/FormModal";
@@ -102,5 +102,29 @@ describe("FormModal", () => {
     expect(bodyWrapper).toHaveClass("min-h-0", "flex-1", "overflow-auto");
     expect(footer).toHaveClass("shrink-0");
     expect(footer).not.toHaveClass("sticky");
+  });
+
+  it("kapselt Portal-Klicks und erlaubt höhere Nested-Modal-Layer", () => {
+    const onParentClick = vi.fn();
+
+    render(
+      <div onClick={onParentClick}>
+        <FormModal
+          open
+          title="Kommentar bearbeiten"
+          modalZIndexClassName="z-[60]"
+          onClose={vi.fn()}
+          onSubmit={vi.fn()}
+        >
+          <button type="button">Modal-Inhalt</button>
+        </FormModal>
+      </div>,
+    );
+
+    const modalRoot = document.body.querySelector(".fixed.inset-0");
+    expect(modalRoot).toHaveClass("z-[60]");
+    fireEvent.click(screen.getByRole("button", { name: "Modal-Inhalt" }));
+
+    expect(onParentClick).not.toHaveBeenCalled();
   });
 });

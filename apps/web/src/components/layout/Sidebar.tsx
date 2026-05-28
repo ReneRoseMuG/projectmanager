@@ -68,14 +68,6 @@ const homeItems: NavigationItem[] = [
     icon: Home,
     resource: "dashboards",
   },
-];
-
-const documentationItems: NavigationItem[] = [
-  { to: "/features", label: "Features", icon: BookOpen, resource: "features" },
-  { to: "/wiki", label: "Wiki", icon: Library, resource: "wiki" },
-];
-
-const informationItems: NavigationItem[] = [
   {
     to: "/calendar",
     label: "Kalender",
@@ -84,10 +76,18 @@ const informationItems: NavigationItem[] = [
   },
   {
     to: "/day-plan",
-    label: "Tagesplan",
+    label: "Persönliche Planung",
     icon: CalendarCheck,
     resource: "dayPlans",
   },
+];
+
+const documentationItems: NavigationItem[] = [
+  { to: "/features", label: "Features", icon: BookOpen, resource: "features" },
+  { to: "/wiki", label: "Wiki", icon: Library, resource: "wiki" },
+];
+
+const informationItems: NavigationItem[] = [
   { to: "/journal", label: "Journal", icon: History, resource: "journal" },
 ];
 

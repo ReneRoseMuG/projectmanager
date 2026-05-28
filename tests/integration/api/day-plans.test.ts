@@ -14,15 +14,15 @@
  * - Temporäre SQLite-Datei aus `tests/.runtime`, Truncate vor jedem Test.
  *
  * Abgedeckte Regeln:
- * - Tagespläne werden pro User und Datum eindeutig angelegt und versioniert aktualisiert.
- * - Aufgaben und Termine können einem Tagesplan zugeordnet und ohne Datenverlust wieder gelöst werden.
+ * - Persönliche Pläne werden pro User und Datum eindeutig angelegt und versioniert aktualisiert.
+ * - Aufgaben, Termine, Notizen und Kommentare können einem persönlichen Plan zugeordnet und ohne Datenverlust wieder gelöst werden.
  * - Day-Plan-Routen sind authentifizierungspflichtig und unterscheiden read/write/delete-Permissions.
  *
  * Fehlerfälle:
  * - Ohne Session liefert die API 401, Reader-Schreibzugriffe liefern 403, ungültige Daten 400 und veraltete Versionen 409.
  *
  * Ziel:
- * Die Tagesplanung als geschützte, versionierte API-Domäne mit echten Relationen absichern.
+ * Die persönliche Planung als geschützte, versionierte API-Domäne mit echten Relationen absichern.
  */
 
 import { eq } from "drizzle-orm";
@@ -30,7 +30,7 @@ import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { config } from "../../../apps/api/src/config.js";
-import { dayPlanEvents, dayPlans, dayPlanTasks, tasks } from "../../../apps/api/src/db/schema.js";
+import { comments, dayPlanComments, dayPlanEvents, dayPlanNotes, dayPlans, dayPlanTasks, notes, tasks } from "../../../apps/api/src/db/schema.js";
 import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 async function loginAdmin(app: FastifyInstance) {
@@ -79,7 +79,7 @@ describe("Day Plans API", () => {
     testDb.sqlite.close();
   });
 
-  it("schützt Tagespläne vor anonymem Zugriff und erzeugt pro User und Datum genau einen Plan", async () => {
+  it("schützt persönliche Pläne vor anonymem Zugriff und erzeugt pro User und Datum genau einen Plan", async () => {
     await supertest(app.server).get("/api/day-plans/2026-05-27").expect(401);
 
     const admin = await loginAdmin(app);
@@ -89,11 +89,11 @@ describe("Day Plans API", () => {
     expect(first.body).toMatchObject({
       date: "2026-05-27",
       status: "open",
-      notes: null,
       version: 1,
       tasks: [],
       events: []
     });
+    expect(first.body.notes).toBeUndefined();
     expect(second.body.id).toBe(first.body.id);
     expect(testDb.db.select().from(dayPlans).where(eq(dayPlans.date, "2026-05-27")).all()).toHaveLength(1);
   });
@@ -103,12 +103,15 @@ describe("Day Plans API", () => {
     await admin.get("/api/day-plans/2026-13-01").expect(400);
 
     const current = await admin.get("/api/day-plans/2026-05-27").expect(200);
+    await admin.patch("/api/day-plans/2026-05-27").send({ status: "completed", notes: "Fokus: Kalender", expectedVersion: current.body.version }).expect(400);
+
     const updated = await admin
       .patch("/api/day-plans/2026-05-27")
-      .send({ status: "completed", notes: "Fokus: Kalender", expectedVersion: current.body.version })
+      .send({ status: "completed", expectedVersion: current.body.version })
       .expect(200);
 
-    expect(updated.body).toMatchObject({ status: "completed", notes: "Fokus: Kalender", version: current.body.version + 1 });
+    expect(updated.body).toMatchObject({ status: "completed", version: current.body.version + 1 });
+    expect(updated.body.notes).toBeUndefined();
 
     await admin.patch("/api/day-plans/2026-05-27").send({ status: "open", expectedVersion: current.body.version }).expect(409);
   });
@@ -154,6 +157,42 @@ describe("Day Plans API", () => {
     expect(afterUnlink.body.events).toEqual([]);
     const persisted = await admin.get(`/api/events/${created.body.id}`).expect(200);
     expect(persisted.body.id).toBe(created.body.id);
+  });
+
+  it("erstellt und löst Notizen und Kommentare am persönlichen Plan", async () => {
+    const admin = await loginAdmin(app);
+    const dayPlan = await admin.get("/api/day-plans/2026-05-27").expect(200);
+
+    const createdNote = await admin
+      .post(`/api/day-plans/${dayPlan.body.id}/notes`)
+      .send({ title: "Planungsnotiz", contentJson: { type: "doc", content: [] } })
+      .expect(201);
+    const noteList = await admin.get(`/api/day-plans/${dayPlan.body.id}/notes`).expect(200);
+    expect(noteList.body.map((note: { id: number }) => note.id)).toEqual([createdNote.body.id]);
+    expect(testDb.db.select().from(dayPlanNotes).all()).toEqual([expect.objectContaining({ dayPlanId: dayPlan.body.id, noteId: createdNote.body.id })]);
+
+    await admin.delete(`/api/day-plans/${dayPlan.body.id}/notes/${createdNote.body.id}`).expect(204);
+    await admin.get(`/api/day-plans/${dayPlan.body.id}/notes`).expect(200).expect((response) => expect(response.body).toEqual([]));
+    expect(testDb.db.select().from(notes).where(eq(notes.id, createdNote.body.id)).get()).toBeTruthy();
+
+    const createdComment = await admin.post(`/api/day-plans/${dayPlan.body.id}/comments`).send({ body: "Kommentar zur Planung" }).expect(201);
+    const commentList = await admin.get(`/api/day-plans/${dayPlan.body.id}/comments`).expect(200);
+    expect(commentList.body.map((comment: { id: number }) => comment.id)).toEqual([createdComment.body.id]);
+    expect(testDb.db.select().from(dayPlanComments).all()).toEqual([expect.objectContaining({ dayPlanId: dayPlan.body.id, commentId: createdComment.body.id })]);
+
+    await admin.delete(`/api/day-plans/${dayPlan.body.id}/comments/${createdComment.body.id}`).expect(204);
+    await admin.get(`/api/day-plans/${dayPlan.body.id}/comments`).expect(200).expect((response) => expect(response.body).toEqual([]));
+    expect(testDb.db.select().from(comments).where(eq(comments.id, createdComment.body.id)).get()).toBeTruthy();
+  });
+
+  it("blockiert DayPlan-ID-Zugriff auf persönliche Pläne anderer User", async () => {
+    const admin = await loginAdmin(app);
+    const reader = await createReaderAgent(app);
+    const readerPlan = await reader.get("/api/day-plans/2026-05-27").expect(200);
+
+    await admin.get(`/api/day-plans/${readerPlan.body.id}/notes`).expect(404);
+    await admin.get(`/api/day-plans/${readerPlan.body.id}/comments`).expect(404);
+    await admin.get(`/api/journal/objects/dayPlan/${readerPlan.body.id}`).expect(404);
   });
 
   it("erlaubt Readern lesenden Zugriff und blockiert Tagesplan-Schreiboperationen", async () => {

@@ -9,7 +9,8 @@ const entityPaths: Record<CommentEntityType, string> = {
   useCase: "use-cases",
   backlogItem: "backlog",
   wikiPage: "wiki",
-  ticket: "tickets"
+  ticket: "tickets",
+  dayPlan: "day-plans"
 };
 
 export async function createComment(taskId: number, input: CommentInput): Promise<Comment> {

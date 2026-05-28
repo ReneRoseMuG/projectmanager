@@ -49,7 +49,6 @@ const dayPlanPatchSchema = {
   additionalProperties: false,
   properties: {
     status: { type: "string", enum: ["open", "completed"] },
-    notes: { type: ["string", "null"] },
     ...expectedVersionPropertySchema
   }
 } as const;

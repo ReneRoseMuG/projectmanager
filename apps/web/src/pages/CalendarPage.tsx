@@ -28,7 +28,7 @@ function CalendarDashboardPageContent() {
         }
       />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+      <div className="flex min-h-0 w-full flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
         {calendar.error ? (
           <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
             {calendar.error}

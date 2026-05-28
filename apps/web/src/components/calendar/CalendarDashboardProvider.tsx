@@ -18,9 +18,12 @@ interface CalendarDashboardContextValue {
   loading: boolean;
   error: string | null;
   canWriteEvents: boolean;
+  canReadTasks: boolean;
+  canWriteTasks: boolean;
   openCreate: (date?: string) => void;
   openEvent: (event: CalendarEvent) => void;
   moveEvent: (event: CalendarEvent, startTime: string, endTime: string) => Promise<void>;
+  moveTask: (task: Task, dueDate: string) => Promise<void>;
 }
 
 const CalendarDashboardContext = createContext<CalendarDashboardContextValue | null>(null);
@@ -42,11 +45,13 @@ export function CalendarDashboardProvider({ children }: { children: ReactNode })
   const [searchParams, setSearchParams] = useSearchParams();
   const canWriteEvents = useHasPermission("events", "write");
   const canDeleteEvents = useHasPermission("events", "delete");
+  const canReadTasks = useHasPermission("tasks", "read");
+  const canWriteTasks = useHasPermission("tasks", "write");
   const projectController = useProjects();
   const { projects, loading: projectsLoading, error: projectsError } = projectController;
   const milestoneController = useMilestones();
   const { milestones, loading: milestonesLoading, error: milestonesError } = milestoneController;
-  const calendarTasks = useCalendarTasks();
+  const calendarTasks = useCalendarTasks(canReadTasks);
   const events = useEvents();
   const [formOpen, setFormOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -131,6 +136,26 @@ export function CalendarDashboardProvider({ children }: { children: ReactNode })
     }
   };
 
+  const moveTask = async (task: Task, dueDate: string) => {
+    if (!canWriteTasks) {
+      return;
+    }
+    try {
+      await calendarTasks.updateTask(task.id, {
+        dueDate,
+        expectedVersion: task.version
+      });
+      showToast({ tone: "success", title: "Aufgabe verschoben" });
+    } catch (taskError) {
+      showToast({
+        tone: "error",
+        title: "Aufgabe konnte nicht verschoben werden",
+        message: errorMessage(taskError)
+      });
+      throw taskError;
+    }
+  };
+
   const removeEvent = async (event: CalendarEvent) => {
     try {
       await events.removeEvent(event.id);
@@ -148,15 +173,18 @@ export function CalendarDashboardProvider({ children }: { children: ReactNode })
 
   const value: CalendarDashboardContextValue = {
     events: events.events,
-    tasks: calendarTasks.tasks,
+    tasks: canReadTasks ? calendarTasks.tasks : [],
     projects,
     milestones,
-    loading: events.loading || calendarTasks.loading || projectsLoading || milestonesLoading,
-    error: events.error ?? calendarTasks.error ?? projectsError ?? milestonesError,
+    loading: events.loading || (canReadTasks && calendarTasks.loading) || projectsLoading || milestonesLoading,
+    error: events.error ?? (canReadTasks ? calendarTasks.error : null) ?? projectsError ?? milestonesError,
     canWriteEvents,
+    canReadTasks,
+    canWriteTasks,
     openCreate,
     openEvent,
-    moveEvent
+    moveEvent,
+    moveTask
   };
 
   return (
@@ -169,7 +197,7 @@ export function CalendarDashboardProvider({ children }: { children: ReactNode })
           initialDate={initialDate}
           projects={projects}
           milestones={milestones}
-          tasks={calendarTasks.tasks}
+          tasks={canReadTasks ? calendarTasks.tasks : []}
           onSubmit={submit}
           onDelete={removeEvent}
           canDelete={canDeleteEvents}

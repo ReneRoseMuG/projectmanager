@@ -9,6 +9,7 @@ interface ModalProps {
   size?: "md" | "lg" | "xl" | "full";
   showHeader?: boolean;
   bodyClassName?: string;
+  zIndexClassName?: string;
   children: ReactNode;
   onClose: () => void;
 }
@@ -20,13 +21,16 @@ const sizes = {
   full: "max-w-[calc(100vw-2rem)] min-h-[calc(100vh-2rem)]"
 };
 
-export function Modal({ open, title, size = "md", showHeader = true, bodyClassName = "p-5", children, onClose }: ModalProps) {
+export function Modal({ open, title, size = "md", showHeader = true, bodyClassName = "p-5", zIndexClassName = "z-50", children, onClose }: ModalProps) {
   if (!open) {
     return null;
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-steel-900/55 p-4 backdrop-blur-[2px]">
+    <div
+      className={`fixed inset-0 flex items-center justify-center bg-steel-900/55 p-4 backdrop-blur-[2px] ${zIndexClassName}`}
+      onClick={(event) => event.stopPropagation()}
+    >
       <div className={`flex max-h-[calc(100vh-64px)] w-full flex-col overflow-hidden rounded-lg bg-white shadow-modal ${sizes[size]}`}>
         {showHeader ? (
           <header className="flex items-center justify-between border-b border-line px-5 py-4">

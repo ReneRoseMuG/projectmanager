@@ -123,14 +123,14 @@ describe("Milestones API", () => {
   it("verwaltet alle Milestone-Relationen mit echten Daten", async () => {
     const project = await createProject(app);
     const milestone = await createMilestone(app, project.id);
-    const task = await createTask(app, project.id, { title: "Bestehende Aufgabe", status: "done" });
+    const task = await createTask(app, project.id, { title: "Bestehende Aufgabe", status: "todo" });
     const ticket = await createTicket(app, null, { title: "Bestehendes Ticket" });
     const feature = await createFeature(app, { title: "Feature A" });
     const tag = await createTag(app, { name: "release", color: "#14b8a6" });
 
     const createdTask = await supertest(app.server)
       .post(`/api/milestones/${milestone.id}/tasks`)
-      .send({ title: "Neue Aufgabe", status: "todo", priority: "medium" })
+      .send({ title: "Neue Aufgabe", status: "done", priority: "medium" })
       .expect(201);
     await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks/${task.id}`).expect(200);
 
@@ -197,8 +197,8 @@ describe("Milestones API", () => {
     const reducedDetail = await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(200);
     expect(reducedDetail.body).toMatchObject({
       taskCount: 1,
-      openTaskCount: 1,
-      doneTaskCount: 0,
+      openTaskCount: 0,
+      doneTaskCount: 1,
       totalTaskCount: 1,
       ticketCount: 1,
       featureCount: 1,

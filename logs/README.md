@@ -2,6 +2,18 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 28.05.26 | 5             | MS-23 Prüfung                                | ⚠️     |
+| 28.05.26 | 4             | MS-23 Tests                                  | ⚠️     |
+| 28.05.26 | 3             | MS-23 DayPlan UI                             | ✅     |
+| 28.05.26 | 2             | MS-23 Dashboard-State                        | ✅     |
+| 28.05.26 | 1             | MS-23 Schema und API                         | ⚠️     |
+| 28.05.26 | Fix           | Kommentar-Modal Schließen                    | ✅     |
+| 28.05.26 | Fix           | TKT-20 Statusfilter Verknüpfungen            | ✅     |
+| 28.05.26 | Feature       | TASK-110 Kommentar Modal List Board          | ⚠️     |
+| 28.05.26 | Fix           | Ticket Markdown HTML Editor                  | ⚠️     |
+| 28.05.26 | Feature       | Kalender MuGPlan Port                        | ⚠️     |
+| 28.05.26 | Fix           | Kalender-Breite                              | ✅     |
+| 28.05.26 | Fix           | Startnavigation und Tagesplan-Breite         | ✅     |
 | 28.05.26 | Feature       | Rene Ein-Klick-Login                         | ⚠️     |
 | 27.05.26 | Fix           | Content Backfill                             | ⚠️     |
 | 27.05.26 | 2             | Backup straffen                              | ✅     |

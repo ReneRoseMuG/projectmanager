@@ -8,7 +8,7 @@ import { noteContentToPreviewText } from "./noteContent";
 interface NoteListViewItemProps {
   note: Note;
   onEdit: (note: Note) => void;
-  onDelete: (note: Note) => void;
+  onDelete?: (note: Note) => void;
 }
 
 export function NoteListViewItem({ note, onEdit, onDelete }: NoteListViewItemProps) {
@@ -33,7 +33,7 @@ export function NoteListViewItem({ note, onEdit, onDelete }: NoteListViewItemPro
         <ActionMenu
           items={[
             { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onEdit(note) },
-            { label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(note), danger: true },
+            ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(note), danger: true }] : []),
           ]}
         />
       }

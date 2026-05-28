@@ -11,6 +11,8 @@ interface NoteListProps {
   onCreate: () => Promise<void>;
   onEdit: (note: Note) => void;
   onDelete: (note: Note) => void;
+  canCreate?: boolean;
+  canDelete?: boolean;
 }
 
 function matchesSearch(note: Note, searchValue: string) {
@@ -22,7 +24,7 @@ function matchesSearch(note: Note, searchValue: string) {
   return note.title.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
-export function NoteList({ notes, onCreate, onEdit, onDelete }: NoteListProps) {
+export function NoteList({ notes, onCreate, onEdit, onDelete, canCreate = true, canDelete = true }: NoteListProps) {
   const [mode, setMode] = useState<ListBoardMode>("board");
   const [searchValue, setSearchValue] = useState("");
   const visibleNotes = useMemo(
@@ -37,6 +39,7 @@ export function NoteList({ notes, onCreate, onEdit, onDelete }: NoteListProps) {
       onModeChange={setMode}
       onAdd={() => void onCreate()}
       addLabel="Neue Notiz"
+      showToolbarAdd={canCreate}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       emptyState={
@@ -52,14 +55,14 @@ export function NoteList({ notes, onCreate, onEdit, onDelete }: NoteListProps) {
         <NoteCard
           note={note}
           onEdit={onEdit}
-          onDelete={onDelete}
+          onDelete={canDelete ? onDelete : undefined}
         />
       )}
       renderRow={(note) => (
         <NoteListViewItem
           note={note}
           onEdit={onEdit}
-          onDelete={onDelete}
+          onDelete={canDelete ? onDelete : undefined}
         />
       )}
     />

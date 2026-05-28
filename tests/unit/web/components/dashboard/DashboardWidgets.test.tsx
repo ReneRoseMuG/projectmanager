@@ -17,7 +17,8 @@
  *
  * Abgedeckte Regeln:
  * - Alle Dashboard-Board/List-Widgets navigieren per Doppelklick zur passenden Detailroute.
- * - Kommentar-Widgets verlinken auch Wiki- und Backlog-Träger korrekt.
+ * - Kommentar-Widgets verlinken auch Wiki-, Backlog- und DayPlan-Träger korrekt.
+ * - noteList rendert persönliche Notizen read-only mit Vorschau.
  * - Das neue Milestone-Listenwidget ist als „Meilensteinliste“ im Widget-Katalog benannt.
  *
  * Fehlerfälle:
@@ -28,7 +29,7 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import type { DashboardWidgetId, DashboardWidgetLayout, Milestone, Project, RecentComment, Task, Ticket } from "@taskmanager/shared-types";
+import type { DashboardWidgetId, DashboardWidgetLayout, Milestone, Note, Project, RecentComment, Task, Ticket } from "@taskmanager/shared-types";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -247,7 +248,26 @@ describe("DashboardWidgetCard", () => {
     expect(screen.queryByTestId("calendar-view")).not.toBeInTheDocument();
   });
 
-  it("verlinkt Wiki- und Backlog-Kommentare zur passenden Detailseite", () => {
+  it("rendert noteList als read-only Notizvorschau", () => {
+    const notes: Note[] = [
+      {
+        id: 1,
+        title: "Fokus",
+        contentJson: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Heute Review abschließen" }] }] },
+        version: 1,
+        createdAt: "2026-05-28T06:00:00.000Z",
+        updatedAt: "2026-05-28T07:00:00.000Z",
+      },
+    ];
+
+    renderWithRouter("noteList", notes);
+
+    expect(screen.getByText("Fokus")).toBeInTheDocument();
+    expect(screen.getByText("Heute Review abschließen")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Fokus/i })).not.toBeInTheDocument();
+  });
+
+  it("verlinkt Wiki-, Backlog- und DayPlan-Kommentare zur passenden Detailseite", () => {
     const comments: RecentComment[] = [
       {
         id: 1,
@@ -268,6 +288,16 @@ describe("DashboardWidgetCard", () => {
         entityType: "backlogItem",
         entityId: 61,
         entityLabel: "Backlog Eintrag"
+      },
+      {
+        id: 3,
+        body: "Planungs-Kommentar",
+        createdAt: "2026-05-27T06:00:00.000Z",
+        updatedAt: "2026-05-27T06:05:00.000Z",
+        authorName: "Admin",
+        entityType: "dayPlan",
+        entityId: 71,
+        entityLabel: "Persönliche Planung 2026-05-27"
       }
     ];
 
@@ -275,5 +305,6 @@ describe("DashboardWidgetCard", () => {
 
     expect(screen.getByText("Wiki Seite").closest("a")).toHaveAttribute("href", "/wiki/51");
     expect(screen.getByText("Backlog Eintrag").closest("a")).toHaveAttribute("href", "/backlog/61");
+    expect(screen.getByText("Persönliche Planung 2026-05-27").closest("a")).toHaveAttribute("href", "/day-plan");
   });
 });

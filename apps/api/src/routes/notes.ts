@@ -1,11 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import type { NoteInput, NoteUpdate } from "@taskmanager/shared-types";
+import { requireCurrentUser } from "../plugins/auth.js";
 import {
+  createDayPlanNote,
   createProjectNote,
   createMilestoneNote,
   createTaskNote,
+  deleteDayPlanNote,
   deleteNote,
   getNote,
+  linkDayPlanNote,
+  listDayPlanNotes,
   listMilestoneNotes,
   listProjectNotes,
   listTaskNotes,
@@ -33,6 +38,16 @@ const notePatchSchema = {
   }
 } as const;
 
+const dayPlanNoteParamSchema = {
+  type: "object",
+  required: ["id", "noteId"],
+  additionalProperties: false,
+  properties: {
+    id: { type: "integer", minimum: 1 },
+    noteId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
 export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { id: number } }>(
     "/projects/:id/notes",
@@ -50,6 +65,15 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     "/milestones/:id/notes",
     { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
     async (request) => listMilestoneNotes(app.db, request.params.id)
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/day-plans/:id/notes",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => {
+      const currentUser = requireCurrentUser(request);
+      return listDayPlanNotes(app.db, request.params.id, currentUser.id);
+    }
   );
 
   app.post<{ Params: { id: number }; Body: NoteInput }>(
@@ -70,6 +94,24 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => reply.status(201).send(createMilestoneNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
+  app.post<{ Params: { id: number }; Body: NoteInput }>(
+    "/day-plans/:id/notes",
+    { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
+    async (request, reply) => {
+      const currentUser = requireCurrentUser(request);
+      return reply.status(201).send(createDayPlanNote(app.db, request.params.id, currentUser.id, request.body, createJournalActor(request.currentUser)));
+    }
+  );
+
+  app.post<{ Params: { id: number; noteId: number } }>(
+    "/day-plans/:id/notes/:noteId",
+    { schema: { params: dayPlanNoteParamSchema, response: { 200: objectResponseSchema } } },
+    async (request) => {
+      const currentUser = requireCurrentUser(request);
+      return linkDayPlanNote(app.db, request.params.id, request.params.noteId, currentUser.id, createJournalActor(request.currentUser));
+    }
+  );
+
   app.get<{ Params: { id: number } }>(
     "/notes/:id",
     { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
@@ -87,6 +129,16 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
       deleteNote(app.db, request.params.id, createJournalActor(request.currentUser));
+      return reply.status(204).send();
+    }
+  );
+
+  app.delete<{ Params: { id: number; noteId: number } }>(
+    "/day-plans/:id/notes/:noteId",
+    { schema: { params: dayPlanNoteParamSchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
+      const currentUser = requireCurrentUser(request);
+      deleteDayPlanNote(app.db, request.params.id, request.params.noteId, currentUser.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

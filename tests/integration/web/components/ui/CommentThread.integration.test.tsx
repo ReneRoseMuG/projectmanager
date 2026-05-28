@@ -24,6 +24,10 @@ import { useEntityComments } from "../../../../../apps/web/src/hooks/useEntityCo
 import { createEntityComment, deleteEntityComment, getEntityComments, updateComment } from "../../../../../apps/web/src/api/comments";
 import { CommentThread } from "../../../../../apps/web/src/components/ui/CommentThread";
 
+vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
+  useHasPermission: () => true
+}));
+
 vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
   RichTextInlineField({ value, onChange, placeholder, readOnly, valueFormat, testIdPrefix }: { value: string | null | undefined; onChange: (value: string) => void; placeholder?: string; readOnly?: boolean; valueFormat?: "html" | "markdown"; testIdPrefix?: string }) {
     if (readOnly) {
@@ -129,8 +133,9 @@ describe("CommentThread API Integration", () => {
     renderHarness();
 
     await waitFor(() => expect(screen.getByText("Noch keine Kommentare")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Kommentar anlegen" }));
     fireEvent.change(screen.getByLabelText("Kommentar schreiben"), { target: { value: "<p>Neu</p>" } });
-    fireEvent.click(screen.getByRole("button", { name: "Kommentar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Anlegen" }));
 
     await waitFor(() => expect(screen.getByText("Neu")).toBeInTheDocument());
     expect(apiMocks.createEntityComment).toHaveBeenCalledWith("project", 7, { body: "<p>Neu</p>" });
@@ -143,7 +148,7 @@ describe("CommentThread API Integration", () => {
     renderHarness();
 
     await waitFor(() => expect(screen.getByText("Bestehender Kommentar")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("Bestehender Kommentar"));
+    fireEvent.click(screen.getByRole("button", { name: "Bearbeiten" }));
     fireEvent.change(screen.getByLabelText("Kommentar bearbeiten"), { target: { value: "<p>Aktualisiert</p>" } });
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 

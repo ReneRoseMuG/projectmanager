@@ -5,6 +5,7 @@ import type {
   JournalEntry,
   JournalListResponse,
   Milestone,
+  Note,
   Project,
   RecentAttachment,
   RecentComment,
@@ -13,8 +14,8 @@ import type {
   Ticket,
   TicketStats,
 } from "@taskmanager/shared-types";
-import { AlertTriangle, ExternalLink, Inbox } from "lucide-react";
-import type { ReactNode } from "react";
+import { AlertTriangle, ExternalLink, Inbox, StickyNote } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCalendarTasks } from "../../hooks/useCalendarTasks";
 import { useEvents } from "../../hooks/useEvents";
@@ -25,6 +26,7 @@ import { formatHumanDate } from "../../utils/date";
 import { CalendarSkeleton } from "../calendar/CalendarSkeleton";
 import { useOptionalCalendarDashboard } from "../calendar/CalendarDashboardProvider";
 import { CalendarView } from "../calendar/CalendarView";
+import { MonthCalendar } from "../calendar/MonthCalendar";
 import { UpcomingEvents } from "../calendar/UpcomingEvents";
 import { WeekCalendar } from "../calendar/WeekCalendar";
 import { MilestoneListBoardView } from "../milestones/MilestoneListBoardView";
@@ -34,10 +36,12 @@ import { TicketListBoardView } from "../tickets/TicketListBoardView";
 import { EmptyState } from "../ui/EmptyState";
 import { PriorityBadge } from "../ui/PriorityBadge";
 import { ProgressBar } from "../ui/ProgressBar";
+import { SegmentedControl } from "../ui/SegmentedControl";
 import { Skeleton } from "../ui/Skeleton";
 import { StatusPill } from "../ui/StatusPill";
 import { TicketTypeBadge } from "../ui/TicketTypeBadge";
 import { useCatalogs } from "../../hooks/useCatalogs";
+import { noteContentToPreviewText } from "../notes/noteContent";
 import { dashboardWidgetRegistry } from "./widgetRegistry";
 
 interface DashboardWidgetCardProps {
@@ -70,6 +74,9 @@ function dashboardPath(type: string, id: number): string {
   }
   if (type === "backlogItem") {
     return `/backlog/${id}`;
+  }
+  if (type === "dayPlan") {
+    return "/day-plan";
   }
   return "/";
 }
@@ -272,6 +279,29 @@ function AttachmentRows({ attachments }: { attachments: RecentAttachment[] | und
   );
 }
 
+function NoteRows({ notes }: { notes: Note[] | undefined }) {
+  if (!notes || notes.length === 0) {
+    return <EmptyState icon={<StickyNote size={20} />} title="Keine Notizen vorhanden" variant="tinted" />;
+  }
+
+  return (
+    <div className="grid gap-2">
+      {notes.map((note) => {
+        const preview = noteContentToPreviewText(note.contentJson);
+        return (
+          <div key={note.id} className="grid gap-1 rounded-md border border-line p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="truncate text-sm font-semibold text-ink">{note.title}</span>
+              <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(note.updatedAt)}</span>
+            </div>
+            <p className="line-clamp-2 text-xs text-steel-600">{preview || "Kein Inhalt"}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function MilestoneRows({ milestones }: { milestones: Milestone[] | undefined }) {
   if (!milestones || milestones.length === 0) {
     return <EmptyState icon={<Inbox size={20} />} title="Keine Meilensteine vorhanden" variant="tinted" />;
@@ -322,6 +352,9 @@ function CalendarWidget() {
 
 function InteractiveCalendarWidget() {
   const calendar = useOptionalCalendarDashboard();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [viewMode, setViewMode] = useState<"week" | "month">("week");
 
   if (!calendar) {
     return <WidgetError message="Kalenderdaten sind nicht verfügbar." />;
@@ -335,20 +368,45 @@ function InteractiveCalendarWidget() {
     return <WidgetError message={calendar.error} />;
   }
 
+  const returnTo = `${location.pathname}${location.search}`;
+  const openTask = (task: Task) => navigate(dashboardDetailPath("task", task.id, returnTo));
+
   return (
-    <WeekCalendar
-      events={calendar.events}
-      tasks={calendar.tasks}
-      projects={calendar.projects}
-      milestones={calendar.milestones}
-      onDateClick={calendar.canWriteEvents ? calendar.openCreate : undefined}
-      onEventClick={calendar.canWriteEvents ? calendar.openEvent : undefined}
-      onEventMove={calendar.canWriteEvents ? calendar.moveEvent : undefined}
-    />
+    <div className="grid gap-3">
+      <div className="flex justify-end">
+        <SegmentedControl
+          value={viewMode}
+          options={[
+            { value: "week", label: "Woche" },
+            { value: "month", label: "Monat" }
+          ]}
+          onChange={setViewMode}
+        />
+      </div>
+      {viewMode === "week" ? (
+        <WeekCalendar
+          events={calendar.events}
+          tasks={calendar.tasks}
+          projects={calendar.projects}
+          milestones={calendar.milestones}
+          onDateClick={calendar.canWriteEvents ? calendar.openCreate : undefined}
+          onEventClick={calendar.canWriteEvents ? calendar.openEvent : undefined}
+          onEventMove={calendar.canWriteEvents ? calendar.moveEvent : undefined}
+          onTaskClick={calendar.canReadTasks ? openTask : undefined}
+          onTaskMove={calendar.canWriteTasks ? calendar.moveTask : undefined}
+        />
+      ) : (
+        <MonthCalendar
+          tasks={calendar.tasks}
+          onTaskClick={calendar.canReadTasks ? openTask : undefined}
+          onTaskMove={calendar.canWriteTasks ? calendar.moveTask : undefined}
+        />
+      )}
+    </div>
   );
 }
 
-function UpcomingEventsWidget() {
+function UpcomingEventsWidget({ owner }: { owner?: DashboardOwner }) {
   const canReadEvents = useHasPermission("events", "read");
   const events = useEvents(undefined, canReadEvents);
 
@@ -356,7 +414,9 @@ function UpcomingEventsWidget() {
     return <WidgetLoading />;
   }
 
-  return <UpcomingEvents events={canReadEvents ? events.events : []} />;
+  const visibleEvents = owner?.type === "dayPlan" ? events.events.filter((event) => event.owners.some((eventOwner) => eventOwner.type === "dayPlan" && eventOwner.id === owner.id)) : events.events;
+
+  return <UpcomingEvents events={canReadEvents ? visibleEvents : []} />;
 }
 
 function TaskBoardWidget({
@@ -474,7 +534,7 @@ export function DashboardWidgetCard({ widget, owner, context }: DashboardWidgetC
   if (widget.widgetId === "upcomingEvents") {
     return (
       <WidgetShell widget={widget}>
-        <UpcomingEventsWidget />
+        <UpcomingEventsWidget owner={owner} />
       </WidgetShell>
     );
   }
@@ -503,6 +563,7 @@ export function DashboardWidgetCard({ widget, owner, context }: DashboardWidgetC
       {widget.widgetId === "ticketJournal" ? <TicketRows tickets={query.data as Ticket[] | undefined} /> : null}
       {widget.widgetId === "globalJournal" ? <JournalRows response={query.data as JournalListResponse | undefined} /> : null}
       {widget.widgetId === "commentJournal" ? <CommentRows comments={query.data as RecentComment[] | undefined} /> : null}
+      {widget.widgetId === "noteList" ? <NoteRows notes={query.data as Note[] | undefined} /> : null}
       {widget.widgetId === "attachmentJournal" ? <AttachmentRows attachments={query.data as RecentAttachment[] | undefined} /> : null}
       {widget.widgetId === "milestoneProgress" ? <MilestoneRows milestones={query.data as Milestone[] | undefined} /> : null}
       {widget.widgetId === "overdueTasks" ? <TaskRows tasks={query.data as Task[] | undefined} emptyTitle="Keine überfälligen Aufgaben" /> : null}

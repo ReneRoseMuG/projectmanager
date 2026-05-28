@@ -7,7 +7,7 @@ import { noteContentToPreviewText } from "./noteContent";
 interface NoteCardProps {
   note: Note;
   onEdit: (note: Note) => void;
-  onDelete: (note: Note) => void;
+  onDelete?: (note: Note) => void;
 }
 
 function NoteHeader({ note }: { note: Note }) {
@@ -34,7 +34,7 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
       footer={<span className="text-xs font-semibold text-steel-500">Notiz #{note.id}</span>}
       onOpen={() => onEdit(note)}
       onEdit={() => onEdit(note)}
-      onDelete={() => onDelete(note)}
+      onDelete={onDelete ? () => onDelete(note) : undefined}
       className="min-h-56"
     />
   );

@@ -160,7 +160,7 @@ describe("FeatureForm", () => {
   });
 
   it("übergibt alle Pending-Daten nach Create an onPostCreate", async () => {
-    formTestMocks.hasPermission.mockImplementation((resource, action) => resource === "projects" && action === "write");
+    formTestMocks.hasPermission.mockImplementation((resource, action) => (resource === "projects" || resource === "comments") && action === "write");
     const createdFeature = { ...feature, id: 111, title: "Neues Feature" };
     const onSubmit = vi.fn().mockResolvedValue(createdFeature);
     const onPostCreate = vi.fn().mockResolvedValue(undefined);

@@ -252,12 +252,32 @@ describe("Tasks API", () => {
     const secondProject = await createProject(app, { name: "Zweites Projekt" });
     const foreignTask = await createTask(app, firstProject.id, { title: "Fremde Aufgabe" });
     const neutralTask = await createTask(app, firstProject.id, { title: "Neutrale Aufgabe" });
+    const closedNeutralTask = await createTask(app, firstProject.id, { title: "Geschlossene Aufgabe", status: "done" });
     await supertest(app.server).delete(`/api/projects/${firstProject.id}/tasks/${neutralTask.id}`).expect(204);
+    await supertest(app.server).delete(`/api/projects/${firstProject.id}/tasks/${closedNeutralTask.id}`).expect(204);
 
     const res = await supertest(app.server).get(`/api/tasks/link-candidates?ownerType=project&ownerId=${secondProject.id}`).expect(200);
 
     expect(res.body.map((item: { id: number }) => item.id)).toContain(neutralTask.id);
     expect(res.body.map((item: { id: number }) => item.id)).not.toContain(foreignTask.id);
+    expect(res.body.map((item: { id: number }) => item.id)).not.toContain(closedNeutralTask.id);
+    await supertest(app.server).post(`/api/projects/${secondProject.id}/tasks/${closedNeutralTask.id}`).expect(400);
+  });
+
+  it("GET /api/tasks/link-candidates und Milestone-Link ignorieren geschlossene Aufgaben", async () => {
+    const project = await createProject(app, { name: "Milestone-Projekt" });
+    const milestone = await createMilestone(app, project.id, { name: "Milestone" });
+    const closedTask = await createTask(app, project.id, { title: "Geschlossene Milestone-Aufgabe", status: "done" });
+    const openTask = await createTask(app, project.id, { title: "Offene Milestone-Aufgabe", status: "todo" });
+    await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${closedTask.id}`).expect(204);
+    await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${openTask.id}`).expect(204);
+
+    const res = await supertest(app.server).get(`/api/tasks/link-candidates?ownerType=milestone&ownerId=${milestone.id}`).expect(200);
+    const ids = res.body.map((item: { id: number }) => item.id);
+
+    expect(ids).toContain(openTask.id);
+    expect(ids).not.toContain(closedTask.id);
+    await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks/${closedTask.id}`).expect(400);
   });
 
   it("DELETE /api/projects/:id/tasks/:taskId entfernt nur die Zuordnung", async () => {

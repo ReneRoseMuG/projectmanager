@@ -22,6 +22,7 @@ interface FormModalProps {
   onOpenInTab?: () => void;
   tabBar?: ReactNode;
   contentClassName?: string;
+  modalZIndexClassName?: string;
   children: ReactNode;
 }
 
@@ -43,6 +44,7 @@ export function FormModal({
   onOpenInTab,
   tabBar,
   contentClassName = "",
+  modalZIndexClassName,
   children,
 }: FormModalProps) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -153,6 +155,7 @@ export function FormModal({
       size="xl"
       showHeader={false}
       bodyClassName="p-0"
+      zIndexClassName={modalZIndexClassName}
       onClose={onClose}
     >
       {form}

@@ -26,6 +26,7 @@ import {
  * - Calendar-Events können global oder mit Projekt-/Aufgaben-Ownern im Browser erstellt werden.
  * - Ownerbasierte Events können im Browser auf mehrere Owner erweitert werden.
  * - Gelöschte Events verschwinden ohne Reload aus Kalender und Terminliste.
+ * - Aufgaben erscheinen in Wochen- und Monatsansicht, öffnen die Detailseite und speichern Due-Date-Änderungen per Drag & Drop.
  *
  * Fehlerfälle:
  * - Die UI darf keine direkten Event-Felder `projectId` oder `taskId` voraussetzen.
@@ -42,6 +43,33 @@ async function openCalendar(page: Page) {
 
 function eventByTitle(page: Page, title: string) {
   return page.getByText(title, { exact: true }).first();
+}
+
+function adjacentDateInCurrentIsoWeek() {
+  const date = new Date();
+  date.setDate(date.getDate() + (date.getDay() === 0 ? -1 : 1));
+  return todayIsoDate(date);
+}
+
+async function dragCalendarTaskToDate(page: Page, taskId: number, targetDate: string) {
+  const source = page.getByTestId(`week-task-${taskId}`);
+  const target = page.getByTestId(`week-day-${targetDate}`);
+  await expect(source).toBeVisible();
+  await expect(target).toBeVisible();
+  await source.scrollIntoViewIfNeeded();
+
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+  expect(sourceBox).not.toBeNull();
+  expect(targetBox).not.toBeNull();
+  if (!sourceBox || !targetBox) {
+    return;
+  }
+
+  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + Math.min(sourceBox.height / 2, 48));
+  await page.mouse.down();
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + Math.min(targetBox.height - 24, 120), { steps: 12 });
+  await page.mouse.up();
 }
 
 async function fillEventBase(
@@ -244,6 +272,44 @@ test.describe("Kalender-Events", () => {
       await expect(form.locator("input[required]").first()).toHaveValue(event.title);
     } finally {
       await deleteEvent(request, event.id);
+    }
+  });
+
+  test("zeigt Aufgaben in Woche und Monat, öffnet Details und speichert Due-Date per Drag & Drop", async ({ page, request }) => {
+    const project = await createProject(request, "E2E Calendar Task Due Project");
+    const sourceDate = todayIsoDate();
+    const targetDate = adjacentDateInCurrentIsoWeek();
+    const task = await createTask(
+      request,
+      { type: "project", id: project.id },
+      "E2E Calendar Due Task",
+      { status: "in_progress", dueDate: sourceDate },
+    );
+
+    try {
+      await openCalendar(page);
+      await expect(page.getByTestId(`week-task-${task.id}`)).toContainText(task.title);
+
+      await page.getByTestId(`week-task-${task.id}`).click();
+      await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}(?:\\?.*)?$`));
+
+      await authenticatedGoto(page, "/calendar");
+      await page.getByRole("button", { name: "Monat", exact: true }).click();
+      await expect(page.getByTestId(`month-task-${task.id}`)).toContainText(task.title);
+
+      await page.getByRole("button", { name: "Woche", exact: true }).click();
+      const updateResponse = page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/tasks/${task.id}`) &&
+          response.request().method() === "PATCH",
+      );
+      await dragCalendarTaskToDate(page, task.id, targetDate);
+      const updated = (await (await updateResponse).json()) as { dueDate: string | null };
+      expect(updated.dueDate).toBe(targetDate);
+      await expect(page.getByTestId(`week-day-${targetDate}`)).toContainText(task.title);
+    } finally {
+      await deleteProject(request, project.id);
+      await deleteTask(request, task.id);
     }
   });
 });

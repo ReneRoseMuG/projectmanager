@@ -1,13 +1,15 @@
 import type { Comment, CommentUpdate } from "@taskmanager/shared-types";
-import { MessageSquare, Pencil, Send, Trash2 } from "lucide-react";
-import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { useHasPermission } from "../../hooks/usePermissions";
 import { formatHumanDate } from "../../utils/date";
 import { Button } from "./Button";
+import { CommentBodyModal, commentTextFromHtml, commentValueFormat } from "./CommentBodyModal";
 import { EmptyState } from "./EmptyState";
-import { FormModal } from "./FormModal";
-import { RichTextInlineField, type RichTextValueFormat } from "./rich-text-inline-field";
-import { Section } from "./Section";
+import { ItemCard } from "./ItemCard";
+import { ItemRow } from "./ItemRow";
+import { ListBoardView, type ListBoardMode } from "./ListBoardView";
+import { RichTextInlineField } from "./rich-text-inline-field";
 
 interface CommentThreadProps {
   comments: Comment[];
@@ -17,133 +19,41 @@ interface CommentThreadProps {
   entityLabel?: string;
 }
 
-function textFromHtml(value: string) {
-  return value
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .trim();
+type CommentModalState =
+  | { mode: "create" }
+  | { mode: "edit"; comment: Comment };
+
+function commentPreview(comment: Comment) {
+  return commentTextFromHtml(comment.body) || "Leerer Kommentar";
 }
 
-function valueFormatForComment(value: string): RichTextValueFormat {
-  return value.trim().startsWith("<") ? "html" : "markdown";
-}
-
-interface CommentEditorModalProps {
-  comment: Comment | null;
-  open: boolean;
-  onSave: (id: number, input: CommentUpdate) => Promise<unknown>;
-  onClose: () => void;
-}
-
-function CommentEditorModal({ comment, open, onSave, onClose }: CommentEditorModalProps) {
-  const [content, setContent] = useState("");
-  const [contentFormat, setContentFormat] = useState<RichTextValueFormat>("html");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open || !comment) {
-      return;
-    }
-    setContent(comment.body);
-    setContentFormat(valueFormatForComment(comment.body));
-  }, [comment, open]);
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!comment || !textFromHtml(content)) {
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await onSave(comment.id, { body: content, expectedVersion: comment.version });
-      onClose();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <FormModal
-      open={open && Boolean(comment)}
-      title="Kommentar bearbeiten"
-      icon={<MessageSquare size={20} />}
-      breadcrumb={["Kommentare", "Bearbeiten"]}
-      onSubmit={submit}
-      onClose={onClose}
-      saving={saving}
-      submitLabel="Speichern"
-      cancelLabel="Schließen"
-    >
-      {comment ? (
-        <Section>
-          <RichTextInlineField
-            value={content}
-            valueFormat={contentFormat}
-            commitOnBlur={false}
-            liveUpdate
-            minRows={10}
-            testIdPrefix={`comment-thread-comment-${comment.id}-editor`}
-            onChange={(value) => {
-              setContent(value);
-              setContentFormat("html");
-            }}
-          />
-        </Section>
-      ) : null}
-    </FormModal>
-  );
-}
-
-function CommentItem({
+function CommentCard({
   comment,
+  canWrite,
+  canDelete,
   onEdit,
   onDelete,
 }: {
   comment: Comment;
+  canWrite: boolean;
+  canDelete: boolean;
   onEdit: (comment: Comment) => void;
   onDelete: (id: number) => Promise<void>;
 }) {
-  const valueFormat = valueFormatForComment(comment.body);
+  const valueFormat = commentValueFormat(comment.body);
 
   return (
-    <article className="grid gap-3 rounded-lg border border-line bg-white p-4 shadow-card">
-      <div className="flex items-start justify-between gap-3">
-        <time className="text-xs text-steel-500">
-          {formatHumanDate(comment.createdAt)}
-        </time>
-        <div className="flex items-center gap-2">
-          <Button
-            aria-label="Bearbeiten"
-            title="Bearbeiten"
-            icon={<Pencil size={16} />}
-            variant="ghost"
-            className="h-10 w-10"
-            onClick={() => onEdit(comment)}
-          />
-          <Button
-            aria-label="Löschen"
-            title="Löschen"
-            icon={<Trash2 size={18} />}
-            variant="ghost"
-            className="h-10 w-10"
-            onClick={() => void onDelete(comment.id).catch(() => undefined)}
-          />
+    <ItemCard
+      onOpen={canWrite ? () => onEdit(comment) : undefined}
+      onEdit={canWrite ? () => onEdit(comment) : undefined}
+      onDelete={canDelete ? () => void onDelete(comment.id).catch(() => undefined) : undefined}
+      header={
+        <div className="grid gap-1">
+          <p className="text-sm font-semibold text-ink">Kommentar</p>
+          <time className="text-xs text-steel-500">{formatHumanDate(comment.createdAt)}</time>
         </div>
-      </div>
-      <div
-        role="button"
-        tabIndex={0}
-        className="rounded-md focus:outline-none focus:ring-2 focus:ring-steel-700/10"
-        onClick={() => onEdit(comment)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onEdit(comment);
-          }
-        }}
-      >
+      }
+      body={
         <RichTextInlineField
           value={comment.body}
           valueFormat={valueFormat}
@@ -151,59 +61,56 @@ function CommentItem({
           testIdPrefix={`comment-thread-comment-${comment.id}-body`}
           onChange={() => undefined}
         />
-      </div>
-      <div className="flex justify-end">
-        <Button variant="ghost" size="sm" icon={<Pencil size={14} />} onClick={() => onEdit(comment)}>
-          Bearbeiten
-        </Button>
-      </div>
-    </article>
+      }
+    />
   );
 }
 
-function CommentComposer({
-  onCreate,
+function CommentRow({
+  comment,
+  canWrite,
+  canDelete,
+  onEdit,
+  onDelete,
 }: {
-  onCreate: (input: { body: string }) => Promise<unknown>;
+  comment: Comment;
+  canWrite: boolean;
+  canDelete: boolean;
+  onEdit: (comment: Comment) => void;
+  onDelete: (id: number) => Promise<void>;
 }) {
-  const [body, setBody] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async () => {
-    if (!textFromHtml(body)) {
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await onCreate({ body });
-      setBody("");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const actions =
+    canWrite || canDelete ? (
+      <>
+        {canWrite ? (
+          <Button
+            aria-label="Bearbeiten"
+            title="Bearbeiten"
+            variant="ghost"
+            icon={<Pencil size={16} />}
+            onClick={() => onEdit(comment)}
+          />
+        ) : null}
+        {canDelete ? (
+          <Button
+            aria-label="Löschen"
+            title="Löschen"
+            variant="ghost"
+            icon={<Trash2 size={17} />}
+            onClick={() => void onDelete(comment.id).catch(() => undefined)}
+          />
+        ) : null}
+      </>
+    ) : undefined;
 
   return (
-    <Section>
-      <div className="grid gap-3">
-        <RichTextInlineField
-          value={body}
-          placeholder="Kommentar schreiben"
-          testIdPrefix="comment-thread-body"
-          onChange={setBody}
-        />
-        <div className="flex justify-end">
-          <Button
-            variant="primary"
-            icon={<Send size={16} />}
-            loading={submitting}
-            onClick={() => void submit()}
-          >
-            Kommentar
-          </Button>
-        </div>
-      </div>
-    </Section>
+    <ItemRow
+      title="Kommentar"
+      description={commentPreview(comment)}
+      meta={<time className="text-xs text-steel-500">{formatHumanDate(comment.createdAt)}</time>}
+      actions={actions}
+      onOpen={canWrite ? () => onEdit(comment) : undefined}
+    />
   );
 }
 
@@ -215,15 +122,39 @@ export function CommentThread({
   onDelete,
   entityLabel = "Objekt",
 }: CommentThreadProps) {
-  const [editingComment, setEditingComment] = useState<Comment | null>(null);
+  const canWriteComments = useHasPermission("comments", "write");
+  const canDeleteComments = useHasPermission("comments", "delete");
+  const [mode, setMode] = useState<ListBoardMode>("list");
+  const [modalState, setModalState] = useState<CommentModalState | null>(null);
 
-  const closeEditor = () => setEditingComment(null);
+  const closeModal = () => setModalState(null);
+
+  const saveComment = async (body: string) => {
+    if (!modalState) {
+      return;
+    }
+    if (modalState.mode === "create") {
+      await onCreate({ body });
+      return;
+    }
+    await onUpdate(modalState.comment.id, {
+      body,
+      expectedVersion: modalState.comment.version,
+    });
+  };
+
+  const editingComment = modalState?.mode === "edit" ? modalState.comment : null;
 
   return (
-    <div className="grid gap-4">
-      <CommentComposer onCreate={onCreate} />
-      <section className="grid gap-3">
-        {comments.length === 0 ? (
+    <div className="min-h-0">
+      <ListBoardView
+        items={comments}
+        mode={mode}
+        onModeChange={setMode}
+        onAdd={() => setModalState({ mode: "create" })}
+        addLabel="Kommentar anlegen"
+        showToolbarAdd={canWriteComments}
+        emptyState={
           <EmptyState
             icon={<MessageSquare size={22} />}
             title="Noch keine Kommentare"
@@ -231,12 +162,37 @@ export function CommentThread({
             tone="neutral"
             variant="default"
           />
-        ) : null}
-        {comments.map((comment) => (
-          <CommentItem key={comment.id} comment={comment} onEdit={setEditingComment} onDelete={onDelete} />
-        ))}
-      </section>
-      <CommentEditorModal comment={editingComment} open={Boolean(editingComment)} onSave={onUpdate} onClose={closeEditor} />
+        }
+        renderCard={(comment) => (
+          <CommentCard
+            comment={comment}
+            canWrite={canWriteComments}
+            canDelete={canDeleteComments}
+            onEdit={(item) => setModalState({ mode: "edit", comment: item })}
+            onDelete={onDelete}
+          />
+        )}
+        renderRow={(comment) => (
+          <CommentRow
+            comment={comment}
+            canWrite={canWriteComments}
+            canDelete={canDeleteComments}
+            onEdit={(item) => setModalState({ mode: "edit", comment: item })}
+            onDelete={onDelete}
+          />
+        )}
+      />
+      <CommentBodyModal
+        open={Boolean(modalState)}
+        title={modalState?.mode === "create" ? "Kommentar anlegen" : "Kommentar bearbeiten"}
+        breadcrumb={["Kommentare", modalState?.mode === "create" ? "Anlegen" : "Bearbeiten"]}
+        initialBody={editingComment?.body ?? ""}
+        placeholder={modalState?.mode === "create" ? "Kommentar schreiben" : "Kommentar bearbeiten"}
+        submitLabel={modalState?.mode === "create" ? "Anlegen" : "Speichern"}
+        testIdPrefix={editingComment ? `comment-thread-comment-${editingComment.id}-editor` : "comment-thread-create-editor"}
+        onSave={saveComment}
+        onClose={closeModal}
+      />
     </div>
   );
 }

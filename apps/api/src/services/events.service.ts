@@ -153,7 +153,7 @@ function getOwnerJournalObject(database: DbClient, owner: EventOwner): JournalOb
   }
   if (owner.type === "dayPlan") {
     const dayPlan = database.select({ id: dayPlans.id, date: dayPlans.date }).from(dayPlans).where(eq(dayPlans.id, owner.id)).get();
-    return makeJournalObject("dayPlan", owner.id, dayPlan?.date ? `Tagesplan ${dayPlan.date}` : `Tagesplan ${owner.id}`);
+    return makeJournalObject("dayPlan", owner.id, dayPlan?.date ? `Persönliche Planung ${dayPlan.date}` : `Persönliche Planung ${owner.id}`);
   }
   const task = database.select({ id: tasks.id, title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)).get();
   return makeJournalObject("task", owner.id, task?.title ?? `Aufgabe ${owner.id}`);

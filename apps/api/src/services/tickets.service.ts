@@ -531,8 +531,11 @@ export function listTicketLinkCandidates(database: DbClient, owner: TicketOwner)
   ensureOwnerExists(database, owner);
   const ownerContext = ticketOwnerProjectContext(database, owner);
   const linkedTicketIds = new Set(selectVisibleOwnerTicketRows(database, owner).map((ticket) => ticket.id));
+  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
 
-  return listTickets(database).filter((ticket) => !linkedTicketIds.has(ticket.id) && projectContextsAreCompatible(ownerContext, ticketProjectContext(database, ticket.id)));
+  return listTickets(database).filter(
+    (ticket) => !linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status) && projectContextsAreCompatible(ownerContext, ticketProjectContext(database, ticket.id))
+  );
 }
 
 export function listOwnerTickets(database: DbClient, owner: TicketOwner): Ticket[] {
@@ -660,6 +663,9 @@ export function linkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId
   const ticket = getTicketRecord(database, ticketId);
   if (ticket.parentId !== null) {
     throw badRequest("Sub-tickets cannot be linked to owners");
+  }
+  if (listClosedCatalogEntryKeys(database, "workStatus").has(ticket.status)) {
+    throw badRequest("Closed tickets cannot be linked to owners");
   }
 
   const existing = getOwnerTicketRow(database, owner, ticketId);
@@ -917,21 +923,29 @@ function ticketRelationPeerIds(database: DbClient, ticketId: number): Set<number
 }
 
 export function listTicketRelationCandidates(database: DbClient, ticketId: number): Ticket[] {
-  getTicketRecord(database, ticketId);
+  const source = getTicketRecord(database, ticketId);
   const sourceContext = ticketProjectContext(database, ticketId);
   const relatedTicketIds = ticketRelationPeerIds(database, ticketId);
+  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
+  if (closedStatusKeys.has(source.status)) {
+    return [];
+  }
 
   return listTickets(database).filter(
-    (ticket) => ticket.id !== ticketId && !relatedTicketIds.has(ticket.id) && projectContextsAreCompatible(sourceContext, ticketProjectContext(database, ticket.id))
+    (ticket) => ticket.id !== ticketId && !relatedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status) && projectContextsAreCompatible(sourceContext, ticketProjectContext(database, ticket.id))
   );
 }
 
 export function addTicketRelation(database: DbClient, ticketId: number, input: TicketRelationInput, actor?: JournalActor | null): void {
   const source = getTicketRecord(database, ticketId);
   const target = getTicketRecord(database, input.targetTicketId);
+  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
 
   if (ticketId === input.targetTicketId) {
     throw badRequest("Ticket cannot be related to itself");
+  }
+  if (closedStatusKeys.has(source.status) || closedStatusKeys.has(target.status)) {
+    throw badRequest("Closed tickets cannot be linked to tickets");
   }
 
   const existing = database

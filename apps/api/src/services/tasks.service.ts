@@ -28,8 +28,8 @@ import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 
 export type { TaskOwner };
 
-export type DashboardTaskOwner = { type: "project" | "milestone" | "task"; id: number };
-export type DashboardOverdueTaskOwner = { type: "project" | "milestone"; id: number };
+export type DashboardTaskOwner = { type: "project" | "milestone" | "task" | "dayPlan"; id: number };
+export type DashboardOverdueTaskOwner = { type: "project" | "milestone" | "dayPlan"; id: number };
 
 type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "version" | "createdAt" | "updatedAt">;
 type OwnerTaskRecord = MappableTaskRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
@@ -284,7 +284,7 @@ function taskDeleteBlockers(database: DbClient, taskIds: number[]): string[] {
   }
 
   if (database.select({ taskId: dayPlanTasks.taskId }).from(dayPlanTasks).where(inArray(dayPlanTasks.taskId, taskIds)).get()) {
-    blockers.push("Tagesplan-VerknÃ¼pfungen");
+    blockers.push("Verknüpfungen zur Persönlichen Planung");
   }
 
   return blockers;
@@ -469,8 +469,11 @@ export function listTaskLinkCandidates(database: DbClient, owner: TaskOwner): Ta
   ensureOwnerExists(database, owner);
   const ownerContext = taskOwnerProjectContext(database, owner);
   const linkedTaskIds = new Set(selectVisibleOwnerTaskRows(database, owner).map((task) => task.id));
+  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
 
-  return listTasks(database).filter((task) => !linkedTaskIds.has(task.id) && projectContextsAreCompatible(ownerContext, taskProjectContext(database, task.id)));
+  return listTasks(database).filter(
+    (task) => !linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status) && projectContextsAreCompatible(ownerContext, taskProjectContext(database, task.id))
+  );
 }
 
 export function listSubtasks(database: DbClient, taskId: number): Task[] {
@@ -487,6 +490,21 @@ export function listSubtasks(database: DbClient, taskId: number): Task[] {
 function listDashboardTasks(database: DbClient, owner?: DashboardTaskOwner): Task[] {
   if (!owner) {
     return listTasks(database);
+  }
+  if (owner.type === "dayPlan") {
+    const rows = database
+      .select({ ...taskSelect, boardPosition: dayPlanTasks.position })
+      .from(dayPlanTasks)
+      .innerJoin(tasks, eq(dayPlanTasks.taskId, tasks.id))
+      .where(and(eq(dayPlanTasks.ownerId, owner.id), isNull(tasks.parentId)))
+      .orderBy(tasks.status, dayPlanTasks.position)
+      .all();
+    const ids = rows.map((task) => task.id);
+    const tagsByTask = getTaskTagsMap(database, ids);
+    const subtaskCounts = getSubtaskCounts(database, ids);
+    const supportCounts = getTaskSupportCounts(database, ids);
+
+    return rows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, supportCounts.get(task.id) ?? emptySupportCounts));
   }
   if (owner.type === "task") {
     return listSubtasks(database, owner.id);
@@ -575,6 +593,9 @@ export function linkOwnerTask(database: DbClient, owner: TaskOwner, taskId: numb
   const task = getTaskRecord(database, taskId);
   if (task.parentId !== null) {
     throw badRequest("Subtasks cannot be linked to owners");
+  }
+  if (listClosedCatalogEntryKeys(database, "workStatus").has(task.status)) {
+    throw badRequest("Closed tasks cannot be linked to owners");
   }
 
   const existing = getOwnerTaskRow(database, owner, taskId);

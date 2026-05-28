@@ -5,6 +5,8 @@ import {
   backlogItemComments,
   backlogItems,
   comments,
+  dayPlanComments,
+  dayPlans,
   featureComments,
   features,
   milestoneComments,
@@ -124,6 +126,20 @@ function ensureTicketExists(database: DbClient, ticketId: number): void {
   }
 }
 
+function ensureDayPlanExists(database: DbClient, dayPlanId: number): void {
+  const dayPlan = database.select({ id: dayPlans.id }).from(dayPlans).where(eq(dayPlans.id, dayPlanId)).get();
+  if (!dayPlan) {
+    throw notFound(`Day plan with id ${dayPlanId} not found`);
+  }
+}
+
+export function ensureDayPlanCommentAccess(database: DbClient, dayPlanId: number, userId: number): void {
+  const dayPlan = database.select({ id: dayPlans.id }).from(dayPlans).where(and(eq(dayPlans.id, dayPlanId), eq(dayPlans.userId, userId))).get();
+  if (!dayPlan) {
+    throw notFound("Day plan not found");
+  }
+}
+
 function ensureOwnerExists(database: DbClient, owner: CommentOwner): void {
   if (owner.type === "project") {
     ensureProjectExists(database, owner.id);
@@ -151,6 +167,10 @@ function ensureOwnerExists(database: DbClient, owner: CommentOwner): void {
   }
   if (owner.type === "wikiPage") {
     ensureWikiPageExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "dayPlan") {
+    ensureDayPlanExists(database, owner.id);
     return;
   }
   ensureTicketExists(database, owner.id);
@@ -185,6 +205,10 @@ function getOwnerJournalObject(database: DbClient, owner: CommentOwner): Journal
     const page = database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)).get();
     return makeJournalObject("wikiPage", owner.id, page?.title ?? `Wiki-Seite ${owner.id}`);
   }
+  if (owner.type === "dayPlan") {
+    const dayPlan = database.select({ date: dayPlans.date }).from(dayPlans).where(eq(dayPlans.id, owner.id)).get();
+    return makeJournalObject("dayPlan", owner.id, dayPlan?.date ? `Persönliche Planung ${dayPlan.date}` : `Persönliche Planung ${owner.id}`);
+  }
   const ticket = database.select({ title: tickets.title }).from(tickets).where(eq(tickets.id, owner.id)).get();
   return makeJournalObject("ticket", owner.id, ticket?.title ?? `Ticket ${owner.id}`);
 }
@@ -212,6 +236,12 @@ function listCommentOwners(database: DbClient, commentId: number): CommentOwner[
       .where(eq(wikiPageComments.commentId, commentId))
       .all()
       .map((row) => ({ type: "wikiPage" as const, id: row.id })),
+    ...database
+      .select({ id: dayPlanComments.dayPlanId })
+      .from(dayPlanComments)
+      .where(eq(dayPlanComments.commentId, commentId))
+      .all()
+      .map((row) => ({ type: "dayPlan" as const, id: row.id })),
     ...database.select({ id: ticketComments.ticketId }).from(ticketComments).where(eq(ticketComments.commentId, commentId)).all().map((row) => ({ type: "ticket" as const, id: row.id }))
   ];
 }
@@ -245,6 +275,10 @@ function insertCommentLink(database: DbSession, owner: CommentOwner, commentId: 
     database.insert(wikiPageComments).values({ wikiPageId: owner.id, commentId }).onConflictDoNothing().run();
     return;
   }
+  if (owner.type === "dayPlan") {
+    database.insert(dayPlanComments).values({ dayPlanId: owner.id, commentId }).onConflictDoNothing().run();
+    return;
+  }
   database.insert(ticketComments).values({ ticketId: owner.id, commentId }).onConflictDoNothing().run();
 }
 
@@ -269,6 +303,9 @@ function deleteCommentLink(database: DbClient, owner: CommentOwner, commentId: n
   }
   if (owner.type === "wikiPage") {
     return database.delete(wikiPageComments).where(and(eq(wikiPageComments.wikiPageId, owner.id), eq(wikiPageComments.commentId, commentId))).run().changes;
+  }
+  if (owner.type === "dayPlan") {
+    return database.delete(dayPlanComments).where(and(eq(dayPlanComments.dayPlanId, owner.id), eq(dayPlanComments.commentId, commentId))).run().changes;
   }
   return database.delete(ticketComments).where(and(eq(ticketComments.ticketId, owner.id), eq(ticketComments.commentId, commentId))).run().changes;
 }
@@ -337,6 +374,15 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
       .orderBy(comments.createdAt, comments.id)
       .all();
   }
+  if (owner.type === "dayPlan") {
+    return database
+      .select(commentSelect)
+      .from(dayPlanComments)
+      .innerJoin(comments, eq(dayPlanComments.commentId, comments.id))
+      .where(eq(dayPlanComments.dayPlanId, owner.id))
+      .orderBy(comments.createdAt, comments.id)
+      .all();
+  }
   return database
     .select(commentSelect)
     .from(ticketComments)
@@ -346,7 +392,7 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
     .all();
 }
 
-type RecentCommentOwner = { type: "project" | "milestone" | "task"; id: number };
+type RecentCommentOwner = { type: "project" | "milestone" | "task" | "dayPlan"; id: number };
 
 interface RecentCommentRow {
   id: number;
@@ -570,6 +616,38 @@ function recentWikiPageCommentRows(database: DbClient, ids: number[], mineUserId
     .map((row) => ({ ...row, entityType: "wikiPage" as const }));
 }
 
+function recentDayPlanCommentRows(database: DbClient, ids: number[], mineUserId?: number, ownerUserId?: number): RecentCommentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  const conditions = [inArray(dayPlanComments.dayPlanId, ids)];
+  if (mineUserId !== undefined) {
+    conditions.push(eq(comments.createdBy, mineUserId));
+  }
+  if (ownerUserId !== undefined) {
+    conditions.push(eq(dayPlans.userId, ownerUserId));
+  }
+  return database
+    .select({
+      id: comments.id,
+      body: comments.body,
+      createdAt: comments.createdAt,
+      updatedAt: comments.updatedAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: dayPlans.id,
+      entityLabel: dayPlans.date
+    })
+    .from(dayPlanComments)
+    .innerJoin(comments, eq(dayPlanComments.commentId, comments.id))
+    .innerJoin(dayPlans, eq(dayPlanComments.dayPlanId, dayPlans.id))
+    .leftJoin(users, eq(comments.createdBy, users.id))
+    .where(and(...conditions))
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .all()
+    .map((row) => ({ ...row, entityType: "dayPlan" as const, entityLabel: `Persönliche Planung ${row.entityLabel}` }));
+}
+
 function recentTaskCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
   if (ids.length === 0) {
     return [];
@@ -637,6 +715,9 @@ function recentCommentRowsForOwner(database: DbClient, owner: RecentCommentOwner
       ...recentTicketCommentRows(database, ticketIdsForOwner(database, owner))
     ];
   }
+  if (owner.type === "dayPlan") {
+    return recentDayPlanCommentRows(database, [owner.id]);
+  }
   return recentTaskCommentRows(database, [owner.id]);
 }
 
@@ -648,12 +729,13 @@ function recentOwnCommentRows(database: DbClient, userId: number): RecentComment
     ...recentUseCaseCommentRows(database, database.select({ id: useCases.id }).from(useCases).all().map((row) => row.id), userId),
     ...recentBacklogItemCommentRows(database, database.select({ id: backlogItems.id }).from(backlogItems).all().map((row) => row.id), userId),
     ...recentWikiPageCommentRows(database, database.select({ id: wikiPages.id }).from(wikiPages).all().map((row) => row.id), userId),
+    ...recentDayPlanCommentRows(database, database.select({ id: dayPlans.id }).from(dayPlans).where(eq(dayPlans.userId, userId)).all().map((row) => row.id), userId, userId),
     ...recentTaskCommentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id), userId),
     ...recentTicketCommentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id), userId)
   ];
 }
 
-function recentAllCommentRows(database: DbClient): RecentCommentRow[] {
+function recentAllCommentRows(database: DbClient, userId: number): RecentCommentRow[] {
   return [
     ...recentProjectCommentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id)),
     ...recentMilestoneCommentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id)),
@@ -661,6 +743,7 @@ function recentAllCommentRows(database: DbClient): RecentCommentRow[] {
     ...recentUseCaseCommentRows(database, database.select({ id: useCases.id }).from(useCases).all().map((row) => row.id)),
     ...recentBacklogItemCommentRows(database, database.select({ id: backlogItems.id }).from(backlogItems).all().map((row) => row.id)),
     ...recentWikiPageCommentRows(database, database.select({ id: wikiPages.id }).from(wikiPages).all().map((row) => row.id)),
+    ...recentDayPlanCommentRows(database, database.select({ id: dayPlans.id }).from(dayPlans).where(eq(dayPlans.userId, userId)).all().map((row) => row.id), undefined, userId),
     ...recentTaskCommentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id)),
     ...recentTicketCommentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id))
   ];
@@ -668,7 +751,7 @@ function recentAllCommentRows(database: DbClient): RecentCommentRow[] {
 
 export function listRecentComments(database: DbClient, options: { owner?: RecentCommentOwner; currentUserId: number; limit?: number; mine?: boolean }): RecentComment[] {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
-  const rows = options.owner ? recentCommentRowsForOwner(database, options.owner) : options.mine === true ? recentOwnCommentRows(database, options.currentUserId) : recentAllCommentRows(database);
+  const rows = options.owner ? recentCommentRowsForOwner(database, options.owner) : options.mine === true ? recentOwnCommentRows(database, options.currentUserId) : recentAllCommentRows(database, options.currentUserId);
   return rows
     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime() || right.id - left.id)
     .slice(0, limit)

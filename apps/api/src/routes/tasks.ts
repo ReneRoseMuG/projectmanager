@@ -1,5 +1,6 @@
 import type { TaskBoardPositionInput, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
+import { requireCurrentUser } from "../plugins/auth.js";
 import {
   createOwnerTask,
   deleteTask,
@@ -16,6 +17,7 @@ import {
   updateTask
 } from "../services/tasks.service.js";
 import type { DashboardOverdueTaskOwner, DashboardTaskOwner, TaskOwner } from "../services/tasks.service.js";
+import { ensureDayPlanOwnedByUser } from "../services/day-plan.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
@@ -78,7 +80,7 @@ const dashboardTaskQuerySchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    ownerType: { type: "string", enum: ["project", "milestone", "task"] },
+    ownerType: { type: "string", enum: ["project", "milestone", "task", "dayPlan"] },
     ownerId: { type: "integer", minimum: 1 },
     limit: { type: "integer", minimum: 1, maximum: 50 },
     sort: { type: "string", enum: ["createdAt", "updatedAt"] }
@@ -89,7 +91,7 @@ const dashboardOverdueTaskQuerySchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    ownerType: { type: "string", enum: ["project", "milestone"] },
+    ownerType: { type: "string", enum: ["project", "milestone", "dayPlan"] },
     ownerId: { type: "integer", minimum: 1 },
     limit: { type: "integer", minimum: 1, maximum: 50 }
   }
@@ -105,8 +107,16 @@ function taskOwnerFromQuery(query: { ownerType?: DashboardTaskOwner["type"]; own
   return { type: query.ownerType, id: query.ownerId };
 }
 
-function overdueTaskOwnerFromQuery(query: { ownerType?: "project" | "milestone"; ownerId?: number }): DashboardOverdueTaskOwner | undefined {
+function overdueTaskOwnerFromQuery(query: { ownerType?: DashboardOverdueTaskOwner["type"]; ownerId?: number }): DashboardOverdueTaskOwner | undefined {
   return taskOwnerFromQuery(query) as DashboardOverdueTaskOwner | undefined;
+}
+
+function ensureDashboardDayPlanAccess(app: FastifyInstance, request: FastifyRequest, owner?: DashboardTaskOwner | DashboardOverdueTaskOwner): void {
+  if (owner?.type !== "dayPlan") {
+    return;
+  }
+  const currentUser = requireCurrentUser(request);
+  ensureDayPlanOwnedByUser(app.db, owner.id, currentUser.id);
 }
 
 export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
@@ -115,19 +125,31 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { ownerType?: DashboardTaskOwner["type"]; ownerId?: number } }>(
     "/tasks/stats",
     { schema: { querystring: dashboardTaskQuerySchema, response: { 200: objectResponseSchema } } },
-    async (request) => getTaskStats(app.db, taskOwnerFromQuery(request.query))
+    async (request) => {
+      const owner = taskOwnerFromQuery(request.query);
+      ensureDashboardDayPlanAccess(app, request, owner);
+      return getTaskStats(app.db, owner);
+    }
   );
 
   app.get<{ Querystring: { ownerType?: DashboardTaskOwner["type"]; ownerId?: number; limit?: number; sort?: "createdAt" | "updatedAt" } }>(
     "/tasks/recent",
     { schema: { querystring: dashboardTaskQuerySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => listRecentTasks(app.db, { owner: taskOwnerFromQuery(request.query), limit: request.query.limit, sort: request.query.sort })
+    async (request) => {
+      const owner = taskOwnerFromQuery(request.query);
+      ensureDashboardDayPlanAccess(app, request, owner);
+      return listRecentTasks(app.db, { owner, limit: request.query.limit, sort: request.query.sort });
+    }
   );
 
-  app.get<{ Querystring: { ownerType?: "project" | "milestone"; ownerId?: number; limit?: number } }>(
+  app.get<{ Querystring: { ownerType?: "project" | "milestone" | "dayPlan"; ownerId?: number; limit?: number } }>(
     "/tasks/overdue",
     { schema: { querystring: dashboardOverdueTaskQuerySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => listOverdueTasks(app.db, { owner: overdueTaskOwnerFromQuery(request.query), limit: request.query.limit })
+    async (request) => {
+      const owner = overdueTaskOwnerFromQuery(request.query);
+      ensureDashboardDayPlanAccess(app, request, owner);
+      return listOverdueTasks(app.db, { owner, limit: request.query.limit });
+    }
   );
 
   app.get<{ Querystring: { ownerType: TaskOwner["type"]; ownerId: number } }>(

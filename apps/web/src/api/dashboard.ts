@@ -10,6 +10,7 @@ import type {
   DashboardWidgetParams,
   JournalListResponse,
   Milestone,
+  Note,
   Project,
   RecentAttachment,
   RecentComment,
@@ -21,6 +22,7 @@ import type {
 import { api } from "./client";
 import { getJournalEntries, getObjectJournalEntries } from "./journal";
 import { getMilestones, getProjectMilestones } from "./milestones";
+import { getDayPlanNotes } from "./notes";
 import { getProjects } from "./projects";
 
 export type DashboardWidgetData =
@@ -29,6 +31,7 @@ export type DashboardWidgetData =
   | Task[]
   | Ticket[]
   | Milestone[]
+  | Note[]
   | Project[]
   | RecentComment[]
   | RecentAttachment[]
@@ -139,7 +142,18 @@ export async function getDashboardRecentComments(owner?: DashboardOwner, limit =
 }
 
 export async function getDashboardRecentAttachments(owner?: DashboardOwner, limit = 10): Promise<RecentAttachment[]> {
+  if (owner?.type === "dayPlan") {
+    return [];
+  }
   return api.get("attachments/recent", { searchParams: widgetSearchParams(owner, { limit }) }).json<RecentAttachment[]>();
+}
+
+export async function getDashboardNotes(owner?: DashboardOwner, params: DashboardWidgetParams = {}): Promise<Note[]> {
+  if (owner?.type !== "dayPlan") {
+    return [];
+  }
+  const notes = await getDayPlanNotes(owner.id);
+  return notes.slice(0, params.limit ?? 10);
 }
 
 export async function getDashboardJournal(owner?: DashboardOwner, limit = 20): Promise<JournalListResponse> {
@@ -167,6 +181,9 @@ export async function getDashboardWidgetData(widgetId: DashboardWidgetId, owner?
   }
   if (widgetId === "commentJournal") {
     return getDashboardRecentComments(owner, params.limit ?? 10);
+  }
+  if (widgetId === "noteList") {
+    return getDashboardNotes(owner, params);
   }
   if (widgetId === "attachmentJournal") {
     return getDashboardRecentAttachments(owner, params.limit ?? 10);

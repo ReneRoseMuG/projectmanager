@@ -668,7 +668,7 @@ beforeEach(() => {
     configurable: true,
     value: vi.fn(() => "blob:owner-form-preview")
   });
-  ownerFormMocks.hasPermission.mockReturnValue(false);
+  ownerFormMocks.hasPermission.mockImplementation((resource, action) => resource === "comments" && action === "write");
   ownerFormMocks.createUseCase.mockResolvedValue(fixtures.useCase);
   ownerFormMocks.updateUseCase.mockResolvedValue(fixtures.useCase);
   ownerFormMocks.createTask.mockResolvedValue(fixtures.task);
@@ -754,7 +754,15 @@ export function clickTab(name: RegExp | string) {
 }
 
 export function addPendingComment(text: string) {
-  fireEvent.change(screen.getByPlaceholderText("Kommentar vormerken"), { target: { value: text } });
+  const previousPermission = ownerFormMocks.hasPermission.getMockImplementation();
+  ownerFormMocks.hasPermission.mockImplementation((resource, action) => {
+    if (resource === "comments" && action === "write") {
+      return true;
+    }
+    return previousPermission?.(resource, action) ?? false;
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Kommentar vormerken" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Kommentar vormerken" }), { target: { value: text } });
   fireEvent.click(screen.getByRole("button", { name: /Hinzuf/i }));
 }
 

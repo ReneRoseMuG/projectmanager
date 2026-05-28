@@ -25,12 +25,11 @@ import { mapTask } from "./tasks.service.js";
 type TaskRecord = typeof tasks.$inferSelect;
 
 const dayPlanJournalFields: Array<JournalFieldDefinition<DayPlanRecord>> = [
-  { key: "status", label: "Status" },
-  { key: "notes", label: "Notizen" }
+  { key: "status", label: "Status" }
 ];
 
 function dayPlanObject(dayPlan: Pick<DayPlanRecord, "id" | "date">): JournalObjectRef {
-  return makeJournalObject("dayPlan", dayPlan.id, `Tagesplan ${dayPlan.date}`);
+  return makeJournalObject("dayPlan", dayPlan.id, `Persönliche Planung ${dayPlan.date}`);
 }
 
 function isValidIsoDate(value: string): boolean {
@@ -77,7 +76,6 @@ function mapDayPlan(database: DbClient, record: DayPlanRecord): DayPlan {
     date: record.date,
     userId: record.userId,
     status: record.status as DayPlanStatus,
-    notes: record.notes,
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -148,6 +146,14 @@ function requireExistingDayPlan(database: DbClient, userId: number, rawDate: str
   return dayPlan;
 }
 
+export function ensureDayPlanOwnedByUser(database: DbClient, dayPlanId: number, userId: number): DayPlanRecord {
+  const dayPlan = dayPlanRepository.findById(database, dayPlanId);
+  if (!dayPlan || dayPlan.userId !== userId) {
+    throw notFound("Day plan not found");
+  }
+  return dayPlan;
+}
+
 export function findOrCreateDayPlanByUserAndDate(database: DbClient, userId: number, rawDate: string, actor?: JournalActor | null): DayPlan {
   const date = normalizeDayPlanDate(rawDate);
   const existing = dayPlanRepository.findByUserAndDate(database, userId, date);
@@ -177,12 +183,9 @@ export function updateDayPlanForUserAndDate(database: DbClient, userId: number, 
     throw notFound("Day plan not found");
   }
 
-  const values: Partial<Pick<DayPlanRecord, "status" | "notes">> = {};
+  const values: Partial<Pick<DayPlanRecord, "status">> = {};
   if (input.status !== undefined) {
     values.status = ensureDayPlanStatus(input.status);
-  }
-  if (input.notes !== undefined) {
-    values.notes = cleanNullable(input.notes) ?? null;
   }
   if (Object.keys(values).length === 0) {
     throw badRequest("No day plan fields provided");
@@ -217,7 +220,7 @@ export function createDayPlanTask(database: DbClient, userId: number, rawDate: s
     const task = createTaskRecord(txDb, input, actor);
     dayPlanRepository.addTask(txDb, dayPlan.id, task.id, position);
     const taskObject = taskJournalObject(task);
-    const ownerObject = makeJournalObject("dayPlan", dayPlan.id, `Tagesplan ${dayPlan.date}`);
+    const ownerObject = dayPlanObject(dayPlan);
     recordJournalEntry(txDb, {
       operation: "create",
       object: taskObject,
@@ -244,7 +247,7 @@ export function linkDayPlanTask(database: DbClient, userId: number, rawDate: str
     const txDb = tx as unknown as DbClient;
     dayPlanRepository.addTask(txDb, dayPlan.id, task.id, position);
     const taskObject = taskJournalObject(task);
-    const ownerObject = makeJournalObject("dayPlan", dayPlan.id, `Tagesplan ${dayPlan.date}`);
+    const ownerObject = dayPlanObject(dayPlan);
     recordJournalEntry(txDb, {
       operation: "link",
       object: taskObject,
@@ -267,7 +270,7 @@ export function unlinkDayPlanTask(database: DbClient, userId: number, rawDate: s
       throw notFound(`Task ${taskId} is not linked to day plan ${dayPlan.id}`);
     }
     const taskObject = taskJournalObject(task);
-    const ownerObject = makeJournalObject("dayPlan", dayPlan.id, `Tagesplan ${dayPlan.date}`);
+    const ownerObject = dayPlanObject(dayPlan);
     recordJournalEntry(txDb, {
       operation: "unlink",
       object: taskObject,
@@ -299,7 +302,7 @@ export function linkDayPlanEvent(database: DbClient, userId: number, rawDate: st
     const txDb = tx as unknown as DbClient;
     dayPlanRepository.addEvent(txDb, dayPlan.id, eventId, position);
     const eventObject = makeJournalObject("event", event.id, event.title);
-    const ownerObject = makeJournalObject("dayPlan", dayPlan.id, `Tagesplan ${dayPlan.date}`);
+    const ownerObject = dayPlanObject(dayPlan);
     recordJournalEntry(txDb, {
       operation: "link",
       object: eventObject,
@@ -322,7 +325,7 @@ export function unlinkDayPlanEvent(database: DbClient, userId: number, rawDate: 
       throw notFound(`Event ${eventId} is not linked to day plan ${dayPlan.id}`);
     }
     const eventObject = makeJournalObject("event", event.id, event.title);
-    const ownerObject = makeJournalObject("dayPlan", dayPlan.id, `Tagesplan ${dayPlan.date}`);
+    const ownerObject = dayPlanObject(dayPlan);
     recordJournalEntry(txDb, {
       operation: "unlink",
       object: eventObject,

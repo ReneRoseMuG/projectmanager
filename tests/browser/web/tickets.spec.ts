@@ -28,9 +28,11 @@ import {
  * - Tickets werden global und aus Owner-Tabs über `/tickets/new` erstellt, schließen nach Speichern zurück und werden über `/tickets/:id` bearbeitet.
  * - Doppelklick und Bearbeiten-Button in Ticket-Boards und Listen navigieren auf dieselbe Detailformular-Seite.
  * - Projekt-, Aufgaben-, Feature- und Use-Case-Ticket-Tabs öffnen echte Ticketdaten per Route.
+ * - Im Ticketformular eingefügtes Markdown wird als HTML gespeichert.
  *
  * Fehlerfälle:
  * - Ticket-Detail darf weder leer bleiben noch in einem alten Detail-/Formular-Overlay landen.
+ * - Markdown darf nicht als Rohtext in der Ticketbeschreibung gespeichert werden.
  *
  * Ziel:
  * Ticket-Detailnavigation und Owner-Ticket-Boards mit echten Daten im Browser absichern.
@@ -122,6 +124,27 @@ async function expectTicketNavigationFromScope(
   await expectTicketFormData(page, { title });
 }
 
+async function pasteRichText(form: Locator, testIdPrefix: string, text: string) {
+  await form.locator(`[data-testid="${testIdPrefix}-view"]`).click();
+  const editor = form.locator(
+    `[data-testid="${testIdPrefix}-editor"] [contenteditable="true"]`,
+  );
+  await expect(editor).toBeVisible();
+  await editor.evaluate((node, pastedText) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", pastedText);
+    node.dispatchEvent(
+      new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: data,
+      }),
+    );
+  }, text);
+  await expect(editor).toContainText("Markdown Ticket");
+  await editor.blur();
+}
+
 test.describe("Ticket-Routen und Detailformular", () => {
   test("Ticket erstellen: Plus-Button navigiert auf Create-Detailseite und Speichern schließt", async ({
     page,
@@ -156,6 +179,48 @@ test.describe("Ticket-Routen und Detailformular", () => {
 
       await expect(page).toHaveURL(/\/tickets$/);
       await expect(itemCard(page, ticketTitle)).toBeVisible();
+    } finally {
+      await deleteTicket(request, ticketId);
+    }
+  });
+
+  test("Ticket erstellen: eingefügtes Markdown wird als HTML gespeichert", async ({
+    page,
+    request,
+  }) => {
+    const ticketTitle = uniqueTitle("E2E Ticket Markdown Paste");
+    let ticketId: number | null = null;
+
+    try {
+      await openTicketList(page);
+      await page.getByRole("button", { name: "Neues Ticket" }).click();
+
+      const form = formPage(page, "Ticket");
+      await form.locator("input[required]").first().fill(ticketTitle);
+      await pasteRichText(
+        form,
+        "ticket-description",
+        "# Markdown Ticket\n\n- erster Punkt\n- zweiter Punkt\n\n**fett**",
+      );
+      await expect(
+        form.locator('[data-testid="ticket-description-view"] h1'),
+      ).toHaveText("Markdown Ticket");
+
+      const ticketResponsePromise = page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/tickets") &&
+          response.request().method() === "POST",
+      );
+      await form.getByRole("button", { name: "Ticket anlegen" }).click();
+      const createdTicket = (await (await ticketResponsePromise).json()) as {
+        id: number;
+        description: string;
+      };
+      ticketId = createdTicket.id;
+
+      expect(createdTicket.description).toContain("<h1>Markdown Ticket</h1>");
+      expect(createdTicket.description).toContain("<li");
+      expect(createdTicket.description).toContain("<strong>fett</strong>");
     } finally {
       await deleteTicket(request, ticketId);
     }

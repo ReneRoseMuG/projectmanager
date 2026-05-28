@@ -1,5 +1,5 @@
 import type { DashboardContext, DashboardWidgetId } from "@taskmanager/shared-types";
-import { Activity, Bug, CalendarClock, CalendarDays, ChevronRight, FileText, Flag, History, KanbanSquare, List, ListTodo, MessageSquare, Paperclip, type LucideIcon } from "lucide-react";
+import { Activity, Bug, CalendarClock, CalendarDays, ChevronRight, FileText, Flag, History, KanbanSquare, List, ListTodo, MessageSquare, Paperclip, StickyNote, type LucideIcon } from "lucide-react";
 
 export interface DashboardWidgetMeta {
   id: DashboardWidgetId;
@@ -44,6 +44,12 @@ export const dashboardWidgetRegistry: Record<DashboardWidgetId, DashboardWidgetM
     label: "Kommentare",
     description: "Zeigt neue Kommentare im aktuellen Kontext.",
     icon: MessageSquare,
+  },
+  noteList: {
+    id: "noteList",
+    label: "Notizen",
+    description: "Zeigt Notizen zur persönlichen Planung.",
+    icon: StickyNote,
   },
   attachmentJournal: {
     id: "attachmentJournal",
@@ -138,6 +144,7 @@ export const dashboardContextLabels: Record<DashboardContext, string> = {
   task: "Aufgabenübersicht",
   home: "Startseite",
   calendar: "Kalender",
+  dayPlan: "Persönliche Planung",
 };
 
 export function dashboardWidgetLabel(widgetId: DashboardWidgetId): string {

@@ -30,6 +30,29 @@ import { PendingNoteList } from "../../../../../apps/web/src/components/ui/Pendi
 import { PendingRelationList } from "../../../../../apps/web/src/components/ui/PendingRelationList";
 import { ToastProvider } from "../../../../../apps/web/src/components/ui/ToastProvider";
 
+vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
+  useHasPermission: () => true,
+}));
+
+vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
+  RichTextInlineField({
+    value,
+    onChange,
+    placeholder,
+    readOnly,
+  }: {
+    value: string | null | undefined;
+    onChange: (value: string) => void;
+    placeholder?: string;
+    readOnly?: boolean;
+  }) {
+    if (readOnly) {
+      return <div>{value}</div>;
+    }
+    return <textarea aria-label={placeholder ?? "Rich Text"} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
+  },
+}));
+
 interface TestItem {
   id: number;
   title: string;
@@ -176,13 +199,14 @@ describe("PendingRelationList", () => {
 });
 
 describe("PendingCommentList", () => {
-  it("merkt getrimmte Kommentare vor und entfernt sie", () => {
+  it("merkt Kommentare über das Modal vor und entfernt sie", () => {
     const onAdd = vi.fn();
     const onRemove = vi.fn();
-    render(<PendingCommentList comments={[{ text: "Vorhanden" }]} onAdd={onAdd} onRemove={onRemove} />);
+    render(<PendingCommentList comments={[{ text: "Vorhanden" }]} onAdd={onAdd} onUpdate={vi.fn()} onRemove={onRemove} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Kommentar vormerken"), { target: { value: "  Neuer Kommentar  " } });
-    fireEvent.click(screen.getByRole("button", { name: /Hinzuf/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Kommentar vormerken" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Kommentar vormerken" }), { target: { value: "Neuer Kommentar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
     fireEvent.click(screen.getByRole("button", { name: "Kommentar entfernen" }));
 
     expect(onAdd).toHaveBeenCalledWith({ text: "Neuer Kommentar" });
@@ -191,10 +215,11 @@ describe("PendingCommentList", () => {
 
   it("sendet keine leeren Kommentare", () => {
     const onAdd = vi.fn();
-    render(<PendingCommentList comments={[]} onAdd={onAdd} onRemove={vi.fn()} />);
+    render(<PendingCommentList comments={[]} onAdd={onAdd} onUpdate={vi.fn()} onRemove={vi.fn()} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Kommentar vormerken"), { target: { value: "   " } });
-    fireEvent.click(screen.getByRole("button", { name: /Hinzuf/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Kommentar vormerken" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Kommentar vormerken" }), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
 
     expect(onAdd).not.toHaveBeenCalled();
     expect(screen.getByText("Keine Kommentare vorgemerkt")).toBeInTheDocument();

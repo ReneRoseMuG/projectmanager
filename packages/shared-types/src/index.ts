@@ -8,7 +8,7 @@ export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 export const TICKET_STATUSES = WORK_STATUSES;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
-export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "milestone", "useCase", "backlogItem", "wikiPage", "ticket"] as const;
+export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "milestone", "useCase", "backlogItem", "wikiPage", "dayPlan", "ticket"] as const;
 export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority", "ticketType"] as const;
 export const STATUS_CATALOG_KINDS = ["workStatus", "featureStatus"] as const;
 
@@ -159,8 +159,8 @@ export function getSettingDefinition(key: string): SettingDefinition | undefined
 
 export const settingDefinitions = Object.values(settingsRegistry) as SettingDefinition[];
 
-export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar"] as const;
-export const DASHBOARD_OWNER_TYPES = ["project", "milestone", "task"] as const;
+export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar", "dayPlan"] as const;
+export const DASHBOARD_OWNER_TYPES = ["project", "milestone", "task", "dayPlan"] as const;
 export const DASHBOARD_WIDGET_IDS = [
   "taskStatusReport",
   "ticketStatusReport",
@@ -168,6 +168,7 @@ export const DASHBOARD_WIDGET_IDS = [
   "ticketJournal",
   "globalJournal",
   "commentJournal",
+  "noteList",
   "attachmentJournal",
   "milestoneProgress",
   "overdueTasks",
@@ -285,7 +286,8 @@ export const DASHBOARD_ALLOWED_WIDGETS = {
   milestone: ["taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList"],
   task: ["taskStatusReport", "taskJournal", "commentJournal", "attachmentJournal"],
   home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
-  calendar: ["calendar", "upcomingEvents", "overdueTasks", "taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"]
+  calendar: ["calendar", "upcomingEvents", "overdueTasks", "taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
+  dayPlan: ["taskList", "taskBoard", "upcomingEvents", "overdueTasks", "commentJournal", "noteList", "globalJournal"]
 } as const satisfies Record<DashboardContext, readonly DashboardWidgetId[]>;
 
 export const DEFAULT_DASHBOARD_LAYOUTS = {
@@ -332,6 +334,13 @@ export const DEFAULT_DASHBOARD_LAYOUTS = {
     { widgetId: "calendar", col: 0, row: 0, colSpan: 2 },
     { widgetId: "upcomingEvents", col: 0, row: 1, colSpan: 1 },
     { widgetId: "overdueTasks", col: 1, row: 1, colSpan: 1, params: { limit: 10 } }
+  ],
+  dayPlan: [
+    { widgetId: "taskList", col: 0, row: 0, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "upcomingEvents", col: 1, row: 0, colSpan: 1 },
+    { widgetId: "noteList", col: 0, row: 1, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "commentJournal", col: 1, row: 1, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "globalJournal", col: 0, row: 2, colSpan: 2, params: { limit: 15 } }
   ]
 } as const satisfies Record<DashboardContext, readonly DashboardWidgetLayout[]>;
 
@@ -896,7 +905,6 @@ export interface DayPlan {
   date: string;
   userId: number;
   status: DayPlanStatus;
-  notes: string | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -906,7 +914,6 @@ export interface DayPlan {
 
 export interface DayPlanPatchInput {
   status?: DayPlanStatus;
-  notes?: string | null;
 }
 
 export type DayPlanUpdate = WithExpectedVersion<DayPlanPatchInput>;

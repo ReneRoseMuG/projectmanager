@@ -261,6 +261,37 @@ describe("Query invalidation integration", () => {
     ]);
   });
 
+  it("invalidiert persönliche Planung, Notizen, Kommentare und Dashboards gemeinsam", async () => {
+    queryClient = createQueryClient();
+    const dayPlanId = 88;
+    const dayPlanNotes = queryKeys.notes.owner("dayPlan", dayPlanId);
+    const dayPlanComments = queryKeys.comments.entity("dayPlan", dayPlanId);
+    const dayPlanDetail = queryKeys.dayPlans.detail("2026-05-28");
+    const dayPlanDashboard = queryKeys.dashboards.list("dayPlan");
+
+    queryClient.setQueryData(dayPlanNotes, []);
+    queryClient.setQueryData(dayPlanComments, []);
+    queryClient.setQueryData(dayPlanDetail, {});
+    queryClient.setQueryData(dayPlanDashboard, {});
+
+    await invalidateNotes(queryClient, "dayPlan", dayPlanId);
+
+    expect(queryClient.getQueryState(dayPlanNotes)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(dayPlanDetail)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(dayPlanDashboard)?.isInvalidated).toBe(true);
+
+    queryClient.clear();
+    queryClient.setQueryData(dayPlanComments, []);
+    queryClient.setQueryData(dayPlanDetail, {});
+    queryClient.setQueryData(dayPlanDashboard, {});
+
+    await invalidateComments(queryClient, "dayPlan", dayPlanId);
+
+    expect(queryClient.getQueryState(dayPlanComments)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(dayPlanDetail)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(dayPlanDashboard)?.isInvalidated).toBe(true);
+  });
+
   it("invalidiert Wiki, Events, Projektlisten und Wiki-Import-Folgen mit den passenden globalen Abhängigkeiten", async () => {
     queryClient = createQueryClient();
     seedKnownQueries(queryClient);

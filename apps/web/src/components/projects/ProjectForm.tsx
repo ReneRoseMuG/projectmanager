@@ -1046,6 +1046,13 @@ export function ProjectForm({
                 onAdd={(comment) =>
                   setPendingComments((items) => [...items, comment])
                 }
+                onUpdate={(index, comment) =>
+                  setPendingComments((items) =>
+                    items.map((item, itemIndex) =>
+                      itemIndex === index ? comment : item,
+                    ),
+                  )
+                }
                 onRemove={(index) =>
                   setPendingComments((items) =>
                     items.filter((_, itemIndex) => itemIndex !== index),
