@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Bug, GitBranch, Link2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { uploadContentImage } from "../../api/content-images";
 import { getTicketLinkCandidates, getTicketRelationCandidates, type TicketOwner } from "../../api/tickets";
 import type { DraftFile } from "../../types";
 import { useAttachments } from "../../hooks/useAttachments";
@@ -393,7 +394,7 @@ export function TicketForm({
                   <Input value={ticketTitle} onChange={(event) => setTicketTitle(event.target.value)} required autoFocus={!ticket} />
                 </FormField>
                 <FormField label="Beschreibung">
-                  <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="ticket-description" onChange={setDescription} />
+                  <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="ticket-description" onImageUpload={uploadContentImage} onChange={setDescription} />
                 </FormField>
               </div>
             </Section>

@@ -261,7 +261,7 @@ describe("MilestoneForm", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Meilenstein aktualisiert</p>" }), []));
   });
 
-  it("stellt Bild-Upload für die Beschreibung nur im Edit-Modus bereit", () => {
+  it("stellt Bild-Upload für die Beschreibung im Edit-Modus bereit", () => {
     renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
     expect(screen.getByTestId("milestone-description-view")).toHaveAttribute("data-image-upload", "enabled");
@@ -284,10 +284,10 @@ describe("MilestoneForm", () => {
     expect(screen.getByTestId("owner-task-board")).toBeInTheDocument();
   });
 
-  it("deaktiviert Bild-Upload für die Beschreibung im Create-Modus", () => {
+  it("stellt Bild-Upload für die Beschreibung im Create-Modus bereit", () => {
     renderWithProviders(<MilestoneForm open projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
-    expect(screen.getByTestId("milestone-description-view")).toHaveAttribute("data-image-upload", "disabled");
+    expect(screen.getByTestId("milestone-description-view")).toHaveAttribute("data-image-upload", "enabled");
   });
 
   it("sperrt die Projektauswahl im vorbelegten Create-Flow", () => {

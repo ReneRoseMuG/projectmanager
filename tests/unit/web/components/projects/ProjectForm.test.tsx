@@ -63,16 +63,16 @@ describe("ProjectForm", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Projekt aktualisiert</p>" }), []));
   });
 
-  it("stellt Bild-Upload für die Projektbeschreibung nur im Edit-Modus bereit", () => {
+  it("stellt Bild-Upload für die Projektbeschreibung im Edit-Modus bereit", () => {
     renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.getByTestId("project-description-view")).toHaveAttribute("data-image-upload", "enabled");
   });
 
-  it("deaktiviert Bild-Upload für die Projektbeschreibung im Create-Modus", () => {
+  it("stellt Bild-Upload für die Projektbeschreibung im Create-Modus bereit", () => {
     renderWithProviders(<ProjectForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
-    expect(screen.getByTestId("project-description-view")).toHaveAttribute("data-image-upload", "disabled");
+    expect(screen.getByTestId("project-description-view")).toHaveAttribute("data-image-upload", "enabled");
   });
 
   it("verknüpft eine Wiki-Seite im Details-Tab", async () => {

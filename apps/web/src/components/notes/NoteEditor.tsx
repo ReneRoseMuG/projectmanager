@@ -2,6 +2,7 @@ import type { Note, NoteUpdate } from "@taskmanager/shared-types";
 import { Download, StickyNote, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { uploadContentImage } from "../../api/content-images";
 import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
@@ -162,6 +163,7 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
                 setContentFormat("html");
                 setDirty(true);
               }}
+              onImageUpload={uploadContentImage}
             />
           </Section>
         </>

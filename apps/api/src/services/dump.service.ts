@@ -258,6 +258,16 @@ interface RemoteDumpImportHistoryEntry {
 }
 
 const activeRemoteImports = new Set<string>();
+const remotePreviewSessionTtlMs = 10 * 60 * 1000;
+
+interface RemotePreviewSession {
+  fileId: string;
+  fileHash: string;
+  preview: InspectedDump;
+  expiresAt: number;
+}
+
+const remotePreviewSessions = new Map<string, RemotePreviewSession>();
 
 function quoteIdentifier(value: string): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) {
@@ -2270,6 +2280,49 @@ async function readRemoteBackupFile(
   };
 }
 
+function disposeInspectedDump(preview: InspectedDump): void {
+  preview.zipFileBuffers.clear();
+}
+
+function cleanupExpiredRemotePreviewSessions(now = Date.now()): void {
+  for (const [token, session] of remotePreviewSessions.entries()) {
+    if (session.expiresAt <= now) {
+      disposeInspectedDump(session.preview);
+      remotePreviewSessions.delete(token);
+    }
+  }
+}
+
+function registerRemotePreviewSession(fileId: string, preview: InspectedDump): string {
+  cleanupExpiredRemotePreviewSessions();
+  const token = crypto.randomUUID();
+  remotePreviewSessions.set(token, {
+    fileId,
+    fileHash: preview.fileHash,
+    preview,
+    expiresAt: Date.now() + remotePreviewSessionTtlMs,
+  });
+  return token;
+}
+
+function takeRemotePreviewSession(
+  token: string,
+  fileId: string,
+  fileHash: string,
+): InspectedDump {
+  cleanupExpiredRemotePreviewSessions();
+  const session = remotePreviewSessions.get(token);
+  if (!session) {
+    throw conflict("Remote backup preview expired; preview the backup again");
+  }
+  remotePreviewSessions.delete(token);
+  if (session.fileId !== fileId || session.fileHash !== fileHash) {
+    disposeInspectedDump(session.preview);
+    throw conflict("Remote backup preview does not match the requested file");
+  }
+  return session.preview;
+}
+
 export async function previewRemoteDump(
   sqlite: Database.Database,
   params: { fileId?: string | null } = {},
@@ -2279,7 +2332,7 @@ export async function previewRemoteDump(
     params.fileId,
   );
   const preview = await inspectDumpArchive(buffer, backupFile);
-  return backupFile.imported
+  const previewWithWarnings: InspectedDump = backupFile.imported
     ? {
         ...preview,
         warnings: [
@@ -2288,6 +2341,14 @@ export async function previewRemoteDump(
         ],
       }
     : preview;
+  if (previewWithWarnings.transferReadiness === "blocked" || backupFile.imported) {
+    disposeInspectedDump(previewWithWarnings);
+    return previewWithWarnings;
+  }
+  return {
+    ...previewWithWarnings,
+    previewToken: registerRemotePreviewSession(backupFile.id, previewWithWarnings),
+  };
 }
 
 export async function previewLatestLocalDump(): Promise<DumpBackupPreviewResult> {
@@ -2464,7 +2525,7 @@ async function applyInspectedDump(
 
 export async function applyRemoteDump(
   sqlite: Database.Database,
-  params: { fileId: string; fileHash: string; confirmed: boolean },
+  params: { fileId: string; fileHash: string; previewToken: string; confirmed: boolean },
   options: DumpProgressOptions = {},
 ): Promise<DumpBackupApplyResult> {
   assertSafeDumpRuntimeTargets();
@@ -2477,13 +2538,10 @@ export async function applyRemoteDump(
   }
 
   activeRemoteImports.add(safeFileId);
+  let preview: InspectedDump | null = null;
   try {
     assertRemoteDumpWasNotImported(sqlite, safeFileId);
-    const { backupFile, buffer } = await readRemoteBackupFile(
-      sqlite,
-      safeFileId,
-    );
-    const preview = await inspectDumpArchive(buffer, backupFile);
+    preview = takeRemotePreviewSession(params.previewToken, safeFileId, params.fileHash);
     if (preview.fileHash !== params.fileHash) {
       throw conflict("Dump file hash changed since preview");
     }
@@ -2510,6 +2568,9 @@ export async function applyRemoteDump(
       },
     });
   } finally {
+    if (preview) {
+      disposeInspectedDump(preview);
+    }
     activeRemoteImports.delete(safeFileId);
   }
 }

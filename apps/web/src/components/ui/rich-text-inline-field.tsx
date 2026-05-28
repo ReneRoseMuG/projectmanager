@@ -273,21 +273,22 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
         return text.replace(/\n{3,}/g, "\n\n");
       },
       handlePaste(view, event): boolean {
-        if (!onImageUpload) {
-          return false;
-        }
-
         const imageItem = Array.from(event.clipboardData?.items ?? []).find((item) => item.type.startsWith("image/"));
         if (!imageItem) {
           return false;
         }
 
-        const file = imageItem.getAsFile();
-        if (!file) {
-          return false;
+        event.preventDefault();
+        if (!onImageUpload) {
+          showToast({ tone: "error", title: "Bild-Upload ist nicht verfügbar" });
+          return true;
         }
 
-        event.preventDefault();
+        const file = imageItem.getAsFile();
+        if (!file) {
+          return true;
+        }
+
         const placeholderFrom = view.state.selection.from;
         view.dispatch(view.state.tr.insertText(IMAGE_UPLOAD_PLACEHOLDER));
         setImageUploadCount((count) => count + 1);
@@ -427,7 +428,7 @@ function RichTextToolbar({ editor, variant, onImageUpload, imageUploading }: { e
           <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Zitat" icon={<Quote />} />
           <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive("codeBlock")} title="Codeblock" icon={<Code2 />} />
           <ToolbarButton onClick={() => setLink(editor)} active={editor.isActive("link")} title="Link" icon={<LinkIcon />} />
-          <ToolbarButton onClick={() => handleImageInsert(editor, onImageUpload, setPickerUploading, showToast)} active={false} disabled={imageUploading || pickerUploading} title="Bild" icon={imageUploading || pickerUploading ? <Loader2 /> : <ImageIcon />} />
+          <ToolbarButton onClick={() => handleImageInsert(editor, onImageUpload, setPickerUploading, showToast)} active={false} disabled={imageUploading || pickerUploading || !onImageUpload} title="Bild" icon={imageUploading || pickerUploading ? <Loader2 /> : <ImageIcon />} />
           <Separator />
           <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Links" icon={<AlignLeft />} />
           <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Mitte" icon={<AlignCenter />} />
@@ -458,37 +459,31 @@ function setLink(editor: Editor) {
 }
 
 function handleImageInsert(editor: Editor, onImageUpload: ImageUploadHandler | undefined, setUploading: (uploading: boolean) => void, showToast: ReturnType<typeof useToast>["showToast"]) {
-  if (onImageUpload) {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file) {
-        return;
-      }
-
-      setUploading(true);
-      void onImageUpload(file)
-        .then((url) => {
-          editor.chain().focus().setImage({ src: url }).run();
-        })
-        .catch((uploadError) => {
-          showToast({ tone: "error", title: "Bild konnte nicht hochgeladen werden", message: errorMessage(uploadError) });
-        })
-        .finally(() => setUploading(false));
-    };
-    input.click();
+  if (!onImageUpload) {
+    showToast({ tone: "error", title: "Bild-Upload ist nicht verfügbar" });
     return;
   }
 
-  const src = window.prompt("Bild-URL");
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.onchange = () => {
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
 
-  if (!src?.trim()) {
-    return;
-  }
-
-  editor.chain().focus().setImage({ src: src.trim() }).run();
+    setUploading(true);
+    void onImageUpload(file)
+      .then((url) => {
+        editor.chain().focus().setImage({ src: url }).run();
+      })
+      .catch((uploadError) => {
+        showToast({ tone: "error", title: "Bild konnte nicht hochgeladen werden", message: errorMessage(uploadError) });
+      })
+      .finally(() => setUploading(false));
+  };
+  input.click();
 }
 
 function ToolbarButton({ onClick, active, title, icon, disabled = false }: ToolbarButtonProps) {

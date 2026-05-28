@@ -70,7 +70,7 @@ export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps)
 
       <Section title="Kurzbeschreibung">
       <div className="grid gap-1 text-sm font-medium">
-        <RichTextInlineField value={description} placeholder="Kurzbeschreibung" minRows={12} testIdPrefix="feature-detail-description" onChange={setDescription} />
+        <RichTextInlineField value={description} placeholder="Kurzbeschreibung" minRows={12} testIdPrefix="feature-detail-description" onImageUpload={uploadContentImage} onChange={setDescription} />
       </div>
       </Section>
 

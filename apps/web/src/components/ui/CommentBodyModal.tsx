@@ -1,6 +1,7 @@
 import { MessageSquare } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { uploadContentImage } from "../../api/content-images";
 import { FormModal } from "./FormModal";
 import { RichTextInlineField, type RichTextValueFormat } from "./rich-text-inline-field";
 import { Section } from "./Section";
@@ -97,6 +98,7 @@ export function CommentBodyModal({
             setContent(value);
             setContentFormat("html");
           }}
+          onImageUpload={uploadContentImage}
         />
       </Section>
     </FormModal>

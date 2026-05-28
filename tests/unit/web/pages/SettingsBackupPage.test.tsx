@@ -245,6 +245,7 @@ describe("SettingsBackupPage", () => {
       expectedTables: [],
       expectedFileRoots: [],
       fileHash: "abc123",
+      previewToken: "preview-token-1",
     });
     backupPageMocks.applyRemoteDump.mockRejectedValue(apiError);
 
@@ -261,7 +262,64 @@ describe("SettingsBackupPage", () => {
     expect(backupPageMocks.applyRemoteDump).toHaveBeenCalledWith({
       fileId: remoteFile.id,
       fileHash: "abc123",
+      previewToken: "preview-token-1",
       confirmed: true,
     });
+  });
+
+  it("zeigt nach erfolgreichem Remote-Import den Abschluss ohne Status-Refetch", async () => {
+    const remoteFile = {
+      id: "taskmanager_dump_remote.zip",
+      name: "taskmanager_dump_remote.zip",
+      path: "/remote/backups/taskmanager_dump_remote.zip",
+      createdTime: "2026-05-27T08:00:00.000Z",
+      modifiedTime: "2026-05-27T08:00:00.000Z",
+      sizeBytes: 25 * 1024 * 1024,
+      imported: false,
+      importedAt: null,
+    };
+
+    backupPageMocks.remoteFiles.push(remoteFile);
+    backupPageMocks.confirm.mockResolvedValue(true);
+    backupPageMocks.previewRemoteDump.mockResolvedValue({
+      dumpId: "taskmanager_dump_remote",
+      backupFile: remoteFile,
+      targetDatabasePath: "C:/test/data/app.db",
+      transferReadiness: "ready",
+      blockingIssues: [],
+      warnings: [],
+      confirmationPhrase: "AKTUALISIERE TASKMANAGER",
+      manifestPresent: true,
+      schemaRevision: "current",
+      expectedTables: [],
+      expectedFileRoots: [],
+      fileHash: "abc123",
+      previewToken: "preview-token-2",
+    });
+    backupPageMocks.applyRemoteDump.mockResolvedValue({
+      dumpId: "taskmanager_dump_remote",
+      backupFile: remoteFile,
+      targetBackupPath: "C:/test/backups/target-before-import.sqlite",
+      verificationPassed: true,
+      importStatus: "success",
+      tablesRestored: 42,
+      fileRootsRestored: [],
+      warnings: [],
+      blockingIssues: [],
+    });
+
+    render(<SettingsBackupPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Importieren" }));
+
+    await waitFor(() => expect(screen.getByText(/Bitte lade die Anwendung neu/)).toBeTruthy());
+    expect(backupPageMocks.applyRemoteDump).toHaveBeenCalledWith({
+      fileId: remoteFile.id,
+      fileHash: "abc123",
+      previewToken: "preview-token-2",
+      confirmed: true,
+    });
+    expect(backupPageMocks.localRefetch).not.toHaveBeenCalled();
+    expect(backupPageMocks.remoteRefetch).not.toHaveBeenCalled();
   });
 });

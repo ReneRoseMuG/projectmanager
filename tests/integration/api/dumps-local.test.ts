@@ -85,6 +85,7 @@ interface SftpMockMetrics {
   clientFactoryCount: number;
   connectCount: number;
   endCount: number;
+  getPaths: string[];
   putPaths: string[];
   deletePaths: string[];
   streamPutCount: number;
@@ -111,6 +112,7 @@ function configureMockSftp(
     clientFactoryCount: 0,
     connectCount: 0,
     endCount: 0,
+    getPaths: [],
     putPaths: [],
     deletePaths: [],
     streamPutCount: 0,
@@ -149,6 +151,7 @@ function configureMockSftp(
       },
       async get(remotePath) {
         const name = remoteKey(remotePath);
+        metrics.getPaths.push(name);
         const file = remoteFiles.get(name);
         if (!file) {
           throw new Error("Remote file missing");
@@ -756,7 +759,7 @@ describe("Remote SFTP backup status", () => {
 
   it("importiert die neueste Remote-Datei und blockiert denselben Dateinamen dauerhaft", async () => {
     const remoteFiles = new Map<string, RemoteMockFile>();
-    configureMockSftp(remoteFiles);
+    const metrics = configureMockSftp(remoteFiles);
     const before = collectSnapshot();
     const archive = await buildDumpArchive(testDb.sqlite);
     remoteFiles.set(archive.filename, {
@@ -769,15 +772,18 @@ describe("Remote SFTP backup status", () => {
     const applyResult = await applyRemoteDump(testDb.sqlite, {
       fileId: preview.backupFile.id,
       fileHash: preview.fileHash,
+      previewToken: preview.previewToken,
       confirmed: true,
     });
 
     expect(applyResult.verificationPassed).toBe(true);
     expect(withoutContentFiles(withoutRemoteImportHistory(collectSnapshot()))).toEqual(withoutContentFiles(before));
+    expect(metrics.getPaths).toEqual([archive.filename]);
     await expect(
       applyRemoteDump(testDb.sqlite, {
         fileId: preview.backupFile.id,
         fileHash: preview.fileHash,
+        previewToken: preview.previewToken,
         confirmed: true,
       }),
     ).rejects.toThrow("already imported");

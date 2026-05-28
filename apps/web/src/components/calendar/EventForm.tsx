@@ -2,6 +2,7 @@ import type { CalendarEvent, EventInput, EventOwner, Milestone, Project, Task } 
 import { CalendarClock, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { uploadContentImage } from "../../api/content-images";
 import { fromDateTimeLocalInput, toDateTimeLocalInput } from "../../utils/date";
 import { Button } from "../ui/Button";
 import { ColorPicker } from "../ui/ColorPicker";
@@ -133,7 +134,7 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
           <Input value={title} onChange={(inputEvent) => setTitle(inputEvent.target.value)} required />
         </FormField>
         <FormField label="Beschreibung" className="mt-4">
-          <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="event-description" onChange={setDescription} />
+          <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="event-description" onImageUpload={uploadContentImage} onChange={setDescription} />
         </FormField>
       </Section>
 

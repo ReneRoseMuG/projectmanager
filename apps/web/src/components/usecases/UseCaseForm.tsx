@@ -430,6 +430,7 @@ export function UseCaseForm({
                   placeholder="Kurze fachliche Zusammenfassung"
                   minRows={12}
                   testIdPrefix="use-case-description"
+                  onImageUpload={uploadContentImage}
                   onChange={setDescription}
                 />
               </FormField>

@@ -2,6 +2,7 @@ import type { BacklogItem, BacklogItemInput, BacklogStatus, DraftComment, Featur
 import { Inbox, Send } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { uploadContentImage } from "../../api/content-images";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
 import { JournalPanel } from "../journal/JournalPanel";
@@ -99,7 +100,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
           <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
         </FormField>
         <FormField label="Beschreibung" className="mt-4">
-          <RichTextInlineField value={description} placeholder="Was soll später umgesetzt werden?" minRows={12} testIdPrefix="backlog-item-description" onChange={setDescription} />
+          <RichTextInlineField value={description} placeholder="Was soll später umgesetzt werden?" minRows={12} testIdPrefix="backlog-item-description" onImageUpload={uploadContentImage} onChange={setDescription} />
         </FormField>
       </Section>
 

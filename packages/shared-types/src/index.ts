@@ -1200,6 +1200,7 @@ export interface DumpBackupSaveResult {
 }
 
 export interface DumpBackupPreviewResult {
+  previewToken?: string;
   fileHash: string;
   dumpId: string;
   backupFile: DumpBackupFile;
@@ -1227,6 +1228,7 @@ export interface DumpRemoteBackupPreviewRequest {
 export interface DumpRemoteBackupApplyRequest {
   fileId: string;
   fileHash: string;
+  previewToken: string;
   confirmed: boolean;
 }
 

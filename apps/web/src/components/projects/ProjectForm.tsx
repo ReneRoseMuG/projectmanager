@@ -28,8 +28,8 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { uploadTaskAttachment } from "../../api/attachments";
-import { assetUrl } from "../../api/client";
 import { createEntityComment } from "../../api/comments";
+import { uploadContentImage } from "../../api/content-images";
 import { createTaskNote } from "../../api/notes";
 import { createSubtask } from "../../api/subtasks";
 import { setTaskTags } from "../../api/tags";
@@ -401,16 +401,6 @@ export function ProjectForm({
       throw attachmentError;
     }
   };
-
-  const uploadEditorImage = project
-    ? async (file: File): Promise<string> => {
-        const uploaded = await uploadAttachment(file);
-        if (!uploaded) {
-          throw new Error("Image upload requires a saved project.");
-        }
-        return assetUrl(uploaded.url);
-      }
-    : undefined;
 
   const deleteBacklogItem = async (item: BacklogItem) => {
     const approved = await confirm({
@@ -807,7 +797,7 @@ export function ProjectForm({
                   placeholder="Worum geht es in diesem Projekt?"
                   minRows={5}
                   testIdPrefix="project-description"
-                  onImageUpload={uploadEditorImage}
+                  onImageUpload={uploadContentImage}
                 />
               </FormField>
             </Section>

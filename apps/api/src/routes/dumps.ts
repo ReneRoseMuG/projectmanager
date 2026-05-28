@@ -32,11 +32,12 @@ const remotePreviewBodySchema = {
 
 const remoteApplyBodySchema = {
   type: "object",
-  required: ["fileId", "fileHash", "confirmed"],
+  required: ["fileId", "fileHash", "previewToken", "confirmed"],
   additionalProperties: false,
   properties: {
     fileId: { type: "string", minLength: 1 },
     fileHash: { type: "string", minLength: 1 },
+    previewToken: { type: "string", minLength: 1 },
     confirmed: { type: "boolean", const: true }
   }
 } as const;

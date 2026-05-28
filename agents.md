@@ -202,16 +202,21 @@ Ein Blocker wird dokumentiert mit: was genau fehlt, welcher Schritt betroffen is
 
 Nach jeder abgeschlossenen Teilaufgabe schreibt Codex **automatisch und ohne Rückfrage** einen Log-Eintrag. Das gilt für jeden nummerierten Implementierungsschritt aus dem Großauftrag sowie für jeden eigenständigen Änderungsauftrag der Klassen 4 und 5.
 
+Jeder Log-Eintrag wird in eine **neue** Datei geschrieben. Bestehende einzelne Log-Dateien unter `logs/` dürfen nicht nachträglich ergänzt, korrigiert oder überschrieben werden. Nachträge, Korrekturen und Anschlussberichte erhalten immer eine eigene neue Log-Datei mit aktuellem Zeitstempel. Die einzige reguläre Änderung an einer bestehenden Datei im Log-Bereich ist die Aktualisierung des Index `logs/README.md`.
+
 ### 5.1 Dateiname und Ablageort
 
 ```
-logs/YYYY-MM-DD-schritt-<N>-<kurztitel-kebab-case>.md
+logs/YYYY-MM-DD-HH-mm-ss-schritt-<N>-<kurztitel-kebab-case>.md
+logs/YYYY-MM-DD-HH-mm-ss-<typ-kebab-case>-<kurztitel-kebab-case>.md
 ```
 
+`HH-mm-ss` ist die lokale Zeit im 24-Stunden-Format und wird mit Bindestrichen geschrieben, damit Dateinamen Windows-kompatibel bleiben.
+
 Beispiele:
-- `logs/2026-05-17-schritt-02-schema-migration.md`
-- `logs/2026-05-17-schritt-05-notizen-api.md`
-- `logs/2026-05-18-fix-kanban-position.md`
+- `logs/2026-05-17-09-14-33-schritt-02-schema-migration.md`
+- `logs/2026-05-17-10-02-08-schritt-05-notizen-api.md`
+- `logs/2026-05-18-16-30-12-fix-kanban-position.md`
 
 Der Ordner `logs/` liegt im Repo-Root. Er wird beim ersten Log automatisch angelegt, falls er noch nicht existiert. `logs/` ist in `.gitignore` **nicht** eingetragen — Logs sind Teil des Repos.
 
@@ -221,6 +226,7 @@ Der Ordner `logs/` liegt im Repo-Root. Er wird beim ersten Log automatisch angel
 # Log: <Kurztitel>
 
 **Datum:** DD.MM.YY  
+**Uhrzeit:** HH:mm:ss  
 **Schritt:** <N> — <Schrittbezeichnung aus Großauftrag> (oder: Fix / Feature)  
 **Status:** ✅ Abgeschlossen | ⚠️ Teilweise abgeschlossen | 🔴 Blockiert
 
@@ -262,10 +268,10 @@ Codex pflegt zusätzlich eine Datei `logs/README.md` als chronologische Übersic
 ```markdown
 # Log-Übersicht Projekt Manager
 
-| Datum | Schritt | Kurztitel | Status |
-|---|---|---|---|
-| 17.05.26 | 2 | Schema & Migration | ✅ |
-| 17.05.26 | 3 | Fastify-Backend Basis | ✅ |
+| Datum | Uhrzeit | Schritt | Kurztitel | Status |
+|---|---|---|---|---|
+| 17.05.26 | 09:14:33 | 2 | Schema & Migration | ✅ |
+| 17.05.26 | 10:02:08 | 3 | Fastify-Backend Basis | ✅ |
 ```
 
 Der neueste Eintrag steht **oben**. Der Index wird nach jedem neuen Log sofort aktualisiert.

@@ -5,7 +5,6 @@ import type {
   DumpBackupSaveResult,
   DumpRemoteBackupFile,
 } from "@taskmanager/shared-types";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
@@ -35,7 +34,6 @@ import {
   useRemoteDumpStatus,
 } from "../hooks/useLocalDumpStatus";
 import { useHasPermission } from "../hooks/usePermissions";
-import { invalidateWikiImportData } from "../queries/invalidation";
 
 function megabytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
@@ -132,7 +130,6 @@ function BackupProgressPanel({ events }: { events: BackupProgressEvent[] }) {
 
 export function SettingsBackupPage() {
   const { confirm } = useConfirm();
-  const queryClient = useQueryClient();
   const canWriteDumps = useHasPermission("dumps", "write");
   const backupStatus = useLocalDumpStatus();
   const remoteStatus = useRemoteDumpStatus();
@@ -147,11 +144,6 @@ export function SettingsBackupPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [importingFileId, setImportingFileId] = useState<string | null>(null);
-
-  async function refreshStatus() {
-    await backupStatus.refetch();
-    await remoteStatus.refetch();
-  }
 
   function refreshRemoteStatusInBackground() {
     void remoteStatus.refetch().catch(() => undefined);
@@ -186,6 +178,9 @@ export function SettingsBackupPage() {
       if (nextPreview.transferReadiness === "blocked") {
         return;
       }
+      if (!nextPreview.previewToken) {
+        throw new Error("Import-Vorschau ist unvollständig. Bitte starte die Vorschau erneut.");
+      }
 
       const approved = await confirm({
         title: "Backup importieren?",
@@ -207,11 +202,10 @@ export function SettingsBackupPage() {
         await applyRemoteDump({
           fileId: nextPreview.backupFile.id,
           fileHash: nextPreview.fileHash,
+          previewToken: nextPreview.previewToken,
           confirmed: true,
         }),
       );
-      await invalidateWikiImportData(queryClient);
-      await refreshStatus();
     } catch (err) {
       setError(await errorMessageAsync(err));
     } finally {
@@ -432,6 +426,7 @@ export function SettingsBackupPage() {
             Import {applyResult.importStatus}. Tabellen:{" "}
             {applyResult.tablesRestored}. Verifikation:{" "}
             {applyResult.verificationPassed ? "bestanden" : "fehlgeschlagen"}.
+            {" "}Die Daten wurden wiederhergestellt. Bitte lade die Anwendung neu und melde dich mit dem importierten Benutzerstand erneut an.
           </section>
         )}
       </div>

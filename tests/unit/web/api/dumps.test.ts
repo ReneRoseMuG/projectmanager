@@ -57,10 +57,10 @@ describe("dump api client", () => {
   it("nutzt für Remote-Importe einen längeren Timeout", async () => {
     apiMocks.json.mockResolvedValue({});
 
-    await applyRemoteDump({ fileId: "remote.zip", fileHash: "abc123", confirmed: true });
+    await applyRemoteDump({ fileId: "remote.zip", fileHash: "abc123", previewToken: "preview-token", confirmed: true });
 
     expect(apiMocks.post).toHaveBeenCalledWith("dumps/remote/apply", {
-      json: { fileId: "remote.zip", fileHash: "abc123", confirmed: true },
+      json: { fileId: "remote.zip", fileHash: "abc123", previewToken: "preview-token", confirmed: true },
       timeout: 600000,
     });
     expect(apiMocks.json).toHaveBeenCalledTimes(1);

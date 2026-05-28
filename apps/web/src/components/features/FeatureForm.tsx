@@ -23,7 +23,6 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
-import { assetUrl } from "../../api/client";
 import { uploadContentImage } from "../../api/content-images";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
@@ -386,18 +385,6 @@ export function FeatureForm({
     }
   };
 
-  const uploadEditorImage = feature
-    ? async (file: File): Promise<string> => {
-        const uploaded = await uploadAttachment(file);
-        if (!uploaded) {
-          throw new Error("Image upload requires a saved feature.");
-        }
-        return assetUrl(uploaded.url);
-      }
-    : undefined;
-
-  const uploadContentEditorImage = async (file: File): Promise<string> => uploadContentImage(file);
-
   const projectParentItems = useMemo(
     () => projects.projects.map(projectParentItem),
     [projects.projects],
@@ -597,7 +584,7 @@ export function FeatureForm({
                 placeholder="Kurzbeschreibung"
                 minRows={12}
                 testIdPrefix="feature-form-description"
-                onImageUpload={uploadEditorImage}
+                onImageUpload={uploadContentImage}
                 onChange={setDescription}
               />
             </Section>
@@ -606,7 +593,7 @@ export function FeatureForm({
                 value={content}
                 placeholder="Feature-Inhalt"
                 testIdPrefix="feature-form-content"
-                onImageUpload={uploadContentEditorImage}
+                onImageUpload={uploadContentImage}
                 onChange={setContent}
               />
             </Section>

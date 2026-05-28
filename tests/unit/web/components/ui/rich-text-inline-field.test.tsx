@@ -8,6 +8,7 @@
  * - Markdown-Werte werden beim Öffnen roh an den Editor gegeben und als Editor-HTML committed.
  * - Legacy-Markdown wird im Live-Update-Modus direkt als Editor-HTML in den Formular-State übernommen.
  * - Eingefügter Markdown-Plain-Text wird zentral durch die Markdown-Extension in HTML konvertiert.
+ * - Bilder können nur über einen expliziten Upload-Handler eingefügt werden.
  * - Im Edit-Zustand wird nur die feste Toolbar gerendert, keine zusätzliche Auswahl- oder Floating-Bar.
  * - TipTap wird im Test gemockt, die Leseansicht wird real gerendert.
  *
@@ -500,15 +501,17 @@ describe("RichTextInlineField", () => {
     expect(tr.insert).toHaveBeenCalledWith(3, imageNode);
   });
 
-  it("T-26 nutzt ohne onImageUpload weiterhin den URL-Prompt für Bilder", () => {
+  it("T-26 blockiert Bild-Einfügen ohne onImageUpload", () => {
     const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("https://assets.test/image.png");
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
 
     fireEvent.click(screen.getByTestId("field-view"));
-    fireEvent.click(screen.getByRole("button", { name: "Bild" }));
+    const imageButton = screen.getByRole("button", { name: "Bild" });
 
-    expect(promptSpy).toHaveBeenCalledWith("Bild-URL");
-    expect(tiptapMock.chain?.setImage).toHaveBeenCalledWith({ src: "https://assets.test/image.png" });
+    expect(imageButton).toBeDisabled();
+    fireEvent.click(imageButton);
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(tiptapMock.chain).toBeUndefined();
     promptSpy.mockRestore();
   });
 });

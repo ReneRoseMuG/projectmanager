@@ -36,16 +36,16 @@ describe("TaskForm", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Aufgabe aktualisiert</p>" })));
   });
 
-  it("stellt Bild-Upload für die Beschreibung nur im Edit-Modus bereit", () => {
+  it("stellt Bild-Upload für die Beschreibung im Edit-Modus bereit", () => {
     renderWithProviders(<TaskForm open task={task} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.getByTestId("task-description-view")).toHaveAttribute("data-image-upload", "enabled");
   });
 
-  it("deaktiviert Bild-Upload für die Beschreibung im Create-Modus", () => {
+  it("stellt Bild-Upload für die Beschreibung im Create-Modus bereit", () => {
     renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
-    expect(screen.getByTestId("task-description-view")).toHaveAttribute("data-image-upload", "disabled");
+    expect(screen.getByTestId("task-description-view")).toHaveAttribute("data-image-upload", "enabled");
   });
 
   it("zeigt im Create-Modus alle erwarteten Verwaltungs-Tabs", () => {
