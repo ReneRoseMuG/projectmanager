@@ -17,12 +17,11 @@
  *
  * Abgedeckte Regeln:
  * - Backup-Fortschritt aus dem Realtime-Store wird auf der Admin-Backup-Seite sichtbar.
- * - Vollsicherung und Sync werden in einem gemeinsamen Aktionscontainer mit eigenen Statuszeilen gerendert.
- * - Die überflüssigen Aktionen "Neueste importieren" und "Aktualisieren" werden nicht angeboten.
+ * - Die Seite bietet nur Vollsicherung und Remote-Vollbackup-Import an.
  *
  * Fehlerfälle:
  * - Ohne korrektes Mapping würde die laufende Phase nicht als Fortschrittszeile erscheinen.
- * - Eine vermischte Aktionsleiste würde die entfernten Aktionen wieder sichtbar machen.
+ * - Entfernte Sync-Aktionen dürfen nicht wieder sichtbar werden.
  *
  * Ziel:
  * Die UI-Anbindung der Backup-Progress-Events gegen Rendering-Regressionen absichern.
@@ -33,19 +32,32 @@ import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsBackupPage } from "../../../../apps/web/src/pages/SettingsBackupPage";
 
-const syncProgressEvent = {
+const fullBackupProgressEvent = {
   type: "backup_progress" as const,
-  operation: "incremental_sync" as const,
-  phase: "file_upload",
+  operation: "full_backup" as const,
+  phase: "archive",
   current: 1,
   total: 3,
-  detail: "uploads/example.txt",
+  detail: "taskmanager_dump_test.zip",
 };
 
 const backupPageMocks = vi.hoisted(() => ({
+  applyRemoteDump: vi.fn(),
+  confirm: vi.fn(),
+  previewRemoteDump: vi.fn(),
   saveLocalDump: vi.fn(),
   localRefetch: vi.fn(),
   remoteRefetch: vi.fn(),
+  remoteFiles: [] as Array<{
+    id: string;
+    name: string;
+    path: string;
+    createdTime: string;
+    modifiedTime: string;
+    sizeBytes: number;
+    imported: boolean;
+    importedAt: string | null;
+  }>,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -53,13 +65,13 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("../../../../apps/web/src/api/dumps", () => ({
-  applyRemoteDump: vi.fn(),
-  previewRemoteDump: vi.fn(),
+  applyRemoteDump: backupPageMocks.applyRemoteDump,
+  previewRemoteDump: backupPageMocks.previewRemoteDump,
   saveLocalDump: backupPageMocks.saveLocalDump,
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ConfirmDialogProvider", () => ({
-  useConfirm: () => ({ confirm: vi.fn() }),
+  useConfirm: () => ({ confirm: backupPageMocks.confirm }),
 }));
 
 vi.mock("../../../../apps/web/src/hooks/usePermissions", () => ({
@@ -70,11 +82,10 @@ vi.mock("../../../../apps/web/src/hooks/useBackupProgress", () => ({
   clearBackupProgress: vi.fn(),
   useBackupProgress: () => ({
     byOperation: {
-      full_backup: null,
-      incremental_sync: syncProgressEvent,
+      full_backup: fullBackupProgressEvent,
       import: null,
     },
-    lastEvent: syncProgressEvent,
+    lastEvent: fullBackupProgressEvent,
     updatedAt: 1,
   }),
 }));
@@ -99,29 +110,24 @@ vi.mock("../../../../apps/web/src/hooks/useLocalDumpStatus", () => ({
       ready: true,
       fileCount: 0,
       latestFile: null,
-      files: [],
+      files: backupPageMocks.remoteFiles,
       blockingIssues: [],
     },
     loading: false,
     error: null,
     refetch: backupPageMocks.remoteRefetch,
   }),
-  useIncrementalRemoteSync: () => ({
-    preview: null,
-    previewError: null,
-    previewSync: vi.fn(),
-    runSync: vi.fn(),
-    applySync: vi.fn(),
-    syncing: false,
-    previewing: false,
-    applying: false,
-  }),
 }));
 
 beforeEach(() => {
+  backupPageMocks.applyRemoteDump.mockReset();
+  backupPageMocks.confirm.mockReset();
+  backupPageMocks.previewRemoteDump.mockReset();
   backupPageMocks.saveLocalDump.mockReset();
   backupPageMocks.localRefetch.mockResolvedValue({});
   backupPageMocks.remoteRefetch.mockResolvedValue({});
+  backupPageMocks.confirm.mockResolvedValue(false);
+  backupPageMocks.remoteFiles.length = 0;
 });
 
 afterEach(() => {
@@ -138,33 +144,30 @@ describe("SettingsBackupPage", () => {
       .closest("section");
     expect(panel).not.toBeNull();
     const progressPanel = within(panel as HTMLElement);
-    expect(progressPanel.getByText("Sync")).toBeTruthy();
-    expect(progressPanel.getByText(/Datei-Upload/)).toBeTruthy();
-    expect(progressPanel.getByText(/uploads\/example\.txt/)).toBeTruthy();
+    expect(progressPanel.getByText("Vollsicherung")).toBeTruthy();
+    expect(progressPanel.getByText(/Archiv/)).toBeTruthy();
+    expect(progressPanel.getByText(/taskmanager_dump_test\.zip/)).toBeTruthy();
     expect(progressPanel.getByText("1/3")).toBeTruthy();
   });
 
-  it("zeigt Vollsicherung und Sync in einem gemeinsamen Aktionscontainer", () => {
+  it("zeigt Vollsicherung und Remote-Vollsicherungen ohne Sync-Aktionen", () => {
     render(<SettingsBackupPage />);
 
     expect(screen.getByRole("heading", { name: "Vollsicherung" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Sync" })).toBeTruthy();
-    expect(screen.getByText(/Letzte Sicherung:/)).toBeTruthy();
-    expect(screen.getByText(/Letzte Synchronisation:/)).toBeTruthy();
     expect(
       screen.getByRole("heading", { name: "Remote-Vollsicherungen" }),
     ).toBeTruthy();
+    expect(screen.getByText(/Letzte Sicherung:/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sichern" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Sync" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Sync" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sync" })).toBeNull();
     expect(
-      screen.getByRole("button", { name: "Sync importieren" }),
-    ).toBeTruthy();
+      screen.queryByRole("button", { name: "Sync importieren" }),
+    ).toBeNull();
     expect(
       screen.queryByRole("button", { name: "Neueste importieren" }),
     ).toBeNull();
     expect(screen.queryByRole("button", { name: "Aktualisieren" })).toBeNull();
-    expect(screen.queryByText("Lokaler Backup-Ordner")).toBeNull();
-    expect(screen.queryByText("SFTP-Backup-Ordner")).toBeNull();
   });
 
   it("wartet nach erfolgreicher Vollsicherung nicht auf die Remote-Liste", async () => {
@@ -198,5 +201,67 @@ describe("SettingsBackupPage", () => {
     expect(screen.getByText(/taskmanager_dump_fast\.zip/)).toBeTruthy();
     expect(backupPageMocks.localRefetch).toHaveBeenCalledTimes(1);
     expect(backupPageMocks.remoteRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("zeigt die API-Fehlermeldung beim fehlgeschlagenen Remote-Import", async () => {
+    const remoteFile = {
+      id: "taskmanager_dump_remote.zip",
+      name: "taskmanager_dump_remote.zip",
+      path: "/remote/backups/taskmanager_dump_remote.zip",
+      createdTime: "2026-05-27T08:00:00.000Z",
+      modifiedTime: "2026-05-27T08:00:00.000Z",
+      sizeBytes: 25 * 1024 * 1024,
+      imported: false,
+      importedAt: null,
+    };
+    const apiError = new Error(
+      "Request failed with status code 400 Bad Request: POST http://localhost:3001/api/dumps/remote/apply",
+    ) as Error & {
+      response: {
+        json: () => Promise<unknown>;
+      };
+    };
+    apiError.response = {
+      json: async () => ({
+        error: "BAD_REQUEST",
+        message:
+          "Dump import is blocked: Schema revision differs: dump=old, target=current.",
+        statusCode: 400,
+      }),
+    };
+
+    backupPageMocks.remoteFiles.push(remoteFile);
+    backupPageMocks.confirm.mockResolvedValue(true);
+    backupPageMocks.previewRemoteDump.mockResolvedValue({
+      dumpId: "taskmanager_dump_remote",
+      backupFile: remoteFile,
+      targetDatabasePath: "C:/test/data/app.db",
+      transferReadiness: "ready",
+      blockingIssues: [],
+      warnings: [],
+      confirmationPhrase: "AKTUALISIERE TASKMANAGER",
+      manifestPresent: true,
+      schemaRevision: "current",
+      expectedTables: [],
+      expectedFileRoots: [],
+      fileHash: "abc123",
+    });
+    backupPageMocks.applyRemoteDump.mockRejectedValue(apiError);
+
+    render(<SettingsBackupPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Importieren" }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Dump import is blocked/)).toBeTruthy(),
+    );
+    expect(
+      screen.queryByText(/Request failed with status code 400/),
+    ).toBeNull();
+    expect(backupPageMocks.applyRemoteDump).toHaveBeenCalledWith({
+      fileId: remoteFile.id,
+      fileHash: "abc123",
+      confirmed: true,
+    });
   });
 });

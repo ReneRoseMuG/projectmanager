@@ -142,8 +142,8 @@ describe("Realtime API", () => {
     const chunk = await readPublishedBackupProgress(baseUrl, firstCookie(login), () => {
       app.realtimeBus.publish({
         type: "backup_progress",
-        operation: "incremental_sync",
-        phase: "file_upload",
+        operation: "full_backup",
+        phase: "archive",
         current: 1,
         total: 3,
         detail: "uploads/example.txt"
@@ -151,8 +151,8 @@ describe("Realtime API", () => {
     });
 
     expect(chunk).toContain("event: backup_progress");
-    expect(chunk).toContain("\"operation\":\"incremental_sync\"");
-    expect(chunk).toContain("\"phase\":\"file_upload\"");
+    expect(chunk).toContain("\"operation\":\"full_backup\"");
+    expect(chunk).toContain("\"phase\":\"archive\"");
   });
 
   it("publiziert Events für erfolgreiche Mutationen und keine Events für Fehler", async () => {

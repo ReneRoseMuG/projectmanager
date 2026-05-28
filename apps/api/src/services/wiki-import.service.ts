@@ -13,13 +13,6 @@ import path from "node:path";
 import type { DbClient } from "../db/client.js";
 import { backlogItems, featureRelations, features, featureTasks, projectFeatures, projects, projectTasks, tasks, useCases, useCaseTasks } from "../db/schema.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import {
-  buildFilename,
-  buildStoredContentPath,
-  resolveContentPath,
-  resolveStoredContentPath,
-  writeContent
-} from "./content.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 
 interface ParsedWiki {
@@ -766,18 +759,6 @@ function getFeatureRelation(
     .get();
 }
 
-function featureContentPath(featureId: number): string {
-  return buildStoredContentPath("features", buildFilename("feature", featureId));
-}
-
-function makeUseCaseContentPath(useCaseId: number): string {
-  return buildStoredContentPath("usecases", buildFilename("usecase", useCaseId));
-}
-
-function writeStoredContent(contentPath: string, content: string): void {
-  writeContent(resolveStoredContentPath(contentPath), content);
-}
-
 function nextTaskPosition(database: DbClient, projectId: number): number {
   const rows = database
     .select({ position: projectTasks.position })
@@ -859,20 +840,18 @@ function upsertFeature(database: DbClient, feature: ParsedFeature, execute: bool
   }
 
   if (existing) {
-    const contentPath = existing.contentPath ?? featureContentPath(existing.id);
     database
       .update(features)
       .set({
         title: feature.title,
         description: feature.description,
         sortOrder: feature.sortOrder,
-        contentPath,
+        content: feature.content,
         updatedAt: now
       })
       .where(eq(features.id, existing.id))
       .run();
-    writeStoredContent(contentPath, feature.content);
-    return { record: { ...existing, contentPath }, action: "updated" };
+    return { record: existing, action: "updated" };
   }
 
   const created = database
@@ -882,17 +861,15 @@ function upsertFeature(database: DbClient, feature: ParsedFeature, execute: bool
       status: "active",
       description: feature.description,
       contentPath: null,
+      content: feature.content,
       sortOrder: feature.sortOrder,
       createdAt: now,
       updatedAt: now
     })
     .returning({ id: features.id, title: features.title, contentPath: features.contentPath })
     .get();
-  const contentPath = featureContentPath(created.id);
-  writeContent(resolveContentPath("features", path.basename(contentPath)), feature.content);
-  database.update(features).set({ contentPath, updatedAt: now }).where(eq(features.id, created.id)).run();
 
-  return { record: { ...created, contentPath }, action: "created" };
+  return { record: created, action: "created" };
 }
 
 function upsertUseCase(
@@ -908,7 +885,6 @@ function upsertUseCase(
   }
 
   if (existing) {
-    const contentPath = existing.contentPath ?? makeUseCaseContentPath(existing.id);
     database
       .update(useCases)
       .set({
@@ -916,13 +892,12 @@ function upsertUseCase(
         title: useCase.title,
         description: useCase.description,
         sortOrder: useCase.sortOrder,
-        contentPath,
+        content: useCase.content,
         updatedAt: now
       })
       .where(eq(useCases.id, existing.id))
       .run();
-    writeStoredContent(contentPath, useCase.content);
-    return { record: { ...existing, featureId, contentPath }, action: "updated" };
+    return { record: { ...existing, featureId }, action: "updated" };
   }
 
   const created = database
@@ -933,17 +908,15 @@ function upsertUseCase(
       status: "active",
       description: useCase.description,
       contentPath: null,
+      content: useCase.content,
       sortOrder: useCase.sortOrder,
       createdAt: now,
       updatedAt: now
     })
     .returning({ id: useCases.id, featureId: useCases.featureId, title: useCases.title, contentPath: useCases.contentPath })
     .get();
-  const contentPath = makeUseCaseContentPath(created.id);
-  writeContent(resolveContentPath("usecases", path.basename(contentPath)), useCase.content);
-  database.update(useCases).set({ contentPath, updatedAt: now }).where(eq(useCases.id, created.id)).run();
 
-  return { record: { ...created, contentPath }, action: "created" };
+  return { record: created, action: "created" };
 }
 
 function upsertBacklogItem(

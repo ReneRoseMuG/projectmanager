@@ -2,6 +2,7 @@ import type { Feature, FeatureStatus, FeatureUpdate } from "@taskmanager/shared-
 import { RotateCcw, Save, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { uploadContentImage } from "../../api/content-images";
 import { Button } from "../ui/Button";
 import { FormField } from "../ui/FormField";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
@@ -75,7 +76,7 @@ export function FeatureDetail({ feature, onSave, onDelete }: FeatureDetailProps)
 
       <Section title="Inhalt">
       <div className="grid gap-2 text-sm font-medium">
-        <RichTextInlineField value={content} placeholder="Feature-Inhalt" testIdPrefix="feature-detail-content" onChange={setContent} />
+        <RichTextInlineField value={content} placeholder="Feature-Inhalt" testIdPrefix="feature-detail-content" onImageUpload={uploadContentImage} onChange={setContent} />
       </div>
       </Section>
 

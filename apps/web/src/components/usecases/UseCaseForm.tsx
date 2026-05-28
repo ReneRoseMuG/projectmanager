@@ -15,6 +15,7 @@ import { BookOpen, Bug, ListTodo, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { uploadContentImage } from "../../api/content-images";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useTasks } from "../../hooks/useTasks";
@@ -446,6 +447,7 @@ export function UseCaseForm({
                 value={content}
                 placeholder="Use-Case-Inhalt"
                 testIdPrefix="use-case-content"
+                onImageUpload={uploadContentImage}
                 onChange={setContent}
               />
             </Section>

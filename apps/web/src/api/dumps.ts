@@ -4,10 +4,6 @@ import type {
   DumpBackupPreviewResult,
   DumpBackupSaveResult,
   DumpBackupStatus,
-  DumpIncrementalSyncApplyRequest,
-  DumpIncrementalSyncApplyResult,
-  DumpIncrementalSyncPreviewResult,
-  DumpIncrementalSyncResult,
   DumpRemoteBackupApplyRequest,
   DumpRemoteBackupPreviewRequest,
   DumpRemoteBackupStatus
@@ -42,16 +38,4 @@ export async function previewRemoteDump(input: DumpRemoteBackupPreviewRequest = 
 
 export async function applyRemoteDump(input: DumpRemoteBackupApplyRequest): Promise<DumpBackupApplyResult> {
   return api.post("dumps/remote/apply", { json: input, timeout: BACKUP_OPERATION_TIMEOUT_MS }).json<DumpBackupApplyResult>();
-}
-
-export async function runIncrementalRemoteSync(): Promise<DumpIncrementalSyncResult> {
-  return api.post("dumps/remote/sync", { timeout: BACKUP_OPERATION_TIMEOUT_MS }).json<DumpIncrementalSyncResult>();
-}
-
-export async function previewIncrementalRemoteSync(): Promise<DumpIncrementalSyncPreviewResult> {
-  return api.get("dumps/remote/sync/preview", { timeout: BACKUP_OPERATION_TIMEOUT_MS }).json<DumpIncrementalSyncPreviewResult>();
-}
-
-export async function applyIncrementalRemoteSync(input: DumpIncrementalSyncApplyRequest): Promise<DumpIncrementalSyncApplyResult> {
-  return api.post("dumps/remote/sync/apply", { json: input, timeout: BACKUP_OPERATION_TIMEOUT_MS }).json<DumpIncrementalSyncApplyResult>();
 }

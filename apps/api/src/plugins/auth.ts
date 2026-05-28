@@ -45,6 +45,7 @@ function resourceForPath(path: string): AuthResource {
   const segmentMap: Array<[string, AuthResource]> = [
     ["/comments", "comments"],
     ["/notes", "notes"],
+    ["/content/images", "contentImages"],
     ["/attachments", "attachments"],
     ["/tickets", "tickets"],
     ["/tasks", "tasks"],

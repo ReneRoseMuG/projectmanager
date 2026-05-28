@@ -70,7 +70,7 @@ describe("Features API", () => {
     fs.rmSync(previewCacheDir, { recursive: true, force: true });
   });
 
-  it("POST erstellt Feature und Markdown-Datei", async () => {
+  it("POST erstellt Feature mit DB-Content", async () => {
     const res = await supertest(app.server)
       .post("/api/features")
       .send({ title: "FT-01", content: "# FT-01\n\nBeschreibung." })
@@ -78,8 +78,9 @@ describe("Features API", () => {
 
     expect(res.body).toMatchObject({ title: "FT-01", status: "draft" });
     expect(res.body).not.toHaveProperty("slug");
-    expect(res.body.contentPath).toMatch(/content\/features\/feature-\d+\.md/);
-    expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# FT-01\n\nBeschreibung.");
+    expect(res.body.contentPath).toBeNull();
+    const row = testDb.sqlite.prepare("SELECT content FROM features WHERE id = ?").get(res.body.id) as { content: string };
+    expect(row.content).toBe("# FT-01\n\nBeschreibung.");
   });
 
   it("POST setzt Default-Werte", async () => {
@@ -129,13 +130,30 @@ describe("Features API", () => {
     expect(res.body.content).toBe("# Detail");
   });
 
-  it("PATCH aktualisiert Content und Datei", async () => {
+  it("GET einzelnes Feature liest Legacy-Dateicontent als Fallback", async () => {
+    const contentPath = "content/features/legacy-feature.md";
+    fs.writeFileSync(resolveStoredContentPath(contentPath), "# Legacy Feature", "utf8");
+    const now = new Date().toISOString();
+    const result = testDb.sqlite
+      .prepare(
+        "INSERT INTO features (title, status, content_path, content, sort_order, version, created_at, updated_at) VALUES (?, 'draft', ?, NULL, 0, 1, ?, ?)"
+      )
+      .run("Legacy Feature", contentPath, now, now);
+
+    const res = await supertest(app.server).get(`/api/features/${result.lastInsertRowid}`).expect(200);
+
+    expect(res.body.content).toBe("# Legacy Feature");
+    expect(res.body.contentPath).toBe(contentPath);
+  });
+
+  it("PATCH aktualisiert DB-Content", async () => {
     const feature = await createFeature(app, { title: "Patchfeature", content: "# Alt" });
 
     const res = await supertest(app.server).patch(`/api/features/${feature.id}`).send({ content: "# Neu", expectedVersion: feature.version }).expect(200);
 
     expect(res.body.content).toBe("# Neu");
-    expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# Neu");
+    const row = testDb.sqlite.prepare("SELECT content FROM features WHERE id = ?").get(feature.id) as { content: string };
+    expect(row.content).toBe("# Neu");
   });
 
   it("PATCH aktualisiert Metadaten", async () => {
@@ -151,22 +169,19 @@ describe("Features API", () => {
 
   it("PATCH mit neuem Titel behÃ¤lt Datei", async () => {
     const feature = await createFeature(app, { title: "Alter Titel", content: "# Inhalt" });
-    const oldPath = resolveStoredContentPath(feature.contentPath ?? "");
-
     const res = await supertest(app.server).patch(`/api/features/${feature.id}`).send({ title: "Neuer Titel", expectedVersion: feature.version }).expect(200);
 
     expect(res.body.contentPath).toBe(feature.contentPath);
-    expect(fs.existsSync(oldPath)).toBe(true);
-    expect(fs.existsSync(resolveStoredContentPath(res.body.contentPath))).toBe(true);
+    const row = testDb.sqlite.prepare("SELECT content FROM features WHERE id = ?").get(feature.id) as { content: string };
+    expect(row.content).toBe("# Inhalt");
   });
 
   it("DELETE entfernt Feature und Datei", async () => {
     const feature = await createFeature(app, { title: "LÃ¶schfeature" });
-    const contentPath = resolveStoredContentPath(feature.contentPath ?? "");
-
     await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-    expect(fs.existsSync(contentPath)).toBe(false);
+    const row = testDb.sqlite.prepare("SELECT id FROM features WHERE id = ?").get(feature.id);
+    expect(row).toBeUndefined();
     await supertest(app.server).get(`/api/features/${feature.id}`).expect(404);
   });
 

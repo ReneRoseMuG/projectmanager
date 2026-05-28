@@ -2,6 +2,14 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 28.05.26 | Feature       | Rene Ein-Klick-Login                         | ⚠️     |
+| 27.05.26 | Fix           | Content Backfill                             | ⚠️     |
+| 27.05.26 | 2             | Backup straffen                              | ✅     |
+| 27.05.26 | 1             | HTML-Content in der DB                       | ✅     |
+| 27.05.26 | Fix           | Backup Altbackup User Remap                  | ✅     |
+| 27.05.26 | Feature       | Backup User Vollrestore                      | ⚠️     |
+| 27.05.26 | Fix           | Migrationen nachholen                        | ⚠️     |
+| 27.05.26 | Fix           | Backup-Import-Fehlermeldung                 | ✅     |
 | 27.05.26 | Fix           | Web-Testdrift                                | ✅     |
 | 27.05.26 | 1             | Kalender-Dashboard und WeekEventTile-Design  | ⚠️     |
 | 27.05.26 | Fix           | Migrationen ausführen                        | ⚠️     |

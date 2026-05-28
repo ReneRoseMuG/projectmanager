@@ -24,6 +24,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { assetUrl } from "../../api/client";
+import { uploadContentImage } from "../../api/content-images";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useCatalogs } from "../../hooks/useCatalogs";
@@ -395,6 +396,8 @@ export function FeatureForm({
       }
     : undefined;
 
+  const uploadContentEditorImage = async (file: File): Promise<string> => uploadContentImage(file);
+
   const projectParentItems = useMemo(
     () => projects.projects.map(projectParentItem),
     [projects.projects],
@@ -603,7 +606,7 @@ export function FeatureForm({
                 value={content}
                 placeholder="Feature-Inhalt"
                 testIdPrefix="feature-form-content"
-                onImageUpload={uploadEditorImage}
+                onImageUpload={uploadContentEditorImage}
                 onChange={setContent}
               />
             </Section>

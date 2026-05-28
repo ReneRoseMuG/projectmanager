@@ -5,7 +5,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type FeatureRecord = typeof features.$inferSelect;
 export type FeatureCreateData = Omit<typeof features.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type FeatureUpdateData = Partial<Pick<FeatureCreateData, "title" | "status" | "description" | "contentPath" | "sortOrder">>;
+export type FeatureUpdateData = Partial<Pick<FeatureCreateData, "title" | "status" | "description" | "contentPath" | "content" | "sortOrder">>;
 
 function nowIso(): string {
   return new Date().toISOString();

@@ -341,7 +341,7 @@ export interface ApiErrorPayload {
   statusCode: number;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "dumps", "settings", "realtime", "users", "roles"] as const;
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "dumps", "settings", "realtime", "users", "roles"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";
@@ -416,7 +416,7 @@ export interface RealtimeInvalidationEvent {
   occurredAt: string;
 }
 
-export type BackupProgressOperation = "full_backup" | "incremental_sync" | "import";
+export type BackupProgressOperation = "full_backup" | "import";
 
 export interface BackupProgressEvent {
   type: "backup_progress";
@@ -1146,6 +1146,7 @@ export interface DumpFileRootSummary {
   fileCount: number;
   totalBytes: number;
   sha256: string;
+  partial?: boolean;
 }
 
 export interface DumpBackupStatus {
@@ -1178,16 +1179,8 @@ export interface DumpRemoteUploadResult {
   error: string | null;
 }
 
-export interface DumpIncrementalSyncResult {
-  success: boolean;
-  error: string | null;
-  tablesUpdated: boolean;
-  filesUploaded: number;
-  filesDeleted: number;
-  filesDeleteFailed: number;
-  totalRemoteFiles: number;
-  syncedAt: string;
-  warnings: string[];
+export interface ContentImageUploadResponse {
+  url: string;
 }
 
 export interface DumpBackupSaveResult {
@@ -1230,28 +1223,6 @@ export interface DumpRemoteBackupApplyRequest {
   confirmed: boolean;
 }
 
-export interface DumpIncrementalSyncPreviewResult {
-  manifestHash: string;
-  dumpId: string;
-  remoteDirectory: string;
-  targetDatabasePath: string;
-  transferReadiness: DumpReadiness;
-  blockingIssues: string[];
-  warnings: string[];
-  manifestPresent: boolean;
-  schemaRevision: string | null;
-  syncedAt: string;
-  expectedTables: DumpTableSummary[];
-  expectedFileRoots: DumpFileRootSummary[];
-  totalFiles: number;
-  totalBytes: number;
-}
-
-export interface DumpIncrementalSyncApplyRequest {
-  manifestHash: string;
-  confirmed: boolean;
-}
-
 export interface DumpBackupApplyResult {
   dumpId: string;
   backupFile: DumpBackupFile;
@@ -1264,15 +1235,3 @@ export interface DumpBackupApplyResult {
   blockingIssues: string[];
 }
 
-export interface DumpIncrementalSyncApplyResult {
-  dumpId: string;
-  manifestHash: string;
-  remoteDirectory: string;
-  targetBackupPath: string;
-  verificationPassed: boolean;
-  importStatus: DumpImportStatus;
-  tablesRestored: number;
-  fileRootsRestored: DumpFileRootSummary[];
-  warnings: string[];
-  blockingIssues: string[];
-}

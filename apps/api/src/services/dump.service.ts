@@ -9,10 +9,6 @@ import type {
   DumpRemoteBackupFile,
   DumpRemoteBackupStatus,
   DumpRemoteUploadResult,
-  DumpIncrementalSyncApplyRequest,
-  DumpIncrementalSyncApplyResult,
-  DumpIncrementalSyncPreviewResult,
-  DumpIncrementalSyncResult,
   DumpTableSummary,
 } from "@taskmanager/shared-types";
 import * as archiverPackage from "archiver";
@@ -31,25 +27,17 @@ import {
 } from "../runtime-safety.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import {
-  batchSftpOperations,
-  deleteBackupSftpFileInSession,
   downloadBackupSftpFile,
-  downloadBackupSftpTextFileInSession,
-  downloadBackupSftpTextFile,
   getBackupSftpReadiness,
   listBackupSftpFiles,
   uploadBackupSftpFile,
-  uploadBackupSftpFileAtPathInSession,
-  uploadBackupSftpFileInSession,
-  type BackupSftpClient,
 } from "./backup-sftp.service.js";
 import { getContentBaseDir } from "./content.service.js";
 
 const APP_ID = "taskmanager";
-const DUMP_FORMAT_VERSION = 10;
-const SUPPORTED_DUMP_FORMAT_VERSIONS = [8, 9, DUMP_FORMAT_VERSION] as const;
+const DUMP_FORMAT_VERSION = 12;
+const SUPPORTED_DUMP_FORMAT_VERSIONS = [8, 9, 10, 11, DUMP_FORMAT_VERSION] as const;
 const DUMP_FILENAME_PREFIX = "taskmanager_dump_";
-const STANDARD_ADMIN_SETUP_SETTING_KEY = "admin_setup_done";
 const REMOTE_IMPORT_HISTORY_SETTING_KEY = "remote_dump_import_history";
 const ZipArchive = (
   archiverPackage as unknown as {
@@ -87,6 +75,7 @@ const DUMP_TABLES = [
   { key: "wikiPages", tableName: "wiki_pages" },
   { key: "comments", tableName: "comments" },
   { key: "attachments", tableName: "attachments" },
+  { key: "contentImages", tableName: "content_images" },
   { key: "events", tableName: "events" },
   { key: "sentNotifications", tableName: "sent_notifications" },
   { key: "projectEvents", tableName: "project_events" },
@@ -159,6 +148,7 @@ interface DumpFileSourceEntry {
 
 interface DumpFileRootManifest extends DumpFileRootSummary {
   files: DumpFileEntry[];
+  partial?: boolean;
 }
 
 interface DumpManifest {
@@ -188,23 +178,11 @@ interface ArchiveProgressState {
   progressCallback?: BackupProgressCallback;
 }
 
-interface SyncFileEntry extends DumpFileEntry {
-  root: "uploads" | "content";
-  remotePath: string;
-  localPath: string;
-}
-
-interface InspectedIncrementalSync {
-  payload: DumpPayload;
-  manifest: DumpManifest;
-  manifestHash: string;
-  preview: DumpIncrementalSyncPreviewResult;
-}
-
 interface InspectedDump extends DumpBackupPreviewResult {
   payload: DumpPayload;
   directory: unzipper.CentralDirectory;
   zipFileBuffers: ZipFileBufferCache;
+  manifest: DumpManifest | null;
 }
 
 type ZipFileBufferCache = Map<string, Buffer>;
@@ -214,18 +192,45 @@ interface StagedFileRoots {
   content: string;
 }
 
-interface FileRootBackup {
+interface FileRootSwap {
   key: "uploads" | "content";
   targetDir: string;
-  backupDir: string;
-  existed: boolean;
+  previousDir: string;
+  stagedDir: string;
+  targetExisted: boolean;
+  swapped: boolean;
 }
 
-interface PreservedLocalAuth {
-  admin: Record<string, unknown> | null;
-  adminSetup: Record<string, unknown> | null;
-  remoteImportHistory: Record<string, unknown> | null;
-  adminSettings: Array<Record<string, unknown>>;
+interface LegacyStandardAdminFallback {
+  id: number;
+  row: Record<string, unknown>;
+}
+
+interface ForeignKeyViolation {
+  table: string;
+  rowid: number;
+  parent: string;
+  fkid: number;
+}
+
+interface ForeignKeyDefinition {
+  id: number;
+  seq: number;
+  table: string;
+  from: string;
+  to: string;
+}
+
+interface MissingUserReference {
+  table: string;
+  rowid: number;
+  column: string;
+  userId: number;
+}
+
+interface RestoreTablesResult {
+  restored: number;
+  refreshedTableKeys: Set<DumpTableKey>;
 }
 
 interface ApplyDumpOptions {
@@ -251,7 +256,6 @@ interface RemoteDumpImportHistoryEntry {
 }
 
 const activeRemoteImports = new Set<string>();
-let activeIncrementalRemoteOperation = false;
 
 function quoteIdentifier(value: string): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) {
@@ -284,6 +288,25 @@ function ensureWorkDir(): string {
   assertSafeTestDirectoryPath(config.backupWorkDir, "BACKUP_WORK_DIR");
   fs.mkdirSync(config.backupWorkDir, { recursive: true });
   return config.backupWorkDir;
+}
+
+function localBackupManifestPath(): string {
+  const dataDir = path.dirname(config.databasePath);
+  fs.mkdirSync(dataDir, { recursive: true });
+  return path.join(dataDir, "last-backup-manifest.json");
+}
+
+function readLastLocalBackupManifest(): DumpManifest | null {
+  try {
+    return parseManifest(JSON.parse(fs.readFileSync(localBackupManifestPath(), "utf8")) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+function writeLastLocalBackupManifest(manifest: DumpManifest): void {
+  const manifestPath = localBackupManifestPath();
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
 
 function isDumpBackupFilename(filename: string): boolean {
@@ -479,22 +502,60 @@ function numericValue(value: unknown): number | null {
   return Number.isInteger(numeric) ? numeric : null;
 }
 
+function isSerializedBlob(value: unknown): value is { __blobBase64: string } {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      typeof (value as { __blobBase64?: unknown }).__blobBase64 === "string",
+  );
+}
+
+function isBlobColumn(tableName: string, column: string): boolean {
+  return tableName === "content_images" && column === "data";
+}
+
+function serializeTableRow(
+  tableName: string,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...row };
+  for (const [column, value] of Object.entries(result)) {
+    if (isBlobColumn(tableName, column) && Buffer.isBuffer(value)) {
+      result[column] = { __blobBase64: value.toString("base64") };
+    }
+  }
+  return result;
+}
+
+function deserializeTableRow(
+  tableName: string,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...row };
+  for (const [column, value] of Object.entries(result)) {
+    if (!isBlobColumn(tableName, column)) {
+      continue;
+    }
+    if (Buffer.isBuffer(value) || value === null || value === undefined) {
+      continue;
+    }
+    if (!isSerializedBlob(value)) {
+      throw badRequest(`Dump table '${tableName}' column '${column}' has an invalid blob value`);
+    }
+    result[column] = Buffer.from(value.__blobBase64, "base64");
+  }
+  return result;
+}
+
 function selectTableRows(
   sqlite: Database.Database,
   tableName: string,
 ): Array<Record<string, unknown>> {
   return sqlite
     .prepare(`SELECT * FROM ${quoteIdentifier(tableName)} ORDER BY rowid`)
-    .all() as Array<Record<string, unknown>>;
-}
-
-function findStandardAdminId(
-  rows: Array<Record<string, unknown>>,
-): number | null {
-  const admin = rows.find(
-    (row) => stringValue(row.email)?.toLowerCase() === standardAdminEmail(),
-  );
-  return admin ? numericValue(admin.id) : null;
+    .all()
+    .map((row) => serializeTableRow(tableName, row as Record<string, unknown>));
 }
 
 function buildRoleCodeById(
@@ -511,53 +572,31 @@ function buildRoleCodeById(
   return result;
 }
 
-function clearStandardAdminReferences(
-  row: Record<string, unknown>,
-  standardAdminId: number | null,
-): Record<string, unknown> {
-  if (standardAdminId === null) {
-    return { ...row };
-  }
-
-  const result = { ...row };
-  for (const column of ["created_by", "updated_by", "actor_user_id"]) {
-    if (numericValue(result[column]) === standardAdminId) {
-      result[column] = null;
-    }
-  }
-  return result;
-}
-
 function normalizeUserRows(
   rows: Array<Record<string, unknown>>,
   roleCodeById: Map<number, string>,
 ): Array<Record<string, unknown>> {
-  return rows
-    .filter(
-      (row) => stringValue(row.email)?.toLowerCase() !== standardAdminEmail(),
-    )
-    .map((row) => {
-      const result = { ...row };
-      const roleCode = stringValue(result.roleCode);
-      if (!roleCode) {
-        const roleId = numericValue(result.role_id);
-        if (roleId === null) {
-          throw badRequest("Dump user is missing a role reference");
-        }
-        const mappedRoleCode = roleCodeById.get(roleId);
-        if (!mappedRoleCode) {
-          throw badRequest("Dump user references an unknown role");
-        }
-        result.roleCode = mappedRoleCode;
+  return rows.map((row) => {
+    const result = { ...row };
+    const roleCode = stringValue(result.roleCode);
+    if (!roleCode) {
+      const roleId = numericValue(result.role_id);
+      if (roleId === null) {
+        throw badRequest("Dump user is missing a role reference");
       }
-      delete result.role_id;
-      return result;
-    });
+      const mappedRoleCode = roleCodeById.get(roleId);
+      if (!mappedRoleCode) {
+        throw badRequest("Dump user references an unknown role");
+      }
+      result.roleCode = mappedRoleCode;
+    }
+    delete result.role_id;
+    return result;
+  });
 }
 
 function normalizeDumpTables(tables: DumpTableRows): DumpTableRows {
   const result = {} as DumpTableRows;
-  const standardAdminId = findStandardAdminId(tables.users);
   const roleCodeById = buildRoleCodeById(tables.roles);
 
   for (const entry of DUMP_TABLES) {
@@ -565,30 +604,7 @@ function normalizeDumpTables(tables: DumpTableRows): DumpTableRows {
       result.users = normalizeUserRows(tables.users, roleCodeById);
       continue;
     }
-    if (entry.key === "appSettings") {
-      result.appSettings = tables.appSettings.filter(
-        (row) =>
-          row.key !== STANDARD_ADMIN_SETUP_SETTING_KEY &&
-          row.key !== REMOTE_IMPORT_HISTORY_SETTING_KEY,
-      );
-      continue;
-    }
-    if (entry.key === "settingsValues") {
-      result.settingsValues = tables.settingsValues
-        .filter(
-          (row) =>
-            !(
-              standardAdminId !== null &&
-              row.scope_type === "USER" &&
-              String(row.scope_id) === String(standardAdminId)
-            ),
-        )
-        .map((row) => clearStandardAdminReferences(row, standardAdminId));
-      continue;
-    }
-    result[entry.key] = tables[entry.key].map((row) =>
-      clearStandardAdminReferences(row, standardAdminId),
-    );
+    result[entry.key] = tables[entry.key].map((row) => ({ ...row }));
   }
 
   return result;
@@ -712,6 +728,7 @@ function listFileSourcesRecursive(rootDir: string): DumpFileSourceEntry[] {
 function buildFileRootManifestFromEntries(
   key: "uploads" | "content",
   files: DumpFileEntry[],
+  partial = false,
 ): DumpFileRootManifest {
   return {
     key,
@@ -719,6 +736,7 @@ function buildFileRootManifestFromEntries(
     totalBytes: files.reduce((sum, entry) => sum + entry.sizeBytes, 0),
     sha256: sha256Json(files),
     files,
+    ...(partial ? { partial: true } : {}),
   };
 }
 
@@ -743,12 +761,14 @@ function buildFileRootSummaries(manifest: DumpManifest): DumpFileRootSummary[] {
       fileCount: manifest.fileRoots.uploads.fileCount,
       totalBytes: manifest.fileRoots.uploads.totalBytes,
       sha256: manifest.fileRoots.uploads.sha256,
+      ...(manifest.fileRoots.uploads.partial ? { partial: true } : {}),
     },
     {
       key: "content",
       fileCount: manifest.fileRoots.content.fileCount,
       totalBytes: manifest.fileRoots.content.totalBytes,
       sha256: manifest.fileRoots.content.sha256,
+      ...(manifest.fileRoots.content.partial ? { partial: true } : {}),
     },
   ];
 }
@@ -769,7 +789,7 @@ function buildDumpSnapshot(
       }
     : {
         uploads: buildFileRootManifest("uploads", config.uploadDir),
-        content: buildFileRootManifest("content", getContentBaseDir()),
+        content: buildEmptyFileRootManifest("content"),
       };
   const payload: DumpPayload = {
     appId: APP_ID,
@@ -794,55 +814,6 @@ function buildDumpSnapshot(
     payload,
     manifest,
   };
-}
-
-function fileRootEntries(
-  root: "uploads" | "content",
-  rootDir: string,
-): SyncFileEntry[] {
-  return listFilesRecursive(rootDir).map((entry) => ({
-    ...entry,
-    root,
-    remotePath: `${root}/${entry.relativePath}`,
-    localPath: path.join(rootDir, entry.relativePath),
-  }));
-}
-
-function currentSyncFileEntries(): SyncFileEntry[] {
-  return [
-    ...fileRootEntries("uploads", config.uploadDir),
-    ...fileRootEntries("content", getContentBaseDir()),
-  ].sort((a, b) => a.remotePath.localeCompare(b.remotePath, "en"));
-}
-
-function manifestFileHashByRemotePath(
-  manifest: DumpManifest | null,
-): Map<string, string> {
-  const result = new Map<string, string>();
-  if (!manifest) {
-    return result;
-  }
-  for (const root of ["uploads", "content"] as const) {
-    for (const file of manifest.fileRoots[root].files) {
-      result.set(`${root}/${file.relativePath}`, file.sha256);
-    }
-  }
-  return result;
-}
-
-function readSyncFileBuffer(file: SyncFileEntry): Buffer {
-  assertSafeRelativePath(file.relativePath);
-  const rootDir =
-    file.root === "uploads" ? config.uploadDir : getContentBaseDir();
-  const resolvedRoot = path.resolve(rootDir);
-  const targetPath = path.resolve(resolvedRoot, file.relativePath);
-  const safeRoot = resolvedRoot.endsWith(path.sep)
-    ? resolvedRoot
-    : `${resolvedRoot}${path.sep}`;
-  if (!targetPath.startsWith(safeRoot)) {
-    throw badRequest("Sync contains an unsafe file path");
-  }
-  return fs.readFileSync(targetPath);
 }
 
 function archiveToFile(archive: Archiver, targetPath: string): Promise<void> {
@@ -893,12 +864,41 @@ function emitArchiveProgress(
   });
 }
 
+function buildFileEntriesFromSources(
+  sources: DumpFileSourceEntry[],
+): DumpFileEntry[] {
+  return sources.map((source) => {
+    const buffer = fs.readFileSync(source.absolutePath);
+    return {
+      relativePath: source.relativePath,
+      sizeBytes: buffer.byteLength,
+      sha256: sha256Buffer(buffer),
+    };
+  });
+}
+
+function fileHashByRelativePath(
+  manifest: DumpFileRootManifest | null | undefined,
+): Map<string, string> {
+  return new Map((manifest?.files ?? []).map((file) => [file.relativePath, file.sha256]));
+}
+
+function selectChangedFileSources(
+  sources: DumpFileSourceEntry[],
+  currentFiles: DumpFileEntry[],
+  previousManifest: DumpFileRootManifest | null | undefined,
+): DumpFileSourceEntry[] {
+  const previousHashes = fileHashByRelativePath(previousManifest);
+  const currentByPath = new Map(currentFiles.map((file) => [file.relativePath, file]));
+  return sources.filter((source) => previousHashes.get(source.relativePath) !== currentByPath.get(source.relativePath)?.sha256);
+}
+
 function appendBufferedFileRoot(
   archive: Archiver,
   key: "uploads" | "content",
   sources: DumpFileSourceEntry[],
   progressState?: ArchiveProgressState,
-): DumpFileRootManifest {
+): DumpFileEntry[] {
   const files: DumpFileEntry[] = [];
   for (const source of sources) {
     const buffer = fs.readFileSync(source.absolutePath);
@@ -913,7 +913,7 @@ function appendBufferedFileRoot(
       emitArchiveProgress(progressState, `${key}/${source.relativePath}`);
     }
   }
-  return buildFileRootManifestFromEntries(key, files);
+  return files;
 }
 
 function createArchiveFromSnapshot(
@@ -925,8 +925,14 @@ function createArchiveFromSnapshot(
     name: "data.json",
   });
   const uploadSources = listFileSourcesRecursive(config.uploadDir);
-  const contentSources = listFileSourcesRecursive(getContentBaseDir());
-  const totalBytes = [...uploadSources, ...contentSources].reduce(
+  const currentUploadFiles = buildFileEntriesFromSources(uploadSources);
+  const previousManifest = readLastLocalBackupManifest();
+  const uploadSourcesToArchive = selectChangedFileSources(
+    uploadSources,
+    currentUploadFiles,
+    previousManifest?.fileRoots.uploads,
+  );
+  const totalBytes = uploadSourcesToArchive.reduce(
     (sum, entry) => sum + entry.sizeBytes,
     0,
   );
@@ -936,19 +942,19 @@ function createArchiveFromSnapshot(
   if (progressState) {
     emitArchiveProgress(progressState, snapshot.filename);
   }
+  appendBufferedFileRoot(
+    archive,
+    "uploads",
+    uploadSourcesToArchive,
+    progressState,
+  );
   snapshot.manifest.fileRoots = {
-    uploads: appendBufferedFileRoot(
-      archive,
+    uploads: buildFileRootManifestFromEntries(
       "uploads",
-      uploadSources,
-      progressState,
+      currentUploadFiles,
+      previousManifest !== null && uploadSourcesToArchive.length < uploadSources.length,
     ),
-    content: appendBufferedFileRoot(
-      archive,
-      "content",
-      contentSources,
-      progressState,
-    ),
+    content: buildEmptyFileRootManifest("content"),
   };
   archive.append(`${JSON.stringify(snapshot.manifest, null, 2)}\n`, {
     name: "manifest.json",
@@ -971,25 +977,12 @@ async function writeDumpArchiveFile(
   };
 }
 
-async function buildDumpArchiveFile(
+async function createDatabaseSnapshot(
   sqlite: Database.Database,
-  targetPath?: string,
-): Promise<{
-  filePath: string;
-  sizeBytes: number;
-  dumpId: string;
-  filename: string;
-  manifest: DumpManifest;
-}> {
-  const snapshot = buildDumpSnapshot(sqlite, { deferFileRoots: true });
-  const filePath = targetPath ?? path.join(ensureWorkDir(), snapshot.filename);
-  const archiveFile = await writeDumpArchiveFile(snapshot, filePath);
-  return {
-    ...archiveFile,
-    dumpId: snapshot.dumpId,
-    filename: snapshot.filename,
-    manifest: snapshot.manifest,
-  };
+  targetPath: string,
+): Promise<void> {
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+  await sqlite.backup(targetPath);
 }
 
 export async function buildDumpArchive(sqlite: Database.Database): Promise<{
@@ -1112,6 +1105,7 @@ function parseFileRootManifest(
     totalBytes,
     sha256,
     files,
+    ...(candidate.partial === true ? { partial: true } : {}),
   };
 }
 
@@ -1211,6 +1205,83 @@ async function collectZipFiles(
     sha256: sha256Json(files),
     files,
   };
+}
+
+function fileEntryKey(file: DumpFileEntry): string {
+  return `${file.relativePath}:${file.sizeBytes}:${file.sha256}`;
+}
+
+function validateZipFilesAgainstManifest(
+  root: "uploads" | "content",
+  manifestRoot: DumpFileRootManifest,
+  actualRoot: DumpFileRootManifest,
+): string[] {
+  const issues: string[] = [];
+  const expectedByPath = new Map(manifestRoot.files.map((file) => [file.relativePath, file]));
+  for (const actual of actualRoot.files) {
+    const expected = expectedByPath.get(actual.relativePath);
+    if (!expected) {
+      issues.push(`ZIP file '${root}/${actual.relativePath}' is not listed in the manifest.`);
+      continue;
+    }
+    if (fileEntryKey(actual) !== fileEntryKey(expected)) {
+      issues.push(`ZIP file '${root}/${actual.relativePath}' does not match the manifest.`);
+    }
+  }
+
+  if (!manifestRoot.partial) {
+    for (const expected of manifestRoot.files) {
+      if (!actualRoot.files.some((actual) => actual.relativePath === expected.relativePath)) {
+        issues.push(`Manifest file '${root}/${expected.relativePath}' is missing in the ZIP.`);
+      }
+    }
+  }
+  return issues;
+}
+
+function localRootDir(root: "uploads" | "content"): string {
+  return root === "uploads" ? config.uploadDir : getContentBaseDir();
+}
+
+function safeLocalFilePath(root: "uploads" | "content", relativePath: string): string {
+  assertSafeRelativePath(relativePath);
+  const rootDir = path.resolve(localRootDir(root));
+  const targetPath = path.resolve(rootDir, relativePath);
+  const safeRoot = rootDir.endsWith(path.sep) ? rootDir : `${rootDir}${path.sep}`;
+  if (!targetPath.startsWith(safeRoot)) {
+    throw badRequest("Dump contains an unsafe file path");
+  }
+  return targetPath;
+}
+
+function verifyLocalBaseFile(root: "uploads" | "content", file: DumpFileEntry): string | null {
+  const targetPath = safeLocalFilePath(root, file.relativePath);
+  if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isFile()) {
+    return `Partial dump requires local base file '${root}/${file.relativePath}', but it is missing.`;
+  }
+  const buffer = fs.readFileSync(targetPath);
+  if (buffer.byteLength !== file.sizeBytes || sha256Buffer(buffer) !== file.sha256) {
+    return `Partial dump requires local base file '${root}/${file.relativePath}', but its hash does not match.`;
+  }
+  return null;
+}
+
+function validatePartialLocalBase(
+  root: "uploads" | "content",
+  manifestRoot: DumpFileRootManifest,
+  actualRoot: DumpFileRootManifest,
+): string[] {
+  if (!manifestRoot.partial) {
+    return [];
+  }
+  const zipPaths = new Set(actualRoot.files.map((file) => file.relativePath));
+  return manifestRoot.files.flatMap((file) => {
+    if (zipPaths.has(file.relativePath)) {
+      return [];
+    }
+    const issue = verifyLocalBaseFile(root, file);
+    return issue ? [issue] : [];
+  });
 }
 
 function buildConfirmationPhrase(
@@ -1314,24 +1385,12 @@ export async function inspectDumpArchive(
         blockingIssues.push(`Manifest hash does not match table '${key}'.`);
       }
     }
-    if (
-      manifest.fileRoots.uploads.fileCount !== actualUploads.fileCount ||
-      manifest.fileRoots.uploads.totalBytes !== actualUploads.totalBytes ||
-      manifest.fileRoots.uploads.sha256 !== actualUploads.sha256
-    ) {
-      blockingIssues.push(
-        "Manifest upload summary does not match ZIP content.",
-      );
-    }
-    if (
-      manifest.fileRoots.content.fileCount !== actualContent.fileCount ||
-      manifest.fileRoots.content.totalBytes !== actualContent.totalBytes ||
-      manifest.fileRoots.content.sha256 !== actualContent.sha256
-    ) {
-      blockingIssues.push(
-        "Manifest content summary does not match ZIP content.",
-      );
-    }
+    blockingIssues.push(
+      ...validateZipFilesAgainstManifest("uploads", manifest.fileRoots.uploads, actualUploads),
+      ...validateZipFilesAgainstManifest("content", manifest.fileRoots.content, actualContent),
+      ...validatePartialLocalBase("uploads", manifest.fileRoots.uploads, actualUploads),
+      ...validatePartialLocalBase("content", manifest.fileRoots.content, actualContent),
+    );
   }
 
   const roleCodes = new Set(
@@ -1365,6 +1424,7 @@ export async function inspectDumpArchive(
     payload,
     directory,
     zipFileBuffers,
+    manifest,
     fileHash: sha256Buffer(buffer),
     dumpId: payload.dumpId,
     backupFile,
@@ -1388,23 +1448,19 @@ export async function inspectDumpArchive(
   };
 }
 
-async function stageZipRoot(
-  directory: unzipper.CentralDirectory,
+async function stageZipRootWithoutManifest(
   archiveRoot: "uploads" | "content",
   zipFileBuffers: ZipFileBufferCache,
 ): Promise<string> {
   const stageDir = makeTempDir(`taskmanager-dump-${archiveRoot}-`);
   const prefix = `${archiveRoot}/`;
   try {
-    for (const file of directory.files.filter(
-      (entry) => entry.path.startsWith(prefix) && !entry.path.endsWith("/"),
-    )) {
-      const relativePath = file.path.slice(prefix.length);
-      assertSafeRelativePath(relativePath);
-      const buffer = zipFileBuffers.get(file.path);
-      if (!buffer) {
-        throw badRequest("Dump ZIP file cache is incomplete");
+    for (const [zipPath, buffer] of zipFileBuffers.entries()) {
+      if (!zipPath.startsWith(prefix)) {
+        continue;
       }
+      const relativePath = zipPath.slice(prefix.length);
+      assertSafeRelativePath(relativePath);
       const targetPath = path.resolve(stageDir, relativePath);
       const stageRoot = stageDir.endsWith(path.sep)
         ? stageDir
@@ -1422,58 +1478,118 @@ async function stageZipRoot(
   }
 }
 
-async function stageFileRoots(
-  directory: unzipper.CentralDirectory,
+async function stageFileRootFromManifest(
+  archiveRoot: "uploads" | "content",
   zipFileBuffers: ZipFileBufferCache,
-): Promise<StagedFileRoots> {
-  return {
-    uploads: await stageZipRoot(directory, "uploads", zipFileBuffers),
-    content: await stageZipRoot(directory, "content", zipFileBuffers),
-  };
-}
-
-function createFileRootBackups(backupRoot: string): FileRootBackup[] {
-  const roots: Array<{ key: "uploads" | "content"; targetDir: string }> = [
-    { key: "uploads", targetDir: config.uploadDir },
-    { key: "content", targetDir: getContentBaseDir() },
-  ];
-
-  return roots.map((root) => {
-    const backupDir = path.join(backupRoot, root.key);
-    const existed = fs.existsSync(root.targetDir);
-    if (existed) {
-      fs.mkdirSync(path.dirname(backupDir), { recursive: true });
-      fs.cpSync(root.targetDir, backupDir, { recursive: true, force: true });
+  manifestRoot: DumpFileRootManifest,
+): Promise<string> {
+  const stageDir = makeTempDir(`taskmanager-dump-${archiveRoot}-`);
+  const prefix = `${archiveRoot}/`;
+  try {
+    for (const file of manifestRoot.files) {
+      const zipPath = `${prefix}${file.relativePath}`;
+      let buffer = zipFileBuffers.get(zipPath);
+      if (buffer) {
+        if (buffer.byteLength !== file.sizeBytes || sha256Buffer(buffer) !== file.sha256) {
+          throw badRequest(`Dump ZIP file '${zipPath}' does not match the manifest`);
+        }
+      } else {
+        if (!manifestRoot.partial) {
+          throw badRequest(`Dump ZIP file '${zipPath}' is missing`);
+        }
+        const issue = verifyLocalBaseFile(archiveRoot, file);
+        if (issue) {
+          throw badRequest(issue);
+        }
+        buffer = fs.readFileSync(safeLocalFilePath(archiveRoot, file.relativePath));
+      }
+      const targetPath = path.resolve(stageDir, file.relativePath);
+      const stageRoot = stageDir.endsWith(path.sep)
+        ? stageDir
+        : `${stageDir}${path.sep}`;
+      if (!targetPath.startsWith(stageRoot)) {
+        throw badRequest("Dump contains an unsafe file path");
+      }
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      fs.writeFileSync(targetPath, buffer);
     }
-    return { ...root, backupDir, existed };
-  });
-}
-
-function replaceFileRoots(stagedRoots: StagedFileRoots): void {
-  const replacements: Array<{ targetDir: string; stageDir: string }> = [
-    { targetDir: config.uploadDir, stageDir: stagedRoots.uploads },
-    { targetDir: getContentBaseDir(), stageDir: stagedRoots.content },
-  ];
-
-  for (const replacement of replacements) {
-    fs.rmSync(replacement.targetDir, { recursive: true, force: true });
-    fs.mkdirSync(path.dirname(replacement.targetDir), { recursive: true });
-    fs.cpSync(replacement.stageDir, replacement.targetDir, {
-      recursive: true,
-      force: true,
-    });
+    return stageDir;
+  } catch (error) {
+    fs.rmSync(stageDir, { recursive: true, force: true });
+    throw error;
   }
 }
 
-function restoreFileRootBackups(backups: FileRootBackup[]): void {
-  for (const backup of backups) {
-    fs.rmSync(backup.targetDir, { recursive: true, force: true });
-    if (backup.existed) {
-      fs.mkdirSync(path.dirname(backup.targetDir), { recursive: true });
-      fs.cpSync(backup.backupDir, backup.targetDir, {
-        recursive: true,
-        force: true,
-      });
+async function stageFileRoots(
+  zipFileBuffers: ZipFileBufferCache,
+  manifest: DumpManifest | null,
+): Promise<StagedFileRoots> {
+  if (!manifest) {
+    return {
+      uploads: await stageZipRootWithoutManifest("uploads", zipFileBuffers),
+      content: await stageZipRootWithoutManifest("content", zipFileBuffers),
+    };
+  }
+  return {
+    uploads: await stageFileRootFromManifest("uploads", zipFileBuffers, manifest.fileRoots.uploads),
+    content: await stageFileRootFromManifest("content", zipFileBuffers, manifest.fileRoots.content),
+  };
+}
+
+function moveDirectoryWithCopyFallback(sourceDir: string, targetDir: string): void {
+  fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+  try {
+    fs.renameSync(sourceDir, targetDir);
+  } catch {
+    fs.cpSync(sourceDir, targetDir, { recursive: true, force: true });
+    fs.rmSync(sourceDir, { recursive: true, force: true });
+  }
+}
+
+function replaceFileRoots(stagedRoots: StagedFileRoots, transferDir: string): FileRootSwap[] {
+  const swaps: FileRootSwap[] = [
+    {
+      key: "uploads",
+      targetDir: config.uploadDir,
+      previousDir: path.join(transferDir, "previous-uploads"),
+      stagedDir: stagedRoots.uploads,
+      targetExisted: fs.existsSync(config.uploadDir),
+      swapped: false,
+    },
+    {
+      key: "content",
+      targetDir: getContentBaseDir(),
+      previousDir: path.join(transferDir, "previous-content"),
+      stagedDir: stagedRoots.content,
+      targetExisted: fs.existsSync(getContentBaseDir()),
+      swapped: false,
+    },
+  ];
+
+  try {
+    for (const swap of swaps) {
+      fs.rmSync(swap.previousDir, { recursive: true, force: true });
+      if (swap.targetExisted) {
+        moveDirectoryWithCopyFallback(swap.targetDir, swap.previousDir);
+      }
+      moveDirectoryWithCopyFallback(swap.stagedDir, swap.targetDir);
+      swap.swapped = true;
+    }
+    return swaps;
+  } catch (error) {
+    restoreSwappedFileRoots(swaps);
+    throw error;
+  }
+}
+
+function restoreSwappedFileRoots(swaps: FileRootSwap[]): void {
+  for (const swap of [...swaps].reverse()) {
+    if (!swap.swapped && !fs.existsSync(swap.previousDir)) {
+      continue;
+    }
+    fs.rmSync(swap.targetDir, { recursive: true, force: true });
+    if (swap.targetExisted && fs.existsSync(swap.previousDir)) {
+      moveDirectoryWithCopyFallback(swap.previousDir, swap.targetDir);
     }
   }
 }
@@ -1582,34 +1698,50 @@ function assertRemoteDumpWasNotImported(
   }
 }
 
-function preserveLocalAuth(sqlite: Database.Database): PreservedLocalAuth {
-  const admin = selectSingleRow(sqlite, "users", "lower(email) = ?", [
+function payloadHasAdminUser(payload: DumpPayload): boolean {
+  return payload.tables.users.some((row) => {
+    const email = stringValue(row.email)?.toLowerCase();
+    return email === standardAdminEmail() || stringValue(row.roleCode) === "admin";
+  });
+}
+
+function selectLocalAdminFallback(
+  sqlite: Database.Database,
+): Record<string, unknown> | null {
+  const configuredAdmin = selectSingleRow(sqlite, "users", "lower(email) = ?", [
     standardAdminEmail(),
   ]);
+  if (configuredAdmin) {
+    return configuredAdmin;
+  }
+
+  return (
+    (sqlite
+      .prepare(
+        `SELECT ${quoteIdentifier("users")}.* FROM ${quoteIdentifier("users")} ` +
+          `INNER JOIN ${quoteIdentifier("roles")} ON ${quoteIdentifier("users")}.${quoteIdentifier("role_id")} = ${quoteIdentifier("roles")}.${quoteIdentifier("id")} ` +
+          `WHERE ${quoteIdentifier("roles")}.${quoteIdentifier("key")} = 'admin' ` +
+          `ORDER BY ${quoteIdentifier("users")}.${quoteIdentifier("id")} LIMIT 1`,
+      )
+      .get() as Record<string, unknown> | undefined) ?? null
+  );
+}
+
+function createLegacyStandardAdminFallback(
+  sqlite: Database.Database,
+  payload: DumpPayload,
+): LegacyStandardAdminFallback | null {
+  if (payloadHasAdminUser(payload)) {
+    return null;
+  }
+
+  const admin = selectLocalAdminFallback(sqlite);
   const adminId = admin ? numericValue(admin.id) : null;
-  return {
-    admin,
-    adminSetup: selectSingleRow(
-      sqlite,
-      "app_settings",
-      `${quoteIdentifier("key")} = ?`,
-      [STANDARD_ADMIN_SETUP_SETTING_KEY],
-    ),
-    remoteImportHistory: selectSingleRow(
-      sqlite,
-      "app_settings",
-      `${quoteIdentifier("key")} = ?`,
-      [REMOTE_IMPORT_HISTORY_SETTING_KEY],
-    ),
-    adminSettings:
-      adminId === null
-        ? []
-        : (sqlite
-            .prepare(
-              `SELECT * FROM ${quoteIdentifier("settings_values")} WHERE ${quoteIdentifier("scope_type")} = 'USER' AND ${quoteIdentifier("scope_id")} = ? ORDER BY rowid`,
-            )
-            .all(String(adminId)) as Array<Record<string, unknown>>),
-  };
+  if (!admin || adminId === null) {
+    return null;
+  }
+
+  return { id: adminId, row: admin };
 }
 
 function tableColumns(sqlite: Database.Database, tableName: string): string[] {
@@ -1635,7 +1767,8 @@ function insertRows(
     `INSERT INTO ${quoteIdentifier(tableName)} (${columnSql}) VALUES (${placeholders})`,
   );
   for (const row of rows) {
-    statement.run(columns.map((column) => row[column] ?? null));
+    const nextRow = deserializeTableRow(tableName, row);
+    statement.run(columns.map((column) => nextRow[column] ?? null));
   }
 }
 
@@ -1651,35 +1784,22 @@ function prepareUserRowsForRestore(
   rows: Array<Record<string, unknown>>,
 ): Array<Record<string, unknown>> {
   const roleIds = roleIdsByCode(sqlite);
-  return rows
-    .filter(
-      (row) => stringValue(row.email)?.toLowerCase() !== standardAdminEmail(),
-    )
-    .map((row) => {
-      const result = { ...row };
-      const roleCode = stringValue(result.roleCode);
-      if (roleCode) {
-        const roleId = roleIds.get(roleCode);
-        if (!roleId) {
-          throw badRequest(
-            `Dump user '${stringValue(result.email) ?? "unknown"}' references an unknown role`,
-          );
-        }
-        result.role_id = roleId;
-        delete result.roleCode;
-        return result;
+  return rows.map((row) => {
+    const result = { ...row };
+    const roleCode = stringValue(result.roleCode);
+    if (roleCode) {
+      const roleId = roleIds.get(roleCode);
+      if (!roleId) {
+        throw badRequest(
+          `Dump user '${stringValue(result.email) ?? "unknown"}' references an unknown role`,
+        );
       }
+      result.role_id = roleId;
+      delete result.roleCode;
       return result;
-    });
-}
-
-function nextFreeId(sqlite: Database.Database, tableName: string): number {
-  const row = sqlite
-    .prepare(
-      `SELECT COALESCE(MAX(id), 0) + 1 AS nextId FROM ${quoteIdentifier(tableName)}`,
-    )
-    .get() as { nextId: number };
-  return row.nextId;
+    }
+    return result;
+  });
 }
 
 function userIdExists(sqlite: Database.Database, id: number): boolean {
@@ -1703,91 +1823,67 @@ function adminRoleId(sqlite: Database.Database): number {
   return row.id;
 }
 
-function restorePreservedAdmin(
+function restoreLegacyStandardAdminFallback(
   sqlite: Database.Database,
-  preserved: PreservedLocalAuth,
-): number | null {
-  if (!preserved.admin) {
-    return null;
+  fallback: LegacyStandardAdminFallback | null,
+): Set<DumpTableKey> {
+  const refreshedTableKeys = new Set<DumpTableKey>();
+  if (!fallback) {
+    return refreshedTableKeys;
   }
 
-  const row = { ...preserved.admin };
-  const originalAdminId = numericValue(row.id);
-  const restoredAdminId =
-    originalAdminId !== null && !userIdExists(sqlite, originalAdminId)
-      ? originalAdminId
-      : nextFreeId(sqlite, "users");
-  row.id = restoredAdminId;
-  row.email = standardAdminEmail();
-  row.role_id = adminRoleId(sqlite);
-  insertRows(sqlite, "users", [row]);
-  return restoredAdminId;
-}
-
-function insertPreservedAppSetting(
-  sqlite: Database.Database,
-  row: Record<string, unknown> | null,
-): void {
-  if (!row) {
-    return;
-  }
-  const key = stringValue(row.key);
-  if (!key) {
-    return;
-  }
-  sqlite
-    .prepare(
-      `DELETE FROM ${quoteIdentifier("app_settings")} WHERE ${quoteIdentifier("key")} = ?`,
-    )
-    .run(key);
-  insertRows(sqlite, "app_settings", [row]);
-}
-
-function restorePreservedAdminSettings(
-  sqlite: Database.Database,
-  rows: Array<Record<string, unknown>>,
-  adminId: number | null,
-): void {
-  if (adminId === null) {
-    return;
+  if (!userIdExists(sqlite, fallback.id)) {
+    const row = { ...fallback.row };
+    row.id = fallback.id;
+    row.role_id = adminRoleId(sqlite);
+    insertRows(sqlite, "users", [row]);
+    refreshedTableKeys.add("users");
   }
 
-  for (const row of rows) {
-    const nextRow: Record<string, unknown> = {
-      ...row,
-      scope_id: String(adminId),
-    };
-    if (numericValue(nextRow.created_by) !== null) {
-      nextRow.created_by = adminId;
-    }
-    if (numericValue(nextRow.updated_by) !== null) {
-      nextRow.updated_by = adminId;
-    }
-    const rowId = numericValue(nextRow.id);
-    if (rowId !== null) {
-      const exists = sqlite
-        .prepare(
-          `SELECT 1 AS existsRow FROM ${quoteIdentifier("settings_values")} WHERE id = ?`,
-        )
-        .get(rowId);
-      if (exists) {
-        nextRow.id = nextFreeId(sqlite, "settings_values");
-      }
-    }
+  const errors = sqlite.pragma("foreign_key_check") as ForeignKeyViolation[];
+  for (const reference of missingUserReferences(sqlite, errors)) {
     sqlite
       .prepare(
-        `DELETE FROM ${quoteIdentifier("settings_values")} WHERE ${quoteIdentifier("setting_key")} = ? AND ${quoteIdentifier("scope_type")} = 'USER' AND ${quoteIdentifier("scope_id")} = ?`,
+        `UPDATE ${quoteIdentifier(reference.table)} SET ${quoteIdentifier(reference.column)} = ? WHERE rowid = ?`,
       )
-      .run(nextRow.setting_key, String(adminId));
-    insertRows(sqlite, "settings_values", [nextRow]);
+      .run(fallback.id, reference.rowid);
+    const tableKey = DUMP_TABLES.find(
+      (entry) => entry.tableName === reference.table,
+    )?.key;
+    if (tableKey) {
+      refreshedTableKeys.add(tableKey);
+    }
   }
+
+  return refreshedTableKeys;
+}
+
+function refreshExpectedTableSummary(
+  expectedTables: DumpTableSummary[],
+  key: DumpTableKey,
+  rows: Array<Record<string, unknown>>,
+): void {
+  const index = expectedTables.findIndex((entry) => entry.key === key);
+  const nextSummary: DumpTableSummary = {
+    key,
+    rowCount: rows.length,
+    sha256: sha256Json(rows),
+  };
+  if (index >= 0) {
+    expectedTables[index] = nextSummary;
+    return;
+  }
+  expectedTables.push(nextSummary);
 }
 
 function restoreTables(
   sqlite: Database.Database,
   payload: DumpPayload,
-): number {
-  const preservedLocalAuth = preserveLocalAuth(sqlite);
+): RestoreTablesResult {
+  const legacyStandardAdminFallback = createLegacyStandardAdminFallback(
+    sqlite,
+    payload,
+  );
   for (const entry of [...DUMP_TABLES].reverse()) {
     sqlite.prepare(`DELETE FROM ${quoteIdentifier(entry.tableName)}`).run();
     sqlite
@@ -1806,23 +1902,78 @@ function restoreTables(
       restored += 1;
     }
   }
-  const adminId = restorePreservedAdmin(sqlite, preservedLocalAuth);
-  insertPreservedAppSetting(sqlite, preservedLocalAuth.adminSetup);
-  insertPreservedAppSetting(sqlite, preservedLocalAuth.remoteImportHistory);
-  restorePreservedAdminSettings(
+  const refreshedTableKeys = restoreLegacyStandardAdminFallback(
     sqlite,
-    preservedLocalAuth.adminSettings,
-    adminId,
+    legacyStandardAdminFallback,
   );
-  return restored;
+  return { restored, refreshedTableKeys };
+}
+
+function foreignKeyDefinitions(
+  sqlite: Database.Database,
+  tableName: string,
+): ForeignKeyDefinition[] {
+  return sqlite
+    .prepare(`PRAGMA foreign_key_list(${quoteIdentifier(tableName)})`)
+    .all() as ForeignKeyDefinition[];
+}
+
+function missingUserReferences(
+  sqlite: Database.Database,
+  errors: ForeignKeyViolation[],
+): MissingUserReference[] {
+  return errors.flatMap((error) => {
+    if (error.parent !== "users") {
+      return [];
+    }
+    const definition = foreignKeyDefinitions(sqlite, error.table).find(
+      (entry) => entry.id === error.fkid && entry.seq === 0,
+    );
+    if (!definition) {
+      return [];
+    }
+    const row = sqlite
+      .prepare(
+        `SELECT ${quoteIdentifier(definition.from)} AS value FROM ${quoteIdentifier(error.table)} WHERE rowid = ?`,
+      )
+      .get(error.rowid) as { value: unknown } | undefined;
+    const userId = numericValue(row?.value);
+    if (userId === null) {
+      return [];
+    }
+    return [
+      {
+        table: error.table,
+        rowid: error.rowid,
+        column: definition.from,
+        userId,
+      },
+    ];
+  });
+}
+
+function foreignKeyErrorMessage(
+  sqlite: Database.Database,
+  errors: ForeignKeyViolation[],
+): string {
+  const missingUsers = missingUserReferences(sqlite, errors);
+  if (missingUsers.length === 0) {
+    return `Dump import produced foreign key errors: ${JSON.stringify(errors)}`;
+  }
+
+  const details = missingUsers
+    .map(
+      (reference) =>
+        `${reference.table}.${reference.column}=${reference.userId} (rowid ${reference.rowid})`,
+    )
+    .join(", ");
+  return `Dump import is missing referenced users.id values: ${details}`;
 }
 
 function assertForeignKeys(sqlite: Database.Database): void {
-  const errors = sqlite.pragma("foreign_key_check") as unknown[];
+  const errors = sqlite.pragma("foreign_key_check") as ForeignKeyViolation[];
   if (errors.length > 0) {
-    throw badRequest(
-      `Dump import produced foreign key errors: ${JSON.stringify(errors)}`,
-    );
+    throw badRequest(foreignKeyErrorMessage(sqlite, errors));
   }
 }
 
@@ -2011,6 +2162,7 @@ export async function saveDumpToLocalBackup(
     detail: snapshot.filename,
   });
   const backupFile = mapBackupFile(filePath);
+  writeLastLocalBackupManifest(snapshot.manifest);
   emitBackupProgress(options.progressCallback, {
     operation: "full_backup",
     phase: "local_save",
@@ -2040,217 +2192,6 @@ export async function saveDumpToLocalBackup(
     backupFile,
     remoteUpload,
   };
-}
-
-function incrementalSyncUnavailableResult(
-  error: string,
-): DumpIncrementalSyncResult {
-  return {
-    success: false,
-    error,
-    tablesUpdated: false,
-    filesUploaded: 0,
-    filesDeleted: 0,
-    filesDeleteFailed: 0,
-    totalRemoteFiles: 0,
-    syncedAt: nowIso(),
-    warnings: [],
-  };
-}
-
-async function readRemoteSyncManifestOrNull(
-  client: BackupSftpClient,
-): Promise<DumpManifest | null> {
-  try {
-    const rawManifest = await downloadBackupSftpTextFileInSession(
-      client,
-      "manifest.json",
-    );
-    return parseManifest(JSON.parse(rawManifest));
-  } catch {
-    return null;
-  }
-}
-
-function hasTableChanges(
-  currentManifest: DumpManifest,
-  previousManifest: DumpManifest | null,
-): boolean {
-  if (!previousManifest) {
-    return true;
-  }
-  return DUMP_TABLE_KEYS.some(
-    (key) =>
-      currentManifest.tables[key].sha256 !==
-      previousManifest.tables[key].sha256,
-  );
-}
-
-export async function performIncrementalSftpSync(
-  sqlite: Database.Database,
-  options: DumpProgressOptions = {},
-): Promise<DumpIncrementalSyncResult> {
-  if (activeIncrementalRemoteOperation || activeRemoteImports.size > 0) {
-    return incrementalSyncUnavailableResult(
-      "A remote backup operation is already running",
-    );
-  }
-
-  activeIncrementalRemoteOperation = true;
-  try {
-    assertSafeDumpRuntimeTargets();
-    const readiness = getBackupSftpReadiness();
-    if (!readiness.ready) {
-      return incrementalSyncUnavailableResult(
-        readiness.blockingIssues.join(" | "),
-      );
-    }
-
-    const snapshot = buildDumpSnapshot(sqlite);
-    const currentFiles = currentSyncFileEntries();
-    return await batchSftpOperations(async (client) => {
-      const previousManifest = await readRemoteSyncManifestOrNull(client);
-      emitBackupProgress(options.progressCallback, {
-        operation: "incremental_sync",
-        phase: "manifest_fetch",
-        current: previousManifest ? 1 : 0,
-        total: 1,
-        detail: previousManifest ? previousManifest.dumpId : "missing",
-      });
-
-      const currentFileHashByRemotePath = new Map(
-        currentFiles.map((file) => [file.remotePath, file.sha256]),
-      );
-      const previousFileHashByRemotePath =
-        manifestFileHashByRemotePath(previousManifest);
-      const tablesUpdated = hasTableChanges(
-        snapshot.manifest,
-        previousManifest,
-      );
-      const filesToUpload = currentFiles.filter(
-        (file) =>
-          previousFileHashByRemotePath.get(file.remotePath) !== file.sha256,
-      );
-      const filesToDelete = [...previousFileHashByRemotePath.keys()].filter(
-        (remotePath) => !currentFileHashByRemotePath.has(remotePath),
-      );
-      const warnings: string[] = [];
-      emitBackupProgress(options.progressCallback, {
-        operation: "incremental_sync",
-        phase: "file_compare",
-        current: 0,
-        total: filesToUpload.length,
-        detail: `${filesToUpload.length} upload, ${filesToDelete.length} delete`,
-      });
-
-      if (tablesUpdated) {
-        await uploadBackupSftpFileInSession(
-          client,
-          "data.json",
-          Buffer.from(`${JSON.stringify(snapshot.payload, null, 2)}\n`, "utf8"),
-        );
-      }
-
-      let filesUploaded = 0;
-      for (const file of filesToUpload) {
-        await uploadBackupSftpFileAtPathInSession(
-          client,
-          file.remotePath,
-          readSyncFileBuffer(file),
-          file.sizeBytes,
-        );
-        filesUploaded += 1;
-        emitBackupProgress(options.progressCallback, {
-          operation: "incremental_sync",
-          phase: "file_upload",
-          current: filesUploaded,
-          total: filesToUpload.length,
-          detail: file.remotePath,
-        });
-      }
-
-      let filesDeleted = 0;
-      let filesDeleteFailed = 0;
-      let filesDeleteAttempted = 0;
-      for (const remotePath of filesToDelete) {
-        try {
-          await deleteBackupSftpFileInSession(client, remotePath);
-          filesDeleted += 1;
-        } catch (error) {
-          filesDeleteFailed += 1;
-          warnings.push(
-            `Remote file '${remotePath}' could not be deleted: ${error instanceof Error ? error.message : "unknown error"}.`,
-          );
-        } finally {
-          filesDeleteAttempted += 1;
-          emitBackupProgress(options.progressCallback, {
-            operation: "incremental_sync",
-            phase: "file_delete",
-            current: filesDeleteAttempted,
-            total: filesToDelete.length,
-            detail: remotePath,
-          });
-        }
-      }
-
-      if (
-        tablesUpdated ||
-        filesUploaded > 0 ||
-        filesDeleted > 0 ||
-        filesDeleteFailed > 0
-      ) {
-        await uploadBackupSftpFileInSession(
-          client,
-          "manifest.json",
-          Buffer.from(
-            `${JSON.stringify(snapshot.manifest, null, 2)}\n`,
-            "utf8",
-          ),
-        );
-        emitBackupProgress(options.progressCallback, {
-          operation: "incremental_sync",
-          phase: "manifest_update",
-          current: 1,
-          total: 1,
-          detail: snapshot.manifest.dumpId,
-        });
-      }
-
-      emitBackupProgress(options.progressCallback, {
-        operation: "incremental_sync",
-        phase: "done",
-        current: currentFiles.length + 2,
-        total: currentFiles.length + 2,
-        detail: `${filesUploaded} uploaded, ${filesDeleted} deleted`,
-      });
-
-      return {
-        success: true,
-        error: null,
-        tablesUpdated,
-        filesUploaded,
-        filesDeleted,
-        filesDeleteFailed,
-        totalRemoteFiles: currentFiles.length + 2,
-        syncedAt: nowIso(),
-        warnings,
-      };
-    });
-  } catch (error) {
-    emitBackupProgress(options.progressCallback, {
-      operation: "incremental_sync",
-      phase: "done",
-      current: 0,
-      total: 0,
-      detail:
-        error instanceof Error ? error.message : "Incremental SFTP sync failed",
-    });
-    return incrementalSyncUnavailableResult(
-      error instanceof Error ? error.message : "Incremental SFTP sync failed",
-    );
-  } finally {
-    activeIncrementalRemoteOperation = false;
-  }
 }
 
 export async function getRemoteBackupStatus(
@@ -2325,164 +2266,6 @@ async function readRemoteBackupFile(
     ),
     buffer: await downloadBackupSftpFile(selectedFile.name),
   };
-}
-
-function parseRemoteSyncJson(raw: string, label: string): unknown {
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    throw badRequest(`${label} is invalid JSON`);
-  }
-}
-
-function roleReferenceIssues(payload: DumpPayload): string[] {
-  const roleCodes = new Set(
-    payload.tables.roles
-      .map((row) => stringValue(row.key))
-      .filter((key): key is string => Boolean(key)),
-  );
-  return payload.tables.users.flatMap((row) => {
-    const roleCode = stringValue(row.roleCode);
-    if (!roleCode || !roleCodes.has(roleCode)) {
-      return [
-        `Dump user '${stringValue(row.email) ?? "unknown"}' references an unknown role.`,
-      ];
-    }
-    return [];
-  });
-}
-
-async function inspectIncrementalRemoteSync(): Promise<InspectedIncrementalSync> {
-  assertSafeDumpRuntimeTargets();
-  const readiness = getBackupSftpReadiness();
-  if (!readiness.ready) {
-    throw badRequest(readiness.blockingIssues.join(" | "));
-  }
-
-  let rawManifest: string;
-  try {
-    rawManifest = await downloadBackupSftpTextFile("manifest.json");
-  } catch {
-    throw notFound("No incremental remote sync manifest was found");
-  }
-
-  let rawPayload: string;
-  try {
-    rawPayload = await downloadBackupSftpTextFile("data.json");
-  } catch {
-    throw badRequest("Incremental remote sync does not contain data.json");
-  }
-
-  const manifest = parseManifest(
-    parseRemoteSyncJson(rawManifest, "manifest.json"),
-  );
-  const payload = normalizeDumpPayload(
-    parsePayload(parseRemoteSyncJson(rawPayload, "data.json")),
-  );
-  const warnings: string[] = [];
-  const blockingIssues: string[] = [];
-
-  if (manifest.schemaRevision !== getSchemaRevision()) {
-    blockingIssues.push(
-      `Schema revision differs: dump=${manifest.schemaRevision}, target=${getSchemaRevision()}.`,
-    );
-  }
-  for (const key of DUMP_TABLE_KEYS) {
-    const tableRows = payload.tables[key];
-    const expected = manifest.tables[key];
-    if (tableRows.length !== expected.rowCount) {
-      blockingIssues.push(`Manifest row count does not match table '${key}'.`);
-    }
-    if (sha256Json(tableRows) !== expected.sha256) {
-      blockingIssues.push(`Manifest hash does not match table '${key}'.`);
-    }
-  }
-  blockingIssues.push(...roleReferenceIssues(payload));
-
-  const manifestHash = sha256Buffer(Buffer.from(rawManifest, "utf8"));
-  const expectedFileRoots = buildFileRootSummaries(manifest);
-  const preview: DumpIncrementalSyncPreviewResult = {
-    manifestHash,
-    dumpId: manifest.dumpId,
-    remoteDirectory: readiness.remoteDirectory,
-    targetDatabasePath: config.databasePath,
-    transferReadiness:
-      blockingIssues.length > 0
-        ? "blocked"
-        : warnings.length > 0
-          ? "warning"
-          : "ready",
-    blockingIssues,
-    warnings,
-    manifestPresent: true,
-    schemaRevision: manifest.schemaRevision,
-    syncedAt: manifest.exportedAt,
-    expectedTables: Object.values(manifest.tables),
-    expectedFileRoots,
-    totalFiles: expectedFileRoots.reduce(
-      (sum, root) => sum + root.fileCount,
-      0,
-    ),
-    totalBytes: expectedFileRoots.reduce(
-      (sum, root) => sum + root.totalBytes,
-      0,
-    ),
-  };
-
-  return { payload, manifest, manifestHash, preview };
-}
-
-async function stageRemoteSyncRoot(
-  manifest: DumpManifest,
-  root: "uploads" | "content",
-): Promise<string> {
-  const stageDir = makeTempDir(`taskmanager-sync-${root}-`);
-  try {
-    for (const file of manifest.fileRoots[root].files) {
-      assertSafeRelativePath(file.relativePath);
-      const buffer = await downloadBackupSftpFile(
-        `${root}/${file.relativePath}`,
-      );
-      if (
-        buffer.byteLength !== file.sizeBytes ||
-        sha256Buffer(buffer) !== file.sha256
-      ) {
-        throw badRequest(
-          `Remote sync file '${root}/${file.relativePath}' does not match the manifest.`,
-        );
-      }
-      const targetPath = path.resolve(stageDir, file.relativePath);
-      const stageRoot = stageDir.endsWith(path.sep)
-        ? stageDir
-        : `${stageDir}${path.sep}`;
-      if (!targetPath.startsWith(stageRoot)) {
-        throw badRequest("Remote sync contains an unsafe file path");
-      }
-      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-      fs.writeFileSync(targetPath, buffer);
-    }
-    return stageDir;
-  } catch (error) {
-    fs.rmSync(stageDir, { recursive: true, force: true });
-    throw error;
-  }
-}
-
-async function stageRemoteSyncFileRoots(
-  manifest: DumpManifest,
-): Promise<StagedFileRoots> {
-  const uploads = await stageRemoteSyncRoot(manifest, "uploads");
-  try {
-    const content = await stageRemoteSyncRoot(manifest, "content");
-    return { uploads, content };
-  } catch (error) {
-    fs.rmSync(uploads, { recursive: true, force: true });
-    throw error;
-  }
-}
-
-export async function previewIncrementalRemoteSync(): Promise<DumpIncrementalSyncPreviewResult> {
-  return (await inspectIncrementalRemoteSync()).preview;
 }
 
 export async function previewRemoteDump(
@@ -2563,13 +2346,12 @@ async function applyInspectedDump(
   try {
     const workDir = ensureWorkDir();
     transferDir = fs.mkdtempSync(path.join(workDir, "transfer-"));
-    const backupRoot = path.join(transferDir, "file-root-backups");
-    const targetBackupPath = path.join(transferDir, "target-before-import.zip");
-    await buildDumpArchiveFile(sqlite, targetBackupPath);
+    const targetBackupPath = path.join(transferDir, "target-before-import.sqlite");
+    await createDatabaseSnapshot(sqlite, targetBackupPath);
 
     const stagedRoots = await stageFileRoots(
-      preview.directory,
       preview.zipFileBuffers,
+      preview.manifest,
     );
     emitBackupProgress(options.progressCallback, {
       operation: "import",
@@ -2584,14 +2366,23 @@ async function applyInspectedDump(
       ),
       detail: preview.backupFile.name,
     });
-    const backups = createFileRootBackups(backupRoot);
+    let swaps: FileRootSwap[] = [];
     let tablesRestored = 0;
     let fileRootsTouched = false;
     let committed = false;
 
     try {
       beginImportTransaction(sqlite);
-      tablesRestored = restoreTables(sqlite, preview.payload);
+      const restoreResult = restoreTables(sqlite, preview.payload);
+      tablesRestored = restoreResult.restored;
+      const restoredTables = collectDumpTableRows(sqlite);
+      for (const key of restoreResult.refreshedTableKeys) {
+        refreshExpectedTableSummary(
+          preview.expectedTables,
+          key,
+          restoredTables[key],
+        );
+      }
       emitBackupProgress(options.progressCallback, {
         operation: "import",
         phase: "db_restore",
@@ -2601,7 +2392,7 @@ async function applyInspectedDump(
       });
       options.afterTablesRestore?.(sqlite, preview);
       assertForeignKeys(sqlite);
-      replaceFileRoots(stagedRoots);
+      swaps = replaceFileRoots(stagedRoots, transferDir);
       fileRootsTouched = true;
       emitBackupProgress(options.progressCallback, {
         operation: "import",
@@ -2618,13 +2409,12 @@ async function applyInspectedDump(
         rollbackImportTransaction(sqlite);
       }
       if (fileRootsTouched) {
-        restoreFileRootBackups(backups);
+        restoreSwappedFileRoots(swaps);
       }
       throw error;
     } finally {
       fs.rmSync(stagedRoots.uploads, { recursive: true, force: true });
       fs.rmSync(stagedRoots.content, { recursive: true, force: true });
-      fs.rmSync(backupRoot, { recursive: true, force: true });
     }
 
     const blockingIssues = [
@@ -2710,137 +2500,15 @@ export async function applyRemoteDump(
           dumpId: inspectedPreview.dumpId,
           importedAt: nowIso(),
         });
+        refreshExpectedTableSummary(
+          inspectedPreview.expectedTables,
+          "appSettings",
+          selectTableRows(database, "app_settings"),
+        );
       },
     });
   } finally {
     activeRemoteImports.delete(safeFileId);
-  }
-}
-
-export async function applyIncrementalRemoteSync(
-  sqlite: Database.Database,
-  params: DumpIncrementalSyncApplyRequest,
-  options: DumpProgressOptions = {},
-): Promise<DumpIncrementalSyncApplyResult> {
-  assertSafeDumpRuntimeTargets();
-  if (!params.confirmed) {
-    throw badRequest("Incremental remote sync import must be confirmed");
-  }
-  if (activeIncrementalRemoteOperation || activeRemoteImports.size > 0) {
-    throw conflict("Remote backup operation is already running");
-  }
-
-  activeIncrementalRemoteOperation = true;
-  let stagedRoots: StagedFileRoots | null = null;
-  try {
-    const inspected = await inspectIncrementalRemoteSync();
-    if (inspected.manifestHash !== params.manifestHash) {
-      throw conflict("Remote sync manifest changed since preview");
-    }
-    if (inspected.preview.blockingIssues.length > 0) {
-      throw badRequest(
-        `Incremental remote sync import is blocked: ${inspected.preview.blockingIssues.join(" | ")}`,
-      );
-    }
-
-    stagedRoots = await stageRemoteSyncFileRoots(inspected.manifest);
-    const totalFiles = inspected.preview.expectedFileRoots.reduce(
-      (sum, root) => sum + root.fileCount,
-      0,
-    );
-    emitBackupProgress(options.progressCallback, {
-      operation: "import",
-      phase: "staging",
-      current: totalFiles,
-      total: totalFiles,
-      detail: inspected.manifest.dumpId,
-    });
-    const workDir = ensureWorkDir();
-    const transferDir = fs.mkdtempSync(path.join(workDir, "transfer-"));
-    const backupRoot = path.join(transferDir, "file-root-backups");
-    const targetBackupPath = path.join(transferDir, "target-before-import.zip");
-    await buildDumpArchiveFile(sqlite, targetBackupPath);
-
-    const backups = createFileRootBackups(backupRoot);
-    let tablesRestored = 0;
-    let fileRootsTouched = false;
-    let committed = false;
-
-    try {
-      beginImportTransaction(sqlite);
-      tablesRestored = restoreTables(sqlite, inspected.payload);
-      emitBackupProgress(options.progressCallback, {
-        operation: "import",
-        phase: "db_restore",
-        current: tablesRestored,
-        total: DUMP_TABLE_KEYS.length,
-        detail: inspected.manifest.dumpId,
-      });
-      assertForeignKeys(sqlite);
-      replaceFileRoots(stagedRoots);
-      fileRootsTouched = true;
-      emitBackupProgress(options.progressCallback, {
-        operation: "import",
-        phase: "file_swap",
-        current: 2,
-        total: 2,
-        detail: inspected.manifest.dumpId,
-      });
-      finishImportTransaction(sqlite);
-      committed = true;
-    } catch (error) {
-      if (!committed) {
-        rollbackImportTransaction(sqlite);
-      }
-      if (fileRootsTouched) {
-        restoreFileRootBackups(backups);
-      }
-      throw error;
-    } finally {
-      fs.rmSync(backupRoot, { recursive: true, force: true });
-    }
-
-    const blockingIssues = [
-      ...verifyRestoredTables(sqlite, inspected.preview.expectedTables),
-      ...verifyRestoredFileRoots(inspected.preview.expectedFileRoots),
-    ];
-    const verificationPassed = blockingIssues.length === 0;
-    emitBackupProgress(options.progressCallback, {
-      operation: "import",
-      phase: "verify",
-      current: verificationPassed ? 1 : 0,
-      total: 1,
-      detail: inspected.manifest.dumpId,
-    });
-    emitBackupProgress(options.progressCallback, {
-      operation: "import",
-      phase: "done",
-      current: verificationPassed ? 1 : 0,
-      total: 1,
-      detail: inspected.manifest.dumpId,
-    });
-    return {
-      dumpId: inspected.manifest.dumpId,
-      manifestHash: inspected.manifestHash,
-      remoteDirectory: inspected.preview.remoteDirectory,
-      targetBackupPath,
-      verificationPassed,
-      importStatus: verificationPassed
-        ? inspected.preview.warnings.length > 0
-          ? "warning"
-          : "success"
-        : "error",
-      tablesRestored,
-      fileRootsRestored: currentFileRootSummaries(),
-      warnings: inspected.preview.warnings,
-      blockingIssues,
-    };
-  } finally {
-    if (stagedRoots) {
-      fs.rmSync(stagedRoots.uploads, { recursive: true, force: true });
-      fs.rmSync(stagedRoots.content, { recursive: true, force: true });
-    }
-    activeIncrementalRemoteOperation = false;
   }
 }
 

@@ -1,9 +1,22 @@
 /**
  * Test Scope:
  *
+ * Test-Ebene:
+ * - Integration
+ *
+ * Realitätsgrad:
+ * - Echte Fastify-App, echte SQLite-Testdatenbank und echtes temporäres Content-Dateisystem.
+ *
+ * Mock-Entscheidung:
+ * - Keine Mocks.
+ *
+ * Isolation:
+ * - Temp-DB und Temp-Content-Root pro Suite.
+ *
  * Abgedeckte Regeln:
  * - Wiki-Seiten können als Root- und Unterseiten angelegt werden.
- * - Breadcrumb-Reihenfolge und ID-basierte Dateipfade stimmen.
+ * - Content wird DB-first gespeichert und gelesen.
+ * - Legacy-Dateipfade bleiben als Fallback lesbar.
  * - Seiten mit Unterseiten sind vor direktem Löschen geschützt.
  *
  * Fehlerfälle:
@@ -11,7 +24,7 @@
  * - Löschen einer Seite mit Kindern liefert 409.
  *
  * Ziel:
- * Wiki-API, Hierarchie und Markdown-Dateisystem isoliert absichern.
+ * Wiki-API, Hierarchie und HTML-Content-Persistenz isoliert absichern.
  */
 
 import type { FastifyInstance } from "fastify";
@@ -53,8 +66,9 @@ describe("Wiki API", () => {
     expect(res.body.parentId).toBeNull();
     expect(res.body).not.toHaveProperty("slug");
     expect(res.body).not.toHaveProperty("projectId");
-    expect(res.body.contentPath).toMatch(/content\/wiki\/wiki-page-\d+\.md/);
-    expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# Einführung");
+    expect(res.body.contentPath).toBeNull();
+    const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(res.body.id) as { content: string };
+    expect(row.content).toBe("# Einführung");
   });
 
   it("Sub-Seite anlegen mit parentId", async () => {
@@ -66,8 +80,9 @@ describe("Wiki API", () => {
       .expect(201);
 
     expect(res.body.parentId).toBe(root.id);
-    expect(res.body.contentPath).toMatch(/content\/wiki\/wiki-page-\d+\.md/);
-    expect(fs.existsSync(resolveStoredContentPath(res.body.contentPath))).toBe(true);
+    expect(res.body.contentPath).toBeNull();
+    const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(res.body.id) as { content: string };
+    expect(row.content).toBe("# Installation");
   });
 
   it("Root-Seite mit projectId wird abgewiesen", async () => {
@@ -91,6 +106,22 @@ describe("Wiki API", () => {
 
     expect(res.body.content).toBe("# Detail");
     expect(res.body).not.toHaveProperty("projectId");
+  });
+
+  it("GET Detail liest Legacy-Dateicontent als Fallback", async () => {
+    const contentPath = "content/wiki/legacy-page.md";
+    fs.writeFileSync(resolveStoredContentPath(contentPath), "# Legacy", "utf8");
+    const now = new Date().toISOString();
+    const result = testDb.sqlite
+      .prepare(
+        "INSERT INTO wiki_pages (title, content_path, content, sort_order, version, created_at, updated_at) VALUES (?, ?, NULL, 0, 1, ?, ?)"
+      )
+      .run("Legacy Wiki", contentPath, now, now);
+
+    const res = await supertest(app.server).get(`/api/wiki/${result.lastInsertRowid}`).expect(200);
+
+    expect(res.body.content).toBe("# Legacy");
+    expect(res.body.contentPath).toBe(contentPath);
   });
 
   it("Breadcrumb-Reihenfolge ist Root zuerst", async () => {
@@ -120,24 +151,24 @@ describe("Wiki API", () => {
     await supertest(app.server).delete(`/api/wiki/${root.id}`).expect(204);
   });
 
-  it("PATCH aktualisiert Content und Datei", async () => {
+  it("PATCH aktualisiert DB-Content", async () => {
     const page = await createWikiPage(app, { title: "Wiki Patch", content: "# Alt" });
 
     const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ content: "# Neu", expectedVersion: page.version }).expect(200);
 
     expect(res.body.content).toBe("# Neu");
-    expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# Neu");
+    const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(page.id) as { content: string };
+    expect(row.content).toBe("# Neu");
   });
 
-  it("PATCH mit neuem Titel behält Datei", async () => {
-    const page = await createWikiPage(app, { title: "Wiki Old" });
-    const oldPath = resolveStoredContentPath(page.contentPath ?? "");
+  it("PATCH mit neuem Titel behält DB-Content", async () => {
+    const page = await createWikiPage(app, { title: "Wiki Old", content: "# Inhalt" });
 
     const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ title: "Wiki New", expectedVersion: page.version }).expect(200);
 
     expect(res.body.contentPath).toBe(page.contentPath);
-    expect(fs.existsSync(oldPath)).toBe(true);
-    expect(fs.existsSync(resolveStoredContentPath(res.body.contentPath))).toBe(true);
+    const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(page.id) as { content: string };
+    expect(row.content).toBe("# Inhalt");
   });
 
   it("PATCH mit projectId wird abgewiesen", async () => {

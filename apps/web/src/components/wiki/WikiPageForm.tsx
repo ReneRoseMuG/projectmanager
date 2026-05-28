@@ -2,6 +2,7 @@ import type { DraftComment, WikiPage, WikiPageInput } from "@taskmanager/shared-
 import { ExternalLink, Eye, History, Save, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { uploadContentImage } from "../../api/content-images";
 import type { WikiTreeNode } from "../../hooks/useWiki";
 import { Button } from "../ui/Button";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
@@ -161,7 +162,7 @@ export function WikiPageForm({ open, page, parent, tree, onSubmit, onPostCreate,
               <div className="prose max-w-none rounded-lg border border-line bg-shell/40 p-4" dangerouslySetInnerHTML={{ __html: content || "<p>Noch kein Inhalt.</p>" }} />
             ) : (
               <>
-                <RichTextInlineField value={content} placeholder="Wiki-Inhalt" testIdPrefix="wiki-page-form-content" onChange={(value) => { setContent(value); setDirty(true); }} />
+                <RichTextInlineField value={content} placeholder="Wiki-Inhalt" testIdPrefix="wiki-page-form-content" onImageUpload={uploadContentImage} onChange={(value) => { setContent(value); setDirty(true); }} />
               </>
             )}
           </Section>

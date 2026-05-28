@@ -11,7 +11,6 @@ interface BackupProgressState {
 
 const emptyByOperation: BackupProgressByOperation = {
   full_backup: null,
-  incremental_sync: null,
   import: null
 };
 

@@ -96,7 +96,7 @@ function parseBackupProgressEvent(data: string): BackupProgressEvent | null {
     const parsed = JSON.parse(data) as Partial<BackupProgressEvent>;
     if (
       parsed.type === "backup_progress" &&
-      (parsed.operation === "full_backup" || parsed.operation === "incremental_sync" || parsed.operation === "import") &&
+      (parsed.operation === "full_backup" || parsed.operation === "import") &&
       typeof parsed.phase === "string" &&
       typeof parsed.current === "number" &&
       typeof parsed.total === "number"

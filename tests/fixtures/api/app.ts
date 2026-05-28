@@ -47,6 +47,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerSubtasksRoutes } = await import("../../../apps/api/src/routes/subtasks.js");
   const { registerCatalogRoutes } = await import("../../../apps/api/src/routes/catalogs.js");
   const { registerCommentsRoutes } = await import("../../../apps/api/src/routes/comments.js");
+  const { registerContentImageRoutes } = await import("../../../apps/api/src/routes/content-images.js");
   const { registerDayPlanRoutes } = await import("../../../apps/api/src/routes/day-plans.js");
   const { registerDashboardRoutes } = await import("../../../apps/api/src/routes/dashboard.js");
   const { registerTagsRoutes } = await import("../../../apps/api/src/routes/tags.js");
@@ -102,6 +103,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerTagsRoutes, { prefix: "/api" });
   await app.register(registerSettingsRoutes, { prefix: "/api" });
   await app.register(registerNotesRoutes, { prefix: "/api" });
+  await app.register(registerContentImageRoutes, { prefix: "/api" });
   if (options.enableMultipart) {
     const { registerAttachmentsRoutes } = await import("../../../apps/api/src/routes/attachments.js");
     await app.register(registerAttachmentsRoutes, { prefix: "/api" });

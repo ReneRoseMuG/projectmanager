@@ -96,6 +96,17 @@ export function getBypassAdminUser(database: DbClient, appConfig: AppConfig = co
   return { ...mapCurrentUser(database, user, appConfig), requiresPasswordSetup: false };
 }
 
+export function loginConfiguredAdmin(database: DbClient, appConfig: AppConfig = config): CurrentUser {
+  const user = userRepository.findByEmail(database, appConfig.adminEmail.toLowerCase());
+  if (!user) {
+    throw unauthorized("Authentication required");
+  }
+  if (!user.isActive) {
+    throw forbidden("Account is disabled");
+  }
+  return { ...mapCurrentUser(database, user, appConfig), requiresPasswordSetup: false };
+}
+
 export function getApiKeyAdminUser(database: DbClient, appConfig: AppConfig = config): CurrentUser {
   const user = userRepository.findByEmail(database, appConfig.adminEmail.toLowerCase());
   if (!appConfig.apiKey || !user || !user.isActive) {

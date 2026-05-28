@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { config } from "../config.js";
+import type { DbClient } from "../db/client.js";
+import { features, useCases, wikiPages } from "../db/schema.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 
 export type ContentSubdir = "features" | "usecases" | "wiki";
@@ -79,6 +82,36 @@ export function readContent(absolutePath: string): string {
     }
     throw error;
   }
+}
+
+export function readContentFromDb(database: DbClient, id: number, table: ContentSubdir): string {
+  const record =
+    table === "features"
+      ? database.select({ content: features.content, contentPath: features.contentPath }).from(features).where(eq(features.id, id)).get()
+      : table === "usecases"
+        ? database.select({ content: useCases.content, contentPath: useCases.contentPath }).from(useCases).where(eq(useCases.id, id)).get()
+        : database.select({ content: wikiPages.content, contentPath: wikiPages.contentPath }).from(wikiPages).where(eq(wikiPages.id, id)).get();
+
+  if (!record) {
+    return "";
+  }
+  if (record.content !== null && record.content !== undefined) {
+    return record.content;
+  }
+  return record.contentPath ? readContent(resolveStoredContentPath(record.contentPath)) : "";
+}
+
+export function writeContentToDb(database: DbClient, id: number, table: ContentSubdir, html: string): void {
+  const updatedAt = new Date().toISOString();
+  if (table === "features") {
+    database.update(features).set({ content: html, updatedAt }).where(eq(features.id, id)).run();
+    return;
+  }
+  if (table === "usecases") {
+    database.update(useCases).set({ content: html, updatedAt }).where(eq(useCases.id, id)).run();
+    return;
+  }
+  database.update(wikiPages).set({ content: html, updatedAt }).where(eq(wikiPages.id, id)).run();
 }
 
 export function deleteContent(absolutePath: string): void {

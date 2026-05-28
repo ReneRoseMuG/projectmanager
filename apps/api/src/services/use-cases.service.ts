@@ -7,13 +7,9 @@ import type { JournalChangeCreateData } from "../repositories/journal.repository
 import { useCaseRepository, type UseCaseRecord, type UseCaseUpdateData } from "../repositories/use-case.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import {
-  buildFilename,
-  buildStoredContentPath,
   deleteContent,
-  readContent,
-  resolveContentPath,
+  readContentFromDb,
   resolveStoredContentPath,
-  writeContent
 } from "./content.service.js";
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
@@ -77,10 +73,6 @@ const useCaseJournalFields: Array<JournalFieldDefinition<UseCaseRecord>> = [
   { key: "description", label: "Beschreibung" },
   { key: "sortOrder", label: "Sortierung" }
 ];
-
-function contentFilename(id: number): string {
-  return buildFilename("usecase", id);
-}
 
 function mapUseCase(record: UseCaseRecord, content?: string, supportCounts = emptyUseCaseSupportCounts): UseCaseDto {
   return {
@@ -148,8 +140,8 @@ function getUseCaseRecord(database: DbClient, id: number): UseCaseRecord {
   return useCase;
 }
 
-function readUseCaseContent(record: UseCaseRecord): string {
-  return record.contentPath ? readContent(resolveStoredContentPath(record.contentPath)) : "";
+function readUseCaseContent(database: DbClient, record: UseCaseRecord): string {
+  return readContentFromDb(database, record.id, "usecases");
 }
 
 function useCaseJournalObject(record: UseCaseRecord): JournalObjectRef {
@@ -194,7 +186,7 @@ export function listUseCases(database: DbClient, featureId: number): UseCaseDto[
 export function getUseCase(database: DbClient, id: number): UseCaseDto {
   const useCase = getUseCaseRecord(database, id);
   const supportCounts = getUseCaseSupportCounts(database, [id]).get(id) ?? emptyUseCaseSupportCounts;
-  return mapUseCase(useCase, readUseCaseContent(useCase), supportCounts);
+  return mapUseCase(useCase, readUseCaseContent(database, useCase), supportCounts);
 }
 
 export function createUseCase(database: DbClient, featureId: number, input: UseCaseInput, actor?: JournalActor | null): UseCaseDto {
@@ -204,30 +196,21 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
   ensureCatalogEntryExists(database, "featureStatus", status);
 
-  const created = useCaseRepository.create(
-    database,
-    {
-      featureId: targetFeatureId,
-      title,
-      status,
-      description: cleanNullable(input.description) ?? null,
-      contentPath: null,
-      sortOrder: input.sortOrder ?? 0
-    },
-    actor?.actorUserId ?? undefined
-  );
-
-  const filename = contentFilename(created.id);
-  const absolutePath = resolveContentPath("usecases", filename);
-  const storedPath = buildStoredContentPath("usecases", filename);
-
-  try {
-    writeContent(absolutePath, input.content ?? "");
-    const updated = database.transaction((tx) => {
-      const useCase = useCaseRepository.setContentPath(tx, created.id, storedPath);
-      if (!useCase) {
-        throw notFound(`Use case with id ${created.id} not found`);
-      }
+  const content = input.content ?? "";
+  const created = database.transaction((tx) => {
+    const useCase = useCaseRepository.create(
+      tx,
+      {
+        featureId: targetFeatureId,
+        title,
+        status,
+        description: cleanNullable(input.description) ?? null,
+        contentPath: null,
+        content,
+        sortOrder: input.sortOrder ?? 0
+      },
+      actor?.actorUserId ?? undefined
+    );
       const journalObject = useCaseJournalObject(useCase);
       recordJournalEntry(tx, {
         operation: "create",
@@ -236,26 +219,17 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
         actor,
         contexts: [makeJournalContext(featureObject, "owner")]
       });
-      return useCase;
-    });
-    if (!updated) {
-      throw notFound(`Use case with id ${created.id} not found`);
-    }
+    return useCase;
+  });
 
-    return mapUseCase(updated, input.content ?? "");
-  } catch (error) {
-    useCaseRepository.delete(database, created.id);
-    deleteContent(absolutePath);
-    throw error;
-  }
+  return mapUseCase(created, content);
 }
 
 export function updateUseCase(database: DbClient, id: number, input: UseCaseInput, actor?: JournalActor | null): UseCaseDto {
   const current = getUseCaseRecord(database, id);
-  const previousContent = readUseCaseContent(current);
+  const previousContent = readUseCaseContent(database, current);
   assertVersion(current.version, input.expectedVersion ?? 0);
   const values: UseCaseUpdateData = {};
-  let contentPath = current.contentPath;
 
   if (input.title !== undefined) {
     values.title = requireNonEmpty(input.title, "title");
@@ -279,21 +253,8 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
     throw badRequest("No use case fields provided");
   }
 
-  if (!contentPath) {
-    const nextFilename = contentFilename(id);
-    const nextAbsolutePath = resolveContentPath("usecases", nextFilename);
-    const nextStoredPath = buildStoredContentPath("usecases", nextFilename);
-
-    writeContent(nextAbsolutePath, "");
-    contentPath = nextStoredPath;
-    values.contentPath = nextStoredPath;
-  }
-
   if (input.content !== undefined) {
-    if (!contentPath) {
-      throw badRequest("Use case content path is missing");
-    }
-    writeContent(resolveStoredContentPath(contentPath), input.content);
+    values.content = input.content;
   }
 
   const updated = database.transaction((tx) => {
@@ -323,7 +284,7 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
     throw notFound(`Use case with id ${id} not found`);
   }
   const supportCounts = getUseCaseSupportCounts(database, [id]).get(id) ?? emptyUseCaseSupportCounts;
-  return mapUseCase(updated, input.content ?? readUseCaseContent(updated), supportCounts);
+  return mapUseCase(updated, input.content ?? readUseCaseContent(database, updated), supportCounts);
 }
 
 export function deleteUseCase(database: DbClient, id: number, actor?: JournalActor | null): void {

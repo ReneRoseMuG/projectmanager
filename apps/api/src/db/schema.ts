@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
-import { check, index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { blob, check, index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const WORK_STATUSES = ["active", "on_hold", "completed", "archived", "todo", "open", "in_progress", "in_review", "done", "resolved", "closed", "rejected"] as const;
 export const PROJECT_STATUSES = WORK_STATUSES;
@@ -722,6 +722,7 @@ export const features = sqliteTable("features", {
   status: text("status").notNull().default("draft"),
   description: text("description"),
   contentPath: text("content_path"),
+  content: text("content"),
   sortOrder: integer("sort_order").notNull().default(0),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -739,6 +740,7 @@ export const useCases = sqliteTable("use_cases", {
   status: text("status").notNull().default("draft"),
   description: text("description"),
   contentPath: text("content_path"),
+  content: text("content"),
   sortOrder: integer("sort_order").notNull().default(0),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -772,6 +774,7 @@ export const wikiPages = sqliteTable("wiki_pages", {
   parentId: integer("parent_id").references((): AnySQLiteColumn => wikiPages.id, { onDelete: "restrict" }),
   title: text("title").notNull(),
   contentPath: text("content_path"),
+  content: text("content"),
   sortOrder: integer("sort_order").notNull().default(0),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -779,6 +782,24 @@ export const wikiPages = sqliteTable("wiki_pages", {
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
+
+export const contentImages = sqliteTable(
+  "content_images",
+  {
+    id: text("id").primaryKey(),
+    mimeType: text("mime_type").notNull(),
+    data: blob("data", { mode: "buffer" }).notNull(),
+    size: integer("size").notNull(),
+    version: integer("version").notNull().default(1),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    contentImagesCreatedAtIdx: index("content_images_created_at_idx").on(table.createdAt)
+  })
+);
 
 export const backlogItems = sqliteTable(
   "backlog_items",

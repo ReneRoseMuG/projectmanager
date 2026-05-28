@@ -4,14 +4,14 @@
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - LoginPage sendet E-Mail und Passwort an den Auth-Hook.
+ * - LoginPage bietet nur den Ein-Klick-Login für Rene an.
  * - Serverfehler werden als sichtbare Fehlermeldung gerendert.
  *
  * Fehlerfälle:
- * - Fehlgeschlagener Login bleibt auf der Seite und zeigt den API-Fehler.
+ * - Fehlgeschlagener Ein-Klick-Login bleibt auf der Seite und zeigt den API-Fehler.
  *
  * Ziel:
- * Den Login-Screen gegen Formular- und Fehlerregressionen absichern.
+ * Den Login-Screen gegen Ein-Klick- und Fehlerregressionen absichern.
  */
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
@@ -19,68 +19,58 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LoginPage } from "../../../../apps/web/src/pages/LoginPage";
 
-const loginMock = vi.fn();
+const loginAsReneMock = vi.fn();
 
 vi.mock("../../../../apps/web/src/hooks/useAuth", () => ({
   useAuth: () => ({
-    login: loginMock,
-    loginPending: false,
+    loginAsRene: loginAsReneMock,
+    loginAsRenePending: false,
   }),
 }));
 
 afterEach(() => {
   cleanup();
-  loginMock.mockReset();
+  loginAsReneMock.mockReset();
 });
 
 describe("LoginPage", () => {
-  it("sendet Login-Daten an den Auth-Hook", async () => {
-    loginMock.mockResolvedValue({ requiresPasswordSetup: false });
+  it("meldet Rene über den Auth-Hook an", async () => {
+    loginAsReneMock.mockResolvedValue({ requiresPasswordSetup: false });
     render(
       <MemoryRouter>
         <LoginPage />
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByLabelText("E-Mail"), {
-      target: { value: "user@example.test" },
-    });
-    fireEvent.change(screen.getByLabelText("Passwort"), {
-      target: { value: "password123" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Anmelden" }));
+    fireEvent.click(screen.getByRole("button", { name: "Als Rene anmelden" }));
 
-    await waitFor(() =>
-      expect(loginMock).toHaveBeenCalledWith({
-        email: "user@example.test",
-        password: "password123",
-      }),
-    );
+    await waitFor(() => expect(loginAsReneMock).toHaveBeenCalledTimes(1));
   });
 
-  it("fokussiert das E-Mail-Feld und rendert den Untertitel im hellgrauen Ton", async () => {
+  it("fokussiert den Ein-Klick-Button und rendert Rene als Untertitel", async () => {
     render(
       <MemoryRouter>
         <LoginPage />
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByLabelText("E-Mail")).toHaveFocus());
-    expect(screen.getByText("Anmeldung")).toHaveClass("text-steel-500");
+    const button = screen.getByRole("button", { name: "Als Rene anmelden" });
+    await waitFor(() => expect(button).toHaveFocus());
+    expect(screen.queryByLabelText("E-Mail")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Passwort")).not.toBeInTheDocument();
+    expect(screen.getByText("Rene Rose")).toHaveClass("text-steel-500");
   });
 
-  it("zeigt Fehler aus fehlgeschlagenem Login", async () => {
-    loginMock.mockRejectedValue(new Error("Invalid email or password"));
+  it("zeigt Fehler aus fehlgeschlagenem Ein-Klick-Login", async () => {
+    loginAsReneMock.mockRejectedValue(new Error("Authentication required"));
     render(
       <MemoryRouter>
         <LoginPage />
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Anmelden" }));
+    fireEvent.click(screen.getByRole("button", { name: "Als Rene anmelden" }));
 
-    expect(
-      await screen.findByText("Invalid email or password"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Authentication required")).toBeInTheDocument();
   });
 });

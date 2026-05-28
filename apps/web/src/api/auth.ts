@@ -5,6 +5,10 @@ export function login(input: LoginRequest): Promise<CurrentUser> {
   return api.post("auth/login", { json: input }).json<CurrentUser>();
 }
 
+export function loginAsRene(): Promise<CurrentUser> {
+  return api.post("auth/login-as-rene").json<CurrentUser>();
+}
+
 export function logout(): Promise<void> {
   return api.post("auth/logout").then(() => undefined);
 }

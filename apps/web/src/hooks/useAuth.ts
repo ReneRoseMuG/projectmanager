@@ -1,7 +1,7 @@
 import type { LoginRequest, SetPasswordRequest } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { getCurrentUser, login as loginRequest, logout as logoutRequest, setInitialPassword as setInitialPasswordRequest } from "../api/auth";
+import { getCurrentUser, login as loginRequest, loginAsRene as loginAsReneRequest, logout as logoutRequest, setInitialPassword as setInitialPasswordRequest } from "../api/auth";
 import { queryKeys } from "../queries/queryKeys";
 import { toQueryError } from "../queries/queryErrors";
 
@@ -29,6 +29,13 @@ export function useAuth(options: UseAuthOptions = {}) {
     }
   });
 
+  const loginAsReneMutation = useMutation({
+    mutationFn: loginAsReneRequest,
+    onSuccess: (user) => {
+      queryClient.setQueryData(queryKeys.auth.me(), user);
+    }
+  });
+
   const logoutMutation = useMutation({
     mutationFn: logoutRequest,
     onSuccess: async () => {
@@ -44,6 +51,7 @@ export function useAuth(options: UseAuthOptions = {}) {
   });
 
   const login = useCallback((input: LoginRequest) => loginMutation.mutateAsync(input), [loginMutation]);
+  const loginAsRene = useCallback(() => loginAsReneMutation.mutateAsync(), [loginAsReneMutation]);
   const logout = useCallback(() => logoutMutation.mutateAsync(), [logoutMutation]);
   const setInitialPassword = useCallback((input: SetPasswordRequest) => setPasswordMutation.mutateAsync(input), [setPasswordMutation]);
 
@@ -54,12 +62,15 @@ export function useAuth(options: UseAuthOptions = {}) {
     requiresPasswordSetup: authQueryEnabled ? Boolean(meQuery.data?.requiresPasswordSetup) : false,
     error: authQueryEnabled ? toQueryError(meQuery.error) : null,
     login,
+    loginAsRene,
     logout,
     setInitialPassword,
     loginPending: loginMutation.isPending,
+    loginAsRenePending: loginAsReneMutation.isPending,
     logoutPending: logoutMutation.isPending,
     setPasswordPending: setPasswordMutation.isPending,
     loginError: toQueryError(loginMutation.error),
+    loginAsReneError: toQueryError(loginAsReneMutation.error),
     setPasswordError: toQueryError(setPasswordMutation.error)
   };
 }

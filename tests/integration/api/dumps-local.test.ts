@@ -33,7 +33,6 @@ import { vitestRuntimeRoot } from "../../../apps/api/src/runtime-safety.js";
 import { config } from "../../../apps/api/src/config.js";
 import {
   applyLocalDump,
-  applyIncrementalRemoteSync,
   applyRemoteDump,
   buildDumpArchive,
   DUMP_TABLE_KEYS,
@@ -41,8 +40,6 @@ import {
   getLocalBackupStatus,
   getRemoteBackupStatus,
   inspectDumpArchive,
-  performIncrementalSftpSync,
-  previewIncrementalRemoteSync,
   previewLatestLocalDump,
   previewRemoteDump,
   saveDumpToLocalBackup,
@@ -280,6 +277,13 @@ function withoutRemoteImportHistory(snapshot: Snapshot): Snapshot {
   };
 }
 
+function withoutContentFiles(snapshot: Snapshot): Snapshot {
+  return {
+    ...snapshot,
+    content: {},
+  };
+}
+
 function seedCompleteDataset(): void {
   fs.mkdirSync(path.join(uploadDir, "docs"), { recursive: true });
   fs.mkdirSync(path.join(contentDir, "features"), { recursive: true });
@@ -399,6 +403,8 @@ function seedCompleteDataset(): void {
       VALUES (4, 'ticket.txt', 'ticket-file.txt', 'text/plain', 11, '2026-05-17T08:00:00');
     INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at)
       VALUES (5, 'milestone.txt', 'milestone-file.txt', 'text/plain', 16, '2026-05-17T08:00:00');
+    INSERT INTO content_images (id, mime_type, data, size, version, created_by, updated_by, created_at, updated_at)
+      VALUES ('content-image-1', 'image/png', X'89504E47', 4, 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO events (id, title, description, start_time, end_time, is_all_day, color, reminder_minutes, created_at, updated_at)
       VALUES (1, 'Termin', NULL, '2026-05-20T08:00:00', '2026-05-20T09:00:00', 0, '#123456', 30, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO sent_notifications (id, event_id, user_id, channel, reminder_minutes, sent_at)
@@ -480,6 +486,14 @@ async function parseZipJson(
   >;
 }
 
+async function zipEntryNames(buffer: Buffer): Promise<string[]> {
+  const directory = await unzipper.Open.buffer(buffer);
+  return directory.files
+    .filter((entry) => !entry.path.endsWith("/"))
+    .map((entry) => entry.path)
+    .sort((a, b) => a.localeCompare(b, "en"));
+}
+
 async function replaceDumpJson(
   original: Buffer,
   data: Record<string, unknown>,
@@ -499,6 +513,22 @@ async function replaceDumpJson(
     }
   }
   return zipFromEntries(entries);
+}
+
+function updateManifestTable(
+  manifest: Record<string, unknown>,
+  key: string,
+  rows: Array<Record<string, unknown>>,
+): void {
+  const tables = manifest.tables as Record<
+    string,
+    { rowCount: number; sha256: string }
+  >;
+  tables[key] = {
+    ...tables[key],
+    rowCount: rows.length,
+    sha256: sha256Json(rows),
+  };
 }
 
 beforeEach(() => {
@@ -582,6 +612,49 @@ describe("Local backup status", () => {
     await app.close();
   });
 
+  it("stellt Partial-Backups aus ZIP-Dateien und verifizierten lokalen Basisdateien wieder her", async () => {
+    await saveDumpToLocalBackup(testDb.sqlite);
+    fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "Projektdatei neu", "utf8");
+    await saveDumpToLocalBackup(testDb.sqlite);
+    const expected = collectSnapshot();
+
+    testDb.sqlite
+      .prepare("UPDATE projects SET name = 'Partial Mutation' WHERE id = 1")
+      .run();
+    fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "kaputt", "utf8");
+    fs.writeFileSync(path.join(uploadDir, "extra.txt"), "extra", "utf8");
+    expect(collectSnapshot()).not.toEqual(expected);
+
+    const preview = await previewLatestLocalDump();
+    expect(preview.transferReadiness).toBe("ready");
+    await applyLocalDump(testDb.sqlite, {
+      fileId: preview.backupFile.id,
+      fileHash: preview.fileHash,
+      confirmationPhrase: preview.confirmationPhrase,
+    });
+
+    expect(collectSnapshot()).toEqual(withoutContentFiles(expected));
+  });
+
+  it("blockiert Partial-Backups, wenn eine unveränderte lokale Basisdatei fehlt", async () => {
+    await saveDumpToLocalBackup(testDb.sqlite);
+    fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "Projektdatei neu", "utf8");
+    await saveDumpToLocalBackup(testDb.sqlite);
+    fs.rmSync(path.join(uploadDir, "milestone-file.txt"), { force: true });
+
+    const preview = await previewLatestLocalDump();
+
+    expect(preview.transferReadiness).toBe("blocked");
+    expect(preview.blockingIssues.join(" ")).toContain("milestone-file.txt");
+    await expect(
+      applyLocalDump(testDb.sqlite, {
+        fileId: preview.backupFile.id,
+        fileHash: preview.fileHash,
+        confirmationPhrase: preview.confirmationPhrase,
+      }),
+    ).rejects.toThrow("Dump import is blocked");
+  });
+
   it("schützt lokale Dump-Routen über Auth und Dumps-Berechtigungen", async () => {
     const originalAdminInitialPassword = config.adminInitialPassword;
     config.adminInitialPassword = "password123";
@@ -596,13 +669,8 @@ describe("Local backup status", () => {
         .send({ email: "admin@local", password: "password123" })
         .expect(200);
       await admin.post("/api/dumps/local/save").expect(200);
-      const remoteFiles = new Map<string, RemoteMockFile>();
-      configureMockSftp(remoteFiles);
-      const syncResponse = await admin
-        .post("/api/dumps/remote/sync")
-        .expect(200);
-      expect(syncResponse.body.success).toBe(true);
-      await admin.get("/api/dumps/remote/sync/preview").expect(200);
+      await admin.post("/api/dumps/remote/sync").expect(404);
+      await admin.get("/api/dumps/remote/sync/preview").expect(404);
 
       const roles = await admin.get("/api/admin/roles").expect(200);
       const readerRole = roles.body.find(
@@ -627,7 +695,7 @@ describe("Local backup status", () => {
         .expect(200);
       await reader.get("/api/dumps/local/status").expect(200);
       await reader.get("/api/dumps/local/latest/preview").expect(200);
-      await reader.get("/api/dumps/remote/sync/preview").expect(200);
+      await reader.get("/api/dumps/remote/sync/preview").expect(404);
       await reader.post("/api/dumps/local/save").expect(403);
       await reader.post("/api/dumps/remote/sync").expect(403);
       await reader
@@ -705,7 +773,7 @@ describe("Remote SFTP backup status", () => {
     });
 
     expect(applyResult.verificationPassed).toBe(true);
-    expect(withoutRemoteImportHistory(collectSnapshot())).toEqual(before);
+    expect(withoutContentFiles(withoutRemoteImportHistory(collectSnapshot()))).toEqual(withoutContentFiles(before));
     await expect(
       applyRemoteDump(testDb.sqlite, {
         fileId: preview.backupFile.id,
@@ -719,139 +787,9 @@ describe("Remote SFTP backup status", () => {
   });
 });
 
-describe("Incremental SFTP sync", () => {
-  it("überträgt beim ersten Sync alles und beim unveränderten Folgelauf nichts", async () => {
-    const remoteFiles = new Map<string, RemoteMockFile>();
-    const metrics = configureMockSftp(remoteFiles);
-    const phases: string[] = [];
-
-    const first = await performIncrementalSftpSync(testDb.sqlite, {
-      progressCallback: (event) => {
-        phases.push(event.phase);
-      },
-    });
-
-    expect(first).toMatchObject({
-      success: true,
-      tablesUpdated: true,
-      filesDeleted: 0,
-      filesDeleteFailed: 0,
-    });
-    expect(first.filesUploaded).toBeGreaterThan(0);
-    expect(remoteFiles.has("data.json")).toBe(true);
-    expect(remoteFiles.has("manifest.json")).toBe(true);
-    expect(remoteFiles.has("uploads/project-file.txt")).toBe(true);
-    expect(remoteFiles.has("content/wiki/root.md")).toBe(true);
-    expect(metrics.clientFactoryCount).toBe(1);
-    expect(metrics.connectCount).toBe(1);
-    expect(metrics.endCount).toBe(1);
-    expect(phases).toEqual(
-      expect.arrayContaining([
-        "manifest_fetch",
-        "file_compare",
-        "file_upload",
-        "manifest_update",
-        "done",
-      ]),
-    );
-
-    const remoteSnapshot = new Map(remoteFiles);
-    const putCountAfterFirstSync = metrics.putPaths.length;
-    const second = await performIncrementalSftpSync(testDb.sqlite);
-
-    expect(second).toMatchObject({
-      success: true,
-      tablesUpdated: false,
-      filesUploaded: 0,
-      filesDeleted: 0,
-      filesDeleteFailed: 0,
-    });
-    expect(remoteFiles).toEqual(remoteSnapshot);
-    expect(metrics.clientFactoryCount).toBe(2);
-    expect(metrics.connectCount).toBe(2);
-    expect(metrics.endCount).toBe(2);
-    expect(metrics.putPaths).toHaveLength(putCountAfterFirstSync);
-  });
-
-  it("synchronisiert Tabellen, neue Dateien, geänderte Dateien und gelöschte Dateien und stellt den Stand wieder her", async () => {
-    const remoteFiles = new Map<string, RemoteMockFile>();
-    const metrics = configureMockSftp(remoteFiles);
-    await performIncrementalSftpSync(testDb.sqlite);
-
-    mutateLocalState();
-    const expected = collectSnapshot();
-    const connectionCountBeforeSecondSync = metrics.connectCount;
-    const result = await performIncrementalSftpSync(testDb.sqlite);
-
-    expect(result.success).toBe(true);
-    expect(result.tablesUpdated).toBe(true);
-    expect(result.filesUploaded).toBeGreaterThanOrEqual(3);
-    expect(result.filesDeleted).toBe(1);
-    expect(remoteFiles.has("uploads/extra.txt")).toBe(true);
-    expect(remoteFiles.has("content/wiki/root.md")).toBe(false);
-    expect(metrics.connectCount).toBe(connectionCountBeforeSecondSync + 1);
-    expect(metrics.deletePaths).toContain("content/wiki/root.md");
-
-    testDb.sqlite
-      .prepare("UPDATE projects SET name = 'Bürostand' WHERE id = 1")
-      .run();
-    fs.writeFileSync(
-      path.join(uploadDir, "project-file.txt"),
-      "Bürodatei",
-      "utf8",
-    );
-    fs.rmSync(path.join(uploadDir, "extra.txt"), { force: true });
-    expect(collectSnapshot()).not.toEqual(expected);
-
-    const preview = await previewIncrementalRemoteSync();
-    expect(preview.transferReadiness).toBe("ready");
-    const applyResult = await applyIncrementalRemoteSync(testDb.sqlite, {
-      manifestHash: preview.manifestHash,
-      confirmed: true,
-    });
-
-    expect(applyResult.verificationPassed).toBe(true);
-    expect(collectSnapshot()).toEqual(expected);
-  });
-
-  it("schließt die einzelne SFTP-Verbindung auch bei Upload-Fehlern", async () => {
-    const remoteFiles = new Map<string, RemoteMockFile>();
-    const metrics = configureMockSftp(remoteFiles);
-    await performIncrementalSftpSync(testDb.sqlite);
-    const manifestBeforeFailedSync = remoteFiles
-      .get("manifest.json")
-      ?.buffer.toString("utf8");
-    mutateLocalState();
-    metrics.failOnPutPath = "uploads/project-file.txt";
-
-    const result = await performIncrementalSftpSync(testDb.sqlite);
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain("Configured SFTP put failure");
-    expect(metrics.connectCount).toBe(2);
-    expect(metrics.endCount).toBe(2);
-    expect(remoteFiles.get("manifest.json")?.buffer.toString("utf8")).toBe(
-      manifestBeforeFailedSync,
-    );
-  });
-
-  it("bricht den Sync nicht ab, wenn ein Progress-Callback fehlschlägt", async () => {
-    const remoteFiles = new Map<string, RemoteMockFile>();
-    configureMockSftp(remoteFiles);
-
-    const result = await performIncrementalSftpSync(testDb.sqlite, {
-      progressCallback: () => {
-        throw new Error("Subscriber failed");
-      },
-    });
-
-    expect(result.success).toBe(true);
-    expect(remoteFiles.has("manifest.json")).toBe(true);
-  });
-});
 
 describe("Local dump roundtrip", () => {
-  it("exportiert Benutzer ohne Standardadmin und mit roleCode", async () => {
+  it("exportiert Benutzer inklusive Standardadmin und mit roleCode", async () => {
     const archive = await buildDumpArchive(testDb.sqlite);
     const data = await parseZipJson(archive.buffer, "data.json");
     const tables = data.tables as Record<
@@ -859,26 +797,28 @@ describe("Local dump roundtrip", () => {
       Array<Record<string, unknown>>
     >;
 
-    expect(tables.users.some((user) => user.email === "admin@local")).toBe(
-      false,
+    const exportedAdmin = tables.users.find(
+      (user) => user.email === "admin@local",
     );
     const exportedUser = tables.users.find(
       (user) => user.email === "ada@example.test",
     );
 
+    expect(exportedAdmin).toMatchObject({ roleCode: "admin" });
+    expect(exportedAdmin).not.toHaveProperty("role_id");
     expect(exportedUser).toMatchObject({ roleCode: "editor" });
     expect(exportedUser).not.toHaveProperty("role_id");
     expect(
       tables.appSettings.some((setting) => setting.key === "admin_setup_done"),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       tables.settingsValues.some(
         (setting) => setting.scope_type === "USER" && setting.scope_id === "1",
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("neutralisiert Referenzen auf den Standardadmin im Export", async () => {
+  it("erhält Referenzen auf den Standardadmin im Export", async () => {
     testDb.sqlite
       .prepare(
         "UPDATE projects SET created_by = 1, updated_by = 1 WHERE id = 1",
@@ -897,11 +837,80 @@ describe("Local dump roundtrip", () => {
     const project = tables.projects.find((row) => row.id === 1);
     const journalEntry = tables.journalEntries.find((row) => row.id === 1);
 
-    expect(project).toMatchObject({ created_by: null, updated_by: null });
-    expect(journalEntry).toMatchObject({ actor_user_id: null });
+    expect(project).toMatchObject({ created_by: 1, updated_by: 1 });
+    expect(journalEntry).toMatchObject({ actor_user_id: 1 });
   });
 
-  it("sichert und aktualisiert DB, uploads und content als echten Roundtrip", async () => {
+  it("serialisiert Content-Image-BLOBs im JSON-Dump base64", async () => {
+    const archive = await buildDumpArchive(testDb.sqlite);
+    const data = await parseZipJson(archive.buffer, "data.json");
+    const tables = data.tables as Record<
+      string,
+      Array<Record<string, unknown>>
+    >;
+    const image = tables.contentImages.find((row) => row.id === "content-image-1");
+
+    expect(image).toMatchObject({
+      id: "content-image-1",
+      mime_type: "image/png",
+      size: 4,
+      data: { __blobBase64: "iVBORw==" },
+    });
+  });
+
+  it("packt beim ersten lokalen Backup alle Uploads und keine neuen Content-Dateien", async () => {
+    const result = await saveDumpToLocalBackup(testDb.sqlite);
+    const buffer = fs.readFileSync(result.filePath);
+    const entries = await zipEntryNames(buffer);
+    const manifest = await parseZipJson(buffer, "manifest.json");
+    const fileRoots = manifest.fileRoots as Record<
+      "uploads" | "content",
+      { fileCount: number; partial?: boolean; files: Array<{ relativePath: string }> }
+    >;
+
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        "data.json",
+        "manifest.json",
+        "uploads/project-file.txt",
+        "uploads/docs/task-file.pdf",
+      ]),
+    );
+    expect(entries.some((entry) => entry.startsWith("content/"))).toBe(false);
+    expect(fileRoots.uploads.fileCount).toBe(5);
+    expect(fileRoots.uploads.partial).toBeUndefined();
+    expect(fileRoots.content.fileCount).toBe(0);
+  });
+
+  it("packt beim Folgelauf nur geänderte Uploads und manifestiert weiter alle Uploads", async () => {
+    await saveDumpToLocalBackup(testDb.sqlite);
+    fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "Projektdatei neu", "utf8");
+
+    const result = await saveDumpToLocalBackup(testDb.sqlite);
+    const buffer = fs.readFileSync(result.filePath);
+    const entries = await zipEntryNames(buffer);
+    const manifest = await parseZipJson(buffer, "manifest.json");
+    const fileRoots = manifest.fileRoots as Record<
+      "uploads" | "content",
+      { fileCount: number; partial?: boolean; files: Array<{ relativePath: string }> }
+    >;
+
+    expect(entries).toContain("uploads/project-file.txt");
+    expect(entries).not.toContain("uploads/milestone-file.txt");
+    expect(entries).not.toContain("uploads/docs/task-file.pdf");
+    expect(entries.some((entry) => entry.startsWith("content/"))).toBe(false);
+    expect(fileRoots.uploads.fileCount).toBe(5);
+    expect(fileRoots.uploads.partial).toBe(true);
+    expect(fileRoots.uploads.files.map((file) => file.relativePath)).toEqual([
+      "docs/task-file.pdf",
+      "feature-file.txt",
+      "milestone-file.txt",
+      "project-file.txt",
+      "ticket-file.txt",
+    ]);
+  });
+
+  it("sichert und aktualisiert DB und Uploads als echten Roundtrip", async () => {
     const before = collectSnapshot();
     const app = await buildTestApp(testDb, { enableMultipart: true });
     setContentBaseDir(contentDir);
@@ -935,7 +944,7 @@ describe("Local dump roundtrip", () => {
     const applyResult = applyResponse.body as DumpBackupApplyResult;
 
     expect(applyResult.verificationPassed).toBe(true);
-    expect(collectSnapshot()).toEqual(before);
+    expect(collectSnapshot()).toEqual(withoutContentFiles(before));
     await app.close();
   });
 
@@ -999,7 +1008,7 @@ describe("Local dump roundtrip", () => {
     }
   });
 
-  it("behält lokalen Standardadmin, Setup-Status und Admin-Einstellungen beim Import", async () => {
+  it("stellt Standardadmin, Setup-Status und Admin-Einstellungen aus dem Dump wieder her", async () => {
     const archive = await buildDumpArchive(testDb.sqlite);
     const file = writeBackupFile(archive.filename, archive.buffer);
     const preview = await inspectDumpArchive(archive.buffer, file);
@@ -1045,13 +1054,72 @@ describe("Local dump roundtrip", () => {
 
     expect(applyResult.verificationPassed).toBe(true);
     expect(admin).toEqual({
-      first_name: "Local",
-      last_name: "Owner",
-      password_hash: "target-only-hash",
-      is_active: 0,
+      first_name: "Test",
+      last_name: "Admin",
+      password_hash:
+        "$2b$12$6i0aEyMqgUs3z.zKCqvpQexCgDxZk17O0lNs8ChHO4Iy87/pDp40q",
+      is_active: 1,
     });
-    expect(setup.value).toBe("false");
-    expect(adminSetting.value_json).toBe('"local-kanban"');
+    expect(setup.value).toBe("true");
+    expect(adminSetting.value_json).toBe('"kanban"');
+  });
+
+  it("setzt bei alten Dumps ohne Standardadmin den lokalen Admin für fehlende Admin-Referenzen ein", async () => {
+    const archive = await buildDumpArchive(testDb.sqlite);
+    const data = await parseZipJson(archive.buffer, "data.json");
+    const manifest = await parseZipJson(archive.buffer, "manifest.json");
+    data.formatVersion = 10;
+    manifest.formatVersion = 10;
+    const tables = data.tables as Record<
+      string,
+      Array<Record<string, unknown>>
+    >;
+    tables.users = [];
+    tables.dayPlans = tables.dayPlans.map((dayPlan) =>
+      dayPlan.id === 1
+        ? { ...dayPlan, user_id: 2, created_by: 2, updated_by: 2 }
+        : dayPlan,
+    );
+    updateManifestTable(manifest, "users", tables.users);
+    updateManifestTable(manifest, "dayPlans", tables.dayPlans);
+    const legacyArchive = await replaceDumpJson(archive.buffer, data, manifest);
+    const file = writeBackupFile(archive.filename, legacyArchive);
+    const preview = await inspectDumpArchive(legacyArchive, file);
+    testDb.sqlite
+      .prepare(
+        "UPDATE users SET first_name = 'Local', last_name = 'Fallback', password_hash = 'local-fallback-hash' WHERE id = 1",
+      )
+      .run();
+    mutateLocalState();
+
+    const applyResult = await applyLocalDump(testDb.sqlite, {
+      fileId: file.id,
+      fileHash: preview.fileHash,
+      confirmationPhrase: preview.confirmationPhrase,
+    });
+    const admin = testDb.sqlite
+      .prepare(
+        "SELECT id, first_name, last_name, password_hash FROM users WHERE email = 'admin@local'",
+      )
+      .get() as {
+      id: number;
+      first_name: string;
+      last_name: string;
+      password_hash: string;
+    };
+    const dayPlan = testDb.sqlite
+      .prepare("SELECT user_id, created_by, updated_by FROM day_plans WHERE id = 1")
+      .get() as { user_id: number; created_by: number; updated_by: number };
+
+    expect(applyResult.verificationPassed).toBe(true);
+    expect(admin).toEqual({
+      id: 1,
+      first_name: "Local",
+      last_name: "Fallback",
+      password_hash: "local-fallback-hash",
+    });
+    expect(dayPlan).toEqual({ user_id: 1, created_by: 1, updated_by: 1 });
+    expect(testDb.sqlite.pragma("foreign_key_check") as unknown[]).toEqual([]);
   });
 
   it("importiert bestehende rohe User-Dumps mit role_id weiterhin", async () => {
@@ -1207,6 +1275,39 @@ describe("Dump import failure safety", () => {
       }),
     ).rejects.toThrow();
     expect(collectSnapshot()).toEqual(before);
+  });
+
+  it("blockiert fehlende Nicht-Admin-User-Referenzen und rollt vollständig zurück", async () => {
+    const archive = await buildDumpArchive(testDb.sqlite);
+    const data = await parseZipJson(archive.buffer, "data.json");
+    const manifest = await parseZipJson(archive.buffer, "manifest.json");
+    const tables = data.tables as Record<
+      string,
+      Array<Record<string, unknown>>
+    >;
+    tables.users = tables.users.filter(
+      (user) => user.email !== "ada@example.test",
+    );
+    updateManifestTable(manifest, "users", tables.users);
+    const badArchive = await replaceDumpJson(archive.buffer, data, manifest);
+    const file = writeBackupFile(archive.filename, badArchive);
+    const before = collectSnapshot();
+    mutateLocalState();
+    const mutated = collectSnapshot();
+
+    const preview = await inspectDumpArchive(badArchive, file);
+    expect(preview.transferReadiness).toBe("ready");
+    await expect(
+      applyLocalDump(testDb.sqlite, {
+        fileId: file.id,
+        fileHash: preview.fileHash,
+        confirmationPhrase: preview.confirmationPhrase,
+      }),
+    ).rejects.toThrow("Dump import is missing referenced users.id values");
+
+    expect(collectSnapshot()).toEqual(mutated);
+    expect(collectSnapshot()).not.toEqual(before);
+    expect(testDb.sqlite.pragma("foreign_key_check") as unknown[]).toEqual([]);
   });
 
   it("rollt ungültige Fremdschlüssel vollständig zurück", async () => {

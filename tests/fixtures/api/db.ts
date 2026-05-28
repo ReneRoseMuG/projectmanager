@@ -166,6 +166,7 @@ export function truncateAll(sqlite: Database.Database): void {
     "feature_relations",
     "features",
     "comments",
+    "content_images",
     "ticket_relations",
     "ticket_tags",
     "ticket_notes",

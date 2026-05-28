@@ -3,7 +3,7 @@
  *
  * Abgedeckte Regeln:
  * - Auth-Migration legt Rollen, Permissions und `full_name` als generierte Spalte an.
- * - Login, Session-Cookie, `/auth/me`, globale Guards und Admin-Guards funktionieren.
+ * - Login, Session-Cookie, Ein-Klick-Login, `/auth/me`, globale Guards und Admin-Guards funktionieren.
  * - Admin-Benutzer und Rollen werden versioniert verwaltet und Passwörter gehasht.
  * - Die geschützte User-Auswahlliste liefert aktive Benutzer ohne Admin-Route.
  *
@@ -162,6 +162,33 @@ describe("Auth API", () => {
 
     config.authBypassAdmin = false;
     await supertest(app.server).get("/api/projects").expect(401);
+  });
+
+  it("meldet den konfigurierten Admin per Ein-Klick-Login ohne Passwort an", async () => {
+    testDb.sqlite.prepare("UPDATE users SET password_hash = NULL WHERE email = 'admin@local'").run();
+    testDb.sqlite.prepare("UPDATE app_settings SET value = 'false' WHERE key = 'admin_setup_done'").run();
+
+    const agent = supertest.agent(app.server);
+    const login = await agent.post("/api/auth/login-as-rene").expect(200);
+
+    expect(login.body).toMatchObject({
+      email: "admin@local",
+      role: { key: "admin" },
+      requiresPasswordSetup: false
+    });
+    await agent.get("/api/projects").expect(200);
+  });
+
+  it("blockiert den Ein-Klick-Login für deaktivierte Admins", async () => {
+    testDb.sqlite.prepare("UPDATE users SET is_active = 0 WHERE email = 'admin@local'").run();
+
+    const response = await supertest(app.server).post("/api/auth/login-as-rene").expect(403);
+
+    expect(response.body).toMatchObject({
+      error: "FORBIDDEN",
+      message: "Account is disabled",
+      statusCode: 403
+    });
   });
 
   it("legt Benutzer an, speichert Passwörter gehasht und schützt Admin-Routen vor Nicht-Admins", async () => {

@@ -1,10 +1,7 @@
-import { Lock, Mail } from "lucide-react";
-import type { FormEvent } from "react";
+import { LogIn, UserRound } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
-import { FormField } from "../components/ui/FormField";
-import { Input } from "../components/ui/Input";
 import { useAuth } from "../hooks/useAuth";
 import { errorMessageAsync } from "../hooks/errors";
 
@@ -15,19 +12,16 @@ interface LocationState {
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, loginPending } = useAuth({ enabled: false });
-  const [email, setEmail] = useState("admin@local");
-  const [password, setPassword] = useState("");
+  const { loginAsRene, loginAsRenePending } = useAuth({ enabled: false });
   const [error, setError] = useState<string | null>(null);
 
   const from =
     (location.state as LocationState | null)?.from?.pathname ?? "/";
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleLogin() {
     setError(null);
     try {
-      const user = await login({ email, password });
+      const user = await loginAsRene();
       navigate(user.requiresPasswordSetup ? "/setup-password" : from, {
         replace: true,
       });
@@ -41,41 +35,28 @@ export function LoginPage() {
       <section className="w-full max-w-sm rounded-lg border border-line bg-white p-6 shadow-card">
         <div className="mb-6">
           <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-md bg-steel-700 text-white">
-            <Lock size={20} />
+            <UserRound size={20} />
           </span>
           <h1 className="text-xl font-bold text-ink">Projekt Manager</h1>
-          <p className="mt-1 text-sm text-steel-500">Anmeldung</p>
+          <p className="mt-1 text-sm text-steel-500">Rene Rose</p>
         </div>
-        <form className="grid gap-4" onSubmit={handleSubmit}>
-          <FormField label="E-Mail" htmlFor="login-email">
-            <Input
-              id="login-email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              autoFocus
-              iconLeft={<Mail size={16} />}
-            />
-          </FormField>
-          <FormField label="Passwort" htmlFor="login-password">
-            <Input
-              id="login-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              autoComplete="current-password"
-              iconLeft={<Lock size={16} />}
-            />
-          </FormField>
+        <div className="grid gap-4">
           {error ? (
             <p className="rounded-md border border-crimson/30 bg-crimson/5 px-3 py-2 text-sm text-crimson">
               {error}
             </p>
           ) : null}
-          <Button type="submit" variant="primary" loading={loginPending}>
-            Anmelden
+          <Button
+            type="button"
+            variant="primary"
+            icon={<LogIn size={16} />}
+            loading={loginAsRenePending}
+            autoFocus
+            onClick={handleLogin}
+          >
+            Als Rene anmelden
           </Button>
-        </form>
+        </div>
       </section>
     </main>
   );

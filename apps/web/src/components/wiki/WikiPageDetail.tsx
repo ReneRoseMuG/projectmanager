@@ -2,6 +2,7 @@ import type { WikiPage, WikiPageUpdate } from "@taskmanager/shared-types";
 import { Edit3, Save, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { uploadContentImage } from "../../api/content-images";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
 import { JournalPanel } from "../journal/JournalPanel";
@@ -61,7 +62,7 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
       <div className="p-5">
         {activeTab === "content" ? (
           <form id="wiki-page-detail-form" className="grid gap-5" onSubmit={submit}>
-            <RichTextInlineField value={content} placeholder="Wiki-Inhalt" testIdPrefix="wiki-page-detail-content" onChange={setContent} />
+            <RichTextInlineField value={content} placeholder="Wiki-Inhalt" testIdPrefix="wiki-page-detail-content" onImageUpload={uploadContentImage} onChange={setContent} />
             <footer className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-white/95 p-4 shadow-panel backdrop-blur">
               <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(page)}>
                 Löschen

@@ -47,7 +47,7 @@ describe("Use Cases API", () => {
     fs.rmSync(tmpContentDir, { recursive: true, force: true });
   });
 
-  it("POST erstellt Use Case und Markdown-Datei", async () => {
+  it("POST erstellt Use Case mit DB-Content", async () => {
     const feature = await createFeature(app, { title: "Feature fuer Use Case" });
 
     const res = await supertest(app.server)
@@ -57,8 +57,26 @@ describe("Use Cases API", () => {
 
     expect(res.body.featureId).toBe(feature.id);
     expect(res.body).not.toHaveProperty("slug");
-    expect(res.body.contentPath).toMatch(/content\/usecases\/usecase-\d+\.md/);
-    expect(fs.readFileSync(resolveStoredContentPath(res.body.contentPath), "utf8")).toBe("# UC-01");
+    expect(res.body.contentPath).toBeNull();
+    const row = testDb.sqlite.prepare("SELECT content FROM use_cases WHERE id = ?").get(res.body.id) as { content: string };
+    expect(row.content).toBe("# UC-01");
+  });
+
+  it("GET einzelner Use Case liest Legacy-Dateicontent als Fallback", async () => {
+    const feature = await createFeature(app, { title: "Legacy-Feature" });
+    const contentPath = "content/usecases/legacy-use-case.md";
+    fs.writeFileSync(resolveStoredContentPath(contentPath), "# Legacy Use Case", "utf8");
+    const now = new Date().toISOString();
+    const result = testDb.sqlite
+      .prepare(
+        "INSERT INTO use_cases (feature_id, title, status, content_path, content, sort_order, version, created_at, updated_at) VALUES (?, ?, 'draft', ?, NULL, 0, 1, ?, ?)"
+      )
+      .run(feature.id, "Legacy Use Case", contentPath, now, now);
+
+    const res = await supertest(app.server).get(`/api/use-cases/${result.lastInsertRowid}`).expect(200);
+
+    expect(res.body.content).toBe("# Legacy Use Case");
+    expect(res.body.contentPath).toBe(contentPath);
   });
 
   it("GET Liste gibt Use Cases ohne Content zurück", async () => {
@@ -96,24 +114,23 @@ describe("Use Cases API", () => {
   it("Feature-DELETE entfernt Use Cases per Cascade und Dateien per Service-Logik", async () => {
     const feature = await createFeature(app, { title: "Cascade-Feature" });
     const useCase = await createUseCase(app, feature.id, { title: "Cascade-Use-Case" });
-    const useCasePath = resolveStoredContentPath(useCase.contentPath ?? "");
 
     await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-    expect(fs.existsSync(useCasePath)).toBe(false);
+    const row = testDb.sqlite.prepare("SELECT id FROM use_cases WHERE id = ?").get(useCase.id);
+    expect(row).toBeUndefined();
     await supertest(app.server).get(`/api/use-cases/${useCase.id}`).expect(404);
   });
 
   it("PATCH mit neuem Titel behÃ¤lt Datei", async () => {
     const feature = await createFeature(app, { title: "Rename-Feature" });
     const useCase = await createUseCase(app, feature.id, { title: "Alter Use Case" });
-    const oldPath = resolveStoredContentPath(useCase.contentPath ?? "");
 
     const res = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ title: "Neuer Use Case", expectedVersion: useCase.version }).expect(200);
 
     expect(res.body.contentPath).toBe(useCase.contentPath);
-    expect(fs.existsSync(oldPath)).toBe(true);
-    expect(fs.existsSync(resolveStoredContentPath(res.body.contentPath))).toBe(true);
+    const row = testDb.sqlite.prepare("SELECT content FROM use_cases WHERE id = ?").get(useCase.id) as { content: string };
+    expect(row.content).toBe("# Test Use Case");
   });
 
   it("PATCH aktualisiert Metadaten", async () => {
@@ -131,11 +148,11 @@ describe("Use Cases API", () => {
   it("DELETE entfernt Use Case und Datei", async () => {
     const feature = await createFeature(app, { title: "Delete-Feature" });
     const useCase = await createUseCase(app, feature.id, { title: "Delete-Use-Case" });
-    const contentPath = resolveStoredContentPath(useCase.contentPath ?? "");
 
     await supertest(app.server).delete(`/api/use-cases/${useCase.id}`).expect(204);
 
-    expect(fs.existsSync(contentPath)).toBe(false);
+    const row = testDb.sqlite.prepare("SELECT id FROM use_cases WHERE id = ?").get(useCase.id);
+    expect(row).toBeUndefined();
     await supertest(app.server).get(`/api/use-cases/${useCase.id}`).expect(404);
   });
 
@@ -148,6 +165,7 @@ describe("Use Cases API", () => {
 
     const updated = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ content: "# Neu", expectedVersion: useCase.version }).expect(200);
     expect(updated.body.content).toBe("# Neu");
-    expect(fs.readFileSync(resolveStoredContentPath(updated.body.contentPath), "utf8")).toBe("# Neu");
+    const row = testDb.sqlite.prepare("SELECT content FROM use_cases WHERE id = ?").get(useCase.id) as { content: string };
+    expect(row.content).toBe("# Neu");
   });
 });

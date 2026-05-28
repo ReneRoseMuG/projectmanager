@@ -10,13 +10,9 @@ import { badRequest, notFound } from "../utils/errors.js";
 import { deleteFeatureAttachmentsForIds } from "./attachments.service.js";
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import {
-  buildFilename,
-  buildStoredContentPath,
   deleteContent,
-  readContent,
-  resolveContentPath,
+  readContentFromDb,
   resolveStoredContentPath,
-  writeContent
 } from "./content.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import {
@@ -77,10 +73,6 @@ const featureJournalFields: Array<JournalFieldDefinition<FeatureRecord>> = [
   { key: "description", label: "Beschreibung" },
   { key: "sortOrder", label: "Sortierung" }
 ];
-
-function contentFilename(id: number): string {
-  return buildFilename("feature", id);
-}
 
 function mapFeature(record: FeatureRecord, useCaseCount: number, content?: string, supportCounts = emptyFeatureSupportCounts): FeatureDto {
   return {
@@ -153,8 +145,8 @@ function getFeatureRecord(database: DbClient, id: number): FeatureRecord {
   return feature;
 }
 
-function readFeatureContent(record: FeatureRecord): string {
-  return record.contentPath ? readContent(resolveStoredContentPath(record.contentPath)) : "";
+function readFeatureContent(database: DbClient, record: FeatureRecord): string {
+  return readContentFromDb(database, record.id, "features");
 }
 
 function featureJournalObject(record: FeatureRecord): JournalObjectRef {
@@ -200,7 +192,7 @@ export function listFeatures(database: DbClient): FeatureDto[] {
 export function getFeature(database: DbClient, id: number): FeatureDto {
   const feature = getFeatureRecord(database, id);
   const supportCounts = getFeatureSupportCounts(database, [id]).get(id) ?? emptyFeatureSupportCounts;
-  return mapFeature(feature, countUseCases(database, id), readFeatureContent(feature), supportCounts);
+  return mapFeature(feature, countUseCases(database, id), readFeatureContent(database, feature), supportCounts);
 }
 
 export function createFeature(database: DbClient, input: FeatureInput, actor?: JournalActor | null): FeatureDto {
@@ -208,29 +200,20 @@ export function createFeature(database: DbClient, input: FeatureInput, actor?: J
   const status = input.status ?? resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
   ensureCatalogEntryExists(database, "featureStatus", status);
 
-  const created = featureRepository.create(
-    database,
-    {
-      title,
-      status,
-      description: cleanNullable(input.description) ?? null,
-      contentPath: null,
-      sortOrder: input.sortOrder ?? 0
-    },
-    actor?.actorUserId ?? undefined
-  );
-
-  const filename = contentFilename(created.id);
-  const absolutePath = resolveContentPath("features", filename);
-  const storedPath = buildStoredContentPath("features", filename);
-
-  try {
-    writeContent(absolutePath, input.content ?? "");
-    const updated = database.transaction((tx) => {
-      const feature = featureRepository.setContentPath(tx, created.id, storedPath);
-      if (!feature) {
-        throw notFound(`Feature with id ${created.id} not found`);
-      }
+  const content = input.content ?? "";
+  const created = database.transaction((tx) => {
+    const feature = featureRepository.create(
+      tx,
+      {
+        title,
+        status,
+        description: cleanNullable(input.description) ?? null,
+        contentPath: null,
+        content,
+        sortOrder: input.sortOrder ?? 0
+      },
+      actor?.actorUserId ?? undefined
+    );
       const journalObject = featureJournalObject(feature);
       recordJournalEntry(tx, {
         operation: "create",
@@ -238,26 +221,17 @@ export function createFeature(database: DbClient, input: FeatureInput, actor?: J
         summary: buildCreateSummary(journalObject),
         actor
       });
-      return feature;
-    });
-    if (!updated) {
-      throw notFound(`Feature with id ${created.id} not found`);
-    }
+    return feature;
+  });
 
-    return mapFeature(updated, 0, input.content ?? "");
-  } catch (error) {
-    featureRepository.delete(database, created.id);
-    deleteContent(absolutePath);
-    throw error;
-  }
+  return mapFeature(created, 0, content);
 }
 
 export function updateFeature(database: DbClient, id: number, input: FeatureInput, actor?: JournalActor | null): FeatureDto {
   const current = getFeatureRecord(database, id);
-  const previousContent = readFeatureContent(current);
+  const previousContent = readFeatureContent(database, current);
   assertVersion(current.version, input.expectedVersion ?? 0);
   const values: FeatureUpdateData = {};
-  let contentPath = current.contentPath;
 
   if (input.title !== undefined) {
     values.title = requireNonEmpty(input.title, "title");
@@ -280,21 +254,8 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
     throw badRequest("No feature fields provided");
   }
 
-  if (!contentPath) {
-    const nextFilename = contentFilename(id);
-    const nextAbsolutePath = resolveContentPath("features", nextFilename);
-    const nextStoredPath = buildStoredContentPath("features", nextFilename);
-
-    writeContent(nextAbsolutePath, "");
-    contentPath = nextStoredPath;
-    values.contentPath = nextStoredPath;
-  }
-
   if (input.content !== undefined) {
-    if (!contentPath) {
-      throw badRequest("Feature content path is missing");
-    }
-    writeContent(resolveStoredContentPath(contentPath), input.content);
+    values.content = input.content;
   }
 
   const updated = database.transaction((tx) => {
@@ -318,7 +279,7 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
     throw notFound(`Feature with id ${id} not found`);
   }
   const supportCounts = getFeatureSupportCounts(database, [id]).get(id) ?? emptyFeatureSupportCounts;
-  return mapFeature(updated, countUseCases(database, id), input.content ?? readFeatureContent(updated), supportCounts);
+  return mapFeature(updated, countUseCases(database, id), input.content ?? readFeatureContent(database, updated), supportCounts);
 }
 
 export async function deleteFeature(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {

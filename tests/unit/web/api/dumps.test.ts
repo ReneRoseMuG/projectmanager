@@ -18,18 +18,18 @@ const apiMocks = vi.hoisted(() => {
   return {
     json,
     get: vi.fn(() => ({ json })),
-    post: vi.fn(() => ({ json }))
+    post: vi.fn(() => ({ json })),
   };
 });
 
 vi.mock("../../../../apps/web/src/api/client", () => ({
   api: {
     get: apiMocks.get,
-    post: apiMocks.post
-  }
+    post: apiMocks.post,
+  },
 }));
 
-import { applyIncrementalRemoteSync, applyRemoteDump, previewIncrementalRemoteSync, previewRemoteDump, runIncrementalRemoteSync, saveLocalDump } from "../../../../apps/web/src/api/dumps";
+import { applyRemoteDump, previewRemoteDump, saveLocalDump } from "../../../../apps/web/src/api/dumps";
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -61,37 +61,7 @@ describe("dump api client", () => {
 
     expect(apiMocks.post).toHaveBeenCalledWith("dumps/remote/apply", {
       json: { fileId: "remote.zip", fileHash: "abc123", confirmed: true },
-      timeout: 600000
-    });
-    expect(apiMocks.json).toHaveBeenCalledTimes(1);
-  });
-
-  it("nutzt für inkrementelle Remote-Syncs einen längeren Timeout", async () => {
-    apiMocks.json.mockResolvedValue({});
-
-    await runIncrementalRemoteSync();
-
-    expect(apiMocks.post).toHaveBeenCalledWith("dumps/remote/sync", { timeout: 600000 });
-    expect(apiMocks.json).toHaveBeenCalledTimes(1);
-  });
-
-  it("nutzt für inkrementelle Remote-Sync-Prüfungen einen längeren Timeout", async () => {
-    apiMocks.json.mockResolvedValue({});
-
-    await previewIncrementalRemoteSync();
-
-    expect(apiMocks.get).toHaveBeenCalledWith("dumps/remote/sync/preview", { timeout: 600000 });
-    expect(apiMocks.json).toHaveBeenCalledTimes(1);
-  });
-
-  it("nutzt für inkrementelle Remote-Sync-Importe einen längeren Timeout", async () => {
-    apiMocks.json.mockResolvedValue({});
-
-    await applyIncrementalRemoteSync({ manifestHash: "abc123", confirmed: true });
-
-    expect(apiMocks.post).toHaveBeenCalledWith("dumps/remote/sync/apply", {
-      json: { manifestHash: "abc123", confirmed: true },
-      timeout: 600000
+      timeout: 600000,
     });
     expect(apiMocks.json).toHaveBeenCalledTimes(1);
   });
