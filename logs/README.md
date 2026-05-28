@@ -2,6 +2,7 @@
 
 | Datum    | Schritt       | Kurztitel                                    | Status |
 | -------- | ------------- | -------------------------------------------- | ------ |
+| 28.05.26 | Fix           | Migrationskonsolidierung                     | ✅     |
 | 28.05.26 | 5             | MS-23 Prüfung                                | ⚠️     |
 | 28.05.26 | 4             | MS-23 Tests                                  | ⚠️     |
 | 28.05.26 | 3             | MS-23 DayPlan UI                             | ✅     |
