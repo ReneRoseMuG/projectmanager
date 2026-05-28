@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 28.05.26 | 16:26:02 | Fix | ParentBadge WikiPage | ✅ |
 | 28.05.26 | 14:59:23 | 4 | Tests und Abnahme | ⚠️ |
 | 28.05.26 | 14:47:31 | 3 | Wiki-Web-UI | ✅ |
 | 28.05.26 | 14:47:08 | 2 | Wiki-API-Verknüpfungen | ✅ |

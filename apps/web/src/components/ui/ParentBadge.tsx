@@ -7,6 +7,7 @@ const parentTypeLabels: Record<VisibleParentContext["type"], string> = {
   task: "Aufgabe",
   feature: "Feature",
   useCase: "Use Case",
+  wikiPage: "Wiki-Seite",
 };
 
 export function ParentBadge({ parent }: { parent?: VisibleParentContext | null }) {
