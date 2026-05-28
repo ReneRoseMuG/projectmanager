@@ -140,7 +140,7 @@ describe("MCP tool definitions", () => {
       parentId: 7,
       title: "Projektbeschreibung redigieren",
       editorialBrief: "Bitte Tonalität vereinheitlichen.",
-      assignee: "Rene",
+      responsibleUserId: 7,
       dueDate: "2026-05-30"
     });
 
@@ -149,7 +149,7 @@ describe("MCP tool definitions", () => {
       description: "Bitte Tonalität vereinheitlichen.",
       status: "todo",
       priority: "medium",
-      assignee: "Rene",
+      responsibleUserId: 7,
       dueDate: "2026-05-30"
     });
   });
@@ -269,7 +269,7 @@ describe("MCP tool definitions", () => {
       description: "Neu",
       status: "in_progress",
       priority: "high",
-      assignee: null,
+      responsibleUserId: null,
       dueDate: "2026-06-10"
     });
 
@@ -279,7 +279,7 @@ describe("MCP tool definitions", () => {
       description: "Neu",
       status: "in_progress",
       priority: "high",
-      assignee: null,
+      responsibleUserId: null,
       dueDate: "2026-06-10",
       expectedVersion: 3
     });

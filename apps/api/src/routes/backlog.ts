@@ -24,7 +24,8 @@ const backlogBodySchema = {
     importKey: { type: ["string", "null"] },
     featureId: { type: ["integer", "null"], minimum: 1 },
     useCaseId: { type: ["integer", "null"], minimum: 1 },
-    sortOrder: { type: "integer" }
+    sortOrder: { type: "integer" },
+    responsibleUserId: { type: ["integer", "null"], minimum: 1 }
   }
 } as const;
 

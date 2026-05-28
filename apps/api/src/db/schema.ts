@@ -249,6 +249,7 @@ export const projects = sqliteTable("projects", {
   color: text("color").default("#6366f1"),
   startDate: text("start_date"),
   dueDate: text("due_date"),
+  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
   wikiPageId: integer("wiki_page_id").references((): AnySQLiteColumn => wikiPages.id, { onDelete: "set null" }),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
@@ -268,6 +269,7 @@ export const milestones = sqliteTable("milestones", {
   color: text("color").default("#6366f1"),
   startDate: text("start_date"),
   dueDate: text("due_date"),
+  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -284,7 +286,7 @@ export const tasks = sqliteTable(
     description: text("description"),
     status: text("status").notNull().default("todo"),
     priority: text("priority").notNull().default("medium"),
-    assignee: text("assignee"),
+    responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
     dueDate: text("due_date"),
     importKey: text("import_key"),
     version: integer("version").notNull().default(1),
@@ -552,6 +554,21 @@ export const dayPlanNotes = sqliteTable(
   })
 );
 
+export const wikiPageNotes = sqliteTable(
+  "wiki_page_notes",
+  {
+    wikiPageId: integer("wiki_page_id")
+      .notNull()
+      .references(() => wikiPages.id, { onDelete: "cascade" }),
+    noteId: integer("note_id")
+      .notNull()
+      .references(() => notes.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    wikiPageNoteUnique: uniqueIndex("wiki_page_notes_owner_note_unique").on(table.wikiPageId, table.noteId)
+  })
+);
+
 export const attachments = sqliteTable(
   "attachments",
   {
@@ -652,6 +669,7 @@ export const events = sqliteTable("events", {
   isAllDay: integer("is_all_day", { mode: "boolean" }).notNull().default(false),
   color: text("color").default("#6366f1"),
   reminderMinutes: integer("reminder_minutes").notNull().default(60),
+  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -767,6 +785,7 @@ export const features = sqliteTable("features", {
   description: text("description"),
   content: text("content"),
   sortOrder: integer("sort_order").notNull().default(0),
+  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -784,6 +803,7 @@ export const useCases = sqliteTable("use_cases", {
   description: text("description"),
   content: text("content"),
   sortOrder: integer("sort_order").notNull().default(0),
+  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
   version: integer("version").notNull().default(1),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -874,6 +894,7 @@ export const backlogItems = sqliteTable(
     status: text("status").notNull().default("open"),
     importKey: text("import_key"),
     sortOrder: integer("sort_order").notNull().default(0),
+    responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
     version: integer("version").notNull().default(1),
     createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
     updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -1008,8 +1029,8 @@ export const tickets = sqliteTable("tickets", {
   status: text("status").notNull().default("open"),
   priority: text("priority").notNull().default("medium"),
   resolution: text("resolution", { enum: TICKET_RESOLUTIONS }),
-  reporter: text("reporter"),
-  assignee: text("assignee"),
+  reporterUserId: integer("reporter_user_id").references(() => users.id, { onDelete: "set null" }),
+  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
   environment: text("environment"),
   affectedVersion: text("affected_version"),
   dueDate: text("due_date"),

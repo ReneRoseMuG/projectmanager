@@ -25,13 +25,14 @@ import {
 import { deleteTaskNotesForIds, listTaskNotes } from "./notes.service.js";
 import { assertCompatibleProjectContexts, projectContextsAreCompatible, taskOwnerProjectContext, taskProjectContext } from "./project-context.service.js";
 import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
+import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
 
 export type { TaskOwner };
 
 export type DashboardTaskOwner = { type: "project" | "milestone" | "task" | "dayPlan"; id: number };
 export type DashboardOverdueTaskOwner = { type: "project" | "milestone" | "dayPlan"; id: number };
 
-type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "assignee" | "dueDate" | "version" | "createdAt" | "updatedAt">;
+type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "responsibleUserId" | "dueDate" | "version" | "createdAt" | "updatedAt">;
 type OwnerTaskRecord = MappableTaskRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
 interface SupportCounts {
   attachmentCount: number;
@@ -52,7 +53,7 @@ const taskSelect = {
   description: tasks.description,
   status: tasks.status,
   priority: tasks.priority,
-  assignee: tasks.assignee,
+  responsibleUserId: tasks.responsibleUserId,
   dueDate: tasks.dueDate,
   version: tasks.version,
   createdAt: tasks.createdAt,
@@ -64,7 +65,7 @@ const taskJournalFields: Array<JournalFieldDefinition<TaskRecord>> = [
   { key: "description", label: "Beschreibung" },
   { key: "status", label: "Status" },
   { key: "priority", label: "Priorität" },
-  { key: "assignee", label: "Zuständige Person" },
+  { key: "responsibleUserId", label: "Zuständige Person" },
   { key: "dueDate", label: "Fälligkeitsdatum" }
 ];
 
@@ -83,7 +84,8 @@ export function mapTask(
     description: record.description,
     status: record.status,
     priority: record.priority,
-    assignee: record.assignee,
+    responsibleUserId: record.responsibleUserId,
+    responsibleUser: getUserOption(database, record.responsibleUserId),
     dueDate: record.dueDate,
     version: record.version,
     createdAt: record.createdAt,
@@ -476,7 +478,7 @@ function insertTask(database: DbClient, input: TaskInput, parentId: number | nul
       description: cleanNullable(input.description) ?? null,
       status,
       priority,
-      assignee: cleanNullable(input.assignee) ?? null,
+      responsibleUserId: normalizeAssignableUserId(database, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId"),
       dueDate: input.dueDate ?? null
     },
     actor?.actorUserId ?? undefined
@@ -771,7 +773,7 @@ export function getTaskDetail(database: DbClient, id: number): TaskDetail {
 }
 
 export function updateTask(database: DbClient, id: number, input: TaskUpdate, actor?: JournalActor | null): Task {
-  const values: Partial<Pick<TaskRecord, "title" | "description" | "status" | "priority" | "assignee" | "dueDate">> = {};
+  const values: Partial<Pick<TaskRecord, "title" | "description" | "status" | "priority" | "responsibleUserId" | "dueDate">> = {};
 
   if (input.title !== undefined) {
     values.title = requireNonEmpty(input.title, "title");
@@ -787,8 +789,8 @@ export function updateTask(database: DbClient, id: number, input: TaskUpdate, ac
     ensureCatalogEntryExists(database, "priority", input.priority);
     values.priority = input.priority;
   }
-  if (input.assignee !== undefined) {
-    values.assignee = cleanNullable(input.assignee) ?? null;
+  if (input.responsibleUserId !== undefined) {
+    values.responsibleUserId = normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
   }
   if (input.dueDate !== undefined) {
     values.dueDate = input.dueDate;

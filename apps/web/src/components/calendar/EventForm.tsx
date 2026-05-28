@@ -3,6 +3,7 @@ import { CalendarClock, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
+import { useAuth } from "../../hooks/useAuth";
 import { fromDateTimeLocalInput, toDateTimeLocalInput } from "../../utils/date";
 import { Button } from "../ui/Button";
 import { ColorPicker } from "../ui/ColorPicker";
@@ -13,6 +14,7 @@ import { Input } from "../ui/Input";
 import { JournalPanel } from "../journal/JournalPanel";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
+import { UserSelectField } from "../users/UserSelectField";
 import { useHasPermission } from "../../hooks/usePermissions";
 
 interface EventFormProps {
@@ -59,6 +61,7 @@ function toggleId(values: number[], id: number): number[] {
 }
 
 export function EventForm({ open, event, initialDate, initialOwners, projects, milestones = [], tasks, onSubmit, onDelete, canDelete = true, onClose }: EventFormProps) {
+  const auth = useAuth();
   const canReadJournal = useHasPermission("journal", "read");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -67,6 +70,7 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
   const [isAllDay, setIsAllDay] = useState(false);
   const [color, setColor] = useState(colors[0] ?? "var(--color-steel-700)");
   const [reminderMinutes, setReminderMinutes] = useState(60);
+  const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [projectIds, setProjectIds] = useState<number[]>([]);
   const [milestoneIds, setMilestoneIds] = useState<number[]>([]);
   const [taskIds, setTaskIds] = useState<number[]>([]);
@@ -84,10 +88,11 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
     setIsAllDay(event?.isAllDay ?? false);
     setColor(event?.color ?? colors[0] ?? "var(--color-steel-700)");
     setReminderMinutes(event?.reminderMinutes ?? 60);
+    setResponsibleUserId(event ? event.responsibleUserId : (auth.user?.id ?? null));
     setProjectIds(ownerIds(event, initialOwners, "project"));
     setMilestoneIds(ownerIds(event, initialOwners, "milestone"));
     setTaskIds(ownerIds(event, initialOwners, "task"));
-  }, [event, initialDate, initialOwners, open]);
+  }, [auth.user?.id, event, initialDate, initialOwners, open]);
 
   const submit = async (submitEvent: FormEvent<HTMLFormElement>) => {
     submitEvent.preventDefault();
@@ -102,6 +107,7 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
           isAllDay,
           color,
           reminderMinutes,
+          responsibleUserId,
           owners: [
             ...preservedOwners(event, initialOwners),
             ...projectIds.map((id) => ({ type: "project" as const, id })),
@@ -161,6 +167,9 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
       </Section>
 
       <Section title="Zuordnung">
+        <div className="mb-4">
+          <UserSelectField label="Verantwortlich" value={responsibleUserId} selectedUser={event?.responsibleUser ?? null} onChange={setResponsibleUserId} />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Projekte">
             <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">

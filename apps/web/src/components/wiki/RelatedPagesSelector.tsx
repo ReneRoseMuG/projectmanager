@@ -72,11 +72,12 @@ export function RelatedPagesSelector({ pages, projects, currentPageId, selectedP
 
   const selectedIds = useMemo(() => new Set(selectedPages.map((page) => page.id)), [selectedPages]);
   const normalizedQuery = query.trim().toLowerCase();
-  const candidates = pages.filter((page) => {
+  const hasSearchQuery = normalizedQuery.length > 0;
+  const candidates = hasSearchQuery ? pages.filter((page) => {
     if (page.id === currentPageId || selectedIds.has(page.id)) {
       return false;
     }
-    if (normalizedQuery && !page.title.toLowerCase().includes(normalizedQuery)) {
+    if (!page.title.toLowerCase().includes(normalizedQuery)) {
       return false;
     }
     if (projectFilter === "unassigned") {
@@ -86,7 +87,7 @@ export function RelatedPagesSelector({ pages, projects, currentPageId, selectedP
       return pageProjectId.get(page.id) === Number(projectFilter);
     }
     return true;
-  });
+  }) : [];
 
   const addPage = (page: WikiPage) => {
     onChange([...selectedPages, toSummary(page)]);
@@ -134,20 +135,25 @@ export function RelatedPagesSelector({ pages, projects, currentPageId, selectedP
         </div>
       ) : null}
 
-      <div className="grid max-h-56 gap-2 overflow-auto rounded-md border border-line bg-shell/60 p-2">
-        {candidates.map((page) => (
-          <button
-            key={page.id}
-            type="button"
-            className="flex min-h-10 items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-left text-sm transition hover:bg-teal/10"
-            onClick={() => addPage(page)}
-          >
-            <span className="min-w-0 truncate font-medium text-ink">{page.title}</span>
-            <Plus size={15} className="shrink-0 text-teal" />
-          </button>
-        ))}
-        {candidates.length === 0 ? <div className="px-2 py-4 text-sm text-steel-500">Keine passenden Seiten.</div> : null}
-      </div>
+      {hasSearchQuery ? (
+        <div className="grid max-h-56 gap-2 overflow-auto rounded-lg border border-line bg-shell/60 p-2">
+          {candidates.map((page) => (
+            <button
+              key={page.id}
+              type="button"
+              aria-label={`${page.title} als verwandte Seite hinzufügen`}
+              className="flex min-h-10 items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-left text-sm transition hover:bg-teal/10"
+              onClick={() => addPage(page)}
+            >
+              <span className="min-w-0 truncate font-medium text-ink">{page.title}</span>
+              <Plus size={15} className="shrink-0 text-teal" />
+            </button>
+          ))}
+          {candidates.length === 0 ? <div className="px-2 py-4 text-sm text-steel-500">Keine passenden Seiten.</div> : null}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-line bg-shell/60 px-3 py-4 text-sm text-steel-500">Gib einen Suchbegriff ein, um verwandte Seiten vorzuschlagen.</div>
+      )}
     </div>
   );
 }

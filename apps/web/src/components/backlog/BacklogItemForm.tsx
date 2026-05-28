@@ -14,9 +14,11 @@ import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
 import { useEntityComments } from "../../hooks/useEntityComments";
+import { useAuth } from "../../hooks/useAuth";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { resolveCatalogEntryKey } from "../../utils/catalogs";
 import { StatusToggle } from "../ui/StatusToggle";
+import { UserSelectField } from "../users/UserSelectField";
 import { useHasPermission } from "../../hooks/usePermissions";
 
 interface BacklogItemFormProps {
@@ -33,12 +35,14 @@ interface BacklogItemFormProps {
 
 export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, onClose, variant = "modal", closeOnSubmit = true, onOpenInTab }: BacklogItemFormProps) {
   const comments = useEntityComments("backlogItem", item?.id);
+  const auth = useAuth();
   const catalogs = useCatalogs();
   const canReadJournal = useHasPermission("journal", "read");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<BacklogStatus>("open");
   const [featureId, setFeatureId] = useState<number | null>(null);
+  const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [sortOrder, setSortOrder] = useState(0);
   const [saving, setSaving] = useState(false);
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
@@ -53,11 +57,12 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
     setDescription(item?.description ?? "");
     setStatus(item?.status ?? "open");
     setFeatureId(item?.featureId ?? null);
+    setResponsibleUserId(item ? item.responsibleUserId : (auth.user?.id ?? null));
     setSortOrder(item?.sortOrder ?? 0);
     if (!item) {
       setPendingComments([]);
     }
-  }, [open, item]);
+  }, [auth.user?.id, open, item]);
 
   useEffect(() => {
     if (open) {
@@ -69,7 +74,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
     event.preventDefault();
     setSaving(true);
     try {
-      const created = await onSubmit({ title, description, status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"), featureId, sortOrder });
+      const created = await onSubmit({ title, description, status: resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open"), featureId, responsibleUserId, sortOrder });
       if (!item && created && onPostCreate) {
         await onPostCreate(created.id, { comments: pendingComments });
       }
@@ -121,14 +126,17 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
           </FormField>
         </div>
         <div className="mt-4">
-          <Select label="Feature" value={featureId ?? ""} onChange={(event) => setFeatureId(event.target.value ? Number(event.target.value) : null)}>
-            <option value="">Ohne Feature</option>
-            {features.map((feature) => (
-              <option key={feature.id} value={feature.id}>
-                {feature.title}
-              </option>
-            ))}
-          </Select>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Select label="Feature" value={featureId ?? ""} onChange={(event) => setFeatureId(event.target.value ? Number(event.target.value) : null)}>
+              <option value="">Ohne Feature</option>
+              {features.map((feature) => (
+                <option key={feature.id} value={feature.id}>
+                  {feature.title}
+                </option>
+              ))}
+            </Select>
+            <UserSelectField label="Verantwortlich" value={responsibleUserId} selectedUser={item?.responsibleUser ?? null} onChange={setResponsibleUserId} />
+          </div>
         </div>
       </Section>
 

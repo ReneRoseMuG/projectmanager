@@ -18,6 +18,10 @@ function sourceTabHeader(request: FastifyRequest): string | null {
 
 function scopeForPath(path: string): RealtimeInvalidationScope {
   const apiPath = path.replace(/^\/api/, "");
+  const apiPathSegments = apiPath.split("/").filter(Boolean);
+  if (apiPathSegments.includes("comments")) {
+    return "comments";
+  }
   if (apiPath.startsWith("/admin/users")) {
     return "adminUsers";
   }
@@ -47,9 +51,6 @@ function scopeForPath(path: string): RealtimeInvalidationScope {
   }
   if (apiPath.startsWith("/wiki") || apiPath.startsWith("/imports")) {
     return "wiki";
-  }
-  if (apiPath.startsWith("/comments")) {
-    return "comments";
   }
   if (apiPath.startsWith("/notes")) {
     return "notes";

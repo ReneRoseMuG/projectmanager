@@ -26,6 +26,7 @@ import type { DraftFile, ViewMode } from "../../types";
 import { uploadContentImage } from "../../api/content-images";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
+import { useAuth } from "../../hooks/useAuth";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useFeatureProjectLinks } from "../../hooks/useDocLinks";
 import { useEntityComments } from "../../hooks/useEntityComments";
@@ -71,6 +72,7 @@ import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
+import { UserSelectField } from "../users/UserSelectField";
 import { useHasPermission } from "../../hooks/usePermissions";
 
 interface FeatureFormProps {
@@ -219,6 +221,7 @@ export function FeatureForm({
       : null;
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const auth = useAuth();
   const canReadJournal = useHasPermission("journal", "read");
   const canWriteProjectRelations = useHasPermission("projects", "write");
   const projects = useProjects();
@@ -240,6 +243,7 @@ export function FeatureForm({
   const [status, setStatus] = useState<FeatureStatus>("draft");
   const [description, setDescription] = useState("");
   const [sortOrder, setSortOrder] = useState(0);
+  const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -299,8 +303,9 @@ export function FeatureForm({
     setStatus(feature?.status ?? "draft");
     setDescription(feature?.description ?? "");
     setSortOrder(feature?.sortOrder ?? 0);
+    setResponsibleUserId(feature ? feature.responsibleUserId : (auth.user?.id ?? null));
     setContent(feature?.content ?? "");
-  }, [feature, open]);
+  }, [auth.user?.id, feature, open]);
 
   useEffect(() => {
     if (open && !feature) {
@@ -330,6 +335,7 @@ export function FeatureForm({
         ),
         description,
         sortOrder,
+        responsibleUserId,
         content,
       });
       if (!feature && created && onPostCreate) {
@@ -559,11 +565,21 @@ export function FeatureForm({
               </div>
             </Section>
             <Section title="Status">
-              <StatusToggle
-                kind="featureStatus"
-                value={status}
-                onChange={setStatus}
-              />
+              <div className="grid items-start gap-4 md:grid-cols-2">
+                <FormField label="Status">
+                  <StatusToggle
+                    kind="featureStatus"
+                    value={status}
+                    onChange={setStatus}
+                  />
+                </FormField>
+                <UserSelectField
+                  label="Verantwortlich"
+                  value={responsibleUserId}
+                  selectedUser={feature?.responsibleUser ?? null}
+                  onChange={setResponsibleUserId}
+                />
+              </div>
             </Section>
             <Section title="Parent-Projekt">
               <SelectParent

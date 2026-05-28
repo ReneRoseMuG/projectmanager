@@ -16,6 +16,7 @@ import {
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage, errorMessageAsync } from "../hooks/errors";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useTicketDetail } from "../hooks/useTicketDetail";
 import { useTickets } from "../hooks/useTickets";
 import { withStandaloneView } from "../utils/standalone";
@@ -56,6 +57,7 @@ export function TicketDetailPage() {
   const detail = useTicketDetail(
     !isCreateMode && Number.isFinite(ticketId) ? ticketId : null,
   );
+  useDocumentTitle(isCreateMode ? "Ticket: Neu" : detail.ticket ? `Ticket: ${detail.ticket.title}` : "Ticket");
   const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/tickets") : "/tickets");
   const currentRoute = !isCreateMode && ticketId !== null && Number.isFinite(ticketId)
     ? `/tickets/${ticketId}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
@@ -79,8 +81,8 @@ export function TicketDetailPage() {
       description: input.description,
       status: input.status,
       priority: input.priority,
-      reporter: input.reporter,
-      assignee: input.assignee,
+      reporterUserId: input.reporterUserId,
+      responsibleUserId: input.responsibleUserId,
       environment: input.environment,
       affectedVersion: input.affectedVersion,
       dueDate: input.dueDate,
@@ -143,8 +145,8 @@ export function TicketDetailPage() {
       status: input.status,
       priority: input.priority,
       resolution: input.resolution,
-      reporter: input.reporter,
-      assignee: input.assignee,
+      reporterUserId: input.reporterUserId,
+      responsibleUserId: input.responsibleUserId,
       environment: input.environment,
       affectedVersion: input.affectedVersion,
       dueDate: input.dueDate,

@@ -11,11 +11,22 @@ import {
   type TaskBoardItem,
   type TaskStatus,
   type Ticket,
+  type UserSummary,
   type UseCase
 } from "@taskmanager/shared-types";
 
 const createdAt = "2026-05-17T08:00:00.000Z";
 const updatedAt = "2026-05-17T09:30:00.000Z";
+
+export function buildUserSummary(overrides: Partial<UserSummary> = {}): UserSummary {
+  return {
+    id: 1,
+    name: "max.mustermann",
+    fullName: "Max Mustermann",
+    email: "max@example.test",
+    ...overrides
+  };
+}
 
 const projectStatusLabels: Record<ProjectStatus, string> = {
   active: "Aktiv",
@@ -56,6 +67,8 @@ export function buildProject(overrides: Partial<Project> = {}): Project {
     color: "#4f46e5",
     startDate: "2026-01-01",
     dueDate: "2026-12-31",
+    responsibleUserId: 1,
+    responsibleUser: buildUserSummary(),
     wikiPageId: null,
     version: 1,
     createdAt,
@@ -83,6 +96,8 @@ export function buildMilestone(overrides: Partial<Milestone> = {}): Milestone {
     color: "#0f766e",
     startDate: "2026-02-01",
     dueDate: "2026-03-01",
+    responsibleUserId: 1,
+    responsibleUser: buildUserSummary(),
     version: 1,
     createdAt,
     updatedAt,
@@ -108,7 +123,8 @@ export function buildTask(overrides: Partial<TaskBoardItem> = {}): TaskBoardItem
     description: "Eine vollständig beschriebene Aufgabe",
     status: "todo",
     priority: "high",
-    assignee: "Max Mustermann",
+    responsibleUserId: 1,
+    responsibleUser: buildUserSummary(),
     dueDate: "2026-12-31",
     boardPosition: 1,
     version: 1,
@@ -131,6 +147,8 @@ export function buildFeature(overrides: Partial<Feature> = {}): Feature {
     description: "Ermöglicht die Benutzeranmeldung",
     content: "Ausführliche Beschreibung des Login-Features.",
     sortOrder: 1,
+    responsibleUserId: 1,
+    responsibleUser: buildUserSummary(),
     useCaseCount: 3,
     attachmentCount: 0,
     noteCount: 0,
@@ -151,6 +169,8 @@ export function buildUseCase(overrides: Partial<UseCase> = {}): UseCase {
     description: "Normaler Anmeldeablauf",
     content: "Der Nutzer meldet sich mit gültigen Zugangsdaten an.",
     sortOrder: 1,
+    responsibleUserId: 1,
+    responsibleUser: buildUserSummary(),
     attachmentCount: 0,
     noteCount: 0,
     commentCount: 0,
@@ -172,6 +192,8 @@ export function buildBacklogItem(overrides: Partial<BacklogItem> = {}): BacklogI
     status: "open",
     importKey: null,
     sortOrder: 1,
+    responsibleUserId: 1,
+    responsibleUser: buildUserSummary(),
     version: 1,
     createdAt,
     updatedAt,
@@ -201,8 +223,10 @@ export function buildTicket(overrides: Partial<Ticket> = {}): Ticket {
     status: "open",
     priority: "high",
     resolution: null,
-    reporter: "Max Mustermann",
-    assignee: "Erika Musterfrau",
+    reporterUserId: 1,
+    reporterUser: buildUserSummary(),
+    responsibleUserId: 2,
+    responsibleUser: buildUserSummary({ id: 2, name: "erika.musterfrau", fullName: "Erika Musterfrau", email: "erika@example.test" }),
     environment: "Test",
     affectedVersion: "1.0.0",
     dueDate: "2026-12-31",

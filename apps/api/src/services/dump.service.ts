@@ -35,8 +35,8 @@ import {
 import { getContentBaseDir } from "./content.service.js";
 
 const APP_ID = "taskmanager";
-const DUMP_FORMAT_VERSION = 14;
-const SUPPORTED_DUMP_FORMAT_VERSIONS = [8, 9, 10, 11, 12, 13, DUMP_FORMAT_VERSION] as const;
+const DUMP_FORMAT_VERSION = 15;
+const SUPPORTED_DUMP_FORMAT_VERSIONS = [8, 9, 10, 11, 12, 13, 14, DUMP_FORMAT_VERSION] as const;
 const DUMP_FILENAME_PREFIX = "taskmanager_dump_";
 const REMOTE_IMPORT_HISTORY_SETTING_KEY = "remote_dump_import_history";
 const ZipArchive = (
@@ -94,6 +94,7 @@ const DUMP_TABLES = [
   { key: "ticketNotes", tableName: "ticket_notes" },
   { key: "milestoneNotes", tableName: "milestone_notes" },
   { key: "dayPlanNotes", tableName: "day_plan_notes" },
+  { key: "wikiPageNotes", tableName: "wiki_page_notes" },
   { key: "projectFeatures", tableName: "project_features" },
   { key: "milestoneFeatures", tableName: "milestone_features" },
   { key: "projectTasks", tableName: "project_tasks" },

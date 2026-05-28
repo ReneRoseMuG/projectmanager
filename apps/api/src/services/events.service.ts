@@ -17,6 +17,7 @@ import {
   type JournalFieldDefinition,
   type JournalObjectRef
 } from "./journal.service.js";
+import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
 
 type EventRecord = typeof events.$inferSelect;
 
@@ -27,7 +28,8 @@ const eventJournalFields: Array<JournalFieldDefinition<EventRecord>> = [
   { key: "endTime", label: "Endzeit" },
   { key: "isAllDay", label: "Ganztägig" },
   { key: "color", label: "Farbe" },
-  { key: "reminderMinutes", label: "Erinnerung" }
+  { key: "reminderMinutes", label: "Erinnerung" },
+  { key: "responsibleUserId", label: "Verantwortlich" }
 ];
 
 function listEventOwners(database: DbClient, eventId: number): EventOwner[] {
@@ -73,6 +75,8 @@ function mapEvent(database: DbClient, record: EventRecord): Event {
     isAllDay: record.isAllDay,
     color: record.color,
     reminderMinutes: record.reminderMinutes,
+    responsibleUserId: record.responsibleUserId,
+    responsibleUser: getUserOption(database, record.responsibleUserId),
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
@@ -245,6 +249,9 @@ export function createEvent(database: DbClient, input: EventInput, actor?: Journ
         isAllDay: input.isAllDay ?? false,
         color: input.color ?? "#6366f1",
         reminderMinutes,
+        responsibleUserId: normalizeAssignableUserId(txDb, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId"),
+        createdBy: actor?.actorUserId ?? null,
+        updatedBy: actor?.actorUserId ?? null,
         createdAt: now,
         updatedAt: now
       })
@@ -307,6 +314,9 @@ export function updateEvent(database: DbClient, id: number, input: EventUpdate, 
   if (input.reminderMinutes !== undefined) {
     values.reminderMinutes = normalizeReminderMinutes(input.reminderMinutes);
   }
+  if (input.responsibleUserId !== undefined) {
+    values.responsibleUserId = normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
+  }
 
   const ownersSpecified = input.owners !== undefined;
   const owners = ownersSpecified ? normalizeOwners(input.owners) : [];
@@ -324,7 +334,7 @@ export function updateEvent(database: DbClient, id: number, input: EventUpdate, 
     const txDb = tx as unknown as DbClient;
     const event = txDb
       .update(events)
-      .set({ ...values, version: current.version + 1, updatedAt: nowIso() })
+      .set({ ...values, version: current.version + 1, updatedBy: actor?.actorUserId ?? null, updatedAt: nowIso() })
       .where(eq(events.id, id))
       .returning()
       .get();

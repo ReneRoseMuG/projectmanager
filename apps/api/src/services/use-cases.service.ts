@@ -1,4 +1,4 @@
-import type { JsonValue } from "@taskmanager/shared-types";
+import type { JsonValue, UserSummary } from "@taskmanager/shared-types";
 import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { features, useCaseComments } from "../db/schema.js";
@@ -21,6 +21,7 @@ import {
   type JournalFieldDefinition,
   type JournalObjectRef
 } from "./journal.service.js";
+import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
 
 type UseCaseStatus = UseCaseRecord["status"];
 
@@ -31,6 +32,7 @@ export interface UseCaseInput {
   description?: string | null;
   content?: string;
   sortOrder?: number;
+  responsibleUserId?: number | null;
   expectedVersion?: number;
 }
 
@@ -42,6 +44,8 @@ export interface UseCaseDto {
   description: string | null;
   content?: string;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   attachmentCount: number;
   noteCount: number;
   commentCount: number;
@@ -66,10 +70,11 @@ const useCaseJournalFields: Array<JournalFieldDefinition<UseCaseRecord>> = [
   { key: "title", label: "Titel" },
   { key: "status", label: "Status" },
   { key: "description", label: "Beschreibung" },
-  { key: "sortOrder", label: "Sortierung" }
+  { key: "sortOrder", label: "Sortierung" },
+  { key: "responsibleUserId", label: "Verantwortlich" }
 ];
 
-function mapUseCase(record: UseCaseRecord, content?: string, supportCounts = emptyUseCaseSupportCounts): UseCaseDto {
+function mapUseCase(database: DbClient, record: UseCaseRecord, content?: string, supportCounts = emptyUseCaseSupportCounts): UseCaseDto {
   return {
     id: record.id,
     featureId: record.featureId,
@@ -78,6 +83,8 @@ function mapUseCase(record: UseCaseRecord, content?: string, supportCounts = emp
     description: record.description,
     content,
     sortOrder: record.sortOrder,
+    responsibleUserId: record.responsibleUserId,
+    responsibleUser: getUserOption(database, record.responsibleUserId),
     attachmentCount: supportCounts.attachmentCount,
     noteCount: supportCounts.noteCount,
     commentCount: supportCounts.commentCount,
@@ -174,13 +181,13 @@ export function listUseCases(database: DbClient, featureId: number): UseCaseDto[
   const rows = useCaseRepository.findByFeatureId(database, featureId);
   const ids = rows.map((useCase) => useCase.id);
   const supportCounts = getUseCaseSupportCounts(database, ids);
-  return rows.map((useCase) => mapUseCase(useCase, undefined, supportCounts.get(useCase.id) ?? emptyUseCaseSupportCounts));
+  return rows.map((useCase) => mapUseCase(database, useCase, undefined, supportCounts.get(useCase.id) ?? emptyUseCaseSupportCounts));
 }
 
 export function getUseCase(database: DbClient, id: number): UseCaseDto {
   const useCase = getUseCaseRecord(database, id);
   const supportCounts = getUseCaseSupportCounts(database, [id]).get(id) ?? emptyUseCaseSupportCounts;
-  return mapUseCase(useCase, readUseCaseContent(database, useCase), supportCounts);
+  return mapUseCase(database, useCase, readUseCaseContent(database, useCase), supportCounts);
 }
 
 export function createUseCase(database: DbClient, featureId: number, input: UseCaseInput, actor?: JournalActor | null): UseCaseDto {
@@ -200,7 +207,8 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
         status,
         description: cleanNullable(input.description) ?? null,
         content,
-        sortOrder: input.sortOrder ?? 0
+        sortOrder: input.sortOrder ?? 0,
+        responsibleUserId: normalizeAssignableUserId(tx, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId")
       },
       actor?.actorUserId ?? undefined
     );
@@ -215,7 +223,7 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
     return useCase;
   });
 
-  return mapUseCase(created, content);
+  return mapUseCase(database, created, content);
 }
 
 export function updateUseCase(database: DbClient, id: number, input: UseCaseInput, actor?: JournalActor | null): UseCaseDto {
@@ -240,6 +248,9 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
   }
   if (input.sortOrder !== undefined) {
     values.sortOrder = input.sortOrder;
+  }
+  if (input.responsibleUserId !== undefined) {
+    values.responsibleUserId = normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
   }
 
   if (Object.keys(values).length === 0 && input.content === undefined) {
@@ -277,7 +288,7 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
     throw notFound(`Use case with id ${id} not found`);
   }
   const supportCounts = getUseCaseSupportCounts(database, [id]).get(id) ?? emptyUseCaseSupportCounts;
-  return mapUseCase(updated, input.content ?? readUseCaseContent(database, updated), supportCounts);
+  return mapUseCase(database, updated, input.content ?? readUseCaseContent(database, updated), supportCounts);
 }
 
 export function deleteUseCase(database: DbClient, id: number, actor?: JournalActor | null): void {

@@ -20,6 +20,7 @@ import {
 import { deleteMilestoneOwnedSupportForProjectIds } from "./milestones.service.js";
 import { deleteProjectNotesForIds } from "./notes.service.js";
 import { getProjectTags, getProjectTagsMap } from "./tags.service.js";
+import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
 
 interface ProjectCounts {
   milestoneCount: number;
@@ -58,6 +59,7 @@ function projectJournalFields(database: DbClient): Array<JournalFieldDefinition<
     { key: "color", label: "Farbe" },
     { key: "startDate", label: "Startdatum" },
     { key: "dueDate", label: "Enddatum" },
+    { key: "responsibleUserId", label: "Verantwortlich" },
     { key: "wikiPageId", label: "Wiki-Startseite", format: (value) => wikiPageLabel(database, value) }
   ];
 }
@@ -84,6 +86,8 @@ function mapProject(database: DbClient, record: ProjectRecord, counts: ProjectCo
     color: record.color,
     startDate: record.startDate,
     dueDate: record.dueDate,
+    responsibleUserId: record.responsibleUserId,
+    responsibleUser: getUserOption(database, record.responsibleUserId),
     wikiPageId: record.wikiPageId,
     version: record.version,
     createdAt: record.createdAt,
@@ -199,7 +203,8 @@ export function createProject(database: DbClient, input: ProjectInput, actor?: J
         status,
         color: input.color ?? "#6366f1",
         startDate: cleanNullable(input.startDate) ?? null,
-        dueDate: cleanNullable(input.dueDate) ?? null
+        dueDate: cleanNullable(input.dueDate) ?? null,
+        responsibleUserId: normalizeAssignableUserId(tx, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId")
       },
       actor?.actorUserId ?? undefined
     );
@@ -237,6 +242,9 @@ export function updateProject(database: DbClient, id: number, input: ProjectUpda
   }
   if (input.dueDate !== undefined) {
     values.dueDate = cleanNullable(input.dueDate) ?? null;
+  }
+  if (input.responsibleUserId !== undefined) {
+    values.responsibleUserId = normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
   }
   if (input.wikiPageId !== undefined) {
     ensureWikiPageExists(database, input.wikiPageId);

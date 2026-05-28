@@ -22,6 +22,7 @@ import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useFeatures } from "../hooks/useFeatures";
 import { withStandaloneView } from "../utils/standalone";
 import type { DraftFile } from "../types";
@@ -40,6 +41,7 @@ export function FeatureDetailPage() {
     : undefined;
   const initialTab = parseFeatureFormTab(searchParams.get("tab"));
   const features = useFeatures(featureId);
+  useDocumentTitle(isCreateMode ? "Feature: Neu" : features.feature ? `Feature: ${features.feature.title}` : "Feature");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
 
   const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/features") : "/features");

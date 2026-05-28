@@ -22,6 +22,7 @@ import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useProjects } from "../hooks/useProjects";
 import { useStatusCascadeWorkflow } from "../hooks/useStatusCascadeWorkflow";
 import { withStandaloneView } from "../utils/standalone";
@@ -38,6 +39,7 @@ export function ProjectDetailPage() {
   const projectId = isCreateMode ? undefined : Number(params.id);
   const { project, loading, createProject, updateProject, removeProject } =
     useProjects(projectId);
+  useDocumentTitle(isCreateMode ? "Projekt: Neu" : project ? `Projekt: ${project.name}` : "Projekt");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
   const initialTab = parseProjectFormTab(searchParams.get("tab"));
 

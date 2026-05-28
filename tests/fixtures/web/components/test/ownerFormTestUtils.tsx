@@ -55,6 +55,12 @@ const ownerFormMocks = vi.hoisted(() => ({
 }));
 
 const fixtures = vi.hoisted(() => {
+  const userSummary = {
+    id: 1,
+    name: "test.admin",
+    fullName: "Test Admin",
+    email: "admin@local"
+  };
   const feature = {
     id: 10,
     title: "Feature Alpha",
@@ -62,6 +68,8 @@ const fixtures = vi.hoisted(() => {
     description: "<p>Beschreibung</p>",
     content: "<p>Inhalt</p>",
     sortOrder: 1,
+    responsibleUserId: userSummary.id,
+    responsibleUser: userSummary,
     useCaseCount: 1,
     attachmentCount: 0,
     noteCount: 0,
@@ -78,6 +86,8 @@ const fixtures = vi.hoisted(() => {
     description: "<p>Beschreibung</p>",
     content: "<p>Inhalt</p>",
     sortOrder: 1,
+    responsibleUserId: userSummary.id,
+    responsibleUser: userSummary,
     attachmentCount: 0,
     noteCount: 0,
     commentCount: 0,
@@ -93,6 +103,8 @@ const fixtures = vi.hoisted(() => {
     color: "var(--color-steel-700)",
     startDate: null,
     dueDate: null,
+    responsibleUserId: userSummary.id,
+    responsibleUser: userSummary,
     wikiPageId: null,
     version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
@@ -146,6 +158,8 @@ const fixtures = vi.hoisted(() => {
     color: "var(--color-teal)",
     startDate: null,
     dueDate: null,
+    responsibleUserId: userSummary.id,
+    responsibleUser: userSummary,
     version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z",
@@ -165,7 +179,8 @@ const fixtures = vi.hoisted(() => {
     description: "<p>Aufgabe</p>",
     status: "todo",
     priority: "medium",
-    assignee: null,
+    responsibleUserId: userSummary.id,
+    responsibleUser: userSummary,
     dueDate: null,
     version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
@@ -186,8 +201,10 @@ const fixtures = vi.hoisted(() => {
     status: "open",
     priority: "medium",
     resolution: null,
-    reporter: null,
-    assignee: null,
+    reporterUserId: userSummary.id,
+    reporterUser: userSummary,
+    responsibleUserId: userSummary.id,
+    responsibleUser: userSummary,
     environment: null,
     affectedVersion: null,
     dueDate: null,

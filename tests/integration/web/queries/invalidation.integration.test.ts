@@ -60,6 +60,7 @@ const knownQueries = {
   taskComments: queryKeys.comments.entity("task", taskId),
   projectNotes: queryKeys.notes.owner("project", projectId),
   taskNotes: queryKeys.notes.owner("task", taskId),
+  wikiNotes: queryKeys.notes.owner("wikiPage", wikiPageId),
   projectAttachments: queryKeys.attachments.owner("project", projectId),
   taskAttachments: queryKeys.attachments.owner("task", taskId),
   attachmentPreview: queryKeys.attachments.preview(attachmentId),
@@ -237,6 +238,13 @@ describe("Query invalidation integration", () => {
     queryClient.clear();
     seedKnownQueries(queryClient);
 
+    await invalidateNotes(queryClient, "wikiPage", wikiPageId);
+
+    expectInvalidated(queryClient, ["wikiTree", "wikiDetail", "wikiNotes", "globalSearch"]);
+
+    queryClient.clear();
+    seedKnownQueries(queryClient);
+
     await invalidateAttachments(queryClient, "project", projectId);
 
     expectInvalidated(queryClient, ["projectsList", "projectDetail", "projectTasks", "projectBacklog", "projectFeatures", "projectAttachments", "globalSearch"]);
@@ -347,6 +355,7 @@ describe("Query invalidation integration", () => {
       "taskComments",
       "projectNotes",
       "taskNotes",
+      "wikiNotes",
       "projectAttachments",
       "taskAttachments",
       "attachmentPreview",

@@ -2,6 +2,17 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 28.05.26 | 17:58:56 | Nachtrag | TKT-32 Kommentar Realtime | ⚠️ |
+| 28.05.26 | 17:59:08 | Log | Manueller Status TKT-33 | ✅ |
+| 28.05.26 | 17:58:03 | 4 | Tests teilweise blockiert | ⚠️ |
+| 28.05.26 | 17:49:16 | Fix / Feature | Wiki Support Tabs | ⚠️ |
+| 28.05.26 | 17:44:08 | 3 | UI-Feinpunkte | ✅ |
+| 28.05.26 | 17:40:41 | 2 | Web Userbezüge Kalender Daten | ✅ |
+| 28.05.26 | 17:28:51 | 1 | User-Bezüge Schema API MCP | ✅ |
+| 28.05.26 | 17:14:43 | Fix | TKT-32 Kommentar Realtime | ⚠️ |
+| 28.05.26 | 17:12:54 | Nachtrag | Wiki Verwandte Seiten Lint | ⚠️ |
+| 28.05.26 | 17:11:31 | Fix | Wiki Verwandte Seiten Suche | ✅ |
+| 28.05.26 | 16:39:13 | Fix | Wiki Detail Kopfbereich | ✅ |
 | 28.05.26 | 16:26:02 | Fix | ParentBadge WikiPage | ✅ |
 | 28.05.26 | 14:59:23 | 4 | Tests und Abnahme | ⚠️ |
 | 28.05.26 | 14:47:31 | 3 | Wiki-Web-UI | ✅ |

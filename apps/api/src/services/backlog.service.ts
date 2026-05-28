@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import type { UserSummary } from "@taskmanager/shared-types";
 import type { DbClient } from "../db/client.js";
 import { features, projects, useCases } from "../db/schema.js";
 import { backlogItemRepository, type BacklogItemRecord, type BacklogItemUpdateData } from "../repositories/backlog-item.repository.js";
@@ -17,6 +18,7 @@ import {
   type JournalFieldDefinition,
   type JournalObjectRef
 } from "./journal.service.js";
+import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
 
 type BacklogStatus = BacklogItemRecord["status"];
 
@@ -28,6 +30,7 @@ export interface BacklogInput {
   featureId?: number | null;
   useCaseId?: number | null;
   sortOrder?: number;
+  responsibleUserId?: number | null;
   expectedVersion?: number;
 }
 
@@ -47,6 +50,8 @@ export interface BacklogDto {
   status: BacklogStatus;
   importKey: string | null;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -57,10 +62,11 @@ const backlogJournalFields: Array<JournalFieldDefinition<BacklogItemRecord>> = [
   { key: "description", label: "Beschreibung" },
   { key: "status", label: "Status" },
   { key: "importKey", label: "Import-Schlüssel" },
-  { key: "sortOrder", label: "Sortierung" }
+  { key: "sortOrder", label: "Sortierung" },
+  { key: "responsibleUserId", label: "Verantwortlich" }
 ];
 
-function mapBacklogItem(record: BacklogItemRecord): BacklogDto {
+function mapBacklogItem(database: DbClient, record: BacklogItemRecord): BacklogDto {
   return {
     id: record.id,
     projectId: record.projectId,
@@ -71,6 +77,8 @@ function mapBacklogItem(record: BacklogItemRecord): BacklogDto {
     status: record.status,
     importKey: record.importKey,
     sortOrder: record.sortOrder,
+    responsibleUserId: record.responsibleUserId,
+    responsibleUser: getUserOption(database, record.responsibleUserId),
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt
@@ -157,7 +165,7 @@ function getBacklogRecord(database: DbClient, id: number): BacklogItemRecord {
 export function listBacklogItems(database: DbClient, projectId: number, filters: BacklogFilters): BacklogDto[] {
   ensureProjectExists(database, projectId);
 
-  return backlogItemRepository.findByProject(database, projectId, filters).map(mapBacklogItem);
+  return backlogItemRepository.findByProject(database, projectId, filters).map((item) => mapBacklogItem(database, item));
 }
 
 export function createBacklogItem(database: DbClient, projectId: number, input: BacklogInput, actor?: JournalActor | null): BacklogDto {
@@ -178,7 +186,8 @@ export function createBacklogItem(database: DbClient, projectId: number, input: 
         description: cleanNullable(input.description) ?? null,
         status,
         importKey: cleanNullable(input.importKey) ?? null,
-        sortOrder: input.sortOrder ?? 0
+        sortOrder: input.sortOrder ?? 0,
+        responsibleUserId: normalizeAssignableUserId(tx, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId")
       },
       actor?.actorUserId ?? undefined
     );
@@ -193,11 +202,11 @@ export function createBacklogItem(database: DbClient, projectId: number, input: 
     return item;
   });
 
-  return mapBacklogItem(created);
+  return mapBacklogItem(database, created);
 }
 
 export function getBacklogItem(database: DbClient, id: number): BacklogDto {
-  return mapBacklogItem(getBacklogRecord(database, id));
+  return mapBacklogItem(database, getBacklogRecord(database, id));
 }
 
 export function updateBacklogItem(database: DbClient, id: number, input: BacklogInput, actor?: JournalActor | null): BacklogDto {
@@ -227,6 +236,9 @@ export function updateBacklogItem(database: DbClient, id: number, input: Backlog
   }
   if (input.sortOrder !== undefined) {
     values.sortOrder = input.sortOrder;
+  }
+  if (input.responsibleUserId !== undefined) {
+    values.responsibleUserId = normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
   }
 
   if (Object.keys(values).length === 0) {
@@ -265,7 +277,7 @@ export function updateBacklogItem(database: DbClient, id: number, input: Backlog
   if (!updated) {
     throw notFound(`Backlog item with id ${id} not found`);
   }
-  return mapBacklogItem(updated);
+  return mapBacklogItem(database, updated);
 }
 
 export function deleteBacklogItem(database: DbClient, id: number, actor?: JournalActor | null): void {

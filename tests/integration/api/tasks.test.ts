@@ -73,7 +73,7 @@ describe("Tasks API", () => {
         description: "Beschreibung",
         status: "todo",
         priority: "high",
-        assignee: "Max",
+        responsibleUserId: 1,
         dueDate: "2026-06-30"
       })
       .expect(201);
@@ -84,7 +84,8 @@ describe("Tasks API", () => {
       description: "Beschreibung",
       status: "todo",
       priority: "high",
-      assignee: "Max",
+      responsibleUserId: 1,
+      responsibleUser: expect.objectContaining({ id: 1 }),
       dueDate: "2026-06-30"
     });
     expect(res.body.boardPosition).toBeGreaterThan(0);
@@ -184,7 +185,7 @@ describe("Tasks API", () => {
         title: "Aktualisiert",
         status: "in_progress",
         priority: "urgent",
-        assignee: "Erika",
+        responsibleUserId: 1,
         dueDate: "2026-07-01",
         expectedVersion: task.version
       })
@@ -194,9 +195,20 @@ describe("Tasks API", () => {
       title: "Aktualisiert",
       status: "in_progress",
       priority: "urgent",
-      assignee: "Erika",
+      responsibleUserId: 1,
+      responsibleUser: expect.objectContaining({ id: 1 }),
       dueDate: "2026-07-01"
     });
+  });
+
+  it("PATCH /api/tasks/:id weist unbekannte verantwortliche User ab", async () => {
+    const project = await createProject(app);
+    const task = await createTask(app, project.id);
+
+    await supertest(app.server)
+      .patch(`/api/tasks/${task.id}`)
+      .send({ responsibleUserId: 9999, expectedVersion: task.version })
+      .expect(400);
   });
 
   it("PATCH /api/projects/:id/tasks/:taskId/board aktualisiert Status und Owner-Position", async () => {

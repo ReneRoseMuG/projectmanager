@@ -37,6 +37,7 @@ import {
 import { deleteTicketNotesForIds, listTicketNotes } from "./notes.service.js";
 import { assertCompatibleProjectContexts, projectContextsAreCompatible, ticketOwnerProjectContext, ticketProjectContext } from "./project-context.service.js";
 import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
+import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
 
 export type { TicketOwner };
 export type DashboardTicketOwner = { type: "project" | "milestone"; id: number };
@@ -63,8 +64,8 @@ const ticketSelect = {
   status: tickets.status,
   priority: tickets.priority,
   resolution: tickets.resolution,
-  reporter: tickets.reporter,
-  assignee: tickets.assignee,
+  reporterUserId: tickets.reporterUserId,
+  responsibleUserId: tickets.responsibleUserId,
   environment: tickets.environment,
   affectedVersion: tickets.affectedVersion,
   dueDate: tickets.dueDate,
@@ -84,8 +85,8 @@ const ticketJournalFields: Array<JournalFieldDefinition<TicketRecord>> = [
   { key: "status", label: "Status" },
   { key: "priority", label: "Priorität" },
   { key: "resolution", label: "Lösung" },
-  { key: "reporter", label: "Reporter" },
-  { key: "assignee", label: "Zuständige Person" },
+  { key: "reporterUserId", label: "Meldende Person" },
+  { key: "responsibleUserId", label: "Zuständige Person" },
   { key: "environment", label: "Umgebung" },
   { key: "affectedVersion", label: "Betroffene Version" },
   { key: "dueDate", label: "Fälligkeitsdatum" },
@@ -465,8 +466,8 @@ function insertTicketRecord(database: DbClient, input: TicketInput, parentId: nu
       status,
       priority,
       resolution: null,
-      reporter: cleanNullable(input.reporter) ?? null,
-      assignee: cleanNullable(input.assignee) ?? null,
+      reporterUserId: normalizeAssignableUserId(database, input.reporterUserId ?? actor?.actorUserId ?? null, "reporterUserId"),
+      responsibleUserId: normalizeAssignableUserId(database, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId"),
       environment: cleanNullable(input.environment) ?? null,
       affectedVersion: cleanNullable(input.affectedVersion) ?? null,
       dueDate: cleanNullable(input.dueDate) ?? null,
@@ -532,8 +533,10 @@ export function mapTicket(
     status: record.status,
     priority: record.priority,
     resolution: record.resolution,
-    reporter: record.reporter,
-    assignee: record.assignee,
+    reporterUserId: record.reporterUserId,
+    reporterUser: getUserOption(database, record.reporterUserId),
+    responsibleUserId: record.responsibleUserId,
+    responsibleUser: getUserOption(database, record.responsibleUserId),
     environment: record.environment,
     affectedVersion: record.affectedVersion,
     dueDate: record.dueDate,
@@ -792,8 +795,8 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
       | "status"
       | "priority"
       | "resolution"
-      | "reporter"
-      | "assignee"
+      | "reporterUserId"
+      | "responsibleUserId"
       | "environment"
       | "affectedVersion"
       | "dueDate"
@@ -825,11 +828,11 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
   if (input.resolution !== undefined) {
     values.resolution = input.resolution;
   }
-  if (input.reporter !== undefined) {
-    values.reporter = cleanNullable(input.reporter) ?? null;
+  if (input.reporterUserId !== undefined) {
+    values.reporterUserId = normalizeAssignableUserId(database, input.reporterUserId, "reporterUserId");
   }
-  if (input.assignee !== undefined) {
-    values.assignee = cleanNullable(input.assignee) ?? null;
+  if (input.responsibleUserId !== undefined) {
+    values.responsibleUserId = normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
   }
   if (input.environment !== undefined) {
     values.environment = cleanNullable(input.environment) ?? null;

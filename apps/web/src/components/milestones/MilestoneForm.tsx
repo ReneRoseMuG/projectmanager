@@ -22,6 +22,7 @@ import type { DraftFile, ViewMode } from "../../types";
 import { uploadContentImage } from "../../api/content-images";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
+import { useAuth } from "../../hooks/useAuth";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useFeatures } from "../../hooks/useFeatures";
 import { useMilestoneFeatureLinks } from "../../hooks/useDocLinks";
@@ -62,6 +63,7 @@ import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
+import { UserSelectField } from "../users/UserSelectField";
 import { useHasPermission } from "../../hooks/usePermissions";
 
 interface MilestoneFormProps {
@@ -151,6 +153,7 @@ export function MilestoneForm({
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
+  const auth = useAuth();
   const milestoneId = milestone?.id;
   const allFeatures = useFeatures();
   const featureLinks = useMilestoneFeatureLinks(milestoneId);
@@ -178,6 +181,7 @@ export function MilestoneForm({
   const [color, setColor] = useState("var(--color-teal)");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("list");
   const [featureLinkOpen, setFeatureLinkOpen] = useState(false);
@@ -240,8 +244,9 @@ export function MilestoneForm({
     setColor(milestone?.color ?? "var(--color-teal)");
     setStartDate(milestone?.startDate ?? "");
     setDueDate(milestone?.dueDate ?? "");
+    setResponsibleUserId(milestone ? milestone.responsibleUserId : (auth.user?.id ?? null));
     setSelectedTags(milestone?.tags ?? []);
-  }, [initialProjectId, milestone, open, projects]);
+  }, [auth.user?.id, initialProjectId, milestone, open, projects]);
 
   useEffect(() => {
     if (open) {
@@ -273,6 +278,7 @@ export function MilestoneForm({
           color,
           startDate: startDate || null,
           dueDate: dueDate || null,
+          responsibleUserId,
         },
         selectedTags.map((tag) => tag.id),
       );
@@ -522,13 +528,21 @@ export function MilestoneForm({
               </FormField>
             </Section>
             <Section title="Status">
-              <FormField label="Status">
-                <StatusToggle
-                  kind="workStatus"
-                  value={status}
-                  onChange={setStatus}
+              <div className="grid items-start gap-4 md:grid-cols-2">
+                <FormField label="Status">
+                  <StatusToggle
+                    kind="workStatus"
+                    value={status}
+                    onChange={setStatus}
+                  />
+                </FormField>
+                <UserSelectField
+                  label="Verantwortlich"
+                  value={responsibleUserId}
+                  selectedUser={milestone?.responsibleUser ?? null}
+                  onChange={setResponsibleUserId}
                 />
-              </FormField>
+              </div>
             </Section>
             <Section title="Zeitraum">
               <div className="grid gap-4 md:grid-cols-2">

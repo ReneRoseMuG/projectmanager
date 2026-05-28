@@ -19,6 +19,7 @@ import { WikiPageDetail } from "../components/wiki/WikiPageDetail";
 import { WikiPageForm } from "../components/wiki/WikiPageForm";
 import { WikiTree } from "../components/wiki/WikiTree";
 import { errorMessage } from "../hooks/errors";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useStandaloneView } from "../hooks/useStandaloneView";
 import { useProjects } from "../hooks/useProjects";
 import { useWiki, type WikiTreeNode } from "../hooks/useWiki";
@@ -41,6 +42,7 @@ export function WikiPage() {
   const [formParent, setFormParent] = useState<WikiPageType | null>(null);
   const [editingPage, setEditingPage] = useState<WikiPageType | null>(null);
   const standalone = useStandaloneView();
+  useDocumentTitle(wiki.page ? `Wiki: ${wiki.page.title}` : "Wiki");
 
   const openCreate = (parent: WikiTreeNode | null) => {
     setEditingPage(null);

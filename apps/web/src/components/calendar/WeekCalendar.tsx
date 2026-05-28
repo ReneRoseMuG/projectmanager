@@ -99,7 +99,7 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
       label: project?.name ?? `Projekt #${projectOwner.id}`,
       accentColor: contextualAccent(event.color, project?.color ?? fallbackAccent),
       ownerType: "project",
-      assignee: null
+      responsibleName: project?.responsibleUser?.fullName ?? null
     };
   }
 
@@ -110,7 +110,7 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
       label: milestone?.name ?? `Meilenstein #${milestoneOwner.id}`,
       accentColor: contextualAccent(event.color, milestone?.color ?? project?.color ?? milestoneAccent),
       ownerType: "milestone",
-      assignee: null
+      responsibleName: milestone?.responsibleUser?.fullName ?? null
     };
   }
 
@@ -120,7 +120,7 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
       label: task?.title ?? `Aufgabe #${taskOwner.id}`,
       accentColor: contextualAccent(event.color, taskAccent),
       ownerType: "task",
-      assignee: task?.assignee ?? null
+      responsibleName: task?.responsibleUser?.fullName ?? null
     };
   }
 
@@ -129,7 +129,7 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
       label: "Persönliche Planung",
       accentColor: contextualAccent(event.color, dayPlanAccent),
       ownerType: "dayPlan",
-      assignee: null
+      responsibleName: event.responsibleUser?.fullName ?? null
     };
   }
 
@@ -137,7 +137,7 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
     label: "Ohne Kontext",
     accentColor: event.color ?? fallbackAccent,
     ownerType: "none",
-    assignee: null
+    responsibleName: event.responsibleUser?.fullName ?? null
   };
 }
 

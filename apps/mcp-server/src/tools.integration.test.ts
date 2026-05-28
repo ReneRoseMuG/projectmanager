@@ -203,7 +203,7 @@ describe("MCP tools integration", () => {
       description: "Per MCP angelegt",
       status: "todo",
       priority: "medium",
-      assignee: "Test Admin",
+      responsibleUserId: 1,
       dueDate: "2026-06-01"
     });
     expect(createdTask).toMatchObject({ title: "MCP Tool Aufgabe", description: "Per MCP angelegt" });
@@ -235,7 +235,7 @@ describe("MCP tools integration", () => {
       parentId: milestone.id,
       title: "Redaktion: Beschreibung schärfen",
       editorialBrief: "Bitte fachlich überarbeiten.",
-      assignee: "Test Admin",
+      responsibleUserId: 1,
       dueDate: "2026-06-02"
     });
     expect(editorialTask).toMatchObject({
@@ -253,8 +253,8 @@ describe("MCP tools integration", () => {
       type: "bug",
       status: "open",
       priority: "high",
-      reporter: "Test Admin",
-      assignee: "Test Admin",
+      reporterUserId: 1,
+      responsibleUserId: 1,
       environment: "Integrationstest",
       affectedVersion: "0.1.0",
       dueDate: "2026-06-03"
@@ -344,12 +344,12 @@ describe("MCP tools integration", () => {
     expect(
       await callTool<Milestone>(executedTools, "update_milestone", { id: milestone.id, name: "MCP Meilenstein aktualisiert", description: "Meilensteinbeschreibung MCP", status: "active", color: "#14b8a6", startDate: null, dueDate: "2026-07-15" })
     ).toMatchObject({ name: "MCP Meilenstein aktualisiert", description: "Meilensteinbeschreibung MCP", dueDate: "2026-07-15" });
-    expect(await callTool<Task>(executedTools, "update_task", { id: task.id, title: "MCP Aufgabe aktualisiert", description: "Aufgabenbeschreibung MCP", status: "in_progress", priority: "high", assignee: "Test Admin", dueDate: "2026-06-20" })).toMatchObject({
+    expect(await callTool<Task>(executedTools, "update_task", { id: task.id, title: "MCP Aufgabe aktualisiert", description: "Aufgabenbeschreibung MCP", status: "in_progress", priority: "high", responsibleUserId: 1, dueDate: "2026-06-20" })).toMatchObject({
       title: "MCP Aufgabe aktualisiert",
       description: "Aufgabenbeschreibung MCP",
       priority: "high"
     });
-    expect(await callTool<Ticket>(executedTools, "update_ticket", { id: ticket.id, title: "MCP Ticket aktualisiert", type: "bug", description: "Ticketbeschreibung MCP", status: "resolved", priority: "high", reporter: "Test Admin", assignee: "Test Admin", environment: "Integrationstest", affectedVersion: "0.2.0", dueDate: "2026-06-30", resolution: "fixed" })).toMatchObject({
+    expect(await callTool<Ticket>(executedTools, "update_ticket", { id: ticket.id, title: "MCP Ticket aktualisiert", type: "bug", description: "Ticketbeschreibung MCP", status: "resolved", priority: "high", reporterUserId: 1, responsibleUserId: 1, environment: "Integrationstest", affectedVersion: "0.2.0", dueDate: "2026-06-30", resolution: "fixed" })).toMatchObject({
       title: "MCP Ticket aktualisiert",
       description: "Ticketbeschreibung MCP",
       resolution: "fixed"

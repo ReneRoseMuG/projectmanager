@@ -13,21 +13,24 @@ import {
   type JournalActor,
   type JournalObjectRef
 } from "./journal.service.js";
+import { getUserOption } from "./users.service.js";
 
 type MappableFeatureRecord = Pick<
   typeof features.$inferSelect,
-  "id" | "title" | "status" | "description" | "sortOrder" | "version" | "createdAt" | "updatedAt"
+  "id" | "title" | "status" | "description" | "sortOrder" | "responsibleUserId" | "version" | "createdAt" | "updatedAt"
 >;
 
 type FeatureReference = Pick<typeof features.$inferSelect, "id" | "title">;
 
-function mapFeature(row: MappableFeatureRecord, useCaseCount = 0): FeatureDto {
+function mapFeature(database: DbClient, row: MappableFeatureRecord, useCaseCount = 0): FeatureDto {
   return {
     id: row.id,
     title: row.title,
     status: row.status,
     description: row.description,
     sortOrder: row.sortOrder,
+    responsibleUserId: row.responsibleUserId,
+    responsibleUser: getUserOption(database, row.responsibleUserId),
     version: row.version,
     useCaseCount,
     attachmentCount: 0,
@@ -230,6 +233,7 @@ export function listProjectFeatures(database: DbClient, projectId: number): Feat
       status: features.status,
       description: features.description,
       sortOrder: features.sortOrder,
+      responsibleUserId: features.responsibleUserId,
       version: features.version,
       createdAt: features.createdAt,
       updatedAt: features.updatedAt
@@ -240,7 +244,7 @@ export function listProjectFeatures(database: DbClient, projectId: number): Feat
     .all();
   const counts = getUseCaseCountMap(database, rows.map((row) => row.id));
 
-  return rows.map((row) => mapFeature(row, counts.get(row.id) ?? 0));
+  return rows.map((row) => mapFeature(database, row, counts.get(row.id) ?? 0));
 }
 
 export function setProjectFeatures(database: DbClient, projectId: number, featureIds: number[], actor?: JournalActor | null): FeatureDto[] {
@@ -277,6 +281,7 @@ export function listMilestoneFeatures(database: DbClient, milestoneId: number): 
       status: features.status,
       description: features.description,
       sortOrder: features.sortOrder,
+      responsibleUserId: features.responsibleUserId,
       version: features.version,
       createdAt: features.createdAt,
       updatedAt: features.updatedAt
@@ -287,7 +292,7 @@ export function listMilestoneFeatures(database: DbClient, milestoneId: number): 
     .all();
   const counts = getUseCaseCountMap(database, rows.map((row) => row.id));
 
-  return rows.map((row) => mapFeature(row, counts.get(row.id) ?? 0));
+  return rows.map((row) => mapFeature(database, row, counts.get(row.id) ?? 0));
 }
 
 export function setMilestoneFeatures(database: DbClient, milestoneId: number, featureIds: number[], actor?: JournalActor | null): FeatureDto[] {
@@ -330,6 +335,7 @@ export function listFeatureRelations(database: DbClient, featureId: number): Fea
       targetStatus: features.status,
       targetDescription: features.description,
       targetSortOrder: features.sortOrder,
+      targetResponsibleUserId: features.responsibleUserId,
       targetVersion: features.version,
       targetCreatedAt: features.createdAt,
       targetUpdatedAt: features.updatedAt
@@ -351,12 +357,14 @@ export function listFeatureRelations(database: DbClient, featureId: number): Fea
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     targetFeature: mapFeature(
-        {
-          id: row.targetId,
-          title: row.targetTitle,
-          status: row.targetStatus,
+      database,
+      {
+        id: row.targetId,
+        title: row.targetTitle,
+        status: row.targetStatus,
         description: row.targetDescription,
         sortOrder: row.targetSortOrder,
+        responsibleUserId: row.targetResponsibleUserId,
         version: row.targetVersion,
         createdAt: row.targetCreatedAt,
         updatedAt: row.targetUpdatedAt

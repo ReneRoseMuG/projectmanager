@@ -1,7 +1,7 @@
 import type { Note, NoteInput, NoteUpdate } from "@taskmanager/shared-types";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { dayPlanNotes, dayPlans, milestoneNotes, milestones, notes, projectNotes, projects, taskNotes, tasks, ticketNotes, tickets } from "../db/schema.js";
+import { dayPlanNotes, dayPlans, milestoneNotes, milestones, notes, projectNotes, projects, taskNotes, tasks, ticketNotes, tickets, wikiPageNotes, wikiPages } from "../db/schema.js";
 import { dayPlanRepository } from "../repositories/day-plan.repository.js";
 import { noteRepository, type NoteRecord, type NoteUpdateData } from "../repositories/note.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
@@ -22,7 +22,7 @@ import {
 } from "./journal.service.js";
 
 type MappableNoteRecord = Pick<NoteRecord, "id" | "title" | "contentJson" | "version" | "createdAt" | "updatedAt">;
-type NoteOwner = { type: "project" | "milestone" | "task" | "dayPlan" | "ticket"; id: number };
+type NoteOwner = { type: "project" | "milestone" | "task" | "dayPlan" | "ticket" | "wikiPage"; id: number };
 
 const noteJournalFields: Array<JournalFieldDefinition<NoteRecord>> = [
   { key: "title", label: "Titel" },
@@ -80,6 +80,13 @@ function ensureDayPlanOwnedByUser(database: DbClient, dayPlanId: number, userId:
   }
 }
 
+function ensureWikiPageExists(database: DbClient, wikiPageId: number): void {
+  const wikiPage = database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)).get();
+  if (!wikiPage) {
+    throw notFound(`Wiki page with id ${wikiPageId} not found`);
+  }
+}
+
 function noteJournalObject(note: Pick<NoteRecord, "id" | "title">): JournalObjectRef {
   return makeJournalObject("note", note.id, note.title);
 }
@@ -101,6 +108,10 @@ function getOwnerJournalObject(database: DbClient, owner: NoteOwner): JournalObj
     const dayPlan = database.select({ date: dayPlans.date }).from(dayPlans).where(eq(dayPlans.id, owner.id)).get();
     return makeJournalObject("dayPlan", owner.id, dayPlan?.date ? `Persönliche Planung ${dayPlan.date}` : `Persönliche Planung ${owner.id}`);
   }
+  if (owner.type === "wikiPage") {
+    const wikiPage = database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)).get();
+    return makeJournalObject("wikiPage", owner.id, wikiPage?.title ?? `Wiki-Seite ${owner.id}`);
+  }
   const ticket = database.select({ title: tickets.title }).from(tickets).where(eq(tickets.id, owner.id)).get();
   return makeJournalObject("ticket", owner.id, ticket?.title ?? `Ticket ${owner.id}`);
 }
@@ -115,7 +126,8 @@ function listNoteOwners(database: DbClient, noteId: number): NoteOwner[] {
     ...database.select({ id: milestoneNotes.milestoneId }).from(milestoneNotes).where(eq(milestoneNotes.noteId, noteId)).all().map((row) => ({ type: "milestone" as const, id: row.id })),
     ...database.select({ id: taskNotes.taskId }).from(taskNotes).where(eq(taskNotes.noteId, noteId)).all().map((row) => ({ type: "task" as const, id: row.id })),
     ...database.select({ id: dayPlanNotes.dayPlanId }).from(dayPlanNotes).where(eq(dayPlanNotes.noteId, noteId)).all().map((row) => ({ type: "dayPlan" as const, id: row.id })),
-    ...database.select({ id: ticketNotes.ticketId }).from(ticketNotes).where(eq(ticketNotes.noteId, noteId)).all().map((row) => ({ type: "ticket" as const, id: row.id }))
+    ...database.select({ id: ticketNotes.ticketId }).from(ticketNotes).where(eq(ticketNotes.noteId, noteId)).all().map((row) => ({ type: "ticket" as const, id: row.id })),
+    ...database.select({ id: wikiPageNotes.wikiPageId }).from(wikiPageNotes).where(eq(wikiPageNotes.noteId, noteId)).all().map((row) => ({ type: "wikiPage" as const, id: row.id }))
   ];
 }
 
@@ -204,6 +216,26 @@ export function listDayPlanNotes(database: DbClient, dayPlanId: number, userId: 
   return dayPlanRepository.listNotes(database, dayPlanId).map(mapNote);
 }
 
+export function listWikiPageNotes(database: DbClient, wikiPageId: number): Note[] {
+  ensureWikiPageExists(database, wikiPageId);
+  const rows = database
+    .select({
+      id: notes.id,
+      title: notes.title,
+      contentJson: notes.contentJson,
+      version: notes.version,
+      createdAt: notes.createdAt,
+      updatedAt: notes.updatedAt
+    })
+    .from(wikiPageNotes)
+    .innerJoin(notes, eq(wikiPageNotes.noteId, notes.id))
+    .where(eq(wikiPageNotes.wikiPageId, wikiPageId))
+    .orderBy(desc(notes.updatedAt))
+    .all();
+
+  return rows.map(mapNote);
+}
+
 export function createProjectNote(database: DbClient, projectId: number, input: NoteInput, actor?: JournalActor | null): Note {
   ensureProjectExists(database, projectId);
   const created = database.transaction((tx) => {
@@ -283,6 +315,23 @@ export function createDayPlanNote(database: DbClient, dayPlanId: number, userId:
     dayPlanRepository.addNote(txDb, dayPlanId, note.id);
     const noteObject = noteJournalObject(note);
     recordJournalEntry(txDb, { operation: "create", object: noteObject, summary: buildCreateSummary(noteObject), actor, contexts: [ownerContext(txDb, { type: "dayPlan", id: dayPlanId })] });
+    return note;
+  });
+
+  return mapNote(created);
+}
+
+export function createWikiPageNote(database: DbClient, wikiPageId: number, input: NoteInput, actor?: JournalActor | null): Note {
+  ensureWikiPageExists(database, wikiPageId);
+  const created = database.transaction((tx) => {
+    const txDb = tx as unknown as DbClient;
+    const note = noteRepository.create(txDb, {
+      title: cleanTitle(input.title),
+      contentJson: stringifyJsonObject(input.contentJson)
+    }, actor?.actorUserId ?? undefined);
+    tx.insert(wikiPageNotes).values({ wikiPageId, noteId: note.id }).run();
+    const noteObject = noteJournalObject(note);
+    recordJournalEntry(txDb, { operation: "create", object: noteObject, summary: buildCreateSummary(noteObject), actor, contexts: [ownerContext(txDb, { type: "wikiPage", id: wikiPageId })] });
     return note;
   });
 
@@ -425,6 +474,16 @@ export function deleteDayPlanNotesForIds(database: DbClient, dayPlanIds: number[
   }
 
   const rows = database.select({ noteId: dayPlanNotes.noteId }).from(dayPlanNotes).where(inArray(dayPlanNotes.dayPlanId, uniqueIds)).all();
+  deleteNotesByIds(database, rows.map((row) => row.noteId));
+}
+
+export function deleteWikiPageNotesForIds(database: DbClient, wikiPageIds: number[]): void {
+  const uniqueIds = [...new Set(wikiPageIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const rows = database.select({ noteId: wikiPageNotes.noteId }).from(wikiPageNotes).where(inArray(wikiPageNotes.wikiPageId, uniqueIds)).all();
   deleteNotesByIds(database, rows.map((row) => row.noteId));
 }
 

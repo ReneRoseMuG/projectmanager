@@ -36,6 +36,7 @@ import { setTaskTags } from "../../api/tags";
 import { addTicketRelation, createOwnerTicket, createSubTicket, createTicketNote, linkOwnerTicket, setTicketTags, uploadTicketAttachment } from "../../api/tickets";
 import { errorMessage, errorMessageAsync } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
+import { useAuth } from "../../hooks/useAuth";
 import { useBacklog } from "../../hooks/useBacklog";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useFeatures } from "../../hooks/useFeatures";
@@ -92,6 +93,7 @@ import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
+import { UserSelectField } from "../users/UserSelectField";
 import { useHasPermission } from "../../hooks/usePermissions";
 import { ProjectWikiPanel } from "./ProjectWikiPanel";
 
@@ -195,6 +197,7 @@ export function ProjectForm({
   const projectId = project?.id;
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const auth = useAuth();
   const statusCascade = useStatusCascadeWorkflow();
   const allFeatures = useFeatures();
   const milestones = useMilestones(null, projectId);
@@ -224,6 +227,7 @@ export function ProjectForm({
   const [deleting, setDeleting] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [milestoneViewMode, setMilestoneViewMode] =
     useState<ViewMode>("kanban");
   const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
@@ -298,7 +302,8 @@ export function ProjectForm({
     setSelectedTags(project?.tags ?? []);
     setStartDate(project?.startDate ?? "");
     setDueDate(project?.dueDate ?? "");
-  }, [open, project]);
+    setResponsibleUserId(project ? project.responsibleUserId : (auth.user?.id ?? null));
+  }, [auth.user?.id, open, project]);
 
   useEffect(() => {
     if (open) {
@@ -325,6 +330,7 @@ export function ProjectForm({
           color,
           startDate: startDate || null,
           dueDate: dueDate || null,
+          responsibleUserId,
         },
         selectedTags.map((tag) => tag.id),
       );
@@ -521,8 +527,8 @@ export function ProjectForm({
       description: input.description,
       status: input.status,
       priority: input.priority,
-      reporter: input.reporter,
-      assignee: input.assignee,
+      reporterUserId: input.reporterUserId,
+      responsibleUserId: input.responsibleUserId,
       environment: input.environment,
       affectedVersion: input.affectedVersion,
       dueDate: input.dueDate,
@@ -802,13 +808,21 @@ export function ProjectForm({
               </FormField>
             </Section>
             <Section title="Status">
-              <FormField label="Status">
-                <StatusToggle
-                  kind="workStatus"
-                  value={status}
-                  onChange={setStatus}
+              <div className="grid items-start gap-4 md:grid-cols-2">
+                <FormField label="Status">
+                  <StatusToggle
+                    kind="workStatus"
+                    value={status}
+                    onChange={setStatus}
+                  />
+                </FormField>
+                <UserSelectField
+                  label="Verantwortlich"
+                  value={responsibleUserId}
+                  selectedUser={project?.responsibleUser ?? null}
+                  onChange={setResponsibleUserId}
                 />
-              </FormField>
+              </div>
             </Section>
             <Section title="Zeitraum">
               <div className="grid gap-4 md:grid-cols-2">

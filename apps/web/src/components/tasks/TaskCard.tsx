@@ -3,7 +3,7 @@ import { CheckCircle2, Edit3, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { objectReference } from "../../lib/references";
 import { catalogColor, isCatalogStatusClosed } from "../../utils/catalogs";
-import { isOverdue } from "../../utils/date";
+import { formatHumanDate, isOverdue } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
 import { CardFooterBar } from "../ui/CardFooterBar";
@@ -76,7 +76,8 @@ function TaskCardBody({ description }: { description: string }) {
 
 function TaskCardFooter({ task, allTags, taskClosed, onDueDateChange, onTagsChange }: { task: Task; allTags?: Tag[]; taskClosed: boolean; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (taskId: number, tagIds: number[]) => void | Promise<void> }) {
   const overdue = !taskClosed && isOverdue(task.dueDate);
-  const hasMeta = task.subtaskCount > 0 || Boolean(task.dueDate);
+  const closedDate = taskClosed ? task.updatedAt : null;
+  const hasMeta = task.subtaskCount > 0 || Boolean(task.dueDate) || Boolean(closedDate);
 
   return (
     <div className="grid gap-3">
@@ -89,7 +90,15 @@ function TaskCardFooter({ task, allTags, taskClosed, onDueDateChange, onTagsChan
             </span>
           ) : null}
           {task.dueDate ? (
-            <InlineDateField value={task.dueDate} className={overdue ? "text-crimson" : ""} onChange={onDueDateChange ? (dueDate) => onDueDateChange(task, dueDate) : undefined} />
+            <span className={`inline-flex items-center gap-1 font-semibold ${overdue ? "text-crimson" : ""}`}>
+              Fällig
+              <InlineDateField value={task.dueDate} onChange={onDueDateChange ? (dueDate) => onDueDateChange(task, dueDate) : undefined} />
+            </span>
+          ) : null}
+          {closedDate ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-steel-500">
+              Geschlossen {formatHumanDate(closedDate)}
+            </span>
           ) : null}
         </div>
       ) : null}
@@ -119,6 +128,7 @@ function TaskSupportFooter({ task, allTags, onTagsChange, bordered = true }: { t
 
 function TaskRow({ task, allTags, description, statusColor, taskClosed, onOpen, onDelete, onStatusChange, onDueDateChange, onTagsChange }: { task: Task; allTags?: Tag[]; description: string; statusColor: string; taskClosed: boolean; onOpen: (task: Task) => void; onDelete?: (task: Task) => void; onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (taskId: number, tagIds: number[]) => void | Promise<void> }) {
   const overdue = !taskClosed && isOverdue(task.dueDate);
+  const closedDate = taskClosed ? task.updatedAt : null;
 
   return (
     <div className="hidden md:block">
@@ -134,9 +144,13 @@ function TaskRow({ task, allTags, description, statusColor, taskClosed, onOpen, 
           </>
         }
         meta={
-          <span className={`inline-flex min-w-[82px] items-center gap-1 text-xs font-semibold ${overdue ? "text-crimson" : "text-steel-500"}`}>
-            <InlineDateField value={task.dueDate} onChange={onDueDateChange ? (dueDate) => onDueDateChange(task, dueDate) : undefined} />
-          </span>
+          <div className="flex min-w-[9rem] flex-wrap items-center justify-end gap-2 text-xs font-semibold text-steel-500">
+            <span className={`inline-flex items-center gap-1 ${overdue ? "text-crimson" : ""}`}>
+              Fällig
+              <InlineDateField value={task.dueDate} emptyLabel="Ohne Fälligkeit" onChange={onDueDateChange ? (dueDate) => onDueDateChange(task, dueDate) : undefined} />
+            </span>
+            {closedDate ? <span>Geschlossen {formatHumanDate(closedDate)}</span> : null}
+          </div>
         }
         footer={<TaskSupportFooter task={task} allTags={allTags} onTagsChange={onTagsChange} bordered={false} />}
         actions={

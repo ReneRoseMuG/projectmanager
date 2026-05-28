@@ -139,6 +139,7 @@ export function truncateAll(sqlite: Database.Database): void {
     "feature_tasks",
     "day_plan_tasks",
     "day_plan_notes",
+    "wiki_page_notes",
     "milestone_tasks",
     "project_tasks",
     "day_plan_comments",

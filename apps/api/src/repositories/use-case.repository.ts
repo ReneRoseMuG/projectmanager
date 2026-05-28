@@ -5,7 +5,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type UseCaseRecord = typeof useCases.$inferSelect;
 export type UseCaseCreateData = Omit<typeof useCases.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type UseCaseUpdateData = Partial<Pick<UseCaseCreateData, "featureId" | "title" | "status" | "description" | "content" | "sortOrder">>;
+export type UseCaseUpdateData = Partial<Pick<UseCaseCreateData, "featureId" | "title" | "status" | "description" | "content" | "sortOrder" | "responsibleUserId">>;
 
 function nowIso(): string {
   return new Date().toISOString();

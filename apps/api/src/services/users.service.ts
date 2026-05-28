@@ -65,7 +65,7 @@ export function listAdminUsers(database: DbClient): AdminUser[] {
   return userRepository.findAll(database).map((user) => mapAdminUser(database, user));
 }
 
-function mapUserOption(record: UserRecord): UserOption {
+export function mapUserOption(record: UserRecord): UserOption {
   return {
     id: record.id,
     firstName: record.firstName,
@@ -77,6 +77,28 @@ function mapUserOption(record: UserRecord): UserOption {
 
 export function listUserOptions(database: DbClient): UserOption[] {
   return userRepository.findActive(database).map(mapUserOption);
+}
+
+export function getUserOption(database: DbClient, id: number | null | undefined): UserOption | null {
+  if (id === null || id === undefined) {
+    return null;
+  }
+  const user = userRepository.findById(database, id);
+  return user ? mapUserOption(user) : null;
+}
+
+export function normalizeAssignableUserId(database: DbClient, value: number | null | undefined, field: string): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!Number.isInteger(value) || value < 1) {
+    throw badRequest(`${field} must reference a valid user`);
+  }
+  const user = userRepository.findById(database, value);
+  if (!user || !user.isActive) {
+    throw badRequest(`User with id ${value} does not exist or is inactive`);
+  }
+  return user.id;
 }
 
 export function getAdminUser(database: DbClient, id: number): AdminUser {

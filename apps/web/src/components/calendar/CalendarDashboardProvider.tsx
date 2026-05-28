@@ -8,6 +8,7 @@ import { useMilestones } from "../../hooks/useMilestones";
 import { useHasPermission } from "../../hooks/usePermissions";
 import { useProjects } from "../../hooks/useProjects";
 import { EventForm } from "./EventForm";
+import { TaskForm, type TaskFormInput } from "../tasks/TaskForm";
 import { useToast } from "../ui/ToastProvider";
 
 interface CalendarDashboardContextValue {
@@ -22,6 +23,7 @@ interface CalendarDashboardContextValue {
   canWriteTasks: boolean;
   openCreate: (date?: string) => void;
   openEvent: (event: CalendarEvent) => void;
+  openTask: (task: Task) => void;
   moveEvent: (event: CalendarEvent, startTime: string, endTime: string) => Promise<void>;
   moveTask: (task: Task, dueDate: string) => Promise<void>;
 }
@@ -56,6 +58,8 @@ export function CalendarDashboardProvider({ children }: { children: ReactNode })
   const [formOpen, setFormOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [initialDate, setInitialDate] = useState<string | null>(null);
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   useEffect(() => {
     if (events.loading) {
@@ -90,6 +94,14 @@ export function CalendarDashboardProvider({ children }: { children: ReactNode })
     }
     setSelectedEvent(event);
     setFormOpen(true);
+  };
+
+  const openTask = (task: Task) => {
+    if (!canWriteTasks) {
+      return;
+    }
+    setSelectedTask(task);
+    setTaskFormOpen(true);
   };
 
   const submit = async (input: EventInput, eventId?: number) => {
@@ -156,6 +168,36 @@ export function CalendarDashboardProvider({ children }: { children: ReactNode })
     }
   };
 
+  const submitTask = async (input: TaskFormInput) => {
+    if (!selectedTask) {
+      return;
+    }
+    try {
+      await calendarTasks.updateTask(selectedTask.id, {
+        title: input.title,
+        description: input.description,
+        status: input.status,
+        priority: input.priority,
+        responsibleUserId: input.responsibleUserId,
+        dueDate: input.dueDate,
+        expectedVersion: selectedTask.version
+      });
+      const currentTagIds = selectedTask.tags.map((tag) => tag.id).sort((left, right) => left - right);
+      const nextTagIds = [...input.tagIds].sort((left, right) => left - right);
+      if (currentTagIds.join(",") !== nextTagIds.join(",")) {
+        await calendarTasks.updateTaskTags(selectedTask.id, input.tagIds);
+      }
+      showToast({ tone: "success", title: "Aufgabe aktualisiert" });
+    } catch (taskError) {
+      showToast({
+        tone: "error",
+        title: "Aufgabe konnte nicht gespeichert werden",
+        message: errorMessage(taskError)
+      });
+      throw taskError;
+    }
+  };
+
   const removeEvent = async (event: CalendarEvent) => {
     try {
       await events.removeEvent(event.id);
@@ -183,6 +225,7 @@ export function CalendarDashboardProvider({ children }: { children: ReactNode })
     canWriteTasks,
     openCreate,
     openEvent,
+    openTask,
     moveEvent,
     moveTask
   };
@@ -202,6 +245,15 @@ export function CalendarDashboardProvider({ children }: { children: ReactNode })
           onDelete={removeEvent}
           canDelete={canDeleteEvents}
           onClose={() => setFormOpen(false)}
+        />
+      ) : null}
+      {canWriteTasks ? (
+        <TaskForm
+          open={taskFormOpen}
+          task={selectedTask}
+          onSubmit={submitTask}
+          onChanged={calendarTasks.reload}
+          onClose={() => setTaskFormOpen(false)}
         />
       ) : null}
     </CalendarDashboardContext.Provider>

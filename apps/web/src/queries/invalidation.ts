@@ -186,6 +186,9 @@ function noteOwnerKeys(ownerType: NoteOwnerType, ownerId: number): QueryKey[] {
   if (ownerType === "dayPlan") {
     return [queryKeys.dayPlans.root];
   }
+  if (ownerType === "wikiPage") {
+    return [queryKeys.wiki.root, queryKeys.wiki.detail(ownerId)];
+  }
   return [];
 }
 

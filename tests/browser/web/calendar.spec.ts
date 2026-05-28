@@ -175,7 +175,6 @@ test.describe("Kalender-Events", () => {
       request,
       { type: "project", id: project.id },
       "E2E Calendar Task",
-      { assignee: "Ada Lovelace" },
     );
     const title = uniqueTitle("E2E Calendar Task Event");
     let eventId: number | null = null;
@@ -188,7 +187,7 @@ test.describe("Kalender-Events", () => {
       eventId = event.id;
       expect(event.owners).toEqual([{ type: "task", id: task.id }]);
       const tile = page.getByTestId(`week-event-${event.id}`);
-      await expect(tile).toContainText("AL");
+      await expect(tile).toContainText("TA");
       expect(await tile.evaluate((element) => element.getAttribute("style") ?? "")).toContain("border-left: 4px solid var(--color-tangerine)");
     } finally {
       await deleteEvent(request, eventId);

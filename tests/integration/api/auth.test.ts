@@ -391,4 +391,26 @@ describe("Auth API", () => {
       .send({ body: "Reader blockiert", expectedVersion: updated.body.version })
       .expect(403);
   });
+
+  it("schützt Wiki-Notizen über notes-Berechtigungen", async () => {
+    const admin = await loginAdmin(app);
+    const wikiPage = await admin.post("/api/wiki").send({ title: "Notiz-Wiki", content: "" }).expect(201);
+
+    await supertest(app.server).post(`/api/wiki/${wikiPage.body.id}/notes`).send({ title: "Anonym blockiert" }).expect(401);
+
+    const created = await admin.post(`/api/wiki/${wikiPage.body.id}/notes`).send({ title: "Admin-Notiz", contentJson: {} }).expect(201);
+    expect(created.body).toEqual(expect.objectContaining({ title: "Admin-Notiz" }));
+
+    const roles = await admin.get("/api/admin/roles").expect(200);
+    const readerRole = roles.body.find((role: { key: string }) => role.key === "reader") as { id: number };
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Note", lastName: "Reader", email: "note-reader@example.test", roleId: readerRole.id, password: "password123", isActive: true })
+      .expect(201);
+
+    const reader = supertest.agent(app.server);
+    await reader.post("/api/auth/login").send({ email: "note-reader@example.test", password: "password123" }).expect(200);
+    await reader.get(`/api/wiki/${wikiPage.body.id}/notes`).expect(200);
+    await reader.post(`/api/wiki/${wikiPage.body.id}/notes`).send({ title: "Reader blockiert" }).expect(403);
+  });
 });

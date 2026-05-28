@@ -5,7 +5,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type BacklogItemRecord = typeof backlogItems.$inferSelect;
 export type BacklogItemCreateData = Omit<typeof backlogItems.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type BacklogItemUpdateData = Partial<Pick<BacklogItemCreateData, "title" | "description" | "status" | "importKey" | "featureId" | "useCaseId" | "sortOrder">>;
+export type BacklogItemUpdateData = Partial<Pick<BacklogItemCreateData, "title" | "description" | "status" | "importKey" | "featureId" | "useCaseId" | "sortOrder" | "responsibleUserId">>;
 export interface BacklogItemFilters {
   featureId?: number;
   useCaseId?: number;

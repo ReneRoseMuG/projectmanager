@@ -352,8 +352,6 @@ function CalendarWidget() {
 
 function InteractiveCalendarWidget() {
   const calendar = useOptionalCalendarDashboard();
-  const navigate = useNavigate();
-  const location = useLocation();
   const [viewMode, setViewMode] = useState<"week" | "month">("week");
 
   if (!calendar) {
@@ -367,9 +365,6 @@ function InteractiveCalendarWidget() {
   if (calendar.error) {
     return <WidgetError message={calendar.error} />;
   }
-
-  const returnTo = `${location.pathname}${location.search}`;
-  const openTask = (task: Task) => navigate(dashboardDetailPath("task", task.id, returnTo));
 
   return (
     <div className="grid gap-3">
@@ -392,13 +387,13 @@ function InteractiveCalendarWidget() {
           onDateClick={calendar.canWriteEvents ? calendar.openCreate : undefined}
           onEventClick={calendar.canWriteEvents ? calendar.openEvent : undefined}
           onEventMove={calendar.canWriteEvents ? calendar.moveEvent : undefined}
-          onTaskClick={calendar.canReadTasks ? openTask : undefined}
+          onTaskClick={calendar.canWriteTasks ? calendar.openTask : undefined}
           onTaskMove={calendar.canWriteTasks ? calendar.moveTask : undefined}
         />
       ) : (
         <MonthCalendar
           tasks={calendar.tasks}
-          onTaskClick={calendar.canReadTasks ? openTask : undefined}
+          onTaskClick={calendar.canWriteTasks ? calendar.openTask : undefined}
           onTaskMove={calendar.canWriteTasks ? calendar.moveTask : undefined}
         />
       )}

@@ -15,7 +15,8 @@ const milestoneBodySchema = {
     status: { type: "string", minLength: 1 },
     color: { type: ["string", "null"] },
     startDate: { type: ["string", "null"] },
-    dueDate: { type: ["string", "null"] }
+    dueDate: { type: ["string", "null"] },
+    responsibleUserId: { type: ["integer", "null"], minimum: 1 }
   }
 } as const;
 
@@ -39,7 +40,8 @@ const projectMilestoneBodySchema = {
     status: { type: "string", minLength: 1 },
     color: { type: ["string", "null"] },
     startDate: { type: ["string", "null"] },
-    dueDate: { type: ["string", "null"] }
+    dueDate: { type: ["string", "null"] },
+    responsibleUserId: { type: ["integer", "null"], minimum: 1 }
   }
 } as const;
 

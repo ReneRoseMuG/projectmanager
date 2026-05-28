@@ -19,6 +19,7 @@ import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useFeatures } from "../hooks/useFeatures";
 import { useUseCases } from "../hooks/useUseCases";
 import { withStandaloneView } from "../utils/standalone";
@@ -44,6 +45,7 @@ export function UseCaseDetailPage() {
   const useCases = useUseCases(validFeatureId);
   const [useCase, setUseCase] = useState<UseCase | null>(null);
   const [loading, setLoading] = useState(false);
+  useDocumentTitle(isCreateMode ? "Use Case: Neu" : useCase ? `Use Case: ${useCase.title}` : "Use Case");
   const returnTo =
     searchParams.get("returnTo") ??
     (searchParams.get("standalone") === "1"

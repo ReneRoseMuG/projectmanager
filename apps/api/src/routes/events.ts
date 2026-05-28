@@ -26,6 +26,7 @@ const eventBodySchema = {
     isAllDay: { type: "boolean" },
     color: { type: ["string", "null"] },
     reminderMinutes: { type: "integer", minimum: 1 },
+    responsibleUserId: { type: ["integer", "null"], minimum: 1 },
     owners: {
       type: "array",
       items: eventOwnerSchema

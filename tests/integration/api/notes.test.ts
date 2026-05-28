@@ -16,6 +16,7 @@ import {
   createTask,
   createTestDb,
   createTicket,
+  createWikiPage,
   truncateAll,
   type TestDb
 } from "../../fixtures/api/index.js";
@@ -111,6 +112,13 @@ describe("Notes API", () => {
         const ticket = await createTicket(app, null);
         return { id: ticket.id, path: `/api/tickets/${ticket.id}/notes` };
       }
+    },
+    {
+      label: "wikiPage",
+      createOwner: async () => {
+        const wikiPage = await createWikiPage(app);
+        return { id: wikiPage.id, path: `/api/wiki/${wikiPage.id}/notes` };
+      }
     }
   ])("POST+GET verknuepft Notizen mit $label", async ({ label, createOwner }) => {
     const owner = await createOwner();
@@ -122,6 +130,15 @@ describe("Notes API", () => {
 
     expect(created.body).toEqual(expect.objectContaining({ title, contentJson }));
     expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, title, contentJson })]);
+  });
+
+  it("DELETE /api/wiki/:id entfernt verknuepfte Wiki-Notizen vollstaendig", async () => {
+    const wikiPage = await createWikiPage(app);
+    const created = await supertest(app.server).post(`/api/wiki/${wikiPage.id}/notes`).send({ title: "Wiki-Notiz", contentJson: {} }).expect(201);
+
+    await supertest(app.server).delete(`/api/wiki/${wikiPage.id}`).expect(204);
+
+    await supertest(app.server).get(`/api/notes/${created.body.id}`).expect(404);
   });
 
   it("GET /api/tasks/:id/notes gibt alle Task-Notizen zurueck", async () => {

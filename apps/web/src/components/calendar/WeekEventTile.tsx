@@ -9,7 +9,7 @@ export interface EventContext {
   label: string;
   accentColor: string;
   ownerType: string;
-  assignee: string | null;
+  responsibleName: string | null;
 }
 
 interface WeekEventTileProps {
@@ -63,9 +63,9 @@ export function WeekEventTile({ event, context, timeLabel, dragging = false, ove
         <Clock3 size={12} className="shrink-0" />
         <span className="truncate">{timeLabel}</span>
       </span>
-      {context.assignee ? (
+      {context.responsibleName ? (
         <span className="mt-1 flex justify-end">
-          <Avatar name={context.assignee} size="sm" />
+          <Avatar name={context.responsibleName} size="sm" />
         </span>
       ) : null}
     </button>

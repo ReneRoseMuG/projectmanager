@@ -21,7 +21,8 @@ const useCaseBodySchema = {
     status: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
     content: { type: "string" },
-    sortOrder: { type: "integer" }
+    sortOrder: { type: "integer" },
+    responsibleUserId: { type: ["integer", "null"], minimum: 1 }
   }
 } as const;
 

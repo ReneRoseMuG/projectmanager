@@ -108,8 +108,8 @@ describe("Tickets API", () => {
         description: "Cannot sign in",
         status: "open",
         priority: "high",
-        reporter: "QA",
-        assignee: "Dev",
+        reporterUserId: 1,
+        responsibleUserId: 1,
         environment: "Local",
         affectedVersion: "1.0",
         dueDate: "2026-06-30"
@@ -122,8 +122,10 @@ describe("Tickets API", () => {
       type: "bug",
       status: "open",
       priority: "high",
-      reporter: "QA",
-      assignee: "Dev",
+      reporterUserId: 1,
+      reporterUser: expect.objectContaining({ id: 1 }),
+      responsibleUserId: 1,
+      responsibleUser: expect.objectContaining({ id: 1 }),
       environment: "Local",
       affectedVersion: "1.0",
       dueDate: "2026-06-30",
@@ -361,10 +363,19 @@ describe("Tickets API", () => {
 
     const res = await supertest(app.server)
       .patch(`/api/tickets/${ticket.id}`)
-      .send({ title: "Updated", status: "in_progress", priority: "urgent", assignee: "Erika", resolution: "fixed", expectedVersion: ticket.version })
+      .send({ title: "Updated", status: "in_progress", priority: "urgent", responsibleUserId: 1, resolution: "fixed", expectedVersion: ticket.version })
       .expect(200);
 
-    expect(res.body).toMatchObject({ title: "Updated", status: "in_progress", priority: "urgent", assignee: "Erika", resolution: "fixed" });
+    expect(res.body).toMatchObject({ title: "Updated", status: "in_progress", priority: "urgent", responsibleUserId: 1, responsibleUser: expect.objectContaining({ id: 1 }), resolution: "fixed" });
+  });
+
+  it("PATCH /api/tickets/:id weist unbekannte User-Bezüge ab", async () => {
+    const ticket = await createTicket(app, null);
+
+    await supertest(app.server)
+      .patch(`/api/tickets/${ticket.id}`)
+      .send({ reporterUserId: 9999, expectedVersion: ticket.version })
+      .expect(400);
   });
 
   it("PATCH /api/tickets/:id sets resolvedAt for resolved and closed status", async () => {

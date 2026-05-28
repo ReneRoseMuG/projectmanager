@@ -6,6 +6,7 @@ import {
   createProjectNote,
   createMilestoneNote,
   createTaskNote,
+  createWikiPageNote,
   deleteDayPlanNote,
   deleteNote,
   getNote,
@@ -14,6 +15,7 @@ import {
   listMilestoneNotes,
   listProjectNotes,
   listTaskNotes,
+  listWikiPageNotes,
   updateNote
 } from "../services/notes.service.js";
 import { createJournalActor } from "../services/journal.service.js";
@@ -76,6 +78,12 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  app.get<{ Params: { id: number } }>(
+    "/wiki/:id/notes",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listWikiPageNotes(app.db, request.params.id)
+  );
+
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/projects/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
@@ -101,6 +109,12 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
       const currentUser = requireCurrentUser(request);
       return reply.status(201).send(createDayPlanNote(app.db, request.params.id, currentUser.id, request.body, createJournalActor(request.currentUser)));
     }
+  );
+
+  app.post<{ Params: { id: number }; Body: NoteInput }>(
+    "/wiki/:id/notes",
+    { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
+    async (request, reply) => reply.status(201).send(createWikiPageNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number; noteId: number } }>(

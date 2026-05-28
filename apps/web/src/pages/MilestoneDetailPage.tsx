@@ -11,6 +11,7 @@ import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useMilestones } from "../hooks/useMilestones";
 import { useProjects } from "../hooks/useProjects";
 import { useStatusCascadeWorkflow } from "../hooks/useStatusCascadeWorkflow";
@@ -44,6 +45,7 @@ export function MilestoneDetailPage() {
     updateMilestone,
     removeMilestone,
   } = useMilestones(milestoneId);
+  useDocumentTitle(isCreateMode ? "Meilenstein: Neu" : milestone ? `Meilenstein: ${milestone.name}` : "Meilenstein");
 
   const returnTo =
     searchParams.get("returnTo") ??

@@ -71,6 +71,8 @@ function project(overrides: Partial<Project>): Project {
     color: "var(--color-fern)",
     startDate: null,
     dueDate: null,
+    responsibleUserId: null,
+    responsibleUser: null,
     wikiPageId: null,
     version: 1,
     createdAt: "2026-05-20T08:00:00",
@@ -96,7 +98,8 @@ function task(overrides: Partial<Task>): Task {
     description: null,
     status: "todo",
     priority: "medium",
-    assignee: null,
+    responsibleUserId: null,
+    responsibleUser: null,
     dueDate: null,
     version: 1,
     createdAt: "2026-05-20T08:00:00",
@@ -150,7 +153,7 @@ describe("WeekCalendar helpers", () => {
       event({ owners: [{ type: "task", id: 5 }], color: "var(--color-steel-700)" }),
       [],
       [],
-      [task({ id: 5, title: "Design prüfen", assignee: "Ada Lovelace" })]
+      [task({ id: 5, title: "Design prüfen", responsibleUserId: 1, responsibleUser: { id: 1, name: "ada.lovelace", fullName: "Ada Lovelace", email: "ada@example.test" } })]
     );
     const milestoneContext = resolveEventContext(event({ owners: [{ type: "milestone", id: 9 }], color: null }), [], []);
 
@@ -158,13 +161,13 @@ describe("WeekCalendar helpers", () => {
       label: "Design prüfen",
       accentColor: "var(--color-tangerine)",
       ownerType: "task",
-      assignee: "Ada Lovelace"
+      responsibleName: "Ada Lovelace"
     });
     expect(milestoneContext).toMatchObject({
       label: "Meilenstein #9",
       accentColor: "var(--color-violet)",
       ownerType: "milestone",
-      assignee: null
+      responsibleName: null
     });
   });
 
@@ -176,7 +179,7 @@ describe("WeekCalendar helpers", () => {
           label: "Design prüfen",
           accentColor: "var(--color-tangerine)",
           ownerType: "task",
-          assignee: "Ada Lovelace"
+          responsibleName: "Ada Lovelace"
         }}
         timeLabel="09:00 - 10:00"
         overlay

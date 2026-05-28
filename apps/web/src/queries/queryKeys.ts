@@ -1,6 +1,6 @@
 import type { CommentEntityType, DashboardContext, DashboardWidgetId, DashboardWidgetParams, JournalObjectType } from "@taskmanager/shared-types";
 
-export type NoteOwnerType = "project" | "milestone" | "task" | "ticket" | "dayPlan";
+export type NoteOwnerType = "project" | "milestone" | "task" | "ticket" | "dayPlan" | "wikiPage";
 export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket" | "wikiPage";
 export type TaskOwnerType = "project" | "milestone" | "feature" | "useCase" | "wikiPage";
 export type TicketOwnerType = "project" | "milestone" | "task" | "feature" | "useCase" | "wikiPage";

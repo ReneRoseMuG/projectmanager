@@ -2,6 +2,7 @@ import type { Task, TaskUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { getTasks, updateTask as updateTaskRequest } from "../api/tasks";
+import { setTaskTags } from "../api/tags";
 import { invalidateTaskScope } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
@@ -23,6 +24,12 @@ export function useCalendarTasks(enabled = true) {
       await invalidateTaskScope(queryClient, updated.id);
     }
   });
+  const updateTaskTagsMutation = useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTaskTags(id, tagIds),
+    onSuccess: async (_tags, { id }) => {
+      await invalidateTaskScope(queryClient, id);
+    }
+  });
 
   const reload = useCallback(async () => {
     await tasksQuery.refetch();
@@ -34,12 +41,19 @@ export function useCalendarTasks(enabled = true) {
     },
     [updateTaskMutation]
   );
+  const updateTaskTags = useCallback(
+    async (id: number, tagIds: number[]) => {
+      return updateTaskTagsMutation.mutateAsync({ id, tagIds });
+    },
+    [updateTaskTagsMutation]
+  );
 
   return {
     tasks: tasksQuery.data ?? [],
     loading: tasksQuery.isLoading,
     error: toQueryError(tasksQuery.error),
     reload,
-    updateTask
+    updateTask,
+    updateTaskTags
   };
 }

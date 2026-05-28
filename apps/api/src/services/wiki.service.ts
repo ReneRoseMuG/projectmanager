@@ -8,6 +8,7 @@ import { wikiPageRepository, type WikiPageRecord, type WikiPageUpdateData } from
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { readContentFromDb } from "./content.service.js";
 import { requireNonEmpty } from "./helpers.js";
+import { deleteWikiPageNotesForIds } from "./notes.service.js";
 import {
   buildLinkSummary,
   buildCreateSummary,
@@ -351,6 +352,8 @@ export function deleteWikiPage(database: DbClient, id: number, actor?: JournalAc
   if (childCount(database, id) > 0) {
     throw conflict("Wiki page has child pages");
   }
+
+  deleteWikiPageNotesForIds(database, [id]);
 
   database.transaction((tx) => {
     const journalObject = wikiJournalObject(page);

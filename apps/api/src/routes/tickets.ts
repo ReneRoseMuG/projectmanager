@@ -52,8 +52,8 @@ const ticketBodySchema = {
     description: { type: ["string", "null"] },
     status: { type: "string", minLength: 1 },
     priority: { type: "string", minLength: 1 },
-    reporter: { type: ["string", "null"] },
-    assignee: { type: ["string", "null"] },
+    reporterUserId: { type: ["integer", "null"], minimum: 1 },
+    responsibleUserId: { type: ["integer", "null"], minimum: 1 },
     environment: { type: ["string", "null"] },
     affectedVersion: { type: ["string", "null"] },
     dueDate: { type: ["string", "null"] }

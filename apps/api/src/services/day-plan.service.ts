@@ -21,6 +21,7 @@ import {
   type JournalObjectRef
 } from "./journal.service.js";
 import { mapTask } from "./tasks.service.js";
+import { normalizeAssignableUserId } from "./users.service.js";
 
 type TaskRecord = typeof tasks.$inferSelect;
 
@@ -116,7 +117,7 @@ function createTaskRecord(database: DbClient, input: TaskInput, actor?: JournalA
       description: cleanNullable(input.description) ?? null,
       status,
       priority,
-      assignee: cleanNullable(input.assignee) ?? null,
+      responsibleUserId: normalizeAssignableUserId(database, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId"),
       dueDate: input.dueDate ?? null
     },
     actor?.actorUserId ?? undefined

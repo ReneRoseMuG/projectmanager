@@ -29,6 +29,7 @@ import {
 import { toDateInput } from "../../utils/date";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
+import { useAuth } from "../../hooks/useAuth";
 import { useNotes } from "../../hooks/useNotes";
 import { useTaskDetail } from "../../hooks/useTaskDetail";
 import { objectReference } from "../../lib/references";
@@ -63,6 +64,7 @@ import { StatusPill } from "../ui/StatusPill";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
+import { UserSelectField } from "../users/UserSelectField";
 import { SubtaskList } from "./SubtaskList";
 import { useHasPermission } from "../../hooks/usePermissions";
 
@@ -167,6 +169,7 @@ export function TaskForm({
   const attachments = useAttachments(
     taskId && open ? { type: "task", id: taskId } : null,
   );
+  const auth = useAuth();
   const { showToast } = useToast();
   const canReadJournal = useHasPermission("journal", "read");
   const { confirm } = useConfirm();
@@ -175,6 +178,7 @@ export function TaskForm({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>("active");
   const [priority, setPriority] = useState<Priority>("medium");
+  const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState("");
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [saving, setSaving] = useState(false);
@@ -218,9 +222,10 @@ export function TaskForm({
     setDescription(source?.description ?? "");
     setStatus(source?.status ?? initialStatus);
     setPriority(source?.priority ?? "medium");
+    setResponsibleUserId(source ? source.responsibleUserId : (auth.user?.id ?? null));
     setDueDate(toDateInput(source?.dueDate));
     setSelectedTags(source?.tags ?? []);
-  }, [detail.task, initialStatus, open, task]);
+  }, [auth.user?.id, detail.task, initialStatus, open, task]);
 
   useEffect(() => {
     if (open) {
@@ -252,7 +257,7 @@ export function TaskForm({
           priority,
           "medium",
         ),
-        assignee: null,
+        responsibleUserId,
         dueDate: dueDate || null,
         tagIds: selectedTags.map((tag) => tag.id),
         pendingSubtasks,
@@ -436,8 +441,8 @@ export function TaskForm({
               </div>
             </Section>
 
-            <Section title="Status & Priorität">
-              <div className="grid items-start gap-4 md:grid-cols-2">
+            <Section title="Status, Priorität & Fälligkeit">
+              <div className="grid items-start gap-4 md:grid-cols-3">
                 <FormField label="Status">
                   <StatusToggle
                     kind="workStatus"
@@ -448,15 +453,23 @@ export function TaskForm({
                 <FormField label="Priorität">
                   <PrioritySelect value={priority} onChange={setPriority} />
                 </FormField>
+                <DatePicker
+                  label="Fällig"
+                  value={dueDate}
+                  onChange={(event) => setDueDate(event.target.value)}
+                />
               </div>
             </Section>
 
-            <Section title="Termin">
-              <DatePicker
-                label="Fällig"
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-              />
+            <Section title="Zuständigkeit">
+              <div className="grid items-start gap-4 md:grid-cols-2">
+                <UserSelectField
+                  label="Verantwortlich"
+                  value={responsibleUserId}
+                  selectedUser={(detail.task ?? task)?.responsibleUser ?? null}
+                  onChange={setResponsibleUserId}
+                />
+              </div>
             </Section>
 
             <Section title="Tags">

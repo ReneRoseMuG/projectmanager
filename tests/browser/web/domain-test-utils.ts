@@ -41,7 +41,7 @@ export interface UseCaseFixture {
 export interface TaskFixture {
   id: number;
   title: string;
-  assignee?: string | null;
+  responsibleUserId?: number | null;
   dueDate?: string | null;
   version?: number;
 }
@@ -287,7 +287,7 @@ export async function createTask(
     description: string;
     status: string;
     priority: string;
-    assignee: string;
+    responsibleUserId: number | null;
     dueDate: string;
   }> = {},
 ) {
@@ -302,7 +302,7 @@ export async function createTask(
           input.description ?? "<p>E2E Aufgabenbeschreibung vollständig</p>",
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.priority !== undefined ? { priority: input.priority } : {}),
-        ...(input.assignee !== undefined ? { assignee: input.assignee } : {}),
+        ...(input.responsibleUserId !== undefined ? { responsibleUserId: input.responsibleUserId } : {}),
         dueDate: input.dueDate ?? "2026-05-29",
       },
     },
@@ -320,8 +320,8 @@ export async function createTicket(
     type: string;
     status: string;
     priority: string;
-    assignee: string;
-    reporter: string;
+    responsibleUserId: number | null;
+    reporterUserId: number | null;
     dueDate: string;
     environment: string;
     affectedVersion: string;
@@ -339,8 +339,8 @@ export async function createTicket(
         type: input.type ?? "bug",
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.priority !== undefined ? { priority: input.priority } : {}),
-        assignee: input.assignee ?? "Ada Lovelace",
-        reporter: input.reporter ?? "Grace Hopper",
+        ...(input.responsibleUserId !== undefined ? { responsibleUserId: input.responsibleUserId } : {}),
+        ...(input.reporterUserId !== undefined ? { reporterUserId: input.reporterUserId } : {}),
         dueDate: input.dueDate ?? "2026-05-30",
         environment: input.environment ?? "E2E Umgebung",
         affectedVersion: input.affectedVersion ?? "v1.2.3",

@@ -32,6 +32,14 @@ vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
   useHasPermission: () => false
 }));
 
+vi.mock("../../../../../apps/web/src/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { id: 1, name: "test.admin", fullName: "Test Admin", email: "admin@local" } })
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useUsers", () => ({
+  useUsers: () => ({ users: [{ id: 1, name: "test.admin", fullName: "Test Admin", email: "admin@local" }], loading: false, error: null })
+}));
+
 const projects: Project[] = [
   {
     id: 1,
@@ -41,6 +49,8 @@ const projects: Project[] = [
     color: "#111111",
     startDate: null,
     dueDate: null,
+    responsibleUserId: null,
+    responsibleUser: null,
     wikiPageId: null,
     version: 1,
     createdAt: "2026-05-19T08:00:00.000Z",
@@ -63,6 +73,8 @@ const projects: Project[] = [
     color: "#222222",
     startDate: null,
     dueDate: null,
+    responsibleUserId: null,
+    responsibleUser: null,
     wikiPageId: null,
     version: 1,
     createdAt: "2026-05-19T08:00:00.000Z",
@@ -87,7 +99,8 @@ const tasks: Task[] = [
     description: null,
     status: "todo",
     priority: "medium",
-    assignee: null,
+    responsibleUserId: null,
+    responsibleUser: null,
     dueDate: null,
     version: 1,
     createdAt: "2026-05-19T08:00:00.000Z",
@@ -105,7 +118,8 @@ const tasks: Task[] = [
     description: null,
     status: "todo",
     priority: "medium",
-    assignee: null,
+    responsibleUserId: null,
+    responsibleUser: null,
     dueDate: null,
     version: 1,
     createdAt: "2026-05-19T08:00:00.000Z",
@@ -131,6 +145,8 @@ const event: CalendarEvent = {
   isAllDay: false,
   color: "#123456",
   reminderMinutes: 60,
+  responsibleUserId: null,
+  responsibleUser: null,
   version: 3,
   createdAt: "2026-05-19T08:00:00.000Z",
   updatedAt: "2026-05-19T08:00:00.000Z"

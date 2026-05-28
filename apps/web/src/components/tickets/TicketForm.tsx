@@ -11,7 +11,6 @@ import type {
   TicketResolution,
   TicketStatus,
   TicketType,
-  UserOption,
 } from "@taskmanager/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import { Bug, GitBranch, Link2 } from "lucide-react";
@@ -21,6 +20,7 @@ import { uploadContentImage } from "../../api/content-images";
 import { getTicketLinkCandidates, getTicketRelationCandidates, type TicketOwner } from "../../api/tickets";
 import type { DraftFile } from "../../types";
 import { useAttachments } from "../../hooks/useAttachments";
+import { useAuth } from "../../hooks/useAuth";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { errorMessage } from "../../hooks/errors";
 import { useNotes } from "../../hooks/useNotes";
@@ -28,7 +28,6 @@ import { useHasPermission } from "../../hooks/usePermissions";
 import { useTicketDetail } from "../../hooks/useTicketDetail";
 import { objectReference } from "../../lib/references";
 import { queryKeys } from "../../queries/queryKeys";
-import { useUsers } from "../../hooks/useUsers";
 import {
   catalogColor,
   catalogEntriesByKind,
@@ -70,6 +69,7 @@ import { StatusPill } from "../ui/StatusPill";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
+import { UserSelectField } from "../users/UserSelectField";
 import { TicketCard } from "./TicketCard";
 import { TicketRelationPanel } from "./TicketRelationPanel";
 
@@ -139,21 +139,6 @@ function ticketTypeValue(entries: Parameters<typeof resolveCatalogEntryKey>[0], 
   return resolveCatalogEntryKey(entries, "ticketType", value, "bug") ?? "bug";
 }
 
-function userSelectValue(user: UserOption): string {
-  return user.fullName || user.email;
-}
-
-function buildUserOptions(users: UserOption[], currentValue: string): Array<{ value: string; label: string }> {
-  const options = users.map((user) => {
-    const value = userSelectValue(user);
-    return { value, label: `${value} (${user.email})` };
-  });
-  if (currentValue && !options.some((option) => option.value === currentValue)) {
-    return [{ value: currentValue, label: currentValue }, ...options];
-  }
-  return options;
-}
-
 export function TicketForm({
   open,
   ticket,
@@ -181,7 +166,7 @@ export function TicketForm({
     queryFn: () => (ticketId ? getTicketRelationCandidates(ticketId) : getTicketLinkCandidates(validOwner as TicketOwner)),
     enabled: open && (ticketId !== null || validOwner !== undefined),
   });
-  const userList = useUsers(open);
+  const auth = useAuth();
   const catalogs = useCatalogs();
   const notes = useNotes(ticketId && open ? { type: "ticket", id: ticketId } : null);
   const attachments = useAttachments(ticketId && open ? { type: "ticket", id: ticketId } : null);
@@ -195,8 +180,8 @@ export function TicketForm({
   const [status, setStatus] = useState<TicketStatus>("open");
   const [priority, setPriority] = useState<Priority>("medium");
   const [resolution, setResolution] = useState<TicketResolution>("fixed");
-  const [assignee, setAssignee] = useState("");
-  const [reporter, setReporter] = useState("");
+  const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
+  const [reporterUserId, setReporterUserId] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState("");
   const [environment, setEnvironment] = useState("");
   const [affectedVersion, setAffectedVersion] = useState("");
@@ -241,13 +226,13 @@ export function TicketForm({
     setStatus(ticket?.status ?? initialStatus);
     setPriority(ticket?.priority ?? "medium");
     setResolution(ticket?.resolution ?? "fixed");
-    setAssignee(ticket?.assignee ?? "");
-    setReporter(ticket?.reporter ?? "");
+    setResponsibleUserId(ticket ? ticket.responsibleUserId : (auth.user?.id ?? null));
+    setReporterUserId(ticket ? ticket.reporterUserId : (auth.user?.id ?? null));
     setDueDate(toDateInput(ticket?.dueDate));
     setEnvironment(ticket?.environment ?? "");
     setAffectedVersion(ticket?.affectedVersion ?? "");
     setSelectedTags(ticket?.tags ?? []);
-  }, [initialStatus, open, ticket]);
+  }, [auth.user?.id, initialStatus, open, ticket]);
 
   useEffect(() => {
     if (open) {
@@ -270,8 +255,6 @@ export function TicketForm({
     () => catalogEntriesByKind(catalogs.entries, "priority").map((entry) => ({ value: entry.key as Priority, label: entry.label, color: entry.color })),
     [catalogs.entries],
   );
-  const assigneeOptions = useMemo(() => buildUserOptions(userList.users, assignee), [assignee, userList.users]);
-  const reporterOptions = useMemo(() => buildUserOptions(userList.users, reporter), [reporter, userList.users]);
   const statusClosed = isCatalogStatusClosed(catalogs.entries, "workStatus", status);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -285,8 +268,8 @@ export function TicketForm({
         status: ticketStatusValue(catalogs.entries, status),
         priority: priorityValue(catalogs.entries, priority),
         resolution: statusClosed ? resolution : null,
-        reporter,
-        assignee,
+        reporterUserId,
+        responsibleUserId,
         environment: type === "bug" ? environment : null,
         affectedVersion: type === "bug" ? affectedVersion : null,
         dueDate: dueDate || null,
@@ -410,8 +393,8 @@ export function TicketForm({
               </div>
             </Section>
 
-            <Section title="Status & Lösung">
-              <div className="grid items-start gap-4 md:grid-cols-2">
+            <Section title="Status, Lösung & Fälligkeit">
+              <div className="grid items-start gap-4 md:grid-cols-3">
                 <FormField label="Status">
                   <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
                 </FormField>
@@ -420,42 +403,24 @@ export function TicketForm({
                     <RadioList value={resolution} options={resolutionOptions} onChange={setResolution} />
                   </FormField>
                 ) : null}
+                <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
               </div>
             </Section>
 
             <Section title="Zuweisung">
-              <div className="grid gap-4 md:grid-cols-3">
-                <FormField label="Zuständig" error={userList.error ?? undefined}>
-                  <select
-                    className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 disabled:bg-steel-50 disabled:text-steel-400"
-                    value={assignee}
-                    disabled={userList.loading || Boolean(userList.error)}
-                    onChange={(event) => setAssignee(event.target.value)}
-                  >
-                    <option value="">{userList.loading ? "Benutzer werden geladen..." : "Nicht zugewiesen"}</option>
-                    {assigneeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </FormField>
-                <FormField label="Reporter">
-                  <select
-                    className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 disabled:bg-steel-50 disabled:text-steel-400"
-                    value={reporter}
-                    disabled={userList.loading || Boolean(userList.error)}
-                    onChange={(event) => setReporter(event.target.value)}
-                  >
-                    <option value="">{userList.loading ? "Benutzer werden geladen..." : "Kein Reporter"}</option>
-                    {reporterOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </FormField>
-                <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              <div className="grid gap-4 md:grid-cols-2">
+                <UserSelectField
+                  label="Zuständig"
+                  value={responsibleUserId}
+                  selectedUser={ticket?.responsibleUser ?? null}
+                  onChange={setResponsibleUserId}
+                />
+                <UserSelectField
+                  label="Meldende Person"
+                  value={reporterUserId}
+                  selectedUser={ticket?.reporterUser ?? null}
+                  onChange={setReporterUserId}
+                />
               </div>
             </Section>
 

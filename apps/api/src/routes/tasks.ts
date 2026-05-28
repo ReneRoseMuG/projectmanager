@@ -31,7 +31,7 @@ const taskBodySchema = {
     description: { type: ["string", "null"] },
     status: { type: "string", minLength: 1 },
     priority: { type: "string", minLength: 1 },
-    assignee: { type: ["string", "null"] },
+    responsibleUserId: { type: ["integer", "null"], minimum: 1 },
     dueDate: { type: ["string", "null"] }
   }
 } as const;

@@ -21,6 +21,7 @@ import {
 } from "./journal.service.js";
 import { deleteMilestoneNotesForIds } from "./notes.service.js";
 import { getMilestoneTags, getMilestoneTagsMap } from "./tags.service.js";
+import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
 
 interface MilestoneCounts {
   taskCount: number;
@@ -40,7 +41,8 @@ const milestoneJournalFields: Array<JournalFieldDefinition<MilestoneRecord>> = [
   { key: "status", label: "Status" },
   { key: "color", label: "Farbe" },
   { key: "startDate", label: "Startdatum" },
-  { key: "dueDate", label: "Enddatum" }
+  { key: "dueDate", label: "Enddatum" },
+  { key: "responsibleUserId", label: "Verantwortlich" }
 ];
 
 function emptyMilestoneCounts(): MilestoneCounts {
@@ -67,6 +69,8 @@ function mapMilestone(database: DbClient, record: MilestoneRecord, counts: Miles
     color: record.color,
     startDate: record.startDate,
     dueDate: record.dueDate,
+    responsibleUserId: record.responsibleUserId,
+    responsibleUser: getUserOption(database, record.responsibleUserId),
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -212,7 +216,8 @@ export function createMilestone(database: DbClient, input: MilestoneInput, actor
         status,
         color: input.color ?? "#6366f1",
         startDate: cleanNullable(input.startDate) ?? null,
-        dueDate: cleanNullable(input.dueDate) ?? null
+        dueDate: cleanNullable(input.dueDate) ?? null,
+        responsibleUserId: normalizeAssignableUserId(tx, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId")
       },
       actor?.actorUserId ?? undefined
     );
@@ -255,6 +260,9 @@ export function updateMilestone(database: DbClient, id: number, input: Milestone
   }
   if (input.dueDate !== undefined) {
     values.dueDate = cleanNullable(input.dueDate) ?? null;
+  }
+  if (input.responsibleUserId !== undefined) {
+    values.responsibleUserId = normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
   }
 
   if (Object.keys(values).length === 0) {

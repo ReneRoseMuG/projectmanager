@@ -363,9 +363,9 @@ function seedCompleteDataset(): void {
       VALUES (2, 'Meilenstein-Notiz', '{"type":"doc","content":[]}', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO features (id, title, status, description, content, sort_order, created_at, updated_at)
       VALUES (1, 'Feature Alpha', 'active', 'Feature Beschreibung', '# Feature Alpha', 10, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO tasks (id, parent_id, title, description, status, priority, assignee, due_date, import_key, created_at, updated_at)
-      VALUES (1, NULL, 'Task Alpha', 'Task Beschreibung', 'todo', 'high', 'Ada', '2026-05-20', 'task-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO tasks (id, parent_id, title, description, status, priority, assignee, due_date, import_key, created_at, updated_at)
+    INSERT INTO tasks (id, parent_id, title, description, status, priority, responsible_user_id, due_date, import_key, created_at, updated_at)
+      VALUES (1, NULL, 'Task Alpha', 'Task Beschreibung', 'todo', 'high', 2, '2026-05-20', 'task-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO tasks (id, parent_id, title, description, status, priority, responsible_user_id, due_date, import_key, created_at, updated_at)
       VALUES (2, 1, 'Subtask Alpha', NULL, 'in_progress', 'medium', NULL, NULL, 'subtask-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO tickets (id, type, title, description, status, priority, position, created_at, updated_at)
       VALUES (1, 'bug', 'Ticket Alpha', 'Ticket Beschreibung', 'open', 'high', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');

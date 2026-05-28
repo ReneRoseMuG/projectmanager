@@ -11,15 +11,23 @@ import {
   getMilestoneNotes,
   getProjectNotes,
   getTaskNotes,
+  getWikiPageNotes,
   unlinkDayPlanNote,
-  updateNote as updateNoteRequest
+  updateNote as updateNoteRequest,
+  createWikiPageNote
 } from "../api/notes";
 import { createTicketNote, getTicketNotes } from "../api/tickets";
 import { invalidateNotes } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
-export type NoteOwner = { type: "project"; id: number } | { type: "milestone"; id: number } | { type: "task"; id: number } | { type: "ticket"; id: number } | { type: "dayPlan"; id: number };
+export type NoteOwner =
+  | { type: "project"; id: number }
+  | { type: "milestone"; id: number }
+  | { type: "task"; id: number }
+  | { type: "ticket"; id: number }
+  | { type: "dayPlan"; id: number }
+  | { type: "wikiPage"; id: number };
 
 export function useNotes(owner: NoteOwner | null) {
   const queryClient = useQueryClient();
@@ -41,6 +49,9 @@ export function useNotes(owner: NoteOwner | null) {
       }
       if (ownerType === "dayPlan") {
         return getDayPlanNotes(ownerId as number);
+      }
+      if (ownerType === "wikiPage") {
+        return getWikiPageNotes(ownerId as number);
       }
       return getTaskNotes(ownerId as number);
     },
@@ -69,6 +80,9 @@ export function useNotes(owner: NoteOwner | null) {
       }
       if (ownerType === "dayPlan") {
         return createDayPlanNote(ownerId as number, input);
+      }
+      if (ownerType === "wikiPage") {
+        return createWikiPageNote(ownerId as number, input);
       }
       return createTaskNote(ownerId as number, input);
     },

@@ -73,7 +73,7 @@ const taskInputSchema = parentSchema.extend({
   description: z.string().nullable().optional(),
   status: z.string().min(1).optional(),
   priority: z.string().min(1).optional(),
-  assignee: z.string().nullable().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional(),
   dueDate: z.string().nullable().optional()
 });
 const ticketInputSchema = parentSchema.extend({
@@ -82,8 +82,8 @@ const ticketInputSchema = parentSchema.extend({
   description: z.string().nullable().optional(),
   status: z.string().min(1).optional(),
   priority: z.string().min(1).optional(),
-  reporter: z.string().nullable().optional(),
-  assignee: z.string().nullable().optional(),
+  reporterUserId: z.number().int().positive().nullable().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional(),
   environment: z.string().nullable().optional(),
   affectedVersion: z.string().nullable().optional(),
   dueDate: z.string().nullable().optional()
@@ -99,7 +99,7 @@ const editorialTaskSchema = parentSchema.extend({
   editorialBrief: z.string().min(1),
   status: z.string().min(1).default("todo"),
   priority: z.string().min(1).default("medium"),
-  assignee: z.string().nullable().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional(),
   dueDate: z.string().nullable().optional()
 });
 const commentInputSchema = extendedParentSchema.extend({ body: z.string().min(1) });
@@ -125,7 +125,8 @@ const projectCreateSchema = z.object({
   status: z.string().min(1).optional(),
   color: z.string().nullable().optional(),
   startDate: z.string().nullable().optional(),
-  dueDate: z.string().nullable().optional()
+  dueDate: z.string().nullable().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional()
 });
 const milestoneCreateSchema = projectCreateSchema.extend({
   projectId: z.number().int().positive()
@@ -136,7 +137,8 @@ const updateProjectSchema = idSchema.extend({
   status: z.string().min(1).optional(),
   color: z.string().nullable().optional(),
   startDate: z.string().nullable().optional(),
-  dueDate: z.string().nullable().optional()
+  dueDate: z.string().nullable().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional()
 });
 const updateMilestoneSchema = idSchema.extend({
   name: z.string().min(1).optional(),
@@ -151,7 +153,7 @@ const updateTaskSchema = idSchema.extend({
   description: z.string().nullable().optional(),
   status: z.string().min(1).optional(),
   priority: z.string().min(1).optional(),
-  assignee: z.string().nullable().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional(),
   dueDate: z.string().nullable().optional()
 });
 const updateTicketSchema = idSchema.extend({
@@ -160,8 +162,8 @@ const updateTicketSchema = idSchema.extend({
   description: z.string().nullable().optional(),
   status: z.string().min(1).optional(),
   priority: z.string().min(1).optional(),
-  reporter: z.string().nullable().optional(),
-  assignee: z.string().nullable().optional(),
+  reporterUserId: z.number().int().positive().nullable().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional(),
   environment: z.string().nullable().optional(),
   affectedVersion: z.string().nullable().optional(),
   dueDate: z.string().nullable().optional(),
@@ -172,14 +174,16 @@ const featureCreateSchema = z.object({
   description: z.string().nullable().optional().describe("Zusammenfassung des redaktionellen Feature-Inhalts."),
   content: z.string().optional().describe("Redaktioneller Hauptinhalt des Features."),
   status: z.string().min(1).optional(),
-  sortOrder: z.number().int().optional()
+  sortOrder: z.number().int().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional()
 });
 const updateFeatureSchema = idSchema.extend({
   title: z.string().min(1).optional(),
   status: z.string().min(1).optional(),
   description: z.string().nullable().optional().describe("Zusammenfassung des redaktionellen Feature-Inhalts."),
   content: z.string().optional().describe("Redaktioneller Hauptinhalt des Features."),
-  sortOrder: z.number().int().optional()
+  sortOrder: z.number().int().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional()
 });
 const useCaseCreateSchema = z.object({
   featureId: z.number().int().positive(),
@@ -187,7 +191,8 @@ const useCaseCreateSchema = z.object({
   description: z.string().nullable().optional(),
   content: z.string().optional(),
   status: z.string().min(1).optional(),
-  sortOrder: z.number().int().optional()
+  sortOrder: z.number().int().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional()
 });
 const updateUseCaseSchema = idSchema.extend({
   title: z.string().min(1).optional(),
@@ -195,6 +200,7 @@ const updateUseCaseSchema = idSchema.extend({
   description: z.string().nullable().optional(),
   content: z.string().optional(),
   sortOrder: z.number().int().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional(),
   featureId: z.number().int().positive().optional()
 });
 const referenceSchema = z.object({
@@ -208,7 +214,8 @@ const useCaseChildSchema = z.object({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   status: z.string().min(1).optional(),
-  priority: z.string().min(1).optional()
+  priority: z.string().min(1).optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional()
 });
 
 function ownerPath(parentType: ParentType, parentId: number): string {
@@ -450,7 +457,7 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
     defineTool({
       name: "assign_editorial_task",
       title: "Redaktionelle Aufgabe vergeben",
-      description: "Legt eine redaktionelle Aufgabe als normale Task mit Briefing, Status, Priorität, Assignee und DueDate an.",
+      description: "Legt eine redaktionelle Aufgabe als normale Task mit Briefing, Status, Priorität, Verantwortlichem und DueDate an.",
       inputSchema: editorialTaskSchema,
       execute: (input) =>
         client.post<Task>(`${ownerPath(input.parentType, input.parentId)}/tasks`, {
@@ -458,7 +465,7 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
           description: input.editorialBrief,
           status: input.status,
           priority: input.priority,
-          assignee: input.assignee,
+          responsibleUserId: input.responsibleUserId,
           dueDate: input.dueDate
         } satisfies TaskInput)
     }),

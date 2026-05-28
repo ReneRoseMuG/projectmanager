@@ -1,6 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 
+export interface TestUserSummary {
+  id: number;
+  name: string;
+  fullName: string;
+  email: string;
+}
+
 export interface TestProject {
   id: number;
   version: number;
@@ -8,6 +15,8 @@ export interface TestProject {
   status: string;
   color: string | null;
   description: string | null;
+  responsibleUserId: number | null;
+  responsibleUser: TestUserSummary | null;
   wikiPageId: number | null;
   createdAt: string;
   updatedAt: string;
@@ -32,6 +41,8 @@ export interface TestMilestone {
   description: string | null;
   startDate: string | null;
   dueDate: string | null;
+  responsibleUserId: number | null;
+  responsibleUser: TestUserSummary | null;
   createdAt: string;
   updatedAt: string;
   taskCount: number;
@@ -54,7 +65,8 @@ export interface TestTask {
   description: string | null;
   status: string;
   priority: string;
-  assignee: string | null;
+  responsibleUserId: number | null;
+  responsibleUser: TestUserSummary | null;
   dueDate: string | null;
   boardPosition?: number;
   createdAt: string;
@@ -76,8 +88,10 @@ export interface TestTicket {
   status: string;
   priority: string;
   resolution: string | null;
-  reporter: string | null;
-  assignee: string | null;
+  reporterUserId: number | null;
+  reporterUser: TestUserSummary | null;
+  responsibleUserId: number | null;
+  responsibleUser: TestUserSummary | null;
   environment: string | null;
   affectedVersion: string | null;
   dueDate: string | null;
@@ -117,6 +131,8 @@ export interface TestEvent {
   isAllDay: boolean;
   color: string | null;
   reminderMinutes: number;
+  responsibleUserId: number | null;
+  responsibleUser: TestUserSummary | null;
   version: number;
 }
 
@@ -135,6 +151,8 @@ export interface TestFeature {
   description: string | null;
   content?: string;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: TestUserSummary | null;
   useCaseCount: number;
   attachmentCount: number;
   noteCount: number;
@@ -152,6 +170,8 @@ export interface TestUseCase {
   description: string | null;
   content?: string;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: TestUserSummary | null;
   attachmentCount: number;
   noteCount: number;
   commentCount: number;
@@ -185,6 +205,8 @@ export interface TestBacklogItem {
   description: string | null;
   status: string;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: TestUserSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -236,7 +258,7 @@ export async function createTask(
     description: string | null;
     status: string;
     priority: string;
-    assignee: string | null;
+    responsibleUserId: number | null;
     dueDate: string | null;
   }> = {}
 ): Promise<TestTask> {
@@ -275,7 +297,8 @@ export async function createTicket(
     description: string | null;
     status: string;
     priority: string;
-    assignee: string | null;
+    reporterUserId: number | null;
+    responsibleUserId: number | null;
   }> = {}
 ): Promise<TestTicket> {
   const body = {
@@ -384,6 +407,7 @@ export async function createEvent(
     endTime: string;
     isAllDay: boolean;
     reminderMinutes: number;
+    responsibleUserId: number | null;
     owners: Array<{ type: "project" | "milestone" | "task"; id: number }>;
     color: string | null;
   }> = {}

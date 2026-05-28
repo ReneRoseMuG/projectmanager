@@ -461,6 +461,8 @@ export interface UserOption {
   email: string;
 }
 
+export type UserSummary = UserOption;
+
 export interface AdminUserInput {
   firstName: string;
   lastName: string;
@@ -602,6 +604,8 @@ export interface Project {
   color: string | null;
   startDate: string | null;
   dueDate: string | null;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   wikiPageId: number | null;
   version: number;
   createdAt: string;
@@ -624,6 +628,7 @@ export interface ProjectInput {
   color?: string | null;
   startDate?: string | null;
   dueDate?: string | null;
+  responsibleUserId?: number | null;
 }
 
 export type ProjectUpdate = WithExpectedVersion<Partial<ProjectInput> & { wikiPageId?: number | null }>;
@@ -637,6 +642,8 @@ export interface Milestone {
   color: string | null;
   startDate: string | null;
   dueDate: string | null;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -660,6 +667,7 @@ export interface MilestoneInput {
   color?: string | null;
   startDate?: string | null;
   dueDate?: string | null;
+  responsibleUserId?: number | null;
 }
 
 export type MilestoneUpdate = WithExpectedVersion<Partial<MilestoneInput>>;
@@ -680,7 +688,8 @@ export interface Task {
   description: string | null;
   status: TaskStatus;
   priority: Priority;
-  assignee: string | null;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   dueDate: string | null;
   version: number;
   createdAt: string;
@@ -702,7 +711,7 @@ export interface TaskInput {
   description?: string | null;
   status?: TaskStatus;
   priority?: Priority;
-  assignee?: string | null;
+  responsibleUserId?: number | null;
   dueDate?: string | null;
 }
 
@@ -724,8 +733,10 @@ export interface Ticket {
   status: TicketStatus;
   priority: Priority;
   resolution: TicketResolution | null;
-  reporter: string | null;
-  assignee: string | null;
+  reporterUserId: number | null;
+  reporterUser: UserSummary | null;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   environment: string | null;
   affectedVersion: string | null;
   dueDate: string | null;
@@ -763,8 +774,8 @@ export interface TicketInput {
   description?: string | null;
   status?: TicketStatus;
   priority?: Priority;
-  reporter?: string | null;
-  assignee?: string | null;
+  reporterUserId?: number | null;
+  responsibleUserId?: number | null;
   environment?: string | null;
   affectedVersion?: string | null;
   dueDate?: string | null;
@@ -875,6 +886,8 @@ export interface Event {
   isAllDay: boolean;
   color: string | null;
   reminderMinutes: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -892,6 +905,7 @@ export interface EventInput {
   isAllDay?: boolean;
   color?: string | null;
   reminderMinutes?: number;
+  responsibleUserId?: number | null;
   owners?: EventOwner[];
 }
 
@@ -946,6 +960,8 @@ export interface Feature {
   description: string | null;
   content?: string;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   useCaseCount: number;
   attachmentCount: number;
   noteCount: number;
@@ -961,6 +977,7 @@ export interface FeatureInput {
   description?: string | null;
   content?: string;
   sortOrder?: number;
+  responsibleUserId?: number | null;
 }
 
 export type FeatureUpdate = WithExpectedVersion<Partial<FeatureInput>>;
@@ -989,6 +1006,8 @@ export interface UseCase {
   description: string | null;
   content?: string;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   attachmentCount: number;
   noteCount: number;
   commentCount: number;
@@ -1004,6 +1023,7 @@ export interface UseCaseInput {
   description?: string | null;
   content?: string;
   sortOrder?: number;
+  responsibleUserId?: number | null;
 }
 
 export type UseCaseUpdate = WithExpectedVersion<Partial<UseCaseInput>>;
@@ -1079,6 +1099,8 @@ export interface BacklogItem {
   status: BacklogStatus;
   importKey: string | null;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -1092,6 +1114,7 @@ export interface BacklogItemInput {
   status?: BacklogStatus;
   importKey?: string | null;
   sortOrder?: number;
+  responsibleUserId?: number | null;
 }
 
 export type BacklogItemUpdate = WithExpectedVersion<Partial<BacklogItemInput>>;

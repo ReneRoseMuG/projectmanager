@@ -5,12 +5,16 @@
  *
  * Abgedeckte Regeln:
  * - WikiPageForm bindet RichTextInlineField an den Formular-State.
+ * - Der Edit-Kopfbereich bietet die ID-Kopieraktion ohne alte Vorschau-/Versionsaktionen.
+ * - Der Edit-Modus bietet Tabs für Kommentare, Notizen und Dateien.
  *
  * Fehlerfälle:
  * - Aktualisierter Inhalt muss im Submit-Payload landen.
+ * - Die Wiki-Seiten-ID muss in die Zwischenablage kopiert werden.
+ * - Bearbeitete Wiki-Seiten dürfen keine fehlenden Support-Tabs haben.
  *
  * Ziel:
- * Die Rich-Text-Integration im Wiki-Formular absichern.
+ * Die Rich-Text-Integration und die Support-Tabs im Wiki-Formular absichern.
  */
 import "@testing-library/jest-dom/vitest";
 import type { WikiPage } from "@taskmanager/shared-types";
@@ -24,6 +28,55 @@ import { WikiPageForm } from "../../../../../apps/web/src/components/wiki/WikiPa
 vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
   RichTextInlineField({ value, onChange, placeholder, testIdPrefix }: { value: string | null | undefined; onChange: (value: string) => void; placeholder?: string; testIdPrefix?: string }) {
     return <textarea aria-label={placeholder ?? "Rich Text"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
+  }
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useEntityComments", () => ({
+  useEntityComments() {
+    return {
+      comments: [],
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+      createComment: vi.fn(),
+      updateComment: vi.fn(),
+      removeComment: vi.fn()
+    };
+  }
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useNotes", () => ({
+  useNotes() {
+    return {
+      notes: [],
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+      createNote: vi.fn(),
+      updateNote: vi.fn(),
+      removeNote: vi.fn()
+    };
+  }
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useAttachments", () => ({
+  useAttachments() {
+    return {
+      attachments: [],
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+      uploadAttachment: vi.fn(),
+      removeAttachment: vi.fn(),
+      openAttachment: vi.fn(),
+      openingAttachmentId: null
+    };
+  }
+}));
+
+vi.mock("../../../../../apps/web/src/components/ui/ToastProvider", () => ({
+  useToast() {
+    return { showToast: vi.fn() };
   }
 }));
 
@@ -68,6 +121,32 @@ describe("WikiPageForm", () => {
     renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
+  });
+
+  it("zeigt im Edit-Modus Support-Tabs für Kommentare, Notizen und Dateien", () => {
+    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Kommentare" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Notizen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dateien" })).toBeInTheDocument();
+  });
+
+  it("zeigt im Edit-Kopfbereich ID kopieren ohne Vorschau und Versionen", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText }
+    });
+
+    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Vorschau" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Versionen" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "ID 5 kopieren" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("5"));
   });
 
   it("zeigt im Edit-Modus keinen 'In neuem Tab öffnen'-Button, wenn onOpenInTab fehlt", () => {

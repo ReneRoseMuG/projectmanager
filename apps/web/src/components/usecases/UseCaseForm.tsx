@@ -16,6 +16,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { uploadContentImage } from "../../api/content-images";
+import { useAuth } from "../../hooks/useAuth";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useTasks } from "../../hooks/useTasks";
@@ -50,6 +51,7 @@ import { Select } from "../ui/Select";
 import { StatusPill } from "../ui/StatusPill";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
+import { UserSelectField } from "../users/UserSelectField";
 import { useHasPermission } from "../../hooks/usePermissions";
 
 interface UseCaseFormProps {
@@ -153,6 +155,7 @@ export function UseCaseForm({
   const navigate = useNavigate();
   const location = useLocation();
   const comments = useEntityComments("useCase", useCase?.id);
+  const auth = useAuth();
   const catalogs = useCatalogs();
   const tasks = useTasks(
     useCase ? { type: "useCase", id: useCase.id } : undefined,
@@ -168,6 +171,7 @@ export function UseCaseForm({
   const [sortOrder, setSortOrder] = useState(0);
   const [content, setContent] = useState("");
   const [selectedFeatureId, setSelectedFeatureId] = useState<number | "">("");
+  const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
@@ -228,7 +232,8 @@ export function UseCaseForm({
     setSortOrder(useCase?.sortOrder ?? 0);
     setContent(useCase?.content ?? "");
     setSelectedFeatureId(useCase?.featureId ?? currentFeatureId ?? "");
-  }, [currentFeatureId, open, useCase]);
+    setResponsibleUserId(useCase ? useCase.responsibleUserId : (auth.user?.id ?? null));
+  }, [auth.user?.id, currentFeatureId, open, useCase]);
 
   useEffect(() => {
     if (open) {
@@ -254,6 +259,7 @@ export function UseCaseForm({
         description,
         sortOrder,
         content,
+        responsibleUserId,
       });
       if (!useCase && created && onPostCreate) {
         await onPostCreate(created.id, {
@@ -384,22 +390,30 @@ export function UseCaseForm({
             </Section>
 
             <Section title="Zuordnung">
-              <Select
-                label="Feature"
-                value={selectedFeatureId}
-                onChange={(event) =>
-                  setSelectedFeatureId(
-                    event.target.value ? Number(event.target.value) : "",
-                  )
-                }
-              >
-                <option value="">Ohne Feature</option>
-                {features.map((feature) => (
-                  <option key={feature.id} value={feature.id}>
-                    {feature.title}
-                  </option>
-                ))}
-              </Select>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Select
+                  label="Feature"
+                  value={selectedFeatureId}
+                  onChange={(event) =>
+                    setSelectedFeatureId(
+                      event.target.value ? Number(event.target.value) : "",
+                    )
+                  }
+                >
+                  <option value="">Ohne Feature</option>
+                  {features.map((feature) => (
+                    <option key={feature.id} value={feature.id}>
+                      {feature.title}
+                    </option>
+                  ))}
+                </Select>
+                <UserSelectField
+                  label="Verantwortlich"
+                  value={responsibleUserId}
+                  selectedUser={useCase?.responsibleUser ?? null}
+                  onChange={setResponsibleUserId}
+                />
+              </div>
             </Section>
 
             <Section title="Status & Sortierung">

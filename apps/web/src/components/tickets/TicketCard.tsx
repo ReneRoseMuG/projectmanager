@@ -3,7 +3,7 @@ import { Edit3, GitBranch, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { objectReference } from "../../lib/references";
 import { catalogColor, isCatalogStatusClosed } from "../../utils/catalogs";
-import { isOverdue } from "../../utils/date";
+import { formatHumanDate, isOverdue } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { ActionMenu } from "../ui/ActionMenu";
 import { Avatar } from "../ui/Avatar";
@@ -79,7 +79,8 @@ function TicketCardBody({ description }: { description: string }) {
 
 function TicketCardFooter({ ticket, allTags, ticketClosed, onDueDateChange, onTagsChange }: { ticket: Ticket; allTags?: Tag[]; ticketClosed: boolean; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void> }) {
   const overdue = !ticketClosed && isOverdue(ticket.dueDate);
-  const hasMeta = ticket.subTicketCount > 0 || Boolean(ticket.dueDate);
+  const closedDate = ticketClosed ? (ticket.resolvedAt ?? ticket.updatedAt) : null;
+  const hasMeta = ticket.subTicketCount > 0 || Boolean(ticket.dueDate) || Boolean(closedDate);
 
   return (
     <div className="grid gap-3">
@@ -92,7 +93,15 @@ function TicketCardFooter({ ticket, allTags, ticketClosed, onDueDateChange, onTa
             </span>
           ) : null}
           {ticket.dueDate ? (
-            <InlineDateField value={ticket.dueDate} className={overdue ? "text-crimson" : ""} onChange={onDueDateChange ? (dueDate) => onDueDateChange(ticket, dueDate) : undefined} />
+            <span className={`inline-flex items-center gap-1 font-semibold ${overdue ? "text-crimson" : ""}`}>
+              Fällig
+              <InlineDateField value={ticket.dueDate} onChange={onDueDateChange ? (dueDate) => onDueDateChange(ticket, dueDate) : undefined} />
+            </span>
+          ) : null}
+          {closedDate ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-steel-500">
+              Geschlossen {formatHumanDate(closedDate)}
+            </span>
           ) : null}
         </div>
       ) : null}
@@ -122,6 +131,7 @@ function TicketSupportFooter({ ticket, allTags, onTagsChange, bordered = true }:
 
 function TicketRow({ ticket, allTags, description, statusColor, ticketClosed, onOpen, onDelete, onStatusChange, onDueDateChange, onTagsChange }: { ticket: Ticket; allTags?: Tag[]; description: string; statusColor: string; ticketClosed: boolean; onOpen: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void; onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void> }) {
   const overdue = !ticketClosed && isOverdue(ticket.dueDate);
+  const closedDate = ticketClosed ? (ticket.resolvedAt ?? ticket.updatedAt) : null;
 
   return (
     <div className="hidden md:block">
@@ -140,10 +150,14 @@ function TicketRow({ ticket, allTags, description, statusColor, ticketClosed, on
         }
         meta={
           <div className="flex items-center gap-3">
-            <span className={`inline-flex min-w-[82px] items-center gap-1 text-xs font-semibold ${overdue ? "text-crimson" : "text-steel-500"}`}>
-              <InlineDateField value={ticket.dueDate} onChange={onDueDateChange ? (dueDate) => onDueDateChange(ticket, dueDate) : undefined} />
-            </span>
-            <Avatar name={ticket.assignee} />
+            <div className="flex min-w-[9rem] flex-wrap items-center justify-end gap-2 text-xs font-semibold text-steel-500">
+              <span className={`inline-flex items-center gap-1 ${overdue ? "text-crimson" : ""}`}>
+                Fällig
+                <InlineDateField value={ticket.dueDate} emptyLabel="Ohne Fälligkeit" onChange={onDueDateChange ? (dueDate) => onDueDateChange(ticket, dueDate) : undefined} />
+              </span>
+              {closedDate ? <span>Geschlossen {formatHumanDate(closedDate)}</span> : null}
+            </div>
+            <Avatar name={ticket.responsibleUser?.fullName ?? null} />
           </div>
         }
         footer={<TicketSupportFooter ticket={ticket} allTags={allTags} onTagsChange={onTagsChange} bordered={false} />}

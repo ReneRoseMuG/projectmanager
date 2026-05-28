@@ -16,6 +16,7 @@ import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useTaskDetail } from "../hooks/useTaskDetail";
 import { useTasks } from "../hooks/useTasks";
 import { invalidateTags } from "../queries/invalidation";
@@ -54,6 +55,7 @@ export function TaskDetailPage() {
   const detail = useTaskDetail(
     !isCreateMode && Number.isFinite(taskId) ? taskId : null,
   );
+  useDocumentTitle(isCreateMode ? "Aufgabe: Neu" : detail.task ? `Aufgabe: ${detail.task.title}` : "Aufgabe");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
   const returnTo =
     searchParams.get("returnTo") ??

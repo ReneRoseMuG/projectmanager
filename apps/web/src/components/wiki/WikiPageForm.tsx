@@ -1,16 +1,28 @@
-import type { DraftComment, Project, WikiPage, WikiPageInput, WikiPageRelationSummary } from "@taskmanager/shared-types";
-import { ExternalLink, Eye, History, Save, X } from "lucide-react";
+import type { DraftComment, Note, Project, WikiPage, WikiPageInput, WikiPageRelationSummary } from "@taskmanager/shared-types";
+import { ExternalLink, Save, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
+import { errorMessage } from "../../hooks/errors";
+import { useAttachments } from "../../hooks/useAttachments";
+import { useEntityComments } from "../../hooks/useEntityComments";
+import { useNotes } from "../../hooks/useNotes";
 import type { WikiTreeNode } from "../../hooks/useWiki";
+import { AttachmentList } from "../attachments/AttachmentList";
+import { AttachmentUploader } from "../attachments/AttachmentUploader";
+import { NoteEditor } from "../notes/NoteEditor";
+import { NoteList } from "../notes/NoteList";
 import { Button } from "../ui/Button";
+import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
+import { CopyReferenceButton } from "../ui/CopyReferenceButton";
 import { FormField } from "../ui/FormField";
 import { Modal } from "../ui/Modal";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
+import { TabBar, type Tab } from "../ui/TabBar";
+import { useToast } from "../ui/ToastProvider";
 import { RelatedPagesSelector } from "./RelatedPagesSelector";
 
 interface WikiPageFormProps {
@@ -29,34 +41,73 @@ function flattenTree(nodes: WikiTreeNode[]): WikiPage[] {
   return nodes.flatMap((node) => [node, ...flattenTree(node.children)]);
 }
 
+type WikiPageFormTab = "details" | "comments" | "notes" | "attachments";
+
+const tabs: Array<Tab<WikiPageFormTab>> = [
+  { value: "details", label: "Details" },
+  { value: "comments", label: "Kommentare" },
+  { value: "notes", label: "Notizen" },
+  { value: "attachments", label: "Dateien" }
+];
+
 export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onPostCreate, onClose, onOpenInTab }: WikiPageFormProps) {
   const { confirm } = useConfirm();
+  const { showToast } = useToast();
+  const pageId = page?.id ?? null;
+  const comments = useEntityComments("wikiPage", open ? pageId : null);
+  const notes = useNotes(open && pageId !== null ? { type: "wikiPage", id: pageId } : null);
+  const attachments = useAttachments(open && pageId !== null ? { type: "wikiPage", id: pageId } : null);
   const pages = useMemo(() => flattenTree(tree).filter((item) => item.id !== page?.id), [page?.id, tree]);
   const [title, setTitle] = useState("");
   const [parentId, setParentId] = useState<number | null>(null);
   const [content, setContent] = useState("");
   const [relatedPages, setRelatedPages] = useState<WikiPageRelationSummary[]>([]);
   const [saving, setSaving] = useState(false);
-  const [preview, setPreview] = useState(false);
-  const [versionsOpen, setVersionsOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
+  const [activeTab, setActiveTab] = useState<WikiPageFormTab>("details");
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
 
   useEffect(() => {
     if (!open) {
+      setActiveTab("details");
+      setEditingNote(null);
       return;
     }
     setTitle(page?.title ?? "");
     setParentId(page?.parentId ?? parent?.id ?? null);
     setContent(page?.content ?? "");
     setRelatedPages(page?.relatedPages ?? []);
-    setPreview(false);
-    setVersionsOpen(false);
     setDirty(false);
+    setActiveTab("details");
+    setEditingNote(null);
     if (!page) {
       setPendingComments([]);
     }
   }, [open, page, parent]);
+
+  const createNote = async () => {
+    try {
+      const note = await notes.createNote({ title: "Ohne Titel", contentJson: {} });
+      if (note) {
+        setEditingNote(note);
+        showToast({ tone: "success", title: "Notiz erstellt" });
+      }
+    } catch (noteError) {
+      showToast({ tone: "error", title: "Notiz konnte nicht erstellt werden", message: errorMessage(noteError) });
+    }
+  };
+
+  const uploadAttachment = async (file: File) => {
+    try {
+      const uploaded = await attachments.uploadAttachment(file);
+      showToast({ tone: "success", title: "Datei hochgeladen" });
+      return uploaded;
+    } catch (attachmentError) {
+      showToast({ tone: "error", title: "Datei konnte nicht hochgeladen werden", message: errorMessage(attachmentError) });
+      throw attachmentError;
+    }
+  };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -92,10 +143,24 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
     }
   };
 
+  const visibleTabs = page ? tabs : tabs.filter((tab) => tab.value === "details" || tab.value === "comments");
+  const tabItems = visibleTabs.map((tab) => {
+    if (tab.value === "comments") {
+      return { ...tab, count: page ? comments.comments.length : pendingComments.length };
+    }
+    if (tab.value === "notes") {
+      return { ...tab, count: notes.notes.length };
+    }
+    if (tab.value === "attachments") {
+      return { ...tab, count: attachments.attachments.length };
+    }
+    return tab;
+  });
+
   return (
     <Modal open={open} title={page ? "Wiki-Seite bearbeiten" : "Neue Wiki-Seite"} size="xl" showHeader={false} bodyClassName="p-0" onClose={() => void requestClose()}>
       <form className="flex max-h-[calc(100vh-64px)] flex-col bg-shell" onSubmit={submit}>
-        <header className="bg-gradient-to-br from-teal to-teal/75 px-5 py-5 text-white md:px-6">
+        <header className="border-b border-steel-700 bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
           <div className="flex items-start justify-between gap-4">
             <div className="grid gap-2">
               <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-white/75">
@@ -108,12 +173,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
               <h2 className="text-2xl font-bold tracking-normal">{title || (page ? "Wiki-Seite bearbeiten" : "Wiki-Seite anlegen")}</h2>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="onColor" icon={<Eye size={16} />} onClick={() => setPreview((current) => !current)}>
-                Vorschau
-              </Button>
-              <Button variant="onColor" icon={<History size={16} />} onClick={() => setVersionsOpen((current) => !current)}>
-                Versionen
-              </Button>
+              {page ? <CopyReferenceButton reference={String(page.id)} variant="hero" /> : null}
               {onOpenInTab ? (
                 <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="In neuem Tab öffnen" title="In neuem Tab öffnen" onClick={onOpenInTab}>
                   <ExternalLink size={18} />
@@ -125,66 +185,152 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
             </div>
           </div>
         </header>
+        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
 
         <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
-          <Section>
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField label="Titel">
-                <input className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/15" value={title} onChange={(event) => { setTitle(event.target.value); setDirty(true); }} required />
-              </FormField>
-              <FormField label="Übergeordnete Seite">
-                <select className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-teal" value={parentId ?? ""} onChange={(event) => { setParentId(event.target.value ? Number(event.target.value) : null); setDirty(true); }}>
-                  <option value="">Root-Seite</option>
-                  {pages.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.title}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-            </div>
-          </Section>
+          {activeTab === "details" ? (
+            <>
+              <Section>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField label="Titel">
+                    <input
+                      className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/15"
+                      value={title}
+                      onChange={(event) => {
+                        setTitle(event.target.value);
+                        setDirty(true);
+                      }}
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Übergeordnete Seite">
+                    <select
+                      className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-teal"
+                      value={parentId ?? ""}
+                      onChange={(event) => {
+                        setParentId(event.target.value ? Number(event.target.value) : null);
+                        setDirty(true);
+                      }}
+                    >
+                      <option value="">Root-Seite</option>
+                      {pages.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.title}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                </div>
+              </Section>
 
-          <Section title="Verwandte Themen">
-            <RelatedPagesSelector
-              pages={pages}
-              projects={projects}
-              currentPageId={page?.id}
-              selectedPages={relatedPages}
-              onChange={(nextPages) => {
-                setRelatedPages(nextPages);
-                setDirty(true);
-              }}
-            />
-          </Section>
+              <Section title="Verwandte Themen">
+                <RelatedPagesSelector
+                  pages={pages}
+                  projects={projects}
+                  currentPageId={page?.id}
+                  selectedPages={relatedPages}
+                  onChange={(nextPages) => {
+                    setRelatedPages(nextPages);
+                    setDirty(true);
+                  }}
+                />
+              </Section>
 
-          {versionsOpen ? <Section><div className="rounded-lg border border-dashed border-line bg-shell/60 p-8 text-center text-sm text-steel-500">Noch keine Versionen vorhanden.</div></Section> : null}
+              <Section>
+                <RichTextInlineField
+                  value={content}
+                  placeholder="Wiki-Inhalt"
+                  testIdPrefix="wiki-page-form-content"
+                  onImageUpload={uploadContentImage}
+                  onChange={(value) => {
+                    setContent(value);
+                    setDirty(true);
+                  }}
+                />
+              </Section>
+            </>
+          ) : null}
 
-          <Section>
-            {preview ? (
-              <div className="prose max-w-none rounded-lg border border-line bg-shell/40 p-4" dangerouslySetInnerHTML={{ __html: content || "<p>Noch kein Inhalt.</p>" }} />
-            ) : (
-              <RichTextInlineField value={content} placeholder="Wiki-Inhalt" testIdPrefix="wiki-page-form-content" onImageUpload={uploadContentImage} onChange={(value) => { setContent(value); setDirty(true); }} />
-            )}
-          </Section>
-
-          {!page ? (
+          {activeTab === "comments" ? (
             <Section title="Kommentare">
-              <PendingCommentList
-                comments={pendingComments}
-                onAdd={(comment) => {
-                  setPendingComments((items) => [...items, comment]);
-                  setDirty(true);
-                }}
-                onUpdate={(index, comment) => {
-                  setPendingComments((items) => items.map((item, itemIndex) => (itemIndex === index ? comment : item)));
-                  setDirty(true);
-                }}
-                onRemove={(index) => {
-                  setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index));
-                  setDirty(true);
+              {page ? (
+                <>
+                  {comments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{comments.error}</div> : null}
+                  <CommentThread comments={comments.comments} entityLabel="Wiki-Seite" onCreate={comments.createComment} onUpdate={comments.updateComment} onDelete={comments.removeComment} />
+                </>
+              ) : (
+                <PendingCommentList
+                  comments={pendingComments}
+                  onAdd={(comment) => {
+                    setPendingComments((items) => [...items, comment]);
+                    setDirty(true);
+                  }}
+                  onUpdate={(index, comment) => {
+                    setPendingComments((items) => items.map((item, itemIndex) => (itemIndex === index ? comment : item)));
+                    setDirty(true);
+                  }}
+                  onRemove={(index) => {
+                    setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index));
+                    setDirty(true);
+                  }}
+                />
+              )}
+            </Section>
+          ) : null}
+
+          {activeTab === "notes" && page ? (
+            <Section fill>
+              {notes.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{notes.error}</div> : null}
+              <NoteList
+                notes={notes.notes}
+                onCreate={createNote}
+                onEdit={setEditingNote}
+                onDelete={(note) => {
+                  void confirm({
+                    title: "Notiz löschen?",
+                    body: `Die Notiz "${note.title}" wird entfernt.`,
+                    severity: "danger",
+                    confirmLabel: "Löschen"
+                  }).then((approved) => {
+                    if (approved) {
+                      void notes
+                        .removeNote(note.id)
+                        .then(() => showToast({ tone: "success", title: "Notiz gelöscht" }))
+                        .catch((noteError: unknown) => showToast({ tone: "error", title: "Notiz konnte nicht gelöscht werden", message: errorMessage(noteError) }));
+                    }
+                  });
                 }}
               />
+              <NoteEditor note={editingNote} open={Boolean(editingNote)} onSave={notes.updateNote} onClose={() => setEditingNote(null)} />
+            </Section>
+          ) : null}
+
+          {activeTab === "attachments" && page ? (
+            <Section title="Dateien">
+              {attachments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{attachments.error}</div> : null}
+              <div className="grid gap-4">
+                <AttachmentUploader size="sm" onUpload={uploadAttachment} />
+                <AttachmentList
+                  attachments={attachments.attachments}
+                  onDelete={(attachment) => {
+                    void confirm({
+                      title: "Datei löschen?",
+                      body: attachment.originalName,
+                      severity: "danger",
+                      confirmLabel: "Löschen"
+                    }).then((approved) => {
+                      if (approved) {
+                        void attachments
+                          .removeAttachment(attachment.id)
+                          .then(() => showToast({ tone: "success", title: "Datei gelöscht" }))
+                          .catch((attachmentError: unknown) => showToast({ tone: "error", title: "Datei konnte nicht gelöscht werden", message: errorMessage(attachmentError) }));
+                      }
+                    });
+                  }}
+                  onOpen={(attachment) => attachments.openAttachment(attachment.id)}
+                  openingAttachmentId={attachments.openingAttachmentId}
+                />
+              </div>
             </Section>
           ) : null}
         </div>

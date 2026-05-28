@@ -8,6 +8,7 @@ import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useBacklog } from "../hooks/useBacklog";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useFeatures } from "../hooks/useFeatures";
 import { withStandaloneView } from "../utils/standalone";
 
@@ -31,6 +32,7 @@ export function BacklogItemDetailPage() {
       : undefined);
   const backlog = useBacklog(projectId);
   const features = useFeatures();
+  useDocumentTitle(isCreateMode ? "Backlog-Item: Neu" : item ? `Backlog-Item: ${item.title}` : "Backlog-Item");
   const returnTo =
     searchParams.get("returnTo") ??
     (searchParams.get("standalone") === "1"

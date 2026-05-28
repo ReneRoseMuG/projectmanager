@@ -402,17 +402,29 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
 function RichTextToolbar({ editor, variant, onImageUpload, imageUploading }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none">; onImageUpload?: ImageUploadHandler; imageUploading: boolean }) {
   const showFullToolbar = variant === "full";
   const [pickerUploading, setPickerUploading] = useState(false);
+  const [, setToolbarVersion] = useState(0);
   const { showToast } = useToast();
+  const hasTextSelection = !editor.state.selection.empty;
+
+  useEffect(() => {
+    const refreshToolbarState = () => setToolbarVersion((version) => version + 1);
+    editor.on("selectionUpdate", refreshToolbarState);
+    editor.on("transaction", refreshToolbarState);
+    return () => {
+      editor.off("selectionUpdate", refreshToolbarState);
+      editor.off("transaction", refreshToolbarState);
+    };
+  }, [editor]);
 
   return (
     <div data-testid="rich-text-toolbar" className="sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-t-md border-b border-line bg-shell p-1.5">
-      <ToolbarButton onClick={() => editor.chain().focus().unsetHighlight().run()} active={false} title="Hervorhebungen entfernen" icon={<RemoveFormatting />} />
+      <ToolbarButton onClick={() => editor.chain().focus().unsetHighlight().run()} active={false} disabled={!hasTextSelection} title="Hervorhebungen entfernen" icon={<RemoveFormatting />} />
       <Separator />
       <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Fett" icon={<Bold />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Kursiv" icon={<Italic />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Unterstrichen" icon={<UnderlineIcon />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive("strike")} title="Durchgestrichen" icon={<Strikethrough />} />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleHighlight({ color: "#fff3bf" }).run()} active={editor.isActive("highlight")} title="Hervorheben" icon={<Highlighter />} />
+      <ToolbarButton onClick={() => editor.chain().focus().toggleHighlight({ color: "#fff3bf" }).run()} active={hasTextSelection && editor.isActive("highlight")} disabled={!hasTextSelection} title="Hervorheben" icon={<Highlighter />} />
       <Separator />
       <ToolbarButton onClick={() => editor.chain().focus().setParagraph().run()} active={editor.isActive("paragraph")} title="Absatz" icon={<Text />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Aufzählung" icon={<List />} />

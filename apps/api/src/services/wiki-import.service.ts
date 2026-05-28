@@ -1046,7 +1046,7 @@ function upsertTask(database: DbClient, projectId: number, task: ParsedTask, exe
       description: task.description,
       status: "todo",
       priority: task.priority,
-      assignee: null,
+      responsibleUserId: null,
       dueDate: null,
       importKey: task.importKey,
       createdAt: now,

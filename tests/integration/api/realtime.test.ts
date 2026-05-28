@@ -171,4 +171,21 @@ describe("Realtime API", () => {
 
     expect(events).toEqual([{ scope: "projects", sourceTabId: "tab-a" }]);
   });
+
+  it("publiziert verschachtelte Kommentar-Mutationen als Kommentar-Invalidierung", async () => {
+    const admin = await loginAdmin(app);
+    const project = await admin.post("/api/projects").send({ name: "Realtime Comment Project" }).expect(201);
+    const events: Array<{ scope: string; sourceTabId: string | null }> = [];
+    const unsubscribe = app.realtimeBus.subscribe((event) => {
+      if (event.type === "invalidate") {
+        events.push({ scope: event.scope, sourceTabId: event.sourceTabId });
+      }
+    });
+
+    await admin.post(`/api/projects/${project.body.id}/comments`).send({ body: "<p>Extern angelegter Kommentar</p>" }).expect(201);
+
+    unsubscribe();
+
+    expect(events).toEqual([{ scope: "comments", sourceTabId: null }]);
+  });
 });
