@@ -2,6 +2,10 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 28.05.26 | 14:59:23 | 4 | Tests und Abnahme | ⚠️ |
+| 28.05.26 | 14:47:31 | 3 | Wiki-Web-UI | ✅ |
+| 28.05.26 | 14:47:08 | 2 | Wiki-API-Verknüpfungen | ✅ |
+| 28.05.26 | 14:45:31 | 1 | Datenmodell und Migration | ⚠️ |
 | 28.05.26 | 10:24:50 | 2 | Editor-Bilder als Content Images | ✅ |
 | 28.05.26 | 10:24:50 | 1 | Backup-Import entdoppeln | ⚠️ |
 | 28.05.26 | 09:57:29 | Fix | Log-Richtlinien Zeitstempel | ✅ |

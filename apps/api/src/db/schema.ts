@@ -446,6 +446,21 @@ export const wikiPageComments = sqliteTable(
   })
 );
 
+export const wikiPageAttachments = sqliteTable(
+  "wiki_page_attachments",
+  {
+    wikiPageId: integer("wiki_page_id")
+      .notNull()
+      .references(() => wikiPages.id, { onDelete: "cascade" }),
+    attachmentId: integer("attachment_id")
+      .notNull()
+      .references(() => attachments.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    wikiPageAttachmentUnique: uniqueIndex("wiki_page_attachments_parent_attachment_unique").on(table.wikiPageId, table.attachmentId)
+  })
+);
+
 export const tags = sqliteTable("tags", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
@@ -750,7 +765,6 @@ export const features = sqliteTable("features", {
   title: text("title").notNull(),
   status: text("status").notNull().default("draft"),
   description: text("description"),
-  contentPath: text("content_path"),
   content: text("content"),
   sortOrder: integer("sort_order").notNull().default(0),
   version: integer("version").notNull().default(1),
@@ -768,7 +782,6 @@ export const useCases = sqliteTable("use_cases", {
   title: text("title").notNull(),
   status: text("status").notNull().default("draft"),
   description: text("description"),
-  contentPath: text("content_path"),
   content: text("content"),
   sortOrder: integer("sort_order").notNull().default(0),
   version: integer("version").notNull().default(1),
@@ -802,7 +815,6 @@ export const wikiPages = sqliteTable("wiki_pages", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   parentId: integer("parent_id").references((): AnySQLiteColumn => wikiPages.id, { onDelete: "restrict" }),
   title: text("title").notNull(),
-  contentPath: text("content_path"),
   content: text("content"),
   sortOrder: integer("sort_order").notNull().default(0),
   version: integer("version").notNull().default(1),
@@ -811,6 +823,24 @@ export const wikiPages = sqliteTable("wiki_pages", {
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
 });
+
+export const wikiPageRelations = sqliteTable(
+  "wiki_page_relations",
+  {
+    sourceWikiPageId: integer("source_wiki_page_id")
+      .notNull()
+      .references(() => wikiPages.id, { onDelete: "cascade" }),
+    targetWikiPageId: integer("target_wiki_page_id")
+      .notNull()
+      .references(() => wikiPages.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  },
+  (table) => ({
+    wikiPageRelationUnique: uniqueIndex("wiki_page_relations_source_target_unique").on(table.sourceWikiPageId, table.targetWikiPageId),
+    noSelfRelation: check("wiki_page_relations_no_self_relation", sql`${table.sourceWikiPageId} <> ${table.targetWikiPageId}`)
+  })
+);
 
 export const contentImages = sqliteTable(
   "content_images",
@@ -953,6 +983,22 @@ export const useCaseTasks = sqliteTable(
   })
 );
 
+export const wikiPageTasks = sqliteTable(
+  "wiki_page_tasks",
+  {
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => wikiPages.id, { onDelete: "cascade" }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    wikiPageTaskUnique: uniqueIndex("wiki_page_tasks_owner_task_unique").on(table.ownerId, table.taskId)
+  })
+);
+
 export const tickets = sqliteTable("tickets", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   parentId: integer("parent_id").references((): AnySQLiteColumn => tickets.id, { onDelete: "cascade" }),
@@ -1053,6 +1099,22 @@ export const useCaseTickets = sqliteTable(
   },
   (table) => ({
     useCaseTicketUnique: uniqueIndex("use_case_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
+  })
+);
+
+export const wikiPageTickets = sqliteTable(
+  "wiki_page_tickets",
+  {
+    ownerId: integer("owner_id")
+      .notNull()
+      .references(() => wikiPages.id, { onDelete: "cascade" }),
+    ticketId: integer("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    position: real("position").notNull().default(0)
+  },
+  (table) => ({
+    wikiPageTicketUnique: uniqueIndex("wiki_page_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
   })
 );
 

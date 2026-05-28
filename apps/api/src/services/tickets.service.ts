@@ -13,7 +13,7 @@ import type {
 } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { featureTickets, features, milestoneTickets, milestones, projectTickets, projects, taskTickets, tasks, ticketAttachments, ticketComments, ticketNotes, ticketRelations, tickets, useCases, useCaseTickets } from "../db/schema.js";
+import { featureTickets, features, milestoneTickets, milestones, projectTickets, projects, taskTickets, tasks, ticketAttachments, ticketComments, ticketNotes, ticketRelations, tickets, useCases, useCaseTickets, wikiPageTickets, wikiPages } from "../db/schema.js";
 import { ticketRepository, type TicketRecord } from "../repositories/ticket.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
@@ -128,6 +128,13 @@ function ensureUseCaseExists(database: DbClient, useCaseId: number): void {
   }
 }
 
+function ensureWikiPageExists(database: DbClient, wikiPageId: number): void {
+  const page = database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)).get();
+  if (!page) {
+    throw notFound(`Wiki page with id ${wikiPageId} not found`);
+  }
+}
+
 function ensureOwnerExists(database: DbClient, owner: TicketOwner): void {
   if (owner.type === "project") {
     ensureProjectExists(database, owner.id);
@@ -143,6 +150,10 @@ function ensureOwnerExists(database: DbClient, owner: TicketOwner): void {
   }
   if (owner.type === "feature") {
     ensureFeatureExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "wikiPage") {
+    ensureWikiPageExists(database, owner.id);
     return;
   }
   ensureUseCaseExists(database, owner.id);
@@ -164,6 +175,10 @@ function getOwnerJournalObject(database: DbClient, owner: TicketOwner): JournalO
   if (owner.type === "feature") {
     const feature = database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)).get();
     return makeJournalObject("feature", owner.id, feature?.title ?? `Feature ${owner.id}`);
+  }
+  if (owner.type === "wikiPage") {
+    const page = database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)).get();
+    return makeJournalObject("wikiPage", owner.id, page?.title ?? `Wiki-Seite ${owner.id}`);
   }
   const useCase = database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)).get();
   return makeJournalObject("useCase", owner.id, useCase?.title ?? `Use Case ${owner.id}`);
@@ -314,6 +329,15 @@ function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRe
       .orderBy(tickets.status, featureTickets.position)
       .all();
   }
+  if (owner.type === "wikiPage") {
+    return database
+      .select({ ...ticketSelect, boardPosition: wikiPageTickets.position })
+      .from(wikiPageTickets)
+      .innerJoin(tickets, eq(wikiPageTickets.ticketId, tickets.id))
+      .where(and(eq(wikiPageTickets.ownerId, owner.id), isNull(tickets.parentId)))
+      .orderBy(tickets.status, wikiPageTickets.position)
+      .all();
+  }
 
   return database
     .select({ ...ticketSelect, boardPosition: useCaseTickets.position })
@@ -390,6 +414,10 @@ function insertOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: num
     database.insert(featureTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
     return;
   }
+  if (owner.type === "wikiPage") {
+    database.insert(wikiPageTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+    return;
+  }
   database.insert(useCaseTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
 }
 
@@ -405,6 +433,9 @@ function deleteOwnerTicketLink(database: DbClient, owner: TicketOwner, ticketId:
   }
   if (owner.type === "feature") {
     return database.delete(featureTickets).where(and(eq(featureTickets.ownerId, owner.id), eq(featureTickets.ticketId, ticketId))).run().changes;
+  }
+  if (owner.type === "wikiPage") {
+    return database.delete(wikiPageTickets).where(and(eq(wikiPageTickets.ownerId, owner.id), eq(wikiPageTickets.ticketId, ticketId))).run().changes;
   }
   return database.delete(useCaseTickets).where(and(eq(useCaseTickets.ownerId, owner.id), eq(useCaseTickets.ticketId, ticketId))).run().changes;
 }
@@ -463,6 +494,9 @@ function ticketDeleteBlockers(database: DbClient, ticketId: number): string[] {
   }
   if (database.select({ ownerId: useCaseTickets.ownerId }).from(useCaseTickets).where(eq(useCaseTickets.ticketId, ticketId)).get()) {
     blockers.push("Use-Case-Verknüpfungen");
+  }
+  if (database.select({ ownerId: wikiPageTickets.ownerId }).from(wikiPageTickets).where(eq(wikiPageTickets.ticketId, ticketId)).get()) {
+    blockers.push("Wiki-VerknÃ¼pfungen");
   }
   if (database.select({ id: tickets.id }).from(tickets).where(eq(tickets.parentId, ticketId)).get()) {
     blockers.push("Sub-Tickets");
@@ -529,9 +563,13 @@ export function listTickets(database: DbClient): Ticket[] {
 
 export function listTicketLinkCandidates(database: DbClient, owner: TicketOwner): Ticket[] {
   ensureOwnerExists(database, owner);
-  const ownerContext = ticketOwnerProjectContext(database, owner);
   const linkedTicketIds = new Set(selectVisibleOwnerTicketRows(database, owner).map((ticket) => ticket.id));
   const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
+  if (owner.type === "wikiPage") {
+    return listTickets(database).filter((ticket) => !linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status));
+  }
+
+  const ownerContext = ticketOwnerProjectContext(database, owner);
 
   return listTickets(database).filter(
     (ticket) => !linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status) && projectContextsAreCompatible(ownerContext, ticketProjectContext(database, ticket.id))
@@ -658,7 +696,13 @@ export function createOwnerTicket(database: DbClient, owner: TicketOwner, input:
   return mapTicket(database, created, [], 0, position);
 }
 
-export function linkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number, actor?: JournalActor | null): Ticket {
+export function linkOwnerTicket(
+  database: DbClient,
+  owner: TicketOwner,
+  ticketId: number,
+  actor?: JournalActor | null,
+  options: { conflictOnExisting?: boolean } = {}
+): Ticket {
   ensureOwnerExists(database, owner);
   const ticket = getTicketRecord(database, ticketId);
   if (ticket.parentId !== null) {
@@ -670,10 +714,15 @@ export function linkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId
 
   const existing = getOwnerTicketRow(database, owner, ticketId);
   if (existing) {
+    if (options.conflictOnExisting === true) {
+      throw conflict(`Ticket ${ticketId} is already linked to ${owner.type} ${owner.id}`);
+    }
     return mapTicket(database, existing, undefined, undefined, existing.boardPosition);
   }
 
-  assertCompatibleProjectContexts(ticketOwnerProjectContext(database, owner), ticketProjectContext(database, ticketId));
+  if (owner.type !== "wikiPage") {
+    assertCompatibleProjectContexts(ticketOwnerProjectContext(database, owner), ticketProjectContext(database, ticketId));
+  }
 
   const position = nextOwnerPosition(database, owner, ticket.status);
   database.transaction((tx) => {

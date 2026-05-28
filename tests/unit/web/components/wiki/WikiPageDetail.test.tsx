@@ -16,6 +16,7 @@ import "@testing-library/jest-dom/vitest";
 import type { WikiPage } from "@taskmanager/shared-types";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WikiPageDetail } from "../../../../../apps/web/src/components/wiki/WikiPageDetail";
 
@@ -43,13 +44,15 @@ vi.mock("../../../../../apps/web/src/hooks/useEntityComments", () => ({
 
 const wikiPage: WikiPage = {
   id: 6,
-  projectId: null,
   parentId: null,
   title: "Wiki Detail",
   content: "<p>Wiki Detail Inhalt</p>",
-  contentPath: null,
   sortOrder: 0,
   childCount: 0,
+  attachmentCount: 0,
+  taskCount: 0,
+  ticketCount: 0,
+  relatedPages: [],
   version: 4,
   createdAt: "2026-05-19T08:00:00.000Z",
   updatedAt: "2026-05-19T09:00:00.000Z"
@@ -63,7 +66,11 @@ afterEach(() => {
 describe("WikiPageDetail", () => {
   it("bindet RichTextInlineField an den Inhalt", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
-    render(<WikiPageDetail page={wikiPage} onSave={onSave} onDelete={vi.fn()} onEditMetadata={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <WikiPageDetail page={wikiPage} onSave={onSave} onDelete={vi.fn()} onEditMetadata={vi.fn()} />
+      </MemoryRouter>
+    );
 
     expect(screen.getByTestId("wiki-page-detail-content-view")).toHaveValue(wikiPage.content);
     fireEvent.change(screen.getByTestId("wiki-page-detail-content-view"), { target: { value: "<p>Wiki Detail aktualisiert</p>" } });

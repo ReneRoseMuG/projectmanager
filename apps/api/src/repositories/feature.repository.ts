@@ -5,7 +5,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type FeatureRecord = typeof features.$inferSelect;
 export type FeatureCreateData = Omit<typeof features.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type FeatureUpdateData = Partial<Pick<FeatureCreateData, "title" | "status" | "description" | "contentPath" | "content" | "sortOrder">>;
+export type FeatureUpdateData = Partial<Pick<FeatureCreateData, "title" | "status" | "description" | "content" | "sortOrder">>;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -53,10 +53,6 @@ export const featureRepository = {
       .where(eq(features.id, id))
       .returning()
       .get();
-  },
-
-  setContentPath(database: DbClient, id: number, contentPath: string): FeatureRecord | undefined {
-    return database.update(features).set({ contentPath, updatedAt: nowIso() }).where(eq(features.id, id)).returning().get();
   },
 
   delete(database: DbClient, id: number): number {

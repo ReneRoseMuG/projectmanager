@@ -34,6 +34,9 @@ function ownerTicketKey(owner?: TicketOwner | null) {
   if (owner.type === "feature") {
     return queryKeys.features.tickets(owner.id);
   }
+  if (owner.type === "wikiPage") {
+    return queryKeys.wiki.tickets(owner.id);
+  }
   return queryKeys.useCases.tickets(owner.id);
 }
 

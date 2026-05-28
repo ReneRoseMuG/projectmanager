@@ -35,8 +35,8 @@ import {
 import { getContentBaseDir } from "./content.service.js";
 
 const APP_ID = "taskmanager";
-const DUMP_FORMAT_VERSION = 13;
-const SUPPORTED_DUMP_FORMAT_VERSIONS = [8, 9, 10, 11, 12, DUMP_FORMAT_VERSION] as const;
+const DUMP_FORMAT_VERSION = 14;
+const SUPPORTED_DUMP_FORMAT_VERSIONS = [8, 9, 10, 11, 12, 13, DUMP_FORMAT_VERSION] as const;
 const DUMP_FILENAME_PREFIX = "taskmanager_dump_";
 const REMOTE_IMPORT_HISTORY_SETTING_KEY = "remote_dump_import_history";
 const ZipArchive = (
@@ -84,6 +84,7 @@ const DUMP_TABLES = [
   { key: "dayPlanEvents", tableName: "day_plan_events" },
   { key: "backlogItems", tableName: "backlog_items" },
   { key: "featureRelations", tableName: "feature_relations" },
+  { key: "wikiPageRelations", tableName: "wiki_page_relations" },
   { key: "projectTags", tableName: "project_tags" },
   { key: "taskTags", tableName: "task_tags" },
   { key: "ticketTags", tableName: "ticket_tags" },
@@ -100,11 +101,13 @@ const DUMP_TABLES = [
   { key: "dayPlanTasks", tableName: "day_plan_tasks" },
   { key: "featureTasks", tableName: "feature_tasks" },
   { key: "useCaseTasks", tableName: "use_case_tasks" },
+  { key: "wikiPageTasks", tableName: "wiki_page_tasks" },
   { key: "projectTickets", tableName: "project_tickets" },
   { key: "milestoneTickets", tableName: "milestone_tickets" },
   { key: "taskTickets", tableName: "task_tickets" },
   { key: "featureTickets", tableName: "feature_tickets" },
   { key: "useCaseTickets", tableName: "use_case_tickets" },
+  { key: "wikiPageTickets", tableName: "wiki_page_tickets" },
   { key: "ticketRelations", tableName: "ticket_relations" },
   { key: "projectComments", tableName: "project_comments" },
   { key: "milestoneComments", tableName: "milestone_comments" },
@@ -120,6 +123,7 @@ const DUMP_TABLES = [
   { key: "taskAttachments", tableName: "task_attachments" },
   { key: "featureAttachments", tableName: "feature_attachments" },
   { key: "ticketAttachments", tableName: "ticket_attachments" },
+  { key: "wikiPageAttachments", tableName: "wiki_page_attachments" },
 ] as const;
 
 export const DUMP_TABLE_KEYS = DUMP_TABLES.map((entry) => entry.key);

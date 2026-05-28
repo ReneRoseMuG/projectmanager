@@ -48,7 +48,6 @@ const feature: Feature = {
   status: "active",
   description: "<p>Feature Beschreibung</p>",
   content: "<p>Feature Inhalt</p>",
-  contentPath: null,
   sortOrder: 1,
   useCaseCount: 0,
   attachmentCount: 0,

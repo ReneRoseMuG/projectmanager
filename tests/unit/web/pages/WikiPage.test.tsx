@@ -70,14 +70,16 @@ vi.mock("../../../../apps/web/src/hooks/useWiki", () => ({
   useWiki: () => ({
     page: router.params.id
       ? {
-          id: 10,
-          projectId: null,
+        id: 10,
           parentId: null,
           title: "Wiki Alpha",
           content: null,
-          contentPath: null,
           sortOrder: 0,
           childCount: 0,
+          attachmentCount: 0,
+          taskCount: 0,
+          ticketCount: 0,
+          relatedPages: [],
           version: 1,
           createdAt: "2026-05-20T08:00:00.000Z",
           updatedAt: "2026-05-20T08:00:00.000Z"
@@ -89,7 +91,16 @@ vi.mock("../../../../apps/web/src/hooks/useWiki", () => ({
     error: null,
     createWikiPage: vi.fn(),
     updateWikiPage: vi.fn(),
+    syncWikiPageRelations: vi.fn(),
     removeWikiPage: vi.fn()
+  })
+}));
+
+vi.mock("../../../../apps/web/src/hooks/useProjects", () => ({
+  useProjects: () => ({
+    projects: [],
+    loading: false,
+    error: null
   })
 }));
 

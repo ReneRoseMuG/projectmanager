@@ -64,7 +64,6 @@ vi.mock("../../../../apps/web/src/hooks/useFeatures", () => ({
           status: "active",
           description: null,
           content: null,
-          contentPath: null,
           sortOrder: 0,
           useCaseCount: 0,
           attachmentCount: 0,

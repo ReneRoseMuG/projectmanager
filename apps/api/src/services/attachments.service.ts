@@ -21,7 +21,9 @@ import {
   tasks,
   ticketAttachments,
   tickets,
-  users
+  users,
+  wikiPageAttachments,
+  wikiPages
 } from "../db/schema.js";
 import { attachmentRepository, type AttachmentRecord } from "../repositories/attachment.repository.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
@@ -32,6 +34,7 @@ import type { FileOpener } from "./file-opener.service.js";
 import {
   buildDeleteSummary,
   buildLinkSummary,
+  buildUnlinkSummary,
   makeJournalContext,
   makeJournalObject,
   objectTypeLabel,
@@ -111,6 +114,13 @@ function ensureTicketExists(database: DbClient, ticketId: number): void {
   }
 }
 
+function ensureWikiPageExists(database: DbClient, wikiPageId: number): void {
+  const page = database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)).get();
+  if (!page) {
+    throw notFound(`Wiki page with id ${wikiPageId} not found`);
+  }
+}
+
 function ensureOwnerExists(database: DbClient, owner: AttachmentOwner): void {
   if (owner.type === "project") {
     ensureProjectExists(database, owner.id);
@@ -126,6 +136,10 @@ function ensureOwnerExists(database: DbClient, owner: AttachmentOwner): void {
   }
   if (owner.type === "feature") {
     ensureFeatureExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "wikiPage") {
+    ensureWikiPageExists(database, owner.id);
     return;
   }
   ensureTicketExists(database, owner.id);
@@ -159,6 +173,13 @@ function getOwnerJournalObject(database: DbClient, owner: AttachmentOwner): Jour
       throw notFound(`Feature with id ${owner.id} not found`);
     }
     return makeJournalObject("feature", feature.id, feature.title);
+  }
+  if (owner.type === "wikiPage") {
+    const page = database.select({ id: wikiPages.id, title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)).get();
+    if (!page) {
+      throw notFound(`Wiki page with id ${owner.id} not found`);
+    }
+    return makeJournalObject("wikiPage", page.id, page.title);
   }
   const ticket = database.select({ id: tickets.id, title: tickets.title }).from(tickets).where(eq(tickets.id, owner.id)).get();
   if (!ticket) {
@@ -229,6 +250,12 @@ function listAttachmentOwners(database: DbClient, attachmentId: number): Attachm
       .all()
       .map((row) => ({ type: "feature" as const, id: row.id })),
     ...database
+      .select({ id: wikiPageAttachments.wikiPageId })
+      .from(wikiPageAttachments)
+      .where(eq(wikiPageAttachments.attachmentId, attachmentId))
+      .all()
+      .map((row) => ({ type: "wikiPage" as const, id: row.id })),
+    ...database
       .select({ id: ticketAttachments.ticketId })
       .from(ticketAttachments)
       .where(eq(ticketAttachments.attachmentId, attachmentId))
@@ -252,6 +279,10 @@ function insertAttachmentLink(database: DbSession, owner: AttachmentOwner, attac
   }
   if (owner.type === "feature") {
     database.insert(featureAttachments).values({ featureId: owner.id, attachmentId }).onConflictDoNothing().run();
+    return;
+  }
+  if (owner.type === "wikiPage") {
+    database.insert(wikiPageAttachments).values({ wikiPageId: owner.id, attachmentId }).onConflictDoNothing().run();
     return;
   }
   database.insert(ticketAttachments).values({ ticketId: owner.id, attachmentId }).onConflictDoNothing().run();
@@ -297,7 +328,9 @@ async function deleteAttachmentsOwnedOnlyBy(database: DbClient, ownerType: Attac
           ? database.select({ id: milestoneAttachments.attachmentId }).from(milestoneAttachments).where(inArray(milestoneAttachments.milestoneId, uniqueIds)).all()
           : ownerType === "feature"
             ? database.select({ id: featureAttachments.attachmentId }).from(featureAttachments).where(inArray(featureAttachments.featureId, uniqueIds)).all()
-            : database.select({ id: ticketAttachments.attachmentId }).from(ticketAttachments).where(inArray(ticketAttachments.ticketId, uniqueIds)).all();
+            : ownerType === "wikiPage"
+              ? database.select({ id: wikiPageAttachments.attachmentId }).from(wikiPageAttachments).where(inArray(wikiPageAttachments.wikiPageId, uniqueIds)).all()
+              : database.select({ id: ticketAttachments.attachmentId }).from(ticketAttachments).where(inArray(ticketAttachments.ticketId, uniqueIds)).all();
 
   const attachmentIds = [...new Set(candidateRows.map((row) => row.id))].filter((attachmentId) => attachmentOnlyOwnedBy(database, attachmentId, ownerType, idSet));
   if (attachmentIds.length === 0) {
@@ -378,6 +411,15 @@ function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Att
       .from(featureAttachments)
       .innerJoin(attachments, eq(featureAttachments.attachmentId, attachments.id))
       .where(eq(featureAttachments.featureId, owner.id))
+      .orderBy(desc(attachments.createdAt))
+      .all();
+  }
+  if (owner.type === "wikiPage") {
+    return database
+      .select(attachmentSelect)
+      .from(wikiPageAttachments)
+      .innerJoin(attachments, eq(wikiPageAttachments.attachmentId, attachments.id))
+      .where(eq(wikiPageAttachments.wikiPageId, owner.id))
       .orderBy(desc(attachments.createdAt))
       .all();
   }
@@ -605,6 +647,33 @@ function recentTicketAttachmentRows(database: DbClient, ids: number[], mineUserI
     .map((row) => mapRecentAttachmentRow(row, "ticket"));
 }
 
+function recentWikiPageAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+  if (ids.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      id: attachments.id,
+      filename: attachments.originalName,
+      storageFilename: attachments.filename,
+      mimetype: attachments.mimetype,
+      fileSize: attachments.size,
+      createdAt: attachments.createdAt,
+      authorFullName: users.fullName,
+      authorEmail: users.email,
+      entityId: wikiPages.id,
+      entityLabel: wikiPages.title
+    })
+    .from(wikiPageAttachments)
+    .innerJoin(attachments, eq(wikiPageAttachments.attachmentId, attachments.id))
+    .innerJoin(wikiPages, eq(wikiPageAttachments.wikiPageId, wikiPages.id))
+    .leftJoin(users, eq(attachments.createdBy, users.id))
+    .where(mineUserId === undefined ? inArray(wikiPageAttachments.wikiPageId, ids) : and(inArray(wikiPageAttachments.wikiPageId, ids), eq(attachments.createdBy, mineUserId)))
+    .orderBy(desc(attachments.createdAt), desc(attachments.id))
+    .all()
+    .map((row) => mapRecentAttachmentRow(row, "wikiPage"));
+}
+
 function recentAttachmentRowsForOwner(database: DbClient, owner: RecentAttachmentOwner): RecentAttachmentRow[] {
   if (owner.type === "project") {
     const milestoneIds = attachmentProjectMilestoneIds(database, owner.id);
@@ -631,7 +700,8 @@ function recentOwnAttachmentRows(database: DbClient, userId: number): RecentAtta
     ...recentMilestoneAttachmentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id), userId),
     ...recentFeatureAttachmentRows(database, database.select({ id: features.id }).from(features).all().map((row) => row.id), userId),
     ...recentTaskAttachmentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id), userId),
-    ...recentTicketAttachmentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id), userId)
+    ...recentTicketAttachmentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id), userId),
+    ...recentWikiPageAttachmentRows(database, database.select({ id: wikiPages.id }).from(wikiPages).all().map((row) => row.id), userId)
   ];
 }
 
@@ -641,7 +711,8 @@ function recentAllAttachmentRows(database: DbClient): RecentAttachmentRow[] {
     ...recentMilestoneAttachmentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id)),
     ...recentFeatureAttachmentRows(database, database.select({ id: features.id }).from(features).all().map((row) => row.id)),
     ...recentTaskAttachmentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id)),
-    ...recentTicketAttachmentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id))
+    ...recentTicketAttachmentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id)),
+    ...recentWikiPageAttachmentRows(database, database.select({ id: wikiPages.id }).from(wikiPages).all().map((row) => row.id))
   ];
 }
 
@@ -691,6 +762,10 @@ export function listTicketAttachments(database: DbClient, ticketId: number): Att
   return listOwnerAttachments(database, { type: "ticket", id: ticketId });
 }
 
+export function listWikiPageAttachments(database: DbClient, wikiPageId: number): Attachment[] {
+  return listOwnerAttachments(database, { type: "wikiPage", id: wikiPageId });
+}
+
 export async function deleteProjectAttachmentsForIds(database: DbClient, projectIds: number[]): Promise<void> {
   await deleteAttachmentsOwnedOnlyBy(database, "project", projectIds);
 }
@@ -709,6 +784,10 @@ export async function deleteFeatureAttachmentsForIds(database: DbClient, feature
 
 export async function deleteTicketAttachmentsForIds(database: DbClient, ticketIds: number[]): Promise<void> {
   await deleteAttachmentsOwnedOnlyBy(database, "ticket", ticketIds);
+}
+
+export async function deleteWikiPageAttachmentsForIds(database: DbClient, wikiPageIds: number[]): Promise<void> {
+  await deleteAttachmentsOwnedOnlyBy(database, "wikiPage", wikiPageIds);
 }
 
 export async function createProjectAttachment(database: DbClient, projectId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
@@ -741,6 +820,12 @@ export async function createTicketAttachment(database: DbClient, ticketId: numbe
   return persistAttachment({ database, owner, upload, actor });
 }
 
+export async function createWikiPageAttachment(database: DbClient, wikiPageId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
+  const owner = { type: "wikiPage" as const, id: wikiPageId };
+  ensureOwnerExists(database, owner);
+  return persistAttachment({ database, owner, upload, actor });
+}
+
 export async function linkAttachment(database: DbClient, owner: AttachmentOwner, attachmentId: number, actor?: JournalActor | null): Promise<Attachment> {
   ensureOwnerExists(database, owner);
   const attachment = attachmentRepository.findById(database, attachmentId);
@@ -763,6 +848,38 @@ export async function linkAttachment(database: DbClient, owner: AttachmentOwner,
     }
   });
   return mapAttachment(database, attachment);
+}
+
+export async function deleteWikiPageAttachment(database: DbClient, wikiPageId: number, attachmentId: number, actor?: JournalActor | null): Promise<void> {
+  const owner = { type: "wikiPage" as const, id: wikiPageId };
+  ensureOwnerExists(database, owner);
+  const record = attachmentRepository.findById(database, attachmentId);
+  if (!record) {
+    throw notFound(`Attachment with id ${attachmentId} not found`);
+  }
+  const linked = listAttachmentOwners(database, attachmentId).some((currentOwner) => currentOwner.type === owner.type && currentOwner.id === owner.id);
+  if (!linked) {
+    throw notFound(`Attachment with id ${attachmentId} is not linked to wiki page ${wikiPageId}`);
+  }
+
+  const ownerObject = getOwnerJournalObject(database, owner);
+  const attachmentObject = attachmentJournalObject(record);
+  database.transaction((tx) => {
+    tx.delete(wikiPageAttachments)
+      .where(and(eq(wikiPageAttachments.wikiPageId, wikiPageId), eq(wikiPageAttachments.attachmentId, attachmentId)))
+      .run();
+    recordJournalEntry(tx, {
+      operation: "unlink",
+      object: attachmentObject,
+      summary: buildUnlinkSummary(attachmentObject, ownerObject),
+      actor,
+      contexts: [makeJournalContext(ownerObject, "owner")]
+    });
+  });
+
+  if (listAttachmentOwners(database, attachmentId).length === 0) {
+    await deleteAttachmentRecords(database, [record]);
+  }
 }
 
 export async function deleteAttachment(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {

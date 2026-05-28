@@ -20,6 +20,7 @@ import { WikiPageForm } from "../components/wiki/WikiPageForm";
 import { WikiTree } from "../components/wiki/WikiTree";
 import { errorMessage } from "../hooks/errors";
 import { useStandaloneView } from "../hooks/useStandaloneView";
+import { useProjects } from "../hooks/useProjects";
 import { useWiki, type WikiTreeNode } from "../hooks/useWiki";
 import { withStandaloneView } from "../utils/standalone";
 
@@ -32,6 +33,7 @@ export function WikiPage() {
   const pageId = Number(params.id);
   const activePageId = Number.isFinite(pageId) ? pageId : undefined;
   const wiki = useWiki(activePageId);
+  const { projects } = useProjects();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
@@ -78,13 +80,18 @@ export function WikiPage() {
     }
   };
 
-  const submitForm = async (input: WikiPageInput) => {
+  const submitForm = async (input: WikiPageInput, relatedPageIds: number[]) => {
     try {
       if (editingPage) {
         await wiki.updateWikiPage(editingPage.id, {
           ...input,
           expectedVersion: editingPage.version,
         });
+        await wiki.syncWikiPageRelations(
+          editingPage.id,
+          editingPage.relatedPages.map((relatedPage) => relatedPage.id),
+          relatedPageIds,
+        );
         showToast({ tone: "success", title: "Wiki-Seite gespeichert" });
       } else {
         const created = await wiki.createWikiPage(input);
@@ -103,9 +110,10 @@ export function WikiPage() {
 
   const postCreatePage = async (
     pageId: number,
-    pending: { comments: DraftComment[] },
+    pending: { comments: DraftComment[]; relatedPageIds: number[] },
   ) => {
     try {
+      await wiki.syncWikiPageRelations(pageId, [], pending.relatedPageIds);
       for (const comment of pending.comments) {
         await createEntityComment("wikiPage", pageId, { body: comment.text });
       }
@@ -208,6 +216,7 @@ export function WikiPage() {
         page={editingPage}
         parent={formParent}
         tree={wiki.tree}
+        projects={projects}
         onSubmit={submitForm}
         onPostCreate={postCreatePage}
         onOpenInTab={openInTab}

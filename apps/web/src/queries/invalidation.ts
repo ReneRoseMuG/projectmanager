@@ -124,6 +124,9 @@ function ticketOwnerKeys(owner: TicketOwnerScope): QueryKey[] {
   if (owner.type === "feature") {
     return [queryKeys.features.detail(owner.id), queryKeys.features.tickets(owner.id), queryKeys.tickets.byOwner(owner.type, owner.id)];
   }
+  if (owner.type === "wikiPage") {
+    return [queryKeys.wiki.detail(owner.id), queryKeys.wiki.tickets(owner.id), queryKeys.tickets.byOwner(owner.type, owner.id)];
+  }
   return [queryKeys.useCases.detail(owner.id), queryKeys.useCases.tickets(owner.id), queryKeys.tickets.byOwner(owner.type, owner.id)];
 }
 
@@ -201,6 +204,9 @@ function attachmentOwnerKeys(ownerType: QueryOwnerType, ownerId: number): QueryK
   }
   if (ownerType === "milestone") {
     return [queryKeys.milestones.root, queryKeys.milestones.detail(ownerId)];
+  }
+  if (ownerType === "wikiPage") {
+    return [queryKeys.wiki.root, queryKeys.wiki.detail(ownerId)];
   }
   return [];
 }

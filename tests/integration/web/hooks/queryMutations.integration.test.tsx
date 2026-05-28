@@ -79,7 +79,6 @@ function featureFixture(overrides: Partial<Feature> = {}): Feature {
     title: "Aktuelles Feature",
     status: "active",
     description: null,
-    contentPath: null,
     sortOrder: 0,
     useCaseCount: 0,
     attachmentCount: 0,

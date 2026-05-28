@@ -664,7 +664,7 @@ export interface MilestoneInput {
 
 export type MilestoneUpdate = WithExpectedVersion<Partial<MilestoneInput>>;
 
-export type VisibleParentType = "project" | "milestone" | "task" | "feature" | "useCase";
+export type VisibleParentType = "project" | "milestone" | "task" | "feature" | "useCase" | "wikiPage";
 
 export interface VisibleParentContext {
   type: VisibleParentType;
@@ -713,7 +713,7 @@ export type TaskBoardPositionInput = WithExpectedVersion<{
   position: number;
 }>;
 
-export type TaskOwner = { type: "project" | "milestone" | "feature" | "useCase"; id: number };
+export type TaskOwner = { type: "project" | "milestone" | "feature" | "useCase" | "wikiPage"; id: number };
 
 export interface Ticket {
   id: number;
@@ -785,7 +785,7 @@ export interface TicketRelationInput {
   relationType: TicketRelationType;
 }
 
-export type TicketOwner = { type: "project" | "milestone" | "task" | "feature" | "useCase"; id: number };
+export type TicketOwner = { type: "project" | "milestone" | "task" | "feature" | "useCase" | "wikiPage"; id: number };
 
 export interface Comment {
   id: number;
@@ -841,6 +841,7 @@ export type AttachmentOwner =
   | { type: "milestone"; id: number }
   | { type: "task"; id: number }
   | { type: "feature"; id: number }
+  | { type: "wikiPage"; id: number }
   | { type: "ticket"; id: number };
 
 export type AttachmentPreviewKind = "image" | "pdf" | "text" | "csv" | "audio" | "video" | "generatedPdf" | "unsupported";
@@ -944,7 +945,6 @@ export interface Feature {
   status: FeatureStatus;
   description: string | null;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
   useCaseCount: number;
   attachmentCount: number;
@@ -988,7 +988,6 @@ export interface UseCase {
   status: FeatureStatus;
   description: string | null;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
   attachmentCount: number;
   noteCount: number;
@@ -1039,12 +1038,21 @@ export interface WikiPage {
   parentId: number | null;
   title: string;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
   childCount: number;
+  attachmentCount: number;
+  taskCount: number;
+  ticketCount: number;
+  relatedPages: WikiPageRelationSummary[];
   version: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WikiPageRelationSummary {
+  id: number;
+  title: string;
+  parentId: number | null;
 }
 
 export interface WikiBreadcrumb {

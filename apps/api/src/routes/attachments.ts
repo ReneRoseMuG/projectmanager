@@ -5,12 +5,15 @@ import {
   createMilestoneAttachment,
   createProjectAttachment,
   createTaskAttachment,
+  createWikiPageAttachment,
   deleteAttachment,
+  deleteWikiPageAttachment,
   listRecentAttachments,
   listFeatureAttachments,
   listMilestoneAttachments,
   listProjectAttachments,
   listTaskAttachments,
+  listWikiPageAttachments,
   openAttachment
 } from "../services/attachments.service.js";
 import { getAttachmentPreview } from "../services/attachment-preview.service.js";
@@ -111,6 +114,14 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
     async (request) => listFeatureAttachments(app.db, request.params.id)
   );
 
+  for (const basePath of ["/wiki", "/wiki-pages"]) {
+    app.get<{ Params: { id: number } }>(
+      `${basePath}/:id/attachments`,
+      { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+      async (request) => listWikiPageAttachments(app.db, request.params.id)
+    );
+  }
+
   app.get<{ Params: { id: number } }>(
     "/attachments/:id/preview",
     { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
@@ -164,6 +175,38 @@ export async function registerAttachmentsRoutes(app: FastifyInstance): Promise<v
       return reply.status(201).send(attachment);
     }
   );
+
+  for (const basePath of ["/wiki", "/wiki-pages"]) {
+    app.post<{ Params: { id: number } }>(
+      `${basePath}/:id/attachments`,
+      { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
+      async (request, reply) => {
+        const attachment = await createWikiPageAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
+        return reply.status(201).send(attachment);
+      }
+    );
+
+    app.delete<{ Params: { id: number; attachmentId: number } }>(
+      `${basePath}/:id/attachments/:attachmentId`,
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id", "attachmentId"],
+            properties: {
+              id: { type: "integer", minimum: 1 },
+              attachmentId: { type: "integer", minimum: 1 }
+            }
+          },
+          response: { 204: { type: "null" } }
+        }
+      },
+      async (request, reply) => {
+        await deleteWikiPageAttachment(app.db, request.params.id, request.params.attachmentId, createJournalActor(request.currentUser));
+        return reply.status(204).send();
+      }
+    );
+  }
 
   app.delete<{ Params: { id: number } }>(
     "/attachments/:id",

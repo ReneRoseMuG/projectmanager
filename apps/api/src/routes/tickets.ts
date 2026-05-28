@@ -129,12 +129,21 @@ const ownerTicketParamSchema = {
   }
 } as const;
 
+const ticketLinkBodySchema = {
+  type: "object",
+  required: ["ticketId"],
+  additionalProperties: false,
+  properties: {
+    ticketId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
 const ticketLinkCandidatesQuerySchema = {
   type: "object",
   required: ["ownerType", "ownerId"],
   additionalProperties: false,
   properties: {
-    ownerType: { type: "string", enum: ["project", "milestone", "task", "feature", "useCase"] },
+    ownerType: { type: "string", enum: ["project", "milestone", "task", "feature", "useCase", "wikiPage"] },
     ownerId: { type: "integer", minimum: 1 }
   }
 } as const;
@@ -254,6 +263,38 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
       { schema: { params: ownerTicketParamSchema, response: { 204: { type: "null" } } } },
       async (request, reply) => {
         unlinkOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.params.ticketId, createJournalActor(request.currentUser));
+        return reply.status(204).send();
+      }
+    );
+  }
+
+  for (const basePath of ["/wiki", "/wiki-pages"]) {
+    app.get<{ Params: { id: number } }>(
+      `${basePath}/:id/tickets`,
+      { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+      async (request) => listOwnerTickets(app.db, { type: "wikiPage", id: request.params.id })
+    );
+
+    app.post<{ Params: { id: number }; Body: { ticketId: number } }>(
+      `${basePath}/:id/tickets`,
+      { schema: { params: idParamSchema, body: ticketLinkBodySchema, response: { 201: objectResponseSchema } } },
+      async (request, reply) => {
+        const ticket = linkOwnerTicket(
+          app.db,
+          { type: "wikiPage", id: request.params.id },
+          request.body.ticketId,
+          createJournalActor(request.currentUser),
+          { conflictOnExisting: true }
+        );
+        return reply.status(201).send(ticket);
+      }
+    );
+
+    app.delete<{ Params: { id: number; ticketId: number } }>(
+      `${basePath}/:id/tickets/:ticketId`,
+      { schema: { params: ownerTicketParamSchema, response: { 204: { type: "null" } } } },
+      async (request, reply) => {
+        unlinkOwnerTicket(app.db, { type: "wikiPage", id: request.params.id }, request.params.ticketId, createJournalActor(request.currentUser));
         return reply.status(204).send();
       }
     );

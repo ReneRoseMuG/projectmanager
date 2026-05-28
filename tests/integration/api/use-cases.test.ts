@@ -15,36 +15,26 @@
  */
 
 import type { FastifyInstance } from "fastify";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { resolveStoredContentPath, setContentBaseDir } from "../../../apps/api/src/services/content.service.js";
 import { buildTestApp, createFeature, createTestDb, createUseCase, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 describe("Use Cases API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
-  let tmpContentDir: string;
 
   beforeAll(async () => {
-    tmpContentDir = fs.mkdtempSync(path.join(os.tmpdir(), "taskmanager-content-"));
-    setContentBaseDir(tmpContentDir);
     testDb = createTestDb();
     app = await buildTestApp(testDb);
   });
 
   beforeEach(() => {
     truncateAll(testDb.sqlite);
-    fs.rmSync(tmpContentDir, { recursive: true, force: true });
-    fs.mkdirSync(tmpContentDir, { recursive: true });
   });
 
   afterAll(async () => {
     await app.close();
     testDb.sqlite.close();
-    fs.rmSync(tmpContentDir, { recursive: true, force: true });
   });
 
   it("POST erstellt Use Case mit DB-Content", async () => {
@@ -57,26 +47,9 @@ describe("Use Cases API", () => {
 
     expect(res.body.featureId).toBe(feature.id);
     expect(res.body).not.toHaveProperty("slug");
-    expect(res.body.contentPath).toBeNull();
+    expect(res.body).not.toHaveProperty("contentPath");
     const row = testDb.sqlite.prepare("SELECT content FROM use_cases WHERE id = ?").get(res.body.id) as { content: string };
     expect(row.content).toBe("# UC-01");
-  });
-
-  it("GET einzelner Use Case liest Legacy-Dateicontent als Fallback", async () => {
-    const feature = await createFeature(app, { title: "Legacy-Feature" });
-    const contentPath = "content/usecases/legacy-use-case.md";
-    fs.writeFileSync(resolveStoredContentPath(contentPath), "# Legacy Use Case", "utf8");
-    const now = new Date().toISOString();
-    const result = testDb.sqlite
-      .prepare(
-        "INSERT INTO use_cases (feature_id, title, status, content_path, content, sort_order, version, created_at, updated_at) VALUES (?, ?, 'draft', ?, NULL, 0, 1, ?, ?)"
-      )
-      .run(feature.id, "Legacy Use Case", contentPath, now, now);
-
-    const res = await supertest(app.server).get(`/api/use-cases/${result.lastInsertRowid}`).expect(200);
-
-    expect(res.body.content).toBe("# Legacy Use Case");
-    expect(res.body.contentPath).toBe(contentPath);
   });
 
   it("GET Liste gibt Use Cases ohne Content zurück", async () => {
@@ -128,7 +101,7 @@ describe("Use Cases API", () => {
 
     const res = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ title: "Neuer Use Case", expectedVersion: useCase.version }).expect(200);
 
-    expect(res.body.contentPath).toBe(useCase.contentPath);
+    expect(res.body).not.toHaveProperty("contentPath");
     const row = testDb.sqlite.prepare("SELECT content FROM use_cases WHERE id = ?").get(useCase.id) as { content: string };
     expect(row.content).toBe("# Test Use Case");
   });

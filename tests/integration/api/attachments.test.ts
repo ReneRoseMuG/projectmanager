@@ -34,6 +34,7 @@ import {
   createTask,
   createTestDb,
   createTicket,
+  createWikiPage,
   truncateAll,
   type TestDb
 } from "../../fixtures/api/index.js";
@@ -180,6 +181,14 @@ describe("Attachments API", () => {
         const ticket = await createTicket(app, null);
         return { id: ticket.id, path: `/api/tickets/${ticket.id}/attachments` };
       }
+    },
+    {
+      label: "wikiPage",
+      ownerType: "wikiPage",
+      createOwner: async () => {
+        const page = await createWikiPage(app);
+        return { id: page.id, path: `/api/wiki/${page.id}/attachments` };
+      }
     }
   ])("POST+GET verknuepft Attachments mit $label", async ({ label, ownerType, createOwner }) => {
     const owner = await createOwner();
@@ -193,6 +202,20 @@ describe("Attachments API", () => {
 
     expect(created.body).toEqual(expect.objectContaining({ originalName: filename, owners: [{ type: ownerType, id: owner.id }] }));
     expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, originalName: filename, owners: [{ type: ownerType, id: owner.id }] })]);
+  });
+
+  it("DELETE /api/wiki/:id/attachments/:attachmentId entfernt Wiki-Attachments", async () => {
+    const page = await createWikiPage(app);
+    const created = await supertest(app.server)
+      .post(`/api/wiki/${page.id}/attachments`)
+      .attach("file", Buffer.from("Wiki-Datei"), { filename: "wiki.txt", contentType: "text/plain" })
+      .expect(201);
+
+    await supertest(app.server).delete(`/api/wiki/${page.id}/attachments/${created.body.id}`).expect(204);
+
+    const listed = await supertest(app.server).get(`/api/wiki/${page.id}/attachments`).expect(200);
+    expect(listed.body).toEqual([]);
+    expect(testDb.sqlite.prepare("SELECT id FROM attachments WHERE id = ?").get(created.body.id)).toBeUndefined();
   });
 
   it("POST zu nicht existierendem Projekt gibt 404 zurueck", async () => {

@@ -1,7 +1,7 @@
 import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskStats, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { dayPlanTasks, featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks } from "../db/schema.js";
+import { dayPlanTasks, featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks, wikiPageTasks, wikiPages } from "../db/schema.js";
 import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
@@ -132,6 +132,13 @@ function ensureUseCaseExists(database: DbClient, useCaseId: number): void {
   }
 }
 
+function ensureWikiPageExists(database: DbClient, wikiPageId: number): void {
+  const page = database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)).get();
+  if (!page) {
+    throw notFound(`Wiki page with id ${wikiPageId} not found`);
+  }
+}
+
 function ensureOwnerExists(database: DbClient, owner: TaskOwner): void {
   if (owner.type === "project") {
     ensureProjectExists(database, owner.id);
@@ -143,6 +150,10 @@ function ensureOwnerExists(database: DbClient, owner: TaskOwner): void {
   }
   if (owner.type === "milestone") {
     ensureMilestoneExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "wikiPage") {
+    ensureWikiPageExists(database, owner.id);
     return;
   }
   ensureUseCaseExists(database, owner.id);
@@ -160,6 +171,10 @@ function getOwnerJournalObject(database: DbClient, owner: TaskOwner): JournalObj
   if (owner.type === "feature") {
     const feature = database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)).get();
     return makeJournalObject("feature", owner.id, feature?.title ?? `Feature ${owner.id}`);
+  }
+  if (owner.type === "wikiPage") {
+    const page = database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)).get();
+    return makeJournalObject("wikiPage", owner.id, page?.title ?? `Wiki-Seite ${owner.id}`);
   }
   const useCase = database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)).get();
   return makeJournalObject("useCase", owner.id, useCase?.title ?? `Use Case ${owner.id}`);
@@ -283,6 +298,10 @@ function taskDeleteBlockers(database: DbClient, taskIds: number[]): string[] {
     blockers.push("Use-Case-Verknüpfungen");
   }
 
+  if (database.select({ taskId: wikiPageTasks.taskId }).from(wikiPageTasks).where(inArray(wikiPageTasks.taskId, taskIds)).get()) {
+    blockers.push("Wiki-VerknÃ¼pfungen");
+  }
+
   if (database.select({ taskId: dayPlanTasks.taskId }).from(dayPlanTasks).where(inArray(dayPlanTasks.taskId, taskIds)).get()) {
     blockers.push("Verknüpfungen zur Persönlichen Planung");
   }
@@ -321,6 +340,15 @@ function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Array<Mappab
       .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
       .where(and(eq(milestoneTasks.ownerId, owner.id), isNull(tasks.parentId)))
       .orderBy(tasks.status, milestoneTasks.position)
+      .all();
+  }
+  if (owner.type === "wikiPage") {
+    return database
+      .select({ ...taskSelect, boardPosition: wikiPageTasks.position })
+      .from(wikiPageTasks)
+      .innerJoin(tasks, eq(wikiPageTasks.taskId, tasks.id))
+      .where(and(eq(wikiPageTasks.ownerId, owner.id), isNull(tasks.parentId)))
+      .orderBy(tasks.status, wikiPageTasks.position)
       .all();
   }
 
@@ -390,6 +418,10 @@ function insertOwnerTask(database: DbClient, owner: TaskOwner, taskId: number, p
     database.insert(milestoneTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
     return;
   }
+  if (owner.type === "wikiPage") {
+    database.insert(wikiPageTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
+    return;
+  }
   database.insert(useCaseTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
 }
 
@@ -406,6 +438,10 @@ function updateOwnerTaskPosition(database: DbClient, owner: TaskOwner, taskId: n
     database.update(milestoneTasks).set({ position }).where(and(eq(milestoneTasks.ownerId, owner.id), eq(milestoneTasks.taskId, taskId))).run();
     return;
   }
+  if (owner.type === "wikiPage") {
+    database.update(wikiPageTasks).set({ position }).where(and(eq(wikiPageTasks.ownerId, owner.id), eq(wikiPageTasks.taskId, taskId))).run();
+    return;
+  }
   database.update(useCaseTasks).set({ position }).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId))).run();
 }
 
@@ -418,6 +454,9 @@ function deleteOwnerTaskLink(database: DbClient, owner: TaskOwner, taskId: numbe
   }
   if (owner.type === "milestone") {
     return database.delete(milestoneTasks).where(and(eq(milestoneTasks.ownerId, owner.id), eq(milestoneTasks.taskId, taskId))).run().changes;
+  }
+  if (owner.type === "wikiPage") {
+    return database.delete(wikiPageTasks).where(and(eq(wikiPageTasks.ownerId, owner.id), eq(wikiPageTasks.taskId, taskId))).run().changes;
   }
   return database.delete(useCaseTasks).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId))).run().changes;
 }
@@ -467,9 +506,13 @@ export function listTasks(database: DbClient): Task[] {
 
 export function listTaskLinkCandidates(database: DbClient, owner: TaskOwner): Task[] {
   ensureOwnerExists(database, owner);
-  const ownerContext = taskOwnerProjectContext(database, owner);
   const linkedTaskIds = new Set(selectVisibleOwnerTaskRows(database, owner).map((task) => task.id));
   const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
+  if (owner.type === "wikiPage") {
+    return listTasks(database).filter((task) => !linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status));
+  }
+
+  const ownerContext = taskOwnerProjectContext(database, owner);
 
   return listTasks(database).filter(
     (task) => !linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status) && projectContextsAreCompatible(ownerContext, taskProjectContext(database, task.id))
@@ -588,7 +631,13 @@ export function createOwnerTask(database: DbClient, owner: TaskOwner, input: Tas
   return mapTaskBoardItem(database, { ...created, boardPosition: position }, [], 0);
 }
 
-export function linkOwnerTask(database: DbClient, owner: TaskOwner, taskId: number, actor?: JournalActor | null): TaskBoardItem {
+export function linkOwnerTask(
+  database: DbClient,
+  owner: TaskOwner,
+  taskId: number,
+  actor?: JournalActor | null,
+  options: { conflictOnExisting?: boolean } = {}
+): TaskBoardItem {
   ensureOwnerExists(database, owner);
   const task = getTaskRecord(database, taskId);
   if (task.parentId !== null) {
@@ -600,10 +649,15 @@ export function linkOwnerTask(database: DbClient, owner: TaskOwner, taskId: numb
 
   const existing = getOwnerTaskRow(database, owner, taskId);
   if (existing) {
+    if (options.conflictOnExisting === true) {
+      throw conflict(`Task ${taskId} is already linked to ${owner.type} ${owner.id}`);
+    }
     return mapTaskBoardItem(database, existing);
   }
 
-  assertCompatibleProjectContexts(taskOwnerProjectContext(database, owner), taskProjectContext(database, taskId));
+  if (owner.type !== "wikiPage") {
+    assertCompatibleProjectContexts(taskOwnerProjectContext(database, owner), taskProjectContext(database, taskId));
+  }
 
   const position = nextOwnerPosition(database, owner, task.status);
   database.transaction((tx) => {

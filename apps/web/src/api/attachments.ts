@@ -17,6 +17,10 @@ export async function getFeatureAttachments(featureId: number): Promise<Attachme
   return api.get(`features/${featureId}/attachments`).json<Attachment[]>();
 }
 
+export async function getWikiPageAttachments(wikiPageId: number): Promise<Attachment[]> {
+  return api.get(`wiki/${wikiPageId}/attachments`).json<Attachment[]>();
+}
+
 export async function uploadProjectAttachment(projectId: number, file: File): Promise<Attachment> {
   const formData = new FormData();
   formData.append("file", file);
@@ -39,6 +43,16 @@ export async function uploadFeatureAttachment(featureId: number, file: File): Pr
   const formData = new FormData();
   formData.append("file", file);
   return api.post(`features/${featureId}/attachments`, { body: formData }).json<Attachment>();
+}
+
+export async function uploadWikiPageAttachment(wikiPageId: number, file: File): Promise<Attachment> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post(`wiki/${wikiPageId}/attachments`, { body: formData }).json<Attachment>();
+}
+
+export async function deleteWikiPageAttachment(wikiPageId: number, attachmentId: number): Promise<void> {
+  await api.delete(`wiki/${wikiPageId}/attachments/${attachmentId}`).json();
 }
 
 export async function deleteAttachment(id: number): Promise<void> {

@@ -2,12 +2,14 @@ import type { WikiBreadcrumb, WikiPage, WikiPageInput, WikiPageUpdate } from "@t
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
+  addWikiPageRelation,
   createWikiPage as createWikiPageRequest,
   deleteWikiPage as deleteWikiPageRequest,
   getRootWikiPages,
   getWikiBreadcrumb,
   getWikiChildren,
   getWikiPage,
+  removeWikiPageRelation,
   updateWikiPage as updateWikiPageRequest
 } from "../api/wiki";
 import { invalidateWiki } from "../queries/invalidation";
@@ -98,6 +100,22 @@ export function useWiki(pageId?: number) {
     [removeWikiPageMutation]
   );
 
+  const syncWikiPageRelations = useCallback(
+    async (id: number, currentRelationIds: number[], nextRelationIds: number[]) => {
+      const current = new Set(currentRelationIds);
+      const next = new Set(nextRelationIds);
+      const additions = [...next].filter((relationId) => !current.has(relationId));
+      const removals = [...current].filter((relationId) => !next.has(relationId));
+
+      await Promise.all([
+        ...additions.map((relationId) => addWikiPageRelation(id, relationId)),
+        ...removals.map((relationId) => removeWikiPageRelation(id, relationId))
+      ]);
+      await invalidateWiki(queryClient);
+    },
+    [queryClient]
+  );
+
   return {
     tree: wikiQuery.data?.tree ?? [],
     page: wikiQuery.data?.page ?? null,
@@ -107,6 +125,7 @@ export function useWiki(pageId?: number) {
     reload,
     createWikiPage,
     updateWikiPage,
+    syncWikiPageRelations,
     removeWikiPage
   };
 }

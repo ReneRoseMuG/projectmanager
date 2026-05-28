@@ -28,36 +28,26 @@
  */
 
 import type { FastifyInstance } from "fastify";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { resolveStoredContentPath, setContentBaseDir } from "../../../apps/api/src/services/content.service.js";
-import { buildTestApp, createTestDb, createWikiPage, truncateAll, type TestDb } from "../../fixtures/api/index.js";
+import { buildTestApp, createProject, createTask, createTestDb, createTicket, createWikiPage, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 describe("Wiki API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
-  let tmpContentDir: string;
 
   beforeAll(async () => {
-    tmpContentDir = fs.mkdtempSync(path.join(os.tmpdir(), "taskmanager-content-"));
-    setContentBaseDir(tmpContentDir);
     testDb = createTestDb();
     app = await buildTestApp(testDb);
   });
 
   beforeEach(() => {
     truncateAll(testDb.sqlite);
-    fs.rmSync(tmpContentDir, { recursive: true, force: true });
-    fs.mkdirSync(tmpContentDir, { recursive: true });
   });
 
   afterAll(async () => {
     await app.close();
     testDb.sqlite.close();
-    fs.rmSync(tmpContentDir, { recursive: true, force: true });
   });
 
   it("Root-Seite anlegen", async () => {
@@ -66,7 +56,7 @@ describe("Wiki API", () => {
     expect(res.body.parentId).toBeNull();
     expect(res.body).not.toHaveProperty("slug");
     expect(res.body).not.toHaveProperty("projectId");
-    expect(res.body.contentPath).toBeNull();
+    expect(res.body).not.toHaveProperty("contentPath");
     const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(res.body.id) as { content: string };
     expect(row.content).toBe("# Einführung");
   });
@@ -80,7 +70,7 @@ describe("Wiki API", () => {
       .expect(201);
 
     expect(res.body.parentId).toBe(root.id);
-    expect(res.body.contentPath).toBeNull();
+    expect(res.body).not.toHaveProperty("contentPath");
     const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(res.body.id) as { content: string };
     expect(row.content).toBe("# Installation");
   });
@@ -106,22 +96,6 @@ describe("Wiki API", () => {
 
     expect(res.body.content).toBe("# Detail");
     expect(res.body).not.toHaveProperty("projectId");
-  });
-
-  it("GET Detail liest Legacy-Dateicontent als Fallback", async () => {
-    const contentPath = "content/wiki/legacy-page.md";
-    fs.writeFileSync(resolveStoredContentPath(contentPath), "# Legacy", "utf8");
-    const now = new Date().toISOString();
-    const result = testDb.sqlite
-      .prepare(
-        "INSERT INTO wiki_pages (title, content_path, content, sort_order, version, created_at, updated_at) VALUES (?, ?, NULL, 0, 1, ?, ?)"
-      )
-      .run("Legacy Wiki", contentPath, now, now);
-
-    const res = await supertest(app.server).get(`/api/wiki/${result.lastInsertRowid}`).expect(200);
-
-    expect(res.body.content).toBe("# Legacy");
-    expect(res.body.contentPath).toBe(contentPath);
   });
 
   it("Breadcrumb-Reihenfolge ist Root zuerst", async () => {
@@ -166,7 +140,7 @@ describe("Wiki API", () => {
 
     const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ title: "Wiki New", expectedVersion: page.version }).expect(200);
 
-    expect(res.body.contentPath).toBe(page.contentPath);
+    expect(res.body).not.toHaveProperty("contentPath");
     const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(page.id) as { content: string };
     expect(row.content).toBe("# Inhalt");
   });
@@ -187,6 +161,77 @@ describe("Wiki API", () => {
     expect(res.body[0].childCount).toBe(1);
     expect(res.body[0].content).toBeUndefined();
     expect(res.body[0]).not.toHaveProperty("projectId");
+  });
+
+  it("Relationen werden bidirektional gelesen und validiert", async () => {
+    const source = await createWikiPage(app, { title: "Source" });
+    const target = await createWikiPage(app, { title: "Target" });
+
+    const created = await supertest(app.server)
+      .post(`/api/wiki/${source.id}/relations`)
+      .send({ targetWikiPageId: target.id })
+      .expect(201);
+
+    expect(created.body).toEqual([{ id: target.id, title: target.title, parentId: null }]);
+    const reverse = await supertest(app.server).get(`/api/wiki-pages/${target.id}/relations`).expect(200);
+    expect(reverse.body).toEqual([{ id: source.id, title: source.title, parentId: null }]);
+    const detail = await supertest(app.server).get(`/api/wiki/${source.id}`).expect(200);
+    expect(detail.body.relatedPages).toEqual([{ id: target.id, title: target.title, parentId: null }]);
+
+    await supertest(app.server).post(`/api/wiki/${source.id}/relations`).send({ targetWikiPageId: target.id }).expect(409);
+    await supertest(app.server).post(`/api/wiki/${source.id}/relations`).send({ targetWikiPageId: source.id }).expect(400);
+    await supertest(app.server).delete(`/api/wiki-pages/${source.id}/relations/${target.id}`).expect(204);
+    const afterDelete = await supertest(app.server).get(`/api/wiki/${source.id}/relations`).expect(200);
+    expect(afterDelete.body).toEqual([]);
+  });
+
+  it("Wiki-Seiten verknüpfen offene Root-Aufgaben", async () => {
+    const page = await createWikiPage(app, { title: "Task Links" });
+    const project = await createProject(app, { name: "Task Project" });
+    const task = await createTask(app, project.id, { title: "Linked Task" });
+
+    const linked = await supertest(app.server).post(`/api/wiki/${page.id}/tasks`).send({ taskId: task.id }).expect(201);
+    expect(linked.body.id).toBe(task.id);
+
+    const list = await supertest(app.server).get(`/api/wiki-pages/${page.id}/tasks`).expect(200);
+    expect(list.body.map((item: { id: number }) => item.id)).toContain(task.id);
+    await supertest(app.server).post(`/api/wiki/${page.id}/tasks`).send({ taskId: task.id }).expect(409);
+    await supertest(app.server).delete(`/api/wiki/${page.id}/tasks/${task.id}`).expect(204);
+  });
+
+  it("Wiki-Seiten verknüpfen offene Root-Tickets", async () => {
+    const page = await createWikiPage(app, { title: "Ticket Links" });
+    const ticket = await createTicket(app, null, { title: "Linked Ticket" });
+
+    const linked = await supertest(app.server).post(`/api/wiki/${page.id}/tickets`).send({ ticketId: ticket.id }).expect(201);
+    expect(linked.body.id).toBe(ticket.id);
+
+    const list = await supertest(app.server).get(`/api/wiki-pages/${page.id}/tickets`).expect(200);
+    expect(list.body.map((item: { id: number }) => item.id)).toContain(ticket.id);
+    await supertest(app.server).post(`/api/wiki/${page.id}/tickets`).send({ ticketId: ticket.id }).expect(409);
+    await supertest(app.server).delete(`/api/wiki/${page.id}/tickets/${ticket.id}`).expect(204);
+  });
+
+  it("Wiki-Löschung entfernt Relations-, Task- und Ticket-Links per Cascade", async () => {
+    const page = await createWikiPage(app, { title: "Cascade Links" });
+    const related = await createWikiPage(app, { title: "Cascade Related" });
+    const project = await createProject(app, { name: "Cascade Project" });
+    const task = await createTask(app, project.id, { title: "Cascade Task" });
+    const ticket = await createTicket(app, null, { title: "Cascade Ticket" });
+
+    await supertest(app.server).post(`/api/wiki/${page.id}/relations`).send({ targetWikiPageId: related.id }).expect(201);
+    await supertest(app.server).post(`/api/wiki/${page.id}/tasks`).send({ taskId: task.id }).expect(201);
+    await supertest(app.server).post(`/api/wiki/${page.id}/tickets`).send({ ticketId: ticket.id }).expect(201);
+    await supertest(app.server).delete(`/api/wiki/${page.id}`).expect(204);
+
+    const relation = testDb.sqlite
+      .prepare("SELECT source_wiki_page_id FROM wiki_page_relations WHERE source_wiki_page_id = ? OR target_wiki_page_id = ?")
+      .get(page.id, page.id);
+    const taskLink = testDb.sqlite.prepare("SELECT owner_id FROM wiki_page_tasks WHERE owner_id = ?").get(page.id);
+    const ticketLink = testDb.sqlite.prepare("SELECT owner_id FROM wiki_page_tickets WHERE owner_id = ?").get(page.id);
+    expect(relation).toBeUndefined();
+    expect(taskLink).toBeUndefined();
+    expect(ticketLink).toBeUndefined();
   });
 
   it("Unbekannte Parent-Seite liefert 404", async () => {

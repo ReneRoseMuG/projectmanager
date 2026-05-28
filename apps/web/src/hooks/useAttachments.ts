@@ -2,15 +2,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
   deleteAttachment as deleteAttachmentRequest,
+  deleteWikiPageAttachment,
   getFeatureAttachments,
   getMilestoneAttachments,
   getProjectAttachments,
   getTaskAttachments,
+  getWikiPageAttachments,
   openAttachment as openAttachmentRequest,
   uploadMilestoneAttachment,
   uploadFeatureAttachment,
   uploadProjectAttachment,
-  uploadTaskAttachment
+  uploadTaskAttachment,
+  uploadWikiPageAttachment
 } from "../api/attachments";
 import { getTicketAttachments, uploadTicketAttachment } from "../api/tickets";
 import { invalidateAttachments } from "../queries/invalidation";
@@ -22,7 +25,8 @@ export type AttachmentOwner =
   | { type: "milestone"; id: number }
   | { type: "task"; id: number }
   | { type: "feature"; id: number }
-  | { type: "ticket"; id: number };
+  | { type: "ticket"; id: number }
+  | { type: "wikiPage"; id: number };
 
 export function useAttachments(owner: AttachmentOwner | null) {
   const queryClient = useQueryClient();
@@ -44,6 +48,9 @@ export function useAttachments(owner: AttachmentOwner | null) {
       }
       if (ownerType === "ticket") {
         return getTicketAttachments(ownerId as number);
+      }
+      if (ownerType === "wikiPage") {
+        return getWikiPageAttachments(ownerId as number);
       }
       return getFeatureAttachments(ownerId as number);
     },
@@ -73,6 +80,9 @@ export function useAttachments(owner: AttachmentOwner | null) {
       if (ownerType === "ticket") {
         return uploadTicketAttachment(ownerId as number, file);
       }
+      if (ownerType === "wikiPage") {
+        return uploadWikiPageAttachment(ownerId as number, file);
+      }
       return uploadFeatureAttachment(ownerId as number, file);
     },
     onSuccess: async () => {
@@ -83,7 +93,13 @@ export function useAttachments(owner: AttachmentOwner | null) {
   });
 
   const removeMutation = useMutation({
-    mutationFn: deleteAttachmentRequest,
+    mutationFn: async (id: number) => {
+      if (ownerType === "wikiPage" && ownerId !== undefined) {
+        await deleteWikiPageAttachment(ownerId, id);
+        return;
+      }
+      await deleteAttachmentRequest(id);
+    },
     onSuccess: async () => {
       if (hasOwner) {
         await invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);

@@ -13,6 +13,9 @@ function ownerPath(owner: TaskOwner): string {
   if (owner.type === "feature") {
     return `features/${owner.id}`;
   }
+  if (owner.type === "wikiPage") {
+    return `wiki/${owner.id}`;
+  }
   return `use-cases/${owner.id}`;
 }
 
@@ -33,6 +36,9 @@ export async function getTaskLinkCandidates(owner: TaskOwner): Promise<Task[]> {
 }
 
 export async function createOwnerTask(owner: TaskOwner, input: TaskInput): Promise<TaskBoardItem> {
+  if (owner.type === "wikiPage") {
+    throw new Error("Wiki pages can only link existing tasks");
+  }
   return api.post(`${ownerPath(owner)}/tasks`, { json: input }).json<TaskBoardItem>();
 }
 
@@ -41,6 +47,9 @@ export async function createTask(projectId: number, input: TaskInput): Promise<T
 }
 
 export async function linkOwnerTask(owner: TaskOwner, taskId: number): Promise<TaskBoardItem> {
+  if (owner.type === "wikiPage") {
+    return api.post(`${ownerPath(owner)}/tasks`, { json: { taskId } }).json<TaskBoardItem>();
+  }
   return api.post(`${ownerPath(owner)}/tasks/${taskId}`).json<TaskBoardItem>();
 }
 
@@ -49,6 +58,9 @@ export async function unlinkOwnerTask(owner: TaskOwner, taskId: number): Promise
 }
 
 export async function updateOwnerTaskBoard(owner: TaskOwner, taskId: number, input: TaskBoardPositionInput): Promise<TaskBoardItem> {
+  if (owner.type === "wikiPage") {
+    throw new Error("Wiki page task links cannot be moved on a board");
+  }
   return api.patch(`${ownerPath(owner)}/tasks/${taskId}/board`, { json: input }).json<TaskBoardItem>();
 }
 

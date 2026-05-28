@@ -361,18 +361,20 @@ function seedCompleteDataset(): void {
       VALUES (1, 'Notiz', '{"type":"doc"}', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO notes (id, title, content_json, created_at, updated_at)
       VALUES (2, 'Meilenstein-Notiz', '{"type":"doc","content":[]}', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO features (id, title, status, description, content_path, sort_order, created_at, updated_at)
-      VALUES (1, 'Feature Alpha', 'active', 'Feature Beschreibung', 'content/features/feature-1.md', 10, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO features (id, title, status, description, content, sort_order, created_at, updated_at)
+      VALUES (1, 'Feature Alpha', 'active', 'Feature Beschreibung', '# Feature Alpha', 10, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO tasks (id, parent_id, title, description, status, priority, assignee, due_date, import_key, created_at, updated_at)
       VALUES (1, NULL, 'Task Alpha', 'Task Beschreibung', 'todo', 'high', 'Ada', '2026-05-20', 'task-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO tasks (id, parent_id, title, description, status, priority, assignee, due_date, import_key, created_at, updated_at)
       VALUES (2, 1, 'Subtask Alpha', NULL, 'in_progress', 'medium', NULL, NULL, 'subtask-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     INSERT INTO tickets (id, type, title, description, status, priority, position, created_at, updated_at)
       VALUES (1, 'bug', 'Ticket Alpha', 'Ticket Beschreibung', 'open', 'high', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO use_cases (id, feature_id, title, status, description, content_path, sort_order, created_at, updated_at)
-      VALUES (1, 1, 'Use Case Alpha', 'active', 'UC Beschreibung', 'content/usecases/usecase-1.md', 20, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO wiki_pages (id, parent_id, title, content_path, sort_order, created_at, updated_at)
-      VALUES (1, NULL, 'Wiki Root', 'content/wiki/wiki-page-1.md', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO use_cases (id, feature_id, title, status, description, content, sort_order, created_at, updated_at)
+      VALUES (1, 1, 'Use Case Alpha', 'active', 'UC Beschreibung', '# Use Case Alpha', 20, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO wiki_pages (id, parent_id, title, content, sort_order, created_at, updated_at)
+      VALUES (1, NULL, 'Wiki Root', '# Wiki Root', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
+    INSERT INTO wiki_pages (id, parent_id, title, content, sort_order, created_at, updated_at)
+      VALUES (2, NULL, 'Wiki Related', '# Wiki Related', 2, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
     UPDATE projects SET wiki_page_id = 1 WHERE id = 1;
     INSERT INTO comments (id, body, created_at)
       VALUES (1, 'Task Kommentar', '2026-05-17T08:00:00');
@@ -420,9 +422,12 @@ function seedCompleteDataset(): void {
     INSERT INTO milestone_tasks (owner_id, task_id, position) VALUES (1, 1, 2);
     INSERT INTO feature_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
     INSERT INTO use_case_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
+    INSERT INTO wiki_page_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
     INSERT INTO day_plan_tasks (owner_id, task_id, position) VALUES (1, 1, 3);
     INSERT INTO project_tickets (owner_id, ticket_id, position) VALUES (1, 1, 1);
     INSERT INTO milestone_tickets (owner_id, ticket_id, position) VALUES (1, 1, 2);
+    INSERT INTO wiki_page_tickets (owner_id, ticket_id, position) VALUES (1, 1, 1);
+    INSERT INTO wiki_page_relations (source_wiki_page_id, target_wiki_page_id) VALUES (1, 2);
     INSERT INTO project_events (project_id, event_id) VALUES (1, 1);
     INSERT INTO milestone_events (milestone_id, event_id) VALUES (1, 1);
     INSERT INTO task_events (task_id, event_id) VALUES (1, 1);
@@ -440,6 +445,7 @@ function seedCompleteDataset(): void {
     INSERT INTO task_attachments (task_id, attachment_id) VALUES (1, 2);
     INSERT INTO feature_attachments (feature_id, attachment_id) VALUES (1, 3);
     INSERT INTO ticket_attachments (ticket_id, attachment_id) VALUES (1, 4);
+    INSERT INTO wiki_page_attachments (wiki_page_id, attachment_id) VALUES (1, 3);
   `);
 }
 

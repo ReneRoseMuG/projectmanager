@@ -1,9 +1,9 @@
 import type { CommentEntityType, DashboardContext, DashboardWidgetId, DashboardWidgetParams, JournalObjectType } from "@taskmanager/shared-types";
 
 export type NoteOwnerType = "project" | "milestone" | "task" | "ticket" | "dayPlan";
-export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket";
-export type TaskOwnerType = "project" | "milestone" | "feature" | "useCase";
-export type TicketOwnerType = "project" | "milestone" | "task" | "feature" | "useCase";
+export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket" | "wikiPage";
+export type TaskOwnerType = "project" | "milestone" | "feature" | "useCase" | "wikiPage";
+export type TicketOwnerType = "project" | "milestone" | "task" | "feature" | "useCase" | "wikiPage";
 
 export const queryKeys = {
   auth: {
@@ -107,7 +107,10 @@ export const queryKeys = {
   wiki: {
     root: ["wiki"] as const,
     tree: () => [...queryKeys.wiki.root, "tree"] as const,
-    detail: (pageId: number) => [...queryKeys.wiki.root, "detail", pageId] as const
+    detail: (pageId: number) => [...queryKeys.wiki.root, "detail", pageId] as const,
+    relations: (pageId: number) => [...queryKeys.wiki.detail(pageId), "relations"] as const,
+    tasks: (pageId: number) => [...queryKeys.wiki.detail(pageId), "tasks"] as const,
+    tickets: (pageId: number) => [...queryKeys.wiki.detail(pageId), "tickets"] as const
   },
   events: {
     root: ["events"] as const,

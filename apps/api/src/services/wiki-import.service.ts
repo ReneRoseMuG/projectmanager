@@ -77,14 +77,12 @@ interface ParsedTask {
 interface StoredFeature {
   id: number;
   title: string;
-  contentPath: string | null;
 }
 
 interface StoredUseCase {
   id: number;
   featureId: number;
   title: string;
-  contentPath: string | null;
 }
 
 interface StoredTask {
@@ -705,7 +703,7 @@ function ensureProjectExists(database: DbClient, projectId: number): void {
 
 function getFeatureByTitle(database: DbClient, title: string): StoredFeature | undefined {
   return database
-    .select({ id: features.id, title: features.title, contentPath: features.contentPath })
+    .select({ id: features.id, title: features.title })
     .from(features)
     .where(eq(features.title, title))
     .get();
@@ -713,7 +711,7 @@ function getFeatureByTitle(database: DbClient, title: string): StoredFeature | u
 
 function getUseCaseByFeatureAndTitle(database: DbClient, featureId: number, title: string): StoredUseCase | undefined {
   return database
-    .select({ id: useCases.id, featureId: useCases.featureId, title: useCases.title, contentPath: useCases.contentPath })
+    .select({ id: useCases.id, featureId: useCases.featureId, title: useCases.title })
     .from(useCases)
     .where(and(eq(useCases.featureId, featureId), eq(useCases.title, title)))
     .get();
@@ -860,13 +858,12 @@ function upsertFeature(database: DbClient, feature: ParsedFeature, execute: bool
       title: feature.title,
       status: "active",
       description: feature.description,
-      contentPath: null,
       content: feature.content,
       sortOrder: feature.sortOrder,
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: features.id, title: features.title, contentPath: features.contentPath })
+    .returning({ id: features.id, title: features.title })
     .get();
 
   return { record: created, action: "created" };
@@ -907,13 +904,12 @@ function upsertUseCase(
       title: useCase.title,
       status: "active",
       description: useCase.description,
-      contentPath: null,
       content: useCase.content,
       sortOrder: useCase.sortOrder,
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: useCases.id, featureId: useCases.featureId, title: useCases.title, contentPath: useCases.contentPath })
+    .returning({ id: useCases.id, featureId: useCases.featureId, title: useCases.title })
     .get();
 
   return { record: created, action: "created" };
@@ -1149,7 +1145,7 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
 
   for (const feature of parsed.features) {
     const result = upsertFeature(database, feature, execute, now);
-    const record = result.record ?? getFeatureByTitle(database, feature.title) ?? (!execute ? { id: previewFeatureId--, title: feature.title, contentPath: null } : undefined);
+    const record = result.record ?? getFeatureByTitle(database, feature.title) ?? (!execute ? { id: previewFeatureId--, title: feature.title } : undefined);
     if (record) {
       featureRecordsByKey.set(feature.sourceKey, record);
       reportProjectFeatureLink(report, database, projectId, record, execute);
@@ -1210,7 +1206,7 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
     }
 
     const result = upsertUseCase(database, useCase, feature.id, execute, now);
-    const record = result.record ?? getUseCaseByFeatureAndTitle(database, feature.id, useCase.title) ?? (!execute ? { id: previewUseCaseId--, featureId: feature.id, title: useCase.title, contentPath: null } : undefined);
+    const record = result.record ?? getUseCaseByFeatureAndTitle(database, feature.id, useCase.title) ?? (!execute ? { id: previewUseCaseId--, featureId: feature.id, title: useCase.title } : undefined);
     if (record) {
       useCaseRecordsByKey.set(useCase.sourceKey, record);
     }

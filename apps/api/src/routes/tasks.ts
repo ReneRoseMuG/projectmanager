@@ -66,12 +66,21 @@ const ownerTaskParamSchema = {
   }
 } as const;
 
+const taskLinkBodySchema = {
+  type: "object",
+  required: ["taskId"],
+  additionalProperties: false,
+  properties: {
+    taskId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
 const taskLinkCandidatesQuerySchema = {
   type: "object",
   required: ["ownerType", "ownerId"],
   additionalProperties: false,
   properties: {
-    ownerType: { type: "string", enum: ["project", "milestone", "feature", "useCase"] },
+    ownerType: { type: "string", enum: ["project", "milestone", "feature", "useCase", "wikiPage"] },
     ownerId: { type: "integer", minimum: 1 }
   }
 } as const;
@@ -241,6 +250,38 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     { schema: { params: ownerTaskParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => linkOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser))
   );
+
+  for (const basePath of ["/wiki", "/wiki-pages"]) {
+    app.get<{ Params: { id: number } }>(
+      `${basePath}/:id/tasks`,
+      { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+      async (request) => listOwnerTasks(app.db, { type: "wikiPage", id: request.params.id })
+    );
+
+    app.post<{ Params: { id: number }; Body: { taskId: number } }>(
+      `${basePath}/:id/tasks`,
+      { schema: { params: idParamSchema, body: taskLinkBodySchema, response: { 201: objectResponseSchema } } },
+      async (request, reply) => {
+        const task = linkOwnerTask(
+          app.db,
+          { type: "wikiPage", id: request.params.id },
+          request.body.taskId,
+          createJournalActor(request.currentUser),
+          { conflictOnExisting: true }
+        );
+        return reply.status(201).send(task);
+      }
+    );
+
+    app.delete<{ Params: { id: number; taskId: number } }>(
+      `${basePath}/:id/tasks/:taskId`,
+      { schema: { params: ownerTaskParamSchema, response: { 204: { type: "null" } } } },
+      async (request, reply) => {
+        unlinkOwnerTask(app.db, { type: "wikiPage", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
+        return reply.status(204).send();
+      }
+    );
+  }
 
   app.delete<{ Params: { id: number; taskId: number } }>(
     "/projects/:id/tasks/:taskId",

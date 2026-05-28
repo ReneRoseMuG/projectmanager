@@ -5,7 +5,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type WikiPageRecord = typeof wikiPages.$inferSelect;
 export type WikiPageCreateData = Omit<typeof wikiPages.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type WikiPageUpdateData = Partial<Pick<WikiPageCreateData, "parentId" | "title" | "contentPath" | "content" | "sortOrder">>;
+export type WikiPageUpdateData = Partial<Pick<WikiPageCreateData, "parentId" | "title" | "content" | "sortOrder">>;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -57,10 +57,6 @@ export const wikiPageRepository = {
       .where(eq(wikiPages.id, id))
       .returning()
       .get();
-  },
-
-  setContentPath(database: DbClient, id: number, contentPath: string): WikiPageRecord | undefined {
-    return database.update(wikiPages).set({ contentPath, updatedAt: nowIso() }).where(eq(wikiPages.id, id)).returning().get();
   },
 
   delete(database: DbClient, id: number): number {

@@ -134,7 +134,6 @@ export interface TestFeature {
   status: string;
   description: string | null;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
   useCaseCount: number;
   attachmentCount: number;
@@ -152,7 +151,6 @@ export interface TestUseCase {
   status: string;
   description: string | null;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
   attachmentCount: number;
   noteCount: number;
@@ -167,9 +165,12 @@ export interface TestWikiPage {
   parentId: number | null;
   title: string;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
   childCount: number;
+  attachmentCount: number;
+  taskCount: number;
+  ticketCount: number;
+  relatedPages: Array<{ id: number; title: string; parentId: number | null }>;
   createdAt: string;
   updatedAt: string;
 }

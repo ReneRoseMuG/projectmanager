@@ -16,7 +16,7 @@ import {
 
 type MappableFeatureRecord = Pick<
   typeof features.$inferSelect,
-  "id" | "title" | "status" | "description" | "contentPath" | "sortOrder" | "version" | "createdAt" | "updatedAt"
+  "id" | "title" | "status" | "description" | "sortOrder" | "version" | "createdAt" | "updatedAt"
 >;
 
 type FeatureReference = Pick<typeof features.$inferSelect, "id" | "title">;
@@ -27,7 +27,6 @@ function mapFeature(row: MappableFeatureRecord, useCaseCount = 0): FeatureDto {
     title: row.title,
     status: row.status,
     description: row.description,
-    contentPath: row.contentPath,
     sortOrder: row.sortOrder,
     version: row.version,
     useCaseCount,
@@ -230,7 +229,6 @@ export function listProjectFeatures(database: DbClient, projectId: number): Feat
       title: features.title,
       status: features.status,
       description: features.description,
-      contentPath: features.contentPath,
       sortOrder: features.sortOrder,
       version: features.version,
       createdAt: features.createdAt,
@@ -278,7 +276,6 @@ export function listMilestoneFeatures(database: DbClient, milestoneId: number): 
       title: features.title,
       status: features.status,
       description: features.description,
-      contentPath: features.contentPath,
       sortOrder: features.sortOrder,
       version: features.version,
       createdAt: features.createdAt,
@@ -332,7 +329,6 @@ export function listFeatureRelations(database: DbClient, featureId: number): Fea
       targetTitle: features.title,
       targetStatus: features.status,
       targetDescription: features.description,
-      targetContentPath: features.contentPath,
       targetSortOrder: features.sortOrder,
       targetVersion: features.version,
       targetCreatedAt: features.createdAt,
@@ -360,7 +356,6 @@ export function listFeatureRelations(database: DbClient, featureId: number): Fea
           title: row.targetTitle,
           status: row.targetStatus,
         description: row.targetDescription,
-        contentPath: row.targetContentPath,
         sortOrder: row.targetSortOrder,
         version: row.targetVersion,
         createdAt: row.targetCreatedAt,

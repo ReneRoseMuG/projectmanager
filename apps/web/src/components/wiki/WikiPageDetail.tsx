@@ -1,7 +1,8 @@
 import type { WikiPage, WikiPageUpdate } from "@taskmanager/shared-types";
-import { Edit3, Save, Trash2 } from "lucide-react";
+import { Edit3, FileText, Save, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { uploadContentImage } from "../../api/content-images";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
@@ -63,6 +64,18 @@ export function WikiPageDetail({ page, onSave, onDelete, onEditMetadata }: WikiP
         {activeTab === "content" ? (
           <form id="wiki-page-detail-form" className="grid gap-5" onSubmit={submit}>
             <RichTextInlineField value={content} placeholder="Wiki-Inhalt" testIdPrefix="wiki-page-detail-content" onImageUpload={uploadContentImage} onChange={setContent} />
+            {page.relatedPages.length > 0 ? (
+              <Section title="Verwandte Themen">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {page.relatedPages.map((relatedPage) => (
+                    <Link key={relatedPage.id} to={`/wiki/${relatedPage.id}`} className="flex min-h-14 items-center gap-3 rounded-md border border-line bg-white px-3 py-2 text-sm transition hover:border-teal hover:bg-teal/5">
+                      <FileText size={17} className="shrink-0 text-teal" />
+                      <span className="min-w-0 truncate font-medium text-ink">{relatedPage.title}</span>
+                    </Link>
+                  ))}
+                </div>
+              </Section>
+            ) : null}
             <footer className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-white/95 p-4 shadow-panel backdrop-blur">
               <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(page)}>
                 Löschen

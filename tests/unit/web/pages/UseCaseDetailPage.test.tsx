@@ -42,7 +42,6 @@ vi.mock("../../../../apps/web/src/api/use-cases", () => ({
     status: "active",
     description: null,
     content: null,
-    contentPath: null,
     sortOrder: 0,
     version: 1,
     createdAt: "2026-05-20T08:00:00.000Z",

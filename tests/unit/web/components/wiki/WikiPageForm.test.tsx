@@ -29,13 +29,15 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
 
 const wikiPage: WikiPage = {
   id: 5,
-  projectId: null,
   parentId: null,
   title: "Wiki Alpha",
   content: "<p>Wiki Inhalt</p>",
-  contentPath: null,
   sortOrder: 0,
   childCount: 0,
+  attachmentCount: 0,
+  taskCount: 0,
+  ticketCount: 0,
+  relatedPages: [],
   version: 1,
   createdAt: "2026-05-19T08:00:00.000Z",
   updatedAt: "2026-05-19T09:00:00.000Z"
@@ -53,23 +55,23 @@ afterEach(() => {
 describe("WikiPageForm", () => {
   it("bindet RichTextInlineField an den Inhalt", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} onSubmit={onSubmit} onClose={vi.fn()} />);
+    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={onSubmit} onClose={vi.fn()} />);
 
     expect(screen.getByTestId("wiki-page-form-content-view")).toHaveValue(wikiPage.content);
     fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: "<p>Wiki aktualisiert</p>" } });
     fireEvent.click(screen.getByRole("button", { name: "Veröffentlichen" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Wiki aktualisiert</p>" })));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Wiki aktualisiert</p>" }), []));
   });
 
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {
-    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} />);
+    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} onOpenInTab={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "In neuem Tab öffnen" })).toBeInTheDocument();
   });
 
   it("zeigt im Edit-Modus keinen 'In neuem Tab öffnen'-Button, wenn onOpenInTab fehlt", () => {
-    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
   });

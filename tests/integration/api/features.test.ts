@@ -21,13 +21,11 @@ import * as path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { config } from "../../../apps/api/src/config.js";
-import { resolveStoredContentPath, setContentBaseDir } from "../../../apps/api/src/services/content.service.js";
 import { buildTestApp, createFeature, createTestDb, createUseCase, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 describe("Features API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
-  let tmpContentDir: string;
   let originalUploadDir: string;
   let originalPreviewCacheDir: string;
   const uploadDir = path.join(os.tmpdir(), `taskmanager-api-feature-counts-${process.pid}`);
@@ -40,16 +38,12 @@ describe("Features API", () => {
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
     config.uploadDir = uploadDir;
     config.previewCacheDir = previewCacheDir;
-    tmpContentDir = fs.mkdtempSync(path.join(os.tmpdir(), "taskmanager-content-"));
-    setContentBaseDir(tmpContentDir);
     testDb = createTestDb();
     app = await buildTestApp(testDb, { enableMultipart: true });
   });
 
   beforeEach(() => {
     truncateAll(testDb.sqlite);
-    fs.rmSync(tmpContentDir, { recursive: true, force: true });
-    fs.mkdirSync(tmpContentDir, { recursive: true });
     fs.rmSync(uploadDir, { recursive: true, force: true });
     fs.rmSync(previewCacheDir, { recursive: true, force: true });
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -65,7 +59,6 @@ describe("Features API", () => {
     }
     config.uploadDir = originalUploadDir;
     config.previewCacheDir = originalPreviewCacheDir;
-    fs.rmSync(tmpContentDir, { recursive: true, force: true });
     fs.rmSync(uploadDir, { recursive: true, force: true });
     fs.rmSync(previewCacheDir, { recursive: true, force: true });
   });
@@ -78,7 +71,7 @@ describe("Features API", () => {
 
     expect(res.body).toMatchObject({ title: "FT-01", status: "draft" });
     expect(res.body).not.toHaveProperty("slug");
-    expect(res.body.contentPath).toBeNull();
+    expect(res.body).not.toHaveProperty("contentPath");
     const row = testDb.sqlite.prepare("SELECT content FROM features WHERE id = ?").get(res.body.id) as { content: string };
     expect(row.content).toBe("# FT-01\n\nBeschreibung.");
   });
@@ -130,22 +123,6 @@ describe("Features API", () => {
     expect(res.body.content).toBe("# Detail");
   });
 
-  it("GET einzelnes Feature liest Legacy-Dateicontent als Fallback", async () => {
-    const contentPath = "content/features/legacy-feature.md";
-    fs.writeFileSync(resolveStoredContentPath(contentPath), "# Legacy Feature", "utf8");
-    const now = new Date().toISOString();
-    const result = testDb.sqlite
-      .prepare(
-        "INSERT INTO features (title, status, content_path, content, sort_order, version, created_at, updated_at) VALUES (?, 'draft', ?, NULL, 0, 1, ?, ?)"
-      )
-      .run("Legacy Feature", contentPath, now, now);
-
-    const res = await supertest(app.server).get(`/api/features/${result.lastInsertRowid}`).expect(200);
-
-    expect(res.body.content).toBe("# Legacy Feature");
-    expect(res.body.contentPath).toBe(contentPath);
-  });
-
   it("PATCH aktualisiert DB-Content", async () => {
     const feature = await createFeature(app, { title: "Patchfeature", content: "# Alt" });
 
@@ -171,7 +148,7 @@ describe("Features API", () => {
     const feature = await createFeature(app, { title: "Alter Titel", content: "# Inhalt" });
     const res = await supertest(app.server).patch(`/api/features/${feature.id}`).send({ title: "Neuer Titel", expectedVersion: feature.version }).expect(200);
 
-    expect(res.body.contentPath).toBe(feature.contentPath);
+    expect(res.body).not.toHaveProperty("contentPath");
     const row = testDb.sqlite.prepare("SELECT content FROM features WHERE id = ?").get(feature.id) as { content: string };
     expect(row.content).toBe("# Inhalt");
   });

@@ -29,6 +29,9 @@ function ownerPath(owner: TicketOwner): string {
   if (owner.type === "feature") {
     return `features/${owner.id}`;
   }
+  if (owner.type === "wikiPage") {
+    return `wiki/${owner.id}`;
+  }
   return `use-cases/${owner.id}`;
 }
 
@@ -57,10 +60,16 @@ export async function createTicket(input: TicketInput): Promise<Ticket> {
 }
 
 export async function createOwnerTicket(owner: TicketOwner, input: TicketInput): Promise<Ticket> {
+  if (owner.type === "wikiPage") {
+    throw new Error("Wiki pages can only link existing tickets");
+  }
   return api.post(`${ownerPath(owner)}/tickets`, { json: input }).json<Ticket>();
 }
 
 export async function linkOwnerTicket(owner: TicketOwner, ticketId: number): Promise<Ticket> {
+  if (owner.type === "wikiPage") {
+    return api.post(`${ownerPath(owner)}/tickets`, { json: { ticketId } }).json<Ticket>();
+  }
   return api.post(`${ownerPath(owner)}/tickets/${ticketId}`).json<Ticket>();
 }
 

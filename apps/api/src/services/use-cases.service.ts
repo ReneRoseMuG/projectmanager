@@ -6,11 +6,7 @@ import { assertVersion } from "../repositories/base.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { useCaseRepository, type UseCaseRecord, type UseCaseUpdateData } from "../repositories/use-case.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import {
-  deleteContent,
-  readContentFromDb,
-  resolveStoredContentPath,
-} from "./content.service.js";
+import { readContentFromDb } from "./content.service.js";
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import {
@@ -45,7 +41,6 @@ export interface UseCaseDto {
   status: UseCaseStatus;
   description: string | null;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
   attachmentCount: number;
   noteCount: number;
@@ -82,7 +77,6 @@ function mapUseCase(record: UseCaseRecord, content?: string, supportCounts = emp
     status: record.status,
     description: record.description,
     content,
-    contentPath: record.contentPath,
     sortOrder: record.sortOrder,
     attachmentCount: supportCounts.attachmentCount,
     noteCount: supportCounts.noteCount,
@@ -205,7 +199,6 @@ export function createUseCase(database: DbClient, featureId: number, input: UseC
         title,
         status,
         description: cleanNullable(input.description) ?? null,
-        contentPath: null,
         content,
         sortOrder: input.sortOrder ?? 0
       },
@@ -301,8 +294,4 @@ export function deleteUseCase(database: DbClient, id: number, actor?: JournalAct
     });
     useCaseRepository.delete(tx, id);
   });
-
-  if (useCase.contentPath) {
-    deleteContent(resolveStoredContentPath(useCase.contentPath));
-  }
 }

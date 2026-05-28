@@ -5,15 +5,10 @@ import { featureAttachments, featureComments, useCases } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import { featureRepository, type FeatureRecord, type FeatureUpdateData } from "../repositories/feature.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
-import { useCaseRepository } from "../repositories/use-case.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { deleteFeatureAttachmentsForIds } from "./attachments.service.js";
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
-import {
-  deleteContent,
-  readContentFromDb,
-  resolveStoredContentPath,
-} from "./content.service.js";
+import { readContentFromDb } from "./content.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import {
   buildCreateSummary,
@@ -44,7 +39,6 @@ export interface FeatureDto {
   status: FeatureStatus;
   description: string | null;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
   version: number;
   useCaseCount: number;
@@ -81,7 +75,6 @@ function mapFeature(record: FeatureRecord, useCaseCount: number, content?: strin
     status: record.status,
     description: record.description,
     content,
-    contentPath: record.contentPath,
     sortOrder: record.sortOrder,
     version: record.version,
     useCaseCount,
@@ -208,7 +201,6 @@ export function createFeature(database: DbClient, input: FeatureInput, actor?: J
         title,
         status,
         description: cleanNullable(input.description) ?? null,
-        contentPath: null,
         content,
         sortOrder: input.sortOrder ?? 0
       },
@@ -284,7 +276,6 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
 
 export async function deleteFeature(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
   const feature = getFeatureRecord(database, id);
-  const linkedUseCases = useCaseRepository.findByFeatureId(database, id);
 
   await deleteFeatureAttachmentsForIds(database, [id]);
   database.transaction((tx) => {
@@ -297,14 +288,4 @@ export async function deleteFeature(database: DbClient, id: number, actor?: Jour
     });
     featureRepository.delete(tx, id);
   });
-
-  if (feature.contentPath) {
-    deleteContent(resolveStoredContentPath(feature.contentPath));
-  }
-
-  for (const useCase of linkedUseCases) {
-    if (useCase.contentPath) {
-      deleteContent(resolveStoredContentPath(useCase.contentPath));
-    }
-  }
 }

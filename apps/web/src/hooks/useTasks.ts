@@ -14,7 +14,7 @@ import {
   updateTask as updateTaskRequest
 } from "../api/tasks";
 import { setTaskTags } from "../api/tags";
-import { invalidateFeatureScope, invalidateMilestoneScope, invalidateProjectScope, invalidateTaskScope, invalidateUseCaseScope } from "../queries/invalidation";
+import { invalidateFeatureScope, invalidateMilestoneScope, invalidateProjectScope, invalidateTaskScope, invalidateUseCaseScope, invalidateWiki } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
@@ -31,6 +31,9 @@ function ownerTaskKey(owner?: TaskOwner) {
   if (owner.type === "feature") {
     return queryKeys.features.tasks(owner.id);
   }
+  if (owner.type === "wikiPage") {
+    return queryKeys.wiki.tasks(owner.id);
+  }
   return queryKeys.useCases.tasks(owner.id);
 }
 
@@ -43,6 +46,8 @@ async function invalidateOwner(queryClient: QueryClient, owner?: TaskOwner, task
     await invalidateFeatureScope(queryClient, owner.id);
   } else if (owner?.type === "useCase") {
     await invalidateUseCaseScope(queryClient, undefined, owner.id);
+  } else if (owner?.type === "wikiPage") {
+    await invalidateWiki(queryClient);
   }
   await invalidateTaskScope(queryClient, taskId);
 }

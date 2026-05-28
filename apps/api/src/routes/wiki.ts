@@ -1,5 +1,17 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from "fastify";
-import { createWikiPage, deleteWikiPage, getWikiBreadcrumb, getWikiPage, listRootWikiPages, listWikiChildren, updateWikiPage, type WikiPageInput } from "../services/wiki.service.js";
+import {
+  addWikiPageRelation,
+  createWikiPage,
+  deleteWikiPage,
+  getWikiBreadcrumb,
+  getWikiPage,
+  listRootWikiPages,
+  listWikiChildren,
+  listWikiPageRelations,
+  removeWikiPageRelation,
+  updateWikiPage,
+  type WikiPageInput
+} from "../services/wiki.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
@@ -23,6 +35,15 @@ const wikiPatchSchema = {
   properties: {
     ...wikiBodySchema.properties,
     ...expectedVersionPropertySchema
+  }
+} as const;
+
+const wikiRelationBodySchema = {
+  type: "object",
+  required: ["targetWikiPageId"],
+  additionalProperties: false,
+  properties: {
+    targetWikiPageId: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -76,4 +97,42 @@ export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(204).send();
     }
   );
+
+  for (const basePath of ["/wiki", "/wiki-pages"]) {
+    app.get<{ Params: { id: number } }>(
+      `${basePath}/:id/relations`,
+      { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+      async (request) => listWikiPageRelations(app.db, request.params.id)
+    );
+
+    app.post<{ Params: { id: number }; Body: { targetWikiPageId: number } }>(
+      `${basePath}/:id/relations`,
+      { schema: { params: idParamSchema, body: wikiRelationBodySchema, response: { 201: arrayResponseSchema } } },
+      async (request, reply) => {
+        const relations = addWikiPageRelation(app.db, request.params.id, request.body.targetWikiPageId, createJournalActor(request.currentUser));
+        return reply.status(201).send(relations);
+      }
+    );
+
+    app.delete<{ Params: { id: number; targetId: number } }>(
+      `${basePath}/:id/relations/:targetId`,
+      {
+        schema: {
+          params: {
+            type: "object",
+            required: ["id", "targetId"],
+            properties: {
+              id: { type: "integer", minimum: 1 },
+              targetId: { type: "integer", minimum: 1 }
+            }
+          },
+          response: { 204: { type: "null" } }
+        }
+      },
+      async (request, reply) => {
+        removeWikiPageRelation(app.db, request.params.id, request.params.targetId, createJournalActor(request.currentUser));
+        return reply.status(204).send();
+      }
+    );
+  }
 }
