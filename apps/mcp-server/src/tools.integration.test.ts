@@ -42,6 +42,27 @@ import { createProjectManagerMcpServer } from "./server.js";
 
 type ToolCallResponse = Awaited<ReturnType<Client["callTool"]>>;
 
+interface BulkCreated<Result> {
+  index: number;
+  result: Result;
+}
+
+interface BulkError {
+  index: number;
+  stage: string;
+  message: string;
+  code?: string;
+  statusCode?: number;
+}
+
+interface BulkResult<Result> {
+  requested: number;
+  createdCount: number;
+  errorCount: number;
+  created: Array<BulkCreated<Result>>;
+  errors: BulkError[];
+}
+
 const apiKey = "mcp-integration-api-key";
 const uploadDir = path.join(os.tmpdir(), `taskmanager-mcp-attachments-${process.pid}`);
 const previewCacheDir = path.join(os.tmpdir(), `taskmanager-mcp-attachment-previews-${process.pid}`);
@@ -317,6 +338,99 @@ describe("MCP tools integration", () => {
     expect(await seedClient.get<Attachment[]>(`tasks/${task.id}/attachments`)).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: attachment.id, originalName: "mcp-attachment.txt" })])
     );
+
+    const bulkNotes = await callTool<BulkResult<Note>>(executedTools, "add_notes_to_parent", {
+      parentType: "ticket",
+      parentId: ticket.id,
+      notes: [
+        { title: "Bulk Notiz 1", text: "Erste Bulk-Notiz" },
+        { title: "Bulk Notiz 2", text: "Zweite Bulk-Notiz" }
+      ]
+    });
+    expect(bulkNotes).toMatchObject({ requested: 2, createdCount: 2, errorCount: 0 });
+    expect(bulkNotes.created.map((entry) => entry.result.title)).toEqual(["Bulk Notiz 1", "Bulk Notiz 2"]);
+    expect(await seedClient.get<Note[]>(`tickets/${ticket.id}/notes`)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: bulkNotes.created[0]?.result.id, title: "Bulk Notiz 1" })])
+    );
+
+    const bulkComments = await callTool<BulkResult<Comment>>(executedTools, "add_comments_to_parent", {
+      parentType: "feature",
+      parentId: feature.id,
+      comments: [{ body: "Bulk Kommentar 1" }, { body: "Bulk Kommentar 2" }]
+    });
+    expect(bulkComments).toMatchObject({ requested: 2, createdCount: 2, errorCount: 0 });
+    expect(bulkComments.created.map((entry) => entry.result.body)).toEqual(["Bulk Kommentar 1", "Bulk Kommentar 2"]);
+
+    const bulkAttachments = await callTool<BulkResult<Attachment>>(executedTools, "add_attachments_to_parent", {
+      parentType: "milestone",
+      parentId: milestone.id,
+      attachments: [
+        {
+          fileName: "bulk-one.txt",
+          contentBase64: Buffer.from("bulk one", "utf8").toString("base64"),
+          mimetype: "text/plain"
+        },
+        {
+          fileName: "bulk-two.txt",
+          contentBase64: Buffer.from("bulk two", "utf8").toString("base64"),
+          mimetype: "text/plain"
+        }
+      ]
+    });
+    expect(bulkAttachments).toMatchObject({ requested: 2, createdCount: 2, errorCount: 0 });
+    expect(await fs.readFile(path.join(uploadDir, bulkAttachments.created[1]?.result.filename ?? ""), "utf8")).toBe("bulk two");
+
+    const bulkTasks = await callTool<BulkResult<{ task: Task; attachment?: Attachment }>>(executedTools, "add_task_list_to_parent", {
+      parentType: "useCase",
+      parentId: useCase.id,
+      tasks: [
+        {
+          title: "Bulk Aufgabe mit Attachment",
+          description: "Per Bulk-Tool angelegt",
+          status: "todo",
+          priority: "medium",
+          attachment: {
+            fileName: "bulk-task.txt",
+            contentBase64: Buffer.from("bulk task", "utf8").toString("base64"),
+            mimetype: "text/plain"
+          }
+        },
+        {
+          title: "Bulk Aufgabe ohne Attachment",
+          description: "Per Bulk-Tool angelegt",
+          status: "todo",
+          priority: "low"
+        }
+      ]
+    });
+    expect(bulkTasks).toMatchObject({ requested: 2, createdCount: 2, errorCount: 0 });
+    expect(bulkTasks.created[0]?.result.task).toMatchObject({ title: "Bulk Aufgabe mit Attachment" });
+    expect(bulkTasks.created[0]?.result.attachment).toMatchObject({ originalName: "bulk-task.txt", owners: [{ type: "task", id: bulkTasks.created[0]?.result.task.id }] });
+    expect(await seedClient.get<Task[]>(`use-cases/${useCase.id}/tasks`)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: bulkTasks.created[1]?.result.task.id, title: "Bulk Aufgabe ohne Attachment" })])
+    );
+
+    const bulkTickets = await callTool<BulkResult<{ ticket: Ticket; attachment?: Attachment }>>(executedTools, "add_ticket_list_to_parent", {
+      parentType: "task",
+      parentId: task.id,
+      tickets: [
+        {
+          title: "Bulk Ticket mit Attachment",
+          description: "Per Bulk-Tool angelegt",
+          type: "bug",
+          status: "open",
+          priority: "high",
+          attachment: {
+            fileName: "bulk-ticket.txt",
+            contentBase64: Buffer.from("bulk ticket", "utf8").toString("base64"),
+            mimetype: "text/plain"
+          }
+        }
+      ]
+    });
+    expect(bulkTickets).toMatchObject({ requested: 1, createdCount: 1, errorCount: 0 });
+    expect(bulkTickets.created[0]?.result.ticket).toMatchObject({ title: "Bulk Ticket mit Attachment" });
+    expect(bulkTickets.created[0]?.result.attachment).toMatchObject({ originalName: "bulk-ticket.txt", owners: [{ type: "ticket", id: bulkTickets.created[0]?.result.ticket.id }] });
 
     const context = await callTool<ReferenceContext>(executedTools, "get_reference_context", { reference: `PROJ-${project.id}` });
     expect(context.normalizedReference).toBe(`PROJ-${project.id}`);

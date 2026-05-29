@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 29.05.26 | 08:36:24 | Feature | MCP Bulk Tools | ✅ |
+| 29.05.26 | 05:35:18 | Fix | Migrationen und Dev-Start | ✅ |
 | 28.05.26 | 17:59:08 | Log | Manueller Status TKT-33 | ✅ |
 | 28.05.26 | 17:58:56 | Nachtrag | TKT-32 Kommentar Realtime | ⚠️ |
 | 28.05.26 | 17:58:49 | Nachtrag | Wiki Support Tabs Log | ✅ |

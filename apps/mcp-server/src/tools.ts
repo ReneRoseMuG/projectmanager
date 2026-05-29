@@ -25,7 +25,7 @@ import type {
   UserOption
 } from "@taskmanager/shared-types";
 import { z } from "zod";
-import type { ProjectManagerApiClient } from "./api-client.js";
+import { ProjectManagerApiError, type ProjectManagerApiClient } from "./api-client.js";
 import { buildReferenceContext } from "./reference-context.js";
 import { plainTextDocument } from "./rich-text.js";
 
@@ -33,6 +33,8 @@ export type ParentType = "project" | "milestone";
 export type LinkParentType = ParentType | "feature" | "useCase";
 export type ExtendedParentType = ParentType | "task" | "feature" | "useCase" | "ticket";
 export type AttachmentParentType = ParentType | "task" | "feature" | "ticket";
+export type TaskCreateParentType = ParentType | "feature" | "useCase";
+export type TicketCreateParentType = ParentType | "task" | "feature" | "useCase";
 
 export interface ToolDefinition {
   name: string;
@@ -67,6 +69,19 @@ const linkParentSchema = z.object({
 const extendedParentSchema = z.object({
   parentType: z.enum(["project", "milestone", "task", "feature", "useCase", "ticket"]),
   parentId: z.number().int().positive()
+});
+const taskCreateParentSchema = z.object({
+  parentType: z.enum(["project", "milestone", "feature", "useCase"]),
+  parentId: z.number().int().positive()
+});
+const ticketCreateParentSchema = z.object({
+  parentType: z.enum(["project", "milestone", "task", "feature", "useCase"]),
+  parentId: z.number().int().positive()
+});
+const attachmentFileSchema = z.object({
+  fileName: z.string().min(1),
+  contentBase64: z.string().min(1),
+  mimetype: z.string().min(1).optional()
 });
 const taskInputSchema = parentSchema.extend({
   title: z.string().min(1),
@@ -103,6 +118,9 @@ const editorialTaskSchema = parentSchema.extend({
   dueDate: z.string().nullable().optional()
 });
 const commentInputSchema = extendedParentSchema.extend({ body: z.string().min(1) });
+const commentListInputSchema = extendedParentSchema.extend({
+  comments: z.array(z.object({ body: z.string().min(1) })).min(1)
+});
 const noteInputSchema = z
   .object({
     parentType: z.enum(["project", "milestone", "task", "ticket"]),
@@ -112,12 +130,30 @@ const noteInputSchema = z
     title: z.string().optional(),
     text: z.string().min(1)
   });
-const attachmentInputSchema = z.object({
+const noteListInputSchema = z
+  .object({
+    parentType: z.enum(["project", "milestone", "task", "ticket"]),
+    parentId: z.number().int().positive()
+  })
+  .extend({
+    notes: z.array(noteInputSchema.omit({ parentType: true, parentId: true })).min(1)
+  });
+const attachmentInputSchema = z
+  .object({
+    parentType: z.enum(["project", "milestone", "task", "feature", "ticket"]),
+    parentId: z.number().int().positive()
+  })
+  .merge(attachmentFileSchema);
+const attachmentListInputSchema = z.object({
   parentType: z.enum(["project", "milestone", "task", "feature", "ticket"]),
   parentId: z.number().int().positive(),
-  fileName: z.string().min(1),
-  contentBase64: z.string().min(1),
-  mimetype: z.string().min(1).optional()
+  attachments: z.array(attachmentFileSchema).min(1)
+});
+const taskListInputSchema = taskCreateParentSchema.extend({
+  tasks: z.array(taskInputSchema.omit({ parentType: true, parentId: true }).extend({ attachment: attachmentFileSchema.optional() })).min(1)
+});
+const ticketListInputSchema = ticketCreateParentSchema.extend({
+  tickets: z.array(ticketInputSchema.omit({ parentType: true, parentId: true }).extend({ attachment: attachmentFileSchema.optional() })).min(1)
 });
 const projectCreateSchema = z.object({
   name: z.string().min(1),
@@ -222,6 +258,14 @@ function ownerPath(parentType: ParentType, parentId: number): string {
   return parentType === "project" ? `projects/${parentId}` : `milestones/${parentId}`;
 }
 
+function taskCreateOwnerPath(parentType: TaskCreateParentType, parentId: number): string {
+  return linkOwnerPath(parentType, parentId);
+}
+
+function ticketCreateOwnerPath(parentType: TicketCreateParentType, parentId: number): string {
+  return extendedOwnerPath(parentType, parentId);
+}
+
 function linkOwnerPath(parentType: LinkParentType, parentId: number): string {
   if (parentType === "useCase") {
     return `use-cases/${parentId}`;
@@ -257,7 +301,7 @@ function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer {
   return arrayBuffer;
 }
 
-function attachmentFormData(input: z.infer<typeof attachmentInputSchema>): FormData {
+function attachmentFileFormData(input: z.infer<typeof attachmentFileSchema>): FormData {
   const formData = new FormData();
   const blob = new Blob([bufferToArrayBuffer(decodeBase64Content(input.contentBase64))], {
     type: input.mimetype ?? "application/octet-stream"
@@ -266,8 +310,17 @@ function attachmentFormData(input: z.infer<typeof attachmentInputSchema>): FormD
   return formData;
 }
 
+function attachmentFormData(input: z.infer<typeof attachmentInputSchema>): FormData {
+  return attachmentFileFormData(input);
+}
+
 function withoutParent<T extends { parentType: string; parentId: number }>(input: T): Omit<T, "parentType" | "parentId"> {
   const { parentType: _parentType, parentId: _parentId, ...body } = input;
+  return body;
+}
+
+function withoutAttachment<T extends { attachment?: unknown }>(input: T): Omit<T, "attachment"> {
+  const { attachment: _attachment, ...body } = input;
   return body;
 }
 
@@ -310,6 +363,180 @@ function referencePath(reference: string): string {
     default:
       throw new Error(`Ungültige Referenz "${reference}" - erwartet z. B. TASK-10`);
   }
+}
+
+interface BulkFailure {
+  index: number;
+  stage: "create" | "attachment";
+  message: string;
+  code?: string;
+  statusCode?: number;
+}
+
+interface BulkCreated<Result> {
+  index: number;
+  result: Result;
+}
+
+interface BulkToolResult<Result> {
+  requested: number;
+  createdCount: number;
+  errorCount: number;
+  created: Array<BulkCreated<Result>>;
+  errors: BulkFailure[];
+}
+
+function bulkFailure(index: number, stage: BulkFailure["stage"], error: unknown): BulkFailure {
+  const failure: BulkFailure = {
+    index,
+    stage,
+    message: error instanceof Error ? error.message : String(error)
+  };
+  if (error instanceof ProjectManagerApiError) {
+    failure.code = error.code;
+    failure.statusCode = error.statusCode;
+  }
+  return failure;
+}
+
+function bulkResult<Result>(requested: number, created: Array<BulkCreated<Result>>, errors: BulkFailure[]): BulkToolResult<Result> {
+  return {
+    requested,
+    createdCount: created.length,
+    errorCount: errors.length,
+    created,
+    errors
+  };
+}
+
+async function uploadAttachmentFile(
+  client: ProjectManagerApiClient,
+  parentType: AttachmentParentType,
+  parentId: number,
+  attachment: z.infer<typeof attachmentFileSchema>
+): Promise<Attachment> {
+  return client.postForm<Attachment>(`${attachmentOwnerPath(parentType, parentId)}/attachments`, attachmentFileFormData(attachment));
+}
+
+async function createNotesBulk(client: ProjectManagerApiClient, input: z.infer<typeof noteListInputSchema>): Promise<BulkToolResult<Note>> {
+  const created: Array<BulkCreated<Note>> = [];
+  const errors: BulkFailure[] = [];
+  for (const [index, note] of input.notes.entries()) {
+    try {
+      created.push({
+        index,
+        result: await client.post<Note>(`${extendedOwnerPath(input.parentType, input.parentId)}/notes`, {
+          title: note.title,
+          contentJson: plainTextDocument(note.text)
+        })
+      });
+    } catch (error) {
+      errors.push(bulkFailure(index, "create", error));
+    }
+  }
+  return bulkResult(input.notes.length, created, errors);
+}
+
+async function createCommentsBulk(client: ProjectManagerApiClient, input: z.infer<typeof commentListInputSchema>): Promise<BulkToolResult<Comment>> {
+  const created: Array<BulkCreated<Comment>> = [];
+  const errors: BulkFailure[] = [];
+  for (const [index, comment] of input.comments.entries()) {
+    try {
+      created.push({
+        index,
+        result: await client.post<Comment>(`${extendedOwnerPath(input.parentType, input.parentId)}/comments`, { body: comment.body })
+      });
+    } catch (error) {
+      errors.push(bulkFailure(index, "create", error));
+    }
+  }
+  return bulkResult(input.comments.length, created, errors);
+}
+
+async function createAttachmentsBulk(client: ProjectManagerApiClient, input: z.infer<typeof attachmentListInputSchema>): Promise<BulkToolResult<Attachment>> {
+  const created: Array<BulkCreated<Attachment>> = [];
+  const errors: BulkFailure[] = [];
+  for (const [index, attachment] of input.attachments.entries()) {
+    try {
+      created.push({
+        index,
+        result: await uploadAttachmentFile(client, input.parentType, input.parentId, attachment)
+      });
+    } catch (error) {
+      errors.push(bulkFailure(index, "attachment", error));
+    }
+  }
+  return bulkResult(input.attachments.length, created, errors);
+}
+
+async function createTasksBulk(
+  client: ProjectManagerApiClient,
+  input: z.infer<typeof taskListInputSchema>
+): Promise<BulkToolResult<{ task: Task; attachment?: Attachment }>> {
+  const created: Array<BulkCreated<{ task: Task; attachment?: Attachment }>> = [];
+  const errors: BulkFailure[] = [];
+  const path = `${taskCreateOwnerPath(input.parentType, input.parentId)}/tasks`;
+  for (const [index, task] of input.tasks.entries()) {
+    if (task.attachment) {
+      try {
+        decodeBase64Content(task.attachment.contentBase64);
+      } catch (error) {
+        errors.push(bulkFailure(index, "attachment", error));
+        continue;
+      }
+    }
+
+    try {
+      const createdTask = await client.post<Task>(path, withoutAttachment(task) satisfies TaskInput);
+      const result: { task: Task; attachment?: Attachment } = { task: createdTask };
+      if (task.attachment) {
+        try {
+          result.attachment = await uploadAttachmentFile(client, "task", createdTask.id, task.attachment);
+        } catch (error) {
+          errors.push(bulkFailure(index, "attachment", error));
+        }
+      }
+      created.push({ index, result });
+    } catch (error) {
+      errors.push(bulkFailure(index, "create", error));
+    }
+  }
+  return bulkResult(input.tasks.length, created, errors);
+}
+
+async function createTicketsBulk(
+  client: ProjectManagerApiClient,
+  input: z.infer<typeof ticketListInputSchema>
+): Promise<BulkToolResult<{ ticket: Ticket; attachment?: Attachment }>> {
+  const created: Array<BulkCreated<{ ticket: Ticket; attachment?: Attachment }>> = [];
+  const errors: BulkFailure[] = [];
+  const path = `${ticketCreateOwnerPath(input.parentType, input.parentId)}/tickets`;
+  for (const [index, ticket] of input.tickets.entries()) {
+    if (ticket.attachment) {
+      try {
+        decodeBase64Content(ticket.attachment.contentBase64);
+      } catch (error) {
+        errors.push(bulkFailure(index, "attachment", error));
+        continue;
+      }
+    }
+
+    try {
+      const createdTicket = await client.post<Ticket>(path, withoutAttachment(ticket) satisfies TicketInput);
+      const result: { ticket: Ticket; attachment?: Attachment } = { ticket: createdTicket };
+      if (ticket.attachment) {
+        try {
+          result.attachment = await uploadAttachmentFile(client, "ticket", createdTicket.id, ticket.attachment);
+        } catch (error) {
+          errors.push(bulkFailure(index, "attachment", error));
+        }
+      }
+      created.push({ index, result });
+    } catch (error) {
+      errors.push(bulkFailure(index, "create", error));
+    }
+  }
+  return bulkResult(input.tickets.length, created, errors);
 }
 
 export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefinition[] {
@@ -448,6 +675,13 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       execute: (input) => client.post<Task>(`${ownerPath(input.parentType, input.parentId)}/tasks`, withoutParent(input) satisfies TaskInput)
     }),
     defineTool({
+      name: "add_task_list_to_parent",
+      title: "Aufgabenliste hinzufügen",
+      description: "Legt mehrere Aufgaben seriell an einem Projekt, Meilenstein, Feature oder Use Case an. Pro Aufgabe kann optional ein Attachment hochgeladen werden.",
+      inputSchema: taskListInputSchema,
+      execute: (input) => createTasksBulk(client, input)
+    }),
+    defineTool({
       name: "link_task_to_parent",
       title: "Aufgabe verknüpfen",
       description: "Verknüpft eine bestehende Aufgabe mit Projekt, Meilenstein, Feature oder Use Case, ohne die Aufgabe neu anzulegen.",
@@ -477,6 +711,13 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       execute: (input) => client.post<Ticket>(`${ownerPath(input.parentType, input.parentId)}/tickets`, withoutParent(input) satisfies TicketInput)
     }),
     defineTool({
+      name: "add_ticket_list_to_parent",
+      title: "Ticketliste hinzufügen",
+      description: "Legt mehrere Tickets seriell an einem Projekt, Meilenstein, Task, Feature oder Use Case an. Pro Ticket kann optional ein Attachment hochgeladen werden.",
+      inputSchema: ticketListInputSchema,
+      execute: (input) => createTicketsBulk(client, input)
+    }),
+    defineTool({
       name: "link_ticket_to_parent",
       title: "Ticket verknüpfen",
       description: "Verknüpft ein bestehendes Ticket mit Projekt, Meilenstein, Feature oder Use Case, ohne das Ticket neu anzulegen.",
@@ -491,6 +732,13 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       execute: (input) => client.post<Comment>(`${extendedOwnerPath(input.parentType, input.parentId)}/comments`, { body: input.body })
     }),
     defineTool({
+      name: "add_comments_to_parent",
+      title: "Kommentare hinzufügen",
+      description: "Legt mehrere Kommentare seriell an Projekt, Meilenstein, Task, Ticket, Feature oder Use Case an.",
+      inputSchema: commentListInputSchema,
+      execute: (input) => createCommentsBulk(client, input)
+    }),
+    defineTool({
       name: "add_note_to_parent",
       title: "Notiz hinzufügen",
       description: "Legt eine Textnotiz an Projekt, Meilenstein, Task oder Ticket an.",
@@ -502,11 +750,25 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
         })
     }),
     defineTool({
+      name: "add_notes_to_parent",
+      title: "Notizen hinzufügen",
+      description: "Legt mehrere Textnotizen seriell an Projekt, Meilenstein, Task oder Ticket an.",
+      inputSchema: noteListInputSchema,
+      execute: (input) => createNotesBulk(client, input)
+    }),
+    defineTool({
       name: "add_attachment_to_parent",
       title: "Attachment hinzufügen",
       description: "Hängt eine Base64-codierte Datei an Projekt, Meilenstein, Task, Feature oder Ticket.",
       inputSchema: attachmentInputSchema,
       execute: (input) => client.postForm<Attachment>(`${attachmentOwnerPath(input.parentType, input.parentId)}/attachments`, attachmentFormData(input))
+    }),
+    defineTool({
+      name: "add_attachments_to_parent",
+      title: "Attachments hinzufügen",
+      description: "Hängt mehrere Base64-codierte Dateien seriell an Projekt, Meilenstein, Task, Feature oder Ticket.",
+      inputSchema: attachmentListInputSchema,
+      execute: (input) => createAttachmentsBulk(client, input)
     }),
     defineTool({
       name: "update_project",

@@ -29,6 +29,27 @@ interface MockClient {
   put: ReturnType<typeof vi.fn>;
 }
 
+interface BulkCreated<Result> {
+  index: number;
+  result: Result;
+}
+
+interface BulkError {
+  index: number;
+  stage: string;
+  message: string;
+  code?: string;
+  statusCode?: number;
+}
+
+interface BulkResult<Result> {
+  requested: number;
+  createdCount: number;
+  errorCount: number;
+  created: Array<BulkCreated<Result>>;
+  errors: BulkError[];
+}
+
 function createMockClient(): MockClient & ProjectManagerApiClient {
   return {
     get: vi.fn(),
@@ -67,6 +88,11 @@ describe("MCP tool definitions", () => {
       "create_project",
       "create_milestone",
       "add_attachment_to_parent",
+      "add_attachments_to_parent",
+      "add_comments_to_parent",
+      "add_notes_to_parent",
+      "add_task_list_to_parent",
+      "add_ticket_list_to_parent",
       "link_task_to_parent",
       "link_ticket_to_parent",
       "update_project",
@@ -255,6 +281,195 @@ describe("MCP tool definitions", () => {
       })
     ).toThrow();
 
+    expect(client.postForm).not.toHaveBeenCalled();
+  });
+
+  it("creates bulk notes and comments with the expected parent paths", async () => {
+    const client = createMockClient();
+    client.post
+      .mockResolvedValueOnce({ id: 1, title: "Notiz 1" })
+      .mockResolvedValueOnce({ id: 2, title: "Notiz 2" })
+      .mockResolvedValueOnce({ id: 3, body: "Kommentar 1" })
+      .mockResolvedValueOnce({ id: 4, body: "Kommentar 2" });
+
+    const notesResult = (await tool("add_notes_to_parent", client).execute({
+      parentType: "task",
+      parentId: 9,
+      notes: [
+        { title: "Notiz 1", text: "Erste Notiz" },
+        { title: "Notiz 2", text: "Zweite Notiz" }
+      ]
+    })) as BulkResult<{ id: number }>;
+    const commentsResult = (await tool("add_comments_to_parent", client).execute({
+      parentType: "ticket",
+      parentId: 8,
+      comments: [{ body: "Kommentar 1" }, { body: "Kommentar 2" }]
+    })) as BulkResult<{ id: number }>;
+
+    expect(notesResult).toMatchObject({ requested: 2, createdCount: 2, errorCount: 0 });
+    expect(commentsResult).toMatchObject({ requested: 2, createdCount: 2, errorCount: 0 });
+    expect(client.post.mock.calls.map(([path]) => path)).toEqual([
+      "tasks/9/notes",
+      "tasks/9/notes",
+      "tickets/8/comments",
+      "tickets/8/comments"
+    ]);
+    expect(client.post.mock.calls[0]?.[1]).toMatchObject({ title: "Notiz 1", contentJson: { type: "doc" } });
+    expect(client.post.mock.calls[2]?.[1]).toEqual({ body: "Kommentar 1" });
+  });
+
+  it("uploads bulk attachments to the same parent serially", async () => {
+    const client = createMockClient();
+    client.postForm.mockResolvedValueOnce({ id: 1 }).mockResolvedValueOnce({ id: 2 });
+
+    const result = (await tool("add_attachments_to_parent", client).execute({
+      parentType: "feature",
+      parentId: 4,
+      attachments: [
+        {
+          fileName: "one.txt",
+          contentBase64: Buffer.from("one", "utf8").toString("base64"),
+          mimetype: "text/plain"
+        },
+        {
+          fileName: "two.txt",
+          contentBase64: Buffer.from("two", "utf8").toString("base64"),
+          mimetype: "text/plain"
+        }
+      ]
+    })) as BulkResult<{ id: number }>;
+
+    expect(result).toMatchObject({ requested: 2, createdCount: 2, errorCount: 0 });
+    expect(client.postForm.mock.calls.map(([path]) => path)).toEqual(["features/4/attachments", "features/4/attachments"]);
+    const uploadedFile = (client.postForm.mock.calls[1]?.[1] as FormData).get("file");
+    expect(uploadedFile).toBeInstanceOf(Blob);
+    expect((uploadedFile as File).name).toBe("two.txt");
+    await expect((uploadedFile as Blob).text()).resolves.toBe("two");
+  });
+
+  it("creates task and ticket lists with one optional attachment per created item", async () => {
+    const client = createMockClient();
+    client.post
+      .mockResolvedValueOnce({ id: 10, title: "Task mit Datei" })
+      .mockResolvedValueOnce({ id: 11, title: "Task ohne Datei" })
+      .mockResolvedValueOnce({ id: 20, title: "Ticket mit Datei" });
+    client.postForm.mockResolvedValueOnce({ id: 30 }).mockResolvedValueOnce({ id: 40 });
+
+    const taskResult = (await tool("add_task_list_to_parent", client).execute({
+      parentType: "feature",
+      parentId: 4,
+      tasks: [
+        {
+          title: "Task mit Datei",
+          description: "Beschreibung",
+          status: "todo",
+          priority: "medium",
+          attachment: {
+            fileName: "task.txt",
+            contentBase64: Buffer.from("task attachment", "utf8").toString("base64"),
+            mimetype: "text/plain"
+          }
+        },
+        {
+          title: "Task ohne Datei",
+          description: null,
+          status: "todo",
+          priority: "low"
+        }
+      ]
+    })) as BulkResult<{ task: { id: number }; attachment?: { id: number } }>;
+
+    const ticketResult = (await tool("add_ticket_list_to_parent", client).execute({
+      parentType: "task",
+      parentId: 10,
+      tickets: [
+        {
+          title: "Ticket mit Datei",
+          type: "bug",
+          description: "Beschreibung",
+          status: "open",
+          priority: "high",
+          attachment: {
+            fileName: "ticket.txt",
+            contentBase64: Buffer.from("ticket attachment", "utf8").toString("base64"),
+            mimetype: "text/plain"
+          }
+        }
+      ]
+    })) as BulkResult<{ ticket: { id: number }; attachment?: { id: number } }>;
+
+    expect(taskResult).toMatchObject({
+      requested: 2,
+      createdCount: 2,
+      errorCount: 0,
+      created: [
+        { index: 0, result: { task: { id: 10 }, attachment: { id: 30 } } },
+        { index: 1, result: { task: { id: 11 } } }
+      ]
+    });
+    expect(ticketResult).toMatchObject({
+      requested: 1,
+      createdCount: 1,
+      errorCount: 0,
+      created: [{ index: 0, result: { ticket: { id: 20 }, attachment: { id: 40 } } }]
+    });
+    expect(client.post.mock.calls).toEqual([
+      [
+        "features/4/tasks",
+        {
+          title: "Task mit Datei",
+          description: "Beschreibung",
+          status: "todo",
+          priority: "medium"
+        }
+      ],
+      [
+        "features/4/tasks",
+        {
+          title: "Task ohne Datei",
+          description: null,
+          status: "todo",
+          priority: "low"
+        }
+      ],
+      [
+        "tasks/10/tickets",
+        {
+          title: "Ticket mit Datei",
+          type: "bug",
+          description: "Beschreibung",
+          status: "open",
+          priority: "high"
+        }
+      ]
+    ]);
+    expect(client.postForm.mock.calls.map(([path]) => path)).toEqual(["tasks/10/attachments", "tickets/20/attachments"]);
+  });
+
+  it("rejects invalid bulk item attachment content before creating the task", async () => {
+    const client = createMockClient();
+
+    const result = (await tool("add_task_list_to_parent", client).execute({
+      parentType: "project",
+      parentId: 1,
+      tasks: [
+        {
+          title: "Ungültige Datei",
+          attachment: {
+            fileName: "invalid.txt",
+            contentBase64: "not-base64"
+          }
+        }
+      ]
+    })) as BulkResult<{ task: { id: number } }>;
+
+    expect(result).toMatchObject({
+      requested: 1,
+      createdCount: 0,
+      errorCount: 1,
+      errors: [{ index: 0, stage: "attachment" }]
+    });
+    expect(client.post).not.toHaveBeenCalled();
     expect(client.postForm).not.toHaveBeenCalled();
   });
 

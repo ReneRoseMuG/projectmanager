@@ -1,6 +1,6 @@
 # MCP-Tools
 
-**Stand:** 24.05.26
+**Stand:** 29.05.26
 
 Diese Übersicht beschreibt die aktuell verfügbaren MCP-Tools des Projekt-Managers. Die Tools sind für Clients wie Claude Desktop oder ChatGPT gedacht und laufen gegen die bestehenden API-Routen der App.
 
@@ -48,15 +48,22 @@ Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt u
 | Tool | Zweck | Wichtige Eingaben | Ergebnis |
 |---|---|---|---|
 | `add_task_to_parent` | Legt eine Aufgabe an einem Projekt oder Meilenstein an und befüllt Stammdatenfelder. | `parentType`, `parentId`, `title`, optional `description`, `status`, `priority`, `assignee`, `dueDate` | Neue Aufgabe |
+| `add_task_list_to_parent` | Legt mehrere Aufgaben seriell an einem Projekt, Meilenstein, Feature oder Use Case an. | `parentType`, `parentId`, `tasks[]`, je Aufgabe optional `attachment` mit `fileName`, `contentBase64`, `mimetype` | Bulk-Ergebnis mit neuen Aufgaben und optionalen Attachments |
 | `assign_editorial_task` | Vergibt eine redaktionelle Aufgabe als normale Aufgabe mit Briefing. | `parentType`, `parentId`, `title`, `editorialBrief`, optional `status`, `priority`, `assignee`, `dueDate` | Neue Aufgabe |
 | `add_ticket_to_parent` | Legt ein Ticket an einem Projekt oder Meilenstein an und befüllt Stammdatenfelder. | `parentType`, `parentId`, `title`, optional `type`, `description`, `status`, `priority`, `reporter`, `assignee`, `environment`, `affectedVersion`, `dueDate` | Neues Ticket |
+| `add_ticket_list_to_parent` | Legt mehrere Tickets seriell an einem Projekt, Meilenstein, Task, Feature oder Use Case an. | `parentType`, `parentId`, `tickets[]`, je Ticket optional `attachment` mit `fileName`, `contentBase64`, `mimetype` | Bulk-Ergebnis mit neuen Tickets und optionalen Attachments |
 | `add_comment_to_parent` | Legt einen Kommentar an Projekt, Meilenstein, Aufgabe, Ticket, Feature oder Use Case an. | `parentType`, `parentId`, `body` | Neuer Kommentar |
+| `add_comments_to_parent` | Legt mehrere Kommentare seriell an Projekt, Meilenstein, Aufgabe, Ticket, Feature oder Use Case an. | `parentType`, `parentId`, `comments[]` mit `body` | Bulk-Ergebnis mit neuen Kommentaren |
 | `add_note_to_parent` | Legt eine Textnotiz an Projekt, Meilenstein, Aufgabe oder Ticket an. | `parentType`, `parentId`, optional `title`, `text` | Neue Notiz |
+| `add_notes_to_parent` | Legt mehrere Textnotizen seriell an Projekt, Meilenstein, Aufgabe oder Ticket an. | `parentType`, `parentId`, `notes[]` mit optional `title` und `text` | Bulk-Ergebnis mit neuen Notizen |
 | `add_attachment_to_parent` | Hängt eine Base64-codierte Datei an Projekt, Meilenstein, Aufgabe, Feature oder Ticket an. | `parentType`, `parentId`, `fileName`, `contentBase64`, optional `mimetype` | Neues Attachment |
+| `add_attachments_to_parent` | Hängt mehrere Base64-codierte Dateien seriell an Projekt, Meilenstein, Aufgabe, Feature oder Ticket an. | `parentType`, `parentId`, `attachments[]` mit `fileName`, `contentBase64`, optional `mimetype` | Bulk-Ergebnis mit neuen Attachments |
 | `create_feature` | Erstellt ein neues Feature mit Beschreibung und optionalem Content. | `title`, optional `description`, `content`, `status` | Neues Feature |
 | `create_use_case` | Erstellt einen neuen Use Case unter einem Feature. | `featureId`, `title`, optional `description`, `content`, `status` | Neuer Use Case |
 | `add_task_to_use_case` | Legt eine Aufgabe an einem Use Case an. | `useCaseId`, `title`, optional `description`, `status`, `priority`, `assignee`, `dueDate` | Neue Aufgabe |
 | `add_ticket_to_use_case` | Legt ein Ticket an einem Use Case an. | `useCaseId`, `title`, optional `type`, `description`, `status`, `priority`, `reporter`, `assignee`, `environment`, `affectedVersion`, `dueDate` | Neues Ticket |
+
+Bulk-Tools laufen seriell und liefern kein einzelnes Objekt, sondern ein Ergebnis mit `requested`, `createdCount`, `errorCount`, `created[]` und `errors[]`. Wenn bei einer kombinierten Task-/Ticket-Anlage der optionale Attachment-Upload nach erfolgreicher Objektanlage fehlschlägt, bleibt das neue Objekt bestehen und der Attachment-Fehler wird im Ergebnis gemeldet.
 
 ## Redaktion und Inhaltsüberarbeitung
 
@@ -80,6 +87,8 @@ Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt u
 | Kontext | Unterstützte Werte |
 |---|---|
 | Aufgaben und Tickets an Parent | `project`, `milestone` |
+| Aufgabenliste an Parent | `project`, `milestone`, `feature`, `useCase` |
+| Ticketliste an Parent | `project`, `milestone`, `task`, `feature`, `useCase` |
 | Kommentare | `project`, `milestone`, `task`, `ticket`, `feature`, `useCase` |
 | Notizen | `project`, `milestone`, `task`, `ticket` |
 | Attachments | `project`, `milestone`, `task`, `feature`, `ticket` |
