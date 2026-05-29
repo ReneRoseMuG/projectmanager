@@ -1,15 +1,17 @@
 import type { DraftComment, Note, Project, WikiPage, WikiPageInput, WikiPageRelationSummary } from "@taskmanager/shared-types";
-import { ExternalLink, Save, X } from "lucide-react";
+import { ExternalLink, Save, Trash2, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useEntityComments } from "../../hooks/useEntityComments";
+import { useHasPermission } from "../../hooks/usePermissions";
 import { useNotes } from "../../hooks/useNotes";
 import type { WikiTreeNode } from "../../hooks/useWiki";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
+import { JournalPanel } from "../journal/JournalPanel";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { Button } from "../ui/Button";
@@ -18,6 +20,7 @@ import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { CopyReferenceButton } from "../ui/CopyReferenceButton";
 import { FormField } from "../ui/FormField";
 import { Modal } from "../ui/Modal";
+import { PageHero } from "../ui/PageHero";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
@@ -35,25 +38,30 @@ interface WikiPageFormProps {
   onPostCreate?: (pageId: number, pending: { comments: DraftComment[]; relatedPageIds: number[] }) => Promise<void>;
   onClose: () => void;
   onOpenInTab?: () => void;
+  inline?: boolean;
+  onDelete?: (page: WikiPage) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 function flattenTree(nodes: WikiTreeNode[]): WikiPage[] {
   return nodes.flatMap((node) => [node, ...flattenTree(node.children)]);
 }
 
-type WikiPageFormTab = "details" | "comments" | "notes" | "attachments";
+type WikiPageFormTab = "details" | "comments" | "notes" | "attachments" | "journal";
 
 const tabs: Array<Tab<WikiPageFormTab>> = [
   { value: "details", label: "Details" },
   { value: "comments", label: "Kommentare" },
   { value: "notes", label: "Notizen" },
-  { value: "attachments", label: "Dateien" }
+  { value: "attachments", label: "Dateien" },
+  { value: "journal", label: "Journal" }
 ];
 
-export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onPostCreate, onClose, onOpenInTab }: WikiPageFormProps) {
+export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onPostCreate, onClose, onOpenInTab, inline = false, onDelete, onDirtyChange }: WikiPageFormProps) {
   const { confirm } = useConfirm();
   const { showToast } = useToast();
   const pageId = page?.id ?? null;
+  const canReadJournal = useHasPermission("journal", "read");
   const comments = useEntityComments("wikiPage", open ? pageId : null);
   const notes = useNotes(open && pageId !== null ? { type: "wikiPage", id: pageId } : null);
   const attachments = useAttachments(open && pageId !== null ? { type: "wikiPage", id: pageId } : null);
@@ -67,6 +75,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
   const [activeTab, setActiveTab] = useState<WikiPageFormTab>("details");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const parentPageTitle = pages.find((item) => item.id === parentId)?.title ?? parent?.title ?? null;
 
   useEffect(() => {
     if (!open) {
@@ -85,6 +94,10 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
       setPendingComments([]);
     }
   }, [open, page, parent]);
+
+  useEffect(() => {
+    onDirtyChange?.(open && dirty);
+  }, [dirty, onDirtyChange, open]);
 
   const createNote = async () => {
     try {
@@ -119,7 +132,9 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
         await onPostCreate(created.id, { comments: pendingComments, relatedPageIds });
       }
       setDirty(false);
-      onClose();
+      if (!inline || !page) {
+        onClose();
+      }
     } catch {
       // Error feedback is handled by the page-level toast.
     } finally {
@@ -143,7 +158,9 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
     }
   };
 
-  const visibleTabs = page ? tabs : tabs.filter((tab) => tab.value === "details" || tab.value === "comments");
+  const visibleTabs = page
+    ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
+    : tabs.filter((tab) => tab.value === "details" || tab.value === "comments");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "comments") {
       return { ...tab, count: page ? comments.comments.length : pendingComments.length };
@@ -157,9 +174,29 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
     return tab;
   });
 
-  return (
-    <Modal open={open} title={page ? "Wiki-Seite bearbeiten" : "Neue Wiki-Seite"} size="xl" showHeader={false} bodyClassName="p-0" onClose={() => void requestClose()}>
-      <form className="flex max-h-[calc(100vh-64px)] flex-col bg-shell" onSubmit={submit}>
+  if (!open) {
+    return null;
+  }
+
+  const form = (
+      <form className={inline ? "flex h-full min-h-0 flex-col bg-shell" : "flex max-h-[calc(100vh-64px)] flex-col bg-shell"} onSubmit={submit}>
+        {inline ? (
+          <PageHero
+            variant="detail"
+            breadcrumb={["Wiki", parentPageTitle ?? "Root"]}
+            title={title || (page ? "Wiki-Seite bearbeiten" : "Wiki-Seite anlegen")}
+            actions={
+              <>
+                {page ? <CopyReferenceButton reference={String(page.id)} variant="hero" /> : null}
+                {page && onDelete ? (
+                  <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Seite löschen" title="Seite löschen" onClick={() => onDelete(page)}>
+                    <Trash2 size={18} />
+                  </button>
+                ) : null}
+              </>
+            }
+          />
+        ) : (
         <header className="border-b border-steel-700 bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
           <div className="flex items-start justify-between gap-4">
             <div className="grid gap-2">
@@ -185,6 +222,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
             </div>
           </div>
         </header>
+        )}
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
 
         <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
@@ -242,6 +280,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                   placeholder="Wiki-Inhalt"
                   testIdPrefix="wiki-page-form-content"
                   onImageUpload={uploadContentImage}
+                  className="min-h-[400px]"
                   onChange={(value) => {
                     setContent(value);
                     setDirty(true);
@@ -333,6 +372,12 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
               </div>
             </Section>
           ) : null}
+
+          {activeTab === "journal" && page ? (
+            <Section title="Journal" fill>
+              <JournalPanel objectType="wikiPage" objectId={page.id} />
+            </Section>
+          ) : null}
         </div>
 
         <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">
@@ -344,6 +389,15 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
           </div>
         </footer>
       </form>
+  );
+
+  if (inline) {
+    return form;
+  }
+
+  return (
+    <Modal open={open} title={page ? "Wiki-Seite bearbeiten" : "Neue Wiki-Seite"} size="xl" showHeader={false} bodyClassName="p-0" onClose={() => void requestClose()}>
+      {form}
     </Modal>
   );
 }

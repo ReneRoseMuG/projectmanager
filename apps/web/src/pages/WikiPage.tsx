@@ -1,11 +1,10 @@
 import type {
   WikiPage as WikiPageType,
   WikiPageInput,
-  WikiPageUpdate,
   DraftComment,
 } from "@taskmanager/shared-types";
 import { FileText, Plus } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createEntityComment } from "../api/comments";
 import { Button } from "../components/ui/Button";
@@ -14,8 +13,6 @@ import { EmptyState } from "../components/ui/EmptyState";
 import { PageHero } from "../components/ui/PageHero";
 import { TaskListSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
-import { WikiBreadcrumb } from "../components/wiki/WikiBreadcrumb";
-import { WikiPageDetail } from "../components/wiki/WikiPageDetail";
 import { WikiPageForm } from "../components/wiki/WikiPageForm";
 import { WikiTree } from "../components/wiki/WikiTree";
 import { errorMessage } from "../hooks/errors";
@@ -29,6 +26,10 @@ function countPages(nodes: WikiTreeNode[]): number {
   return nodes.reduce((sum, node) => sum + 1 + countPages(node.children), 0);
 }
 
+function flattenTree(nodes: WikiTreeNode[]): WikiPageType[] {
+  return nodes.flatMap((node) => [node, ...flattenTree(node.children)]);
+}
+
 export function WikiPage() {
   const params = useParams();
   const pageId = Number(params.id);
@@ -40,38 +41,24 @@ export function WikiPage() {
   const { confirm } = useConfirm();
   const [formOpen, setFormOpen] = useState(false);
   const [formParent, setFormParent] = useState<WikiPageType | null>(null);
-  const [editingPage, setEditingPage] = useState<WikiPageType | null>(null);
+  const [inlineDirty, setInlineDirty] = useState(false);
   const standalone = useStandaloneView();
+  const flatPages = useMemo(() => flattenTree(wiki.tree), [wiki.tree]);
+  const inlineParent = wiki.page?.parentId
+    ? flatPages.find((page) => page.id === wiki.page?.parentId) ?? null
+    : null;
   useDocumentTitle(wiki.page ? `Wiki: ${wiki.page.title}` : "Wiki");
 
   const openCreate = (parent: WikiTreeNode | null) => {
-    setEditingPage(null);
     setFormParent(parent);
     setFormOpen(true);
   };
 
-  const openEditMetadata = () => {
-    setEditingPage(wiki.page);
-    setFormParent(null);
-    setFormOpen(true);
-  };
-
-  const openInTab = editingPage
-    ? () => {
-        window.open(withStandaloneView(`/wiki/${editingPage.id}`), "_blank");
-        navigate(standalone ? withStandaloneView("/wiki") : "/wiki");
-        setFormOpen(false);
-        setFormParent(null);
-        setEditingPage(null);
-      }
-    : undefined;
-
-  const savePage = async (id: number, input: WikiPageUpdate) => {
+  const submitForm = async (input: WikiPageInput, relatedPageIds: number[]) => {
     try {
-      const expectedVersion =
-        wiki.page?.id === id ? wiki.page.version : input.expectedVersion;
-      await wiki.updateWikiPage(id, { ...input, expectedVersion });
-      showToast({ tone: "success", title: "Wiki-Seite gespeichert" });
+      const created = await wiki.createWikiPage(input);
+      showToast({ tone: "success", title: "Wiki-Seite erstellt" });
+      return created;
     } catch (wikiError) {
       showToast({
         tone: "error",
@@ -82,24 +69,22 @@ export function WikiPage() {
     }
   };
 
-  const submitForm = async (input: WikiPageInput, relatedPageIds: number[]) => {
+  const submitInlineForm = async (input: WikiPageInput, relatedPageIds: number[]) => {
+    if (!wiki.page) {
+      return;
+    }
+
     try {
-      if (editingPage) {
-        await wiki.updateWikiPage(editingPage.id, {
-          ...input,
-          expectedVersion: editingPage.version,
-        });
-        await wiki.syncWikiPageRelations(
-          editingPage.id,
-          editingPage.relatedPages.map((relatedPage) => relatedPage.id),
-          relatedPageIds,
-        );
-        showToast({ tone: "success", title: "Wiki-Seite gespeichert" });
-      } else {
-        const created = await wiki.createWikiPage(input);
-        showToast({ tone: "success", title: "Wiki-Seite erstellt" });
-        return created;
-      }
+      await wiki.updateWikiPage(wiki.page.id, {
+        ...input,
+        expectedVersion: wiki.page.version,
+      });
+      await wiki.syncWikiPageRelations(
+        wiki.page.id,
+        wiki.page.relatedPages.map((relatedPage) => relatedPage.id),
+        relatedPageIds,
+      );
+      showToast({ tone: "success", title: "Wiki-Seite gespeichert" });
     } catch (wikiError) {
       showToast({
         tone: "error",
@@ -154,6 +139,19 @@ export function WikiPage() {
     }
   };
 
+  const requestInlineNavigation = async () => {
+    if (!inlineDirty) {
+      return true;
+    }
+
+    return confirm({
+      title: "Änderungen verwerfen?",
+      body: "Die Wiki-Seite enthält ungespeicherte Änderungen.",
+      severity: "warn",
+      confirmLabel: "Verwerfen",
+    });
+  };
+
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       <PageHero
@@ -171,25 +169,38 @@ export function WikiPage() {
         }
       />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {wiki.loading ? (
-          <TaskListSkeleton />
+          <>
+            <div className="w-[280px] shrink-0 bg-gradient-to-b from-steel-800 to-steel-900" />
+            <div className="flex-1 p-5">
+              <TaskListSkeleton />
+            </div>
+          </>
         ) : (
-          <div className="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
-            <WikiTree tree={wiki.tree} onCreate={openCreate} />
-            <div className="grid content-start gap-4">
+          <>
+            <WikiTree tree={wiki.tree} onCreate={openCreate} onNavigate={requestInlineNavigation} />
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               {wiki.error ? (
-                <div className="rounded-lg border border-line bg-white p-4 text-sm text-crimson">
-                  {wiki.error}
+                <div className="px-5 pt-5">
+                  <div className="mb-4 rounded-lg border border-line bg-white p-4 text-sm text-crimson">
+                    {wiki.error}
+                  </div>
                 </div>
               ) : null}
-              <WikiBreadcrumb items={wiki.breadcrumb} />
+              <div className={wiki.page ? "flex min-h-0 flex-1 flex-col" : "p-5"}>
               {wiki.page ? (
-                <WikiPageDetail
+                <WikiPageForm
+                  inline
+                  open={true}
                   page={wiki.page}
-                  onSave={savePage}
+                  parent={inlineParent}
+                  tree={wiki.tree}
+                  projects={projects}
+                  onSubmit={submitInlineForm}
                   onDelete={deletePage}
-                  onEditMetadata={openEditMetadata}
+                  onDirtyChange={setInlineDirty}
+                  onClose={() => navigate(standalone ? withStandaloneView("/wiki") : "/wiki")}
                 />
               ) : (
                 <EmptyState
@@ -208,24 +219,23 @@ export function WikiPage() {
                   ]}
                 />
               )}
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
 
       <WikiPageForm
         open={formOpen}
-        page={editingPage}
+        page={null}
         parent={formParent}
         tree={wiki.tree}
         projects={projects}
         onSubmit={submitForm}
         onPostCreate={postCreatePage}
-        onOpenInTab={openInTab}
         onClose={() => {
           setFormOpen(false);
           setFormParent(null);
-          setEditingPage(null);
         }}
       />
     </div>

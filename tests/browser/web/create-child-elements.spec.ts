@@ -391,10 +391,7 @@ test.describe("Create-Flows verknüpfen vorgemerkte Kindobjekte", () => {
       wikiPageId = ((await (await createResponsePromise).json()) as { id: number }).id;
       await expect(page).toHaveURL(new RegExp(`/wiki/${wikiPageId}`));
 
-      const detail = page
-        .locator("section")
-        .filter({ has: page.getByRole("heading", { name: pageTitle }) })
-        .first();
+      const detail = formPage(page, pageTitle);
       await tabButton(detail, "Kommentare").click();
       await expect(detail).toContainText(children.comment ?? "");
     } finally {

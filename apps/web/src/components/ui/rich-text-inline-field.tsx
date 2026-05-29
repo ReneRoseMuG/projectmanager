@@ -16,7 +16,6 @@
 // components/ui/CommentThread.tsx                 | draft body               | comment-thread-body
 // components/usecases/UseCaseForm.tsx             | description              | use-case-description
 // components/usecases/UseCaseForm.tsx             | content                  | use-case-content
-// components/wiki/WikiPageDetail.tsx              | content                  | wiki-page-detail-content
 // components/wiki/WikiPageForm.tsx                | content                  | wiki-page-form-content
 
 import type { Editor } from "@tiptap/core";

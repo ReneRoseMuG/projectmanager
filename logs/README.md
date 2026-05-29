@@ -4,6 +4,12 @@
 |---|---|---|---|---|
 | 29.05.26 | 10:32:01 | 2 | MySQL-Migrationsanalyse | ✅ |
 | 29.05.26 | 10:30:39 | 1 | Branching MS-26 | ✅ |
+| 29.05.26 | 10:22:45 | Fix | MS-25 Branchhinweis-Kommentar | ✅ |
+| 29.05.26 | 10:21:06 | 5 | Testabdeckung und Verifikation | ⚠️ |
+| 29.05.26 | 10:16:54 | 4 | WikiPageDetail Entfernen | ✅ |
+| 29.05.26 | 10:16:36 | 3 | WikiPageForm Inline Modus | ✅ |
+| 29.05.26 | 10:07:30 | 2 | WikiPage Two Pane Layout | ✅ |
+| 29.05.26 | 10:05:39 | 1 | WikiTree Dark Sidebar | ✅ |
 | 29.05.26 | 09:52:58 | Nachtrag | MS-24 Formular-Testabdeckung | ⚠️ |
 | 29.05.26 | 09:17:55 | 4 | Formulare und Tests | ✅ |
 | 29.05.26 | 09:17:54 | 3 | Rich-Text-Editor | ✅ |
