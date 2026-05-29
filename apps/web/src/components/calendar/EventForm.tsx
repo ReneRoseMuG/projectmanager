@@ -4,18 +4,19 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
 import { useAuth } from "../../hooks/useAuth";
+import { useHasPermission } from "../../hooks/usePermissions";
 import { fromDateTimeLocalInput, toDateTimeLocalInput } from "../../utils/date";
+import { JournalPanel } from "../journal/JournalPanel";
 import { Button } from "../ui/Button";
 import { ColorPicker } from "../ui/ColorPicker";
 import { DatePicker } from "../ui/DatePicker";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
-import { JournalPanel } from "../journal/JournalPanel";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { UserSelectField } from "../users/UserSelectField";
-import { useHasPermission } from "../../hooks/usePermissions";
 
 interface EventFormProps {
   open: boolean;
@@ -134,105 +135,106 @@ export function EventForm({ open, event, initialDate, initialOwners, projects, m
       onSubmit={submit}
       saving={saving}
       onClose={onClose}
+      contentLayout="flush"
     >
-      <Section title="Stammdaten">
-        <FormField label="Titel" required>
-          <Input value={title} onChange={(inputEvent) => setTitle(inputEvent.target.value)} required />
-        </FormField>
-        <FormField label="Beschreibung" className="mt-4">
-          <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="event-description" onImageUpload={uploadContentImage} onChange={setDescription} />
-        </FormField>
-      </Section>
+      <div className="flex min-h-0 w-full flex-1">
+        <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
+          <div className="mx-auto grid w-full max-w-5xl gap-4">
+            <Section title="Stammdaten">
+              <FormField label="Titel" required>
+                <Input value={title} onChange={(inputEvent) => setTitle(inputEvent.target.value)} required />
+              </FormField>
+              <FormField label="Beschreibung" className="mt-4">
+                <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="event-description" onImageUpload={uploadContentImage} onChange={setDescription} />
+              </FormField>
+            </Section>
 
-      <Section title="Zeitraum">
-        <label className="mb-4 flex items-center gap-2 text-sm font-medium">
-          <input type="checkbox" checked={isAllDay} onChange={(inputEvent) => setIsAllDay(inputEvent.target.checked)} />
-          Ganztägig
-        </label>
-        <div className="grid gap-4 lg:grid-cols-3">
-          <DatePicker label="Start" mode="datetime-local" value={startTime} onChange={(inputEvent) => setStartTime(inputEvent.target.value)} />
-          <DatePicker label="Ende" mode="datetime-local" value={endTime} onChange={(inputEvent) => setEndTime(inputEvent.target.value)} />
-          <FormField label="Erinnerung">
-            <select
-              className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
-              value={reminderMinutes}
-              onChange={(inputEvent) => setReminderMinutes(Number(inputEvent.target.value))}
-            >
-              <option value={15}>15 Minuten vorher</option>
-              <option value={60}>1 Stunde vorher</option>
-              <option value={1440}>1 Tag vorher</option>
-            </select>
-          </FormField>
+            <Section title="Zuordnung">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="Projekte">
+                  <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
+                    {projects.length > 0 ? (
+                      projects.map((project) => (
+                        <label key={project.id} className="flex items-center gap-2 text-sm text-steel-700">
+                          <input type="checkbox" checked={projectIds.includes(project.id)} onChange={() => setProjectIds((current) => toggleId(current, project.id))} />
+                          {project.name}
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-steel-500">Keine Projekte</p>
+                    )}
+                  </div>
+                </FormField>
+                <FormField label="Meilensteine">
+                  <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
+                    {milestones.length > 0 ? (
+                      milestones.map((milestone) => (
+                        <label key={milestone.id} className="flex items-center gap-2 text-sm text-steel-700">
+                          <input type="checkbox" checked={milestoneIds.includes(milestone.id)} onChange={() => setMilestoneIds((current) => toggleId(current, milestone.id))} />
+                          {milestone.name}
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-steel-500">Keine Meilensteine</p>
+                    )}
+                  </div>
+                </FormField>
+                <FormField label="Aufgaben">
+                  <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
+                    {tasks.length > 0 ? (
+                      tasks.map((task) => (
+                        <label key={task.id} className="flex items-center gap-2 text-sm text-steel-700">
+                          <input type="checkbox" checked={taskIds.includes(task.id)} onChange={() => setTaskIds((current) => toggleId(current, task.id))} />
+                          {task.title}
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-sm text-steel-500">Keine Aufgaben</p>
+                    )}
+                  </div>
+                </FormField>
+              </div>
+            </Section>
+
+            {event && canReadJournal ? (
+              <Section title="Journal" fill>
+                <JournalPanel objectType="event" objectId={event.id} />
+              </Section>
+            ) : null}
+          </div>
         </div>
-      </Section>
 
-      <Section title="Zuordnung">
-        <div className="mb-4">
-          <UserSelectField label="Verantwortlich" value={responsibleUserId} selectedUser={event?.responsibleUser ?? null} onChange={setResponsibleUserId} />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Projekte">
-            <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
-              {projects.length > 0 ? (
-                projects.map((project) => (
-                  <label key={project.id} className="flex items-center gap-2 text-sm text-steel-700">
-                    <input type="checkbox" checked={projectIds.includes(project.id)} onChange={() => setProjectIds((current) => toggleId(current, project.id))} />
-                    {project.name}
-                  </label>
-                ))
-              ) : (
-                <p className="text-sm text-steel-500">Keine Projekte</p>
-              )}
-            </div>
-          </FormField>
-          <FormField label="Meilensteine">
-            <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
-              {milestones.length > 0 ? (
-                milestones.map((milestone) => (
-                  <label key={milestone.id} className="flex items-center gap-2 text-sm text-steel-700">
-                    <input type="checkbox" checked={milestoneIds.includes(milestone.id)} onChange={() => setMilestoneIds((current) => toggleId(current, milestone.id))} />
-                    {milestone.name}
-                  </label>
-                ))
-              ) : (
-                <p className="text-sm text-steel-500">Keine Meilensteine</p>
-              )}
-            </div>
-          </FormField>
-          <FormField label="Aufgaben">
-            <div className="grid max-h-44 gap-2 overflow-auto rounded-md border border-line bg-white p-3">
-              {tasks.length > 0 ? (
-                tasks.map((task) => (
-                  <label key={task.id} className="flex items-center gap-2 text-sm text-steel-700">
-                    <input type="checkbox" checked={taskIds.includes(task.id)} onChange={() => setTaskIds((current) => toggleId(current, task.id))} />
-                    {task.title}
-                  </label>
-                ))
-              ) : (
-                <p className="text-sm text-steel-500">Keine Aufgaben</p>
-              )}
-            </div>
-          </FormField>
-        </div>
-      </Section>
-
-      <Section title="Farbe">
-        <ColorPicker value={color} onChange={setColor} swatches={colors} />
-      </Section>
-
-      {event && canDelete ? (
-        <Section title="Gefahrenzone">
-          <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => void onDelete(event).catch(() => undefined)}>
-            Löschen
-          </Button>
-        </Section>
-      ) : null}
-
-      {event && canReadJournal ? (
-        <Section title="Journal" fill>
-          <JournalPanel objectType="event" objectId={event.id} />
-        </Section>
-      ) : null}
+        <FormSidebar storageKey="event-form-sidebar">
+          <div className="grid gap-4">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" checked={isAllDay} onChange={(inputEvent) => setIsAllDay(inputEvent.target.checked)} />
+              Ganztägig
+            </label>
+            <DatePicker label="Start" mode="datetime-local" value={startTime} onChange={(inputEvent) => setStartTime(inputEvent.target.value)} />
+            <DatePicker label="Ende" mode="datetime-local" value={endTime} onChange={(inputEvent) => setEndTime(inputEvent.target.value)} />
+            <FormField label="Erinnerung">
+              <select
+                className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
+                value={reminderMinutes}
+                onChange={(inputEvent) => setReminderMinutes(Number(inputEvent.target.value))}
+              >
+                <option value={15}>15 Minuten vorher</option>
+                <option value={60}>1 Stunde vorher</option>
+                <option value={1440}>1 Tag vorher</option>
+              </select>
+            </FormField>
+            <UserSelectField label="Verantwortlich" value={responsibleUserId} selectedUser={event?.responsibleUser ?? null} onChange={setResponsibleUserId} />
+            <FormField label="Farbe">
+              <ColorPicker value={color} onChange={setColor} swatches={colors} />
+            </FormField>
+            {event && canDelete ? (
+              <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => void onDelete(event).catch(() => undefined)}>
+                Löschen
+              </Button>
+            ) : null}
+          </div>
+        </FormSidebar>
+      </div>
     </FormModal>
   );
 }

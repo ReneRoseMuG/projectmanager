@@ -53,7 +53,9 @@ import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { DatePicker } from "../ui/DatePicker";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
+import { ParentContextField } from "../ui/ParentContextField";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
@@ -256,6 +258,8 @@ export function TicketForm({
     [catalogs.entries],
   );
   const statusClosed = isCatalogStatusClosed(catalogs.entries, "workStatus", status);
+  const currentTicket = loadedTicket ?? ticket;
+  const showParentContexts = !owner && (currentTicket?.parentContexts?.length ?? 0) > 0;
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -355,7 +359,8 @@ export function TicketForm({
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
-        contentClassName={activeTab === "details" ? "w-full max-w-7xl self-center" : ""}
+        contentLayout={activeTab === "details" ? "flush" : "default"}
+        contentClassName=""
         tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}
         headerMeta={
           <div className="flex flex-wrap gap-2">
@@ -370,31 +375,30 @@ export function TicketForm({
         ) : null}
 
         {activeTab === "details" ? (
-          <>
-            <Section>
-              <div className="grid gap-4">
-                <FormField label="Titel" required>
-                  <Input value={ticketTitle} onChange={(event) => setTicketTitle(event.target.value)} required autoFocus={!ticket} />
-                </FormField>
-                <FormField label="Beschreibung">
-                  <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="ticket-description" onImageUpload={uploadContentImage} onChange={setDescription} />
-                </FormField>
+          <div className="flex min-h-0 w-full flex-1">
+            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
+              <div className="mx-auto grid w-full max-w-5xl gap-4">
+                {showParentContexts ? <ParentContextField parents={currentTicket?.parentContexts} /> : null}
+                <Section>
+                  <div className="grid gap-4">
+                    <FormField label="Titel" required>
+                      <Input value={ticketTitle} onChange={(event) => setTicketTitle(event.target.value)} required autoFocus={!ticket} />
+                    </FormField>
+                    <FormField label="Beschreibung">
+                      <RichTextInlineField value={description} placeholder="Beschreibung" minRows={12} testIdPrefix="ticket-description" onImageUpload={uploadContentImage} onChange={setDescription} />
+                    </FormField>
+                  </div>
+                </Section>
               </div>
-            </Section>
-
-            <Section title="Typ & Priorität">
-              <div className="grid items-start gap-4 md:grid-cols-2">
+            </div>
+            <FormSidebar storageKey="ticket-form-sidebar">
+              <div className="grid gap-4">
                 <FormField label="Typ">
                   <RadioList value={type} options={ticketTypeOptions} onChange={setType} />
                 </FormField>
                 <FormField label="Priorität">
                   <RadioList value={priority} options={priorityOptions} onChange={setPriority} />
                 </FormField>
-              </div>
-            </Section>
-
-            <Section title="Status, Lösung & Fälligkeit">
-              <div className="grid items-start gap-4 md:grid-cols-3">
                 <FormField label="Status">
                   <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
                 </FormField>
@@ -404,30 +408,32 @@ export function TicketForm({
                   </FormField>
                 ) : null}
                 <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-              </div>
-            </Section>
-
-            <Section title="Zuweisung">
-              <div className="grid gap-4 md:grid-cols-2">
                 <UserSelectField
                   label="Zuständig"
                   value={responsibleUserId}
-                  selectedUser={ticket?.responsibleUser ?? null}
+                  selectedUser={currentTicket?.responsibleUser ?? null}
                   onChange={setResponsibleUserId}
                 />
                 <UserSelectField
                   label="Meldende Person"
                   value={reporterUserId}
-                  selectedUser={ticket?.reporterUser ?? null}
+                  selectedUser={currentTicket?.reporterUser ?? null}
                   onChange={setReporterUserId}
                 />
+                {type === "bug" ? (
+                  <>
+                    <FormField label="Umgebung">
+                      <Input value={environment} onChange={(event) => setEnvironment(event.target.value)} />
+                    </FormField>
+                    <FormField label="Betroffene Version">
+                      <Input value={affectedVersion} onChange={(event) => setAffectedVersion(event.target.value)} />
+                    </FormField>
+                  </>
+                ) : null}
+                <TagPicker selected={selectedTags} onChange={setSelectedTags} />
               </div>
-            </Section>
-
-            <Section title="Tags">
-              <TagPicker selected={selectedTags} onChange={setSelectedTags} />
-            </Section>
-          </>
+            </FormSidebar>
+          </div>
         ) : null}
 
         {activeTab === "subTickets" ? (

@@ -2,6 +2,11 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 29.05.26 | 09:52:58 | Nachtrag | MS-24 Formular-Testabdeckung | ⚠️ |
+| 29.05.26 | 09:17:55 | 4 | Formulare und Tests | ✅ |
+| 29.05.26 | 09:17:54 | 3 | Rich-Text-Editor | ✅ |
+| 29.05.26 | 09:17:53 | 2 | Sidebar und Parent-Kontext | ✅ |
+| 29.05.26 | 09:17:52 | 1 | Save und Branch | ✅ |
 | 29.05.26 | 08:36:24 | Feature | MCP Bulk Tools | ✅ |
 | 29.05.26 | 05:35:18 | Fix | Migrationen und Dev-Start | ✅ |
 | 28.05.26 | 17:59:08 | Log | Manueller Status TKT-33 | ✅ |

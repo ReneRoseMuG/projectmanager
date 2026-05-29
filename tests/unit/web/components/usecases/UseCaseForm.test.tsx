@@ -19,23 +19,60 @@
  * 11. CommentThread im Kommentare-Tab sichtbar.
  * 12. AttachmentList im Dateien-Tab sichtbar (sofern Tab vorhanden).
  */
-import { fireEvent, screen, waitFor } from "@testing-library/dom";
+import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
 import { addPendingComment, changeInput, clickTab, feature, renderWithProviders, task, ticket, useCase } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { UseCaseForm } from "../../../../../apps/web/src/components/usecases/UseCaseForm";
 
 describe("UseCaseForm", () => {
-  it("bindet RichTextInlineField an Kurzbeschreibung und Inhalt", async () => {
+  it("verdrahtet Body, Parent-Kontext und Sidebar-Felder ohne entfernte Felder", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(useCase);
+    renderWithProviders(<UseCaseForm open useCase={useCase} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} />);
+
+    const sidebar = screen.getByTestId("form-sidebar");
+    expect(screen.queryByTestId("parent-context-field")).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue(useCase.title)).toBeInTheDocument();
+    expect(screen.getByTestId("use-case-content-view")).toHaveValue(useCase.content);
+    expect(screen.queryByTestId("use-case-description-view")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Sortierung")).not.toBeInTheDocument();
+    expect(within(sidebar).getByRole("combobox", { name: "Feature" })).toHaveValue(String(feature.id));
+    expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
+    expect(within(sidebar).getByRole("button", { name: "Aktiv" })).toHaveAttribute("data-active", "true");
+    expect(within(sidebar).queryByText(/Tags/i)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue(useCase.title), { target: { value: "Use Case Beta" } });
+    fireEvent.change(within(sidebar).getByRole("combobox", { name: "Feature" }), { target: { value: "" } });
+    fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Use Case Beta",
+          featureId: undefined,
+          status: "done",
+          responsibleUserId: null,
+          content: useCase.content
+        })
+      )
+    );
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("description");
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
+  });
+
+  it("bindet RichTextInlineField an Inhalt und sendet keine Kurzbeschreibung oder Sortierung", async () => {
     const onSubmit = vi.fn().mockResolvedValue(useCase);
     renderWithProviders(<UseCaseForm open useCase={useCase} currentFeatureId={feature.id} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} />);
 
-    expect(screen.getByTestId("use-case-description-view")).toHaveValue(useCase.description);
+    expect(screen.queryByTestId("use-case-description-view")).not.toBeInTheDocument();
     expect(screen.getByTestId("use-case-content-view")).toHaveValue(useCase.content);
-    fireEvent.change(screen.getByTestId("use-case-description-view"), { target: { value: "<p>Neue Use-Case-Beschreibung</p>" } });
     fireEvent.change(screen.getByTestId("use-case-content-view"), { target: { value: "<p>Neuer Use-Case-Inhalt</p>" } });
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Neue Use-Case-Beschreibung</p>", content: "<p>Neuer Use-Case-Inhalt</p>" })));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Neuer Use-Case-Inhalt</p>" })));
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("description");
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
   });
 
   it("zeigt im Create-Modus die Relation-Tabs und keinen Dateien-Tab", () => {

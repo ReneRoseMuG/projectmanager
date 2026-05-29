@@ -52,6 +52,28 @@ describe("Use Cases API", () => {
     expect(row.content).toBe("# UC-01");
   });
 
+  it("POST akzeptiert fehlende Beschreibung und Sortierung", async () => {
+    const feature = await createFeature(app, { title: "Feature fuer Defaults" });
+
+    const res = await supertest(app.server)
+      .post(`/api/features/${feature.id}/use-cases`)
+      .send({ title: "Use Case ohne optionale Felder", content: "# Inhalt" })
+      .expect(201);
+
+    expect(res.body).toMatchObject({ title: "Use Case ohne optionale Felder", description: null, sortOrder: 0, content: "# Inhalt" });
+  });
+
+  it("GET einzelner Use Case liefert Feature als Parent-Kontext", async () => {
+    const feature = await createFeature(app, { title: "Parent Feature" });
+    const useCase = await createUseCase(app, feature.id, { title: "Use Case mit Parent" });
+
+    const res = await supertest(app.server).get(`/api/use-cases/${useCase.id}`).expect(200);
+
+    expect(res.body.parentContexts).toEqual([
+      { type: "feature", id: feature.id, label: "Parent Feature", origin: "direct" }
+    ]);
+  });
+
   it("GET Liste gibt Use Cases ohne Content zurück", async () => {
     const feature = await createFeature(app, { title: "Feature fuer Liste" });
     await createUseCase(app, feature.id, { title: "Listen-Use-Case", content: "# Liste" });

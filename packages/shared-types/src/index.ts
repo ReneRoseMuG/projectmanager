@@ -672,7 +672,7 @@ export interface MilestoneInput {
 
 export type MilestoneUpdate = WithExpectedVersion<Partial<MilestoneInput>>;
 
-export type VisibleParentType = "project" | "milestone" | "task" | "feature" | "useCase" | "wikiPage";
+export type VisibleParentType = "project" | "milestone" | "task" | "ticket" | "feature" | "useCase" | "wikiPage";
 
 export interface VisibleParentContext {
   type: VisibleParentType;
@@ -700,6 +700,7 @@ export interface Task {
   noteCount: number;
   commentCount: number;
   visibleParent?: VisibleParentContext | null;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface TaskBoardItem extends Task {
@@ -751,6 +752,7 @@ export interface Ticket {
   noteCount: number;
   commentCount: number;
   visibleParent?: VisibleParentContext | null;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface TicketRelationEntry {
@@ -969,6 +971,7 @@ export interface Feature {
   version: number;
   createdAt: string;
   updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface FeatureInput {
@@ -1014,6 +1017,7 @@ export interface UseCase {
   version: number;
   createdAt: string;
   updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface UseCaseInput {
@@ -1104,6 +1108,7 @@ export interface BacklogItem {
   version: number;
   createdAt: string;
   updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface BacklogItemInput {

@@ -42,7 +42,6 @@ async function openFeatureList(page: Page) {
 async function expectFeatureFormData(
   page: Page,
   feature: { title: string },
-  descriptionText = "E2E Feature-Kurzbeschreibung vollständig",
   contentText = "E2E Feature-Inhalt vollständig",
 ) {
   const form = formPage(page, "Feature bearbeiten");
@@ -50,9 +49,9 @@ async function expectFeatureFormData(
   await expect(form.locator("input[required]").nth(0)).toHaveValue(
     feature.title,
   );
-  await expect(form.locator('input[type="number"]').first()).toHaveValue("7");
-  await expectRichText(form, descriptionText, 0);
-  await expectRichText(form, contentText, 1);
+  await expect(form.locator('input[type="number"]')).toHaveCount(0);
+  await expect(form.locator('[data-testid="feature-form-description-view"]')).toHaveCount(0);
+  await expectRichText(form, contentText, 0);
 }
 
 test.describe("Feature-Routen und Detailformular", () => {
@@ -70,12 +69,6 @@ test.describe("Feature-Routen und Detailformular", () => {
       await expect(page).toHaveURL(pathWithOptionalQuery("/features/new"));
       const form = formPage(page, "Neues Feature");
       await form.locator("input[required]").nth(0).fill(title);
-      await form.locator('input[type="number"]').first().fill("7");
-      await fillRichText(
-        form,
-        "feature-form-description",
-        "E2E Feature-Neuanlage Beschreibung vollständig",
-      );
       await fillRichText(
         form,
         "feature-form-content",
@@ -226,12 +219,8 @@ test.describe("Feature-Routen und Detailformular", () => {
       await expect(useCaseForm.locator("input[required]").nth(0)).toHaveValue(
         useCase.title,
       );
-      await expectRichText(
-        useCaseForm,
-        "E2E Use-Case-Beschreibung vollständig",
-        0,
-      );
-      await expectRichText(useCaseForm, "E2E Use-Case-Inhalt vollständig", 1);
+      await expect(useCaseForm.locator('[data-testid="use-case-description-view"]')).toHaveCount(0);
+      await expectRichText(useCaseForm, "E2E Use-Case-Inhalt vollständig", 0);
 
       await authenticatedGoto(page, `/features/${feature.id}`);
       await formPage(page, "Feature bearbeiten")

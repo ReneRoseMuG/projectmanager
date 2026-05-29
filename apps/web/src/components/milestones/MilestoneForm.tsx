@@ -51,6 +51,7 @@ import { DatePicker } from "../ui/DatePicker";
 import { EmptyState } from "../ui/EmptyState";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
 import { PendingCommentList } from "../ui/PendingCommentList";
@@ -473,8 +474,9 @@ export function MilestoneForm({
         }
         onClose={onClose}
         variant={variant}
+        contentLayout={activeTab === "details" ? "flush" : "default"}
         contentClassName={
-          activeTab === "details" || activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
+          activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
         }
         tabBar={
           <TabBar tabs={tabItems} active={activeTab} onChange={handleTabChange} />
@@ -485,50 +487,52 @@ export function MilestoneForm({
         ) : null}
 
         {activeTab === "details" ? (
-          <>
-            <Section>
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(13rem,16rem)]">
-                <FormField label="Name" required className="min-w-0">
-                  <Input
-                    value={name}
-                    onChange={(inputEvent) => setName(inputEvent.target.value)}
-                    required
-                  />
-                </FormField>
-                <Select
-                  label="Projekt"
-                  required
-                  value={projectId}
-                  disabled={lockProjectSelection}
-                  onChange={(inputEvent) =>
-                    setProjectId(
-                      inputEvent.target.value
-                        ? Number(inputEvent.target.value)
-                        : "",
-                    )
-                  }
-                >
-                  <option value="">Projekt auswählen</option>
-                  {projectOptions.map((project) => (
-                    <option key={project.value} value={project.value}>
-                      {project.label}
-                    </option>
-                  ))}
-                </Select>
+          <div className="flex min-h-0 w-full flex-1">
+            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
+              <div className="mx-auto grid w-full max-w-5xl gap-4">
+                <Section>
+                  <FormField label="Name" required className="min-w-0">
+                    <Input
+                      value={name}
+                      onChange={(inputEvent) => setName(inputEvent.target.value)}
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Beschreibung" className="mt-4">
+                    <RichTextInlineField
+                      value={description}
+                      onChange={setDescription}
+                      placeholder="Wofür steht dieser Meilenstein?"
+                      minRows={12}
+                      testIdPrefix="milestone-description"
+                      onImageUpload={uploadContentImage}
+                    />
+                  </FormField>
+                </Section>
               </div>
-              <FormField label="Beschreibung" className="mt-4">
-                <RichTextInlineField
-                  value={description}
-                  onChange={setDescription}
-                  placeholder="Wofür steht dieser Meilenstein?"
-                  minRows={12}
-                  testIdPrefix="milestone-description"
-                  onImageUpload={uploadContentImage}
-                />
-              </FormField>
-            </Section>
-            <Section title="Status">
-              <div className="grid items-start gap-4 md:grid-cols-2">
+            </div>
+            <FormSidebar storageKey="milestone-form-sidebar">
+              <Select
+                label="Projekt"
+                required
+                value={projectId}
+                disabled={lockProjectSelection}
+                onChange={(inputEvent) =>
+                  setProjectId(
+                    inputEvent.target.value
+                      ? Number(inputEvent.target.value)
+                      : "",
+                  )
+                }
+              >
+                <option value="">Projekt auswählen</option>
+                {projectOptions.map((project) => (
+                  <option key={project.value} value={project.value}>
+                    {project.label}
+                  </option>
+                ))}
+              </Select>
+              <div className="grid gap-4">
                 <FormField label="Status">
                   <StatusToggle
                     kind="workStatus"
@@ -543,9 +547,7 @@ export function MilestoneForm({
                   onChange={setResponsibleUserId}
                 />
               </div>
-            </Section>
-            <Section title="Zeitraum">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4">
                 <DatePicker
                   label="Start"
                   value={startDate}
@@ -559,11 +561,9 @@ export function MilestoneForm({
                   onChange={(inputEvent) => setDueDate(inputEvent.target.value)}
                 />
               </div>
-            </Section>
-            <Section title="Tags">
               <TagPicker selected={selectedTags} onChange={setSelectedTags} />
-            </Section>
-          </>
+            </FormSidebar>
+          </div>
         ) : null}
 
         {activeTab === "features" ? (

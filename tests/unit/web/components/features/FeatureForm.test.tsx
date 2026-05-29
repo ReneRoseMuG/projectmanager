@@ -21,36 +21,71 @@
  * 13. AttachmentList im Dateien-Tab sichtbar (sofern Tab vorhanden).
  * 14. Parent-Projekt im Details-Tab liest und schreibt die bestehende Projekt-Feature-Relation.
  */
-import { fireEvent, screen, waitFor } from "@testing-library/dom";
+import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
 import { addPendingComment, changeInput, clickTab, feature, formTestMocks, getFileInput, project, renderWithProviders, task, ticket } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { FeatureForm } from "../../../../../apps/web/src/components/features/FeatureForm";
 
 describe("FeatureForm", () => {
-  it("bindet RichTextInlineField an Kurzbeschreibung und Inhalt", async () => {
+  it("verdrahtet Body, Parent-Kontext und Sidebar-Felder ohne entfernte Felder", async () => {
     const onSubmit = vi.fn().mockResolvedValue(feature);
     renderWithProviders(<FeatureForm open feature={feature} onSubmit={onSubmit} onClose={vi.fn()} />);
 
-    expect(screen.getByTestId("feature-form-description-view")).toHaveValue(feature.description);
+    const sidebar = screen.getByTestId("form-sidebar");
+    expect(screen.getByTestId("parent-context-field")).toHaveTextContent("PROJ-30");
+    expect(screen.getByDisplayValue(feature.title)).toBeInTheDocument();
     expect(screen.getByTestId("feature-form-content-view")).toHaveValue(feature.content);
-    fireEvent.change(screen.getByTestId("feature-form-description-view"), { target: { value: "<p>Neue Kurzbeschreibung</p>" } });
+    expect(screen.queryByTestId("feature-form-description-view")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Sortierung")).not.toBeInTheDocument();
+    expect(within(sidebar).getByRole("button", { name: "Aktiv" })).toHaveAttribute("data-active", "true");
+    expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
+    expect(within(sidebar).getAllByText("Projekt Alpha").length).toBeGreaterThan(0);
+    expect(within(sidebar).queryByText(/Tags/i)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue(feature.title), { target: { value: "Feature Beta" } });
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Feature Beta",
+          status: "done",
+          responsibleUserId: null,
+          content: feature.content
+        })
+      )
+    );
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("description");
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
+  });
+
+  it("bindet RichTextInlineField an Inhalt und sendet keine Kurzbeschreibung oder Sortierung", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(feature);
+    renderWithProviders(<FeatureForm open feature={feature} onSubmit={onSubmit} onClose={vi.fn()} />);
+
+    expect(screen.queryByTestId("feature-form-description-view")).not.toBeInTheDocument();
+    expect(screen.getByTestId("feature-form-content-view")).toHaveValue(feature.content);
     fireEvent.change(screen.getByTestId("feature-form-content-view"), { target: { value: "<p>Neuer Inhalt</p>" } });
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Neue Kurzbeschreibung</p>", content: "<p>Neuer Inhalt</p>" })));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Neuer Inhalt</p>" })));
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("description");
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
   });
 
-  it("stellt Bild-Upload für Kurzbeschreibung und Inhalt im Edit-Modus bereit", () => {
+  it("stellt Bild-Upload für Inhalt im Edit-Modus bereit", () => {
     renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
-    expect(screen.getByTestId("feature-form-description-view")).toHaveAttribute("data-image-upload", "enabled");
+    expect(screen.queryByTestId("feature-form-description-view")).not.toBeInTheDocument();
     expect(screen.getByTestId("feature-form-content-view")).toHaveAttribute("data-image-upload", "enabled");
   });
 
-  it("stellt Bild-Upload für Kurzbeschreibung und Inhalt im Create-Modus bereit", () => {
+  it("stellt Bild-Upload für Inhalt im Create-Modus bereit", () => {
     renderWithProviders(<FeatureForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
-    expect(screen.getByTestId("feature-form-description-view")).toHaveAttribute("data-image-upload", "enabled");
+    expect(screen.queryByTestId("feature-form-description-view")).not.toBeInTheDocument();
     expect(screen.getByTestId("feature-form-content-view")).toHaveAttribute("data-image-upload", "enabled");
   });
 

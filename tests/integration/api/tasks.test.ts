@@ -169,6 +169,9 @@ describe("Tasks API", () => {
 
     expect(res.body.subtaskCount).toBe(2);
     expect(res.body.subtasks).toHaveLength(2);
+    expect(res.body.parentContexts).toEqual([
+      { type: "project", id: project.id, label: project.name, origin: "direct" }
+    ]);
   });
 
   it("GET /api/tasks/:id mit unbekannter ID gibt 404 zurueck", async () => {

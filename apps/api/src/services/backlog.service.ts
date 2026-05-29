@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { UserSummary } from "@taskmanager/shared-types";
+import type { UserSummary, VisibleParentContext } from "@taskmanager/shared-types";
 import type { DbClient } from "../db/client.js";
 import { features, projects, useCases } from "../db/schema.js";
 import { backlogItemRepository, type BacklogItemRecord, type BacklogItemUpdateData } from "../repositories/backlog-item.repository.js";
@@ -55,6 +55,7 @@ export interface BacklogDto {
   version: number;
   createdAt: string;
   updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
 const backlogJournalFields: Array<JournalFieldDefinition<BacklogItemRecord>> = [
@@ -65,6 +66,27 @@ const backlogJournalFields: Array<JournalFieldDefinition<BacklogItemRecord>> = [
   { key: "sortOrder", label: "Sortierung" },
   { key: "responsibleUserId", label: "Verantwortlich" }
 ];
+
+function backlogParentContexts(database: DbClient, record: BacklogItemRecord): VisibleParentContext[] {
+  const contexts: VisibleParentContext[] = [];
+  const project = database.select({ id: projects.id, label: projects.name }).from(projects).where(eq(projects.id, record.projectId)).get();
+  if (project) {
+    contexts.push({ type: "project", id: project.id, label: project.label, origin: "direct" });
+  }
+  if (record.featureId) {
+    const feature = database.select({ id: features.id, label: features.title }).from(features).where(eq(features.id, record.featureId)).get();
+    if (feature) {
+      contexts.push({ type: "feature", id: feature.id, label: feature.label, origin: "direct" });
+    }
+  }
+  if (record.useCaseId) {
+    const useCase = database.select({ id: useCases.id, label: useCases.title }).from(useCases).where(eq(useCases.id, record.useCaseId)).get();
+    if (useCase) {
+      contexts.push({ type: "useCase", id: useCase.id, label: useCase.label, origin: "direct" });
+    }
+  }
+  return contexts;
+}
 
 function mapBacklogItem(database: DbClient, record: BacklogItemRecord): BacklogDto {
   return {
@@ -81,7 +103,8 @@ function mapBacklogItem(database: DbClient, record: BacklogItemRecord): BacklogD
     responsibleUser: getUserOption(database, record.responsibleUserId),
     version: record.version,
     createdAt: record.createdAt,
-    updatedAt: record.updatedAt
+    updatedAt: record.updatedAt,
+    parentContexts: backlogParentContexts(database, record)
   };
 }
 

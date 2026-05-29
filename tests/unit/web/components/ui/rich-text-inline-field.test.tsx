@@ -31,13 +31,18 @@ interface MockEditor {
   getHTML: ReturnType<typeof vi.fn<[], string>>;
   getAttributes: ReturnType<typeof vi.fn<[string], Record<string, string | undefined>>>;
   commands: {
-    setContent: ReturnType<typeof vi.fn<[string], void>>;
+    setContent: ReturnType<typeof vi.fn<[string, { emitUpdate?: boolean }?], void>>;
     blur: ReturnType<typeof vi.fn<[], void>>;
     focus: ReturnType<typeof vi.fn<[string?], void>>;
     setTextSelection: ReturnType<typeof vi.fn<[number], void>>;
   };
   isActive: ReturnType<typeof vi.fn<[(string | Record<string, string>)?, Record<string, unknown>?], boolean>>;
   chain: ReturnType<typeof vi.fn<[], MockCommandChain>>;
+  on: ReturnType<typeof vi.fn<[string, () => void], void>>;
+  off: ReturnType<typeof vi.fn<[string, () => void], void>>;
+  state: {
+    selection: { empty: boolean; from: number; to: number };
+  };
   view: {
     posAtCoords: ReturnType<typeof vi.fn<[{ left: number; top: number }], { pos: number } | null>>;
   };
@@ -56,6 +61,8 @@ interface MockCommandChain {
   toggleOrderedList: () => MockCommandChain;
   toggleBlockquote: () => MockCommandChain;
   toggleCodeBlock: () => MockCommandChain;
+  setHorizontalRule: () => MockCommandChain;
+  insertColumnBlock: () => MockCommandChain;
   extendMarkRange: () => MockCommandChain;
   unsetLink: () => MockCommandChain;
   setLink: () => MockCommandChain;
@@ -107,6 +114,7 @@ interface MockEditorConfig {
   };
   onTransaction?: (input: { editor: MockEditor; transaction: MockTransaction }) => void;
   onUpdate?: (input: { editor: MockEditor }) => void;
+  onFocus?: (input: { editor: MockEditor }) => void;
   onBlur?: (input: { editor: MockEditor }) => void;
 }
 
@@ -132,6 +140,8 @@ function createCommandChain(): MockCommandChain {
     toggleOrderedList: vi.fn(() => chain),
     toggleBlockquote: vi.fn(() => chain),
     toggleCodeBlock: vi.fn(() => chain),
+    setHorizontalRule: vi.fn(() => chain),
+    insertColumnBlock: vi.fn(() => chain),
     extendMarkRange: vi.fn(() => chain),
     unsetLink: vi.fn(() => chain),
     setLink: vi.fn(() => chain),
@@ -176,6 +186,11 @@ vi.mock("@tiptap/react", () => ({
       },
       isActive: vi.fn<[(string | Record<string, string>)?, Record<string, unknown>?], boolean>(() => false),
       chain: vi.fn(() => createCommandChain()),
+      on: vi.fn(),
+      off: vi.fn(),
+      state: {
+        selection: { empty: false, from: 2, to: 5 }
+      },
       view: {
         posAtCoords: vi.fn((_coords: { left: number; top: number }): { pos: number } | null => ({ pos: 1 }))
       }
@@ -185,7 +200,7 @@ vi.mock("@tiptap/react", () => ({
     tiptapMock.config = config;
     return editor;
   }),
-  EditorContent: ({ editor }: { editor: MockEditor }) => <div data-testid="tiptap-editor-content" tabIndex={0} onBlur={() => tiptapMock.config?.onBlur?.({ editor })} />
+  EditorContent: ({ editor }: { editor: MockEditor }) => <div data-testid="tiptap-editor-content" tabIndex={0} onFocus={() => tiptapMock.config?.onFocus?.({ editor })} onBlur={() => tiptapMock.config?.onBlur?.({ editor })} />
 }));
 
 vi.mock("../../../../../apps/web/src/components/ui/tldraw-node", () => ({
@@ -218,41 +233,46 @@ afterEach(() => {
 });
 
 describe("RichTextInlineField", () => {
-  it("T-01 rendert value als HTML in der Leseansicht", () => {
+  it("T-01 mountet den Editor sofort mit HTML-Inhalt", () => {
     renderWithProviders(<RichTextInlineField value="<p><strong>Hallo</strong></p>" onChange={vi.fn()} testIdPrefix="field" />);
 
-    expect(screen.getByTestId("field-view").innerHTML).toBe("<p><strong>Hallo</strong></p>");
+    expect(screen.getByTestId("field-editor")).toBeInTheDocument();
+    expect(tiptapMock.config?.content).toBe("<p><strong>Hallo</strong></p>");
   });
 
-  it("T-01b rendert Markdown-Werte als Text in der Leseansicht", () => {
+  it("T-01b mountet Markdown-Werte roh im Editor", () => {
     renderWithProviders(<RichTextInlineField value={"# Titel\n\n<script>alert(1)</script>"} valueFormat="markdown" onChange={vi.fn()} testIdPrefix="field" />);
 
-    expect(screen.getByTestId("field-view")).toHaveTextContent("# Titel");
-    expect(screen.getByTestId("field-view").querySelector("script")).not.toBeInTheDocument();
+    expect(screen.getByTestId("field-editor")).toBeInTheDocument();
+    expect(tiptapMock.config?.content).toBe("# Titel\n\n<script>alert(1)</script>");
   });
 
   it("T-02 zeigt placeholder wenn value null ist", () => {
     renderWithProviders(<RichTextInlineField value={null} onChange={vi.fn()} placeholder="Text eingeben" testIdPrefix="field" />);
 
-    expect(screen.getByTestId("field-view")).toHaveTextContent("Text eingeben");
+    expect(screen.getByTestId("field-editor")).toBeInTheDocument();
+    expect(tiptapMock.config?.content).toBe("");
   });
 
   it("T-03 zeigt placeholder wenn value undefined ist", () => {
     renderWithProviders(<RichTextInlineField value={undefined} onChange={vi.fn()} placeholder="Text eingeben" testIdPrefix="field" />);
 
-    expect(screen.getByTestId("field-view")).toHaveTextContent("Text eingeben");
+    expect(screen.getByTestId("field-editor")).toBeInTheDocument();
+    expect(tiptapMock.config?.content).toBe("");
   });
 
   it("T-04 zeigt placeholder wenn value leer ist", () => {
     renderWithProviders(<RichTextInlineField value="" onChange={vi.fn()} placeholder="Text eingeben" testIdPrefix="field" />);
 
-    expect(screen.getByTestId("field-view")).toHaveTextContent("Text eingeben");
+    expect(screen.getByTestId("field-editor")).toBeInTheDocument();
+    expect(tiptapMock.config?.content).toBe("");
   });
 
-  it("T-05 zeigt placeholder wenn value nur leere Tags enthält", () => {
+  it("T-05 mountet auch leere HTML-Tags stabil im Editor", () => {
     renderWithProviders(<RichTextInlineField value="<p></p>" onChange={vi.fn()} placeholder="Text eingeben" testIdPrefix="field" />);
 
-    expect(screen.getByTestId("field-view")).toHaveTextContent("Text eingeben");
+    expect(screen.getByTestId("field-editor")).toBeInTheDocument();
+    expect(tiptapMock.config?.content).toBe("<p></p>");
   });
 
   it("T-06 rendert bei readOnly keinen Hover-Indikator", () => {
@@ -269,20 +289,18 @@ describe("RichTextInlineField", () => {
     expect(screen.queryByTestId("field-editor")).not.toBeInTheDocument();
   });
 
-  it("T-08 aktiviert nach Click den Editor", () => {
+  it("T-08 hält den Editor direkt gemountet", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
-
-    fireEvent.click(screen.getByTestId("field-view"));
 
     expect(screen.getByTestId("field-editor")).toBeInTheDocument();
   });
 
-  it("T-09 entfernt nach Click die Leseansicht aus dem DOM", () => {
+  it("T-09 behält den stabilen View-Wrapper im DOM", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
 
     fireEvent.click(screen.getByTestId("field-view"));
 
-    expect(screen.queryByTestId("field-view")).not.toBeInTheDocument();
+    expect(screen.getByTestId("field-view")).toBeInTheDocument();
   });
 
   it("T-10 ruft onChange bei Blur mit Editor-HTML auf", () => {
@@ -320,9 +338,15 @@ describe("RichTextInlineField", () => {
 
   it("T-11 ruft onChange bei Escape mit originalValue auf", () => {
     const onChange = vi.fn();
+    tiptapMock.html = "<p>Original</p>";
     renderWithProviders(<RichTextInlineField value="<p>Original</p>" onChange={onChange} testIdPrefix="field" />);
 
-    fireEvent.click(screen.getByTestId("field-view"));
+    const activeEditor = tiptapMock.editor;
+    if (activeEditor) {
+      act(() => {
+        tiptapMock.config?.onFocus?.({ editor: activeEditor });
+      });
+    }
     fireEvent.keyDown(window, { key: "Escape" });
 
     expect(onChange).toHaveBeenCalledWith("<p>Original</p>");
@@ -365,49 +389,59 @@ describe("RichTextInlineField", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="custom-prefix" />);
 
     expect(screen.getByTestId("custom-prefix-view")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("custom-prefix-view"));
     expect(screen.getByTestId("custom-prefix-editor")).toBeInTheDocument();
   });
 
   it("T-13 rendert ohne testIdPrefix keine data-testid-Attribute", () => {
     const { container } = renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} />);
 
-    expect(container.querySelectorAll("[data-testid]")).toHaveLength(0);
+    expect(container.querySelector("[data-testid='field-view']")).not.toBeInTheDocument();
+    expect(container.querySelector("[data-testid='field-editor']")).not.toBeInTheDocument();
   });
 
-  it("T-14 zeigt die Toolbar erst im Editierzustand", () => {
+  it("T-14 zeigt die Toolbar dauerhaft gedimmt und mit Full-Aktionen", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
 
-    expect(screen.queryByTestId("rich-text-toolbar")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("field-view"));
-
     expect(screen.getByTestId("rich-text-toolbar")).toBeInTheDocument();
+    expect(screen.getByTestId("rich-text-toolbar")).toHaveClass("opacity-60");
     expect(screen.queryByTestId("bubble-menu")).not.toBeInTheDocument();
     expect(screen.queryByTestId("floating-menu")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Zitat" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Überschrift 4" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Trennlinie" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Spalten" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Formatierung entfernen" })).toBeInTheDocument();
+  });
+
+  it("T-14b wendet Highlight nur auf die aktuelle Textselektion an", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hervorheben" }));
+
+    expect(tiptapMock.chain?.setTextSelection).toHaveBeenCalledWith({ from: 2, to: 5 });
+    expect(tiptapMock.chain?.toggleHighlight).toHaveBeenCalled();
+    expect(tiptapMock.chain?.run).toHaveBeenCalled();
   });
 
   it("T-15 setzt die MindesthÃ¶he fÃ¼r Leseansicht und Editor", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} minRows={12} testIdPrefix="field" />);
 
-    expect(screen.getByTestId("field-view")).toHaveClass("rich-text-inline-min-rows");
-    expect(screen.getByTestId("field-view")).toHaveStyle("--rich-text-field-min-rows: 12");
-
-    fireEvent.click(screen.getByTestId("field-view"));
-
     expect(tiptapMock.config?.editorProps?.attributes?.class).toContain("rich-text-inline-min-rows");
     expect(tiptapMock.config?.editorProps?.attributes?.style).toBe("--rich-text-field-min-rows: 12;");
   });
 
-  it("T-16 kennzeichnet editierbare Leseansicht und Editor als Textfeld", () => {
+  it("T-16 kennzeichnet den Editor je nach Fokuszustand", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
 
-    expect(screen.getByTestId("field-view")).toHaveClass("border", "border-line", "bg-shell/70");
+    expect(screen.getByTestId("field-editor")).toHaveClass("border", "border-line", "bg-white");
+    const activeEditor = tiptapMock.editor;
+    if (activeEditor) {
+      act(() => {
+        tiptapMock.config?.onFocus?.({ editor: activeEditor });
+      });
+    }
 
-    fireEvent.click(screen.getByTestId("field-view"));
-
-    expect(screen.getByTestId("field-editor")).toHaveClass("border", "border-steel-600", "bg-white");
+    expect(screen.getByTestId("field-editor")).toHaveClass("border-steel-600", "bg-white");
   });
 
   it("T-22 hält Toolbar sticky und bricht Sticky nicht durch overflow-hidden", () => {

@@ -19,12 +19,49 @@
  * 11. CommentThread im Kommentare-Tab sichtbar.
  * 12. AttachmentList im Dateien-Tab sichtbar (sofern Tab vorhanden).
  */
-import { fireEvent, screen, waitFor } from "@testing-library/dom";
+import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
 import { addPendingComment, changeInput, clickTab, getFileInput, renderWithProviders, task, ticket } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { TaskForm } from "../../../../../apps/web/src/components/tasks/TaskForm";
 
 describe("TaskForm", () => {
+  it("verdrahtet Body, Parent-Kontext und Sidebar-Felder mit Submit-Payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<TaskForm open task={task} onSubmit={onSubmit} onClose={vi.fn()} />);
+
+    const sidebar = screen.getByTestId("form-sidebar");
+    expect(screen.getByTestId("parent-context-field")).toHaveTextContent("PROJ-30");
+    expect(screen.getByDisplayValue(task.title)).toBeInTheDocument();
+    expect(screen.getByTestId("task-description-view")).toHaveValue(task.description);
+    expect(within(sidebar).getAllByRole("button", { name: "Offen" }).some((button) => button.getAttribute("data-active") === "true")).toBe(true);
+    const sidebarSelects = within(sidebar).getAllByRole("combobox");
+    expect(sidebarSelects[0]).toHaveValue("medium");
+    expect(sidebarSelects[1]).toHaveValue("1");
+    expect(within(sidebar).getByRole("button", { name: "Tags 0" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue(task.title), { target: { value: "Aufgabe Beta" } });
+    fireEvent.click(within(sidebar).getByRole("button", { name: "In Arbeit" }));
+    const dueDate = sidebar.querySelector('input[type="date"]');
+    expect(dueDate).not.toBeNull();
+    fireEvent.change(dueDate as HTMLInputElement, { target: { value: "2026-06-20" } });
+    fireEvent.change(sidebarSelects[1], { target: { value: "" } });
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Tags 0" }));
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Aufgabe Beta",
+          status: "in_progress",
+          priority: "medium",
+          dueDate: "2026-06-20",
+          responsibleUserId: null,
+          tagIds: [90]
+        })
+      )
+    );
+  });
+
   it("bindet das RichTextInlineField an die Aufgabenbeschreibung", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     renderWithProviders(<TaskForm open task={task} onSubmit={onSubmit} onClose={vi.fn()} />);

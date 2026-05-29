@@ -1,7 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
-import type { JsonValue, UserSummary } from "@taskmanager/shared-types";
+import type { JsonValue, UserSummary, VisibleParentContext } from "@taskmanager/shared-types";
 import type { DbClient } from "../db/client.js";
-import { featureAttachments, featureComments, useCases } from "../db/schema.js";
+import { featureAttachments, featureComments, milestoneFeatures, milestones, projectFeatures, projects, useCases } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import { featureRepository, type FeatureRecord, type FeatureUpdateData } from "../repositories/feature.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
@@ -51,6 +51,7 @@ export interface FeatureDto {
   commentCount: number;
   createdAt: string;
   updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
 interface FeatureSupportCounts {
@@ -73,7 +74,7 @@ const featureJournalFields: Array<JournalFieldDefinition<FeatureRecord>> = [
   { key: "responsibleUserId", label: "Verantwortlich" }
 ];
 
-function mapFeature(database: DbClient, record: FeatureRecord, useCaseCount: number, content?: string, supportCounts = emptyFeatureSupportCounts): FeatureDto {
+function mapFeature(database: DbClient, record: FeatureRecord, useCaseCount: number, content?: string, supportCounts = emptyFeatureSupportCounts, parentContexts?: VisibleParentContext[]): FeatureDto {
   return {
     id: record.id,
     title: record.title,
@@ -89,8 +90,29 @@ function mapFeature(database: DbClient, record: FeatureRecord, useCaseCount: num
     noteCount: supportCounts.noteCount,
     commentCount: supportCounts.commentCount,
     createdAt: record.createdAt,
-    updatedAt: record.updatedAt
+    updatedAt: record.updatedAt,
+    parentContexts
   };
+}
+
+function featureParentContexts(database: DbClient, featureId: number): VisibleParentContext[] {
+  const projectRows = database
+    .select({ id: projects.id, label: projects.name })
+    .from(projectFeatures)
+    .innerJoin(projects, eq(projectFeatures.projectId, projects.id))
+    .where(eq(projectFeatures.featureId, featureId))
+    .all();
+  const milestoneRows = database
+    .select({ id: milestones.id, label: milestones.name })
+    .from(milestoneFeatures)
+    .innerJoin(milestones, eq(milestoneFeatures.milestoneId, milestones.id))
+    .where(eq(milestoneFeatures.featureId, featureId))
+    .all();
+
+  return [
+    ...projectRows.map((row): VisibleParentContext => ({ type: "project", id: row.id, label: row.label, origin: "direct" })),
+    ...milestoneRows.map((row): VisibleParentContext => ({ type: "milestone", id: row.id, label: row.label, origin: "direct" }))
+  ];
 }
 
 function countUseCases(database: DbClient, featureId: number): number {
@@ -192,7 +214,7 @@ export function listFeatures(database: DbClient): FeatureDto[] {
 export function getFeature(database: DbClient, id: number): FeatureDto {
   const feature = getFeatureRecord(database, id);
   const supportCounts = getFeatureSupportCounts(database, [id]).get(id) ?? emptyFeatureSupportCounts;
-  return mapFeature(database, feature, countUseCases(database, id), readFeatureContent(database, feature), supportCounts);
+  return mapFeature(database, feature, countUseCases(database, id), readFeatureContent(database, feature), supportCounts, featureParentContexts(database, id));
 }
 
 export function createFeature(database: DbClient, input: FeatureInput, actor?: JournalActor | null): FeatureDto {

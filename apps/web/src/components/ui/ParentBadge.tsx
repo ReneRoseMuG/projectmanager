@@ -5,6 +5,7 @@ const parentTypeLabels: Record<VisibleParentContext["type"], string> = {
   project: "Projekt",
   milestone: "Meilenstein",
   task: "Aufgabe",
+  ticket: "Ticket",
   feature: "Feature",
   useCase: "Use Case",
   wikiPage: "Wiki-Seite",

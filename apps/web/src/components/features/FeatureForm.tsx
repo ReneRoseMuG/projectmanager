@@ -58,8 +58,10 @@ import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
+import { ParentContextField } from "../ui/ParentContextField";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingRelationList } from "../ui/PendingRelationList";
@@ -241,8 +243,6 @@ export function FeatureForm({
   const [activeTab, setActiveTab] = useState<FeatureFormTab>("details");
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<FeatureStatus>("draft");
-  const [description, setDescription] = useState("");
-  const [sortOrder, setSortOrder] = useState(0);
   const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
@@ -301,8 +301,6 @@ export function FeatureForm({
     }
     setTitle(feature?.title ?? "");
     setStatus(feature?.status ?? "draft");
-    setDescription(feature?.description ?? "");
-    setSortOrder(feature?.sortOrder ?? 0);
     setResponsibleUserId(feature ? feature.responsibleUserId : (auth.user?.id ?? null));
     setContent(feature?.content ?? "");
   }, [auth.user?.id, feature, open]);
@@ -333,8 +331,6 @@ export function FeatureForm({
           status,
           "draft",
         ),
-        description,
-        sortOrder,
         responsibleUserId,
         content,
       });
@@ -406,6 +402,9 @@ export function FeatureForm({
     projects.loading ||
     Boolean(feature && projectLinks.loading) ||
     !canWriteProjectRelations;
+  const showParentContexts =
+    stableInitialProjectId === undefined &&
+    (feature?.parentContexts?.length ?? 0) > 0;
 
   const changeParentProject = async (item: SelectParentItem | null) => {
     const nextProjectId = item ? Number(item.id) : null;
@@ -534,38 +533,42 @@ export function FeatureForm({
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        contentLayout={activeTab === "details" ? "flush" : "default"}
         contentClassName={
-          activeTab === "details" ? "w-full max-w-7xl self-center" : ""
+          activeTab === "details" ? "" : ""
         }
         tabBar={
           <TabBar tabs={tabItems} active={activeTab} onChange={handleTabChange} />
         }
       >
         {activeTab === "details" ? (
-          <>
-            <Section>
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
-                <FormField label="Titel" required className="min-w-0">
-                  <Input
-                    autoFocus={!feature}
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    required
+          <div className="flex min-h-0 w-full flex-1">
+            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
+              <div className="mx-auto grid w-full max-w-5xl gap-4">
+                {showParentContexts ? <ParentContextField parents={feature?.parentContexts} /> : null}
+                <Section>
+                  <FormField label="Titel" required className="min-w-0">
+                    <Input
+                      autoFocus={!feature}
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      required
+                    />
+                  </FormField>
+                </Section>
+                <Section title="Inhalt">
+                  <RichTextInlineField
+                    value={content}
+                    placeholder="Feature-Inhalt"
+                    testIdPrefix="feature-form-content"
+                    onImageUpload={uploadContentImage}
+                    onChange={setContent}
                   />
-                </FormField>
-                <FormField label="Sortierung" className="min-w-0">
-                  <Input
-                    type="number"
-                    value={sortOrder}
-                    onChange={(event) =>
-                      setSortOrder(Number(event.target.value))
-                    }
-                  />
-                </FormField>
+                </Section>
               </div>
-            </Section>
-            <Section title="Status">
-              <div className="grid items-start gap-4 md:grid-cols-2">
+            </div>
+            <FormSidebar storageKey="feature-form-sidebar">
+              <div className="grid gap-4">
                 <FormField label="Status">
                   <StatusToggle
                     kind="featureStatus"
@@ -580,8 +583,6 @@ export function FeatureForm({
                   onChange={setResponsibleUserId}
                 />
               </div>
-            </Section>
-            <Section title="Parent-Projekt">
               <SelectParent
                 type="project"
                 label="Projekt"
@@ -593,27 +594,8 @@ export function FeatureForm({
                   void changeParentProject(item);
                 }}
               />
-            </Section>
-            <Section title="Kurzbeschreibung">
-              <RichTextInlineField
-                value={description}
-                placeholder="Kurzbeschreibung"
-                minRows={12}
-                testIdPrefix="feature-form-description"
-                onImageUpload={uploadContentImage}
-                onChange={setDescription}
-              />
-            </Section>
-            <Section title="Inhalt">
-              <RichTextInlineField
-                value={content}
-                placeholder="Feature-Inhalt"
-                testIdPrefix="feature-form-content"
-                onImageUpload={uploadContentImage}
-                onChange={setContent}
-              />
-            </Section>
-          </>
+            </FormSidebar>
+          </div>
         ) : null}
 
         {activeTab === "useCases" ? (

@@ -74,6 +74,7 @@ const fixtures = vi.hoisted(() => {
     attachmentCount: 0,
     noteCount: 0,
     commentCount: 0,
+    parentContexts: [{ type: "project", id: 30, label: "Projekt Alpha", origin: "direct" }],
     version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z"
@@ -91,6 +92,7 @@ const fixtures = vi.hoisted(() => {
     attachmentCount: 0,
     noteCount: 0,
     commentCount: 0,
+    parentContexts: [{ type: "feature", id: 10, label: "Feature Alpha", origin: "direct" }],
     version: 1,
     createdAt: "2026-05-18T08:00:00.000Z",
     updatedAt: "2026-05-18T09:00:00.000Z"
@@ -249,6 +251,7 @@ const fixtures = vi.hoisted(() => {
   };
   const taskDetail = {
     ...task,
+    parentContexts: [{ type: "project", id: project.id, label: project.name, origin: "direct" }],
     subtasks: [{ ...task, id: 41, parentId: task.id, title: "Subtask Alpha", subtaskCount: 0 }],
     comments: [comment],
     notes: [note],
@@ -262,6 +265,7 @@ const fixtures = vi.hoisted(() => {
   };
   const ticketDetail = {
     ...ticket,
+    parentContexts: [{ type: "project", id: project.id, label: project.name, origin: "direct" }],
     comments: [comment],
     notes: [note],
     attachments: [attachment],
@@ -269,7 +273,7 @@ const fixtures = vi.hoisted(() => {
     subTickets: [{ ...ticket, id: 52, parentId: ticket.id, title: "Sub-Ticket Alpha", subTicketCount: 0 }]
   };
 
-  return { attachment, childWikiPage, comment, feature, milestone, note, project, task, taskDetail, ticket, ticketDetail, useCase, wikiPage };
+  return { attachment, childWikiPage, comment, feature, milestone, note, project, task, taskDetail, ticket, ticketDetail, useCase, userSummary, wikiPage };
 });
 
 vi.mock("../../../../../apps/web/src/api/tickets", () => ({
@@ -286,6 +290,23 @@ export const ticket = fixtures.ticket as Ticket;
 export const ticketDetail = fixtures.ticketDetail as TicketDetail;
 export const formTestMocks = ownerFormMocks;
 export const wikiPage = fixtures.wikiPage as WikiPage;
+
+vi.mock("../../../../../apps/web/src/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: fixtures.userSummary,
+    authenticated: true,
+    loading: false,
+    error: null
+  })
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useUsers", () => ({
+  useUsers: () => ({
+    users: [fixtures.userSummary],
+    loading: false,
+    error: null
+  })
+}));
 
 vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
   RichTextInlineField({

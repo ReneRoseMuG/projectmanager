@@ -13,8 +13,8 @@
  * Die Rich-Text-Integration im Backlog-Formular absichern.
  */
 import "@testing-library/jest-dom/vitest";
-import type { BacklogItem } from "@taskmanager/shared-types";
-import { fireEvent, screen, waitFor } from "@testing-library/dom";
+import type { BacklogItem, Feature } from "@taskmanager/shared-types";
+import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BacklogItemForm } from "../../../../../apps/web/src/components/backlog/BacklogItemForm";
@@ -28,6 +28,23 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
 vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
   hasPermission: () => false,
   useHasPermission: () => false
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { id: 1, name: "test.admin", fullName: "Test Admin", email: "admin@local" },
+    authenticated: true,
+    loading: false,
+    error: null
+  })
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useUsers", () => ({
+  useUsers: () => ({
+    users: [{ id: 1, name: "test.admin", fullName: "Test Admin", email: "admin@local" }],
+    loading: false,
+    error: null
+  })
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/useEntityComments", () => ({
@@ -74,7 +91,28 @@ const backlogItem: BacklogItem = {
   status: "open",
   importKey: null,
   sortOrder: 0,
+  responsibleUserId: 1,
+  responsibleUser: { id: 1, name: "test.admin", fullName: "Test Admin", email: "admin@local" },
+  parentContexts: [{ type: "project", id: 10, label: "Projekt Alpha", origin: "direct" }],
   version: 2,
+  createdAt: "2026-05-19T08:00:00.000Z",
+  updatedAt: "2026-05-19T09:00:00.000Z"
+};
+
+const feature: Feature = {
+  id: 2,
+  title: "Feature Beta",
+  status: "active",
+  description: null,
+  content: "<p>Feature</p>",
+  sortOrder: 1,
+  responsibleUserId: 1,
+  responsibleUser: { id: 1, name: "test.admin", fullName: "Test Admin", email: "admin@local" },
+  useCaseCount: 0,
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0,
+  version: 1,
   createdAt: "2026-05-19T08:00:00.000Z",
   updatedAt: "2026-05-19T09:00:00.000Z"
 };
@@ -85,6 +123,39 @@ afterEach(() => {
 });
 
 describe("BacklogItemForm", () => {
+  it("verdrahtet Body, Parent-Kontext und Sidebar-Felder mit Submit-Payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<BacklogItemForm open item={backlogItem} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
+
+    const sidebar = screen.getByTestId("form-sidebar");
+    expect(screen.getByTestId("parent-context-field")).toHaveTextContent("PROJ-10");
+    expect(screen.getByDisplayValue(backlogItem.title)).toBeInTheDocument();
+    expect(screen.getByTestId("backlog-item-description-view")).toHaveValue(backlogItem.description);
+    expect(within(sidebar).getByRole("button", { name: "Offen" })).toHaveAttribute("data-active", "true");
+    expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
+    expect(within(sidebar).getByRole("combobox", { name: "Feature" })).toHaveValue("");
+    expect(within(sidebar).getByLabelText("Sortierung")).toHaveValue(0);
+
+    fireEvent.change(screen.getByDisplayValue(backlogItem.title), { target: { value: "Backlog Beta" } });
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
+    fireEvent.change(within(sidebar).getByRole("combobox", { name: "Feature" }), { target: { value: String(feature.id) } });
+    fireEvent.change(within(sidebar).getByLabelText("Sortierung"), { target: { value: "12" } });
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Backlog Beta",
+          status: "done",
+          featureId: feature.id,
+          responsibleUserId: null,
+          sortOrder: 12
+        })
+      )
+    );
+  });
+
   it("bindet RichTextInlineField an die Beschreibung", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(<BacklogItemForm open item={backlogItem} features={[]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);

@@ -1,4 +1,4 @@
-import type { JsonValue, UserSummary } from "@taskmanager/shared-types";
+import type { JsonValue, UserSummary, VisibleParentContext } from "@taskmanager/shared-types";
 import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { features, useCaseComments } from "../db/schema.js";
@@ -52,6 +52,7 @@ export interface UseCaseDto {
   version: number;
   createdAt: string;
   updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
 interface UseCaseSupportCounts {
@@ -74,7 +75,7 @@ const useCaseJournalFields: Array<JournalFieldDefinition<UseCaseRecord>> = [
   { key: "responsibleUserId", label: "Verantwortlich" }
 ];
 
-function mapUseCase(database: DbClient, record: UseCaseRecord, content?: string, supportCounts = emptyUseCaseSupportCounts): UseCaseDto {
+function mapUseCase(database: DbClient, record: UseCaseRecord, content?: string, supportCounts = emptyUseCaseSupportCounts, parentContexts?: VisibleParentContext[]): UseCaseDto {
   return {
     id: record.id,
     featureId: record.featureId,
@@ -90,8 +91,14 @@ function mapUseCase(database: DbClient, record: UseCaseRecord, content?: string,
     commentCount: supportCounts.commentCount,
     version: record.version,
     createdAt: record.createdAt,
-    updatedAt: record.updatedAt
+    updatedAt: record.updatedAt,
+    parentContexts
   };
+}
+
+function useCaseParentContexts(database: DbClient, featureId: number): VisibleParentContext[] {
+  const feature = database.select({ id: features.id, label: features.title }).from(features).where(eq(features.id, featureId)).get();
+  return feature ? [{ type: "feature", id: feature.id, label: feature.label, origin: "direct" }] : [];
 }
 
 function getUseCaseSupportCounts(database: DbClient, useCaseIds: number[]): Map<number, UseCaseSupportCounts> {
@@ -187,7 +194,7 @@ export function listUseCases(database: DbClient, featureId: number): UseCaseDto[
 export function getUseCase(database: DbClient, id: number): UseCaseDto {
   const useCase = getUseCaseRecord(database, id);
   const supportCounts = getUseCaseSupportCounts(database, [id]).get(id) ?? emptyUseCaseSupportCounts;
-  return mapUseCase(database, useCase, readUseCaseContent(database, useCase), supportCounts);
+  return mapUseCase(database, useCase, readUseCaseContent(database, useCase), supportCounts, useCaseParentContexts(database, useCase.featureId));
 }
 
 export function createUseCase(database: DbClient, featureId: number, input: UseCaseInput, actor?: JournalActor | null): UseCaseDto {

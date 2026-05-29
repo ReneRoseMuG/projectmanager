@@ -15,7 +15,7 @@
  * Ziel:
  * Die tabfähige Ticket-Detailform gegen Regressionen in Create- und Edit-Flows absichern.
  */
-import { fireEvent, screen, waitFor } from "@testing-library/dom";
+import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
 import { addPendingComment, changeInput, clickTab, getFileInput, renderWithProviders, ticket } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { TicketForm } from "../../../../../apps/web/src/components/tickets/TicketForm";
@@ -28,6 +28,48 @@ function changeLastInput(value: string) {
 }
 
 describe("TicketForm", () => {
+  it("verdrahtet Body, Parent-Kontext und Sidebar-Felder mit Submit-Payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<TicketForm open ticket={ticket} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
+
+    const sidebar = screen.getByTestId("form-sidebar");
+    expect(screen.getByTestId("parent-context-field")).toHaveTextContent("PROJ-30");
+    expect(screen.getByDisplayValue(ticket.title)).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-description-view")).toHaveValue(ticket.description);
+    expect(within(sidebar).getByRole("button", { name: "Bug" })).toBeInTheDocument();
+    expect(within(sidebar).getByRole("button", { name: "Mittel" })).toBeInTheDocument();
+    expect(within(sidebar).getAllByRole("button", { name: "Offen" }).some((button) => button.getAttribute("data-active") === "true")).toBe(true);
+    expect(within(sidebar).getByRole("combobox", { name: "Zuständig" })).toHaveValue("1");
+    expect(within(sidebar).getByRole("combobox", { name: "Meldende Person" })).toHaveValue("1");
+
+    fireEvent.change(screen.getByDisplayValue(ticket.title), { target: { value: "Ticket Beta" } });
+    const dueDate = sidebar.querySelector('input[type="date"]');
+    expect(dueDate).not.toBeNull();
+    fireEvent.change(dueDate as HTMLInputElement, { target: { value: "2026-06-21" } });
+    fireEvent.change(within(sidebar).getByRole("combobox", { name: "Zuständig" }), { target: { value: "" } });
+    fireEvent.change(within(sidebar).getByLabelText("Umgebung"), { target: { value: "Chrome" } });
+    fireEvent.change(within(sidebar).getByLabelText("Betroffene Version"), { target: { value: "1.2.3" } });
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Tags 0" }));
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Ticket Beta",
+          type: "bug",
+          status: "open",
+          priority: "medium",
+          dueDate: "2026-06-21",
+          responsibleUserId: null,
+          reporterUserId: 1,
+          environment: "Chrome",
+          affectedVersion: "1.2.3",
+          tagIds: [90]
+        })
+      )
+    );
+  });
+
   it("bindet RichTextInlineField an die Beschreibung", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     renderWithProviders(<TicketForm open ticket={ticket} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);

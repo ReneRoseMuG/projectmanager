@@ -249,8 +249,8 @@ describe("TaskListBoardView", () => {
     renderTaskList({ tasks: [overdueTask] });
 
     expect(screen.queryByText("Qualität")).not.toBeInTheDocument();
-    const overdueDate = screen.getByText("01.01.20").closest("span");
-    expect(overdueDate).toHaveClass("text-crimson");
+    const overdueMeta = screen.getByText("Fällig").closest("span");
+    expect(overdueMeta).toHaveClass("text-crimson");
   });
 
   it("zeigt leere Statusspalten wenn keine Aufgaben vorhanden sind", () => {
