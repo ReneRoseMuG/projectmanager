@@ -36,26 +36,28 @@ function nowIso(now: Date): string {
   return now.toISOString();
 }
 
-function roleForUser(database: DbClient, user: UserRecord): Role | null {
-  const role = roleRepository.findById(database, user.roleId);
+async function roleForUser(database: DbClient, user: UserRecord): Promise<Role | null> {
+  const role = await roleRepository.findById(database, user.roleId);
   if (!role) {
     return null;
   }
-  return mapRole(role, roleRepository.findPermissionsByRoleId(database, role.id));
+  return mapRole(role, await roleRepository.findPermissionsByRoleId(database, role.id));
 }
 
-export function listNotificationRecipients(database: DbClient): NotificationRecipient[] {
-  return userRepository
-    .findActive(database)
-    .filter((user) => {
-      const role = roleForUser(database, user);
-      return role ? hasPermission(role, "events", "read") : false;
-    })
-    .map((user) => ({ id: user.id, email: user.email }));
+export async function listNotificationRecipients(database: DbClient): Promise<NotificationRecipient[]> {
+  const users = await userRepository.findActive(database);
+  const result: NotificationRecipient[] = [];
+  for (const user of users) {
+    const role = await roleForUser(database, user);
+    if (role && hasPermission(role, "events", "read")) {
+      result.push({ id: user.id, email: user.email });
+    }
+  }
+  return result;
 }
 
-export function listDueNotificationEvents(database: DbClient, now: Date = new Date()): NotificationEvent[] {
-  return database
+export async function listDueNotificationEvents(database: DbClient, now: Date = new Date()): Promise<NotificationEvent[]> {
+  const rows = await database
     .select({
       id: events.id,
       title: events.title,
@@ -63,16 +65,15 @@ export function listDueNotificationEvents(database: DbClient, now: Date = new Da
       reminderMinutes: events.reminderMinutes
     })
     .from(events)
-    .where(gte(events.startTime, nowIso(now)))
-    .all()
-    .filter((event) => {
-      const startTime = new Date(event.startTime).getTime();
-      if (!Number.isFinite(startTime)) {
-        return false;
-      }
-      const reminderAt = startTime - event.reminderMinutes * 60 * 1000;
-      return reminderAt <= now.getTime() && startTime >= now.getTime();
-    });
+    .where(gte(events.startTime, nowIso(now)));
+  return rows.filter((event) => {
+    const startTime = new Date(event.startTime).getTime();
+    if (!Number.isFinite(startTime)) {
+      return false;
+    }
+    const reminderAt = startTime - event.reminderMinutes * 60 * 1000;
+    return reminderAt <= now.getTime() && startTime >= now.getTime();
+  });
 }
 
 function createEmailTransport(appConfig: AppConfig): Transporter {
@@ -103,12 +104,12 @@ export async function sendPendingEmailNotifications(database: DbClient, appConfi
 
   const transport = options.transport ?? createEmailTransport(appConfig);
   const now = options.now ?? new Date();
-  const dueEvents = listDueNotificationEvents(database, now);
-  const recipients = listNotificationRecipients(database);
+  const dueEvents = await listDueNotificationEvents(database, now);
+  const recipients = await listNotificationRecipients(database);
 
   for (const event of dueEvents) {
     for (const recipient of recipients) {
-      if (notificationRepository.wasSent(database, { eventId: event.id, userId: recipient.id, channel: "email", reminderMinutes: event.reminderMinutes })) {
+      if (await notificationRepository.wasSent(database, { eventId: event.id, userId: recipient.id, channel: "email", reminderMinutes: event.reminderMinutes })) {
         continue;
       }
       try {
@@ -118,7 +119,7 @@ export async function sendPendingEmailNotifications(database: DbClient, appConfi
           subject: emailSubject(event),
           text: emailText(event)
         });
-        notificationRepository.recordSent(database, {
+        await notificationRepository.recordSent(database, {
           eventId: event.id,
           userId: recipient.id,
           channel: "email",

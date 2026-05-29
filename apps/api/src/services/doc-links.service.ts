@@ -2,6 +2,7 @@ import type { FeatureRelation, FeatureRelationInput, JsonValue } from "@taskmana
 import { eq, inArray, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureRelations, features, milestoneFeatures, milestones, projectFeatures, projects, useCases } from "../db/schema.js";
+import { firstRow } from "../db/query-utils.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import type { FeatureDto } from "./features.service.js";
@@ -22,7 +23,7 @@ type MappableFeatureRecord = Pick<
 
 type FeatureReference = Pick<typeof features.$inferSelect, "id" | "title">;
 
-function mapFeature(database: DbClient, row: MappableFeatureRecord, useCaseCount = 0): FeatureDto {
+async function mapFeature(database: DbClient, row: MappableFeatureRecord, useCaseCount = 0): Promise<FeatureDto> {
   return {
     id: row.id,
     title: row.title,
@@ -30,7 +31,7 @@ function mapFeature(database: DbClient, row: MappableFeatureRecord, useCaseCount
     description: row.description,
     sortOrder: row.sortOrder,
     responsibleUserId: row.responsibleUserId,
-    responsibleUser: getUserOption(database, row.responsibleUserId),
+    responsibleUser: await getUserOption(database, row.responsibleUserId),
     version: row.version,
     useCaseCount,
     attachmentCount: 0,
@@ -41,58 +42,58 @@ function mapFeature(database: DbClient, row: MappableFeatureRecord, useCaseCount
   };
 }
 
-function ensureProjectExists(database: DbClient, projectId: number): void {
-  const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
+async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {
+  const project = firstRow(await database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)));
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
 }
 
-function getProjectJournalObject(database: DbClient, projectId: number): JournalObjectRef {
-  const project = database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, projectId)).get();
+async function getProjectJournalObject(database: DbClient, projectId: number): Promise<JournalObjectRef> {
+  const project = firstRow(await database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, projectId)));
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
   return makeJournalObject("project", project.id, project.name);
 }
 
-function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
-  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+async function ensureMilestoneExists(database: DbClient, milestoneId: number): Promise<void> {
+  const milestone = firstRow(await database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)));
   if (!milestone) {
     throw notFound(`Milestone with id ${milestoneId} not found`);
   }
 }
 
-function getMilestoneJournalObject(database: DbClient, milestoneId: number): JournalObjectRef {
-  const milestone = database.select({ id: milestones.id, name: milestones.name }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+async function getMilestoneJournalObject(database: DbClient, milestoneId: number): Promise<JournalObjectRef> {
+  const milestone = firstRow(await database.select({ id: milestones.id, name: milestones.name }).from(milestones).where(eq(milestones.id, milestoneId)));
   if (!milestone) {
     throw notFound(`Milestone with id ${milestoneId} not found`);
   }
   return makeJournalObject("milestone", milestone.id, milestone.name);
 }
 
-function ensureFeatureExists(database: DbClient, featureId: number): void {
-  const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
+async function ensureFeatureExists(database: DbClient, featureId: number): Promise<void> {
+  const feature = firstRow(await database.select({ id: features.id }).from(features).where(eq(features.id, featureId)));
   if (!feature) {
     throw notFound(`Feature with id ${featureId} not found`);
   }
 }
 
-function getFeatureJournalObject(database: DbClient, featureId: number): JournalObjectRef {
-  const feature = database.select({ id: features.id, title: features.title }).from(features).where(eq(features.id, featureId)).get();
+async function getFeatureJournalObject(database: DbClient, featureId: number): Promise<JournalObjectRef> {
+  const feature = firstRow(await database.select({ id: features.id, title: features.title }).from(features).where(eq(features.id, featureId)));
   if (!feature) {
     throw notFound(`Feature with id ${featureId} not found`);
   }
   return makeJournalObject("feature", feature.id, feature.title);
 }
 
-function ensureFeaturesExist(database: DbClient, featureIds: number[]): number[] {
+async function ensureFeaturesExist(database: DbClient, featureIds: number[]): Promise<number[]> {
   const uniqueIds = [...new Set(featureIds)];
   if (uniqueIds.length === 0) {
     return [];
   }
 
-  const found = database.select({ id: features.id }).from(features).where(inArray(features.id, uniqueIds)).all();
+  const found = await database.select({ id: features.id }).from(features).where(inArray(features.id, uniqueIds));
   const foundIds = new Set(found.map((row) => row.id));
   const invalidIds = uniqueIds.filter((id) => !foundIds.has(id));
 
@@ -103,12 +104,12 @@ function ensureFeaturesExist(database: DbClient, featureIds: number[]): number[]
   return uniqueIds;
 }
 
-function findFeatureReferences(database: DbClient, featureIds: number[]): FeatureReference[] {
+async function findFeatureReferences(database: DbClient, featureIds: number[]): Promise<FeatureReference[]> {
   const uniqueIds = [...new Set(featureIds)];
   if (uniqueIds.length === 0) {
     return [];
   }
-  return database.select({ id: features.id, title: features.title }).from(features).where(inArray(features.id, uniqueIds)).all();
+  return database.select({ id: features.id, title: features.title }).from(features).where(inArray(features.id, uniqueIds));
 }
 
 function featureListLabel(records: FeatureReference[]): string | null {
@@ -210,13 +211,13 @@ function normalizeFeatureRelations(featureId: number, relations: FeatureRelation
   return [...uniqueRelations.values()];
 }
 
-function getUseCaseCountMap(database: DbClient, featureIds: number[]): Map<number, number> {
+async function getUseCaseCountMap(database: DbClient, featureIds: number[]): Promise<Map<number, number>> {
   const counts = new Map<number, number>();
   if (featureIds.length === 0) {
     return counts;
   }
 
-  const rows = database.select({ featureId: useCases.featureId }).from(useCases).where(inArray(useCases.featureId, featureIds)).all();
+  const rows = await database.select({ featureId: useCases.featureId }).from(useCases).where(inArray(useCases.featureId, featureIds));
   for (const row of rows) {
     counts.set(row.featureId, (counts.get(row.featureId) ?? 0) + 1);
   }
@@ -224,9 +225,9 @@ function getUseCaseCountMap(database: DbClient, featureIds: number[]): Map<numbe
   return counts;
 }
 
-export function listProjectFeatures(database: DbClient, projectId: number): FeatureDto[] {
-  ensureProjectExists(database, projectId);
-  const rows = database
+export async function listProjectFeatures(database: DbClient, projectId: number): Promise<FeatureDto[]> {
+  await ensureProjectExists(database, projectId);
+  const rows = await database
     .select({
       id: features.id,
       title: features.title,
@@ -240,26 +241,25 @@ export function listProjectFeatures(database: DbClient, projectId: number): Feat
     })
     .from(projectFeatures)
     .innerJoin(features, eq(projectFeatures.featureId, features.id))
-    .where(eq(projectFeatures.projectId, projectId))
-    .all();
-  const counts = getUseCaseCountMap(database, rows.map((row) => row.id));
+    .where(eq(projectFeatures.projectId, projectId));
+  const counts = await getUseCaseCountMap(database, rows.map((row) => row.id));
 
-  return rows.map((row) => mapFeature(database, row, counts.get(row.id) ?? 0));
+  return Promise.all(rows.map((row) => mapFeature(database, row, counts.get(row.id) ?? 0)));
 }
 
-export function setProjectFeatures(database: DbClient, projectId: number, featureIds: number[], actor?: JournalActor | null): FeatureDto[] {
-  const ownerObject = getProjectJournalObject(database, projectId);
-  const uniqueIds = ensureFeaturesExist(database, featureIds);
-  const before = listProjectFeatures(database, projectId).map((feature) => ({ id: feature.id, title: feature.title }));
-  const after = findFeatureReferences(database, uniqueIds);
+export async function setProjectFeatures(database: DbClient, projectId: number, featureIds: number[], actor?: JournalActor | null): Promise<FeatureDto[]> {
+  const ownerObject = await getProjectJournalObject(database, projectId);
+  const uniqueIds = await ensureFeaturesExist(database, featureIds);
+  const before = (await listProjectFeatures(database, projectId)).map((feature) => ({ id: feature.id, title: feature.title }));
+  const after = await findFeatureReferences(database, uniqueIds);
 
-  database.transaction((tx) => {
-    tx.delete(projectFeatures).where(eq(projectFeatures.projectId, projectId)).run();
+  await database.transaction(async (tx) => {
+    await tx.delete(projectFeatures).where(eq(projectFeatures.projectId, projectId));
     if (uniqueIds.length > 0) {
-      tx.insert(projectFeatures).values(uniqueIds.map((featureId) => ({ projectId, featureId }))).run();
+      await tx.insert(projectFeatures).values(uniqueIds.map((featureId) => ({ projectId, featureId })));
     }
     const changes = buildFeatureSetChange(before, after);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "update",
       object: ownerObject,
       summary: buildUpdateSummary(ownerObject, changes),
@@ -272,9 +272,9 @@ export function setProjectFeatures(database: DbClient, projectId: number, featur
   return listProjectFeatures(database, projectId);
 }
 
-export function listMilestoneFeatures(database: DbClient, milestoneId: number): FeatureDto[] {
-  ensureMilestoneExists(database, milestoneId);
-  const rows = database
+export async function listMilestoneFeatures(database: DbClient, milestoneId: number): Promise<FeatureDto[]> {
+  await ensureMilestoneExists(database, milestoneId);
+  const rows = await database
     .select({
       id: features.id,
       title: features.title,
@@ -288,26 +288,25 @@ export function listMilestoneFeatures(database: DbClient, milestoneId: number): 
     })
     .from(milestoneFeatures)
     .innerJoin(features, eq(milestoneFeatures.featureId, features.id))
-    .where(eq(milestoneFeatures.milestoneId, milestoneId))
-    .all();
-  const counts = getUseCaseCountMap(database, rows.map((row) => row.id));
+    .where(eq(milestoneFeatures.milestoneId, milestoneId));
+  const counts = await getUseCaseCountMap(database, rows.map((row) => row.id));
 
-  return rows.map((row) => mapFeature(database, row, counts.get(row.id) ?? 0));
+  return Promise.all(rows.map((row) => mapFeature(database, row, counts.get(row.id) ?? 0)));
 }
 
-export function setMilestoneFeatures(database: DbClient, milestoneId: number, featureIds: number[], actor?: JournalActor | null): FeatureDto[] {
-  const ownerObject = getMilestoneJournalObject(database, milestoneId);
-  const uniqueIds = ensureFeaturesExist(database, featureIds);
-  const before = listMilestoneFeatures(database, milestoneId).map((feature) => ({ id: feature.id, title: feature.title }));
-  const after = findFeatureReferences(database, uniqueIds);
+export async function setMilestoneFeatures(database: DbClient, milestoneId: number, featureIds: number[], actor?: JournalActor | null): Promise<FeatureDto[]> {
+  const ownerObject = await getMilestoneJournalObject(database, milestoneId);
+  const uniqueIds = await ensureFeaturesExist(database, featureIds);
+  const before = (await listMilestoneFeatures(database, milestoneId)).map((feature) => ({ id: feature.id, title: feature.title }));
+  const after = await findFeatureReferences(database, uniqueIds);
 
-  database.transaction((tx) => {
-    tx.delete(milestoneFeatures).where(eq(milestoneFeatures.milestoneId, milestoneId)).run();
+  await database.transaction(async (tx) => {
+    await tx.delete(milestoneFeatures).where(eq(milestoneFeatures.milestoneId, milestoneId));
     if (uniqueIds.length > 0) {
-      tx.insert(milestoneFeatures).values(uniqueIds.map((featureId) => ({ milestoneId, featureId }))).run();
+      await tx.insert(milestoneFeatures).values(uniqueIds.map((featureId) => ({ milestoneId, featureId })));
     }
     const changes = buildFeatureSetChange(before, after);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "update",
       object: ownerObject,
       summary: buildUpdateSummary(ownerObject, changes),
@@ -320,9 +319,9 @@ export function setMilestoneFeatures(database: DbClient, milestoneId: number, fe
   return listMilestoneFeatures(database, milestoneId);
 }
 
-export function listFeatureRelations(database: DbClient, featureId: number): FeatureRelation[] {
-  ensureFeatureExists(database, featureId);
-  const rows = database
+export async function listFeatureRelations(database: DbClient, featureId: number): Promise<FeatureRelation[]> {
+  await ensureFeatureExists(database, featureId);
+  const rows = await database
     .select({
       sourceFeatureId: featureRelations.sourceFeatureId,
       targetFeatureId: featureRelations.targetFeatureId,
@@ -342,21 +341,20 @@ export function listFeatureRelations(database: DbClient, featureId: number): Fea
     })
     .from(featureRelations)
     .innerJoin(features, eq(featureRelations.targetFeatureId, features.id))
-    .where(eq(featureRelations.sourceFeatureId, featureId))
-    .all();
-  const counts = getUseCaseCountMap(
+    .where(eq(featureRelations.sourceFeatureId, featureId));
+  const counts = await getUseCaseCountMap(
     database,
     rows.map((row) => row.targetId)
   );
 
-  return rows.map((row) => ({
+  return Promise.all(rows.map(async (row) => ({
     sourceFeatureId: row.sourceFeatureId,
     targetFeatureId: row.targetFeatureId,
     relationType: row.relationType,
     description: row.description,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    targetFeature: mapFeature(
+    targetFeature: await mapFeature(
       database,
       {
         id: row.targetId,
@@ -371,31 +369,31 @@ export function listFeatureRelations(database: DbClient, featureId: number): Fea
       },
       counts.get(row.targetId) ?? 0
     )
-  }));
+  })));
 }
 
-export function setFeatureRelations(database: DbClient, featureId: number, relations: FeatureRelationInput[], actor?: JournalActor | null): FeatureRelation[] {
-  const ownerObject = getFeatureJournalObject(database, featureId);
-  const beforeRelations = listFeatureRelations(database, featureId).map((relation) => ({
+export async function setFeatureRelations(database: DbClient, featureId: number, relations: FeatureRelationInput[], actor?: JournalActor | null): Promise<FeatureRelation[]> {
+  const ownerObject = await getFeatureJournalObject(database, featureId);
+  const beforeRelations = (await listFeatureRelations(database, featureId)).map((relation) => ({
     targetFeatureId: relation.targetFeatureId,
     relationType: relation.relationType,
     description: relation.description
   }));
   const normalized = normalizeFeatureRelations(featureId, relations);
-  ensureFeaturesExist(
+  await ensureFeaturesExist(
     database,
     normalized.map((relation) => relation.targetFeatureId)
   );
-  const relatedFeatures = findFeatureReferences(database, [
+  const relatedFeatures = await findFeatureReferences(database, [
     ...beforeRelations.map((relation) => relation.targetFeatureId),
     ...normalized.map((relation) => relation.targetFeatureId)
   ]);
   const featureById = new Map(relatedFeatures.map((feature) => [feature.id, feature]));
 
-  database.transaction((tx) => {
-    tx.delete(featureRelations).where(or(eq(featureRelations.sourceFeatureId, featureId), eq(featureRelations.targetFeatureId, featureId))).run();
+  await database.transaction(async (tx) => {
+    await tx.delete(featureRelations).where(or(eq(featureRelations.sourceFeatureId, featureId), eq(featureRelations.targetFeatureId, featureId)));
     if (normalized.length > 0) {
-      tx.insert(featureRelations)
+      await tx.insert(featureRelations)
         .values(
           normalized.map((relation) => ({
             sourceFeatureId: featureId,
@@ -403,20 +401,19 @@ export function setFeatureRelations(database: DbClient, featureId: number, relat
             relationType: relation.relationType,
             description: relation.description
           }))
-        )
-        .run();
+        );
     }
     const changes = buildRelationSetChange(beforeRelations, normalized, featureById);
-    recordJournalEntry(tx, {
+    const contexts = await Promise.all(normalized.map(async (relation) => makeJournalContext(await getFeatureJournalObject(database, relation.targetFeatureId), "related")));
+    await recordJournalEntry(tx, {
       operation: "update",
       object: ownerObject,
       summary: buildUpdateSummary(ownerObject, changes),
       actor,
       changes,
-      contexts: normalized.map((relation) => makeJournalContext(getFeatureJournalObject(database, relation.targetFeatureId), "related"))
+      contexts
     });
   });
 
   return listFeatureRelations(database, featureId);
 }
-

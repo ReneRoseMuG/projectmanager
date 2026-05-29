@@ -73,7 +73,7 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     "/day-plans/:id/notes",
     { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return listDayPlanNotes(app.db, request.params.id, currentUser.id);
     }
   );
@@ -106,7 +106,7 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     "/day-plans/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return reply.status(201).send(createDayPlanNote(app.db, request.params.id, currentUser.id, request.body, createJournalActor(request.currentUser)));
     }
   );
@@ -121,7 +121,7 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     "/day-plans/:id/notes/:noteId",
     { schema: { params: dayPlanNoteParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return linkDayPlanNote(app.db, request.params.id, request.params.noteId, currentUser.id, createJournalActor(request.currentUser));
     }
   );
@@ -151,7 +151,7 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     "/day-plans/:id/notes/:noteId",
     { schema: { params: dayPlanNoteParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       deleteDayPlanNote(app.db, request.params.id, request.params.noteId, currentUser.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }

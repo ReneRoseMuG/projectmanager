@@ -120,11 +120,11 @@ function overdueTaskOwnerFromQuery(query: { ownerType?: DashboardOverdueTaskOwne
   return taskOwnerFromQuery(query) as DashboardOverdueTaskOwner | undefined;
 }
 
-function ensureDashboardDayPlanAccess(app: FastifyInstance, request: FastifyRequest, owner?: DashboardTaskOwner | DashboardOverdueTaskOwner): void {
+async function ensureDashboardDayPlanAccess(app: FastifyInstance, request: FastifyRequest, owner?: DashboardTaskOwner | DashboardOverdueTaskOwner): Promise<void> {
   if (owner?.type !== "dayPlan") {
     return;
   }
-  const currentUser = requireCurrentUser(request);
+  const currentUser = await requireCurrentUser(request);
   ensureDayPlanOwnedByUser(app.db, owner.id, currentUser.id);
 }
 

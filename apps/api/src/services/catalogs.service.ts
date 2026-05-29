@@ -95,97 +95,96 @@ function assertCatalogKind(kind: string): asserts kind is CatalogKind {
   }
 }
 
-function resolveSortOrder(database: DbClient, kind: CatalogKind, sortOrder: number | undefined): number {
+async function resolveSortOrder(database: DbClient, kind: CatalogKind, sortOrder: number | undefined): Promise<number> {
   if (sortOrder !== undefined) {
     return sortOrder;
   }
-  const entries = catalogRepository.findByKind(database, kind);
+  const entries = await catalogRepository.findByKind(database, kind);
   const highest = entries.reduce((current, entry) => Math.max(current, entry.sortOrder), 0);
   return highest + 100;
 }
 
-function setWorkStatusFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): void {
+async function setWorkStatusFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): Promise<void> {
   const now = nowIso();
-  database.update(projects).set({ status: fallback.key, updatedAt: now, version: sql`${projects.version} + 1` }).where(eq(projects.status, fromKey)).run();
-  database.update(milestones).set({ status: fallback.key, updatedAt: now, version: sql`${milestones.version} + 1` }).where(eq(milestones.status, fromKey)).run();
-  database.update(tasks).set({ status: fallback.key, updatedAt: now, version: sql`${tasks.version} + 1` }).where(eq(tasks.status, fromKey)).run();
-  database.update(backlogItems).set({ status: fallback.key, updatedAt: now, version: sql`${backlogItems.version} + 1` }).where(eq(backlogItems.status, fromKey)).run();
-  database
+  await database.update(projects).set({ status: fallback.key, updatedAt: now, version: sql`${projects.version} + 1` }).where(eq(projects.status, fromKey));
+  await database.update(milestones).set({ status: fallback.key, updatedAt: now, version: sql`${milestones.version} + 1` }).where(eq(milestones.status, fromKey));
+  await database.update(tasks).set({ status: fallback.key, updatedAt: now, version: sql`${tasks.version} + 1` }).where(eq(tasks.status, fromKey));
+  await database.update(backlogItems).set({ status: fallback.key, updatedAt: now, version: sql`${backlogItems.version} + 1` }).where(eq(backlogItems.status, fromKey));
+  await database
     .update(tickets)
     .set({
       status: fallback.key,
-      resolvedAt: fallback.isClosed ? sql`coalesce(${tickets.resolvedAt}, datetime('now'))` : null,
+      resolvedAt: fallback.isClosed ? sql`coalesce(${tickets.resolvedAt}, ${now})` : null,
       updatedAt: now,
       version: sql`${tickets.version} + 1`
     })
-    .where(eq(tickets.status, fromKey))
-    .run();
+    .where(eq(tickets.status, fromKey));
 }
 
-function setFeatureStatusFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): void {
+async function setFeatureStatusFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): Promise<void> {
   const now = nowIso();
-  database.update(features).set({ status: fallback.key, updatedAt: now, version: sql`${features.version} + 1` }).where(eq(features.status, fromKey)).run();
-  database.update(useCases).set({ status: fallback.key, updatedAt: now, version: sql`${useCases.version} + 1` }).where(eq(useCases.status, fromKey)).run();
+  await database.update(features).set({ status: fallback.key, updatedAt: now, version: sql`${features.version} + 1` }).where(eq(features.status, fromKey));
+  await database.update(useCases).set({ status: fallback.key, updatedAt: now, version: sql`${useCases.version} + 1` }).where(eq(useCases.status, fromKey));
 }
 
-function setPriorityFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): void {
+async function setPriorityFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): Promise<void> {
   const now = nowIso();
-  database.update(tasks).set({ priority: fallback.key, updatedAt: now, version: sql`${tasks.version} + 1` }).where(eq(tasks.priority, fromKey)).run();
-  database.update(tickets).set({ priority: fallback.key, updatedAt: now, version: sql`${tickets.version} + 1` }).where(eq(tickets.priority, fromKey)).run();
+  await database.update(tasks).set({ priority: fallback.key, updatedAt: now, version: sql`${tasks.version} + 1` }).where(eq(tasks.priority, fromKey));
+  await database.update(tickets).set({ priority: fallback.key, updatedAt: now, version: sql`${tickets.version} + 1` }).where(eq(tickets.priority, fromKey));
 }
 
-function setTicketTypeFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): void {
+async function setTicketTypeFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): Promise<void> {
   const now = nowIso();
-  database.update(tickets).set({ type: fallback.key, updatedAt: now, version: sql`${tickets.version} + 1` }).where(eq(tickets.type, fromKey)).run();
+  await database.update(tickets).set({ type: fallback.key, updatedAt: now, version: sql`${tickets.version} + 1` }).where(eq(tickets.type, fromKey));
 }
 
-export function listCatalogEntries(database: DbClient, kind?: string): CatalogEntry[] {
+export async function listCatalogEntries(database: DbClient, kind?: string): Promise<CatalogEntry[]> {
   if (kind !== undefined) {
     assertCatalogKind(kind);
-    return catalogRepository.findByKind(database, kind).map(mapCatalogEntry);
+    return (await catalogRepository.findByKind(database, kind)).map(mapCatalogEntry);
   }
-  return catalogRepository.findAll(database).map(mapCatalogEntry);
+  return (await catalogRepository.findAll(database)).map(mapCatalogEntry);
 }
 
-export function ensureCatalogEntryExists(database: DbClient, kind: CatalogKind, key: string): void {
-  if (!catalogRepository.findByKindAndKey(database, kind, key)) {
+export async function ensureCatalogEntryExists(database: DbClient, kind: CatalogKind, key: string): Promise<void> {
+  if (!(await catalogRepository.findByKindAndKey(database, kind, key))) {
     throw badRequest(`Catalog entry "${key}" does not exist in ${kind}`);
   }
 }
 
-export function resolveDefaultCatalogEntryKey(database: DbClient, kind: CatalogKind, preferredKey: string): string {
-  const preferred = catalogRepository.findByKindAndKey(database, kind, preferredKey);
+export async function resolveDefaultCatalogEntryKey(database: DbClient, kind: CatalogKind, preferredKey: string): Promise<string> {
+  const preferred = await catalogRepository.findByKindAndKey(database, kind, preferredKey);
   if (preferred) {
     return preferred.key;
   }
-  const fallback = catalogRepository.findLowestByKind(database, kind);
+  const fallback = await catalogRepository.findLowestByKind(database, kind);
   if (!fallback) {
     throw badRequest(`Catalog ${kind} has no entries`);
   }
   return fallback.key;
 }
 
-export function isCatalogEntryClosed(database: DbClient, kind: CatalogKind, key: string): boolean {
-  return catalogRepository.findByKindAndKey(database, kind, key)?.isClosed ?? false;
+export async function isCatalogEntryClosed(database: DbClient, kind: CatalogKind, key: string): Promise<boolean> {
+  return (await catalogRepository.findByKindAndKey(database, kind, key))?.isClosed ?? false;
 }
 
-export function listClosedCatalogEntryKeys(database: DbClient, kind: CatalogKind): Set<string> {
-  return new Set(catalogRepository.findByKind(database, kind).filter((entry) => entry.isClosed).map((entry) => entry.key));
+export async function listClosedCatalogEntryKeys(database: DbClient, kind: CatalogKind): Promise<Set<string>> {
+  return new Set((await catalogRepository.findByKind(database, kind)).filter((entry) => entry.isClosed).map((entry) => entry.key));
 }
 
-export function createCatalogEntry(database: DbClient, kind: string, input: CatalogEntryInput): CatalogEntry {
+export async function createCatalogEntry(database: DbClient, kind: string, input: CatalogEntryInput): Promise<CatalogEntry> {
   assertCatalogKind(kind);
   const key = normalizeCatalogKey(input.key);
   const label = requireNonEmpty(input.label, "label");
-  if (catalogRepository.findByKindAndKey(database, kind, key)) {
+  if (await catalogRepository.findByKindAndKey(database, kind, key)) {
     throw conflict(`Catalog entry "${key}" already exists in ${kind}`);
   }
 
-  const created = catalogRepository.create(database, {
+  const created = await catalogRepository.create(database, {
     kind,
     key,
     label,
-    sortOrder: resolveSortOrder(database, kind, input.sortOrder),
+    sortOrder: await resolveSortOrder(database, kind, input.sortOrder),
     isClosed: isStatusCatalog(kind) ? input.isClosed ?? false : false,
     color: normalizeCatalogColor(input.color, kind, key)
   });
@@ -193,9 +192,9 @@ export function createCatalogEntry(database: DbClient, kind: string, input: Cata
   return mapCatalogEntry(created);
 }
 
-export function updateCatalogEntry(database: DbClient, kind: string, id: number, input: CatalogEntryUpdate): CatalogEntry {
+export async function updateCatalogEntry(database: DbClient, kind: string, id: number, input: CatalogEntryUpdate): Promise<CatalogEntry> {
   assertCatalogKind(kind);
-  const current = catalogRepository.findById(database, id);
+  const current = await catalogRepository.findById(database, id);
   if (!current || current.kind !== kind) {
     throw notFound(`Catalog entry with id ${id} not found`);
   }
@@ -218,35 +217,35 @@ export function updateCatalogEntry(database: DbClient, kind: string, id: number,
     throw badRequest("No catalog entry fields provided");
   }
 
-  const updated = catalogRepository.update(database, id, input.expectedVersion, values);
+  const updated = await catalogRepository.update(database, id, input.expectedVersion, values);
   if (!updated) {
     throw notFound(`Catalog entry with id ${id} not found`);
   }
   return mapCatalogEntry(updated);
 }
 
-export function deleteCatalogEntry(database: DbClient, kind: string, id: number): void {
+export async function deleteCatalogEntry(database: DbClient, kind: string, id: number): Promise<void> {
   assertCatalogKind(kind);
-  const entry = catalogRepository.findById(database, id);
+  const entry = await catalogRepository.findById(database, id);
   if (!entry || entry.kind !== kind) {
     throw notFound(`Catalog entry with id ${id} not found`);
   }
 
-  const fallback = catalogRepository.findLowestByKind(database, kind, id);
+  const fallback = await catalogRepository.findLowestByKind(database, kind, id);
   if (!fallback) {
     throw badRequest("Cannot delete the last catalog entry");
   }
 
-  database.transaction((tx) => {
+  await database.transaction(async (tx) => {
     if (kind === "workStatus") {
-      setWorkStatusFallback(tx, entry.key, fallback);
+      await setWorkStatusFallback(tx, entry.key, fallback);
     } else if (kind === "featureStatus") {
-      setFeatureStatusFallback(tx, entry.key, fallback);
+      await setFeatureStatusFallback(tx, entry.key, fallback);
     } else if (kind === "priority") {
-      setPriorityFallback(tx, entry.key, fallback);
+      await setPriorityFallback(tx, entry.key, fallback);
     } else {
-      setTicketTypeFallback(tx, entry.key, fallback);
+      await setTicketTypeFallback(tx, entry.key, fallback);
     }
-    catalogRepository.delete(tx, id);
+    await catalogRepository.delete(tx, id);
   });
 }

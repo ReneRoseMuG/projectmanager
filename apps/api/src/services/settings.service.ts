@@ -58,7 +58,7 @@ function assertScopeAllowed(definition: SettingDefinition, scopeType: SettingSco
   }
 }
 
-function resolveScopeId(database: DbClient, currentUser: CurrentUser, scopeType: SettingScopeType, inputScopeId: string | undefined): string {
+async function resolveScopeId(database: DbClient, currentUser: CurrentUser, scopeType: SettingScopeType, inputScopeId: string | undefined): Promise<string> {
   if (scopeType === "GLOBAL") {
     if (inputScopeId !== undefined && inputScopeId !== globalScopeId) {
       throw badRequest("GLOBAL settings must use scopeId global");
@@ -78,7 +78,7 @@ function resolveScopeId(database: DbClient, currentUser: CurrentUser, scopeType:
   if (!roleKey) {
     throw badRequest("ROLE settings require scopeId");
   }
-  if (!getRoleByKey(database, roleKey)) {
+  if (!(await getRoleByKey(database, roleKey))) {
     throw badRequest(`Role "${roleKey}" does not exist`);
   }
   return roleKey;
@@ -165,27 +165,27 @@ function settingKeys(): SettingKey[] {
   return Object.keys(settingsRegistry) as SettingKey[];
 }
 
-export function getResolvedSettingsForUser(database: DbClient, currentUser: CurrentUser): SettingsResolvedResponse {
+export async function getResolvedSettingsForUser(database: DbClient, currentUser: CurrentUser): Promise<SettingsResolvedResponse> {
   const keys = settingKeys();
-  const records = settingsRepository.findCandidates(database, keys, scopeCandidatesForUser(currentUser));
+  const records = await settingsRepository.findCandidates(database, keys, scopeCandidatesForUser(currentUser));
   const byScope = settingRecordMap(records);
   return {
     settings: keys.map((key) => resolveSetting(key, byScope, currentUser))
   };
 }
 
-export function setSettingValue(database: DbClient, currentUser: CurrentUser, input: SetSettingValueRequest): SettingsResolvedResponse {
+export async function setSettingValue(database: DbClient, currentUser: CurrentUser, input: SetSettingValueRequest): Promise<SettingsResolvedResponse> {
   assertExpectedVersion(input.expectedVersion);
   const definition = getDefinitionOrThrow(input.key);
   assertScopeAllowed(definition, input.scopeType);
   assertCanWriteScope(currentUser, input.scopeType);
-  const scopeId = resolveScopeId(database, currentUser, input.scopeType, input.scopeId);
+  const scopeId = await resolveScopeId(database, currentUser, input.scopeType, input.scopeId);
 
   if (!definition.validate(input.value)) {
     throw badRequest(`Value for setting "${definition.key}" is invalid`);
   }
 
-  settingsRepository.upsertWithVersion(database, {
+  await settingsRepository.upsertWithVersion(database, {
     settingKey: definition.key,
     scopeType: input.scopeType,
     scopeId,
@@ -197,14 +197,14 @@ export function setSettingValue(database: DbClient, currentUser: CurrentUser, in
   return getResolvedSettingsForUser(database, currentUser);
 }
 
-export function deleteSettingValue(database: DbClient, currentUser: CurrentUser, input: DeleteSettingValueRequest): SettingsResolvedResponse {
+export async function deleteSettingValue(database: DbClient, currentUser: CurrentUser, input: DeleteSettingValueRequest): Promise<SettingsResolvedResponse> {
   assertExpectedVersion(input.expectedVersion);
   const definition = getDefinitionOrThrow(input.key);
   assertScopeAllowed(definition, input.scopeType);
   assertCanWriteScope(currentUser, input.scopeType);
-  const scopeId = resolveScopeId(database, currentUser, input.scopeType, input.scopeId);
+  const scopeId = await resolveScopeId(database, currentUser, input.scopeType, input.scopeId);
 
-  settingsRepository.deleteWithVersion(database, definition.key, input.scopeType, scopeId, input.expectedVersion);
+  await settingsRepository.deleteWithVersion(database, definition.key, input.scopeType, scopeId, input.expectedVersion);
 
   return getResolvedSettingsForUser(database, currentUser);
 }

@@ -71,9 +71,9 @@ export function getPushVapidKey(appConfig: AppConfig): PushVapidKeyResponse {
   };
 }
 
-export function subscribeToPushNotifications(database: DbClient, userId: number, input: PushSubscriptionInput): PushSubscriptionStatus {
+export async function subscribeToPushNotifications(database: DbClient, userId: number, input: PushSubscriptionInput): Promise<PushSubscriptionStatus> {
   const normalized = normalizeSubscription(input);
-  pushSubscriptionRepository.upsert(database, {
+  await pushSubscriptionRepository.upsert(database, {
     userId,
     endpoint: normalized.endpoint,
     p256dh: normalized.keys.p256dh,
@@ -82,17 +82,17 @@ export function subscribeToPushNotifications(database: DbClient, userId: number,
   return getPushSubscriptionStatus(database, userId);
 }
 
-export function unsubscribeFromPushNotifications(database: DbClient, userId: number, endpoint: string): PushSubscriptionStatus {
+export async function unsubscribeFromPushNotifications(database: DbClient, userId: number, endpoint: string): Promise<PushSubscriptionStatus> {
   const normalizedEndpoint = endpoint.trim();
   if (!normalizedEndpoint) {
     throw badRequest("endpoint is required");
   }
-  pushSubscriptionRepository.deleteForUser(database, userId, normalizedEndpoint);
+  await pushSubscriptionRepository.deleteForUser(database, userId, normalizedEndpoint);
   return getPushSubscriptionStatus(database, userId);
 }
 
-export function getPushSubscriptionStatus(database: DbClient, userId: number): PushSubscriptionStatus {
-  return subscriptionStatus(pushSubscriptionRepository.findByUser(database, userId));
+export async function getPushSubscriptionStatus(database: DbClient, userId: number): Promise<PushSubscriptionStatus> {
+  return subscriptionStatus(await pushSubscriptionRepository.findByUser(database, userId));
 }
 
 export async function sendPendingPushNotifications(database: DbClient, appConfig: AppConfig, options: PushNotificationOptions = {}): Promise<void> {
@@ -102,15 +102,15 @@ export async function sendPendingPushNotifications(database: DbClient, appConfig
 
   const sendNotification = options.sendNotification ?? webpush.sendNotification;
   const now = options.now ?? new Date();
-  const dueEvents = listDueNotificationEvents(database, now);
-  const recipients = listNotificationRecipients(database);
+  const dueEvents = await listDueNotificationEvents(database, now);
+  const recipients = await listNotificationRecipients(database);
 
   for (const event of dueEvents) {
     for (const recipient of recipients) {
-      if (notificationRepository.wasSent(database, { eventId: event.id, userId: recipient.id, channel: "push", reminderMinutes: event.reminderMinutes })) {
+      if (await notificationRepository.wasSent(database, { eventId: event.id, userId: recipient.id, channel: "push", reminderMinutes: event.reminderMinutes })) {
         continue;
       }
-      const subscriptions = pushSubscriptionRepository.findByUser(database, recipient.id);
+      const subscriptions = await pushSubscriptionRepository.findByUser(database, recipient.id);
       if (subscriptions.length === 0) {
         continue;
       }
@@ -122,7 +122,7 @@ export async function sendPendingPushNotifications(database: DbClient, appConfig
           delivered = true;
         } catch (error) {
           if (isGoneError(error)) {
-            pushSubscriptionRepository.deleteByEndpoint(database, subscription.endpoint);
+            await pushSubscriptionRepository.deleteByEndpoint(database, subscription.endpoint);
             continue;
           }
           options.logger?.error({ error, channel: "push", eventId: event.id, userId: recipient.id }, "Push notification failed");
@@ -130,7 +130,7 @@ export async function sendPendingPushNotifications(database: DbClient, appConfig
       }
 
       if (delivered) {
-        notificationRepository.recordSent(database, {
+        await notificationRepository.recordSent(database, {
           eventId: event.id,
           userId: recipient.id,
           channel: "push",

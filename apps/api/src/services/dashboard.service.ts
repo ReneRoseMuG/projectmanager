@@ -162,13 +162,13 @@ function defaultScope(scopeType: DashboardDefaultScope, context: DashboardContex
   };
 }
 
-export function ensureDashboardTemplates(database: DbClient): void {
-  database.transaction((tx) => {
+export async function ensureDashboardTemplates(database: DbClient): Promise<void> {
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
     for (const template of systemDashboardTemplates) {
-      let dashboard = dashboardRepository.findByTemplateKey(txDb, template.templateKey);
+      let dashboard = await dashboardRepository.findByTemplateKey(txDb, template.templateKey);
       if (!dashboard) {
-        dashboard = dashboardRepository.create(
+        dashboard = await dashboardRepository.create(
           txDb,
           {
             name: template.name,
@@ -180,19 +180,19 @@ export function ensureDashboardTemplates(database: DbClient): void {
           normalizeWidgets(template.context, template.widgets)
         );
       }
-      const globalDefault = dashboardRepository.findDefault(txDb, { scopeType: "GLOBAL", scopeId: globalScopeId, context: template.context });
+      const globalDefault = await dashboardRepository.findDefault(txDb, { scopeType: "GLOBAL", scopeId: globalScopeId, context: template.context });
       if (!globalDefault) {
-        dashboardRepository.setDefault(txDb, { scopeType: "GLOBAL", scopeId: globalScopeId, context: template.context }, dashboard.id, 0);
+        await dashboardRepository.setDefault(txDb, { scopeType: "GLOBAL", scopeId: globalScopeId, context: template.context }, dashboard.id, 0);
       }
     }
   });
 }
 
-export function listDashboards(database: DbClient, context: DashboardContext, currentUser: CurrentUser): DashboardListResponse {
-  ensureDashboardTemplates(database);
-  const records = dashboardRepository.findByContextForUser(database, context, currentUser.id);
-  const widgets = dashboardRepository.findWidgetsByDashboardIds(database, records.map((dashboard) => dashboard.id));
-  const defaults = dashboardRepository.findDefaultsForContext(database, context, currentUser.id);
+export async function listDashboards(database: DbClient, context: DashboardContext, currentUser: CurrentUser): Promise<DashboardListResponse> {
+  await ensureDashboardTemplates(database);
+  const records = await dashboardRepository.findByContextForUser(database, context, currentUser.id);
+  const widgets = await dashboardRepository.findWidgetsByDashboardIds(database, records.map((dashboard) => dashboard.id));
+  const defaults = await dashboardRepository.findDefaultsForContext(database, context, currentUser.id);
   const globalDefault = defaults.find((entry) => entry.scopeType === "GLOBAL");
   const userDefault = defaults.find((entry) => entry.scopeType === "USER");
   const widgetsByDashboardId = new Map<number, DashboardWidgetRecord[]>();
@@ -208,16 +208,16 @@ export function listDashboards(database: DbClient, context: DashboardContext, cu
   };
 }
 
-export function getDashboard(database: DbClient, id: number, currentUser: CurrentUser): Dashboard {
-  ensureDashboardTemplates(database);
-  const dashboard = dashboardRepository.findById(database, id);
+export async function getDashboard(database: DbClient, id: number, currentUser: CurrentUser): Promise<Dashboard> {
+  await ensureDashboardTemplates(database);
+  const dashboard = await dashboardRepository.findById(database, id);
   if (!dashboard) {
     throw notFound(`Dashboard with id ${id} not found`);
   }
   if (!dashboard.isSystem && dashboard.ownerId !== currentUser.id && !canAdminDashboards(currentUser)) {
     throw forbidden("Dashboard access denied");
   }
-  const response = listDashboards(database, dashboard.context as DashboardContext, currentUser);
+  const response = await listDashboards(database, dashboard.context as DashboardContext, currentUser);
   const found = response.dashboards.find((entry) => entry.id === id);
   if (!found) {
     throw forbidden("Dashboard access denied");
@@ -225,7 +225,7 @@ export function getDashboard(database: DbClient, id: number, currentUser: Curren
   return found;
 }
 
-export function createDashboard(database: DbClient, input: DashboardInput, currentUser: CurrentUser): Dashboard {
+export async function createDashboard(database: DbClient, input: DashboardInput, currentUser: CurrentUser): Promise<Dashboard> {
   const context = input.context;
   if (!isDashboardContext(context)) {
     throw badRequest("Dashboard context is invalid");
@@ -235,7 +235,7 @@ export function createDashboard(database: DbClient, input: DashboardInput, curre
     throw forbidden("Only dashboard administrators can create system dashboards");
   }
   const widgets = normalizeWidgets(context, input.widgets);
-  const record = database.transaction((tx) =>
+  const record = await database.transaction((tx) =>
     dashboardRepository.create(
       tx as unknown as DbClient,
       {
@@ -252,8 +252,8 @@ export function createDashboard(database: DbClient, input: DashboardInput, curre
   return getDashboard(database, record.id, currentUser);
 }
 
-export function updateDashboard(database: DbClient, id: number, input: DashboardUpdate, currentUser: CurrentUser): Dashboard {
-  const current = dashboardRepository.findById(database, id);
+export async function updateDashboard(database: DbClient, id: number, input: DashboardUpdate, currentUser: CurrentUser): Promise<Dashboard> {
+  const current = await dashboardRepository.findById(database, id);
   if (!current) {
     throw notFound(`Dashboard with id ${id} not found`);
   }
@@ -271,7 +271,7 @@ export function updateDashboard(database: DbClient, id: number, input: Dashboard
     throw forbidden("Only dashboard administrators can update system dashboards");
   }
   const widgets = normalizeWidgets(current.context as DashboardContext, input.widgets);
-  const updated = database.transaction((tx) =>
+  const updated = await database.transaction((tx) =>
     dashboardRepository.update(
       tx as unknown as DbClient,
       id,
@@ -292,8 +292,8 @@ export function updateDashboard(database: DbClient, id: number, input: Dashboard
   return getDashboard(database, id, currentUser);
 }
 
-export function deleteDashboard(database: DbClient, id: number, currentUser: CurrentUser): void {
-  const current = dashboardRepository.findById(database, id);
+export async function deleteDashboard(database: DbClient, id: number, currentUser: CurrentUser): Promise<void> {
+  const current = await dashboardRepository.findById(database, id);
   if (!current) {
     throw notFound(`Dashboard with id ${id} not found`);
   }
@@ -303,19 +303,19 @@ export function deleteDashboard(database: DbClient, id: number, currentUser: Cur
   if (!current.isSystem && current.ownerId !== currentUser.id && !canAdminDashboards(currentUser)) {
     throw forbidden("Dashboard access denied");
   }
-  if (dashboardRepository.delete(database, id) === 0) {
+  if (await dashboardRepository.delete(database, id) === 0) {
     throw notFound(`Dashboard with id ${id} not found`);
   }
 }
 
-export function setDefaultDashboard(
+export async function setDefaultDashboard(
   database: DbClient,
   id: number,
   scopeType: DashboardDefaultScope,
   expectedVersion: number,
   currentUser: CurrentUser
-): DashboardListResponse {
-  const dashboard = dashboardRepository.findById(database, id);
+): Promise<DashboardListResponse> {
+  const dashboard = await dashboardRepository.findById(database, id);
   if (!dashboard) {
     throw notFound(`Dashboard with id ${id} not found`);
   }
@@ -328,8 +328,8 @@ export function setDefaultDashboard(
   if (scopeType === "USER" && !dashboard.isSystem && dashboard.ownerId !== currentUser.id) {
     throw forbidden("Users can only default their own dashboards or system dashboards");
   }
-  database.transaction((tx) => {
-    dashboardRepository.setDefault(
+  await database.transaction(async (tx) => {
+    await dashboardRepository.setDefault(
       tx as unknown as DbClient,
       defaultScope(scopeType, dashboard.context as DashboardContext, currentUser),
       id,

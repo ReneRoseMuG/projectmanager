@@ -33,7 +33,7 @@ const deleteSettingBodySchema = {
 
 export async function registerSettingsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/settings/resolved", { schema: { response: { 200: objectResponseSchema } } }, async (request) => {
-    const currentUser = requireCurrentUser(request);
+    const currentUser = await requireCurrentUser(request);
     return getResolvedSettingsForUser(app.db, currentUser);
   });
 
@@ -41,7 +41,7 @@ export async function registerSettingsRoutes(app: FastifyInstance): Promise<void
     "/settings/values",
     { schema: { body: setSettingBodySchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return setSettingValue(app.db, currentUser, request.body);
     }
   );
@@ -50,7 +50,7 @@ export async function registerSettingsRoutes(app: FastifyInstance): Promise<void
     "/settings/values",
     { schema: { body: deleteSettingBodySchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return deleteSettingValue(app.db, currentUser, request.body);
     }
   );

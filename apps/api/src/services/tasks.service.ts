@@ -2,6 +2,7 @@ import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { dayPlanTasks, featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks, wikiPageTasks, wikiPages } from "../db/schema.js";
+import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
 import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
@@ -69,14 +70,14 @@ const taskJournalFields: Array<JournalFieldDefinition<TaskRecord>> = [
   { key: "dueDate", label: "Fälligkeitsdatum" }
 ];
 
-export function mapTask(
+export async function mapTask(
   database: DbClient,
   record: MappableTaskRecord,
   tags = getTaskTags(database, record.id),
-  subtaskCount = getSubtaskCounts(database, [record.id]).get(record.id) ?? 0,
+  subtaskCount = getSubtaskCounts(database, [record.id]).then((m) => m.get(record.id) ?? 0),
   visibleParent?: VisibleParentContext | null,
-  supportCounts = getTaskSupportCounts(database, [record.id]).get(record.id) ?? emptySupportCounts
-): Task {
+  supportCounts = getTaskSupportCounts(database, [record.id]).then((m) => m.get(record.id) ?? emptySupportCounts)
+): Promise<Task> {
   return {
     id: record.id,
     parentId: record.parentId,
@@ -85,105 +86,105 @@ export function mapTask(
     status: record.status,
     priority: record.priority,
     responsibleUserId: record.responsibleUserId,
-    responsibleUser: getUserOption(database, record.responsibleUserId),
+    responsibleUser: await getUserOption(database, record.responsibleUserId),
     dueDate: record.dueDate,
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
-    tags,
-    subtaskCount,
-    attachmentCount: supportCounts.attachmentCount,
-    noteCount: supportCounts.noteCount,
-    commentCount: supportCounts.commentCount,
+    tags: await tags,
+    subtaskCount: await subtaskCount,
+    attachmentCount: (await supportCounts).attachmentCount,
+    noteCount: (await supportCounts).noteCount,
+    commentCount: (await supportCounts).commentCount,
     visibleParent
   };
 }
 
-function mapTaskBoardItem(database: DbClient, record: OwnerTaskRecord, tags?: Task["tags"], subtaskCount?: number, supportCounts?: SupportCounts): TaskBoardItem {
+async function mapTaskBoardItem(database: DbClient, record: OwnerTaskRecord, tags?: Task["tags"], subtaskCount?: number, supportCounts?: SupportCounts): Promise<TaskBoardItem> {
   return {
-    ...mapTask(database, record, tags, subtaskCount, record.visibleParent, supportCounts),
+    ...(await mapTask(database, record, Promise.resolve(tags ?? []), Promise.resolve(subtaskCount ?? 0), record.visibleParent, Promise.resolve(supportCounts ?? emptySupportCounts))),
     boardPosition: record.boardPosition
   };
 }
 
-function ensureProjectExists(database: DbClient, projectId: number): void {
-  const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
+async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {
+  const project = firstRow(await database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)));
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
 }
 
-function ensureFeatureExists(database: DbClient, featureId: number): void {
-  const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
+async function ensureFeatureExists(database: DbClient, featureId: number): Promise<void> {
+  const feature = firstRow(await database.select({ id: features.id }).from(features).where(eq(features.id, featureId)));
   if (!feature) {
     throw notFound(`Feature with id ${featureId} not found`);
   }
 }
 
-function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
-  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+async function ensureMilestoneExists(database: DbClient, milestoneId: number): Promise<void> {
+  const milestone = firstRow(await database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)));
   if (!milestone) {
     throw notFound(`Milestone with id ${milestoneId} not found`);
   }
 }
 
-function ensureUseCaseExists(database: DbClient, useCaseId: number): void {
-  const useCase = database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, useCaseId)).get();
+async function ensureUseCaseExists(database: DbClient, useCaseId: number): Promise<void> {
+  const useCase = firstRow(await database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, useCaseId)));
   if (!useCase) {
     throw notFound(`Use case with id ${useCaseId} not found`);
   }
 }
 
-function ensureWikiPageExists(database: DbClient, wikiPageId: number): void {
-  const page = database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)).get();
+async function ensureWikiPageExists(database: DbClient, wikiPageId: number): Promise<void> {
+  const page = firstRow(await database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)));
   if (!page) {
     throw notFound(`Wiki page with id ${wikiPageId} not found`);
   }
 }
 
-function ensureOwnerExists(database: DbClient, owner: TaskOwner): void {
+async function ensureOwnerExists(database: DbClient, owner: TaskOwner): Promise<void> {
   if (owner.type === "project") {
-    ensureProjectExists(database, owner.id);
+    await ensureProjectExists(database, owner.id);
     return;
   }
   if (owner.type === "feature") {
-    ensureFeatureExists(database, owner.id);
+    await ensureFeatureExists(database, owner.id);
     return;
   }
   if (owner.type === "milestone") {
-    ensureMilestoneExists(database, owner.id);
+    await ensureMilestoneExists(database, owner.id);
     return;
   }
   if (owner.type === "wikiPage") {
-    ensureWikiPageExists(database, owner.id);
+    await ensureWikiPageExists(database, owner.id);
     return;
   }
-  ensureUseCaseExists(database, owner.id);
+  await ensureUseCaseExists(database, owner.id);
 }
 
-function getOwnerJournalObject(database: DbClient, owner: TaskOwner): JournalObjectRef {
+async function getOwnerJournalObject(database: DbClient, owner: TaskOwner): Promise<JournalObjectRef> {
   if (owner.type === "project") {
-    const project = database.select({ name: projects.name }).from(projects).where(eq(projects.id, owner.id)).get();
+    const project = firstRow(await database.select({ name: projects.name }).from(projects).where(eq(projects.id, owner.id)));
     return makeJournalObject("project", owner.id, project?.name ?? `Projekt ${owner.id}`);
   }
   if (owner.type === "milestone") {
-    const milestone = database.select({ name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
+    const milestone = firstRow(await database.select({ name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)));
     return makeJournalObject("milestone", owner.id, milestone?.name ?? `Meilenstein ${owner.id}`);
   }
   if (owner.type === "feature") {
-    const feature = database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)).get();
+    const feature = firstRow(await database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)));
     return makeJournalObject("feature", owner.id, feature?.title ?? `Feature ${owner.id}`);
   }
   if (owner.type === "wikiPage") {
-    const page = database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)).get();
+    const page = firstRow(await database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)));
     return makeJournalObject("wikiPage", owner.id, page?.title ?? `Wiki-Seite ${owner.id}`);
   }
-  const useCase = database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)).get();
+  const useCase = firstRow(await database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)));
   return makeJournalObject("useCase", owner.id, useCase?.title ?? `Use Case ${owner.id}`);
 }
 
-function visibleParentForOwner(database: DbClient, owner: TaskOwner, origin: VisibleParentContext["origin"]): VisibleParentContext {
-  const ownerObject = getOwnerJournalObject(database, owner);
+async function visibleParentForOwner(database: DbClient, owner: TaskOwner, origin: VisibleParentContext["origin"]): Promise<VisibleParentContext> {
+  const ownerObject = await getOwnerJournalObject(database, owner);
   return {
     type: owner.type,
     id: owner.id,
@@ -200,71 +201,49 @@ function taskJournalObject(task: Pick<TaskRecord, "id" | "title">): JournalObjec
   return makeJournalObject("task", task.id, task.title);
 }
 
-function getTaskRecord(database: DbClient, id: number): TaskRecord {
-  const task = taskRepository.findById(database, id);
+async function getTaskRecord(database: DbClient, id: number): Promise<TaskRecord> {
+  const task = await taskRepository.findById(database, id);
   if (!task) {
     throw notFound(`Task with id ${id} not found`);
   }
   return task;
 }
 
-function taskParentContexts(database: DbClient, task: TaskRecord): VisibleParentContext[] {
+async function taskParentContexts(database: DbClient, task: TaskRecord): Promise<VisibleParentContext[]> {
   const contexts: VisibleParentContext[] = [];
   if (task.parentId !== null) {
-    const parentTask = database.select({ id: tasks.id, label: tasks.title }).from(tasks).where(eq(tasks.id, task.parentId)).get();
+    const parentTask = firstRow(await database.select({ id: tasks.id, label: tasks.title }).from(tasks).where(eq(tasks.id, task.parentId)));
     if (parentTask) {
       contexts.push({ type: "task", id: parentTask.id, label: parentTask.label, origin: "direct" });
     }
   }
 
+  const [projectRows, milestoneRows, featureRows, useCaseRows, wikiRows] = await Promise.all([
+    database.select({ id: projects.id, label: projects.name }).from(projectTasks).innerJoin(projects, eq(projectTasks.ownerId, projects.id)).where(eq(projectTasks.taskId, task.id)),
+    database.select({ id: milestones.id, label: milestones.name }).from(milestoneTasks).innerJoin(milestones, eq(milestoneTasks.ownerId, milestones.id)).where(eq(milestoneTasks.taskId, task.id)),
+    database.select({ id: features.id, label: features.title }).from(featureTasks).innerJoin(features, eq(featureTasks.ownerId, features.id)).where(eq(featureTasks.taskId, task.id)),
+    database.select({ id: useCases.id, label: useCases.title }).from(useCaseTasks).innerJoin(useCases, eq(useCaseTasks.ownerId, useCases.id)).where(eq(useCaseTasks.taskId, task.id)),
+    database.select({ id: wikiPages.id, label: wikiPages.title }).from(wikiPageTasks).innerJoin(wikiPages, eq(wikiPageTasks.ownerId, wikiPages.id)).where(eq(wikiPageTasks.taskId, task.id))
+  ]);
+
   contexts.push(
-    ...database
-      .select({ id: projects.id, label: projects.name })
-      .from(projectTasks)
-      .innerJoin(projects, eq(projectTasks.ownerId, projects.id))
-      .where(eq(projectTasks.taskId, task.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "project", id: row.id, label: row.label, origin: "direct" })),
-    ...database
-      .select({ id: milestones.id, label: milestones.name })
-      .from(milestoneTasks)
-      .innerJoin(milestones, eq(milestoneTasks.ownerId, milestones.id))
-      .where(eq(milestoneTasks.taskId, task.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "milestone", id: row.id, label: row.label, origin: "direct" })),
-    ...database
-      .select({ id: features.id, label: features.title })
-      .from(featureTasks)
-      .innerJoin(features, eq(featureTasks.ownerId, features.id))
-      .where(eq(featureTasks.taskId, task.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "feature", id: row.id, label: row.label, origin: "direct" })),
-    ...database
-      .select({ id: useCases.id, label: useCases.title })
-      .from(useCaseTasks)
-      .innerJoin(useCases, eq(useCaseTasks.ownerId, useCases.id))
-      .where(eq(useCaseTasks.taskId, task.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "useCase", id: row.id, label: row.label, origin: "direct" })),
-    ...database
-      .select({ id: wikiPages.id, label: wikiPages.title })
-      .from(wikiPageTasks)
-      .innerJoin(wikiPages, eq(wikiPageTasks.ownerId, wikiPages.id))
-      .where(eq(wikiPageTasks.taskId, task.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "wikiPage", id: row.id, label: row.label, origin: "direct" }))
+    ...projectRows.map((row): VisibleParentContext => ({ type: "project", id: row.id, label: row.label, origin: "direct" })),
+    ...milestoneRows.map((row): VisibleParentContext => ({ type: "milestone", id: row.id, label: row.label, origin: "direct" })),
+    ...featureRows.map((row): VisibleParentContext => ({ type: "feature", id: row.id, label: row.label, origin: "direct" })),
+    ...useCaseRows.map((row): VisibleParentContext => ({ type: "useCase", id: row.id, label: row.label, origin: "direct" })),
+    ...wikiRows.map((row): VisibleParentContext => ({ type: "wikiPage", id: row.id, label: row.label, origin: "direct" }))
   );
 
   return contexts;
 }
 
-function getSubtaskCounts(database: DbClient, taskIds: number[]): Map<number, number> {
+async function getSubtaskCounts(database: DbClient, taskIds: number[]): Promise<Map<number, number>> {
   const counts = new Map<number, number>();
   if (taskIds.length === 0) {
     return counts;
   }
 
-  const rows = database.select({ parentId: tasks.parentId }).from(tasks).where(inArray(tasks.parentId, taskIds)).all();
+  const rows = await database.select({ parentId: tasks.parentId }).from(tasks).where(inArray(tasks.parentId, taskIds));
   for (const row of rows) {
     if (row.parentId !== null) {
       counts.set(row.parentId, (counts.get(row.parentId) ?? 0) + 1);
@@ -274,7 +253,7 @@ function getSubtaskCounts(database: DbClient, taskIds: number[]): Map<number, nu
   return counts;
 }
 
-function getTaskSupportCounts(database: DbClient, taskIds: number[]): Map<number, SupportCounts> {
+async function getTaskSupportCounts(database: DbClient, taskIds: number[]): Promise<Map<number, SupportCounts>> {
   const counts = new Map<number, SupportCounts>();
   if (taskIds.length === 0) {
     return counts;
@@ -290,17 +269,18 @@ function getTaskSupportCounts(database: DbClient, taskIds: number[]): Map<number
     return nextCounts;
   };
 
-  const attachmentRows = database.select({ taskId: taskAttachments.taskId }).from(taskAttachments).where(inArray(taskAttachments.taskId, taskIds)).all();
+  const [attachmentRows, noteRows, commentRows] = await Promise.all([
+    database.select({ taskId: taskAttachments.taskId }).from(taskAttachments).where(inArray(taskAttachments.taskId, taskIds)),
+    database.select({ taskId: taskNotes.taskId }).from(taskNotes).where(inArray(taskNotes.taskId, taskIds)),
+    database.select({ taskId: taskComments.taskId }).from(taskComments).where(inArray(taskComments.taskId, taskIds))
+  ]);
+
   for (const row of attachmentRows) {
     ensureCounts(row.taskId).attachmentCount += 1;
   }
-
-  const noteRows = database.select({ taskId: taskNotes.taskId }).from(taskNotes).where(inArray(taskNotes.taskId, taskIds)).all();
   for (const row of noteRows) {
     ensureCounts(row.taskId).noteCount += 1;
   }
-
-  const commentRows = database.select({ taskId: taskComments.taskId }).from(taskComments).where(inArray(taskComments.taskId, taskIds)).all();
   for (const row of commentRows) {
     ensureCounts(row.taskId).commentCount += 1;
   }
@@ -308,9 +288,9 @@ function getTaskSupportCounts(database: DbClient, taskIds: number[]): Map<number
   return counts;
 }
 
-function collectTaskSubtreeIds(database: DbClient, taskId: number): number[] {
-  getTaskRecord(database, taskId);
-  const rows = taskRepository.findAll(database);
+async function collectTaskSubtreeIds(database: DbClient, taskId: number): Promise<number[]> {
+  await getTaskRecord(database, taskId);
+  const rows = await taskRepository.findAll(database);
   const childrenByParent = new Map<number, number[]>();
 
   for (const row of rows) {
@@ -334,47 +314,42 @@ function collectTaskSubtreeIds(database: DbClient, taskId: number): number[] {
   return ids;
 }
 
-function taskDeleteBlockers(database: DbClient, taskIds: number[]): string[] {
+async function taskDeleteBlockers(database: DbClient, taskIds: number[]): Promise<string[]> {
   const blockers: string[] = [];
 
-  if (database.select({ taskId: projectTasks.taskId }).from(projectTasks).where(inArray(projectTasks.taskId, taskIds)).get()) {
-    blockers.push("Projekt-Verknüpfungen");
-  }
-  if (database.select({ taskId: featureTasks.taskId }).from(featureTasks).where(inArray(featureTasks.taskId, taskIds)).get()) {
-    blockers.push("Feature-Verknüpfungen");
-  }
-  if (database.select({ taskId: milestoneTasks.taskId }).from(milestoneTasks).where(inArray(milestoneTasks.taskId, taskIds)).get()) {
-    blockers.push("Meilenstein-Verknüpfungen");
-  }
-  if (database.select({ taskId: useCaseTasks.taskId }).from(useCaseTasks).where(inArray(useCaseTasks.taskId, taskIds)).get()) {
-    blockers.push("Use-Case-Verknüpfungen");
-  }
+  const [projRow, featRow, mileRow, ucRow, wikiRow, dpRow] = await Promise.all([
+    database.select({ taskId: projectTasks.taskId }).from(projectTasks).where(inArray(projectTasks.taskId, taskIds)).then(firstRow),
+    database.select({ taskId: featureTasks.taskId }).from(featureTasks).where(inArray(featureTasks.taskId, taskIds)).then(firstRow),
+    database.select({ taskId: milestoneTasks.taskId }).from(milestoneTasks).where(inArray(milestoneTasks.taskId, taskIds)).then(firstRow),
+    database.select({ taskId: useCaseTasks.taskId }).from(useCaseTasks).where(inArray(useCaseTasks.taskId, taskIds)).then(firstRow),
+    database.select({ taskId: wikiPageTasks.taskId }).from(wikiPageTasks).where(inArray(wikiPageTasks.taskId, taskIds)).then(firstRow),
+    database.select({ taskId: dayPlanTasks.taskId }).from(dayPlanTasks).where(inArray(dayPlanTasks.taskId, taskIds)).then(firstRow)
+  ]);
 
-  if (database.select({ taskId: wikiPageTasks.taskId }).from(wikiPageTasks).where(inArray(wikiPageTasks.taskId, taskIds)).get()) {
-    blockers.push("Wiki-VerknÃ¼pfungen");
-  }
-
-  if (database.select({ taskId: dayPlanTasks.taskId }).from(dayPlanTasks).where(inArray(dayPlanTasks.taskId, taskIds)).get()) {
-    blockers.push("Verknüpfungen zur Persönlichen Planung");
-  }
+  if (projRow) blockers.push("Projekt-Verknüpfungen");
+  if (featRow) blockers.push("Feature-Verknüpfungen");
+  if (mileRow) blockers.push("Meilenstein-Verknüpfungen");
+  if (ucRow) blockers.push("Use-Case-Verknüpfungen");
+  if (wikiRow) blockers.push("Wiki-Verknüpfungen");
+  if (dpRow) blockers.push("Verknüpfungen zur Persönlichen Planung");
 
   return blockers;
 }
 
-function nextOwnerPosition(database: DbClient, owner: TaskOwner, status: TaskRecord["status"]): number {
-  const rows = selectOwnerTaskRows(database, owner).filter((task) => task.status === status);
-  return rows.reduce((current, row) => Math.max(current, row.boardPosition), 0) + 1024;
+async function nextOwnerPosition(database: DbClient, owner: TaskOwner, status: TaskRecord["status"]): Promise<number> {
+  const rows = await selectOwnerTaskRows(database, owner);
+  const filtered = rows.filter((task) => task.status === status);
+  return filtered.reduce((current, row) => Math.max(current, row.boardPosition), 0) + 1024;
 }
 
-function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Array<MappableTaskRecord & { boardPosition: number }> {
+async function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Promise<Array<MappableTaskRecord & { boardPosition: number }>> {
   if (owner.type === "project") {
     return database
       .select({ ...taskSelect, boardPosition: projectTasks.position })
       .from(projectTasks)
       .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
       .where(and(eq(projectTasks.ownerId, owner.id), isNull(tasks.parentId)))
-      .orderBy(tasks.status, projectTasks.position)
-      .all();
+      .orderBy(tasks.status, projectTasks.position);
   }
   if (owner.type === "feature") {
     return database
@@ -382,8 +357,7 @@ function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Array<Mappab
       .from(featureTasks)
       .innerJoin(tasks, eq(featureTasks.taskId, tasks.id))
       .where(and(eq(featureTasks.ownerId, owner.id), isNull(tasks.parentId)))
-      .orderBy(tasks.status, featureTasks.position)
-      .all();
+      .orderBy(tasks.status, featureTasks.position);
   }
   if (owner.type === "milestone") {
     return database
@@ -391,8 +365,7 @@ function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Array<Mappab
       .from(milestoneTasks)
       .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
       .where(and(eq(milestoneTasks.ownerId, owner.id), isNull(tasks.parentId)))
-      .orderBy(tasks.status, milestoneTasks.position)
-      .all();
+      .orderBy(tasks.status, milestoneTasks.position);
   }
   if (owner.type === "wikiPage") {
     return database
@@ -400,8 +373,7 @@ function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Array<Mappab
       .from(wikiPageTasks)
       .innerJoin(tasks, eq(wikiPageTasks.taskId, tasks.id))
       .where(and(eq(wikiPageTasks.ownerId, owner.id), isNull(tasks.parentId)))
-      .orderBy(tasks.status, wikiPageTasks.position)
-      .all();
+      .orderBy(tasks.status, wikiPageTasks.position);
   }
 
   return database
@@ -409,12 +381,11 @@ function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Array<Mappab
     .from(useCaseTasks)
     .innerJoin(tasks, eq(useCaseTasks.taskId, tasks.id))
     .where(and(eq(useCaseTasks.ownerId, owner.id), isNull(tasks.parentId)))
-    .orderBy(tasks.status, useCaseTasks.position)
-    .all();
+    .orderBy(tasks.status, useCaseTasks.position);
 }
 
-function selectProjectMilestoneTaskRows(database: DbClient, projectId: number): OwnerTaskRecord[] {
-  const milestoneRows = database
+async function selectProjectMilestoneTaskRows(database: DbClient, projectId: number): Promise<OwnerTaskRecord[]> {
+  const milestoneRows = await database
     .select({
       ...taskSelect,
       boardPosition: milestoneTasks.position,
@@ -425,8 +396,7 @@ function selectProjectMilestoneTaskRows(database: DbClient, projectId: number): 
     .innerJoin(milestones, eq(milestoneTasks.ownerId, milestones.id))
     .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
     .where(and(eq(milestones.projectId, projectId), isNull(tasks.parentId)))
-    .orderBy(tasks.status, milestoneTasks.position)
-    .all();
+    .orderBy(tasks.status, milestoneTasks.position);
 
   return milestoneRows.map((row) => {
     const { milestoneId, milestoneName, ...taskRow } = row;
@@ -442,83 +412,83 @@ function selectProjectMilestoneTaskRows(database: DbClient, projectId: number): 
   });
 }
 
-function selectVisibleOwnerTaskRows(database: DbClient, owner: TaskOwner): OwnerTaskRecord[] {
-  const directRows = withVisibleParent(selectOwnerTaskRows(database, owner), visibleParentForOwner(database, owner, "direct"));
+async function selectVisibleOwnerTaskRows(database: DbClient, owner: TaskOwner): Promise<OwnerTaskRecord[]> {
+  const directRows = withVisibleParent(await selectOwnerTaskRows(database, owner), await visibleParentForOwner(database, owner, "direct"));
   if (owner.type !== "project") {
     return directRows;
   }
 
   const directIds = new Set(directRows.map((row) => row.id));
-  const inheritedRows = selectProjectMilestoneTaskRows(database, owner.id).filter((row) => !directIds.has(row.id));
+  const inheritedRows = (await selectProjectMilestoneTaskRows(database, owner.id)).filter((row) => !directIds.has(row.id));
   return [...directRows, ...inheritedRows];
 }
 
-function getOwnerTaskRow(database: DbClient, owner: TaskOwner, taskId: number): (MappableTaskRecord & { boardPosition: number }) | undefined {
-  return selectOwnerTaskRows(database, owner).find((task) => task.id === taskId);
+function getOwnerTaskRow(rows: Array<MappableTaskRecord & { boardPosition: number }>, taskId: number): (MappableTaskRecord & { boardPosition: number }) | undefined {
+  return rows.find((task) => task.id === taskId);
 }
 
-function insertOwnerTask(database: DbClient, owner: TaskOwner, taskId: number, position: number): void {
+async function insertOwnerTask(database: DbClient, owner: TaskOwner, taskId: number, position: number): Promise<void> {
   if (owner.type === "project") {
-    database.insert(projectTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
+    await database.insert(projectTasks).ignore().values({ ownerId: owner.id, taskId, position });
     return;
   }
   if (owner.type === "feature") {
-    database.insert(featureTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
+    await database.insert(featureTasks).ignore().values({ ownerId: owner.id, taskId, position });
     return;
   }
   if (owner.type === "milestone") {
-    database.insert(milestoneTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
+    await database.insert(milestoneTasks).ignore().values({ ownerId: owner.id, taskId, position });
     return;
   }
   if (owner.type === "wikiPage") {
-    database.insert(wikiPageTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
+    await database.insert(wikiPageTasks).ignore().values({ ownerId: owner.id, taskId, position });
     return;
   }
-  database.insert(useCaseTasks).values({ ownerId: owner.id, taskId, position }).onConflictDoNothing().run();
+  await database.insert(useCaseTasks).ignore().values({ ownerId: owner.id, taskId, position });
 }
 
-function updateOwnerTaskPosition(database: DbClient, owner: TaskOwner, taskId: number, position: number): void {
+async function updateOwnerTaskPosition(database: DbClient, owner: TaskOwner, taskId: number, position: number): Promise<void> {
   if (owner.type === "project") {
-    database.update(projectTasks).set({ position }).where(and(eq(projectTasks.ownerId, owner.id), eq(projectTasks.taskId, taskId))).run();
+    await database.update(projectTasks).set({ position }).where(and(eq(projectTasks.ownerId, owner.id), eq(projectTasks.taskId, taskId)));
     return;
   }
   if (owner.type === "feature") {
-    database.update(featureTasks).set({ position }).where(and(eq(featureTasks.ownerId, owner.id), eq(featureTasks.taskId, taskId))).run();
+    await database.update(featureTasks).set({ position }).where(and(eq(featureTasks.ownerId, owner.id), eq(featureTasks.taskId, taskId)));
     return;
   }
   if (owner.type === "milestone") {
-    database.update(milestoneTasks).set({ position }).where(and(eq(milestoneTasks.ownerId, owner.id), eq(milestoneTasks.taskId, taskId))).run();
+    await database.update(milestoneTasks).set({ position }).where(and(eq(milestoneTasks.ownerId, owner.id), eq(milestoneTasks.taskId, taskId)));
     return;
   }
   if (owner.type === "wikiPage") {
-    database.update(wikiPageTasks).set({ position }).where(and(eq(wikiPageTasks.ownerId, owner.id), eq(wikiPageTasks.taskId, taskId))).run();
+    await database.update(wikiPageTasks).set({ position }).where(and(eq(wikiPageTasks.ownerId, owner.id), eq(wikiPageTasks.taskId, taskId)));
     return;
   }
-  database.update(useCaseTasks).set({ position }).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId))).run();
+  await database.update(useCaseTasks).set({ position }).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId)));
 }
 
-function deleteOwnerTaskLink(database: DbClient, owner: TaskOwner, taskId: number): number {
+async function deleteOwnerTaskLink(database: DbClient, owner: TaskOwner, taskId: number): Promise<number> {
   if (owner.type === "project") {
-    return database.delete(projectTasks).where(and(eq(projectTasks.ownerId, owner.id), eq(projectTasks.taskId, taskId))).run().changes;
+    return mutationAffectedRows(await database.delete(projectTasks).where(and(eq(projectTasks.ownerId, owner.id), eq(projectTasks.taskId, taskId))));
   }
   if (owner.type === "feature") {
-    return database.delete(featureTasks).where(and(eq(featureTasks.ownerId, owner.id), eq(featureTasks.taskId, taskId))).run().changes;
+    return mutationAffectedRows(await database.delete(featureTasks).where(and(eq(featureTasks.ownerId, owner.id), eq(featureTasks.taskId, taskId))));
   }
   if (owner.type === "milestone") {
-    return database.delete(milestoneTasks).where(and(eq(milestoneTasks.ownerId, owner.id), eq(milestoneTasks.taskId, taskId))).run().changes;
+    return mutationAffectedRows(await database.delete(milestoneTasks).where(and(eq(milestoneTasks.ownerId, owner.id), eq(milestoneTasks.taskId, taskId))));
   }
   if (owner.type === "wikiPage") {
-    return database.delete(wikiPageTasks).where(and(eq(wikiPageTasks.ownerId, owner.id), eq(wikiPageTasks.taskId, taskId))).run().changes;
+    return mutationAffectedRows(await database.delete(wikiPageTasks).where(and(eq(wikiPageTasks.ownerId, owner.id), eq(wikiPageTasks.taskId, taskId))));
   }
-  return database.delete(useCaseTasks).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId))).run().changes;
+  return mutationAffectedRows(await database.delete(useCaseTasks).where(and(eq(useCaseTasks.ownerId, owner.id), eq(useCaseTasks.taskId, taskId))));
 }
 
-function insertTask(database: DbClient, input: TaskInput, parentId: number | null = null, actor?: JournalActor | null): TaskRecord {
+async function insertTask(database: DbClient, input: TaskInput, parentId: number | null = null, actor?: JournalActor | null): Promise<TaskRecord> {
   const title = requireNonEmpty(input.title, "title");
-  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "active");
-  const priority = input.priority ?? resolveDefaultCatalogEntryKey(database, "priority", "medium");
-  ensureCatalogEntryExists(database, "workStatus", status);
-  ensureCatalogEntryExists(database, "priority", priority);
+  const status = input.status ?? await resolveDefaultCatalogEntryKey(database, "workStatus", "active");
+  const priority = input.priority ?? await resolveDefaultCatalogEntryKey(database, "priority", "medium");
+  await ensureCatalogEntryExists(database, "workStatus", status);
+  await ensureCatalogEntryExists(database, "priority", priority);
 
   return taskRepository.create(
     database,
@@ -528,85 +498,99 @@ function insertTask(database: DbClient, input: TaskInput, parentId: number | nul
       description: cleanNullable(input.description) ?? null,
       status,
       priority,
-      responsibleUserId: normalizeAssignableUserId(database, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId"),
+      responsibleUserId: await normalizeAssignableUserId(database, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId"),
       dueDate: input.dueDate ?? null
     },
     actor?.actorUserId ?? undefined
   );
 }
 
-export function listOwnerTasks(database: DbClient, owner: TaskOwner): TaskBoardItem[] {
-  ensureOwnerExists(database, owner);
-  const rows = selectVisibleOwnerTaskRows(database, owner);
+export async function listOwnerTasks(database: DbClient, owner: TaskOwner): Promise<TaskBoardItem[]> {
+  await ensureOwnerExists(database, owner);
+  const rows = await selectVisibleOwnerTaskRows(database, owner);
   const ids = rows.map((task) => task.id);
-  const tagsByTask = getTaskTagsMap(database, ids);
-  const subtaskCounts = getSubtaskCounts(database, ids);
-  const supportCounts = getTaskSupportCounts(database, ids);
+  const [tagsByTask, subtaskCounts, supportCountsMap] = await Promise.all([
+    getTaskTagsMap(database, ids),
+    getSubtaskCounts(database, ids),
+    getTaskSupportCounts(database, ids)
+  ]);
 
-  return rows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, supportCounts.get(task.id) ?? emptySupportCounts));
+  return Promise.all(rows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, supportCountsMap.get(task.id) ?? emptySupportCounts)));
 }
 
-export function listTasks(database: DbClient): Task[] {
-  const rows = taskRepository.findRootTasks(database);
+export async function listTasks(database: DbClient): Promise<Task[]> {
+  const rows = await taskRepository.findRootTasks(database);
   const ids = rows.map((task) => task.id);
-  const tagsByTask = getTaskTagsMap(database, ids);
-  const subtaskCounts = getSubtaskCounts(database, ids);
-  const supportCounts = getTaskSupportCounts(database, ids);
+  const [tagsByTask, subtaskCounts, supportCountsMap] = await Promise.all([
+    getTaskTagsMap(database, ids),
+    getSubtaskCounts(database, ids),
+    getTaskSupportCounts(database, ids)
+  ]);
 
-  return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, undefined, supportCounts.get(task.id) ?? emptySupportCounts));
+  return Promise.all(rows.map((task) => mapTask(database, task, Promise.resolve(tagsByTask.get(task.id) ?? []), Promise.resolve(subtaskCounts.get(task.id) ?? 0), undefined, Promise.resolve(supportCountsMap.get(task.id) ?? emptySupportCounts))));
 }
 
-export function listTaskLinkCandidates(database: DbClient, owner: TaskOwner): Task[] {
-  ensureOwnerExists(database, owner);
-  const linkedTaskIds = new Set(selectVisibleOwnerTaskRows(database, owner).map((task) => task.id));
-  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
+export async function listTaskLinkCandidates(database: DbClient, owner: TaskOwner): Promise<Task[]> {
+  await ensureOwnerExists(database, owner);
+  const ownerTaskRows = await selectVisibleOwnerTaskRows(database, owner);
+  const linkedTaskIds = new Set(ownerTaskRows.map((task) => task.id));
+  const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
+  const allTasks = await listTasks(database);
+
   if (owner.type === "wikiPage") {
-    return listTasks(database).filter((task) => !linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status));
+    return allTasks.filter((task) => !linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status));
   }
 
-  const ownerContext = taskOwnerProjectContext(database, owner);
+  const ownerContext = await taskOwnerProjectContext(database, owner);
 
-  return listTasks(database).filter(
-    (task) => !linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status) && projectContextsAreCompatible(ownerContext, taskProjectContext(database, task.id))
-  );
+  const candidates: Task[] = [];
+  for (const task of allTasks) {
+    if (!linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status) && projectContextsAreCompatible(ownerContext, await taskProjectContext(database, task.id))) {
+      candidates.push(task);
+    }
+  }
+  return candidates;
 }
 
-export function listSubtasks(database: DbClient, taskId: number): Task[] {
-  getTaskRecord(database, taskId);
-  const rows = taskRepository.findChildren(database, taskId);
+export async function listSubtasks(database: DbClient, taskId: number): Promise<Task[]> {
+  await getTaskRecord(database, taskId);
+  const rows = await taskRepository.findChildren(database, taskId);
   const ids = rows.map((task) => task.id);
-  const tagsByTask = getTaskTagsMap(database, ids);
-  const subtaskCounts = getSubtaskCounts(database, ids);
-  const supportCounts = getTaskSupportCounts(database, ids);
+  const [tagsByTask, subtaskCounts, supportCountsMap] = await Promise.all([
+    getTaskTagsMap(database, ids),
+    getSubtaskCounts(database, ids),
+    getTaskSupportCounts(database, ids)
+  ]);
 
-  return rows.map((task) => mapTask(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, undefined, supportCounts.get(task.id) ?? emptySupportCounts));
+  return Promise.all(rows.map((task) => mapTask(database, task, Promise.resolve(tagsByTask.get(task.id) ?? []), Promise.resolve(subtaskCounts.get(task.id) ?? 0), undefined, Promise.resolve(supportCountsMap.get(task.id) ?? emptySupportCounts))));
 }
 
-function listDashboardTasks(database: DbClient, owner?: DashboardTaskOwner): Task[] {
+async function listDashboardTasks(database: DbClient, owner?: DashboardTaskOwner): Promise<Task[]> {
   if (!owner) {
     return listTasks(database);
   }
   if (owner.type === "dayPlan") {
-    const rows = database
+    const rows = await database
       .select({ ...taskSelect, boardPosition: dayPlanTasks.position })
       .from(dayPlanTasks)
       .innerJoin(tasks, eq(dayPlanTasks.taskId, tasks.id))
       .where(and(eq(dayPlanTasks.ownerId, owner.id), isNull(tasks.parentId)))
-      .orderBy(tasks.status, dayPlanTasks.position)
-      .all();
+      .orderBy(tasks.status, dayPlanTasks.position);
     const ids = rows.map((task) => task.id);
-    const tagsByTask = getTaskTagsMap(database, ids);
-    const subtaskCounts = getSubtaskCounts(database, ids);
-    const supportCounts = getTaskSupportCounts(database, ids);
+    const [tagsByTask, subtaskCounts, supportCountsMap] = await Promise.all([
+      getTaskTagsMap(database, ids),
+      getSubtaskCounts(database, ids),
+      getTaskSupportCounts(database, ids)
+    ]);
 
-    return rows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, supportCounts.get(task.id) ?? emptySupportCounts));
+    return Promise.all(rows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, supportCountsMap.get(task.id) ?? emptySupportCounts)));
   }
   if (owner.type === "task") {
     return listSubtasks(database, owner.id);
   }
   if (owner.type === "project") {
     const seen = new Set<number>();
-    return listOwnerTasks(database, { type: "project", id: owner.id }).filter((task) => {
+    return (await listOwnerTasks(database, { type: "project", id: owner.id })).filter((task) => {
       if (seen.has(task.id)) {
         return false;
       }
@@ -626,9 +610,9 @@ function isOpenTaskStatus(status: string, closedStatusKeys: Set<string>): boolea
   return !closedStatusKeys.has(status);
 }
 
-export function getTaskStats(database: DbClient, owner?: DashboardTaskOwner): TaskStats {
+export async function getTaskStats(database: DbClient, owner?: DashboardTaskOwner): Promise<TaskStats> {
   const statusCounts: Record<string, number> = {};
-  for (const task of listDashboardTasks(database, owner)) {
+  for (const task of await listDashboardTasks(database, owner)) {
     statusCounts[task.status] = (statusCounts[task.status] ?? 0) + 1;
   }
   return {
@@ -637,40 +621,40 @@ export function getTaskStats(database: DbClient, owner?: DashboardTaskOwner): Ta
   };
 }
 
-export function listRecentTasks(
+export async function listRecentTasks(
   database: DbClient,
   options: { owner?: DashboardTaskOwner; limit?: number; sort?: "createdAt" | "updatedAt" } = {}
-): Task[] {
+): Promise<Task[]> {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
   const sort = options.sort ?? "updatedAt";
-  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
-  return [...listDashboardTasks(database, options.owner)]
+  const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
+  return [...(await listDashboardTasks(database, options.owner))]
     .filter((task) => isOpenTaskStatus(task.status, closedStatusKeys))
     .sort((left, right) => dateKey(right[sort]) - dateKey(left[sort]) || right.id - left.id)
     .slice(0, limit);
 }
 
-export function listOverdueTasks(database: DbClient, options: { owner?: DashboardOverdueTaskOwner; limit?: number } = {}): Task[] {
+export async function listOverdueTasks(database: DbClient, options: { owner?: DashboardOverdueTaskOwner; limit?: number } = {}): Promise<Task[]> {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
   const today = new Date().toISOString().slice(0, 10);
-  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
-  return [...listDashboardTasks(database, options.owner)]
+  const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
+  return [...(await listDashboardTasks(database, options.owner))]
     .filter((task) => task.dueDate !== null && task.dueDate < today && isOpenTaskStatus(task.status, closedStatusKeys))
     .sort((left, right) => String(left.dueDate).localeCompare(String(right.dueDate)) || left.id - right.id)
     .slice(0, limit);
 }
 
-export function createOwnerTask(database: DbClient, owner: TaskOwner, input: TaskInput, actor?: JournalActor | null): TaskBoardItem {
-  ensureOwnerExists(database, owner);
-  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "active");
-  const position = nextOwnerPosition(database, owner, status);
-  const created = database.transaction((tx) => {
+export async function createOwnerTask(database: DbClient, owner: TaskOwner, input: TaskInput, actor?: JournalActor | null): Promise<TaskBoardItem> {
+  await ensureOwnerExists(database, owner);
+  const status = input.status ?? await resolveDefaultCatalogEntryKey(database, "workStatus", "active");
+  const position = await nextOwnerPosition(database, owner, status);
+  const created = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const task = insertTask(txDb, input, null, actor);
-    insertOwnerTask(txDb, owner, task.id, position);
+    const task = await insertTask(txDb, input, null, actor);
+    await insertOwnerTask(txDb, owner, task.id, position);
     const taskObject = taskJournalObject(task);
-    const ownerObject = getOwnerJournalObject(txDb, owner);
-    recordJournalEntry(txDb, {
+    const ownerObject = await getOwnerJournalObject(txDb, owner);
+    await recordJournalEntry(txDb, {
       operation: "create",
       object: taskObject,
       summary: buildCreateSummary(taskObject),
@@ -683,23 +667,24 @@ export function createOwnerTask(database: DbClient, owner: TaskOwner, input: Tas
   return mapTaskBoardItem(database, { ...created, boardPosition: position }, [], 0);
 }
 
-export function linkOwnerTask(
+export async function linkOwnerTask(
   database: DbClient,
   owner: TaskOwner,
   taskId: number,
   actor?: JournalActor | null,
   options: { conflictOnExisting?: boolean } = {}
-): TaskBoardItem {
-  ensureOwnerExists(database, owner);
-  const task = getTaskRecord(database, taskId);
+): Promise<TaskBoardItem> {
+  await ensureOwnerExists(database, owner);
+  const task = await getTaskRecord(database, taskId);
   if (task.parentId !== null) {
     throw badRequest("Subtasks cannot be linked to owners");
   }
-  if (listClosedCatalogEntryKeys(database, "workStatus").has(task.status)) {
+  if ((await listClosedCatalogEntryKeys(database, "workStatus")).has(task.status)) {
     throw badRequest("Closed tasks cannot be linked to owners");
   }
 
-  const existing = getOwnerTaskRow(database, owner, taskId);
+  const ownerTaskRows = await selectOwnerTaskRows(database, owner);
+  const existing = getOwnerTaskRow(ownerTaskRows, taskId);
   if (existing) {
     if (options.conflictOnExisting === true) {
       throw conflict(`Task ${taskId} is already linked to ${owner.type} ${owner.id}`);
@@ -708,16 +693,16 @@ export function linkOwnerTask(
   }
 
   if (owner.type !== "wikiPage") {
-    assertCompatibleProjectContexts(taskOwnerProjectContext(database, owner), taskProjectContext(database, taskId));
+    assertCompatibleProjectContexts(await taskOwnerProjectContext(database, owner), await taskProjectContext(database, taskId));
   }
 
-  const position = nextOwnerPosition(database, owner, task.status);
-  database.transaction((tx) => {
+  const position = await nextOwnerPosition(database, owner, task.status);
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    insertOwnerTask(txDb, owner, taskId, position);
+    await insertOwnerTask(txDb, owner, taskId, position);
     const taskObject = taskJournalObject(task);
-    const ownerObject = getOwnerJournalObject(txDb, owner);
-    recordJournalEntry(txDb, {
+    const ownerObject = await getOwnerJournalObject(txDb, owner);
+    await recordJournalEntry(txDb, {
       operation: "link",
       object: taskObject,
       summary: buildLinkSummary(ownerObject, taskObject),
@@ -728,18 +713,18 @@ export function linkOwnerTask(
   return mapTaskBoardItem(database, { ...task, boardPosition: position });
 }
 
-export function unlinkOwnerTask(database: DbClient, owner: TaskOwner, taskId: number, actor?: JournalActor | null): void {
-  ensureOwnerExists(database, owner);
-  const task = getTaskRecord(database, taskId);
-  database.transaction((tx) => {
+export async function unlinkOwnerTask(database: DbClient, owner: TaskOwner, taskId: number, actor?: JournalActor | null): Promise<void> {
+  await ensureOwnerExists(database, owner);
+  const task = await getTaskRecord(database, taskId);
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const changes = deleteOwnerTaskLink(txDb, owner, taskId);
+    const changes = await deleteOwnerTaskLink(txDb, owner, taskId);
     if (changes === 0) {
       throw notFound(`Task ${taskId} is not linked to ${owner.type} ${owner.id}`);
     }
     const taskObject = taskJournalObject(task);
-    const ownerObject = getOwnerJournalObject(txDb, owner);
-    recordJournalEntry(txDb, {
+    const ownerObject = await getOwnerJournalObject(txDb, owner);
+    await recordJournalEntry(txDb, {
       operation: "unlink",
       object: taskObject,
       summary: buildUnlinkSummary(ownerObject, taskObject),
@@ -749,28 +734,29 @@ export function unlinkOwnerTask(database: DbClient, owner: TaskOwner, taskId: nu
   });
 }
 
-export function updateOwnerTaskBoard(database: DbClient, owner: TaskOwner, taskId: number, input: TaskBoardPositionInput, actor?: JournalActor | null): TaskBoardItem {
-  ensureOwnerExists(database, owner);
-  ensureCatalogEntryExists(database, "workStatus", input.status);
-  const linked = getOwnerTaskRow(database, owner, taskId);
+export async function updateOwnerTaskBoard(database: DbClient, owner: TaskOwner, taskId: number, input: TaskBoardPositionInput, actor?: JournalActor | null): Promise<TaskBoardItem> {
+  await ensureOwnerExists(database, owner);
+  await ensureCatalogEntryExists(database, "workStatus", input.status);
+  const ownerTaskRows = await selectOwnerTaskRows(database, owner);
+  const linked = getOwnerTaskRow(ownerTaskRows, taskId);
   if (!linked) {
     throw notFound(`Task ${taskId} is not linked to ${owner.type} ${owner.id}`);
   }
 
-  const updated = database.transaction((tx) => {
+  const updated = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const task = taskRepository.update(txDb, taskId, input.expectedVersion, { status: input.status }, actor?.actorUserId ?? undefined);
+    const task = await taskRepository.update(txDb, taskId, input.expectedVersion, { status: input.status }, actor?.actorUserId ?? undefined);
     if (!task) {
       throw notFound(`Task with id ${taskId} not found`);
     }
-    updateOwnerTaskPosition(txDb, owner, taskId, input.position);
+    await updateOwnerTaskPosition(txDb, owner, taskId, input.position);
     const taskObject = taskJournalObject(task);
-    const ownerObject = getOwnerJournalObject(txDb, owner);
+    const ownerObject = await getOwnerJournalObject(txDb, owner);
     const changes = buildJournalChanges(linked, { ...task, boardPosition: input.position }, [
       { key: "status", label: "Status" },
       { key: "boardPosition", label: "Board-Position" }
     ]);
-    recordJournalEntry(txDb, {
+    await recordJournalEntry(txDb, {
       operation: "update",
       object: taskObject,
       summary: buildUpdateSummary(taskObject, changes),
@@ -784,18 +770,18 @@ export function updateOwnerTaskBoard(database: DbClient, owner: TaskOwner, taskI
   return mapTaskBoardItem(database, { ...updated, boardPosition: input.position });
 }
 
-export function createSubtask(database: DbClient, taskId: number, input: TaskInput, actor?: JournalActor | null): Task {
-  const parent = getTaskRecord(database, taskId);
+export async function createSubtask(database: DbClient, taskId: number, input: TaskInput, actor?: JournalActor | null): Promise<Task> {
+  const parent = await getTaskRecord(database, taskId);
   if (parent.parentId !== null) {
     throw badRequest("Subtasks cannot have subtasks");
   }
 
-  const created = database.transaction((tx) => {
+  const created = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const task = insertTask(txDb, input, parent.id, actor);
+    const task = await insertTask(txDb, input, parent.id, actor);
     const taskObject = taskJournalObject(task);
     const parentObject = taskJournalObject(parent);
-    recordJournalEntry(txDb, {
+    await recordJournalEntry(txDb, {
       operation: "create",
       object: taskObject,
       summary: buildCreateSummary(taskObject),
@@ -804,27 +790,27 @@ export function createSubtask(database: DbClient, taskId: number, input: TaskInp
     });
     return task;
   });
-  return mapTask(database, created, [], 0);
+  return mapTask(database, created, Promise.resolve([]), Promise.resolve(0));
 }
 
-export function getTask(database: DbClient, id: number): Task {
-  return mapTask(database, getTaskRecord(database, id));
+export async function getTask(database: DbClient, id: number): Promise<Task> {
+  return mapTask(database, await getTaskRecord(database, id));
 }
 
-export function getTaskDetail(database: DbClient, id: number): TaskDetail {
-  const record = getTaskRecord(database, id);
-  const base = mapTask(database, record);
+export async function getTaskDetail(database: DbClient, id: number): Promise<TaskDetail> {
+  const record = await getTaskRecord(database, id);
+  const base = await mapTask(database, record);
   return {
     ...base,
-    parentContexts: taskParentContexts(database, record),
-    subtasks: listSubtasks(database, id),
-    comments: listComments(database, id),
-    notes: listTaskNotes(database, id),
-    attachments: listTaskAttachments(database, id)
+    parentContexts: await taskParentContexts(database, record),
+    subtasks: await listSubtasks(database, id),
+    comments: await listComments(database, id),
+    notes: await listTaskNotes(database, id),
+    attachments: await listTaskAttachments(database, id)
   };
 }
 
-export function updateTask(database: DbClient, id: number, input: TaskUpdate, actor?: JournalActor | null): Task {
+export async function updateTask(database: DbClient, id: number, input: TaskUpdate, actor?: JournalActor | null): Promise<Task> {
   const values: Partial<Pick<TaskRecord, "title" | "description" | "status" | "priority" | "responsibleUserId" | "dueDate">> = {};
 
   if (input.title !== undefined) {
@@ -834,15 +820,15 @@ export function updateTask(database: DbClient, id: number, input: TaskUpdate, ac
     values.description = cleanNullable(input.description) ?? null;
   }
   if (input.status !== undefined) {
-    ensureCatalogEntryExists(database, "workStatus", input.status);
+    await ensureCatalogEntryExists(database, "workStatus", input.status);
     values.status = input.status;
   }
   if (input.priority !== undefined) {
-    ensureCatalogEntryExists(database, "priority", input.priority);
+    await ensureCatalogEntryExists(database, "priority", input.priority);
     values.priority = input.priority;
   }
   if (input.responsibleUserId !== undefined) {
-    values.responsibleUserId = normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
+    values.responsibleUserId = await normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
   }
   if (input.dueDate !== undefined) {
     values.dueDate = input.dueDate;
@@ -852,16 +838,16 @@ export function updateTask(database: DbClient, id: number, input: TaskUpdate, ac
     throw badRequest("No task fields provided");
   }
 
-  const updated = database.transaction((tx) => {
+  const updated = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const current = getTaskRecord(txDb, id);
-    const task = taskRepository.update(txDb, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    const current = await getTaskRecord(txDb, id);
+    const task = await taskRepository.update(txDb, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
     if (!task) {
       throw notFound(`Task with id ${id} not found`);
     }
     const taskObject = taskJournalObject(task);
     const changes = buildJournalChanges(current, task, taskJournalFields);
-    recordJournalEntry(txDb, {
+    await recordJournalEntry(txDb, {
       operation: "update",
       object: taskObject,
       summary: buildUpdateSummary(taskObject, changes),
@@ -876,26 +862,26 @@ export function updateTask(database: DbClient, id: number, input: TaskUpdate, ac
 }
 
 export async function deleteTask(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
-  const taskIds = collectTaskSubtreeIds(database, id);
-  const task = getTaskRecord(database, id);
-  const blockers = taskDeleteBlockers(database, taskIds);
+  const taskIds = await collectTaskSubtreeIds(database, id);
+  const task = await getTaskRecord(database, id);
+  const blockers = await taskDeleteBlockers(database, taskIds);
   if (blockers.length > 0) {
     throw conflict(`Aufgabe kann nicht gelöscht werden, solange Beziehungen bestehen: ${blockers.join(", ")}.`);
   }
 
   await deleteTaskAttachmentsForIds(database, taskIds);
-  deleteTaskNotesForIds(database, taskIds);
+  await deleteTaskNotesForIds(database, taskIds);
 
-  database.transaction((tx) => {
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
     const taskObject = taskJournalObject(task);
-    recordJournalEntry(txDb, {
+    await recordJournalEntry(txDb, {
       operation: "delete",
       object: taskObject,
       summary: buildDeleteSummary(taskObject),
       actor
     });
-    if (taskRepository.delete(txDb, id) === 0) {
+    if (await taskRepository.delete(txDb, id) === 0) {
       throw notFound(`Task with id ${id} not found`);
     }
   });

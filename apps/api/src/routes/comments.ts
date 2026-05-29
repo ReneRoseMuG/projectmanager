@@ -67,11 +67,11 @@ function recentCommentOwnerFromQuery(query: { ownerType?: "project" | "milestone
 }
 
 function registerEntityCommentRoutes(app: FastifyInstance, path: string, entityType: CommentEntityType): void {
-  function ensureDayPlanRouteAccess(id: number, request: FastifyRequest): void {
+  async function ensureDayPlanRouteAccess(id: number, request: FastifyRequest): Promise<void> {
     if (entityType !== "dayPlan") {
       return;
     }
-    const currentUser = requireCurrentUser(request);
+    const currentUser = await requireCurrentUser(request);
     ensureDayPlanCommentAccess(app.db, id, currentUser.id);
   }
 
@@ -118,7 +118,7 @@ export async function registerCommentsRoutes(app: FastifyInstance): Promise<void
     "/comments/recent",
     { schema: { querystring: recentCommentsQuerySchema, response: { 200: arrayResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       const owner = recentCommentOwnerFromQuery(request.query);
       if (owner?.type === "dayPlan") {
         ensureDayPlanCommentAccess(app.db, owner.id, currentUser.id);

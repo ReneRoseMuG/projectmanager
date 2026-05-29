@@ -74,7 +74,7 @@ const featureJournalFields: Array<JournalFieldDefinition<FeatureRecord>> = [
   { key: "responsibleUserId", label: "Verantwortlich" }
 ];
 
-function mapFeature(database: DbClient, record: FeatureRecord, useCaseCount: number, content?: string, supportCounts = emptyFeatureSupportCounts, parentContexts?: VisibleParentContext[]): FeatureDto {
+async function mapFeature(database: DbClient, record: FeatureRecord, useCaseCount: number, content?: string, supportCounts = emptyFeatureSupportCounts, parentContexts?: VisibleParentContext[]): Promise<FeatureDto> {
   return {
     id: record.id,
     title: record.title,
@@ -83,7 +83,7 @@ function mapFeature(database: DbClient, record: FeatureRecord, useCaseCount: num
     content,
     sortOrder: record.sortOrder,
     responsibleUserId: record.responsibleUserId,
-    responsibleUser: getUserOption(database, record.responsibleUserId),
+    responsibleUser: await getUserOption(database, record.responsibleUserId),
     version: record.version,
     useCaseCount,
     attachmentCount: supportCounts.attachmentCount,
@@ -95,19 +95,17 @@ function mapFeature(database: DbClient, record: FeatureRecord, useCaseCount: num
   };
 }
 
-function featureParentContexts(database: DbClient, featureId: number): VisibleParentContext[] {
-  const projectRows = database
+async function featureParentContexts(database: DbClient, featureId: number): Promise<VisibleParentContext[]> {
+  const projectRows = await database
     .select({ id: projects.id, label: projects.name })
     .from(projectFeatures)
     .innerJoin(projects, eq(projectFeatures.projectId, projects.id))
-    .where(eq(projectFeatures.featureId, featureId))
-    .all();
-  const milestoneRows = database
+    .where(eq(projectFeatures.featureId, featureId));
+  const milestoneRows = await database
     .select({ id: milestones.id, label: milestones.name })
     .from(milestoneFeatures)
     .innerJoin(milestones, eq(milestoneFeatures.milestoneId, milestones.id))
-    .where(eq(milestoneFeatures.featureId, featureId))
-    .all();
+    .where(eq(milestoneFeatures.featureId, featureId));
 
   return [
     ...projectRows.map((row): VisibleParentContext => ({ type: "project", id: row.id, label: row.label, origin: "direct" })),
@@ -115,13 +113,13 @@ function featureParentContexts(database: DbClient, featureId: number): VisiblePa
   ];
 }
 
-function countUseCases(database: DbClient, featureId: number): number {
-  return database.select({ id: useCases.id }).from(useCases).where(eq(useCases.featureId, featureId)).all().length;
+async function countUseCases(database: DbClient, featureId: number): Promise<number> {
+  return (await database.select({ id: useCases.id }).from(useCases).where(eq(useCases.featureId, featureId))).length;
 }
 
-function getUseCaseCounts(database: DbClient): Map<number, number> {
+async function getUseCaseCounts(database: DbClient): Promise<Map<number, number>> {
   const counts = new Map<number, number>();
-  const rows = database.select({ featureId: useCases.featureId }).from(useCases).all();
+  const rows = await database.select({ featureId: useCases.featureId }).from(useCases);
 
   for (const row of rows) {
     counts.set(row.featureId, (counts.get(row.featureId) ?? 0) + 1);
@@ -130,7 +128,7 @@ function getUseCaseCounts(database: DbClient): Map<number, number> {
   return counts;
 }
 
-function getFeatureSupportCounts(database: DbClient, featureIds: number[]): Map<number, FeatureSupportCounts> {
+async function getFeatureSupportCounts(database: DbClient, featureIds: number[]): Promise<Map<number, FeatureSupportCounts>> {
   const counts = new Map<number, FeatureSupportCounts>();
   if (featureIds.length === 0) {
     return counts;
@@ -146,12 +144,12 @@ function getFeatureSupportCounts(database: DbClient, featureIds: number[]): Map<
     return nextCounts;
   };
 
-  const attachmentRows = database.select({ featureId: featureAttachments.featureId }).from(featureAttachments).where(inArray(featureAttachments.featureId, featureIds)).all();
+  const attachmentRows = await database.select({ featureId: featureAttachments.featureId }).from(featureAttachments).where(inArray(featureAttachments.featureId, featureIds));
   for (const row of attachmentRows) {
     ensureCounts(row.featureId).attachmentCount += 1;
   }
 
-  const commentRows = database.select({ featureId: featureComments.featureId }).from(featureComments).where(inArray(featureComments.featureId, featureIds)).all();
+  const commentRows = await database.select({ featureId: featureComments.featureId }).from(featureComments).where(inArray(featureComments.featureId, featureIds));
   for (const row of commentRows) {
     ensureCounts(row.featureId).commentCount += 1;
   }
@@ -159,15 +157,15 @@ function getFeatureSupportCounts(database: DbClient, featureIds: number[]): Map<
   return counts;
 }
 
-function getFeatureRecord(database: DbClient, id: number): FeatureRecord {
-  const feature = featureRepository.findById(database, id);
+async function getFeatureRecord(database: DbClient, id: number): Promise<FeatureRecord> {
+  const feature = await featureRepository.findById(database, id);
   if (!feature) {
     throw notFound(`Feature with id ${id} not found`);
   }
   return feature;
 }
 
-function readFeatureContent(database: DbClient, record: FeatureRecord): string {
+async function readFeatureContent(database: DbClient, record: FeatureRecord): Promise<string> {
   return readContentFromDb(database, record.id, "features");
 }
 
@@ -202,29 +200,29 @@ function buildContentChange(before: string, after: string): JournalChangeCreateD
   ];
 }
 
-export function listFeatures(database: DbClient): FeatureDto[] {
-  const rows = featureRepository.findAll(database);
-  const counts = getUseCaseCounts(database);
+export async function listFeatures(database: DbClient): Promise<FeatureDto[]> {
+  const rows = await featureRepository.findAll(database);
+  const counts = await getUseCaseCounts(database);
   const ids = rows.map((feature) => feature.id);
-  const supportCounts = getFeatureSupportCounts(database, ids);
+  const supportCounts = await getFeatureSupportCounts(database, ids);
 
-  return rows.map((feature) => mapFeature(database, feature, counts.get(feature.id) ?? 0, undefined, supportCounts.get(feature.id) ?? emptyFeatureSupportCounts));
+  return Promise.all(rows.map((feature) => mapFeature(database, feature, counts.get(feature.id) ?? 0, undefined, supportCounts.get(feature.id) ?? emptyFeatureSupportCounts)));
 }
 
-export function getFeature(database: DbClient, id: number): FeatureDto {
-  const feature = getFeatureRecord(database, id);
-  const supportCounts = getFeatureSupportCounts(database, [id]).get(id) ?? emptyFeatureSupportCounts;
-  return mapFeature(database, feature, countUseCases(database, id), readFeatureContent(database, feature), supportCounts, featureParentContexts(database, id));
+export async function getFeature(database: DbClient, id: number): Promise<FeatureDto> {
+  const feature = await getFeatureRecord(database, id);
+  const supportCounts = (await getFeatureSupportCounts(database, [id])).get(id) ?? emptyFeatureSupportCounts;
+  return mapFeature(database, feature, await countUseCases(database, id), await readFeatureContent(database, feature), supportCounts, await featureParentContexts(database, id));
 }
 
-export function createFeature(database: DbClient, input: FeatureInput, actor?: JournalActor | null): FeatureDto {
+export async function createFeature(database: DbClient, input: FeatureInput, actor?: JournalActor | null): Promise<FeatureDto> {
   const title = requireNonEmpty(input.title, "title");
-  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
-  ensureCatalogEntryExists(database, "featureStatus", status);
+  const status = input.status ?? await resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
+  await ensureCatalogEntryExists(database, "featureStatus", status);
 
   const content = input.content ?? "";
-  const created = database.transaction((tx) => {
-    const feature = featureRepository.create(
+  const created = await database.transaction(async (tx) => {
+    const feature = await featureRepository.create(
       tx,
       {
         title,
@@ -232,12 +230,12 @@ export function createFeature(database: DbClient, input: FeatureInput, actor?: J
         description: cleanNullable(input.description) ?? null,
         content,
         sortOrder: input.sortOrder ?? 0,
-        responsibleUserId: normalizeAssignableUserId(tx, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId")
+        responsibleUserId: await normalizeAssignableUserId(tx, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId")
       },
       actor?.actorUserId ?? undefined
     );
       const journalObject = featureJournalObject(feature);
-      recordJournalEntry(tx, {
+      await recordJournalEntry(tx, {
         operation: "create",
         object: journalObject,
         summary: buildCreateSummary(journalObject),
@@ -249,9 +247,9 @@ export function createFeature(database: DbClient, input: FeatureInput, actor?: J
   return mapFeature(database, created, 0, content);
 }
 
-export function updateFeature(database: DbClient, id: number, input: FeatureInput, actor?: JournalActor | null): FeatureDto {
-  const current = getFeatureRecord(database, id);
-  const previousContent = readFeatureContent(database, current);
+export async function updateFeature(database: DbClient, id: number, input: FeatureInput, actor?: JournalActor | null): Promise<FeatureDto> {
+  const current = await getFeatureRecord(database, id);
+  const previousContent = await readFeatureContent(database, current);
   assertVersion(current.version, input.expectedVersion ?? 0);
   const values: FeatureUpdateData = {};
 
@@ -260,7 +258,7 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
   }
 
   if (input.status !== undefined) {
-    ensureCatalogEntryExists(database, "featureStatus", input.status);
+    await ensureCatalogEntryExists(database, "featureStatus", input.status);
     values.status = input.status;
   }
 
@@ -273,7 +271,7 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
   }
 
   if (input.responsibleUserId !== undefined) {
-    values.responsibleUserId = normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
+    values.responsibleUserId = await normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
   }
 
   if (Object.keys(values).length === 0 && input.content === undefined) {
@@ -284,15 +282,15 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
     values.content = input.content;
   }
 
-  const updated = database.transaction((tx) => {
-    const feature = featureRepository.update(tx, id, input.expectedVersion ?? 0, values, actor?.actorUserId ?? undefined);
+  const updated = await database.transaction(async (tx) => {
+    const feature = await featureRepository.update(tx, id, input.expectedVersion ?? 0, values, actor?.actorUserId ?? undefined);
     if (!feature) {
       throw notFound(`Feature with id ${id} not found`);
     }
     const nextContent = input.content ?? previousContent;
     const journalObject = featureJournalObject(feature);
     const changes = [...buildJournalChanges(current, feature, featureJournalFields), ...buildContentChange(previousContent, nextContent)];
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "update",
       object: journalObject,
       summary: buildUpdateSummary(journalObject, changes),
@@ -304,22 +302,22 @@ export function updateFeature(database: DbClient, id: number, input: FeatureInpu
   if (!updated) {
     throw notFound(`Feature with id ${id} not found`);
   }
-  const supportCounts = getFeatureSupportCounts(database, [id]).get(id) ?? emptyFeatureSupportCounts;
-  return mapFeature(database, updated, countUseCases(database, id), input.content ?? readFeatureContent(database, updated), supportCounts);
+  const supportCounts = (await getFeatureSupportCounts(database, [id])).get(id) ?? emptyFeatureSupportCounts;
+  return mapFeature(database, updated, await countUseCases(database, id), input.content ?? await readFeatureContent(database, updated), supportCounts);
 }
 
 export async function deleteFeature(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
-  const feature = getFeatureRecord(database, id);
+  const feature = await getFeatureRecord(database, id);
 
   await deleteFeatureAttachmentsForIds(database, [id]);
-  database.transaction((tx) => {
+  await database.transaction(async (tx) => {
     const journalObject = featureJournalObject(feature);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "delete",
       object: journalObject,
       summary: buildDeleteSummary(journalObject),
       actor
     });
-    featureRepository.delete(tx, id);
+    await featureRepository.delete(tx, id);
   });
 }

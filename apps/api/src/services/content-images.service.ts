@@ -20,7 +20,7 @@ function normalizeMimeType(value: string | undefined): string {
   return mimetype;
 }
 
-export function createContentImage(database: DbClient, upload: ContentImageUpload, actor?: JournalActor | null): ContentImageUploadResponse {
+export async function createContentImage(database: DbClient, upload: ContentImageUpload, actor?: JournalActor | null): Promise<ContentImageUploadResponse> {
   const mimeType = normalizeMimeType(upload.mimetype);
   if (upload.buffer.byteLength === 0) {
     throw badRequest("Image upload must not be empty");
@@ -29,7 +29,7 @@ export function createContentImage(database: DbClient, upload: ContentImageUploa
     throw badRequest("Image upload exceeds the 10 MB limit");
   }
 
-  const image = contentImageRepository.create(
+  const image = await contentImageRepository.create(
     database,
     {
       id: crypto.randomUUID(),
@@ -43,8 +43,8 @@ export function createContentImage(database: DbClient, upload: ContentImageUploa
   return { url: `/api/content/images/${image.id}` };
 }
 
-export function getContentImage(database: DbClient, id: string): ContentImageRecord {
-  const image = contentImageRepository.findById(database, id);
+export async function getContentImage(database: DbClient, id: string): Promise<ContentImageRecord> {
+  const image = await contentImageRepository.findById(database, id);
   if (!image) {
     throw notFound(`Content image with id ${id} not found`);
   }

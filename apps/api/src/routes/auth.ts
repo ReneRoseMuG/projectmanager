@@ -43,7 +43,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   );
 
   app.post("/auth/login-as-rene", { schema: { response: { 200: objectResponseSchema } } }, async (request) => {
-    const currentUser = loginConfiguredAdmin(app.db);
+    const currentUser = await loginConfiguredAdmin(app.db);
     await applySession(request, currentUser);
     return currentUser;
   });
@@ -62,7 +62,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     "/auth/set-password",
     { preHandler: requireAuth, schema: { body: setPasswordBodySchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       const updated = await setInitialPassword(app.db, currentUser.id, request.body);
       await applySession(request, updated);
       return updated;

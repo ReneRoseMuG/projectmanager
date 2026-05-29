@@ -47,14 +47,14 @@ function finishWatcherAfterChange(attachmentId: number, onSettled: () => void): 
   }, settleDelayMs);
 }
 
-function applyAttachmentFileChange(database: DbClient, attachmentId: number, diskPath: string, actorUserId: number | null): void {
+async function applyAttachmentFileChange(database: DbClient, attachmentId: number, diskPath: string, actorUserId: number | null): Promise<void> {
   try {
     const stat = fs.statSync(diskPath);
-    const record = attachmentRepository.findById(database, attachmentId);
+    const record = await attachmentRepository.findById(database, attachmentId);
     if (!record) {
       return;
     }
-    attachmentRepository.updateSizeAndVersion(database, attachmentId, {
+    await attachmentRepository.updateSizeAndVersion(database, attachmentId, {
       size: stat.size,
       updatedBy: actorUserId
     });
@@ -94,7 +94,9 @@ export function watchAttachmentForChanges(database: DbClient, attachmentId: numb
     if (!hasFileChanged()) {
       return;
     }
-    finishWatcherAfterChange(attachmentId, () => applyAttachmentFileChange(database, attachmentId, diskPath, actorUserId ?? null));
+    finishWatcherAfterChange(attachmentId, () => {
+      void applyAttachmentFileChange(database, attachmentId, diskPath, actorUserId ?? null);
+    });
   };
 
   const timer = setTimeout(() => stopWatcher(attachmentId), watcherTimeoutMs);

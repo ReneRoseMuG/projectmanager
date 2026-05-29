@@ -2,6 +2,7 @@ import type { JsonValue, WikiPageRelationSummary } from "@taskmanager/shared-typ
 import { and, eq, inArray, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { wikiPageAttachments, wikiPageRelations, wikiPageTasks, wikiPageTickets } from "../db/schema.js";
+import { firstRow } from "../db/query-utils.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { wikiPageRepository, type WikiPageRecord, type WikiPageUpdateData } from "../repositories/wiki-page.repository.js";
@@ -94,19 +95,19 @@ function mapWikiPage(
   };
 }
 
-function getWikiPageRecord(database: DbClient, id: number): WikiPageRecord {
-  const page = wikiPageRepository.findById(database, id);
+async function getWikiPageRecord(database: DbClient, id: number): Promise<WikiPageRecord> {
+  const page = await wikiPageRepository.findById(database, id);
   if (!page) {
     throw notFound(`Wiki page with id ${id} not found`);
   }
   return page;
 }
 
-function childCount(database: DbClient, id: number): number {
-  return wikiPageRepository.findChildren(database, id).length;
+async function childCount(database: DbClient, id: number): Promise<number> {
+  return (await wikiPageRepository.findChildren(database, id)).length;
 }
 
-function getWikiPageSupportCounts(database: DbClient, wikiPageIds: number[]): Map<number, WikiPageSupportCounts> {
+async function getWikiPageSupportCounts(database: DbClient, wikiPageIds: number[]): Promise<Map<number, WikiPageSupportCounts>> {
   const counts = new Map<number, WikiPageSupportCounts>();
   if (wikiPageIds.length === 0) {
     return counts;
@@ -122,29 +123,18 @@ function getWikiPageSupportCounts(database: DbClient, wikiPageIds: number[]): Ma
     return nextCounts;
   };
 
-  const attachmentRows = database
-    .select({ wikiPageId: wikiPageAttachments.wikiPageId })
-    .from(wikiPageAttachments)
-    .where(inArray(wikiPageAttachments.wikiPageId, wikiPageIds))
-    .all();
+  const [attachmentRows, taskRows, ticketRows] = await Promise.all([
+    database.select({ wikiPageId: wikiPageAttachments.wikiPageId }).from(wikiPageAttachments).where(inArray(wikiPageAttachments.wikiPageId, wikiPageIds)),
+    database.select({ wikiPageId: wikiPageTasks.ownerId }).from(wikiPageTasks).where(inArray(wikiPageTasks.ownerId, wikiPageIds)),
+    database.select({ wikiPageId: wikiPageTickets.ownerId }).from(wikiPageTickets).where(inArray(wikiPageTickets.ownerId, wikiPageIds))
+  ]);
+
   for (const row of attachmentRows) {
     ensureCounts(row.wikiPageId).attachmentCount += 1;
   }
-
-  const taskRows = database
-    .select({ wikiPageId: wikiPageTasks.ownerId })
-    .from(wikiPageTasks)
-    .where(inArray(wikiPageTasks.ownerId, wikiPageIds))
-    .all();
   for (const row of taskRows) {
     ensureCounts(row.wikiPageId).taskCount += 1;
   }
-
-  const ticketRows = database
-    .select({ wikiPageId: wikiPageTickets.ownerId })
-    .from(wikiPageTickets)
-    .where(inArray(wikiPageTickets.ownerId, wikiPageIds))
-    .all();
   for (const row of ticketRows) {
     ensureCounts(row.wikiPageId).ticketCount += 1;
   }
@@ -152,17 +142,17 @@ function getWikiPageSupportCounts(database: DbClient, wikiPageIds: number[]): Ma
   return counts;
 }
 
-function ensureParentExists(database: DbClient, parentId: number | null | undefined, pageId?: number): void {
+async function ensureParentExists(database: DbClient, parentId: number | null | undefined, pageId?: number): Promise<void> {
   if (parentId === undefined || parentId === null) {
     return;
   }
   if (parentId === pageId) {
     throw badRequest("A wiki page cannot be its own parent");
   }
-  getWikiPageRecord(database, parentId);
+  await getWikiPageRecord(database, parentId);
 }
 
-function readWikiContent(database: DbClient, record: WikiPageRecord): string {
+async function readWikiContent(database: DbClient, record: WikiPageRecord): Promise<string> {
   return readContentFromDb(database, record.id, "wiki");
 }
 
@@ -177,13 +167,12 @@ function normalizeWikiPageRelationIds(sourceWikiPageId: number, targetWikiPageId
   return sourceWikiPageId < targetWikiPageId ? [sourceWikiPageId, targetWikiPageId] : [targetWikiPageId, sourceWikiPageId];
 }
 
-function findWikiPageRelation(database: DbClient, sourceWikiPageId: number, targetWikiPageId: number) {
+async function findWikiPageRelation(database: DbClient, sourceWikiPageId: number, targetWikiPageId: number) {
   const [normalizedSourceId, normalizedTargetId] = normalizeWikiPageRelationIds(sourceWikiPageId, targetWikiPageId);
-  return database
+  return firstRow(await database
     .select()
     .from(wikiPageRelations)
-    .where(and(eq(wikiPageRelations.sourceWikiPageId, normalizedSourceId), eq(wikiPageRelations.targetWikiPageId, normalizedTargetId)))
-    .get();
+    .where(and(eq(wikiPageRelations.sourceWikiPageId, normalizedSourceId), eq(wikiPageRelations.targetWikiPageId, normalizedTargetId))));
 }
 
 function relatedPageSummary(record: WikiPageRecord): WikiPageRelationSummary {
@@ -194,21 +183,24 @@ function relatedPageSummary(record: WikiPageRecord): WikiPageRelationSummary {
   };
 }
 
-function readWikiPageRelations(database: DbClient, wikiPageId: number): WikiPageRelationSummary[] {
-  const rows = database
+async function readWikiPageRelations(database: DbClient, wikiPageId: number): Promise<WikiPageRelationSummary[]> {
+  const rows = await database
     .select({
       sourceWikiPageId: wikiPageRelations.sourceWikiPageId,
       targetWikiPageId: wikiPageRelations.targetWikiPageId
     })
     .from(wikiPageRelations)
-    .where(or(eq(wikiPageRelations.sourceWikiPageId, wikiPageId), eq(wikiPageRelations.targetWikiPageId, wikiPageId)))
-    .all();
+    .where(or(eq(wikiPageRelations.sourceWikiPageId, wikiPageId), eq(wikiPageRelations.targetWikiPageId, wikiPageId)));
 
-  return rows
-    .map((row) => (row.sourceWikiPageId === wikiPageId ? row.targetWikiPageId : row.sourceWikiPageId))
-    .map((relatedWikiPageId) => wikiPageRepository.findById(database, relatedWikiPageId))
-    .filter((record): record is WikiPageRecord => Boolean(record))
-    .map(relatedPageSummary);
+  const relatedIds = rows.map((row) => (row.sourceWikiPageId === wikiPageId ? row.targetWikiPageId : row.sourceWikiPageId));
+  const result: WikiPageRelationSummary[] = [];
+  for (const relatedWikiPageId of relatedIds) {
+    const record = await wikiPageRepository.findById(database, relatedWikiPageId);
+    if (record) {
+      result.push(relatedPageSummary(record));
+    }
+  }
+  return result;
 }
 
 function contentValueLabel(value: string): string | null {
@@ -238,36 +230,44 @@ function buildContentChange(before: string, after: string): JournalChangeCreateD
   ];
 }
 
-function wikiContexts(database: DbClient, record: WikiPageRecord) {
-  return [...(record.parentId ? [makeJournalContext(wikiJournalObject(getWikiPageRecord(database, record.parentId)), "parent" as const)] : [])];
+async function wikiContexts(database: DbClient, record: WikiPageRecord) {
+  if (!record.parentId) {
+    return [];
+  }
+  return [makeJournalContext(wikiJournalObject(await getWikiPageRecord(database, record.parentId)), "parent" as const)];
 }
 
-export function listRootWikiPages(database: DbClient): WikiPageDto[] {
-  const pages = wikiPageRepository.findRootPages(database);
-  const supportCounts = getWikiPageSupportCounts(database, pages.map((page) => page.id));
-  return pages.map((page) => mapWikiPage(page, childCount(database, page.id), undefined, supportCounts.get(page.id) ?? emptyWikiPageSupportCounts));
+export async function listRootWikiPages(database: DbClient): Promise<WikiPageDto[]> {
+  const pages = await wikiPageRepository.findRootPages(database);
+  const supportCounts = await getWikiPageSupportCounts(database, pages.map((page) => page.id));
+  return Promise.all(pages.map(async (page) => mapWikiPage(page, await childCount(database, page.id), undefined, supportCounts.get(page.id) ?? emptyWikiPageSupportCounts)));
 }
 
-export function listWikiChildren(database: DbClient, id: number): WikiPageDto[] {
-  getWikiPageRecord(database, id);
-  const pages = wikiPageRepository.findChildren(database, id);
-  const supportCounts = getWikiPageSupportCounts(database, pages.map((page) => page.id));
-  return pages.map((page) => mapWikiPage(page, childCount(database, page.id), undefined, supportCounts.get(page.id) ?? emptyWikiPageSupportCounts));
+export async function listWikiChildren(database: DbClient, id: number): Promise<WikiPageDto[]> {
+  await getWikiPageRecord(database, id);
+  const pages = await wikiPageRepository.findChildren(database, id);
+  const supportCounts = await getWikiPageSupportCounts(database, pages.map((page) => page.id));
+  return Promise.all(pages.map(async (page) => mapWikiPage(page, await childCount(database, page.id), undefined, supportCounts.get(page.id) ?? emptyWikiPageSupportCounts)));
 }
 
-export function getWikiPage(database: DbClient, id: number): WikiPageDto {
-  const page = getWikiPageRecord(database, id);
-  const supportCounts = getWikiPageSupportCounts(database, [id]).get(id) ?? emptyWikiPageSupportCounts;
-  return mapWikiPage(page, childCount(database, id), readWikiContent(database, page), supportCounts, readWikiPageRelations(database, id));
+export async function getWikiPage(database: DbClient, id: number): Promise<WikiPageDto> {
+  const page = await getWikiPageRecord(database, id);
+  const [cnt, supportCounts, content, relatedPages] = await Promise.all([
+    childCount(database, id),
+    getWikiPageSupportCounts(database, [id]).then((m) => m.get(id) ?? emptyWikiPageSupportCounts),
+    readWikiContent(database, page),
+    readWikiPageRelations(database, id)
+  ]);
+  return mapWikiPage(page, cnt, content, supportCounts, relatedPages);
 }
 
-export function createWikiPage(database: DbClient, input: WikiPageInput, actor?: JournalActor | null): WikiPageDto {
+export async function createWikiPage(database: DbClient, input: WikiPageInput, actor?: JournalActor | null): Promise<WikiPageDto> {
   const title = requireNonEmpty(input.title, "title");
-  ensureParentExists(database, input.parentId);
+  await ensureParentExists(database, input.parentId);
 
   const content = input.content ?? "";
-  const created = database.transaction((tx) => {
-    const page = wikiPageRepository.create(
+  const created = await database.transaction(async (tx) => {
+    const page = await wikiPageRepository.create(
       tx,
       {
         parentId: input.parentId ?? null,
@@ -277,22 +277,22 @@ export function createWikiPage(database: DbClient, input: WikiPageInput, actor?:
       },
       actor?.actorUserId ?? undefined
     );
-      const journalObject = wikiJournalObject(page);
-      recordJournalEntry(tx, {
-        operation: "create",
-        object: journalObject,
-        summary: buildCreateSummary(journalObject),
-        actor,
-        contexts: wikiContexts(database, page)
-      });
+    const journalObject = wikiJournalObject(page);
+    await recordJournalEntry(tx, {
+      operation: "create",
+      object: journalObject,
+      summary: buildCreateSummary(journalObject),
+      actor,
+      contexts: await wikiContexts(database, page)
+    });
     return page;
   });
   return mapWikiPage(created, 0, content);
 }
 
-export function updateWikiPage(database: DbClient, id: number, input: WikiPageInput, actor?: JournalActor | null): WikiPageDto {
-  const current = getWikiPageRecord(database, id);
-  const previousContent = readWikiContent(database, current);
+export async function updateWikiPage(database: DbClient, id: number, input: WikiPageInput, actor?: JournalActor | null): Promise<WikiPageDto> {
+  const current = await getWikiPageRecord(database, id);
+  const previousContent = await readWikiContent(database, current);
   assertVersion(current.version, input.expectedVersion ?? 0);
   const values: WikiPageUpdateData = {};
 
@@ -300,7 +300,7 @@ export function updateWikiPage(database: DbClient, id: number, input: WikiPageIn
     values.title = requireNonEmpty(input.title, "title");
   }
   if (input.parentId !== undefined) {
-    ensureParentExists(database, input.parentId, id);
+    await ensureParentExists(database, input.parentId, id);
     values.parentId = input.parentId;
   }
   if (input.sortOrder !== undefined) {
@@ -315,8 +315,8 @@ export function updateWikiPage(database: DbClient, id: number, input: WikiPageIn
     values.content = input.content;
   }
 
-  const updated = database.transaction((tx) => {
-    const page = wikiPageRepository.update(tx, id, input.expectedVersion ?? 0, values, actor?.actorUserId ?? undefined);
+  const updated = await database.transaction(async (tx) => {
+    const page = await wikiPageRepository.update(tx, id, input.expectedVersion ?? 0, values, actor?.actorUserId ?? undefined);
     if (!page) {
       throw notFound(`Wiki page with id ${id} not found`);
     }
@@ -324,73 +324,77 @@ export function updateWikiPage(database: DbClient, id: number, input: WikiPageIn
       {
         key: "parentId",
         label: "Übergeordnete Wiki-Seite",
-        format: (value) => (typeof value === "number" ? wikiJournalObject(getWikiPageRecord(database, value)).label : null)
+        format: (value) => (typeof value === "number" ? `Wiki-Seite ${value}` : null)
       }
     ];
     const nextContent = input.content ?? previousContent;
     const journalObject = wikiJournalObject(page);
     const changes = [...buildJournalChanges(current, page, [...relationFields, ...wikiJournalFields]), ...buildContentChange(previousContent, nextContent)];
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "update",
       object: journalObject,
       summary: buildUpdateSummary(journalObject, changes),
       actor,
       changes,
-      contexts: wikiContexts(database, page)
+      contexts: await wikiContexts(database, page)
     });
     return page;
   });
   if (!updated) {
     throw notFound(`Wiki page with id ${id} not found`);
   }
-  const supportCounts = getWikiPageSupportCounts(database, [id]).get(id) ?? emptyWikiPageSupportCounts;
-  return mapWikiPage(updated, childCount(database, id), input.content ?? readWikiContent(database, updated), supportCounts, readWikiPageRelations(database, id));
+  const [cnt, supportCounts, content, relatedPages] = await Promise.all([
+    childCount(database, id),
+    getWikiPageSupportCounts(database, [id]).then((m) => m.get(id) ?? emptyWikiPageSupportCounts),
+    input.content !== undefined ? Promise.resolve(input.content) : readWikiContent(database, updated),
+    readWikiPageRelations(database, id)
+  ]);
+  return mapWikiPage(updated, cnt, content, supportCounts, relatedPages);
 }
 
-export function deleteWikiPage(database: DbClient, id: number, actor?: JournalActor | null): void {
-  const page = getWikiPageRecord(database, id);
-  if (childCount(database, id) > 0) {
+export async function deleteWikiPage(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
+  const page = await getWikiPageRecord(database, id);
+  if (await childCount(database, id) > 0) {
     throw conflict("Wiki page has child pages");
   }
 
-  deleteWikiPageNotesForIds(database, [id]);
+  await deleteWikiPageNotesForIds(database, [id]);
 
-  database.transaction((tx) => {
+  await database.transaction(async (tx) => {
     const journalObject = wikiJournalObject(page);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "delete",
       object: journalObject,
       summary: buildDeleteSummary(journalObject),
       actor,
-      contexts: wikiContexts(database, page)
+      contexts: await wikiContexts(database, page)
     });
-    wikiPageRepository.delete(tx, id);
+    await wikiPageRepository.delete(tx, id);
   });
 }
 
-export function listWikiPageRelations(database: DbClient, id: number): WikiPageRelationSummary[] {
-  getWikiPageRecord(database, id);
+export async function listWikiPageRelations(database: DbClient, id: number): Promise<WikiPageRelationSummary[]> {
+  await getWikiPageRecord(database, id);
   return readWikiPageRelations(database, id);
 }
 
-export function addWikiPageRelation(database: DbClient, id: number, targetWikiPageId: number, actor?: JournalActor | null): WikiPageRelationSummary[] {
-  const sourcePage = getWikiPageRecord(database, id);
-  const targetPage = getWikiPageRecord(database, targetWikiPageId);
+export async function addWikiPageRelation(database: DbClient, id: number, targetWikiPageId: number, actor?: JournalActor | null): Promise<WikiPageRelationSummary[]> {
+  const sourcePage = await getWikiPageRecord(database, id);
+  const targetPage = await getWikiPageRecord(database, targetWikiPageId);
   const [normalizedSourceId, normalizedTargetId] = normalizeWikiPageRelationIds(id, targetWikiPageId);
-  if (findWikiPageRelation(database, id, targetWikiPageId)) {
+  if (await findWikiPageRelation(database, id, targetWikiPageId)) {
     throw conflict("Wiki page relation already exists");
   }
 
-  database.transaction((tx) => {
-    tx.insert(wikiPageRelations)
+  await database.transaction(async (tx) => {
+    await tx.insert(wikiPageRelations)
       .values({
         sourceWikiPageId: normalizedSourceId,
         targetWikiPageId: normalizedTargetId
-      })
-      .run();
+      });
     const sourceObject = wikiJournalObject(sourcePage);
     const targetObject = wikiJournalObject(targetPage);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "link",
       object: sourceObject,
       summary: buildLinkSummary(sourceObject, targetObject),
@@ -402,21 +406,20 @@ export function addWikiPageRelation(database: DbClient, id: number, targetWikiPa
   return readWikiPageRelations(database, id);
 }
 
-export function removeWikiPageRelation(database: DbClient, id: number, targetWikiPageId: number, actor?: JournalActor | null): WikiPageRelationSummary[] {
-  const sourcePage = getWikiPageRecord(database, id);
-  const targetPage = getWikiPageRecord(database, targetWikiPageId);
+export async function removeWikiPageRelation(database: DbClient, id: number, targetWikiPageId: number, actor?: JournalActor | null): Promise<WikiPageRelationSummary[]> {
+  const sourcePage = await getWikiPageRecord(database, id);
+  const targetPage = await getWikiPageRecord(database, targetWikiPageId);
   const [normalizedSourceId, normalizedTargetId] = normalizeWikiPageRelationIds(id, targetWikiPageId);
-  if (!findWikiPageRelation(database, id, targetWikiPageId)) {
+  if (!await findWikiPageRelation(database, id, targetWikiPageId)) {
     throw notFound(`Wiki page relation between ${id} and ${targetWikiPageId} not found`);
   }
 
-  database.transaction((tx) => {
-    tx.delete(wikiPageRelations)
-      .where(and(eq(wikiPageRelations.sourceWikiPageId, normalizedSourceId), eq(wikiPageRelations.targetWikiPageId, normalizedTargetId)))
-      .run();
+  await database.transaction(async (tx) => {
+    await tx.delete(wikiPageRelations)
+      .where(and(eq(wikiPageRelations.sourceWikiPageId, normalizedSourceId), eq(wikiPageRelations.targetWikiPageId, normalizedTargetId)));
     const sourceObject = wikiJournalObject(sourcePage);
     const targetObject = wikiJournalObject(targetPage);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "unlink",
       object: sourceObject,
       summary: buildUnlinkSummary(sourceObject, targetObject),
@@ -428,9 +431,9 @@ export function removeWikiPageRelation(database: DbClient, id: number, targetWik
   return readWikiPageRelations(database, id);
 }
 
-export function getWikiBreadcrumb(database: DbClient, id: number): WikiBreadcrumbDto[] {
+export async function getWikiBreadcrumb(database: DbClient, id: number): Promise<WikiBreadcrumbDto[]> {
   const breadcrumb: WikiBreadcrumbDto[] = [];
-  let current: WikiPageRecord | undefined = getWikiPageRecord(database, id);
+  let current: WikiPageRecord | undefined = await getWikiPageRecord(database, id);
   const visited = new Set<number>();
 
   while (current) {
@@ -439,7 +442,7 @@ export function getWikiBreadcrumb(database: DbClient, id: number): WikiBreadcrum
     }
     visited.add(current.id);
     breadcrumb.unshift({ id: current.id, title: current.title });
-    current = current.parentId === null ? undefined : getWikiPageRecord(database, current.parentId);
+    current = current.parentId === null ? undefined : await getWikiPageRecord(database, current.parentId);
   }
 
   return breadcrumb;

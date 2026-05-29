@@ -71,7 +71,7 @@ export async function registerAdminUserRoutes(app: FastifyInstance): Promise<voi
     "/admin/users/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      const actor = requireCurrentUser(request);
+      const actor = await requireCurrentUser(request);
       deleteAdminUser(app.db, request.params.id, actor.id);
       return reply.status(204).send();
     }

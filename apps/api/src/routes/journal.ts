@@ -53,7 +53,7 @@ export async function registerJournalRoutes(app: FastifyInstance): Promise<void>
         if (request.query.objectId === undefined) {
           throw badRequest("objectId is required for dayPlan journal queries");
         }
-        const currentUser = requireCurrentUser(request);
+        const currentUser = await requireCurrentUser(request);
         ensureDayPlanOwnedByUser(app.db, request.query.objectId, currentUser.id);
       }
       return listJournalEntries(app.db, request.query);
@@ -65,7 +65,7 @@ export async function registerJournalRoutes(app: FastifyInstance): Promise<void>
     { schema: { params: journalObjectParamsSchema, querystring: journalQuerySchema, response: { 200: objectResponseSchema } } },
     async (request) => {
       if (request.params.objectType === "dayPlan") {
-        const currentUser = requireCurrentUser(request);
+        const currentUser = await requireCurrentUser(request);
         ensureDayPlanOwnedByUser(app.db, request.params.objectId, currentUser.id);
       }
       return listObjectJournalEntries(app.db, request.params.objectType, request.params.objectId, request.query);
