@@ -266,12 +266,8 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expect(featureForm.locator("input[required]").nth(0)).toHaveValue(
         feature.title,
       );
-      await expectRichText(
-        featureForm,
-        "E2E Feature-Kurzbeschreibung vollständig",
-        0,
-      );
-      await expectRichText(featureForm, "E2E Feature-Inhalt vollständig", 1);
+      await expect(featureForm.locator('[data-testid="feature-form-description-view"]')).toHaveCount(0);
+      await expectRichText(featureForm, "E2E Feature-Inhalt vollständig", 0);
 
       await authenticatedGoto(page, `/projects/${project.id}`);
       await formPage(page, "Projekt bearbeiten")
@@ -462,11 +458,6 @@ test.describe("Projekt-Routen und Detailformular", () => {
       await expect(page).toHaveURL(/\/features\/new\?/);
       const featureForm = formPage(page, "Neues Feature");
       await featureForm.locator("input[required]").nth(0).fill(featureTitle);
-      await fillRichText(
-        featureForm,
-        "feature-form-description",
-        "E2E verknüpfte Kurzbeschreibung vollständig",
-      );
       await fillRichText(
         featureForm,
         "feature-form-content",

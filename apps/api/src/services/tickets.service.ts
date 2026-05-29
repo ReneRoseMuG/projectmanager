@@ -651,12 +651,70 @@ export function listRecentTickets(
     .slice(0, limit);
 }
 
+function ticketParentContexts(database: DbClient, ticket: TicketRecord): VisibleParentContext[] {
+  const contexts: VisibleParentContext[] = [];
+  if (ticket.parentId !== null) {
+    const parentTicket = database.select({ id: tickets.id, label: tickets.title }).from(tickets).where(eq(tickets.id, ticket.parentId)).get();
+    if (parentTicket) {
+      contexts.push({ type: "ticket", id: parentTicket.id, label: parentTicket.label, origin: "direct" });
+    }
+  }
+
+  contexts.push(
+    ...database
+      .select({ id: projects.id, label: projects.name })
+      .from(projectTickets)
+      .innerJoin(projects, eq(projectTickets.ownerId, projects.id))
+      .where(eq(projectTickets.ticketId, ticket.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "project", id: row.id, label: row.label, origin: "direct" })),
+    ...database
+      .select({ id: milestones.id, label: milestones.name })
+      .from(milestoneTickets)
+      .innerJoin(milestones, eq(milestoneTickets.ownerId, milestones.id))
+      .where(eq(milestoneTickets.ticketId, ticket.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "milestone", id: row.id, label: row.label, origin: "direct" })),
+    ...database
+      .select({ id: tasks.id, label: tasks.title })
+      .from(taskTickets)
+      .innerJoin(tasks, eq(taskTickets.ownerId, tasks.id))
+      .where(eq(taskTickets.ticketId, ticket.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "task", id: row.id, label: row.label, origin: "direct" })),
+    ...database
+      .select({ id: features.id, label: features.title })
+      .from(featureTickets)
+      .innerJoin(features, eq(featureTickets.ownerId, features.id))
+      .where(eq(featureTickets.ticketId, ticket.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "feature", id: row.id, label: row.label, origin: "direct" })),
+    ...database
+      .select({ id: useCases.id, label: useCases.title })
+      .from(useCaseTickets)
+      .innerJoin(useCases, eq(useCaseTickets.ownerId, useCases.id))
+      .where(eq(useCaseTickets.ticketId, ticket.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "useCase", id: row.id, label: row.label, origin: "direct" })),
+    ...database
+      .select({ id: wikiPages.id, label: wikiPages.title })
+      .from(wikiPageTickets)
+      .innerJoin(wikiPages, eq(wikiPageTickets.ownerId, wikiPages.id))
+      .where(eq(wikiPageTickets.ticketId, ticket.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "wikiPage", id: row.id, label: row.label, origin: "direct" }))
+  );
+
+  return contexts;
+}
+
 export function getTicketDetail(database: DbClient, id: number): TicketDetail {
   const record = getTicketRecord(database, id);
   const ticket = mapTicket(database, record);
 
   return {
     ...ticket,
+    parentContexts: ticketParentContexts(database, record),
     comments: listEntityComments(database, "ticket", id),
     notes: listTicketNotes(database, id),
     attachments: listTicketAttachments(database, id),

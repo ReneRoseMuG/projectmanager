@@ -21,6 +21,7 @@ interface FormModalProps {
   variant?: "modal" | "page";
   onOpenInTab?: () => void;
   tabBar?: ReactNode;
+  contentLayout?: "default" | "flush";
   contentClassName?: string;
   modalZIndexClassName?: string;
   children: ReactNode;
@@ -43,6 +44,7 @@ export function FormModal({
   variant = "modal",
   onOpenInTab,
   tabBar,
+  contentLayout = "default",
   contentClassName = "",
   modalZIndexClassName,
   children,
@@ -120,7 +122,13 @@ export function FormModal({
 
       <div
         data-testid={isPage ? "form-page-body" : undefined}
-        className={`${isPage ? "flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto px-4 pt-4 md:px-5 md:pt-5" : "grid min-h-0 flex-1 content-start gap-4 overflow-auto p-4 md:p-5"} ${contentClassName}`}
+        className={`${
+          contentLayout === "flush"
+            ? "flex min-h-0 w-full flex-1 overflow-hidden"
+            : isPage
+              ? "flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto px-4 pt-4 md:px-5 md:pt-5"
+              : "grid min-h-0 flex-1 content-start gap-4 overflow-auto p-4 md:p-5"
+        } ${contentClassName}`}
       >
         {children}
       </div>

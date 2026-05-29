@@ -104,6 +104,25 @@ describe("FormModal", () => {
     expect(footer).not.toHaveClass("sticky");
   });
 
+  it("rendert Flush-Inhalte ohne eigenen Padding-Scroll-Wrapper", () => {
+    renderFormModal(
+      <FormModal
+        open
+        title="Aufgabe bearbeiten"
+        contentLayout="flush"
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+      >
+        <section data-testid="form-body">Inhalt</section>
+      </FormModal>,
+    );
+
+    const bodyWrapper = screen.getByTestId("form-body").parentElement;
+
+    expect(bodyWrapper).toHaveClass("flex", "min-h-0", "w-full", "flex-1", "overflow-hidden");
+    expect(bodyWrapper).not.toHaveClass("overflow-auto", "p-4", "gap-4");
+  });
+
   it("kapselt Portal-Klicks und erlaubt höhere Nested-Modal-Layer", () => {
     const onParentClick = vi.fn();
 

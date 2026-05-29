@@ -40,8 +40,10 @@ import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
+import { ParentContextField } from "../ui/ParentContextField";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { PrioritySelect } from "../ui/PrioritySelect";
@@ -167,8 +169,6 @@ export function UseCaseForm({
   const [activeTab, setActiveTab] = useState<UseCaseFormTab>("details");
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<FeatureStatus>("draft");
-  const [description, setDescription] = useState("");
-  const [sortOrder, setSortOrder] = useState(0);
   const [content, setContent] = useState("");
   const [selectedFeatureId, setSelectedFeatureId] = useState<number | "">("");
   const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
@@ -228,8 +228,6 @@ export function UseCaseForm({
     }
     setTitle(useCase?.title ?? "");
     setStatus(useCase?.status ?? "draft");
-    setDescription(useCase?.description ?? "");
-    setSortOrder(useCase?.sortOrder ?? 0);
     setContent(useCase?.content ?? "");
     setSelectedFeatureId(useCase?.featureId ?? currentFeatureId ?? "");
     setResponsibleUserId(useCase ? useCase.responsibleUserId : (auth.user?.id ?? null));
@@ -256,8 +254,6 @@ export function UseCaseForm({
           status,
           "draft",
         ),
-        description,
-        sortOrder,
         content,
         responsibleUserId,
       });
@@ -303,6 +299,10 @@ export function UseCaseForm({
   const visibleTabs = useCase
     ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
     : tabs.filter((tab) => tab.value !== "journal");
+  const showParentContexts =
+    currentFeatureId === undefined &&
+    selectedFeatureId === "" &&
+    (useCase?.parentContexts?.length ?? 0) > 0;
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
@@ -369,28 +369,51 @@ export function UseCaseForm({
         }
         onClose={onClose}
         variant={variant}
+        contentLayout={activeTab === "details" ? "flush" : "default"}
         contentClassName={
-          activeTab === "details" ? "w-full max-w-7xl self-center" : ""
+          activeTab === "details" ? "" : ""
         }
         tabBar={
           <TabBar tabs={tabItems} active={activeTab} onChange={handleTabChange} />
         }
       >
         {activeTab === "details" ? (
-          <>
-            <Section>
-              <FormField label="Titel" required className="min-w-0">
-                <Input
-                  autoFocus
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  required
-                />
-              </FormField>
-            </Section>
+          <div className="flex min-h-0 w-full flex-1">
+            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
+              <div className="mx-auto grid w-full max-w-5xl gap-4">
+                {showParentContexts ? <ParentContextField parents={useCase?.parentContexts} /> : null}
+                <Section>
+                  <FormField label="Titel" required className="min-w-0">
+                    <Input
+                      autoFocus
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      required
+                    />
+                  </FormField>
+                </Section>
 
-            <Section title="Zuordnung">
-              <div className="grid gap-4 md:grid-cols-2">
+                <Section
+                  title="Inhalt"
+                  actions={
+                    <span className="text-xs font-semibold text-steel-500">
+                      HTML
+                    </span>
+                  }
+                >
+                  <RichTextInlineField
+                    value={content}
+                    placeholder="Use-Case-Inhalt"
+                    testIdPrefix="use-case-content"
+                    onImageUpload={uploadContentImage}
+                    onChange={setContent}
+                  />
+                </Section>
+              </div>
+            </div>
+
+            <FormSidebar storageKey="use-case-form-sidebar">
+              <div className="grid gap-4">
                 <Select
                   label="Feature"
                   value={selectedFeatureId}
@@ -414,10 +437,7 @@ export function UseCaseForm({
                   onChange={setResponsibleUserId}
                 />
               </div>
-            </Section>
-
-            <Section title="Status & Sortierung">
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
+              <div className="grid gap-4">
                 <FormField label="Status">
                   <StatusToggle
                     kind="featureStatus"
@@ -425,48 +445,9 @@ export function UseCaseForm({
                     onChange={setStatus}
                   />
                 </FormField>
-                <FormField label="Sortierung">
-                  <Input
-                    type="number"
-                    value={sortOrder}
-                    onChange={(event) =>
-                      setSortOrder(Number(event.target.value))
-                    }
-                  />
-                </FormField>
               </div>
-            </Section>
-
-            <Section title="Kurzbeschreibung">
-              <FormField label="Kurzbeschreibung">
-                <RichTextInlineField
-                  value={description}
-                  placeholder="Kurze fachliche Zusammenfassung"
-                  minRows={12}
-                  testIdPrefix="use-case-description"
-                  onImageUpload={uploadContentImage}
-                  onChange={setDescription}
-                />
-              </FormField>
-            </Section>
-
-            <Section
-              title="Inhalt"
-              actions={
-                <span className="text-xs font-semibold text-steel-500">
-                  HTML
-                </span>
-              }
-            >
-              <RichTextInlineField
-                value={content}
-                placeholder="Use-Case-Inhalt"
-                testIdPrefix="use-case-content"
-                onImageUpload={uploadContentImage}
-                onChange={setContent}
-              />
-            </Section>
-          </>
+            </FormSidebar>
+          </div>
         ) : null}
 
         {activeTab === "tasks" ? (

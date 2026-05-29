@@ -21,7 +21,7 @@ import * as path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { config } from "../../../apps/api/src/config.js";
-import { buildTestApp, createFeature, createTestDb, createUseCase, truncateAll, type TestDb } from "../../fixtures/api/index.js";
+import { buildTestApp, createFeature, createProject, createTestDb, createUseCase, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 describe("Features API", () => {
   let testDb: TestDb;
@@ -85,6 +85,12 @@ describe("Features API", () => {
     expect(res.body.useCaseCount).toBe(0);
   });
 
+  it("POST akzeptiert fehlende Beschreibung und Sortierung", async () => {
+    const res = await supertest(app.server).post("/api/features").send({ title: "Ohne optionale Felder", content: "# Inhalt" }).expect(201);
+
+    expect(res.body).toMatchObject({ title: "Ohne optionale Felder", description: null, sortOrder: 0, content: "# Inhalt" });
+  });
+
   it("POST ohne Titel liefert 400", async () => {
     await supertest(app.server).post("/api/features").send({ status: "draft" }).expect(400);
   });
@@ -121,6 +127,18 @@ describe("Features API", () => {
     const res = await supertest(app.server).get(`/api/features/${feature.id}`).expect(200);
 
     expect(res.body.content).toBe("# Detail");
+  });
+
+  it("GET einzelnes Feature liefert vorhandene Parent-Kontexte", async () => {
+    const project = await createProject(app, { name: "Projekt Parent" });
+    const feature = await createFeature(app, { title: "Feature mit Parent" });
+    await supertest(app.server).put(`/api/projects/${project.id}/features`).send({ featureIds: [feature.id] }).expect(200);
+
+    const res = await supertest(app.server).get(`/api/features/${feature.id}`).expect(200);
+
+    expect(res.body.parentContexts).toEqual([
+      { type: "project", id: project.id, label: "Projekt Parent", origin: "direct" }
+    ]);
   });
 
   it("PATCH aktualisiert DB-Content", async () => {

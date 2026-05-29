@@ -16,7 +16,7 @@
 
 import "@testing-library/jest-dom/vitest";
 import type { CalendarEvent, Project, Task } from "@taskmanager/shared-types";
-import { fireEvent, screen, waitFor } from "@testing-library/dom";
+import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventForm } from "../../../../../apps/web/src/components/calendar/EventForm";
@@ -158,6 +158,51 @@ afterEach(() => {
 });
 
 describe("EventForm", () => {
+  it("verdrahtet Body und Stammdaten-Sidebar mit Initialdaten und Submit-Payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<EventForm open event={event} projects={projects} tasks={tasks} onSubmit={onSubmit} onDelete={vi.fn()} onClose={vi.fn()} />);
+
+    const sidebar = screen.getByTestId("form-sidebar");
+    expect(screen.getByDisplayValue(event.title)).toBeInTheDocument();
+    expect(screen.getByTestId("event-description-view")).toHaveValue("");
+    expect(within(sidebar).getByLabelText("Ganztägig")).not.toBeChecked();
+    expect(within(sidebar).getByDisplayValue("2026-06-01T10:00")).toBeInTheDocument();
+    expect(within(sidebar).getByDisplayValue("2026-06-01T11:00")).toBeInTheDocument();
+    expect(within(sidebar).getByLabelText("Erinnerung")).toHaveValue("60");
+    expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("");
+    expect(screen.getByLabelText("Projekt B")).toBeChecked();
+    expect(screen.getByLabelText("Aufgabe B")).toBeChecked();
+
+    fireEvent.change(screen.getByDisplayValue(event.title), { target: { value: "Termin Beta" } });
+    fireEvent.click(within(sidebar).getByLabelText("Ganztägig"));
+    const dateInputs = within(sidebar).getAllByDisplayValue(/2026-06-01T/) as HTMLInputElement[];
+    fireEvent.change(dateInputs[0], { target: { value: "2026-06-02T12:00" } });
+    fireEvent.change(dateInputs[1], { target: { value: "2026-06-02T13:00" } });
+    fireEvent.change(within(sidebar).getByLabelText("Erinnerung"), { target: { value: "1440" } });
+    fireEvent.click(screen.getByLabelText("Projekt A"));
+    fireEvent.click(screen.getByLabelText("Aufgabe A"));
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Termin Beta",
+          isAllDay: true,
+          startTime: expect.stringMatching(/^2026-06-02T/),
+          endTime: expect.stringMatching(/^2026-06-02T/),
+          reminderMinutes: 1440,
+          owners: expect.arrayContaining([
+            { type: "project", id: 1 },
+            { type: "project", id: 2 },
+            { type: "task", id: 11 },
+            { type: "task", id: 12 }
+          ])
+        }),
+        event.id
+      )
+    );
+  });
+
   it("bindet das RichTextInlineField an die Eventbeschreibung", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(<EventForm open event={event} projects={projects} tasks={tasks} onSubmit={onSubmit} onDelete={vi.fn()} onClose={vi.fn()} />);

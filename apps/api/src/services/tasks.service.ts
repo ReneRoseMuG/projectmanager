@@ -208,6 +208,56 @@ function getTaskRecord(database: DbClient, id: number): TaskRecord {
   return task;
 }
 
+function taskParentContexts(database: DbClient, task: TaskRecord): VisibleParentContext[] {
+  const contexts: VisibleParentContext[] = [];
+  if (task.parentId !== null) {
+    const parentTask = database.select({ id: tasks.id, label: tasks.title }).from(tasks).where(eq(tasks.id, task.parentId)).get();
+    if (parentTask) {
+      contexts.push({ type: "task", id: parentTask.id, label: parentTask.label, origin: "direct" });
+    }
+  }
+
+  contexts.push(
+    ...database
+      .select({ id: projects.id, label: projects.name })
+      .from(projectTasks)
+      .innerJoin(projects, eq(projectTasks.ownerId, projects.id))
+      .where(eq(projectTasks.taskId, task.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "project", id: row.id, label: row.label, origin: "direct" })),
+    ...database
+      .select({ id: milestones.id, label: milestones.name })
+      .from(milestoneTasks)
+      .innerJoin(milestones, eq(milestoneTasks.ownerId, milestones.id))
+      .where(eq(milestoneTasks.taskId, task.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "milestone", id: row.id, label: row.label, origin: "direct" })),
+    ...database
+      .select({ id: features.id, label: features.title })
+      .from(featureTasks)
+      .innerJoin(features, eq(featureTasks.ownerId, features.id))
+      .where(eq(featureTasks.taskId, task.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "feature", id: row.id, label: row.label, origin: "direct" })),
+    ...database
+      .select({ id: useCases.id, label: useCases.title })
+      .from(useCaseTasks)
+      .innerJoin(useCases, eq(useCaseTasks.ownerId, useCases.id))
+      .where(eq(useCaseTasks.taskId, task.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "useCase", id: row.id, label: row.label, origin: "direct" })),
+    ...database
+      .select({ id: wikiPages.id, label: wikiPages.title })
+      .from(wikiPageTasks)
+      .innerJoin(wikiPages, eq(wikiPageTasks.ownerId, wikiPages.id))
+      .where(eq(wikiPageTasks.taskId, task.id))
+      .all()
+      .map((row): VisibleParentContext => ({ type: "wikiPage", id: row.id, label: row.label, origin: "direct" }))
+  );
+
+  return contexts;
+}
+
 function getSubtaskCounts(database: DbClient, taskIds: number[]): Map<number, number> {
   const counts = new Map<number, number>();
   if (taskIds.length === 0) {
@@ -762,9 +812,11 @@ export function getTask(database: DbClient, id: number): Task {
 }
 
 export function getTaskDetail(database: DbClient, id: number): TaskDetail {
-  const base = getTask(database, id);
+  const record = getTaskRecord(database, id);
+  const base = mapTask(database, record);
   return {
     ...base,
+    parentContexts: taskParentContexts(database, record),
     subtasks: listSubtasks(database, id),
     comments: listComments(database, id),
     notes: listTaskNotes(database, id),

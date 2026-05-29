@@ -79,6 +79,7 @@ import { DatePicker } from "../ui/DatePicker";
 import { EmptyState } from "../ui/EmptyState";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
 import { PendingCommentList } from "../ui/PendingCommentList";
@@ -773,8 +774,9 @@ export function ProjectForm({
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        contentLayout={activeTab === "details" ? "flush" : "default"}
         contentClassName={
-          activeTab === "details" || activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
+          activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
         }
         tabBar={
           <TabBar tabs={tabItems} active={activeTab} onChange={handleTabChange} />
@@ -785,30 +787,32 @@ export function ProjectForm({
         ) : null}
 
         {activeTab === "details" ? (
-          <>
-            <Section>
-              <div className="grid gap-4">
-                <FormField label="Projektname" required className="min-w-0">
-                  <Input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    required
-                  />
-                </FormField>
+          <div className="flex min-h-0 w-full flex-1">
+            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
+              <div className="mx-auto grid w-full max-w-5xl gap-4">
+                <Section>
+                  <FormField label="Projektname" required className="min-w-0">
+                    <Input
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Beschreibung" className="mt-4">
+                    <RichTextInlineField
+                      value={description}
+                      onChange={setDescription}
+                      placeholder="Worum geht es in diesem Projekt?"
+                      minRows={5}
+                      testIdPrefix="project-description"
+                      onImageUpload={uploadContentImage}
+                    />
+                  </FormField>
+                </Section>
               </div>
-              <FormField label="Beschreibung" className="mt-4">
-                <RichTextInlineField
-                  value={description}
-                  onChange={setDescription}
-                  placeholder="Worum geht es in diesem Projekt?"
-                  minRows={5}
-                  testIdPrefix="project-description"
-                  onImageUpload={uploadContentImage}
-                />
-              </FormField>
-            </Section>
-            <Section title="Status">
-              <div className="grid items-start gap-4 md:grid-cols-2">
+            </div>
+            <FormSidebar storageKey="project-form-sidebar">
+              <div className="grid gap-4">
                 <FormField label="Status">
                   <StatusToggle
                     kind="workStatus"
@@ -823,9 +827,7 @@ export function ProjectForm({
                   onChange={setResponsibleUserId}
                 />
               </div>
-            </Section>
-            <Section title="Zeitraum">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4">
                 <DatePicker
                   label="Start"
                   value={startDate}
@@ -837,18 +839,16 @@ export function ProjectForm({
                   onChange={(event) => setDueDate(event.target.value)}
                 />
               </div>
-            </Section>
-            <Section title="Tags">
               <TagPicker selected={selectedTags} onChange={setSelectedTags} />
-            </Section>
-            {project ? (
-              <ProjectWikiPanel
-                wikiPageId={projectWikiRelation.wikiPageId}
-                saving={projectWikiRelation.saving}
-                onChange={setProjectWikiPage}
-              />
-            ) : null}
-          </>
+              {project ? (
+                <ProjectWikiPanel
+                  wikiPageId={projectWikiRelation.wikiPageId}
+                  saving={projectWikiRelation.saving}
+                  onChange={setProjectWikiPage}
+                />
+              ) : null}
+            </FormSidebar>
+          </div>
         ) : null}
 
         {activeTab === "milestones" ? (

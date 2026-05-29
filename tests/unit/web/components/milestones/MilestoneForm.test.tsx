@@ -14,7 +14,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import type { Milestone, Project } from "@taskmanager/shared-types";
-import { fireEvent, screen, waitFor } from "@testing-library/dom";
+import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -34,9 +34,30 @@ vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
 }));
 
 vi.mock("../../../../../apps/web/src/components/tags/TagPicker", () => ({
-  TagPicker() {
-    return <div data-testid="tag-picker" />;
+  TagPicker({ selected, onChange }: { selected: Array<{ id: number; name: string; color: string }>; onChange: (tags: Array<{ id: number; name: string; color: string }>) => void }) {
+    return (
+      <button type="button" data-testid="tag-picker" onClick={() => onChange([{ id: 90, name: "tag", color: "#111111" }])}>
+        Tags {selected.length}
+      </button>
+    );
   }
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { id: 1, name: "test.admin", fullName: "Test Admin", email: "admin@local" },
+    authenticated: true,
+    loading: false,
+    error: null
+  })
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useUsers", () => ({
+  useUsers: () => ({
+    users: [{ id: 1, name: "test.admin", fullName: "Test Admin", email: "admin@local" }],
+    loading: false,
+    error: null
+  })
 }));
 
 vi.mock("../../../../../apps/web/src/components/attachments/AttachmentList", () => ({
@@ -210,8 +231,10 @@ const milestone: Milestone = {
   description: "<p>Meilenstein Beschreibung</p>",
   status: "active",
   color: "var(--color-teal)",
-  startDate: null,
-  dueDate: null,
+  startDate: "2026-06-01",
+  dueDate: "2026-06-30",
+  responsibleUserId: 1,
+  responsibleUser: { id: 1, name: "test.admin", fullName: "Test Admin", email: "admin@local" },
   version: 2,
   createdAt: "2026-05-19T08:00:00.000Z",
   updatedAt: "2026-05-19T09:00:00.000Z",
@@ -247,7 +270,46 @@ describe("MilestoneForm", () => {
     expect(screen.getByRole("button", { name: "Details" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Details 0" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Events/ })).not.toBeInTheDocument();
-    expect(screen.queryByText("Stammdaten")).not.toBeInTheDocument();
+    expect(screen.getByTestId("form-sidebar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stammdaten schließen" })).toBeInTheDocument();
+  });
+
+  it("verdrahtet Body und Sidebar-Felder mit Initialdaten und Submit-Payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(milestone);
+    renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project, otherProject]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
+
+    const sidebar = screen.getByTestId("form-sidebar");
+    expect(screen.getByDisplayValue(milestone.name)).toBeInTheDocument();
+    expect(screen.getByTestId("milestone-description-view")).toHaveValue(milestone.description);
+    expect(within(sidebar).getByRole("combobox", { name: "Projekt" })).toHaveValue(String(project.id));
+    expect(within(sidebar).getByRole("button", { name: "Aktiv" })).toHaveAttribute("data-active", "true");
+    expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
+    expect(within(sidebar).getByDisplayValue("2026-06-01")).toBeInTheDocument();
+    expect(within(sidebar).getByDisplayValue("2026-06-30")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue(milestone.name), { target: { value: "Meilenstein Beta" } });
+    fireEvent.change(within(sidebar).getByRole("combobox", { name: "Projekt" }), { target: { value: String(otherProject.id) } });
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
+    const dateInputs = within(sidebar).getAllByDisplayValue(/2026-06-/) as HTMLInputElement[];
+    fireEvent.change(dateInputs[0], { target: { value: "2026-07-01" } });
+    fireEvent.change(dateInputs[1], { target: { value: "2026-07-31" } });
+    fireEvent.click(within(sidebar).getByTestId("tag-picker"));
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: otherProject.id,
+          name: "Meilenstein Beta",
+          status: "done",
+          startDate: "2026-07-01",
+          dueDate: "2026-07-31",
+          responsibleUserId: null
+        }),
+        [90]
+      )
+    );
   });
 
   it("bindet RichTextInlineField an die Beschreibung", async () => {

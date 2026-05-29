@@ -49,7 +49,9 @@ import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { DatePicker } from "../ui/DatePicker";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
+import { ParentContextField } from "../ui/ParentContextField";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
@@ -369,6 +371,8 @@ export function TaskForm({
     return { ...tab, count: 0 };
   });
   const loadedTask = detail.task;
+  const currentTask = detail.task ?? task;
+  const showParentContexts = !owner && (currentTask?.parentContexts?.length ?? 0) > 0;
 
   return (
     <>
@@ -390,8 +394,9 @@ export function TaskForm({
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        contentLayout={activeTab === "details" ? "flush" : "default"}
         contentClassName={
-          activeTab === "details" || activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
+          activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
         }
         tabBar={
           <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
@@ -417,32 +422,36 @@ export function TaskForm({
         ) : null}
 
         {activeTab === "details" ? (
-          <>
-            <Section>
-              <div className="grid gap-4">
-                <FormField label="Titel" required>
-                  <Input
-                    value={title}
-                    onChange={(event) => setTitle(event.target.value)}
-                    required
-                    autoFocus={!task}
-                  />
-                </FormField>
-                <FormField label="Beschreibung">
-                  <RichTextInlineField
-                    value={description}
-                    placeholder="Beschreibung"
-                    minRows={12}
-                    testIdPrefix="task-description"
-                    onImageUpload={uploadContentImage}
-                    onChange={setDescription}
-                  />
-                </FormField>
+          <div className="flex min-h-0 w-full flex-1">
+            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
+              <div className="mx-auto grid w-full max-w-5xl gap-4">
+                {showParentContexts ? <ParentContextField parents={currentTask?.parentContexts} /> : null}
+                <Section>
+                  <div className="grid gap-4">
+                    <FormField label="Titel" required>
+                      <Input
+                        value={title}
+                        onChange={(event) => setTitle(event.target.value)}
+                        required
+                        autoFocus={!task}
+                      />
+                    </FormField>
+                    <FormField label="Beschreibung">
+                      <RichTextInlineField
+                        value={description}
+                        placeholder="Beschreibung"
+                        minRows={12}
+                        testIdPrefix="task-description"
+                        onImageUpload={uploadContentImage}
+                        onChange={setDescription}
+                      />
+                    </FormField>
+                  </div>
+                </Section>
               </div>
-            </Section>
-
-            <Section title="Status, Priorität & Fälligkeit">
-              <div className="grid items-start gap-4 md:grid-cols-3">
+            </div>
+            <FormSidebar storageKey="task-form-sidebar">
+              <div className="grid gap-4">
                 <FormField label="Status">
                   <StatusToggle
                     kind="workStatus"
@@ -458,24 +467,16 @@ export function TaskForm({
                   value={dueDate}
                   onChange={(event) => setDueDate(event.target.value)}
                 />
-              </div>
-            </Section>
-
-            <Section title="Zuständigkeit">
-              <div className="grid items-start gap-4 md:grid-cols-2">
                 <UserSelectField
                   label="Verantwortlich"
                   value={responsibleUserId}
-                  selectedUser={(detail.task ?? task)?.responsibleUser ?? null}
+                  selectedUser={currentTask?.responsibleUser ?? null}
                   onChange={setResponsibleUserId}
                 />
+                <TagPicker selected={selectedTags} onChange={setSelectedTags} />
               </div>
-            </Section>
-
-            <Section title="Tags">
-              <TagPicker selected={selectedTags} onChange={setSelectedTags} />
-            </Section>
-          </>
+            </FormSidebar>
+          </div>
         ) : null}
 
         {activeTab === "subtasks" ? (

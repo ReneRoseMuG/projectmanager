@@ -354,6 +354,17 @@ describe("Tickets API", () => {
     expect(res.body).toMatchObject({ id: ticket.id, comments: [], notes: [], attachments: [], relations: [], subTickets: [] });
   });
 
+  it("GET /api/tickets/:id liefert vorhandene Parent-Kontexte", async () => {
+    const project = await createProject(app, { name: "Ticket-Projekt" });
+    const ticket = await createTicket(app, project.id, { title: "Ticket mit Parent" });
+
+    const res = await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
+
+    expect(res.body.parentContexts).toEqual([
+      { type: "project", id: project.id, label: "Ticket-Projekt", origin: "direct" }
+    ]);
+  });
+
   it("GET /api/tickets/9999 returns 404", async () => {
     await supertest(app.server).get("/api/tickets/9999").expect(404);
   });

@@ -84,7 +84,8 @@ textarea {
 
 .rich-text-surface h1,
 .rich-text-surface h2,
-.rich-text-surface h3 {
+.rich-text-surface h3,
+.rich-text-surface h4 {
   color: theme("colors.ink");
   font-weight: 700;
   letter-spacing: 0;
@@ -106,6 +107,12 @@ textarea {
 .rich-text-surface h3 {
   margin: 1rem 0 0.45rem;
   font-size: 1.05rem;
+}
+
+.rich-text-surface h4 {
+  margin: 0.85rem 0 0.35rem;
+  color: theme("colors.steel.800");
+  font-size: 0.95rem;
 }
 
 .rich-text-surface p {
@@ -152,6 +159,31 @@ textarea {
   border-left: 3px solid theme("colors.steel.300");
   padding-left: 0.9rem;
   color: theme("colors.steel.600");
+}
+
+.rich-text-surface hr {
+  margin: 1rem 0;
+  border: 0;
+  border-top: 1px solid theme("colors.line");
+}
+
+.rich-text-column-block {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: 1rem;
+  margin: 0.9rem 0;
+}
+
+.rich-text-column {
+  min-width: 0;
+  border-left: 2px solid theme("colors.line");
+  padding-left: 0.75rem;
+}
+
+.ProseMirror .rich-text-column {
+  border-radius: 0.375rem;
+  background: theme("colors.shell");
+  padding: 0.5rem 0.75rem;
 }
 
 /* ─── Drittanbieter: FullCalendar ──────────────────────────────────────── */

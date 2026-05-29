@@ -24,7 +24,7 @@
  * Fehlerfälle:
  * - Ohne `tasks:write` und `tickets:write` dürfen die Create-Aktionen im Meilenstein-Menü nicht sichtbar sein.
  */
-import { fireEvent, screen, waitFor } from "@testing-library/dom";
+import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
 import { addPendingComment, changeInput, clickTab, feature, formTestMocks, getFileInput, project, renderWithProviders, wikiPage } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { ProjectForm } from "../../../../../apps/web/src/components/projects/ProjectForm";
@@ -38,18 +38,57 @@ function changeTitleInForm(heading: string, value: string) {
 }
 
 describe("ProjectForm", () => {
-  it("begrenzt nur den Details-Tab auf die frühere Formularbreite", () => {
+  it("rendert Details als Body plus Stammdaten-Sidebar", () => {
     renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
-    expect(screen.queryByText("Stammdaten")).not.toBeInTheDocument();
+    expect(screen.getByTestId("form-sidebar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stammdaten schließen" })).toBeInTheDocument();
 
     const detailsBody = screen.getByDisplayValue(project.name).closest("section")?.parentElement;
-    expect(detailsBody).toHaveClass("w-full", "max-w-7xl");
+    expect(detailsBody).toHaveClass("w-full", "max-w-5xl");
 
     clickTab("Aufgaben");
 
     const boardBody = screen.getByTestId("owner-task-board").closest("section")?.parentElement;
-    expect(boardBody).not.toHaveClass("max-w-7xl");
+    expect(boardBody).not.toHaveClass("max-w-5xl");
+    expect(screen.queryByTestId("form-sidebar")).not.toBeInTheDocument();
+  });
+
+  it("verdrahtet Sidebar-Felder mit Initialdaten und Submit-Payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(project);
+    const datedProject = { ...project, startDate: "2026-05-01", dueDate: "2026-05-31" };
+    renderWithProviders(<ProjectForm open project={datedProject} onSubmit={onSubmit} onClose={vi.fn()} />);
+
+    const sidebar = screen.getByTestId("form-sidebar");
+    expect(screen.getByDisplayValue(project.name)).toBeInTheDocument();
+    expect(screen.getByTestId("project-description-view")).toHaveValue(project.description);
+    expect(within(sidebar).getByRole("button", { name: "Aktiv" })).toHaveAttribute("data-active", "true");
+    expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
+    expect(within(sidebar).getByDisplayValue("2026-05-01")).toBeInTheDocument();
+    expect(within(sidebar).getByDisplayValue("2026-05-31")).toBeInTheDocument();
+    expect(within(sidebar).getByRole("button", { name: "Tags 0" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue(project.name), { target: { value: "Projekt Beta" } });
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
+    const dateInputs = within(sidebar).getAllByDisplayValue(/2026-05-/) as HTMLInputElement[];
+    fireEvent.change(dateInputs[0], { target: { value: "2026-06-01" } });
+    fireEvent.change(dateInputs[1], { target: { value: "2026-06-30" } });
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Tags 0" }));
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Projekt Beta",
+          status: "done",
+          startDate: "2026-06-01",
+          dueDate: "2026-06-30",
+          responsibleUserId: null
+        }),
+        [90]
+      )
+    );
   });
 
   it("bindet das RichTextInlineField an die Projektbeschreibung", async () => {
