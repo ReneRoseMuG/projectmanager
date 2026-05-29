@@ -62,7 +62,7 @@ export async function registerDumpRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     "/dumps/local/save",
     { schema: { response: { 200: objectResponseSchema } } },
-    async () => saveDumpToLocalBackup(app.db, { progressCallback: backupProgressPublisher(app) })
+    async () => saveDumpToLocalBackup({ progressCallback: backupProgressPublisher(app) })
   );
 
   app.get(
@@ -74,24 +74,24 @@ export async function registerDumpRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: DumpBackupApplyRequest }>(
     "/dumps/local/latest/apply",
     { schema: { body: applyBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => applyLocalDump(app.db, request.body, { progressCallback: backupProgressPublisher(app) })
+    async (request) => applyLocalDump(request.body, { progressCallback: backupProgressPublisher(app) })
   );
 
   app.get(
     "/dumps/remote/status",
     { schema: { response: { 200: objectResponseSchema } } },
-    async () => getRemoteBackupStatus(app.db)
+    async () => getRemoteBackupStatus()
   );
 
   app.post<{ Body: DumpRemoteBackupPreviewRequest }>(
     "/dumps/remote/preview",
     { config: { auth: { resource: "dumps", action: "read" } }, schema: { body: remotePreviewBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => previewRemoteDump(app.db, request.body)
+    async (request) => previewRemoteDump(request.body)
   );
 
   app.post<{ Body: DumpRemoteBackupApplyRequest }>(
     "/dumps/remote/apply",
     { schema: { body: remoteApplyBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => applyRemoteDump(app.db, request.body, { progressCallback: backupProgressPublisher(app) })
+    async (request) => applyRemoteDump(request.body, { progressCallback: backupProgressPublisher(app) })
   );
 }
