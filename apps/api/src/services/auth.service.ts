@@ -180,8 +180,20 @@ export async function seedAuthData(database: DbClient, appConfig: AppConfig = co
         })
         .where(eq(users.id, existingAdmin.id));
     } else {
-      await tx.execute(sql`insert into users (name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at)
-        values ('', ${appConfig.adminFirstName}, ${appConfig.adminLastName}, ${adminEmail}, ${passwordHash}, ${adminRole.id}, 1, 1, ${now}, ${now})`);
+      const fullName = `${appConfig.adminFirstName} ${appConfig.adminLastName}`.trim();
+      await tx.insert(users).values({
+        name: fullName,
+        firstName: appConfig.adminFirstName,
+        lastName: appConfig.adminLastName,
+        fullName,
+        email: adminEmail,
+        passwordHash,
+        roleId: adminRole.id,
+        isActive: true,
+        version: 1,
+        createdAt: now,
+        updatedAt: now
+      });
     }
     await tx.insert(appSettings)
       .ignore()
