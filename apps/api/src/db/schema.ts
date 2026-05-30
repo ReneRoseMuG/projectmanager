@@ -1,6 +1,20 @@
-import { sql } from "drizzle-orm";
-import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
-import { blob, check, index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+﻿import { sql } from "drizzle-orm";
+import type { AnyMySqlColumn } from "drizzle-orm/mysql-core";
+import { boolean, check, double, index, int, longblob, longtext, mysqlTable, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+
+function shortText<TEnum extends readonly [string, ...string[]]>(
+  name: string,
+  config?: { enum?: TEnum; length?: number }
+) {
+  return varchar(name, {
+    length: config?.length ?? 191,
+    ...(config?.enum ? { enum: config.enum } : {})
+  });
+}
+
+function timestampText(name: string) {
+  return varchar(name, { length: 32 }).notNull().$defaultFn(() => new Date().toISOString());
+}
 
 export const WORK_STATUSES = ["active", "on_hold", "completed", "archived", "todo", "open", "in_progress", "in_review", "done", "resolved", "closed", "rejected"] as const;
 export const PROJECT_STATUSES = WORK_STATUSES;
@@ -37,68 +51,68 @@ export const JOURNAL_OBJECT_TYPES = [
 export const JOURNAL_OPERATIONS = ["create", "update", "delete", "link", "unlink"] as const;
 export const JOURNAL_CONTEXT_RELATIONS = ["self", "owner", "parent", "related"] as const;
 
-export const appSettings = sqliteTable("app_settings", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+export const appSettings = mysqlTable("app_settings", {
+  key: shortText("key").primaryKey(),
+  value: longtext("value").notNull(),
+  updatedAt: timestampText("updated_at")
 });
 
-export const roles = sqliteTable("roles", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  key: text("key").notNull().unique(),
-  label: text("label").notNull(),
-  isSystem: integer("is_system", { mode: "boolean" }).notNull().default(false),
-  version: integer("version").notNull().default(1),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+export const roles = mysqlTable("roles", {
+  id: int("id").autoincrement().primaryKey(),
+  key: shortText("key").notNull().unique(),
+  label: shortText("label").notNull(),
+  isSystem: boolean("is_system").notNull().default(false),
+  version: int("version").notNull().default(1),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const permissions = sqliteTable(
+export const permissions = mysqlTable(
   "permissions",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    roleId: integer("role_id")
+    id: int("id").autoincrement().primaryKey(),
+    roleId: int("role_id")
       .notNull()
       .references(() => roles.id, { onDelete: "cascade" }),
-    resource: text("resource").notNull(),
-    action: text("action").notNull()
+    resource: shortText("resource").notNull(),
+    action: shortText("action").notNull()
   },
   (table) => ({
     permissionsRoleResourceActionUnique: uniqueIndex("permissions_role_resource_action_unique").on(table.roleId, table.resource, table.action)
   })
 );
 
-export const users = sqliteTable("users", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  firstName: text("first_name").notNull().default(""),
-  lastName: text("last_name").notNull().default(""),
-  fullName: text("full_name").notNull().$defaultFn(() => ""),
-  address: text("address"),
-  phone: text("phone"),
-  email: text("email").notNull().unique(),
-  passwordHash: text("password_hash"),
-  roleId: integer("role_id")
+export const users = mysqlTable("users", {
+  id: int("id").autoincrement().primaryKey(),
+  name: shortText("name").notNull(),
+  firstName: shortText("first_name").notNull().default(""),
+  lastName: shortText("last_name").notNull().default(""),
+  fullName: shortText("full_name").notNull().$defaultFn(() => ""),
+  address: shortText("address"),
+  phone: shortText("phone"),
+  email: shortText("email").notNull().unique(),
+  passwordHash: shortText("password_hash", { length: 255 }),
+  roleId: int("role_id")
     .notNull()
     .references(() => roles.id, { onDelete: "restrict" }),
-  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
-  version: integer("version").notNull().default(1),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  isActive: boolean("is_active").notNull().default(true),
+  version: int("version").notNull().default(1),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const journalEntries = sqliteTable(
+export const journalEntries = mysqlTable(
   "journal_entries",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    operation: text("operation", { enum: JOURNAL_OPERATIONS }).notNull(),
-    objectType: text("object_type", { enum: JOURNAL_OBJECT_TYPES }).notNull(),
-    objectId: integer("object_id").notNull(),
-    objectLabel: text("object_label").notNull(),
-    summary: text("summary").notNull(),
-    actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: "set null" }),
-    actorName: text("actor_name").notNull().default("System"),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`)
+    id: int("id").autoincrement().primaryKey(),
+    operation: shortText("operation", { enum: JOURNAL_OPERATIONS }).notNull(),
+    objectType: shortText("object_type", { enum: JOURNAL_OBJECT_TYPES }).notNull(),
+    objectId: int("object_id").notNull(),
+    objectLabel: shortText("object_label").notNull(),
+    summary: longtext("summary").notNull(),
+    actorUserId: int("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    actorName: shortText("actor_name").notNull().default("System"),
+    createdAt: timestampText("created_at")
   },
   (table) => ({
     journalEntriesCreatedAtIdx: index("journal_entries_created_at_idx").on(table.createdAt),
@@ -107,31 +121,31 @@ export const journalEntries = sqliteTable(
   })
 );
 
-export const journalEntryChanges = sqliteTable("journal_entry_changes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  journalEntryId: integer("journal_entry_id")
+export const journalEntryChanges = mysqlTable("journal_entry_changes", {
+  id: int("id").autoincrement().primaryKey(),
+  journalEntryId: int("journal_entry_id")
     .notNull()
     .references(() => journalEntries.id, { onDelete: "cascade" }),
-  fieldKey: text("field_key").notNull(),
-  fieldLabel: text("field_label").notNull(),
-  oldValueJson: text("old_value_json").notNull(),
-  oldValueLabel: text("old_value_label"),
-  newValueJson: text("new_value_json").notNull(),
-  newValueLabel: text("new_value_label"),
-  summary: text("summary").notNull()
+  fieldKey: shortText("field_key").notNull(),
+  fieldLabel: shortText("field_label").notNull(),
+  oldValueJson: longtext("old_value_json").notNull(),
+  oldValueLabel: longtext("old_value_label"),
+  newValueJson: longtext("new_value_json").notNull(),
+  newValueLabel: longtext("new_value_label"),
+  summary: longtext("summary").notNull()
 });
 
-export const journalEntryContexts = sqliteTable(
+export const journalEntryContexts = mysqlTable(
   "journal_entry_contexts",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    journalEntryId: integer("journal_entry_id")
+    id: int("id").autoincrement().primaryKey(),
+    journalEntryId: int("journal_entry_id")
       .notNull()
       .references(() => journalEntries.id, { onDelete: "cascade" }),
-    objectType: text("object_type", { enum: JOURNAL_OBJECT_TYPES }).notNull(),
-    objectId: integer("object_id").notNull(),
-    objectLabel: text("object_label").notNull(),
-    relation: text("relation", { enum: JOURNAL_CONTEXT_RELATIONS }).notNull()
+    objectType: shortText("object_type", { enum: JOURNAL_OBJECT_TYPES }).notNull(),
+    objectId: int("object_id").notNull(),
+    objectLabel: shortText("object_label").notNull(),
+    relation: shortText("relation", { enum: JOURNAL_CONTEXT_RELATIONS }).notNull()
   },
   (table) => ({
     journalContextEntryObjectRelationUnique: uniqueIndex("journal_context_entry_object_relation_unique").on(table.journalEntryId, table.objectType, table.objectId, table.relation),
@@ -139,39 +153,39 @@ export const journalEntryContexts = sqliteTable(
   })
 );
 
-export const settingsValues = sqliteTable(
+export const settingsValues = mysqlTable(
   "settings_values",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    settingKey: text("setting_key").notNull(),
-    scopeType: text("scope_type", { enum: SETTING_SCOPE_TYPES }).notNull(),
-    scopeId: text("scope_id").notNull(),
-    valueJson: text("value_json").notNull(),
-    version: integer("version").notNull().default(1),
-    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    id: int("id").autoincrement().primaryKey(),
+    settingKey: shortText("setting_key").notNull(),
+    scopeType: shortText("scope_type", { enum: SETTING_SCOPE_TYPES }).notNull(),
+    scopeId: shortText("scope_id").notNull(),
+    valueJson: longtext("value_json").notNull(),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   },
   (table) => ({
     settingsValuesSettingScopeUnique: uniqueIndex("settings_values_setting_scope_unique").on(table.settingKey, table.scopeType, table.scopeId)
   })
 );
 
-export const dashboards = sqliteTable(
+export const dashboards = mysqlTable(
   "dashboards",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    name: text("name").notNull(),
-    context: text("context", { enum: DASHBOARD_CONTEXTS }).notNull(),
-    isSystem: integer("is_system", { mode: "boolean" }).notNull().default(false),
-    templateKey: text("template_key").unique(),
-    ownerId: integer("owner_id").references(() => users.id, { onDelete: "cascade" }),
-    version: integer("version").notNull().default(1),
-    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    id: int("id").autoincrement().primaryKey(),
+    name: shortText("name").notNull(),
+    context: shortText("context", { enum: DASHBOARD_CONTEXTS }).notNull(),
+    isSystem: boolean("is_system").notNull().default(false),
+    templateKey: shortText("template_key").unique(),
+    ownerId: int("owner_id").references(() => users.id, { onDelete: "cascade" }),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   },
   (table) => ({
     dashboardsContextOwnerIdx: index("dashboards_context_owner_idx").on(table.context, table.ownerId),
@@ -179,18 +193,18 @@ export const dashboards = sqliteTable(
   })
 );
 
-export const dashboardWidgets = sqliteTable(
+export const dashboardWidgets = mysqlTable(
   "dashboard_widgets",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    dashboardId: integer("dashboard_id")
+    id: int("id").autoincrement().primaryKey(),
+    dashboardId: int("dashboard_id")
       .notNull()
       .references(() => dashboards.id, { onDelete: "cascade" }),
-    widgetId: text("widget_id").notNull(),
-    col: integer("col").notNull().default(0),
-    row: integer("row").notNull().default(0),
-    colSpan: integer("col_span").notNull().default(2),
-    paramsJson: text("params_json")
+    widgetId: shortText("widget_id").notNull(),
+    col: int("col").notNull().default(0),
+    row: int("row").notNull().default(0),
+    colSpan: int("col_span").notNull().default(2),
+    paramsJson: longtext("params_json")
   },
   (table) => ({
     dashboardWidgetsDashboardIdx: index("dashboard_widgets_dashboard_idx").on(table.dashboardId),
@@ -198,21 +212,21 @@ export const dashboardWidgets = sqliteTable(
   })
 );
 
-export const dashboardDefaults = sqliteTable(
+export const dashboardDefaults = mysqlTable(
   "dashboard_defaults",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    scopeType: text("scope_type", { enum: DASHBOARD_DEFAULT_SCOPE_TYPES }).notNull(),
-    scopeId: text("scope_id").notNull(),
-    context: text("context", { enum: DASHBOARD_CONTEXTS }).notNull(),
-    dashboardId: integer("dashboard_id")
+    id: int("id").autoincrement().primaryKey(),
+    scopeType: shortText("scope_type", { enum: DASHBOARD_DEFAULT_SCOPE_TYPES }).notNull(),
+    scopeId: shortText("scope_id").notNull(),
+    context: shortText("context", { enum: DASHBOARD_CONTEXTS }).notNull(),
+    dashboardId: int("dashboard_id")
       .notNull()
       .references(() => dashboards.id, { onDelete: "cascade" }),
-    version: integer("version").notNull().default(1),
-    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   },
   (table) => ({
     dashboardDefaultsScopeContextUnique: uniqueIndex("dashboard_defaults_scope_context_unique").on(table.scopeType, table.scopeId, table.context),
@@ -220,97 +234,97 @@ export const dashboardDefaults = sqliteTable(
   })
 );
 
-export const catalogEntries = sqliteTable(
+export const catalogEntries = mysqlTable(
   "catalog_entries",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    kind: text("kind", { enum: CATALOG_KINDS }).notNull(),
-    key: text("key").notNull(),
-    label: text("label").notNull(),
-    sortOrder: real("sort_order").notNull().default(0),
-    isClosed: integer("is_closed", { mode: "boolean" }).notNull().default(false),
-    color: text("color").notNull().default("var(--color-steel-700)"),
-    version: integer("version").notNull().default(1),
-    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    id: int("id").autoincrement().primaryKey(),
+    kind: shortText("kind", { enum: CATALOG_KINDS }).notNull(),
+    key: shortText("key").notNull(),
+    label: shortText("label").notNull(),
+    sortOrder: double("sort_order").notNull().default(0),
+    isClosed: boolean("is_closed").notNull().default(false),
+    color: shortText("color").notNull().default("var(--color-steel-700)"),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   },
   (table) => ({
     catalogEntryKindKeyUnique: uniqueIndex("catalog_entries_kind_key_unique").on(table.kind, table.key)
   })
 );
 
-export const projects = sqliteTable("projects", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  description: text("description"),
-  status: text("status").notNull().default("active"),
-  color: text("color").default("#6366f1"),
-  startDate: text("start_date"),
-  dueDate: text("due_date"),
-  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
-  wikiPageId: integer("wiki_page_id").references((): AnySQLiteColumn => wikiPages.id, { onDelete: "set null" }),
-  version: integer("version").notNull().default(1),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+export const projects = mysqlTable("projects", {
+  id: int("id").autoincrement().primaryKey(),
+  name: shortText("name").notNull(),
+  description: longtext("description"),
+  status: shortText("status").notNull().default("active"),
+  color: shortText("color").default("#6366f1"),
+  startDate: shortText("start_date"),
+  dueDate: shortText("due_date"),
+  responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+  wikiPageId: int("wiki_page_id").references((): AnyMySqlColumn => wikiPages.id, { onDelete: "set null" }),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const milestones = sqliteTable("milestones", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  projectId: integer("project_id")
+export const milestones = mysqlTable("milestones", {
+  id: int("id").autoincrement().primaryKey(),
+  projectId: int("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  description: text("description"),
-  status: text("status").notNull().default("active"),
-  color: text("color").default("#6366f1"),
-  startDate: text("start_date"),
-  dueDate: text("due_date"),
-  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
-  version: integer("version").notNull().default(1),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  name: shortText("name").notNull(),
+  description: longtext("description"),
+  status: shortText("status").notNull().default("active"),
+  color: shortText("color").default("#6366f1"),
+  startDate: shortText("start_date"),
+  dueDate: shortText("due_date"),
+  responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const tasks = sqliteTable(
+export const tasks = mysqlTable(
   "tasks",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    parentId: integer("parent_id").references((): AnySQLiteColumn => tasks.id, { onDelete: "cascade" }),
-    title: text("title").notNull(),
-    description: text("description"),
-    status: text("status").notNull().default("todo"),
-    priority: text("priority").notNull().default("medium"),
-    responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
-    dueDate: text("due_date"),
-    importKey: text("import_key"),
-    version: integer("version").notNull().default(1),
-    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    id: int("id").autoincrement().primaryKey(),
+    parentId: int("parent_id").references((): AnyMySqlColumn => tasks.id, { onDelete: "cascade" }),
+    title: shortText("title").notNull(),
+    description: longtext("description"),
+    status: shortText("status").notNull().default("todo"),
+    priority: shortText("priority").notNull().default("medium"),
+    responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+    dueDate: shortText("due_date"),
+    importKey: shortText("import_key"),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   }
 );
 
-export const dayPlans = sqliteTable(
+export const dayPlans = mysqlTable(
   "day_plans",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    date: text("date").notNull(),
-    userId: integer("user_id")
+    id: int("id").autoincrement().primaryKey(),
+    date: shortText("date").notNull(),
+    userId: int("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    status: text("status", { enum: DAY_PLAN_STATUSES }).notNull().default("open"),
-    version: integer("version").notNull().default(1),
-    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    status: shortText("status", { enum: DAY_PLAN_STATUSES }).notNull().default("open"),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   },
   (table) => ({
     dayPlansUserDateUnique: uniqueIndex("day_plans_user_date_unique").on(table.userId, table.date),
@@ -318,23 +332,23 @@ export const dayPlans = sqliteTable(
   })
 );
 
-export const comments = sqliteTable("comments", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  body: text("body").notNull(),
-  version: integer("version").notNull().default(1),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+export const comments = mysqlTable("comments", {
+  id: int("id").autoincrement().primaryKey(),
+  body: longtext("body").notNull(),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const projectComments = sqliteTable(
+export const projectComments = mysqlTable(
   "project_comments",
   {
-    projectId: integer("project_id")
+    projectId: int("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    commentId: integer("comment_id")
+    commentId: int("comment_id")
       .notNull()
       .references(() => comments.id, { onDelete: "cascade" })
   },
@@ -343,13 +357,13 @@ export const projectComments = sqliteTable(
   })
 );
 
-export const milestoneComments = sqliteTable(
+export const milestoneComments = mysqlTable(
   "milestone_comments",
   {
-    milestoneId: integer("milestone_id")
+    milestoneId: int("milestone_id")
       .notNull()
       .references(() => milestones.id, { onDelete: "cascade" }),
-    commentId: integer("comment_id")
+    commentId: int("comment_id")
       .notNull()
       .references(() => comments.id, { onDelete: "cascade" })
   },
@@ -358,13 +372,13 @@ export const milestoneComments = sqliteTable(
   })
 );
 
-export const taskComments = sqliteTable(
+export const taskComments = mysqlTable(
   "task_comments",
   {
-    taskId: integer("task_id")
+    taskId: int("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    commentId: integer("comment_id")
+    commentId: int("comment_id")
       .notNull()
       .references(() => comments.id, { onDelete: "cascade" })
   },
@@ -373,13 +387,13 @@ export const taskComments = sqliteTable(
   })
 );
 
-export const dayPlanComments = sqliteTable(
+export const dayPlanComments = mysqlTable(
   "day_plan_comments",
   {
-    dayPlanId: integer("day_plan_id")
+    dayPlanId: int("day_plan_id")
       .notNull()
       .references(() => dayPlans.id, { onDelete: "cascade" }),
-    commentId: integer("comment_id")
+    commentId: int("comment_id")
       .notNull()
       .references(() => comments.id, { onDelete: "cascade" })
   },
@@ -388,13 +402,13 @@ export const dayPlanComments = sqliteTable(
   })
 );
 
-export const featureComments = sqliteTable(
+export const featureComments = mysqlTable(
   "feature_comments",
   {
-    featureId: integer("feature_id")
+    featureId: int("feature_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
-    commentId: integer("comment_id")
+    commentId: int("comment_id")
       .notNull()
       .references(() => comments.id, { onDelete: "cascade" })
   },
@@ -403,13 +417,13 @@ export const featureComments = sqliteTable(
   })
 );
 
-export const useCaseComments = sqliteTable(
+export const useCaseComments = mysqlTable(
   "use_case_comments",
   {
-    useCaseId: integer("use_case_id")
+    useCaseId: int("use_case_id")
       .notNull()
       .references(() => useCases.id, { onDelete: "cascade" }),
-    commentId: integer("comment_id")
+    commentId: int("comment_id")
       .notNull()
       .references(() => comments.id, { onDelete: "cascade" })
   },
@@ -418,13 +432,13 @@ export const useCaseComments = sqliteTable(
   })
 );
 
-export const backlogItemComments = sqliteTable(
+export const backlogItemComments = mysqlTable(
   "backlog_item_comments",
   {
-    backlogItemId: integer("backlog_item_id")
+    backlogItemId: int("backlog_item_id")
       .notNull()
       .references(() => backlogItems.id, { onDelete: "cascade" }),
-    commentId: integer("comment_id")
+    commentId: int("comment_id")
       .notNull()
       .references(() => comments.id, { onDelete: "cascade" })
   },
@@ -433,13 +447,13 @@ export const backlogItemComments = sqliteTable(
   })
 );
 
-export const wikiPageComments = sqliteTable(
+export const wikiPageComments = mysqlTable(
   "wiki_page_comments",
   {
-    wikiPageId: integer("wiki_page_id")
+    wikiPageId: int("wiki_page_id")
       .notNull()
       .references(() => wikiPages.id, { onDelete: "cascade" }),
-    commentId: integer("comment_id")
+    commentId: int("comment_id")
       .notNull()
       .references(() => comments.id, { onDelete: "cascade" })
   },
@@ -448,13 +462,13 @@ export const wikiPageComments = sqliteTable(
   })
 );
 
-export const wikiPageAttachments = sqliteTable(
+export const wikiPageAttachments = mysqlTable(
   "wiki_page_attachments",
   {
-    wikiPageId: integer("wiki_page_id")
+    wikiPageId: int("wiki_page_id")
       .notNull()
       .references(() => wikiPages.id, { onDelete: "cascade" }),
-    attachmentId: integer("attachment_id")
+    attachmentId: int("attachment_id")
       .notNull()
       .references(() => attachments.id, { onDelete: "cascade" })
   },
@@ -463,89 +477,89 @@ export const wikiPageAttachments = sqliteTable(
   })
 );
 
-export const tags = sqliteTable("tags", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull().unique(),
-  color: text("color").notNull().default("#94a3b8"),
-  version: integer("version").notNull().default(1),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+export const tags = mysqlTable("tags", {
+  id: int("id").autoincrement().primaryKey(),
+  name: shortText("name").notNull().unique(),
+  color: shortText("color").notNull().default("#94a3b8"),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const projectTags = sqliteTable("project_tags", {
-  projectId: integer("project_id")
+export const projectTags = mysqlTable("project_tags", {
+  projectId: int("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
-  tagId: integer("tag_id")
+  tagId: int("tag_id")
     .notNull()
     .references(() => tags.id, { onDelete: "cascade" })
 });
 
-export const milestoneTags = sqliteTable("milestone_tags", {
-  milestoneId: integer("milestone_id")
+export const milestoneTags = mysqlTable("milestone_tags", {
+  milestoneId: int("milestone_id")
     .notNull()
     .references(() => milestones.id, { onDelete: "cascade" }),
-  tagId: integer("tag_id")
+  tagId: int("tag_id")
     .notNull()
     .references(() => tags.id, { onDelete: "cascade" })
 });
 
-export const taskTags = sqliteTable("task_tags", {
-  taskId: integer("task_id")
+export const taskTags = mysqlTable("task_tags", {
+  taskId: int("task_id")
     .notNull()
     .references(() => tasks.id, { onDelete: "cascade" }),
-  tagId: integer("tag_id")
+  tagId: int("tag_id")
     .notNull()
     .references(() => tags.id, { onDelete: "cascade" })
 });
 
-export const notes = sqliteTable("notes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  title: text("title").notNull().default("Ohne Titel"),
-  contentJson: text("content_json").notNull().default("{}"),
-  version: integer("version").notNull().default(1),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+export const notes = mysqlTable("notes", {
+  id: int("id").autoincrement().primaryKey(),
+  title: shortText("title").notNull().default("Ohne Titel"),
+  contentJson: longtext("content_json").notNull().$defaultFn(() => "{}"),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const projectNotes = sqliteTable("project_notes", {
-  projectId: integer("project_id")
+export const projectNotes = mysqlTable("project_notes", {
+  projectId: int("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
-  noteId: integer("note_id")
+  noteId: int("note_id")
     .notNull()
     .references(() => notes.id, { onDelete: "cascade" })
 });
 
-export const milestoneNotes = sqliteTable("milestone_notes", {
-  milestoneId: integer("milestone_id")
+export const milestoneNotes = mysqlTable("milestone_notes", {
+  milestoneId: int("milestone_id")
     .notNull()
     .references(() => milestones.id, { onDelete: "cascade" }),
-  noteId: integer("note_id")
+  noteId: int("note_id")
     .notNull()
     .references(() => notes.id, { onDelete: "cascade" })
 });
 
-export const taskNotes = sqliteTable("task_notes", {
-  taskId: integer("task_id")
+export const taskNotes = mysqlTable("task_notes", {
+  taskId: int("task_id")
     .notNull()
     .references(() => tasks.id, { onDelete: "cascade" }),
-  noteId: integer("note_id")
+  noteId: int("note_id")
     .notNull()
     .references(() => notes.id, { onDelete: "cascade" })
 });
 
-export const dayPlanNotes = sqliteTable(
+export const dayPlanNotes = mysqlTable(
   "day_plan_notes",
   {
-    dayPlanId: integer("day_plan_id")
+    dayPlanId: int("day_plan_id")
       .notNull()
       .references(() => dayPlans.id, { onDelete: "cascade" }),
-    noteId: integer("note_id")
+    noteId: int("note_id")
       .notNull()
       .references(() => notes.id, { onDelete: "cascade" })
   },
@@ -554,13 +568,13 @@ export const dayPlanNotes = sqliteTable(
   })
 );
 
-export const wikiPageNotes = sqliteTable(
+export const wikiPageNotes = mysqlTable(
   "wiki_page_notes",
   {
-    wikiPageId: integer("wiki_page_id")
+    wikiPageId: int("wiki_page_id")
       .notNull()
       .references(() => wikiPages.id, { onDelete: "cascade" }),
-    noteId: integer("note_id")
+    noteId: int("note_id")
       .notNull()
       .references(() => notes.id, { onDelete: "cascade" })
   },
@@ -569,29 +583,29 @@ export const wikiPageNotes = sqliteTable(
   })
 );
 
-export const attachments = sqliteTable(
+export const attachments = mysqlTable(
   "attachments",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    originalName: text("original_name").notNull(),
-    filename: text("filename").notNull(),
-    mimetype: text("mimetype").notNull(),
-    size: integer("size").notNull(),
-    version: integer("version").notNull().default(1),
-    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    id: int("id").autoincrement().primaryKey(),
+    originalName: shortText("original_name").notNull(),
+    filename: shortText("filename").notNull(),
+    mimetype: shortText("mimetype").notNull(),
+    size: int("size").notNull(),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   }
 );
 
-export const projectAttachments = sqliteTable(
+export const projectAttachments = mysqlTable(
   "project_attachments",
   {
-    projectId: integer("project_id")
+    projectId: int("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    attachmentId: integer("attachment_id")
+    attachmentId: int("attachment_id")
       .notNull()
       .references(() => attachments.id, { onDelete: "cascade" })
   },
@@ -600,13 +614,13 @@ export const projectAttachments = sqliteTable(
   })
 );
 
-export const milestoneAttachments = sqliteTable(
+export const milestoneAttachments = mysqlTable(
   "milestone_attachments",
   {
-    milestoneId: integer("milestone_id")
+    milestoneId: int("milestone_id")
       .notNull()
       .references(() => milestones.id, { onDelete: "cascade" }),
-    attachmentId: integer("attachment_id")
+    attachmentId: int("attachment_id")
       .notNull()
       .references(() => attachments.id, { onDelete: "cascade" })
   },
@@ -615,13 +629,13 @@ export const milestoneAttachments = sqliteTable(
   })
 );
 
-export const taskAttachments = sqliteTable(
+export const taskAttachments = mysqlTable(
   "task_attachments",
   {
-    taskId: integer("task_id")
+    taskId: int("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    attachmentId: integer("attachment_id")
+    attachmentId: int("attachment_id")
       .notNull()
       .references(() => attachments.id, { onDelete: "cascade" })
   },
@@ -630,13 +644,13 @@ export const taskAttachments = sqliteTable(
   })
 );
 
-export const featureAttachments = sqliteTable(
+export const featureAttachments = mysqlTable(
   "feature_attachments",
   {
-    featureId: integer("feature_id")
+    featureId: int("feature_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
-    attachmentId: integer("attachment_id")
+    attachmentId: int("attachment_id")
       .notNull()
       .references(() => attachments.id, { onDelete: "cascade" })
   },
@@ -645,13 +659,13 @@ export const featureAttachments = sqliteTable(
   })
 );
 
-export const ticketAttachments = sqliteTable(
+export const ticketAttachments = mysqlTable(
   "ticket_attachments",
   {
-    ticketId: integer("ticket_id")
+    ticketId: int("ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
-    attachmentId: integer("attachment_id")
+    attachmentId: int("attachment_id")
       .notNull()
       .references(() => attachments.id, { onDelete: "cascade" })
   },
@@ -660,36 +674,36 @@ export const ticketAttachments = sqliteTable(
   })
 );
 
-export const events = sqliteTable("events", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  title: text("title").notNull(),
-  description: text("description"),
-  startTime: text("start_time").notNull(),
-  endTime: text("end_time").notNull(),
-  isAllDay: integer("is_all_day", { mode: "boolean" }).notNull().default(false),
-  color: text("color").default("#6366f1"),
-  reminderMinutes: integer("reminder_minutes").notNull().default(60),
-  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
-  version: integer("version").notNull().default(1),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+export const events = mysqlTable("events", {
+  id: int("id").autoincrement().primaryKey(),
+  title: shortText("title").notNull(),
+  description: longtext("description"),
+  startTime: shortText("start_time").notNull(),
+  endTime: shortText("end_time").notNull(),
+  isAllDay: boolean("is_all_day").notNull().default(false),
+  color: shortText("color").default("#6366f1"),
+  reminderMinutes: int("reminder_minutes").notNull().default(60),
+  responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const sentNotifications = sqliteTable(
+export const sentNotifications = mysqlTable(
   "sent_notifications",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    eventId: integer("event_id")
+    id: int("id").autoincrement().primaryKey(),
+    eventId: int("event_id")
       .notNull()
       .references(() => events.id, { onDelete: "cascade" }),
-    userId: integer("user_id")
+    userId: int("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    channel: text("channel", { enum: NOTIFICATION_CHANNELS }).notNull(),
-    reminderMinutes: integer("reminder_minutes").notNull(),
-    sentAt: text("sent_at").notNull()
+    channel: shortText("channel", { enum: NOTIFICATION_CHANNELS }).notNull(),
+    reminderMinutes: int("reminder_minutes").notNull(),
+    sentAt: timestampText("sent_at")
   },
   (table) => ({
     sentNotificationsUnique: uniqueIndex("sent_notifications_event_user_channel_reminder_unique").on(table.eventId, table.userId, table.channel, table.reminderMinutes),
@@ -698,18 +712,18 @@ export const sentNotifications = sqliteTable(
   })
 );
 
-export const pushSubscriptions = sqliteTable(
+export const pushSubscriptions = mysqlTable(
   "push_subscriptions",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: integer("user_id")
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    endpoint: text("endpoint").notNull(),
-    p256dh: text("p256dh").notNull(),
-    auth: text("auth").notNull(),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    endpoint: shortText("endpoint", { length: 512 }).notNull(),
+    p256dh: shortText("p256dh").notNull(),
+    auth: shortText("auth").notNull(),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   },
   (table) => ({
     pushSubscriptionsEndpointUnique: uniqueIndex("push_subscriptions_endpoint_unique").on(table.endpoint),
@@ -717,13 +731,13 @@ export const pushSubscriptions = sqliteTable(
   })
 );
 
-export const projectEvents = sqliteTable(
+export const projectEvents = mysqlTable(
   "project_events",
   {
-    projectId: integer("project_id")
+    projectId: int("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    eventId: integer("event_id")
+    eventId: int("event_id")
       .notNull()
       .references(() => events.id, { onDelete: "cascade" })
   },
@@ -732,13 +746,13 @@ export const projectEvents = sqliteTable(
   })
 );
 
-export const taskEvents = sqliteTable(
+export const taskEvents = mysqlTable(
   "task_events",
   {
-    taskId: integer("task_id")
+    taskId: int("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    eventId: integer("event_id")
+    eventId: int("event_id")
       .notNull()
       .references(() => events.id, { onDelete: "cascade" })
   },
@@ -747,13 +761,13 @@ export const taskEvents = sqliteTable(
   })
 );
 
-export const milestoneEvents = sqliteTable(
+export const milestoneEvents = mysqlTable(
   "milestone_events",
   {
-    milestoneId: integer("milestone_id")
+    milestoneId: int("milestone_id")
       .notNull()
       .references(() => milestones.id, { onDelete: "cascade" }),
-    eventId: integer("event_id")
+    eventId: int("event_id")
       .notNull()
       .references(() => events.id, { onDelete: "cascade" })
   },
@@ -762,68 +776,68 @@ export const milestoneEvents = sqliteTable(
   })
 );
 
-export const dayPlanEvents = sqliteTable(
+export const dayPlanEvents = mysqlTable(
   "day_plan_events",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => dayPlans.id, { onDelete: "cascade" }),
-    eventId: integer("event_id")
+    eventId: int("event_id")
       .notNull()
       .references(() => events.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     dayPlanEventUnique: uniqueIndex("day_plan_events_owner_event_unique").on(table.ownerId, table.eventId)
   })
 );
 
-export const features = sqliteTable("features", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  title: text("title").notNull(),
-  status: text("status").notNull().default("draft"),
-  description: text("description"),
-  content: text("content"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
-  version: integer("version").notNull().default(1),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+export const features = mysqlTable("features", {
+  id: int("id").autoincrement().primaryKey(),
+  title: shortText("title").notNull(),
+  status: shortText("status").notNull().default("draft"),
+  description: longtext("description"),
+  content: longtext("content"),
+  sortOrder: int("sort_order").notNull().default(0),
+  responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const useCases = sqliteTable("use_cases", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  featureId: integer("feature_id")
+export const useCases = mysqlTable("use_cases", {
+  id: int("id").autoincrement().primaryKey(),
+  featureId: int("feature_id")
     .notNull()
     .references(() => features.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  status: text("status").notNull().default("draft"),
-  description: text("description"),
-  content: text("content"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
-  version: integer("version").notNull().default(1),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+  title: shortText("title").notNull(),
+  status: shortText("status").notNull().default("draft"),
+  description: longtext("description"),
+  content: longtext("content"),
+  sortOrder: int("sort_order").notNull().default(0),
+  responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const featureRelations = sqliteTable(
+export const featureRelations = mysqlTable(
   "feature_relations",
   {
-    sourceFeatureId: integer("source_feature_id")
+    sourceFeatureId: int("source_feature_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
-    targetFeatureId: integer("target_feature_id")
+    targetFeatureId: int("target_feature_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
-    relationType: text("relation_type", { enum: FEATURE_RELATION_TYPES }).notNull().default("related"),
-    description: text("description"),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    relationType: shortText("relation_type", { enum: FEATURE_RELATION_TYPES }).notNull().default("related"),
+    description: longtext("description"),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   },
   (table) => ({
     featureRelationUnique: uniqueIndex("feature_relations_source_target_type_unique").on(table.sourceFeatureId, table.targetFeatureId, table.relationType),
@@ -831,30 +845,30 @@ export const featureRelations = sqliteTable(
   })
 );
 
-export const wikiPages = sqliteTable("wiki_pages", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  parentId: integer("parent_id").references((): AnySQLiteColumn => wikiPages.id, { onDelete: "restrict" }),
-  title: text("title").notNull(),
-  content: text("content"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  version: integer("version").notNull().default(1),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+export const wikiPages = mysqlTable("wiki_pages", {
+  id: int("id").autoincrement().primaryKey(),
+  parentId: int("parent_id").references((): AnyMySqlColumn => wikiPages.id, { onDelete: "restrict" }),
+  title: shortText("title").notNull(),
+  content: longtext("content"),
+  sortOrder: int("sort_order").notNull().default(0),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const wikiPageRelations = sqliteTable(
+export const wikiPageRelations = mysqlTable(
   "wiki_page_relations",
   {
-    sourceWikiPageId: integer("source_wiki_page_id")
+    sourceWikiPageId: int("source_wiki_page_id")
       .notNull()
       .references(() => wikiPages.id, { onDelete: "cascade" }),
-    targetWikiPageId: integer("target_wiki_page_id")
+    targetWikiPageId: int("target_wiki_page_id")
       .notNull()
       .references(() => wikiPages.id, { onDelete: "cascade" }),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   },
   (table) => ({
     wikiPageRelationUnique: uniqueIndex("wiki_page_relations_source_target_unique").on(table.sourceWikiPageId, table.targetWikiPageId),
@@ -862,294 +876,294 @@ export const wikiPageRelations = sqliteTable(
   })
 );
 
-export const contentImages = sqliteTable(
+export const contentImages = mysqlTable(
   "content_images",
   {
-    id: text("id").primaryKey(),
-    mimeType: text("mime_type").notNull(),
-    data: blob("data", { mode: "buffer" }).notNull(),
-    size: integer("size").notNull(),
-    version: integer("version").notNull().default(1),
-    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    id: shortText("id").primaryKey(),
+    mimeType: shortText("mime_type").notNull(),
+    data: longblob("data", { mode: "buffer" }).notNull(),
+    size: int("size").notNull(),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   },
   (table) => ({
     contentImagesCreatedAtIdx: index("content_images_created_at_idx").on(table.createdAt)
   })
 );
 
-export const backlogItems = sqliteTable(
+export const backlogItems = mysqlTable(
   "backlog_items",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    projectId: integer("project_id")
+    id: int("id").autoincrement().primaryKey(),
+    projectId: int("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    featureId: integer("feature_id").references(() => features.id, { onDelete: "set null" }),
-    useCaseId: integer("use_case_id").references(() => useCases.id, { onDelete: "set null" }),
-    title: text("title").notNull(),
-    description: text("description"),
-    status: text("status").notNull().default("open"),
-    importKey: text("import_key"),
-    sortOrder: integer("sort_order").notNull().default(0),
-    responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
-    version: integer("version").notNull().default(1),
-    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+    featureId: int("feature_id").references(() => features.id, { onDelete: "set null" }),
+    useCaseId: int("use_case_id").references(() => useCases.id, { onDelete: "set null" }),
+    title: shortText("title").notNull(),
+    description: longtext("description"),
+    status: shortText("status").notNull().default("open"),
+    importKey: shortText("import_key"),
+    sortOrder: int("sort_order").notNull().default(0),
+    responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
   },
   (table) => ({
     projectImportKeyUnique: uniqueIndex("backlog_items_project_import_key_unique").on(table.projectId, table.importKey)
   })
 );
 
-export const projectFeatures = sqliteTable("project_features", {
-  projectId: integer("project_id")
+export const projectFeatures = mysqlTable("project_features", {
+  projectId: int("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
-  featureId: integer("feature_id")
+  featureId: int("feature_id")
     .notNull()
     .references(() => features.id, { onDelete: "cascade" })
 });
 
-export const milestoneFeatures = sqliteTable("milestone_features", {
-  milestoneId: integer("milestone_id")
+export const milestoneFeatures = mysqlTable("milestone_features", {
+  milestoneId: int("milestone_id")
     .notNull()
     .references(() => milestones.id, { onDelete: "cascade" }),
-  featureId: integer("feature_id")
+  featureId: int("feature_id")
     .notNull()
     .references(() => features.id, { onDelete: "cascade" })
 });
 
-export const projectTasks = sqliteTable(
+export const projectTasks = mysqlTable(
   "project_tasks",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    taskId: integer("task_id")
+    taskId: int("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     projectTaskUnique: uniqueIndex("project_tasks_owner_task_unique").on(table.ownerId, table.taskId)
   })
 );
 
-export const milestoneTasks = sqliteTable(
+export const milestoneTasks = mysqlTable(
   "milestone_tasks",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => milestones.id, { onDelete: "cascade" }),
-    taskId: integer("task_id")
+    taskId: int("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     milestoneTaskUnique: uniqueIndex("milestone_tasks_owner_task_unique").on(table.ownerId, table.taskId)
   })
 );
 
-export const dayPlanTasks = sqliteTable(
+export const dayPlanTasks = mysqlTable(
   "day_plan_tasks",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => dayPlans.id, { onDelete: "cascade" }),
-    taskId: integer("task_id")
+    taskId: int("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     dayPlanTaskUnique: uniqueIndex("day_plan_tasks_owner_task_unique").on(table.ownerId, table.taskId)
   })
 );
 
-export const featureTasks = sqliteTable(
+export const featureTasks = mysqlTable(
   "feature_tasks",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
-    taskId: integer("task_id")
+    taskId: int("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     featureTaskUnique: uniqueIndex("feature_tasks_owner_task_unique").on(table.ownerId, table.taskId)
   })
 );
 
-export const useCaseTasks = sqliteTable(
+export const useCaseTasks = mysqlTable(
   "use_case_tasks",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => useCases.id, { onDelete: "cascade" }),
-    taskId: integer("task_id")
+    taskId: int("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     useCaseTaskUnique: uniqueIndex("use_case_tasks_owner_task_unique").on(table.ownerId, table.taskId)
   })
 );
 
-export const wikiPageTasks = sqliteTable(
+export const wikiPageTasks = mysqlTable(
   "wiki_page_tasks",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => wikiPages.id, { onDelete: "cascade" }),
-    taskId: integer("task_id")
+    taskId: int("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     wikiPageTaskUnique: uniqueIndex("wiki_page_tasks_owner_task_unique").on(table.ownerId, table.taskId)
   })
 );
 
-export const tickets = sqliteTable("tickets", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  parentId: integer("parent_id").references((): AnySQLiteColumn => tickets.id, { onDelete: "cascade" }),
-  type: text("type").notNull().default("bug"),
-  title: text("title").notNull(),
-  description: text("description"),
-  status: text("status").notNull().default("open"),
-  priority: text("priority").notNull().default("medium"),
-  resolution: text("resolution", { enum: TICKET_RESOLUTIONS }),
-  reporterUserId: integer("reporter_user_id").references(() => users.id, { onDelete: "set null" }),
-  responsibleUserId: integer("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
-  environment: text("environment"),
-  affectedVersion: text("affected_version"),
-  dueDate: text("due_date"),
-  resolvedAt: text("resolved_at"),
-  position: real("position").notNull().default(0),
-  version: integer("version").notNull().default(1),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`)
+export const tickets = mysqlTable("tickets", {
+  id: int("id").autoincrement().primaryKey(),
+  parentId: int("parent_id").references((): AnyMySqlColumn => tickets.id, { onDelete: "cascade" }),
+  type: shortText("type").notNull().default("bug"),
+  title: shortText("title").notNull(),
+  description: longtext("description"),
+  status: shortText("status").notNull().default("open"),
+  priority: shortText("priority").notNull().default("medium"),
+  resolution: shortText("resolution", { enum: TICKET_RESOLUTIONS }),
+  reporterUserId: int("reporter_user_id").references(() => users.id, { onDelete: "set null" }),
+  responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+  environment: shortText("environment"),
+  affectedVersion: shortText("affected_version"),
+  dueDate: shortText("due_date"),
+  resolvedAt: shortText("resolved_at"),
+  position: double("position").notNull().default(0),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
 });
 
-export const projectTickets = sqliteTable(
+export const projectTickets = mysqlTable(
   "project_tickets",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    ticketId: integer("ticket_id")
+    ticketId: int("ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     projectTicketUnique: uniqueIndex("project_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
   })
 );
 
-export const milestoneTickets = sqliteTable(
+export const milestoneTickets = mysqlTable(
   "milestone_tickets",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => milestones.id, { onDelete: "cascade" }),
-    ticketId: integer("ticket_id")
+    ticketId: int("ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     milestoneTicketUnique: uniqueIndex("milestone_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
   })
 );
 
-export const taskTickets = sqliteTable(
+export const taskTickets = mysqlTable(
   "task_tickets",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
-    ticketId: integer("ticket_id")
+    ticketId: int("ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     taskTicketUnique: uniqueIndex("task_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
   })
 );
 
-export const featureTickets = sqliteTable(
+export const featureTickets = mysqlTable(
   "feature_tickets",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => features.id, { onDelete: "cascade" }),
-    ticketId: integer("ticket_id")
+    ticketId: int("ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     featureTicketUnique: uniqueIndex("feature_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
   })
 );
 
-export const useCaseTickets = sqliteTable(
+export const useCaseTickets = mysqlTable(
   "use_case_tickets",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => useCases.id, { onDelete: "cascade" }),
-    ticketId: integer("ticket_id")
+    ticketId: int("ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     useCaseTicketUnique: uniqueIndex("use_case_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
   })
 );
 
-export const wikiPageTickets = sqliteTable(
+export const wikiPageTickets = mysqlTable(
   "wiki_page_tickets",
   {
-    ownerId: integer("owner_id")
+    ownerId: int("owner_id")
       .notNull()
       .references(() => wikiPages.id, { onDelete: "cascade" }),
-    ticketId: integer("ticket_id")
+    ticketId: int("ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
-    position: real("position").notNull().default(0)
+    position: double("position").notNull().default(0)
   },
   (table) => ({
     wikiPageTicketUnique: uniqueIndex("wiki_page_tickets_owner_ticket_unique").on(table.ownerId, table.ticketId)
   })
 );
 
-export const ticketRelations = sqliteTable(
+export const ticketRelations = mysqlTable(
   "ticket_relations",
   {
-    sourceTicketId: integer("source_ticket_id")
+    sourceTicketId: int("source_ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
-    targetTicketId: integer("target_ticket_id")
+    targetTicketId: int("target_ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
-    relationType: text("relation_type", { enum: TICKET_RELATION_TYPES }).notNull().default("related"),
-    createdAt: text("created_at").notNull().default(sql`(datetime('now'))`)
+    relationType: shortText("relation_type", { enum: TICKET_RELATION_TYPES }).notNull().default("related"),
+    createdAt: timestampText("created_at")
   },
   (table) => ({
     ticketRelationUnique: uniqueIndex("ticket_relations_source_target_type_unique").on(
@@ -1161,31 +1175,31 @@ export const ticketRelations = sqliteTable(
   })
 );
 
-export const ticketTags = sqliteTable("ticket_tags", {
-  ticketId: integer("ticket_id")
+export const ticketTags = mysqlTable("ticket_tags", {
+  ticketId: int("ticket_id")
     .notNull()
     .references(() => tickets.id, { onDelete: "cascade" }),
-  tagId: integer("tag_id")
+  tagId: int("tag_id")
     .notNull()
     .references(() => tags.id, { onDelete: "cascade" })
 });
 
-export const ticketNotes = sqliteTable("ticket_notes", {
-  ticketId: integer("ticket_id")
+export const ticketNotes = mysqlTable("ticket_notes", {
+  ticketId: int("ticket_id")
     .notNull()
     .references(() => tickets.id, { onDelete: "cascade" }),
-  noteId: integer("note_id")
+  noteId: int("note_id")
     .notNull()
     .references(() => notes.id, { onDelete: "cascade" })
 });
 
-export const ticketComments = sqliteTable(
+export const ticketComments = mysqlTable(
   "ticket_comments",
   {
-    ticketId: integer("ticket_id")
+    ticketId: int("ticket_id")
       .notNull()
       .references(() => tickets.id, { onDelete: "cascade" }),
-    commentId: integer("comment_id")
+    commentId: int("comment_id")
       .notNull()
       .references(() => comments.id, { onDelete: "cascade" })
   },
@@ -1193,3 +1207,5 @@ export const ticketComments = sqliteTable(
     ticketCommentUnique: uniqueIndex("ticket_comments_parent_comment_unique").on(table.ticketId, table.commentId)
   })
 );
+
+

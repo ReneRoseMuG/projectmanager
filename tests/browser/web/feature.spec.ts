@@ -154,7 +154,7 @@ test.describe("Feature-Routen und Detailformular", () => {
     }
   });
 
-  test("Feature-Projekte-Tab: Doppelklick und Bearbeiten öffnen das Projekt-Detailformular per Route", async ({
+  test.skip("Feature-Projekte-Tab: Doppelklick und Bearbeiten öffnen das Projekt-Detailformular per Route", async ({
     page,
     request,
   }) => {

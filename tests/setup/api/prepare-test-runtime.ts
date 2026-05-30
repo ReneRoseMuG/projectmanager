@@ -18,5 +18,5 @@ export function setup(): void {
   }
 
   fs.rmSync(resolvedRuntimeRoot, { recursive: true, force: true });
-  fs.mkdirSync(path.join(resolvedRuntimeRoot, "databases"), { recursive: true });
+  fs.mkdirSync(resolvedRuntimeRoot, { recursive: true });
 }

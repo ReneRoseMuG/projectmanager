@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+﻿import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { CommentInput, NoteInput, TicketInput, TicketPositionInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
 import { TICKET_RELATION_TYPES, TICKET_RESOLUTIONS } from "../db/schema.js";
 import { createTicketAttachment, deleteAttachment, listTicketAttachments } from "../services/attachments.service.js";
@@ -212,7 +212,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Body: TicketInput }>(
     "/tickets",
     { schema: { body: ticketBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createTicket(app.db, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createTicket(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { projectId: number } }>(
@@ -225,7 +225,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     "/projects/:projectId/tickets",
     { schema: { params: projectIdParamSchema, body: ticketBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) =>
-      reply.status(201).send(createOwnerTicket(app.db, { type: "project", id: request.params.projectId }, request.body, createJournalActor(request.currentUser)))
+      reply.status(201).send(await createOwnerTicket(app.db, { type: "project", id: request.params.projectId }, request.body, createJournalActor(request.currentUser)))
   );
 
   const ownerRoutes: Array<{ path: string; ownerType: TicketOwner["type"] }> = [
@@ -247,7 +247,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
       route.path,
       { schema: { params: idParamSchema, body: ticketBodySchema, response: { 201: objectResponseSchema } } },
       async (request, reply) =>
-        reply.status(201).send(createOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.body, createJournalActor(request.currentUser)))
+        reply.status(201).send(await createOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.body, createJournalActor(request.currentUser)))
     );
   }
 
@@ -262,7 +262,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
       `${route.path}/:ticketId`,
       { schema: { params: ownerTicketParamSchema, response: { 204: { type: "null" } } } },
       async (request, reply) => {
-        unlinkOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.params.ticketId, createJournalActor(request.currentUser));
+        await unlinkOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.params.ticketId, createJournalActor(request.currentUser));
         return reply.status(204).send();
       }
     );
@@ -279,7 +279,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
       `${basePath}/:id/tickets`,
       { schema: { params: idParamSchema, body: ticketLinkBodySchema, response: { 201: objectResponseSchema } } },
       async (request, reply) => {
-        const ticket = linkOwnerTicket(
+        const ticket = await linkOwnerTicket(
           app.db,
           { type: "wikiPage", id: request.params.id },
           request.body.ticketId,
@@ -294,7 +294,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
       `${basePath}/:id/tickets/:ticketId`,
       { schema: { params: ownerTicketParamSchema, response: { 204: { type: "null" } } } },
       async (request, reply) => {
-        unlinkOwnerTicket(app.db, { type: "wikiPage", id: request.params.id }, request.params.ticketId, createJournalActor(request.currentUser));
+        await unlinkOwnerTicket(app.db, { type: "wikiPage", id: request.params.id }, request.params.ticketId, createJournalActor(request.currentUser));
         return reply.status(204).send();
       }
     );
@@ -342,7 +342,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: { id: number }; Body: TicketInput }>(
     "/tickets/:id/sub-tickets",
     { schema: { params: idParamSchema, body: ticketBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createSubTicket(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createSubTicket(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -361,7 +361,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     "/tickets/:id/relations",
     { schema: { params: idParamSchema, body: ticketRelationSchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      addTicketRelation(app.db, request.params.id, request.body, createJournalActor(request.currentUser));
+      await addTicketRelation(app.db, request.params.id, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send({ ok: true });
     }
   );
@@ -370,7 +370,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     "/tickets/:id/relations",
     { schema: { params: idParamSchema, body: ticketRelationSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      removeTicketRelation(app.db, request.params.id, request.body.targetTicketId, request.body.relationType, createJournalActor(request.currentUser));
+      await removeTicketRelation(app.db, request.params.id, request.body.targetTicketId, request.body.relationType, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -390,14 +390,14 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/tickets/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createTicketNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createTicketNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.delete<{ Params: { id: number; childId: number } }>(
     "/tickets/:id/notes/:childId",
     { schema: { params: idAndChildIdParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteTicketNote(app.db, request.params.id, request.params.childId, createJournalActor(request.currentUser));
+      await deleteTicketNote(app.db, request.params.id, request.params.childId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -411,14 +411,14 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: { id: number }; Body: CommentInput }>(
     "/tickets/:id/comments",
     { schema: { params: idParamSchema, body: commentBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createEntityComment(app.db, "ticket", request.params.id, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createEntityComment(app.db, "ticket", request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.delete<{ Params: { id: number; childId: number } }>(
     "/tickets/:id/comments/:childId",
     { schema: { params: idAndChildIdParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteEntityComment(app.db, "ticket", request.params.id, request.params.childId, createJournalActor(request.currentUser));
+      await deleteEntityComment(app.db, "ticket", request.params.id, request.params.childId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

@@ -92,31 +92,31 @@ function routeAuthOverride(request: FastifyRequest): { resource: AuthResource; a
   return request.routeOptions.config.auth;
 }
 
-export function requireCurrentUser(request: FastifyRequest): CurrentUser {
+export async function requireCurrentUser(request: FastifyRequest): Promise<CurrentUser> {
   if (request.currentUser) {
     return request.currentUser;
   }
   if (hasMatchingApiKey(request)) {
-    const currentUser = getApiKeyAdminUser(request.server.db);
+    const currentUser = await getApiKeyAdminUser(request.server.db);
     request.currentUser = currentUser;
     return currentUser;
   }
   const userId = sessionUserId(request);
   if (!userId) {
     if (config.authBypassAdmin) {
-      const currentUser = getBypassAdminUser(request.server.db);
+      const currentUser = await getBypassAdminUser(request.server.db);
       request.currentUser = currentUser;
       return currentUser;
     }
     throw unauthorized("Authentication required");
   }
-  const currentUser = getCurrentUser(request.server.db, userId);
+  const currentUser = await getCurrentUser(request.server.db, userId);
   request.currentUser = currentUser;
   return currentUser;
 }
 
 export async function requireAuth(request: FastifyRequest): Promise<void> {
-  const currentUser = requireCurrentUser(request);
+  const currentUser = await requireCurrentUser(request);
   if (currentUser.requiresPasswordSetup && !isAllowedDuringPasswordSetup(request)) {
     throw forbidden("Password setup is required");
   }
@@ -124,7 +124,7 @@ export async function requireAuth(request: FastifyRequest): Promise<void> {
 
 export function requirePermission(resource: AuthResource, action: AuthAction) {
   return async (request: FastifyRequest): Promise<void> => {
-    const currentUser = requireCurrentUser(request);
+    const currentUser = await requireCurrentUser(request);
     if (!hasPermission(currentUser.role, resource, action)) {
       throw forbidden("Permission denied");
     }

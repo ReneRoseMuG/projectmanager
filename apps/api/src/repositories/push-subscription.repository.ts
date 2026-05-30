@@ -1,5 +1,6 @@
-import { and, desc, eq } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { and, desc, eq } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { pushSubscriptions } from "../db/schema.js";
 
 export type PushSubscriptionRecord = typeof pushSubscriptions.$inferSelect;
@@ -16,11 +17,11 @@ function nowIso(): string {
 }
 
 export const pushSubscriptionRepository = {
-  upsert(database: DbClient, data: PushSubscriptionData): PushSubscriptionRecord {
-    const existing = database.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, data.endpoint)).get();
+  async upsert(database: DbSession, data: PushSubscriptionData): Promise<PushSubscriptionRecord> {
+    const existing = firstRow(await database.select().from(pushSubscriptions).where(eq(pushSubscriptions.endpoint, data.endpoint)));
     const now = nowIso();
     if (existing) {
-      return database
+      await database
         .update(pushSubscriptions)
         .set({
           userId: data.userId,
@@ -28,33 +29,39 @@ export const pushSubscriptionRepository = {
           auth: data.auth,
           updatedAt: now
         })
-        .where(eq(pushSubscriptions.id, existing.id))
-        .returning()
-        .get();
+        .where(eq(pushSubscriptions.id, existing.id));
+      const updated = firstRow(await database.select().from(pushSubscriptions).where(eq(pushSubscriptions.id, existing.id)));
+      if (!updated) {
+        throw new Error("Updated push subscription could not be loaded");
+      }
+      return updated;
     }
-    return database
+    const result = await database
       .insert(pushSubscriptions)
       .values({
         ...data,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = firstRow(await database.select().from(pushSubscriptions).where(eq(pushSubscriptions.id, insertId(result))));
+    if (!created) {
+      throw new Error("Created push subscription could not be loaded");
+    }
+    return created;
   },
 
-  deleteForUser(database: DbClient, userId: number, endpoint: string): number {
-    return database
+  async deleteForUser(database: DbSession, userId: number, endpoint: string): Promise<number> {
+    return mutationAffectedRows(await database
       .delete(pushSubscriptions)
-      .where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint)))
-      .run().changes;
+      .where(and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint))));
   },
 
-  deleteByEndpoint(database: DbClient, endpoint: string): number {
-    return database.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint)).run().changes;
+  async deleteByEndpoint(database: DbSession, endpoint: string): Promise<number> {
+    return mutationAffectedRows(await database.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint)));
   },
 
-  findByUser(database: DbClient, userId: number): PushSubscriptionRecord[] {
-    return database.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId)).orderBy(desc(pushSubscriptions.updatedAt)).all();
+  async findByUser(database: DbSession, userId: number): Promise<PushSubscriptionRecord[]> {
+    return database.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId)).orderBy(desc(pushSubscriptions.updatedAt));
   }
 };
+

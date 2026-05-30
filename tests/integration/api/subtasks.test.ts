@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope: Subtasks API
  *
  * Covers subtask creation, listing, top-level separation, updates, and depth validation.
@@ -14,15 +14,15 @@ describe("Subtasks API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => { await truncateAll(testDb.pool); });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("POST /api/tasks/:id/subtasks erstellt einen Subtask", async () => {

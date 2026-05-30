@@ -124,10 +124,12 @@ test("Ticket-Detailformular zeigt Tabs und echte Neben-Collections", async ({ pa
     await expect(form).toContainText(attachmentName);
 
     await openTab(form, "Kommentare");
-    await fillRichText(form, "comment-thread-body", liveComment);
+    await form.getByRole("button", { name: "Kommentar anlegen" }).click();
+    const commentModal = formPage(page, "Kommentar anlegen");
+    await fillRichText(commentModal, "comment-thread-create-editor", liveComment);
     await Promise.all([
       page.waitForResponse((response) => response.url().includes(`/api/tickets/${ticket.id}/comments`) && response.request().method() === "POST"),
-      form.getByRole("button", { name: "Kommentar", exact: true }).click(),
+      commentModal.getByRole("button", { name: "Anlegen" }).click(),
     ]);
     await expect(tabWithCount(form, "Kommentare", 2)).toBeVisible();
     await expect(form).toContainText(liveComment);

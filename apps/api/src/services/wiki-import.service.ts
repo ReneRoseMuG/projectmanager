@@ -12,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { DbClient } from "../db/client.js";
 import { backlogItems, featureRelations, features, featureTasks, projectFeatures, projects, projectTasks, tasks, useCases, useCaseTasks } from "../db/schema.js";
+import { firstRow, insertId } from "../db/query-utils.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 
@@ -694,53 +695,49 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
   };
 }
 
-function ensureProjectExists(database: DbClient, projectId: number): void {
-  const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
+async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {
+  const project = firstRow(await database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)));
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
 }
 
-function getFeatureByTitle(database: DbClient, title: string): StoredFeature | undefined {
-  return database
+async function getFeatureByTitle(database: DbClient, title: string): Promise<StoredFeature | undefined> {
+  return firstRow(await database
     .select({ id: features.id, title: features.title })
     .from(features)
-    .where(eq(features.title, title))
-    .get();
+    .where(eq(features.title, title)));
 }
 
-function getUseCaseByFeatureAndTitle(database: DbClient, featureId: number, title: string): StoredUseCase | undefined {
-  return database
+async function getUseCaseByFeatureAndTitle(database: DbClient, featureId: number, title: string): Promise<StoredUseCase | undefined> {
+  return firstRow(await database
     .select({ id: useCases.id, featureId: useCases.featureId, title: useCases.title })
     .from(useCases)
-    .where(and(eq(useCases.featureId, featureId), eq(useCases.title, title)))
-    .get();
+    .where(and(eq(useCases.featureId, featureId), eq(useCases.title, title))));
 }
 
-function getTaskByImportKey(database: DbClient, projectId: number, importKey: string): StoredTask | undefined {
-  return database
+async function getTaskByImportKey(database: DbClient, projectId: number, importKey: string): Promise<StoredTask | undefined> {
+  return firstRow(await database
     .select({ id: tasks.id, importKey: tasks.importKey })
     .from(projectTasks)
     .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
-    .where(and(eq(projectTasks.ownerId, projectId), eq(tasks.importKey, importKey)))
-    .get();
+    .where(and(eq(projectTasks.ownerId, projectId), eq(tasks.importKey, importKey))));
 }
 
-function getBacklogItemByImportKey(database: DbClient, projectId: number, importKey: string): StoredBacklogItem | undefined {
-  return database
+async function getBacklogItemByImportKey(database: DbClient, projectId: number, importKey: string): Promise<StoredBacklogItem | undefined> {
+  return firstRow(await database
     .select({ id: backlogItems.id, projectId: backlogItems.projectId, importKey: backlogItems.importKey })
     .from(backlogItems)
-    .where(and(eq(backlogItems.projectId, projectId), eq(backlogItems.importKey, importKey)))
-    .get();
+    .where(and(eq(backlogItems.projectId, projectId), eq(backlogItems.importKey, importKey))));
 }
 
-function getFeatureRelation(
+async function getFeatureRelation(
   database: DbClient,
   sourceFeatureId: number,
   targetFeatureId: number,
   relationType: FeatureRelationType
-): StoredFeatureRelation | undefined {
-  return database
+): Promise<StoredFeatureRelation | undefined> {
+  return firstRow(await database
     .select({
       sourceFeatureId: featureRelations.sourceFeatureId,
       targetFeatureId: featureRelations.targetFeatureId,
@@ -753,52 +750,47 @@ function getFeatureRelation(
         eq(featureRelations.targetFeatureId, targetFeatureId),
         eq(featureRelations.relationType, relationType)
       )
-    )
-    .get();
+    ));
 }
 
-function nextTaskPosition(database: DbClient, projectId: number): number {
-  const rows = database
+async function nextTaskPosition(database: DbClient, projectId: number): Promise<number> {
+  const rows = await database
     .select({ position: projectTasks.position })
     .from(projectTasks)
     .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
-    .where(and(eq(projectTasks.ownerId, projectId), eq(tasks.status, "todo")))
-    .all();
+    .where(and(eq(projectTasks.ownerId, projectId), eq(tasks.status, "todo")));
 
   return rows.reduce((current, row) => Math.max(current, row.position), 0) + 1024;
 }
 
-function hasProjectFeature(database: DbClient, projectId: number, featureId: number): boolean {
+async function hasProjectFeature(database: DbClient, projectId: number, featureId: number): Promise<boolean> {
   return Boolean(
-    database
+    firstRow(await database
       .select({ projectId: projectFeatures.projectId })
       .from(projectFeatures)
-      .where(and(eq(projectFeatures.projectId, projectId), eq(projectFeatures.featureId, featureId)))
-      .get()
+      .where(and(eq(projectFeatures.projectId, projectId), eq(projectFeatures.featureId, featureId))))
   );
 }
 
-function hasTaskFeature(database: DbClient, taskId: number, featureId: number): boolean {
+async function hasTaskFeature(database: DbClient, taskId: number, featureId: number): Promise<boolean> {
   return Boolean(
-    database
+    firstRow(await database
       .select({ taskId: featureTasks.taskId })
       .from(featureTasks)
-      .where(and(eq(featureTasks.taskId, taskId), eq(featureTasks.ownerId, featureId)))
-      .get()
+      .where(and(eq(featureTasks.taskId, taskId), eq(featureTasks.ownerId, featureId))))
   );
 }
 
-function hasTaskUseCase(database: DbClient, taskId: number, useCaseId: number): boolean {
+async function hasTaskUseCase(database: DbClient, taskId: number, useCaseId: number): Promise<boolean> {
   return Boolean(
-    database
+    firstRow(await database
       .select({ taskId: useCaseTasks.taskId })
       .from(useCaseTasks)
-      .where(and(eq(useCaseTasks.taskId, taskId), eq(useCaseTasks.ownerId, useCaseId)))
-      .get()
+      .where(and(eq(useCaseTasks.taskId, taskId), eq(useCaseTasks.ownerId, useCaseId))))
   );
 }
 
-function reportProjectFeatureLink(report: WikiImportReport, database: DbClient, projectId: number, feature: StoredFeature, execute: boolean): void {
+async function reportProjectFeatureLink(report: WikiImportReport, database: DbClient, projectId: number, feature: StoredFeature, execute: boolean): Promise<void> {
   if (!execute && feature.id <= 0) {
     addResult(report, {
       type: "projectFeature",
@@ -809,7 +801,7 @@ function reportProjectFeatureLink(report: WikiImportReport, database: DbClient, 
     return;
   }
 
-  if (hasProjectFeature(database, projectId, feature.id)) {
+  if (await hasProjectFeature(database, projectId, feature.id)) {
     addResult(report, {
       type: "projectFeature",
       action: "skipped",
@@ -820,7 +812,7 @@ function reportProjectFeatureLink(report: WikiImportReport, database: DbClient, 
   }
 
   if (execute) {
-    database.insert(projectFeatures).values({ projectId, featureId: feature.id }).run();
+    await database.insert(projectFeatures).values({ projectId, featureId: feature.id });
   }
 
   addResult(report, {
@@ -831,14 +823,14 @@ function reportProjectFeatureLink(report: WikiImportReport, database: DbClient, 
   });
 }
 
-function upsertFeature(database: DbClient, feature: ParsedFeature, execute: boolean, now: string): { record?: StoredFeature; action: WikiImportAction } {
-  const existing = getFeatureByTitle(database, feature.title);
+async function upsertFeature(database: DbClient, feature: ParsedFeature, execute: boolean, now: string): Promise<{ record?: StoredFeature; action: WikiImportAction }> {
+  const existing = await getFeatureByTitle(database, feature.title);
   if (!execute) {
     return { record: existing, action: existing ? "updated" : "created" };
   }
 
   if (existing) {
-    database
+    await database
       .update(features)
       .set({
         title: feature.title,
@@ -847,12 +839,11 @@ function upsertFeature(database: DbClient, feature: ParsedFeature, execute: bool
         content: feature.content,
         updatedAt: now
       })
-      .where(eq(features.id, existing.id))
-      .run();
+      .where(eq(features.id, existing.id));
     return { record: existing, action: "updated" };
   }
 
-  const created = database
+  const id = insertId(await database
     .insert(features)
     .values({
       title: feature.title,
@@ -863,26 +854,25 @@ function upsertFeature(database: DbClient, feature: ParsedFeature, execute: bool
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: features.id, title: features.title })
-    .get();
+  );
 
-  return { record: created, action: "created" };
+  return { record: { id, title: feature.title }, action: "created" };
 }
 
-function upsertUseCase(
+async function upsertUseCase(
   database: DbClient,
   useCase: ParsedUseCase,
   featureId: number,
   execute: boolean,
   now: string
-): { record?: StoredUseCase; action: WikiImportAction } {
-  const existing = getUseCaseByFeatureAndTitle(database, featureId, useCase.title);
+): Promise<{ record?: StoredUseCase; action: WikiImportAction }> {
+  const existing = await getUseCaseByFeatureAndTitle(database, featureId, useCase.title);
   if (!execute) {
     return { record: existing, action: existing ? "updated" : "created" };
   }
 
   if (existing) {
-    database
+    await database
       .update(useCases)
       .set({
         featureId,
@@ -892,12 +882,11 @@ function upsertUseCase(
         content: useCase.content,
         updatedAt: now
       })
-      .where(eq(useCases.id, existing.id))
-      .run();
+      .where(eq(useCases.id, existing.id));
     return { record: { ...existing, featureId }, action: "updated" };
   }
 
-  const created = database
+  const id = insertId(await database
     .insert(useCases)
     .values({
       featureId,
@@ -909,27 +898,26 @@ function upsertUseCase(
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: useCases.id, featureId: useCases.featureId, title: useCases.title })
-    .get();
+  );
 
-  return { record: created, action: "created" };
+  return { record: { id, featureId, title: useCase.title }, action: "created" };
 }
 
-function upsertBacklogItem(
+async function upsertBacklogItem(
   database: DbClient,
   projectId: number,
   backlogItem: ParsedBacklogItem,
   featureId: number,
   execute: boolean,
   now: string
-): { record?: StoredBacklogItem; action: WikiImportAction } {
-  const existing = getBacklogItemByImportKey(database, projectId, backlogItem.importKey);
+): Promise<{ record?: StoredBacklogItem; action: WikiImportAction }> {
+  const existing = await getBacklogItemByImportKey(database, projectId, backlogItem.importKey);
   if (!execute) {
     return { record: existing, action: existing ? "updated" : "created" };
   }
 
   if (existing) {
-    database
+    await database
       .update(backlogItems)
       .set({
         featureId,
@@ -940,12 +928,11 @@ function upsertBacklogItem(
         sortOrder: backlogItem.sortOrder,
         updatedAt: now
       })
-      .where(eq(backlogItems.id, existing.id))
-      .run();
+      .where(eq(backlogItems.id, existing.id));
     return { record: existing, action: "updated" };
   }
 
-  const created = database
+  const id = insertId(await database
     .insert(backlogItems)
     .values({
       projectId,
@@ -959,20 +946,19 @@ function upsertBacklogItem(
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: backlogItems.id, projectId: backlogItems.projectId, importKey: backlogItems.importKey })
-    .get();
+  );
 
-  return { record: created, action: "created" };
+  return { record: { id, projectId, importKey: backlogItem.importKey }, action: "created" };
 }
 
-function upsertFeatureRelation(
+async function upsertFeatureRelation(
   database: DbClient,
   sourceFeature: StoredFeature,
   targetFeature: StoredFeature,
   relation: ParsedFeatureRelation,
   execute: boolean,
   now: string
-): WikiImportAction {
+): Promise<WikiImportAction> {
   if (sourceFeature.id === targetFeature.id) {
     return "skipped";
   }
@@ -981,12 +967,12 @@ function upsertFeatureRelation(
     if (sourceFeature.id <= 0 || targetFeature.id <= 0) {
       return "created";
     }
-    return getFeatureRelation(database, sourceFeature.id, targetFeature.id, relation.relationType) ? "updated" : "created";
+    return (await getFeatureRelation(database, sourceFeature.id, targetFeature.id, relation.relationType)) ? "updated" : "created";
   }
 
-  const existing = getFeatureRelation(database, sourceFeature.id, targetFeature.id, relation.relationType);
+  const existing = await getFeatureRelation(database, sourceFeature.id, targetFeature.id, relation.relationType);
   if (existing) {
-    database
+    await database
       .update(featureRelations)
       .set({
         description: relation.description,
@@ -998,12 +984,11 @@ function upsertFeatureRelation(
           eq(featureRelations.targetFeatureId, targetFeature.id),
           eq(featureRelations.relationType, relation.relationType)
         )
-      )
-      .run();
+      );
     return "updated";
   }
 
-  database
+  await database
     .insert(featureRelations)
     .values({
       sourceFeatureId: sourceFeature.id,
@@ -1012,20 +997,19 @@ function upsertFeatureRelation(
       description: relation.description,
       createdAt: now,
       updatedAt: now
-    })
-    .run();
+    });
 
   return "created";
 }
 
-function upsertTask(database: DbClient, projectId: number, task: ParsedTask, execute: boolean, now: string): { record?: StoredTask; action: WikiImportAction } {
-  const existing = getTaskByImportKey(database, projectId, task.importKey);
+async function upsertTask(database: DbClient, projectId: number, task: ParsedTask, execute: boolean, now: string): Promise<{ record?: StoredTask; action: WikiImportAction }> {
+  const existing = await getTaskByImportKey(database, projectId, task.importKey);
   if (!execute) {
     return { record: existing, action: existing ? "updated" : "created" };
   }
 
   if (existing) {
-    database
+    await database
       .update(tasks)
       .set({
         title: task.title,
@@ -1033,12 +1017,11 @@ function upsertTask(database: DbClient, projectId: number, task: ParsedTask, exe
         priority: task.priority,
         updatedAt: now
       })
-      .where(eq(tasks.id, existing.id))
-      .run();
+      .where(eq(tasks.id, existing.id));
     return { record: existing, action: "updated" };
   }
 
-  const created = database
+  const id = insertId(await database
     .insert(tasks)
     .values({
       parentId: null,
@@ -1052,14 +1035,14 @@ function upsertTask(database: DbClient, projectId: number, task: ParsedTask, exe
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: tasks.id, importKey: tasks.importKey })
-    .get();
-  database.insert(projectTasks).values({ ownerId: projectId, taskId: created.id, position: nextTaskPosition(database, projectId) }).run();
+  );
 
-  return { record: created, action: "created" };
+  await database.insert(projectTasks).values({ ownerId: projectId, taskId: id, position: await nextTaskPosition(database, projectId) });
+
+  return { record: { id, importKey: task.importKey }, action: "created" };
 }
 
-function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, taskId: number, feature: StoredFeature, execute: boolean): void {
+async function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, taskId: number, feature: StoredFeature, execute: boolean): Promise<void> {
   if (!execute && feature.id <= 0) {
     addResult(report, {
       type: "taskFeature",
@@ -1070,7 +1053,7 @@ function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, tas
     return;
   }
 
-  if (hasTaskFeature(database, taskId, feature.id)) {
+  if (await hasTaskFeature(database, taskId, feature.id)) {
     addResult(report, {
       type: "taskFeature",
       action: "skipped",
@@ -1081,7 +1064,7 @@ function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, tas
   }
 
   if (execute) {
-    database.insert(featureTasks).values({ ownerId: feature.id, taskId, position: 0 }).run();
+    await database.insert(featureTasks).values({ ownerId: feature.id, taskId, position: 0 });
   }
 
   addResult(report, {
@@ -1092,7 +1075,7 @@ function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, tas
   });
 }
 
-function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, taskId: number, useCase: StoredUseCase, execute: boolean): void {
+async function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, taskId: number, useCase: StoredUseCase, execute: boolean): Promise<void> {
   if (!execute && useCase.id <= 0) {
     addResult(report, {
       type: "taskUseCase",
@@ -1103,7 +1086,7 @@ function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, tas
     return;
   }
 
-  if (hasTaskUseCase(database, taskId, useCase.id)) {
+  if (await hasTaskUseCase(database, taskId, useCase.id)) {
     addResult(report, {
       type: "taskUseCase",
       action: "skipped",
@@ -1114,7 +1097,7 @@ function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, tas
   }
 
   if (execute) {
-    database.insert(useCaseTasks).values({ ownerId: useCase.id, taskId, position: 0 }).run();
+    await database.insert(useCaseTasks).values({ ownerId: useCase.id, taskId, position: 0 });
   }
 
   addResult(report, {
@@ -1125,7 +1108,7 @@ function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, tas
   });
 }
 
-function buildImportReport(database: DbClient, projectId: number, parsed: ParsedWiki, mode: WikiImportReport["mode"], execute: boolean): WikiImportReport {
+async function buildImportReport(database: DbClient, projectId: number, parsed: ParsedWiki, mode: WikiImportReport["mode"], execute: boolean): Promise<WikiImportReport> {
   const report: WikiImportReport = {
     projectId,
     sourcePath: parsed.sourcePath,
@@ -1144,11 +1127,11 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
   }
 
   for (const feature of parsed.features) {
-    const result = upsertFeature(database, feature, execute, now);
-    const record = result.record ?? getFeatureByTitle(database, feature.title) ?? (!execute ? { id: previewFeatureId--, title: feature.title } : undefined);
+    const result = await upsertFeature(database, feature, execute, now);
+    const record = result.record ?? await getFeatureByTitle(database, feature.title) ?? (!execute ? { id: previewFeatureId--, title: feature.title } : undefined);
     if (record) {
       featureRecordsByKey.set(feature.sourceKey, record);
-      reportProjectFeatureLink(report, database, projectId, record, execute);
+      await reportProjectFeatureLink(report, database, projectId, record, execute);
     }
     addResult(report, {
       type: "feature",
@@ -1160,7 +1143,7 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
   }
 
   for (const feature of parsed.features) {
-    const sourceFeature = featureRecordsByKey.get(feature.sourceKey) ?? getFeatureByTitle(database, feature.title);
+    const sourceFeature = featureRecordsByKey.get(feature.sourceKey) ?? await getFeatureByTitle(database, feature.title);
     if (!sourceFeature) {
       continue;
     }
@@ -1179,7 +1162,7 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
         continue;
       }
 
-      const action = upsertFeatureRelation(database, sourceFeature, targetFeature, relation, execute, now);
+      const action = await upsertFeatureRelation(database, sourceFeature, targetFeature, relation, execute, now);
       addResult(report, {
         type: "featureRelation",
         action,
@@ -1205,8 +1188,8 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
       continue;
     }
 
-    const result = upsertUseCase(database, useCase, feature.id, execute, now);
-    const record = result.record ?? getUseCaseByFeatureAndTitle(database, feature.id, useCase.title) ?? (!execute ? { id: previewUseCaseId--, featureId: feature.id, title: useCase.title } : undefined);
+    const result = await upsertUseCase(database, useCase, feature.id, execute, now);
+    const record = result.record ?? await getUseCaseByFeatureAndTitle(database, feature.id, useCase.title) ?? (!execute ? { id: previewUseCaseId--, featureId: feature.id, title: useCase.title } : undefined);
     if (record) {
       useCaseRecordsByKey.set(useCase.sourceKey, record);
     }
@@ -1233,7 +1216,7 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
       continue;
     }
 
-    const result = upsertBacklogItem(database, projectId, backlogItem, feature.id, execute, now);
+    const result = await upsertBacklogItem(database, projectId, backlogItem, feature.id, execute, now);
     addResult(report, {
       type: "backlogItem",
       action: result.action,
@@ -1244,8 +1227,8 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
   }
 
   for (const task of parsed.tasks) {
-    const result = upsertTask(database, projectId, task, execute, now);
-    const record = result.record ?? getTaskByImportKey(database, projectId, task.importKey);
+    const result = await upsertTask(database, projectId, task, execute, now);
+    const record = result.record ?? await getTaskByImportKey(database, projectId, task.importKey);
     addResult(report, {
       type: "task",
       action: result.action,
@@ -1263,18 +1246,18 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
       const feature = featureRecordsByKey.get(featureKey);
       if (feature && !linkedFeatureIds.has(feature.id)) {
         linkedFeatureIds.add(feature.id);
-        reportTaskFeatureLink(report, database, record.id, feature, execute);
+        await reportTaskFeatureLink(report, database, record.id, feature, execute);
       }
     }
 
     for (const useCaseKey of task.useCaseKeys) {
       const useCase = useCaseRecordsByKey.get(useCaseKey);
       if (useCase) {
-        reportTaskUseCaseLink(report, database, record.id, useCase, execute);
+        await reportTaskUseCaseLink(report, database, record.id, useCase, execute);
         const feature = [...featureRecordsByKey.values()].find((candidate) => candidate.id === useCase.featureId);
         if (feature && !linkedFeatureIds.has(feature.id)) {
           linkedFeatureIds.add(feature.id);
-          reportTaskFeatureLink(report, database, record.id, feature, execute);
+          await reportTaskFeatureLink(report, database, record.id, feature, execute);
         }
       }
     }
@@ -1283,14 +1266,14 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
   return report;
 }
 
-export function previewWikiImport(database: DbClient, projectId: number, input: WikiImportRunRequest): WikiImportReport {
-  ensureProjectExists(database, projectId);
+export async function previewWikiImport(database: DbClient, projectId: number, input: WikiImportRunRequest): Promise<WikiImportReport> {
+  await ensureProjectExists(database, projectId);
   const parsed = parseWikiSource(input.sourcePath);
   return buildImportReport(database, projectId, parsed, "preview", false);
 }
 
-export function runWikiImport(database: DbClient, projectId: number, input: WikiImportRunRequest): WikiImportReport {
-  ensureProjectExists(database, projectId);
+export async function runWikiImport(database: DbClient, projectId: number, input: WikiImportRunRequest): Promise<WikiImportReport> {
+  await ensureProjectExists(database, projectId);
   const parsed = parseWikiSource(input.sourcePath);
   return database.transaction((tx) => buildImportReport(tx as unknown as DbClient, projectId, parsed, "run", true));
 }

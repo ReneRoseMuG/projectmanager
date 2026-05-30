@@ -9,6 +9,7 @@ import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { config } from "../config.js";
 import type { DbClient } from "../db/client.js";
+import { firstRow } from "../db/query-utils.js";
 import { attachments } from "../db/schema.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { badRequest, notFound } from "../utils/errors.js";
@@ -279,7 +280,7 @@ function failedPreview(record: AttachmentRecord, profile: AttachmentPreviewProfi
 }
 
 export async function getAttachmentPreview(database: DbClient, id: number): Promise<AttachmentPreviewInfo> {
-  const record = database.select().from(attachments).where(eq(attachments.id, id)).get();
+  const record = firstRow(await database.select().from(attachments).where(eq(attachments.id, id)));
   if (!record) {
     throw notFound(`Attachment with id ${id} not found`);
   }

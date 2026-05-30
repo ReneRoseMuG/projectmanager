@@ -1,5 +1,6 @@
-import { eq } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { eq } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { projects } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -12,17 +13,17 @@ function nowIso(): string {
 }
 
 export const projectRepository = {
-  findById(database: DbClient, id: number): ProjectRecord | undefined {
-    return database.select().from(projects).where(eq(projects.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<ProjectRecord | undefined> {
+    return firstRow(await database.select().from(projects).where(eq(projects.id, id)));
   },
 
-  findAll(database: DbClient): ProjectRecord[] {
-    return database.select().from(projects).all();
+  async findAll(database: DbSession): Promise<ProjectRecord[]> {
+    return database.select().from(projects);
   },
 
-  create(database: DbClient, data: ProjectCreateData, userId?: number): ProjectRecord {
+  async create(database: DbSession, data: ProjectCreateData, userId?: number): Promise<ProjectRecord> {
     const now = nowIso();
-    return database
+    const result = await database
       .insert(projects)
       .values({
         ...data,
@@ -31,18 +32,21 @@ export const projectRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, insertId(result));
+    if (!created) {
+      throw new Error("Created project could not be loaded");
+    }
+    return created;
   },
 
-  update(database: DbClient, id: number, expectedVersion: number, data: ProjectUpdateData, userId?: number): ProjectRecord | undefined {
-    const current = this.findById(database, id);
+  async update(database: DbSession, id: number, expectedVersion: number, data: ProjectUpdateData, userId?: number): Promise<ProjectRecord | undefined> {
+    const current = await this.findById(database, id);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    return database
+    await database
       .update(projects)
       .set({
         ...data,
@@ -50,12 +54,12 @@ export const projectRepository = {
         updatedBy: userId ?? null,
         updatedAt: nowIso()
       })
-      .where(eq(projects.id, id))
-      .returning()
-      .get();
+      .where(eq(projects.id, id));
+    return this.findById(database, id);
   },
 
-  delete(database: DbClient, id: number): number {
-    return database.delete(projects).where(eq(projects.id, id)).run().changes;
+  async delete(database: DbSession, id: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(projects).where(eq(projects.id, id)));
   }
 };
+

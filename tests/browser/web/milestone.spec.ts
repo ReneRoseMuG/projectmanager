@@ -161,10 +161,12 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       await expect(milestoneForm).toContainText("e2e-milestone.txt");
 
       await milestoneForm.getByRole("button", { name: /Kommentare/ }).click();
-      await fillRichText(milestoneForm, "comment-thread-body", "E2E Live Kommentar");
+      await milestoneForm.getByRole("button", { name: "Kommentar anlegen" }).click();
+      const commentModal = formPage(page, "Kommentar anlegen");
+      await fillRichText(commentModal, "comment-thread-create-editor", "E2E Live Kommentar");
       await Promise.all([
         page.waitForResponse((response) => response.url().includes(`/api/milestones/${milestone.id}/comments`) && response.request().method() === "POST"),
-        milestoneForm.getByRole("button", { name: "Kommentar", exact: true }).click()
+        commentModal.getByRole("button", { name: "Anlegen" }).click()
       ]);
       await expect(milestoneForm.getByRole("button", { name: /Kommentare\s+2/ })).toBeVisible();
       await expect(milestoneForm).toContainText("E2E Live Kommentar");

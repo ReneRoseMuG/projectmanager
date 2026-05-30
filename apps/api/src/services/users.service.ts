@@ -35,16 +35,16 @@ function assertPassword(value: string | undefined, required: boolean): string | 
   return value;
 }
 
-function resolveRole(database: DbClient, roleId: number): Role {
-  const role = roleRepository.findById(database, roleId);
+async function resolveRole(database: DbClient, roleId: number): Promise<Role> {
+  const role = await roleRepository.findById(database, roleId);
   if (!role) {
     throw badRequest(`Role with id ${roleId} does not exist`);
   }
-  return mapRole(role, roleRepository.findPermissionsByRoleId(database, role.id));
+  return mapRole(role, await roleRepository.findPermissionsByRoleId(database, role.id));
 }
 
-export function mapAdminUser(database: DbClient, record: UserRecord): AdminUser {
-  const role = resolveRole(database, record.roleId);
+export async function mapAdminUser(database: DbClient, record: UserRecord): Promise<AdminUser> {
+  const role = await resolveRole(database, record.roleId);
   return {
     id: record.id,
     firstName: record.firstName,
@@ -61,8 +61,9 @@ export function mapAdminUser(database: DbClient, record: UserRecord): AdminUser 
   };
 }
 
-export function listAdminUsers(database: DbClient): AdminUser[] {
-  return userRepository.findAll(database).map((user) => mapAdminUser(database, user));
+export async function listAdminUsers(database: DbClient): Promise<AdminUser[]> {
+  const users = await userRepository.findAll(database);
+  return Promise.all(users.map((user) => mapAdminUser(database, user)));
 }
 
 export function mapUserOption(record: UserRecord): UserOption {
@@ -75,34 +76,34 @@ export function mapUserOption(record: UserRecord): UserOption {
   };
 }
 
-export function listUserOptions(database: DbClient): UserOption[] {
-  return userRepository.findActive(database).map(mapUserOption);
+export async function listUserOptions(database: DbClient): Promise<UserOption[]> {
+  return (await userRepository.findActive(database)).map(mapUserOption);
 }
 
-export function getUserOption(database: DbClient, id: number | null | undefined): UserOption | null {
+export async function getUserOption(database: DbClient, id: number | null | undefined): Promise<UserOption | null> {
   if (id === null || id === undefined) {
     return null;
   }
-  const user = userRepository.findById(database, id);
+  const user = await userRepository.findById(database, id);
   return user ? mapUserOption(user) : null;
 }
 
-export function normalizeAssignableUserId(database: DbClient, value: number | null | undefined, field: string): number | null {
+export async function normalizeAssignableUserId(database: DbClient, value: number | null | undefined, field: string): Promise<number | null> {
   if (value === null || value === undefined) {
     return null;
   }
   if (!Number.isInteger(value) || value < 1) {
     throw badRequest(`${field} must reference a valid user`);
   }
-  const user = userRepository.findById(database, value);
+  const user = await userRepository.findById(database, value);
   if (!user || !user.isActive) {
     throw badRequest(`User with id ${value} does not exist or is inactive`);
   }
   return user.id;
 }
 
-export function getAdminUser(database: DbClient, id: number): AdminUser {
-  const user = userRepository.findById(database, id);
+export async function getAdminUser(database: DbClient, id: number): Promise<AdminUser> {
+  const user = await userRepository.findById(database, id);
   if (!user) {
     throw notFound(`User with id ${id} not found`);
   }
@@ -111,13 +112,13 @@ export function getAdminUser(database: DbClient, id: number): AdminUser {
 
 export async function createAdminUser(database: DbClient, input: AdminUserInput): Promise<AdminUser> {
   const email = normalizeEmail(input.email);
-  if (userRepository.findByEmail(database, email)) {
+  if (await userRepository.findByEmail(database, email)) {
     throw conflict(`User with email ${email} already exists`);
   }
   const password = assertPassword(input.password, true);
   const passwordHash = await bcrypt.hash(password ?? "", passwordSaltRounds);
-  const role = resolveRole(database, input.roleId);
-  const created = userRepository.create(database, {
+  const role = await resolveRole(database, input.roleId);
+  const created = await userRepository.create(database, {
     firstName: normalizeName(input.firstName, "firstName"),
     lastName: normalizeName(input.lastName, "lastName"),
     address: cleanNullable(input.address) ?? null,
@@ -130,20 +131,20 @@ export async function createAdminUser(database: DbClient, input: AdminUserInput)
   return mapAdminUser(database, created);
 }
 
-function assertLastAdminCanChange(database: DbClient, current: UserRecord, values: UserUpdateData): void {
-  const currentRole = roleRepository.findById(database, current.roleId);
+async function assertLastAdminCanChange(database: DbClient, current: UserRecord, values: UserUpdateData): Promise<void> {
+  const currentRole = await roleRepository.findById(database, current.roleId);
   if (currentRole?.key !== "admin" || !current.isActive) {
     return;
   }
-  const nextRole = values.roleId !== undefined ? roleRepository.findById(database, values.roleId) : currentRole;
+  const nextRole = values.roleId !== undefined ? await roleRepository.findById(database, values.roleId) : currentRole;
   const staysActiveAdmin = (values.isActive ?? current.isActive) && nextRole?.key === "admin";
-  if (!staysActiveAdmin && !hasAnotherActiveAdmin(database, current.id)) {
+  if (!staysActiveAdmin && !(await hasAnotherActiveAdmin(database, current.id))) {
     throw conflict("At least one active admin user must remain");
   }
 }
 
 export async function updateAdminUser(database: DbClient, id: number, input: AdminUserUpdate): Promise<AdminUser> {
-  const current = userRepository.findById(database, id);
+  const current = await userRepository.findById(database, id);
   if (!current) {
     throw notFound(`User with id ${id} not found`);
   }
@@ -163,14 +164,14 @@ export async function updateAdminUser(database: DbClient, id: number, input: Adm
   }
   if (input.email !== undefined) {
     const email = normalizeEmail(input.email);
-    const existing = userRepository.findByEmail(database, email);
+    const existing = await userRepository.findByEmail(database, email);
     if (existing && existing.id !== id) {
       throw conflict(`User with email ${email} already exists`);
     }
     values.email = email;
   }
   if (input.roleId !== undefined) {
-    values.roleId = resolveRole(database, input.roleId).id;
+    values.roleId = (await resolveRole(database, input.roleId)).id;
   }
   if (input.isActive !== undefined) {
     values.isActive = input.isActive;
@@ -180,22 +181,22 @@ export async function updateAdminUser(database: DbClient, id: number, input: Adm
     values.passwordHash = await bcrypt.hash(password, passwordSaltRounds);
   }
 
-  assertLastAdminCanChange(database, current, values);
-  const updated = userRepository.update(database, id, input.expectedVersion, values);
+  await assertLastAdminCanChange(database, current, values);
+  const updated = await userRepository.update(database, id, input.expectedVersion, values);
   if (!updated) {
     throw notFound(`User with id ${id} not found`);
   }
   return mapAdminUser(database, updated);
 }
 
-export function deleteAdminUser(database: DbClient, id: number, actorUserId: number): void {
+export async function deleteAdminUser(database: DbClient, id: number, actorUserId: number): Promise<void> {
   if (id === actorUserId) {
     throw badRequest("Admins cannot delete their own user");
   }
-  const current = userRepository.findById(database, id);
+  const current = await userRepository.findById(database, id);
   if (!current) {
     throw notFound(`User with id ${id} not found`);
   }
-  assertLastAdminCanChange(database, current, { isActive: false });
-  userRepository.delete(database, id);
+  await assertLastAdminCanChange(database, current, { isActive: false });
+  await userRepository.delete(database, id);
 }

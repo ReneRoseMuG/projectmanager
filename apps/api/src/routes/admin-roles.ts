@@ -1,4 +1,4 @@
-import type { RoleInput, RoleUpdate } from "@taskmanager/shared-types";
+﻿import type { RoleInput, RoleUpdate } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
 import { createRole, deleteRole, getPermissionCatalog, getRole, listRoles, updateRole } from "../services/roles.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, objectResponseSchema } from "../utils/route-schemas.js";
@@ -57,7 +57,7 @@ export async function registerAdminRoleRoutes(app: FastifyInstance): Promise<voi
   app.post<{ Body: RoleInput }>(
     "/admin/roles",
     { schema: { body: roleCreateBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createRole(app.db, request.body))
+    async (request, reply) => reply.status(201).send(await createRole(app.db, request.body))
   );
 
   app.put<{ Params: { id: number }; Body: RoleUpdate }>(
@@ -70,7 +70,7 @@ export async function registerAdminRoleRoutes(app: FastifyInstance): Promise<voi
     "/admin/roles/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteRole(app.db, request.params.id);
+      await deleteRole(app.db, request.params.id);
       return reply.status(204).send();
     }
   );

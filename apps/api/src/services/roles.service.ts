@@ -12,6 +12,7 @@ import {
 } from "@taskmanager/shared-types";
 import { eq, sql } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
+import { firstRow } from "../db/query-utils.js";
 import { users } from "../db/schema.js";
 import {
   roleRepository,
@@ -107,48 +108,48 @@ function normalizePermissions(input: PermissionInput[] | undefined): PermissionC
   return result;
 }
 
-function roleUserCount(database: DbClient, roleId: number): number {
-  const row = database.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.roleId, roleId)).get();
+async function roleUserCount(database: DbClient, roleId: number): Promise<number> {
+  const row = firstRow(await database.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.roleId, roleId)));
   return Number(row?.count ?? 0);
 }
 
-export function listRoles(database: DbClient): Role[] {
-  const records = roleRepository.findAll(database);
-  const permissionRecords = roleRepository.findPermissionsByRoleIds(database, records.map((role) => role.id));
+export async function listRoles(database: DbClient): Promise<Role[]> {
+  const records = await roleRepository.findAll(database);
+  const permissionRecords = await roleRepository.findPermissionsByRoleIds(database, records.map((role) => role.id));
   return records.map((role) => mapRole(role, permissionRecords));
 }
 
-export function getRole(database: DbClient, id: number): Role {
-  const role = roleRepository.findById(database, id);
+export async function getRole(database: DbClient, id: number): Promise<Role> {
+  const role = await roleRepository.findById(database, id);
   if (!role) {
     throw notFound(`Role with id ${id} not found`);
   }
-  return mapRole(role, roleRepository.findPermissionsByRoleId(database, id));
+  return mapRole(role, await roleRepository.findPermissionsByRoleId(database, id));
 }
 
-export function getRoleByKey(database: DbClient, key: string): Role | undefined {
-  const role = roleRepository.findByKey(database, key);
-  return role ? mapRole(role, roleRepository.findPermissionsByRoleId(database, role.id)) : undefined;
+export async function getRoleByKey(database: DbClient, key: string): Promise<Role | undefined> {
+  const role = await roleRepository.findByKey(database, key);
+  return role ? mapRole(role, await roleRepository.findPermissionsByRoleId(database, role.id)) : undefined;
 }
 
-export function createRole(database: DbClient, input: RoleInput): Role {
+export async function createRole(database: DbClient, input: RoleInput): Promise<Role> {
   const key = normalizeRoleKey(input.key);
-  if (roleRepository.findByKey(database, key)) {
+  if (await roleRepository.findByKey(database, key)) {
     throw conflict(`Role "${key}" already exists`);
   }
 
   const label = normalizeRoleLabel(input.label);
   const permissionValues = normalizePermissions(input.permissions);
-  const created = database.transaction((tx) => {
-    const role = roleRepository.create(tx as unknown as DbClient, { key, label, isSystem: false });
-    const createdPermissions = roleRepository.replacePermissions(tx as unknown as DbClient, role.id, permissionValues);
+  const created = await database.transaction(async (tx) => {
+    const role = await roleRepository.create(tx as unknown as DbClient, { key, label, isSystem: false });
+    const createdPermissions = await roleRepository.replacePermissions(tx as unknown as DbClient, role.id, permissionValues);
     return mapRole(role, createdPermissions);
   });
   return created;
 }
 
-export function updateRole(database: DbClient, id: number, input: RoleUpdate): Role {
-  const current = roleRepository.findById(database, id);
+export async function updateRole(database: DbClient, id: number, input: RoleUpdate): Promise<Role> {
+  const current = await roleRepository.findById(database, id);
   if (!current) {
     throw notFound(`Role with id ${id} not found`);
   }
@@ -159,7 +160,7 @@ export function updateRole(database: DbClient, id: number, input: RoleUpdate): R
       throw badRequest("System role keys cannot be changed");
     }
     const key = normalizeRoleKey(input.key);
-    const existing = roleRepository.findByKey(database, key);
+    const existing = await roleRepository.findByKey(database, key);
     if (existing && existing.id !== id) {
       throw conflict(`Role "${key}" already exists`);
     }
@@ -170,31 +171,31 @@ export function updateRole(database: DbClient, id: number, input: RoleUpdate): R
   }
 
   const permissionValues = input.permissions !== undefined ? normalizePermissions(input.permissions) : undefined;
-  const updated = database.transaction((tx) => {
-    const role = roleRepository.update(tx as unknown as DbClient, id, input.expectedVersion, values);
+  const updated = await database.transaction(async (tx) => {
+    const role = await roleRepository.update(tx as unknown as DbClient, id, input.expectedVersion, values);
     if (!role) {
       throw notFound(`Role with id ${id} not found`);
     }
     const permissions = permissionValues
-      ? roleRepository.replacePermissions(tx as unknown as DbClient, role.id, permissionValues)
-      : roleRepository.findPermissionsByRoleId(tx as unknown as DbClient, role.id);
+      ? await roleRepository.replacePermissions(tx as unknown as DbClient, role.id, permissionValues)
+      : await roleRepository.findPermissionsByRoleId(tx as unknown as DbClient, role.id);
     return mapRole(role, permissions);
   });
   return updated;
 }
 
-export function deleteRole(database: DbClient, id: number): void {
-  const role = roleRepository.findById(database, id);
+export async function deleteRole(database: DbClient, id: number): Promise<void> {
+  const role = await roleRepository.findById(database, id);
   if (!role) {
     throw notFound(`Role with id ${id} not found`);
   }
   if (role.isSystem) {
     throw badRequest("System roles cannot be deleted");
   }
-  if (roleUserCount(database, id) > 0) {
+  if ((await roleUserCount(database, id)) > 0) {
     throw conflict("Cannot delete a role that is assigned to users");
   }
-  roleRepository.delete(database, id);
+  await roleRepository.delete(database, id);
 }
 
 export function getPermissionCatalog(): PermissionCatalog {
@@ -212,28 +213,26 @@ export function hasPermission(role: Role, resource: AuthResource, action: AuthAc
   );
 }
 
-export function hasAnotherActiveAdmin(database: DbClient, userId: number): boolean {
-  const adminRole = roleRepository.findByKey(database, "admin");
+export async function hasAnotherActiveAdmin(database: DbClient, userId: number): Promise<boolean> {
+  const adminRole = await roleRepository.findByKey(database, "admin");
   if (!adminRole) {
     return false;
   }
-  const row = database
+  const row = firstRow(await database
     .select({ count: sql<number>`count(*)` })
     .from(users)
-    .where(sql`${users.roleId} = ${adminRole.id} and ${users.isActive} = 1 and ${users.id} <> ${userId}`)
-    .get();
+    .where(sql`${users.roleId} = ${adminRole.id} and ${users.isActive} = 1 and ${users.id} <> ${userId}`));
   return Number(row?.count ?? 0) > 0;
 }
 
-export function activeAdminCount(database: DbClient): number {
-  const adminRole = roleRepository.findByKey(database, "admin");
+export async function activeAdminCount(database: DbClient): Promise<number> {
+  const adminRole = await roleRepository.findByKey(database, "admin");
   if (!adminRole) {
     return 0;
   }
-  const row = database
+  const row = firstRow(await database
     .select({ count: sql<number>`count(*)` })
     .from(users)
-    .where(sql`${users.roleId} = ${adminRole.id} and ${users.isActive} = 1`)
-    .get();
+    .where(sql`${users.roleId} = ${adminRole.id} and ${users.isActive} = 1`));
   return Number(row?.count ?? 0);
 }

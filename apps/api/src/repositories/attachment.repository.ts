@@ -1,5 +1,6 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { attachments } from "../db/schema.js";
 
 export type AttachmentRecord = typeof attachments.$inferSelect;
@@ -10,21 +11,21 @@ function nowIso(): string {
 }
 
 export const attachmentRepository = {
-  findById(database: DbSession, id: number): AttachmentRecord | undefined {
-    return database.select().from(attachments).where(eq(attachments.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<AttachmentRecord | undefined> {
+    return firstRow(await database.select().from(attachments).where(eq(attachments.id, id)));
   },
 
-  findCleanupRecords(database: DbSession, ids: number[]): Array<Pick<AttachmentRecord, "id" | "filename">> {
+  async findCleanupRecords(database: DbSession, ids: number[]): Promise<Array<Pick<AttachmentRecord, "id" | "filename">>> {
     const uniqueIds = [...new Set(ids)];
     if (uniqueIds.length === 0) {
       return [];
     }
-    return database.select({ id: attachments.id, filename: attachments.filename }).from(attachments).where(inArray(attachments.id, uniqueIds)).all();
+    return database.select({ id: attachments.id, filename: attachments.filename }).from(attachments).where(inArray(attachments.id, uniqueIds));
   },
 
-  create(database: DbSession, data: AttachmentCreateData, userId?: number): AttachmentRecord {
+  async create(database: DbSession, data: AttachmentCreateData, userId?: number): Promise<AttachmentRecord> {
     const now = nowIso();
-    return database
+    const result = await database
       .insert(attachments)
       .values({
         ...data,
@@ -33,21 +34,24 @@ export const attachmentRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, insertId(result));
+    if (!created) {
+      throw new Error("Created attachment could not be loaded");
+    }
+    return created;
   },
 
-  deleteByIds(database: DbSession, ids: number[]): number {
+  async deleteByIds(database: DbSession, ids: number[]): Promise<number> {
     const uniqueIds = [...new Set(ids)];
     if (uniqueIds.length === 0) {
       return 0;
     }
-    return database.delete(attachments).where(inArray(attachments.id, uniqueIds)).run().changes;
+    return mutationAffectedRows(await database.delete(attachments).where(inArray(attachments.id, uniqueIds)));
   },
 
-  updateSizeAndVersion(database: DbSession, id: number, data: { size: number; updatedBy: number | null }): void {
-    database
+  async updateSizeAndVersion(database: DbSession, id: number, data: { size: number; updatedBy: number | null }): Promise<void> {
+    await database
       .update(attachments)
       .set({
         size: data.size,
@@ -55,7 +59,6 @@ export const attachmentRepository = {
         updatedAt: nowIso(),
         version: sql`${attachments.version} + 1`
       })
-      .where(eq(attachments.id, id))
-      .run();
+      .where(eq(attachments.id, id));
   }
 };

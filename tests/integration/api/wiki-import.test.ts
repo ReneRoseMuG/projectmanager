@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -33,12 +33,12 @@ describe("Wiki Import API", () => {
     tmpContentDir = fs.mkdtempSync(path.join(os.tmpdir(), "taskmanager-content-"));
     tmpWikiRoot = fs.mkdtempSync(path.join(os.tmpdir(), "taskmanager-wiki-"));
     setContentBaseDir(tmpContentDir);
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => {
-    truncateAll(testDb.sqlite);
+  beforeEach(async () => {
+    await truncateAll(testDb.pool);
     fs.rmSync(tmpContentDir, { recursive: true, force: true });
     fs.rmSync(tmpWikiRoot, { recursive: true, force: true });
     fs.mkdirSync(tmpContentDir, { recursive: true });
@@ -47,8 +47,8 @@ describe("Wiki Import API", () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
     fs.rmSync(tmpContentDir, { recursive: true, force: true });
     fs.rmSync(tmpWikiRoot, { recursive: true, force: true });
   });
@@ -115,7 +115,8 @@ describe("Wiki Import API", () => {
     expect(tasks.body).toHaveLength(1);
     expect(tasks.body[0].title).toBe("Importierte Aufgabe aktualisiert");
 
-    const importKeyRows = testDb.sqlite.prepare("SELECT import_key FROM tasks").all() as Array<{ import_key: string }>;
+    const [importKeyRowsRaw] = await testDb.pool.execute("SELECT import_key FROM tasks");
+    const importKeyRows = importKeyRowsRaw as Array<{ import_key: string }>;
     expect(importKeyRows).toEqual([{ import_key: "wiki:tasks/importierte-aufgabe.md" }]);
   });
 

@@ -28,7 +28,6 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   });
 
   app.decorate("db", testDb.db);
-  app.decorate("sqlite", testDb.sqlite);
   app.decorate("fileOpener", options.fileOpener ?? unavailableFileOpener);
   app.decorate("realtimeBus", createRealtimeEventBus());
 

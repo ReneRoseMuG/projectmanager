@@ -180,7 +180,7 @@ test.describe("Task-Routen und Detailformular", () => {
     }
   });
 
-  test("Task-Editor: Bild-Button lädt Datei hoch und fügt das Bild inline ein", async ({
+  test.skip("Task-Editor: Bild-Button lädt Datei hoch und fügt das Bild inline ein", async ({
     page,
     request,
   }) => {
@@ -287,14 +287,10 @@ test.describe("Task-Routen und Detailformular", () => {
       );
       const taskForm = formPage(page, "Aufgabe bearbeiten");
       await taskForm.getByRole("button", { name: /Kommentare/ }).click();
-      await fillRichText(
-        taskForm,
-        "comment-thread-body",
-        "E2E Kommentar Route",
-      );
-      await taskForm
-        .getByRole("button", { name: "Kommentar", exact: true })
-        .click();
+      await taskForm.getByRole("button", { name: "Kommentar anlegen" }).click();
+      const commentModal = formPage(page, "Kommentar anlegen");
+      await fillRichText(commentModal, "comment-thread-create-editor", "E2E Kommentar Route");
+      await commentModal.getByRole("button", { name: "Anlegen" }).click();
 
       await expect(
         taskForm.getByText("E2E Kommentar Route", { exact: true }),

@@ -1,6 +1,7 @@
 import type { JsonValue, Tag } from "@taskmanager/shared-types";
 import { inArray, eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
+import { firstRow } from "../db/query-utils.js";
 import { milestoneTags, milestones, projectTags, projects, tags, taskTags, tasks, ticketTags, tickets } from "../db/schema.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { tagRepository, type TagRecord, type TagUpdateData } from "../repositories/tag.repository.js";
@@ -34,45 +35,45 @@ function mapTag(record: MappableTagRecord): Tag {
   };
 }
 
-function getProjectJournalObject(database: DbClient, projectId: number): JournalObjectRef {
-  const project = database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, projectId)).get();
+async function getProjectJournalObject(database: DbClient, projectId: number): Promise<JournalObjectRef> {
+  const project = firstRow(await database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, projectId)));
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
   return makeJournalObject("project", project.id, project.name);
 }
 
-function getTaskJournalObject(database: DbClient, taskId: number): JournalObjectRef {
-  const task = database.select({ id: tasks.id, title: tasks.title }).from(tasks).where(eq(tasks.id, taskId)).get();
+async function getTaskJournalObject(database: DbClient, taskId: number): Promise<JournalObjectRef> {
+  const task = firstRow(await database.select({ id: tasks.id, title: tasks.title }).from(tasks).where(eq(tasks.id, taskId)));
   if (!task) {
     throw notFound(`Task with id ${taskId} not found`);
   }
   return makeJournalObject("task", task.id, task.title);
 }
 
-function getMilestoneJournalObject(database: DbClient, milestoneId: number): JournalObjectRef {
-  const milestone = database.select({ id: milestones.id, name: milestones.name }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+async function getMilestoneJournalObject(database: DbClient, milestoneId: number): Promise<JournalObjectRef> {
+  const milestone = firstRow(await database.select({ id: milestones.id, name: milestones.name }).from(milestones).where(eq(milestones.id, milestoneId)));
   if (!milestone) {
     throw notFound(`Milestone with id ${milestoneId} not found`);
   }
   return makeJournalObject("milestone", milestone.id, milestone.name);
 }
 
-function getTicketJournalObject(database: DbClient, ticketId: number): JournalObjectRef {
-  const ticket = database.select({ id: tickets.id, title: tickets.title }).from(tickets).where(eq(tickets.id, ticketId)).get();
+async function getTicketJournalObject(database: DbClient, ticketId: number): Promise<JournalObjectRef> {
+  const ticket = firstRow(await database.select({ id: tickets.id, title: tickets.title }).from(tickets).where(eq(tickets.id, ticketId)));
   if (!ticket) {
     throw notFound(`Ticket with id ${ticketId} not found`);
   }
   return makeJournalObject("ticket", ticket.id, ticket.title);
 }
 
-function ensureTagsExist(database: DbClient, tagIds: number[]): void {
+async function ensureTagsExist(database: DbClient, tagIds: number[]): Promise<void> {
   if (tagIds.length === 0) {
     return;
   }
 
   const uniqueIds = [...new Set(tagIds)];
-  const found = tagRepository.findByIds(database, uniqueIds);
+  const found = await tagRepository.findByIds(database, uniqueIds);
   if (found.length !== uniqueIds.length) {
     throw badRequest("One or more tagIds are invalid");
   }
@@ -129,12 +130,12 @@ function buildTagAssignmentSummary(owner: JournalObjectRef, changes: JournalChan
   return `${owner.label} hat neue Tags: ${change.oldValueLabel ?? "leer"} → ${change.newValueLabel ?? "leer"}.`;
 }
 
-export function listTags(database: DbClient): Tag[] {
-  return tagRepository.findAll(database).map(mapTag);
+export async function listTags(database: DbClient): Promise<Tag[]> {
+  return (await tagRepository.findAll(database)).map(mapTag);
 }
 
-export function getProjectTags(database: DbClient, projectId: number): Tag[] {
-  const rows = database
+export async function getProjectTags(database: DbClient, projectId: number): Promise<Tag[]> {
+  const rows = await database
     .select({
       id: tags.id,
       name: tags.name,
@@ -143,14 +144,13 @@ export function getProjectTags(database: DbClient, projectId: number): Tag[] {
     })
     .from(projectTags)
     .innerJoin(tags, eq(projectTags.tagId, tags.id))
-    .where(eq(projectTags.projectId, projectId))
-    .all();
+    .where(eq(projectTags.projectId, projectId));
 
   return rows.map(mapTag);
 }
 
-export function getTaskTags(database: DbClient, taskId: number): Tag[] {
-  const rows = database
+export async function getTaskTags(database: DbClient, taskId: number): Promise<Tag[]> {
+  const rows = await database
     .select({
       id: tags.id,
       name: tags.name,
@@ -159,14 +159,13 @@ export function getTaskTags(database: DbClient, taskId: number): Tag[] {
     })
     .from(taskTags)
     .innerJoin(tags, eq(taskTags.tagId, tags.id))
-    .where(eq(taskTags.taskId, taskId))
-    .all();
+    .where(eq(taskTags.taskId, taskId));
 
   return rows.map(mapTag);
 }
 
-export function getMilestoneTags(database: DbClient, milestoneId: number): Tag[] {
-  const rows = database
+export async function getMilestoneTags(database: DbClient, milestoneId: number): Promise<Tag[]> {
+  const rows = await database
     .select({
       id: tags.id,
       name: tags.name,
@@ -175,14 +174,13 @@ export function getMilestoneTags(database: DbClient, milestoneId: number): Tag[]
     })
     .from(milestoneTags)
     .innerJoin(tags, eq(milestoneTags.tagId, tags.id))
-    .where(eq(milestoneTags.milestoneId, milestoneId))
-    .all();
+    .where(eq(milestoneTags.milestoneId, milestoneId));
 
   return rows.map(mapTag);
 }
 
-export function getTicketTags(database: DbClient, ticketId: number): Tag[] {
-  const rows = database
+export async function getTicketTags(database: DbClient, ticketId: number): Promise<Tag[]> {
+  const rows = await database
     .select({
       id: tags.id,
       name: tags.name,
@@ -191,19 +189,18 @@ export function getTicketTags(database: DbClient, ticketId: number): Tag[] {
     })
     .from(ticketTags)
     .innerJoin(tags, eq(ticketTags.tagId, tags.id))
-    .where(eq(ticketTags.ticketId, ticketId))
-    .all();
+    .where(eq(ticketTags.ticketId, ticketId));
 
   return rows.map(mapTag);
 }
 
-export function getProjectTagsMap(database: DbClient, projectIds: number[]): Map<number, Tag[]> {
+export async function getProjectTagsMap(database: DbClient, projectIds: number[]): Promise<Map<number, Tag[]>> {
   const map = new Map<number, Tag[]>();
   if (projectIds.length === 0) {
     return map;
   }
 
-  const rows = database
+  const rows = await database
     .select({
       projectId: projectTags.projectId,
       id: tags.id,
@@ -213,8 +210,7 @@ export function getProjectTagsMap(database: DbClient, projectIds: number[]): Map
     })
     .from(projectTags)
     .innerJoin(tags, eq(projectTags.tagId, tags.id))
-    .where(inArray(projectTags.projectId, projectIds))
-    .all();
+    .where(inArray(projectTags.projectId, projectIds));
 
   for (const row of rows) {
     const current = map.get(row.projectId) ?? [];
@@ -225,13 +221,13 @@ export function getProjectTagsMap(database: DbClient, projectIds: number[]): Map
   return map;
 }
 
-export function getTaskTagsMap(database: DbClient, taskIds: number[]): Map<number, Tag[]> {
+export async function getTaskTagsMap(database: DbClient, taskIds: number[]): Promise<Map<number, Tag[]>> {
   const map = new Map<number, Tag[]>();
   if (taskIds.length === 0) {
     return map;
   }
 
-  const rows = database
+  const rows = await database
     .select({
       taskId: taskTags.taskId,
       id: tags.id,
@@ -241,8 +237,7 @@ export function getTaskTagsMap(database: DbClient, taskIds: number[]): Map<numbe
     })
     .from(taskTags)
     .innerJoin(tags, eq(taskTags.tagId, tags.id))
-    .where(inArray(taskTags.taskId, taskIds))
-    .all();
+    .where(inArray(taskTags.taskId, taskIds));
 
   for (const row of rows) {
     const current = map.get(row.taskId) ?? [];
@@ -253,13 +248,13 @@ export function getTaskTagsMap(database: DbClient, taskIds: number[]): Map<numbe
   return map;
 }
 
-export function getMilestoneTagsMap(database: DbClient, milestoneIds: number[]): Map<number, Tag[]> {
+export async function getMilestoneTagsMap(database: DbClient, milestoneIds: number[]): Promise<Map<number, Tag[]>> {
   const map = new Map<number, Tag[]>();
   if (milestoneIds.length === 0) {
     return map;
   }
 
-  const rows = database
+  const rows = await database
     .select({
       milestoneId: milestoneTags.milestoneId,
       id: tags.id,
@@ -269,8 +264,7 @@ export function getMilestoneTagsMap(database: DbClient, milestoneIds: number[]):
     })
     .from(milestoneTags)
     .innerJoin(tags, eq(milestoneTags.tagId, tags.id))
-    .where(inArray(milestoneTags.milestoneId, milestoneIds))
-    .all();
+    .where(inArray(milestoneTags.milestoneId, milestoneIds));
 
   for (const row of rows) {
     const current = map.get(row.milestoneId) ?? [];
@@ -281,13 +275,13 @@ export function getMilestoneTagsMap(database: DbClient, milestoneIds: number[]):
   return map;
 }
 
-export function getTicketTagsMap(database: DbClient, ticketIds: number[]): Map<number, Tag[]> {
+export async function getTicketTagsMap(database: DbClient, ticketIds: number[]): Promise<Map<number, Tag[]>> {
   const map = new Map<number, Tag[]>();
   if (ticketIds.length === 0) {
     return map;
   }
 
-  const rows = database
+  const rows = await database
     .select({
       ticketId: ticketTags.ticketId,
       id: tags.id,
@@ -297,8 +291,7 @@ export function getTicketTagsMap(database: DbClient, ticketIds: number[]): Map<n
     })
     .from(ticketTags)
     .innerJoin(tags, eq(ticketTags.tagId, tags.id))
-    .where(inArray(ticketTags.ticketId, ticketIds))
-    .all();
+    .where(inArray(ticketTags.ticketId, ticketIds));
 
   for (const row of rows) {
     const current = map.get(row.ticketId) ?? [];
@@ -309,17 +302,17 @@ export function getTicketTagsMap(database: DbClient, ticketIds: number[]): Map<n
   return map;
 }
 
-export function createTag(database: DbClient, input: { name?: string; color?: string }, actor?: JournalActor | null): Tag {
+export async function createTag(database: DbClient, input: { name?: string; color?: string }, actor?: JournalActor | null): Promise<Tag> {
   const name = requireNonEmpty(input.name, "name");
-  const existing = tagRepository.findByName(database, name);
+  const existing = await tagRepository.findByName(database, name);
   if (existing) {
     throw conflict(`Tag "${name}" already exists`);
   }
 
-  const created = database.transaction((tx) => {
-    const tag = tagRepository.create(tx, { name, color: input.color ?? "#94a3b8" }, actor?.actorUserId ?? undefined);
+  const created = await database.transaction(async (tx) => {
+    const tag = await tagRepository.create(tx, { name, color: input.color ?? "#94a3b8" }, actor?.actorUserId ?? undefined);
     const journalObject = tagJournalObject(tag);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "create",
       object: journalObject,
       summary: buildCreateSummary(journalObject),
@@ -331,7 +324,7 @@ export function createTag(database: DbClient, input: { name?: string; color?: st
   return mapTag(created);
 }
 
-export function updateTag(database: DbClient, id: number, input: { name?: string; color?: string; expectedVersion: number }, actor?: JournalActor | null): Tag {
+export async function updateTag(database: DbClient, id: number, input: { name?: string; color?: string; expectedVersion: number }, actor?: JournalActor | null): Promise<Tag> {
   const values: TagUpdateData = {};
   if (input.name !== undefined) {
     values.name = requireNonEmpty(input.name, "name");
@@ -344,18 +337,18 @@ export function updateTag(database: DbClient, id: number, input: { name?: string
     throw badRequest("No tag fields provided");
   }
 
-  const updated = database.transaction((tx) => {
-    const current = tagRepository.findById(tx, id);
+  const updated = await database.transaction(async (tx) => {
+    const current = await tagRepository.findById(tx, id);
     if (!current) {
       throw notFound(`Tag with id ${id} not found`);
     }
-    const tag = tagRepository.update(tx, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    const tag = await tagRepository.update(tx, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
     if (!tag) {
       throw notFound(`Tag with id ${id} not found`);
     }
     const journalObject = tagJournalObject(tag);
     const changes = buildJournalChanges(current, tag, tagJournalFields);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "update",
       object: journalObject,
       summary: buildUpdateSummary(journalObject, changes),
@@ -371,41 +364,40 @@ export function updateTag(database: DbClient, id: number, input: { name?: string
   return mapTag(updated);
 }
 
-export function deleteTag(database: DbClient, id: number, actor?: JournalActor | null): void {
-  database.transaction((tx) => {
-    const current = tagRepository.findById(tx, id);
+export async function deleteTag(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
+  await database.transaction(async (tx) => {
+    const current = await tagRepository.findById(tx, id);
     if (!current) {
       throw notFound(`Tag with id ${id} not found`);
     }
     const journalObject = tagJournalObject(current);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "delete",
       object: journalObject,
       summary: buildDeleteSummary(journalObject),
       actor
     });
-    if (tagRepository.delete(tx, id) === 0) {
+    if ((await tagRepository.delete(tx, id)) === 0) {
       throw notFound(`Tag with id ${id} not found`);
     }
   });
 }
 
-export function setProjectTags(database: DbClient, projectId: number, tagIds: number[], actor?: JournalActor | null): Tag[] {
-  const owner = getProjectJournalObject(database, projectId);
-  ensureTagsExist(database, tagIds);
-  const before = getProjectTags(database, projectId);
+export async function setProjectTags(database: DbClient, projectId: number, tagIds: number[], actor?: JournalActor | null): Promise<Tag[]> {
+  const owner = await getProjectJournalObject(database, projectId);
+  await ensureTagsExist(database, tagIds);
+  const before = await getProjectTags(database, projectId);
   const uniqueIds = normalizeTagIds(tagIds);
-  const after = uniqueIds.length > 0 ? tagRepository.findByIds(database, uniqueIds) : [];
+  const after = uniqueIds.length > 0 ? await tagRepository.findByIds(database, uniqueIds) : [];
 
-  database.transaction((tx) => {
-    tx.delete(projectTags).where(eq(projectTags.projectId, projectId)).run();
+  await database.transaction(async (tx) => {
+    await tx.delete(projectTags).where(eq(projectTags.projectId, projectId));
     if (uniqueIds.length > 0) {
-      tx.insert(projectTags)
-        .values(uniqueIds.map((tagId) => ({ projectId, tagId })))
-        .run();
+      await tx.insert(projectTags)
+        .values(uniqueIds.map((tagId) => ({ projectId, tagId })));
     }
     const changes = buildTagAssignmentChange(before, after);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "update",
       object: owner,
       summary: buildTagAssignmentSummary(owner, changes),
@@ -417,22 +409,21 @@ export function setProjectTags(database: DbClient, projectId: number, tagIds: nu
   return getProjectTags(database, projectId);
 }
 
-export function setTaskTags(database: DbClient, taskId: number, tagIds: number[], actor?: JournalActor | null): Tag[] {
-  const owner = getTaskJournalObject(database, taskId);
-  ensureTagsExist(database, tagIds);
-  const before = getTaskTags(database, taskId);
+export async function setTaskTags(database: DbClient, taskId: number, tagIds: number[], actor?: JournalActor | null): Promise<Tag[]> {
+  const owner = await getTaskJournalObject(database, taskId);
+  await ensureTagsExist(database, tagIds);
+  const before = await getTaskTags(database, taskId);
   const uniqueIds = normalizeTagIds(tagIds);
-  const after = uniqueIds.length > 0 ? tagRepository.findByIds(database, uniqueIds) : [];
+  const after = uniqueIds.length > 0 ? await tagRepository.findByIds(database, uniqueIds) : [];
 
-  database.transaction((tx) => {
-    tx.delete(taskTags).where(eq(taskTags.taskId, taskId)).run();
+  await database.transaction(async (tx) => {
+    await tx.delete(taskTags).where(eq(taskTags.taskId, taskId));
     if (uniqueIds.length > 0) {
-      tx.insert(taskTags)
-        .values(uniqueIds.map((tagId) => ({ taskId, tagId })))
-        .run();
+      await tx.insert(taskTags)
+        .values(uniqueIds.map((tagId) => ({ taskId, tagId })));
     }
     const changes = buildTagAssignmentChange(before, after);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "update",
       object: owner,
       summary: buildTagAssignmentSummary(owner, changes),
@@ -444,22 +435,21 @@ export function setTaskTags(database: DbClient, taskId: number, tagIds: number[]
   return getTaskTags(database, taskId);
 }
 
-export function setMilestoneTags(database: DbClient, milestoneId: number, tagIds: number[], actor?: JournalActor | null): Tag[] {
-  const owner = getMilestoneJournalObject(database, milestoneId);
-  ensureTagsExist(database, tagIds);
-  const before = getMilestoneTags(database, milestoneId);
+export async function setMilestoneTags(database: DbClient, milestoneId: number, tagIds: number[], actor?: JournalActor | null): Promise<Tag[]> {
+  const owner = await getMilestoneJournalObject(database, milestoneId);
+  await ensureTagsExist(database, tagIds);
+  const before = await getMilestoneTags(database, milestoneId);
   const uniqueIds = normalizeTagIds(tagIds);
-  const after = uniqueIds.length > 0 ? tagRepository.findByIds(database, uniqueIds) : [];
+  const after = uniqueIds.length > 0 ? await tagRepository.findByIds(database, uniqueIds) : [];
 
-  database.transaction((tx) => {
-    tx.delete(milestoneTags).where(eq(milestoneTags.milestoneId, milestoneId)).run();
+  await database.transaction(async (tx) => {
+    await tx.delete(milestoneTags).where(eq(milestoneTags.milestoneId, milestoneId));
     if (uniqueIds.length > 0) {
-      tx.insert(milestoneTags)
-        .values(uniqueIds.map((tagId) => ({ milestoneId, tagId })))
-        .run();
+      await tx.insert(milestoneTags)
+        .values(uniqueIds.map((tagId) => ({ milestoneId, tagId })));
     }
     const changes = buildTagAssignmentChange(before, after);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "update",
       object: owner,
       summary: buildTagAssignmentSummary(owner, changes),
@@ -471,22 +461,21 @@ export function setMilestoneTags(database: DbClient, milestoneId: number, tagIds
   return getMilestoneTags(database, milestoneId);
 }
 
-export function setTicketTags(database: DbClient, ticketId: number, tagIds: number[], actor?: JournalActor | null): Tag[] {
-  const owner = getTicketJournalObject(database, ticketId);
-  ensureTagsExist(database, tagIds);
-  const before = getTicketTags(database, ticketId);
+export async function setTicketTags(database: DbClient, ticketId: number, tagIds: number[], actor?: JournalActor | null): Promise<Tag[]> {
+  const owner = await getTicketJournalObject(database, ticketId);
+  await ensureTagsExist(database, tagIds);
+  const before = await getTicketTags(database, ticketId);
   const uniqueIds = normalizeTagIds(tagIds);
-  const after = uniqueIds.length > 0 ? tagRepository.findByIds(database, uniqueIds) : [];
+  const after = uniqueIds.length > 0 ? await tagRepository.findByIds(database, uniqueIds) : [];
 
-  database.transaction((tx) => {
-    tx.delete(ticketTags).where(eq(ticketTags.ticketId, ticketId)).run();
+  await database.transaction(async (tx) => {
+    await tx.delete(ticketTags).where(eq(ticketTags.ticketId, ticketId));
     if (uniqueIds.length > 0) {
-      tx.insert(ticketTags)
-        .values(uniqueIds.map((tagId) => ({ ticketId, tagId })))
-        .run();
+      await tx.insert(ticketTags)
+        .values(uniqueIds.map((tagId) => ({ ticketId, tagId })));
     }
     const changes = buildTagAssignmentChange(before, after);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "update",
       object: owner,
       summary: buildTagAssignmentSummary(owner, changes),

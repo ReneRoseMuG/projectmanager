@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -31,19 +31,19 @@ describe("Journal API", () => {
 
   beforeAll(async () => {
     originalAuthBypassAdmin = config.authBypassAdmin;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true });
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     config.authBypassAdmin = false;
-    truncateAll(testDb.sqlite);
+    await truncateAll(testDb.pool);
   });
 
   afterAll(async () => {
     config.authBypassAdmin = originalAuthBypassAdmin;
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("protokolliert Projektänderungen mit konkreter Feldänderung und Akteur", async () => {

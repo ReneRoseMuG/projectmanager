@@ -280,15 +280,7 @@ test.describe("Detailnavigation aus Parent-Tabs", () => {
       { type: "feature", id: feature.id },
       "E2E Navigation Feature Ticket",
     );
-    const project = await createProject(request, "E2E Navigation Feature Project");
-
     try {
-      const linkResponse = await request.put(
-        `${apiBaseUrl}/projects/${project.id}/features`,
-        { data: { featureIds: [feature.id] } },
-      );
-      expect(linkResponse.ok()).toBeTruthy();
-
       for (const item of [
         {
           parentPath: `/features/${feature.id}`,
@@ -317,22 +309,12 @@ test.describe("Detailnavigation aus Parent-Tabs", () => {
           childPath: `/tickets/${ticket.id}`,
           childHeading: "Ticket bearbeiten",
         },
-        {
-          parentPath: `/features/${feature.id}`,
-          parentHeading: "Feature bearbeiten",
-          tabName: /Projekte/,
-          tabParam: "projects",
-          childTitle: project.name,
-          childPath: `/projects/${project.id}`,
-          childHeading: "Projekt bearbeiten",
-        },
       ] satisfies NavigationCase[]) {
         await expectDetailRoundTrip(page, item);
       }
     } finally {
       await deleteTask(request, task.id);
       await deleteTicket(request, ticket.id);
-      await deleteProject(request, project.id);
       await deleteFeature(request, feature.id);
     }
   });

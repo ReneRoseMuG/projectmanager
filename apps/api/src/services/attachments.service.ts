@@ -5,6 +5,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { config } from "../config.js";
 import type { DbClient, DbSession } from "../db/client.js";
+import { firstRow } from "../db/query-utils.js";
 import {
   attachments,
   featureAttachments,
@@ -64,10 +65,10 @@ const attachmentSelect = {
   updatedAt: attachments.updatedAt
 };
 
-function mapAttachment(database: DbClient, record: AttachmentRecord): Attachment {
+async function mapAttachment(database: DbClient, record: AttachmentRecord): Promise<Attachment> {
   return {
     id: record.id,
-    owners: listAttachmentOwners(database, record.id),
+    owners: await listAttachmentOwners(database, record.id),
     originalName: record.originalName,
     filename: record.filename,
     mimetype: record.mimetype,
@@ -79,109 +80,109 @@ function mapAttachment(database: DbClient, record: AttachmentRecord): Attachment
   };
 }
 
-function ensureProjectExists(database: DbClient, projectId: number): void {
-  const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
+async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {
+  const project = firstRow(await database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)));
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
 }
 
-function ensureTaskExists(database: DbClient, taskId: number): void {
-  const task = database.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)).get();
+async function ensureTaskExists(database: DbClient, taskId: number): Promise<void> {
+  const task = firstRow(await database.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)));
   if (!task) {
     throw notFound(`Task with id ${taskId} not found`);
   }
 }
 
-function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
-  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+async function ensureMilestoneExists(database: DbClient, milestoneId: number): Promise<void> {
+  const milestone = firstRow(await database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)));
   if (!milestone) {
     throw notFound(`Milestone with id ${milestoneId} not found`);
   }
 }
 
-function ensureFeatureExists(database: DbClient, featureId: number): void {
-  const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
+async function ensureFeatureExists(database: DbClient, featureId: number): Promise<void> {
+  const feature = firstRow(await database.select({ id: features.id }).from(features).where(eq(features.id, featureId)));
   if (!feature) {
     throw notFound(`Feature with id ${featureId} not found`);
   }
 }
 
-function ensureTicketExists(database: DbClient, ticketId: number): void {
-  const ticket = database.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)).get();
+async function ensureTicketExists(database: DbClient, ticketId: number): Promise<void> {
+  const ticket = firstRow(await database.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)));
   if (!ticket) {
     throw notFound(`Ticket with id ${ticketId} not found`);
   }
 }
 
-function ensureWikiPageExists(database: DbClient, wikiPageId: number): void {
-  const page = database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)).get();
+async function ensureWikiPageExists(database: DbClient, wikiPageId: number): Promise<void> {
+  const page = firstRow(await database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)));
   if (!page) {
     throw notFound(`Wiki page with id ${wikiPageId} not found`);
   }
 }
 
-function ensureOwnerExists(database: DbClient, owner: AttachmentOwner): void {
+async function ensureOwnerExists(database: DbClient, owner: AttachmentOwner): Promise<void> {
   if (owner.type === "project") {
-    ensureProjectExists(database, owner.id);
+    await ensureProjectExists(database, owner.id);
     return;
   }
   if (owner.type === "task") {
-    ensureTaskExists(database, owner.id);
+    await ensureTaskExists(database, owner.id);
     return;
   }
   if (owner.type === "milestone") {
-    ensureMilestoneExists(database, owner.id);
+    await ensureMilestoneExists(database, owner.id);
     return;
   }
   if (owner.type === "feature") {
-    ensureFeatureExists(database, owner.id);
+    await ensureFeatureExists(database, owner.id);
     return;
   }
   if (owner.type === "wikiPage") {
-    ensureWikiPageExists(database, owner.id);
+    await ensureWikiPageExists(database, owner.id);
     return;
   }
-  ensureTicketExists(database, owner.id);
+  await ensureTicketExists(database, owner.id);
 }
 
-function getOwnerJournalObject(database: DbClient, owner: AttachmentOwner): JournalObjectRef {
+async function getOwnerJournalObject(database: DbClient, owner: AttachmentOwner): Promise<JournalObjectRef> {
   if (owner.type === "project") {
-    const project = database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, owner.id)).get();
+    const project = firstRow(await database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, owner.id)));
     if (!project) {
       throw notFound(`Project with id ${owner.id} not found`);
     }
     return makeJournalObject("project", project.id, project.name);
   }
   if (owner.type === "task") {
-    const task = database.select({ id: tasks.id, title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)).get();
+    const task = firstRow(await database.select({ id: tasks.id, title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)));
     if (!task) {
       throw notFound(`Task with id ${owner.id} not found`);
     }
     return makeJournalObject("task", task.id, task.title);
   }
   if (owner.type === "milestone") {
-    const milestone = database.select({ id: milestones.id, name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
+    const milestone = firstRow(await database.select({ id: milestones.id, name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)));
     if (!milestone) {
       throw notFound(`Milestone with id ${owner.id} not found`);
     }
     return makeJournalObject("milestone", milestone.id, milestone.name);
   }
   if (owner.type === "feature") {
-    const feature = database.select({ id: features.id, title: features.title }).from(features).where(eq(features.id, owner.id)).get();
+    const feature = firstRow(await database.select({ id: features.id, title: features.title }).from(features).where(eq(features.id, owner.id)));
     if (!feature) {
       throw notFound(`Feature with id ${owner.id} not found`);
     }
     return makeJournalObject("feature", feature.id, feature.title);
   }
   if (owner.type === "wikiPage") {
-    const page = database.select({ id: wikiPages.id, title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)).get();
+    const page = firstRow(await database.select({ id: wikiPages.id, title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)));
     if (!page) {
       throw notFound(`Wiki page with id ${owner.id} not found`);
     }
     return makeJournalObject("wikiPage", page.id, page.title);
   }
-  const ticket = database.select({ id: tickets.id, title: tickets.title }).from(tickets).where(eq(tickets.id, owner.id)).get();
+  const ticket = firstRow(await database.select({ id: tickets.id, title: tickets.title }).from(tickets).where(eq(tickets.id, owner.id)));
   if (!ticket) {
     throw notFound(`Ticket with id ${owner.id} not found`);
   }
@@ -223,69 +224,45 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-function listAttachmentOwners(database: DbClient, attachmentId: number): AttachmentOwner[] {
+async function listAttachmentOwners(database: DbClient, attachmentId: number): Promise<AttachmentOwner[]> {
+  const projectRows = await database.select({ id: projectAttachments.projectId }).from(projectAttachments).where(eq(projectAttachments.attachmentId, attachmentId));
+  const taskRows = await database.select({ id: taskAttachments.taskId }).from(taskAttachments).where(eq(taskAttachments.attachmentId, attachmentId));
+  const milestoneRows = await database.select({ id: milestoneAttachments.milestoneId }).from(milestoneAttachments).where(eq(milestoneAttachments.attachmentId, attachmentId));
+  const featureRows = await database.select({ id: featureAttachments.featureId }).from(featureAttachments).where(eq(featureAttachments.attachmentId, attachmentId));
+  const wikiPageRows = await database.select({ id: wikiPageAttachments.wikiPageId }).from(wikiPageAttachments).where(eq(wikiPageAttachments.attachmentId, attachmentId));
+  const ticketRows = await database.select({ id: ticketAttachments.ticketId }).from(ticketAttachments).where(eq(ticketAttachments.attachmentId, attachmentId));
   return [
-    ...database
-      .select({ id: projectAttachments.projectId })
-      .from(projectAttachments)
-      .where(eq(projectAttachments.attachmentId, attachmentId))
-      .all()
-      .map((row) => ({ type: "project" as const, id: row.id })),
-    ...database
-      .select({ id: taskAttachments.taskId })
-      .from(taskAttachments)
-      .where(eq(taskAttachments.attachmentId, attachmentId))
-      .all()
-      .map((row) => ({ type: "task" as const, id: row.id })),
-    ...database
-      .select({ id: milestoneAttachments.milestoneId })
-      .from(milestoneAttachments)
-      .where(eq(milestoneAttachments.attachmentId, attachmentId))
-      .all()
-      .map((row) => ({ type: "milestone" as const, id: row.id })),
-    ...database
-      .select({ id: featureAttachments.featureId })
-      .from(featureAttachments)
-      .where(eq(featureAttachments.attachmentId, attachmentId))
-      .all()
-      .map((row) => ({ type: "feature" as const, id: row.id })),
-    ...database
-      .select({ id: wikiPageAttachments.wikiPageId })
-      .from(wikiPageAttachments)
-      .where(eq(wikiPageAttachments.attachmentId, attachmentId))
-      .all()
-      .map((row) => ({ type: "wikiPage" as const, id: row.id })),
-    ...database
-      .select({ id: ticketAttachments.ticketId })
-      .from(ticketAttachments)
-      .where(eq(ticketAttachments.attachmentId, attachmentId))
-      .all()
-      .map((row) => ({ type: "ticket" as const, id: row.id }))
+    ...projectRows.map((row) => ({ type: "project" as const, id: row.id })),
+    ...taskRows.map((row) => ({ type: "task" as const, id: row.id })),
+    ...milestoneRows.map((row) => ({ type: "milestone" as const, id: row.id })),
+    ...featureRows.map((row) => ({ type: "feature" as const, id: row.id })),
+    ...wikiPageRows.map((row) => ({ type: "wikiPage" as const, id: row.id })),
+    ...ticketRows.map((row) => ({ type: "ticket" as const, id: row.id }))
   ];
 }
 
-function insertAttachmentLink(database: DbSession, owner: AttachmentOwner, attachmentId: number): void {
+async function insertAttachmentLink(database: DbSession, owner: AttachmentOwner, attachmentId: number): Promise<void> {
   if (owner.type === "project") {
-    database.insert(projectAttachments).values({ projectId: owner.id, attachmentId }).onConflictDoNothing().run();
+    await database.insert(projectAttachments).ignore().values({ projectId: owner.id, attachmentId });
     return;
   }
   if (owner.type === "task") {
-    database.insert(taskAttachments).values({ taskId: owner.id, attachmentId }).onConflictDoNothing().run();
+    await database.insert(taskAttachments).ignore().values({ taskId: owner.id, attachmentId });
     return;
   }
   if (owner.type === "milestone") {
-    database.insert(milestoneAttachments).values({ milestoneId: owner.id, attachmentId }).onConflictDoNothing().run();
+    await database.insert(milestoneAttachments).ignore().values({ milestoneId: owner.id, attachmentId });
     return;
   }
   if (owner.type === "feature") {
-    database.insert(featureAttachments).values({ featureId: owner.id, attachmentId }).onConflictDoNothing().run();
+    await database.insert(featureAttachments).ignore().values({ featureId: owner.id, attachmentId });
     return;
   }
   if (owner.type === "wikiPage") {
-    database.insert(wikiPageAttachments).values({ wikiPageId: owner.id, attachmentId }).onConflictDoNothing().run();
+    await database.insert(wikiPageAttachments).ignore().values({ wikiPageId: owner.id, attachmentId });
     return;
   }
-  database.insert(ticketAttachments).values({ ticketId: owner.id, attachmentId }).onConflictDoNothing().run();
+  await database.insert(ticketAttachments).ignore().values({ ticketId: owner.id, attachmentId });
 }
 
 async function removeAttachmentFiles(records: AttachmentCleanupRecord[]): Promise<void> {
@@ -303,12 +280,12 @@ async function deleteAttachmentRecords(database: DbClient, records: AttachmentCl
     return;
   }
 
-  attachmentRepository.deleteByIds(database, records.map((record) => record.id));
+  await attachmentRepository.deleteByIds(database, records.map((record) => record.id));
   await removeAttachmentFiles(records);
 }
 
-function attachmentOnlyOwnedBy(database: DbClient, attachmentId: number, ownerType: AttachmentOwner["type"], ownerIds: Set<number>): boolean {
-  const owners = listAttachmentOwners(database, attachmentId);
+async function attachmentOnlyOwnedBy(database: DbClient, attachmentId: number, ownerType: AttachmentOwner["type"], ownerIds: Set<number>): Promise<boolean> {
+  const owners = await listAttachmentOwners(database, attachmentId);
   return owners.length > 0 && owners.every((owner) => owner.type === ownerType && ownerIds.has(owner.id));
 }
 
@@ -321,23 +298,28 @@ async function deleteAttachmentsOwnedOnlyBy(database: DbClient, ownerType: Attac
   const idSet = new Set(uniqueIds);
   const candidateRows =
     ownerType === "project"
-      ? database.select({ id: projectAttachments.attachmentId }).from(projectAttachments).where(inArray(projectAttachments.projectId, uniqueIds)).all()
+      ? await database.select({ id: projectAttachments.attachmentId }).from(projectAttachments).where(inArray(projectAttachments.projectId, uniqueIds))
       : ownerType === "task"
-        ? database.select({ id: taskAttachments.attachmentId }).from(taskAttachments).where(inArray(taskAttachments.taskId, uniqueIds)).all()
+        ? await database.select({ id: taskAttachments.attachmentId }).from(taskAttachments).where(inArray(taskAttachments.taskId, uniqueIds))
         : ownerType === "milestone"
-          ? database.select({ id: milestoneAttachments.attachmentId }).from(milestoneAttachments).where(inArray(milestoneAttachments.milestoneId, uniqueIds)).all()
+          ? await database.select({ id: milestoneAttachments.attachmentId }).from(milestoneAttachments).where(inArray(milestoneAttachments.milestoneId, uniqueIds))
           : ownerType === "feature"
-            ? database.select({ id: featureAttachments.attachmentId }).from(featureAttachments).where(inArray(featureAttachments.featureId, uniqueIds)).all()
+            ? await database.select({ id: featureAttachments.attachmentId }).from(featureAttachments).where(inArray(featureAttachments.featureId, uniqueIds))
             : ownerType === "wikiPage"
-              ? database.select({ id: wikiPageAttachments.attachmentId }).from(wikiPageAttachments).where(inArray(wikiPageAttachments.wikiPageId, uniqueIds)).all()
-              : database.select({ id: ticketAttachments.attachmentId }).from(ticketAttachments).where(inArray(ticketAttachments.ticketId, uniqueIds)).all();
+              ? await database.select({ id: wikiPageAttachments.attachmentId }).from(wikiPageAttachments).where(inArray(wikiPageAttachments.wikiPageId, uniqueIds))
+              : await database.select({ id: ticketAttachments.attachmentId }).from(ticketAttachments).where(inArray(ticketAttachments.ticketId, uniqueIds));
 
-  const attachmentIds = [...new Set(candidateRows.map((row) => row.id))].filter((attachmentId) => attachmentOnlyOwnedBy(database, attachmentId, ownerType, idSet));
+  const attachmentIds: number[] = [];
+  for (const attachmentId of [...new Set(candidateRows.map((row) => row.id))]) {
+    if (await attachmentOnlyOwnedBy(database, attachmentId, ownerType, idSet)) {
+      attachmentIds.push(attachmentId);
+    }
+  }
   if (attachmentIds.length === 0) {
     return;
   }
 
-  const records = attachmentRepository.findCleanupRecords(database, attachmentIds);
+  const records = await attachmentRepository.findCleanupRecords(database, attachmentIds);
   await deleteAttachmentRecords(database, records);
 }
 
@@ -354,17 +336,17 @@ async function persistAttachment(values: {
   const diskPath = path.join(config.uploadDir, filename);
   await fs.writeFile(diskPath, values.upload.buffer);
 
-  const created = values.database.transaction((tx) => {
-    const attachment = attachmentRepository.create(tx, {
+  const created = await values.database.transaction(async (tx) => {
+    const attachment = await attachmentRepository.create(tx, {
       originalName: values.upload.originalName,
       filename,
       mimetype: values.upload.mimetype,
       size: values.upload.buffer.byteLength
     }, values.actor?.actorUserId ?? undefined);
-    insertAttachmentLink(tx, values.owner, attachment.id);
+    await insertAttachmentLink(tx, values.owner, attachment.id);
     const attachmentObject = attachmentJournalObject(attachment);
-    const ownerObject = getOwnerJournalObject(values.database, values.owner);
-    recordJournalEntry(tx, {
+    const ownerObject = await getOwnerJournalObject(values.database, values.owner);
+    await recordJournalEntry(tx, {
       operation: "create",
       object: attachmentObject,
       summary: buildAttachmentCreateSummary(attachmentObject, ownerObject),
@@ -377,7 +359,7 @@ async function persistAttachment(values: {
   return mapAttachment(values.database, created);
 }
 
-function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): AttachmentRecord[] {
+async function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Promise<AttachmentRecord[]> {
   if (owner.type === "project") {
     return database
       .select(attachmentSelect)
@@ -385,7 +367,7 @@ function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Att
       .innerJoin(attachments, eq(projectAttachments.attachmentId, attachments.id))
       .where(eq(projectAttachments.projectId, owner.id))
       .orderBy(desc(attachments.createdAt))
-      .all();
+      ;
   }
   if (owner.type === "task") {
     return database
@@ -394,7 +376,7 @@ function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Att
       .innerJoin(attachments, eq(taskAttachments.attachmentId, attachments.id))
       .where(eq(taskAttachments.taskId, owner.id))
       .orderBy(desc(attachments.createdAt))
-      .all();
+      ;
   }
   if (owner.type === "milestone") {
     return database
@@ -403,7 +385,7 @@ function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Att
       .innerJoin(attachments, eq(milestoneAttachments.attachmentId, attachments.id))
       .where(eq(milestoneAttachments.milestoneId, owner.id))
       .orderBy(desc(attachments.createdAt))
-      .all();
+      ;
   }
   if (owner.type === "feature") {
     return database
@@ -412,7 +394,7 @@ function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Att
       .innerJoin(attachments, eq(featureAttachments.attachmentId, attachments.id))
       .where(eq(featureAttachments.featureId, owner.id))
       .orderBy(desc(attachments.createdAt))
-      .all();
+      ;
   }
   if (owner.type === "wikiPage") {
     return database
@@ -421,7 +403,7 @@ function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Att
       .innerJoin(attachments, eq(wikiPageAttachments.attachmentId, attachments.id))
       .where(eq(wikiPageAttachments.wikiPageId, owner.id))
       .orderBy(desc(attachments.createdAt))
-      .all();
+      ;
   }
   return database
     .select(attachmentSelect)
@@ -429,7 +411,7 @@ function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Att
     .innerJoin(attachments, eq(ticketAttachments.attachmentId, attachments.id))
     .where(eq(ticketAttachments.ticketId, owner.id))
     .orderBy(desc(attachments.createdAt))
-    .all();
+    ;
 }
 
 type RecentAttachmentOwner = { type: "project" | "milestone" | "task"; id: number };
@@ -453,11 +435,11 @@ function attachmentAuthorName(row: Pick<RecentAttachmentRow, "authorFullName" | 
   return name || row.authorEmail || "System";
 }
 
-function collectAttachmentTaskDescendantIds(database: DbClient, rootIds: number[]): number[] {
+async function collectAttachmentTaskDescendantIds(database: DbClient, rootIds: number[]): Promise<number[]> {
   const result = new Set(rootIds);
   let frontier = [...new Set(rootIds)];
   while (frontier.length > 0) {
-    const rows = database.select({ id: tasks.id }).from(tasks).where(inArray(tasks.parentId, frontier)).all();
+    const rows = await database.select({ id: tasks.id }).from(tasks).where(inArray(tasks.parentId, frontier));
     frontier = rows.map((row) => row.id).filter((id) => !result.has(id));
     for (const id of frontier) {
       result.add(id);
@@ -466,43 +448,45 @@ function collectAttachmentTaskDescendantIds(database: DbClient, rootIds: number[
   return [...result];
 }
 
-function attachmentProjectMilestoneIds(database: DbClient, projectId: number): number[] {
-  return database.select({ id: milestones.id }).from(milestones).where(eq(milestones.projectId, projectId)).all().map((row) => row.id);
+async function attachmentProjectMilestoneIds(database: DbClient, projectId: number): Promise<number[]> {
+  return (await database.select({ id: milestones.id }).from(milestones).where(eq(milestones.projectId, projectId))).map((row) => row.id);
 }
 
-function attachmentTaskIdsForOwner(database: DbClient, owner: RecentAttachmentOwner): number[] {
+async function attachmentTaskIdsForOwner(database: DbClient, owner: RecentAttachmentOwner): Promise<number[]> {
   if (owner.type === "task") {
     return [owner.id];
   }
-  const direct =
+  const directRows =
     owner.type === "project"
-      ? database.select({ id: projectTasks.taskId }).from(projectTasks).where(eq(projectTasks.ownerId, owner.id)).all().map((row) => row.id)
-      : database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(eq(milestoneTasks.ownerId, owner.id)).all().map((row) => row.id);
+      ? await database.select({ id: projectTasks.taskId }).from(projectTasks).where(eq(projectTasks.ownerId, owner.id))
+      : await database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(eq(milestoneTasks.ownerId, owner.id));
+  const direct = directRows.map((row) => row.id);
   if (owner.type === "project") {
-    const milestoneIds = attachmentProjectMilestoneIds(database, owner.id);
+    const milestoneIds = await attachmentProjectMilestoneIds(database, owner.id);
     const milestoneLinked =
       milestoneIds.length === 0
         ? []
-        : database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(inArray(milestoneTasks.ownerId, milestoneIds)).all().map((row) => row.id);
+        : (await database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(inArray(milestoneTasks.ownerId, milestoneIds))).map((row) => row.id);
     return collectAttachmentTaskDescendantIds(database, [...direct, ...milestoneLinked]);
   }
   return collectAttachmentTaskDescendantIds(database, direct);
 }
 
-function attachmentTicketIdsForOwner(database: DbClient, owner: RecentAttachmentOwner): number[] {
+async function attachmentTicketIdsForOwner(database: DbClient, owner: RecentAttachmentOwner): Promise<number[]> {
   if (owner.type === "task") {
     return [];
   }
-  const direct =
+  const directRows =
     owner.type === "project"
-      ? database.select({ id: projectTickets.ticketId }).from(projectTickets).where(eq(projectTickets.ownerId, owner.id)).all().map((row) => row.id)
-      : database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(eq(milestoneTickets.ownerId, owner.id)).all().map((row) => row.id);
+      ? await database.select({ id: projectTickets.ticketId }).from(projectTickets).where(eq(projectTickets.ownerId, owner.id))
+      : await database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(eq(milestoneTickets.ownerId, owner.id));
+  const direct = directRows.map((row) => row.id);
   if (owner.type === "project") {
-    const milestoneIds = attachmentProjectMilestoneIds(database, owner.id);
+    const milestoneIds = await attachmentProjectMilestoneIds(database, owner.id);
     const milestoneLinked =
       milestoneIds.length === 0
         ? []
-        : database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(inArray(milestoneTickets.ownerId, milestoneIds)).all().map((row) => row.id);
+        : (await database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(inArray(milestoneTickets.ownerId, milestoneIds))).map((row) => row.id);
     return [...new Set([...direct, ...milestoneLinked])];
   }
   return [...new Set(direct)];
@@ -512,11 +496,11 @@ function mapRecentAttachmentRow(row: Omit<RecentAttachmentRow, "entityType">, en
   return { ...row, entityType };
 }
 
-function recentProjectAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+async function recentProjectAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentAttachmentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  const rows = await database
     .select({
       id: attachments.id,
       filename: attachments.originalName,
@@ -534,16 +518,15 @@ function recentProjectAttachmentRows(database: DbClient, ids: number[], mineUser
     .innerJoin(projects, eq(projectAttachments.projectId, projects.id))
     .leftJoin(users, eq(attachments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(projectAttachments.projectId, ids) : and(inArray(projectAttachments.projectId, ids), eq(attachments.createdBy, mineUserId)))
-    .orderBy(desc(attachments.createdAt), desc(attachments.id))
-    .all()
-    .map((row) => mapRecentAttachmentRow(row, "project"));
+    .orderBy(desc(attachments.createdAt), desc(attachments.id));
+  return rows.map((row) => mapRecentAttachmentRow(row, "project"));
 }
 
-function recentMilestoneAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+async function recentMilestoneAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentAttachmentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  const rows = await database
     .select({
       id: attachments.id,
       filename: attachments.originalName,
@@ -561,16 +544,15 @@ function recentMilestoneAttachmentRows(database: DbClient, ids: number[], mineUs
     .innerJoin(milestones, eq(milestoneAttachments.milestoneId, milestones.id))
     .leftJoin(users, eq(attachments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(milestoneAttachments.milestoneId, ids) : and(inArray(milestoneAttachments.milestoneId, ids), eq(attachments.createdBy, mineUserId)))
-    .orderBy(desc(attachments.createdAt), desc(attachments.id))
-    .all()
-    .map((row) => mapRecentAttachmentRow(row, "milestone"));
+    .orderBy(desc(attachments.createdAt), desc(attachments.id));
+  return rows.map((row) => mapRecentAttachmentRow(row, "milestone"));
 }
 
-function recentFeatureAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+async function recentFeatureAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentAttachmentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  const rows = await database
     .select({
       id: attachments.id,
       filename: attachments.originalName,
@@ -588,16 +570,15 @@ function recentFeatureAttachmentRows(database: DbClient, ids: number[], mineUser
     .innerJoin(features, eq(featureAttachments.featureId, features.id))
     .leftJoin(users, eq(attachments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(featureAttachments.featureId, ids) : and(inArray(featureAttachments.featureId, ids), eq(attachments.createdBy, mineUserId)))
-    .orderBy(desc(attachments.createdAt), desc(attachments.id))
-    .all()
-    .map((row) => mapRecentAttachmentRow(row, "feature"));
+    .orderBy(desc(attachments.createdAt), desc(attachments.id));
+  return rows.map((row) => mapRecentAttachmentRow(row, "feature"));
 }
 
-function recentTaskAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+async function recentTaskAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentAttachmentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  const rows = await database
     .select({
       id: attachments.id,
       filename: attachments.originalName,
@@ -615,16 +596,15 @@ function recentTaskAttachmentRows(database: DbClient, ids: number[], mineUserId?
     .innerJoin(tasks, eq(taskAttachments.taskId, tasks.id))
     .leftJoin(users, eq(attachments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(taskAttachments.taskId, ids) : and(inArray(taskAttachments.taskId, ids), eq(attachments.createdBy, mineUserId)))
-    .orderBy(desc(attachments.createdAt), desc(attachments.id))
-    .all()
-    .map((row) => mapRecentAttachmentRow(row, "task"));
+    .orderBy(desc(attachments.createdAt), desc(attachments.id));
+  return rows.map((row) => mapRecentAttachmentRow(row, "task"));
 }
 
-function recentTicketAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+async function recentTicketAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentAttachmentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  const rows = await database
     .select({
       id: attachments.id,
       filename: attachments.originalName,
@@ -642,16 +622,15 @@ function recentTicketAttachmentRows(database: DbClient, ids: number[], mineUserI
     .innerJoin(tickets, eq(ticketAttachments.ticketId, tickets.id))
     .leftJoin(users, eq(attachments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(ticketAttachments.ticketId, ids) : and(inArray(ticketAttachments.ticketId, ids), eq(attachments.createdBy, mineUserId)))
-    .orderBy(desc(attachments.createdAt), desc(attachments.id))
-    .all()
-    .map((row) => mapRecentAttachmentRow(row, "ticket"));
+    .orderBy(desc(attachments.createdAt), desc(attachments.id));
+  return rows.map((row) => mapRecentAttachmentRow(row, "ticket"));
 }
 
-function recentWikiPageAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): RecentAttachmentRow[] {
+async function recentWikiPageAttachmentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentAttachmentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  const rows = await database
     .select({
       id: attachments.id,
       filename: attachments.originalName,
@@ -669,56 +648,71 @@ function recentWikiPageAttachmentRows(database: DbClient, ids: number[], mineUse
     .innerJoin(wikiPages, eq(wikiPageAttachments.wikiPageId, wikiPages.id))
     .leftJoin(users, eq(attachments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(wikiPageAttachments.wikiPageId, ids) : and(inArray(wikiPageAttachments.wikiPageId, ids), eq(attachments.createdBy, mineUserId)))
-    .orderBy(desc(attachments.createdAt), desc(attachments.id))
-    .all()
-    .map((row) => mapRecentAttachmentRow(row, "wikiPage"));
+    .orderBy(desc(attachments.createdAt), desc(attachments.id));
+  return rows.map((row) => mapRecentAttachmentRow(row, "wikiPage"));
 }
 
-function recentAttachmentRowsForOwner(database: DbClient, owner: RecentAttachmentOwner): RecentAttachmentRow[] {
+async function recentAttachmentRowsForOwner(database: DbClient, owner: RecentAttachmentOwner): Promise<RecentAttachmentRow[]> {
   if (owner.type === "project") {
-    const milestoneIds = attachmentProjectMilestoneIds(database, owner.id);
+    const milestoneIds = await attachmentProjectMilestoneIds(database, owner.id);
+    const taskIds = await attachmentTaskIdsForOwner(database, owner);
+    const ticketIds = await attachmentTicketIdsForOwner(database, owner);
     return [
-      ...recentProjectAttachmentRows(database, [owner.id]),
-      ...recentMilestoneAttachmentRows(database, milestoneIds),
-      ...recentTaskAttachmentRows(database, attachmentTaskIdsForOwner(database, owner)),
-      ...recentTicketAttachmentRows(database, attachmentTicketIdsForOwner(database, owner))
+      ...(await recentProjectAttachmentRows(database, [owner.id])),
+      ...(await recentMilestoneAttachmentRows(database, milestoneIds)),
+      ...(await recentTaskAttachmentRows(database, taskIds)),
+      ...(await recentTicketAttachmentRows(database, ticketIds))
     ];
   }
   if (owner.type === "milestone") {
+    const taskIds = await attachmentTaskIdsForOwner(database, owner);
+    const ticketIds = await attachmentTicketIdsForOwner(database, owner);
     return [
-      ...recentMilestoneAttachmentRows(database, [owner.id]),
-      ...recentTaskAttachmentRows(database, attachmentTaskIdsForOwner(database, owner)),
-      ...recentTicketAttachmentRows(database, attachmentTicketIdsForOwner(database, owner))
+      ...(await recentMilestoneAttachmentRows(database, [owner.id])),
+      ...(await recentTaskAttachmentRows(database, taskIds)),
+      ...(await recentTicketAttachmentRows(database, ticketIds))
     ];
   }
   return recentTaskAttachmentRows(database, [owner.id]);
 }
 
-function recentOwnAttachmentRows(database: DbClient, userId: number): RecentAttachmentRow[] {
+async function recentOwnAttachmentRows(database: DbClient, userId: number): Promise<RecentAttachmentRow[]> {
+  const projectIds = (await database.select({ id: projects.id }).from(projects)).map((row) => row.id);
+  const milestoneIds = (await database.select({ id: milestones.id }).from(milestones)).map((row) => row.id);
+  const featureIds = (await database.select({ id: features.id }).from(features)).map((row) => row.id);
+  const taskIds = (await database.select({ id: tasks.id }).from(tasks)).map((row) => row.id);
+  const ticketIds = (await database.select({ id: tickets.id }).from(tickets)).map((row) => row.id);
+  const wikiPageIds = (await database.select({ id: wikiPages.id }).from(wikiPages)).map((row) => row.id);
   return [
-    ...recentProjectAttachmentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id), userId),
-    ...recentMilestoneAttachmentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id), userId),
-    ...recentFeatureAttachmentRows(database, database.select({ id: features.id }).from(features).all().map((row) => row.id), userId),
-    ...recentTaskAttachmentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id), userId),
-    ...recentTicketAttachmentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id), userId),
-    ...recentWikiPageAttachmentRows(database, database.select({ id: wikiPages.id }).from(wikiPages).all().map((row) => row.id), userId)
+    ...(await recentProjectAttachmentRows(database, projectIds, userId)),
+    ...(await recentMilestoneAttachmentRows(database, milestoneIds, userId)),
+    ...(await recentFeatureAttachmentRows(database, featureIds, userId)),
+    ...(await recentTaskAttachmentRows(database, taskIds, userId)),
+    ...(await recentTicketAttachmentRows(database, ticketIds, userId)),
+    ...(await recentWikiPageAttachmentRows(database, wikiPageIds, userId))
   ];
 }
 
-function recentAllAttachmentRows(database: DbClient): RecentAttachmentRow[] {
+async function recentAllAttachmentRows(database: DbClient): Promise<RecentAttachmentRow[]> {
+  const projectIds = (await database.select({ id: projects.id }).from(projects)).map((row) => row.id);
+  const milestoneIds = (await database.select({ id: milestones.id }).from(milestones)).map((row) => row.id);
+  const featureIds = (await database.select({ id: features.id }).from(features)).map((row) => row.id);
+  const taskIds = (await database.select({ id: tasks.id }).from(tasks)).map((row) => row.id);
+  const ticketIds = (await database.select({ id: tickets.id }).from(tickets)).map((row) => row.id);
+  const wikiPageIds = (await database.select({ id: wikiPages.id }).from(wikiPages)).map((row) => row.id);
   return [
-    ...recentProjectAttachmentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id)),
-    ...recentMilestoneAttachmentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id)),
-    ...recentFeatureAttachmentRows(database, database.select({ id: features.id }).from(features).all().map((row) => row.id)),
-    ...recentTaskAttachmentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id)),
-    ...recentTicketAttachmentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id)),
-    ...recentWikiPageAttachmentRows(database, database.select({ id: wikiPages.id }).from(wikiPages).all().map((row) => row.id))
+    ...(await recentProjectAttachmentRows(database, projectIds)),
+    ...(await recentMilestoneAttachmentRows(database, milestoneIds)),
+    ...(await recentFeatureAttachmentRows(database, featureIds)),
+    ...(await recentTaskAttachmentRows(database, taskIds)),
+    ...(await recentTicketAttachmentRows(database, ticketIds)),
+    ...(await recentWikiPageAttachmentRows(database, wikiPageIds))
   ];
 }
 
-export function listRecentAttachments(database: DbClient, options: { owner?: RecentAttachmentOwner; currentUserId: number; limit?: number; mine?: boolean }): RecentAttachment[] {
+export async function listRecentAttachments(database: DbClient, options: { owner?: RecentAttachmentOwner; currentUserId: number; limit?: number; mine?: boolean }): Promise<RecentAttachment[]> {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
-  const rows = options.owner ? recentAttachmentRowsForOwner(database, options.owner) : options.mine === true ? recentOwnAttachmentRows(database, options.currentUserId) : recentAllAttachmentRows(database);
+  const rows = options.owner ? await recentAttachmentRowsForOwner(database, options.owner) : options.mine === true ? await recentOwnAttachmentRows(database, options.currentUserId) : await recentAllAttachmentRows(database);
   return rows
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime() || right.id - left.id)
     .slice(0, limit)
@@ -737,32 +731,33 @@ export function listRecentAttachments(database: DbClient, options: { owner?: Rec
     }));
 }
 
-function listOwnerAttachments(database: DbClient, owner: AttachmentOwner): Attachment[] {
-  ensureOwnerExists(database, owner);
-  return selectOwnerAttachments(database, owner).map((attachment) => mapAttachment(database, attachment));
+async function listOwnerAttachments(database: DbClient, owner: AttachmentOwner): Promise<Attachment[]> {
+  await ensureOwnerExists(database, owner);
+  const attachments = await selectOwnerAttachments(database, owner);
+  return Promise.all(attachments.map((attachment) => mapAttachment(database, attachment)));
 }
 
-export function listProjectAttachments(database: DbClient, projectId: number): Attachment[] {
+export async function listProjectAttachments(database: DbClient, projectId: number): Promise<Attachment[]> {
   return listOwnerAttachments(database, { type: "project", id: projectId });
 }
 
-export function listTaskAttachments(database: DbClient, taskId: number): Attachment[] {
+export async function listTaskAttachments(database: DbClient, taskId: number): Promise<Attachment[]> {
   return listOwnerAttachments(database, { type: "task", id: taskId });
 }
 
-export function listMilestoneAttachments(database: DbClient, milestoneId: number): Attachment[] {
+export async function listMilestoneAttachments(database: DbClient, milestoneId: number): Promise<Attachment[]> {
   return listOwnerAttachments(database, { type: "milestone", id: milestoneId });
 }
 
-export function listFeatureAttachments(database: DbClient, featureId: number): Attachment[] {
+export async function listFeatureAttachments(database: DbClient, featureId: number): Promise<Attachment[]> {
   return listOwnerAttachments(database, { type: "feature", id: featureId });
 }
 
-export function listTicketAttachments(database: DbClient, ticketId: number): Attachment[] {
+export async function listTicketAttachments(database: DbClient, ticketId: number): Promise<Attachment[]> {
   return listOwnerAttachments(database, { type: "ticket", id: ticketId });
 }
 
-export function listWikiPageAttachments(database: DbClient, wikiPageId: number): Attachment[] {
+export async function listWikiPageAttachments(database: DbClient, wikiPageId: number): Promise<Attachment[]> {
   return listOwnerAttachments(database, { type: "wikiPage", id: wikiPageId });
 }
 
@@ -792,53 +787,53 @@ export async function deleteWikiPageAttachmentsForIds(database: DbClient, wikiPa
 
 export async function createProjectAttachment(database: DbClient, projectId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "project" as const, id: projectId };
-  ensureOwnerExists(database, owner);
+  await ensureOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function createTaskAttachment(database: DbClient, taskId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "task" as const, id: taskId };
-  ensureOwnerExists(database, owner);
+  await ensureOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function createMilestoneAttachment(database: DbClient, milestoneId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "milestone" as const, id: milestoneId };
-  ensureOwnerExists(database, owner);
+  await ensureOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function createFeatureAttachment(database: DbClient, featureId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "feature" as const, id: featureId };
-  ensureOwnerExists(database, owner);
+  await ensureOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function createTicketAttachment(database: DbClient, ticketId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "ticket" as const, id: ticketId };
-  ensureOwnerExists(database, owner);
+  await ensureOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function createWikiPageAttachment(database: DbClient, wikiPageId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "wikiPage" as const, id: wikiPageId };
-  ensureOwnerExists(database, owner);
+  await ensureOwnerExists(database, owner);
   return persistAttachment({ database, owner, upload, actor });
 }
 
 export async function linkAttachment(database: DbClient, owner: AttachmentOwner, attachmentId: number, actor?: JournalActor | null): Promise<Attachment> {
-  ensureOwnerExists(database, owner);
-  const attachment = attachmentRepository.findById(database, attachmentId);
+  await ensureOwnerExists(database, owner);
+  const attachment = await attachmentRepository.findById(database, attachmentId);
   if (!attachment) {
     throw notFound(`Attachment with id ${attachmentId} not found`);
   }
-  const ownerObject = getOwnerJournalObject(database, owner);
+  const ownerObject = await getOwnerJournalObject(database, owner);
   const attachmentObject = attachmentJournalObject(attachment);
-  const alreadyLinked = listAttachmentOwners(database, attachmentId).some((currentOwner) => currentOwner.type === owner.type && currentOwner.id === owner.id);
-  database.transaction((tx) => {
-    insertAttachmentLink(tx, owner, attachmentId);
+  const alreadyLinked = (await listAttachmentOwners(database, attachmentId)).some((currentOwner) => currentOwner.type === owner.type && currentOwner.id === owner.id);
+  await database.transaction(async (tx) => {
+    await insertAttachmentLink(tx, owner, attachmentId);
     if (!alreadyLinked) {
-      recordJournalEntry(tx, {
+      await recordJournalEntry(tx, {
         operation: "link",
         object: attachmentObject,
         summary: buildLinkSummary(attachmentObject, ownerObject),
@@ -852,23 +847,23 @@ export async function linkAttachment(database: DbClient, owner: AttachmentOwner,
 
 export async function deleteWikiPageAttachment(database: DbClient, wikiPageId: number, attachmentId: number, actor?: JournalActor | null): Promise<void> {
   const owner = { type: "wikiPage" as const, id: wikiPageId };
-  ensureOwnerExists(database, owner);
-  const record = attachmentRepository.findById(database, attachmentId);
+  await ensureOwnerExists(database, owner);
+  const record = await attachmentRepository.findById(database, attachmentId);
   if (!record) {
     throw notFound(`Attachment with id ${attachmentId} not found`);
   }
-  const linked = listAttachmentOwners(database, attachmentId).some((currentOwner) => currentOwner.type === owner.type && currentOwner.id === owner.id);
+  const linked = (await listAttachmentOwners(database, attachmentId)).some((currentOwner) => currentOwner.type === owner.type && currentOwner.id === owner.id);
   if (!linked) {
     throw notFound(`Attachment with id ${attachmentId} is not linked to wiki page ${wikiPageId}`);
   }
 
-  const ownerObject = getOwnerJournalObject(database, owner);
+  const ownerObject = await getOwnerJournalObject(database, owner);
   const attachmentObject = attachmentJournalObject(record);
-  database.transaction((tx) => {
-    tx.delete(wikiPageAttachments)
+  await database.transaction(async (tx) => {
+    await tx.delete(wikiPageAttachments)
       .where(and(eq(wikiPageAttachments.wikiPageId, wikiPageId), eq(wikiPageAttachments.attachmentId, attachmentId)))
-      .run();
-    recordJournalEntry(tx, {
+      ;
+    await recordJournalEntry(tx, {
       operation: "unlink",
       object: attachmentObject,
       summary: buildUnlinkSummary(attachmentObject, ownerObject),
@@ -877,34 +872,34 @@ export async function deleteWikiPageAttachment(database: DbClient, wikiPageId: n
     });
   });
 
-  if (listAttachmentOwners(database, attachmentId).length === 0) {
+  if ((await listAttachmentOwners(database, attachmentId)).length === 0) {
     await deleteAttachmentRecords(database, [record]);
   }
 }
 
 export async function deleteAttachment(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
-  const record = attachmentRepository.findById(database, id);
+  const record = await attachmentRepository.findById(database, id);
   if (!record) {
     throw notFound(`Attachment with id ${id} not found`);
   }
 
-  const ownerContexts = listAttachmentOwners(database, id).map((owner) => makeJournalContext(getOwnerJournalObject(database, owner), "owner"));
-  database.transaction((tx) => {
+  const ownerContexts = await Promise.all((await listAttachmentOwners(database, id)).map(async (owner) => makeJournalContext(await getOwnerJournalObject(database, owner), "owner")));
+  await database.transaction(async (tx) => {
     const journalObject = attachmentJournalObject(record);
-    recordJournalEntry(tx, {
+    await recordJournalEntry(tx, {
       operation: "delete",
       object: journalObject,
       summary: buildDeleteSummary(journalObject),
       actor,
       contexts: ownerContexts
     });
-    attachmentRepository.deleteByIds(tx, [id]);
+    await attachmentRepository.deleteByIds(tx, [id]);
   });
   await removeAttachmentFiles([record]);
 }
 
 export async function openAttachment(database: DbClient, id: number, fileOpener: FileOpener, actor?: JournalActor | null): Promise<void> {
-  const record = attachmentRepository.findById(database, id);
+  const record = await attachmentRepository.findById(database, id);
   if (!record) {
     throw notFound(`Attachment with id ${id} not found`);
   }
@@ -920,5 +915,5 @@ export async function openAttachment(database: DbClient, id: number, fileOpener:
   } catch {
     throw internalError("Datei konnte nicht geöffnet werden.");
   }
-  watchAttachmentForChanges(database, record.id, diskPath, actor?.actorUserId ?? null);
+  await watchAttachmentForChanges(database, record.id, diskPath, actor?.actorUserId ?? null);
 }

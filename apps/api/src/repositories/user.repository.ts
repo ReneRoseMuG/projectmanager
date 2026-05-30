@@ -1,5 +1,6 @@
-import { asc, eq, sql } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { asc, eq, sql } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
 import { users } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -15,53 +16,53 @@ function nowIso(): string {
 }
 
 export const userRepository = {
-  findAll(database: DbClient): UserRecord[] {
-    return database.select().from(users).orderBy(asc(users.lastName), asc(users.firstName), asc(users.email)).all();
+  async findAll(database: DbSession): Promise<UserRecord[]> {
+    return database.select().from(users).orderBy(asc(users.lastName), asc(users.firstName), asc(users.email));
   },
 
-  findActive(database: DbClient): UserRecord[] {
-    return database.select().from(users).where(eq(users.isActive, true)).orderBy(asc(users.lastName), asc(users.firstName), asc(users.email)).all();
+  async findActive(database: DbSession): Promise<UserRecord[]> {
+    return database.select().from(users).where(eq(users.isActive, true)).orderBy(asc(users.lastName), asc(users.firstName), asc(users.email));
   },
 
-  findById(database: DbClient, id: number): UserRecord | undefined {
-    return database.select().from(users).where(eq(users.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<UserRecord | undefined> {
+    return firstRow(await database.select().from(users).where(eq(users.id, id)));
   },
 
-  findByEmail(database: DbClient, email: string): UserRecord | undefined {
-    return database.select().from(users).where(eq(users.email, email)).get();
+  async findByEmail(database: DbSession, email: string): Promise<UserRecord | undefined> {
+    return firstRow(await database.select().from(users).where(eq(users.email, email)));
   },
 
-  create(database: DbClient, data: UserCreateData): UserRecord {
+  async create(database: DbSession, data: UserCreateData): Promise<UserRecord> {
     const now = nowIso();
-    database
-      .run(sql`insert into users (name, first_name, last_name, address, phone, email, password_hash, role_id, is_active, version, created_at, updated_at)
-        values ('', ${data.firstName}, ${data.lastName}, ${data.address ?? null}, ${data.phone ?? null}, ${data.email}, ${data.passwordHash ?? null}, ${data.roleId}, ${data.isActive ? 1 : 0}, 1, ${now}, ${now})`);
-    const created = this.findByEmail(database, data.email);
+    const fullName = data.lastName && data.firstName ? `${data.lastName}, ${data.firstName}` : (data.lastName || data.firstName || "");
+    await database.execute(sql`insert into users (name, first_name, last_name, full_name, address, phone, email, password_hash, role_id, is_active, version, created_at, updated_at)
+        values ('', ${data.firstName}, ${data.lastName}, ${fullName}, ${data.address ?? null}, ${data.phone ?? null}, ${data.email}, ${data.passwordHash ?? null}, ${data.roleId}, ${data.isActive ? 1 : 0}, 1, ${now}, ${now})`);
+    const created = await this.findByEmail(database, data.email);
     if (!created) {
       throw new Error("User insert failed");
     }
     return created;
   },
 
-  update(database: DbClient, id: number, expectedVersion: number, data: UserUpdateData): UserRecord | undefined {
-    const current = this.findById(database, id);
+  async update(database: DbSession, id: number, expectedVersion: number, data: UserUpdateData): Promise<UserRecord | undefined> {
+    const current = await this.findById(database, id);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    return database
+    await database
       .update(users)
       .set({
         ...data,
         version: current.version + 1,
         updatedAt: nowIso()
       })
-      .where(eq(users.id, id))
-      .returning()
-      .get();
+      .where(eq(users.id, id));
+    return this.findById(database, id);
   },
 
-  delete(database: DbClient, id: number): number {
-    return database.delete(users).where(eq(users.id, id)).run().changes;
+  async delete(database: DbSession, id: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(users).where(eq(users.id, id)));
   }
 };
+

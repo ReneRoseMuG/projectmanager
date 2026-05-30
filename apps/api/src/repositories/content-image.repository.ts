@@ -1,5 +1,6 @@
-import { eq } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { eq } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow } from "../db/query-utils.js";
 import { contentImages } from "../db/schema.js";
 
 export type ContentImageRecord = typeof contentImages.$inferSelect;
@@ -10,9 +11,9 @@ function nowIso(): string {
 }
 
 export const contentImageRepository = {
-  create(database: DbClient, data: ContentImageCreateData, userId?: number): ContentImageRecord {
+  async create(database: DbSession, data: ContentImageCreateData, userId?: number): Promise<ContentImageRecord> {
     const now = nowIso();
-    return database
+    await database
       .insert(contentImages)
       .values({
         ...data,
@@ -21,12 +22,16 @@ export const contentImageRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, data.id);
+    if (!created) {
+      throw new Error("Created content image could not be loaded");
+    }
+    return created;
   },
 
-  findById(database: DbClient, id: string): ContentImageRecord | undefined {
-    return database.select().from(contentImages).where(eq(contentImages.id, id)).get();
+  async findById(database: DbSession, id: string): Promise<ContentImageRecord | undefined> {
+    return firstRow(await database.select().from(contentImages).where(eq(contentImages.id, id)));
   }
 };
+

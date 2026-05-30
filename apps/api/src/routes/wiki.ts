@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from "fastify";
+﻿import type { FastifyInstance, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from "fastify";
 import {
   addWikiPageRelation,
   createWikiPage,
@@ -74,7 +74,7 @@ export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: WikiPageInput }>(
     "/wiki",
     { preValidation: rejectLegacyProjectId, schema: { body: wikiBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createWikiPage(app.db, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createWikiPage(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -93,7 +93,7 @@ export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
     "/wiki/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteWikiPage(app.db, request.params.id, createJournalActor(request.currentUser));
+      await deleteWikiPage(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -109,7 +109,7 @@ export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
       `${basePath}/:id/relations`,
       { schema: { params: idParamSchema, body: wikiRelationBodySchema, response: { 201: arrayResponseSchema } } },
       async (request, reply) => {
-        const relations = addWikiPageRelation(app.db, request.params.id, request.body.targetWikiPageId, createJournalActor(request.currentUser));
+        const relations = await addWikiPageRelation(app.db, request.params.id, request.body.targetWikiPageId, createJournalActor(request.currentUser));
         return reply.status(201).send(relations);
       }
     );
@@ -130,7 +130,7 @@ export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
         }
       },
       async (request, reply) => {
-        removeWikiPageRelation(app.db, request.params.id, request.params.targetId, createJournalActor(request.currentUser));
+        await removeWikiPageRelation(app.db, request.params.id, request.params.targetId, createJournalActor(request.currentUser));
         return reply.status(204).send();
       }
     );

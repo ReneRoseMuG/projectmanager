@@ -1,18 +1,19 @@
 import type { Attachment, BacklogItem, CatalogEntry, Comment, Event, Feature, FeatureRelation, Milestone, Note, Project, Tag, Task, TaskBoardItem, TaskDetail, Ticket, UseCase, WikiImportReport } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import mysql from "mysql2/promise";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { migrateLegacyTestDb } from "../../fixtures/api/db";
 import { vitestRuntimeRoot } from "../../../apps/api/src/runtime-safety.js";
 
 /**
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Alle API-Route-Gruppen laufen gegen eine isolierte SQLite-DB.
+ * - Alle API-Route-Gruppen laufen gegen eine isolierte MySQL-DB.
  * - Multipart-Uploads werden persistiert und statisch ausgeliefert.
  * - Defaults aus Schema und Services bleiben konsistent.
  *
@@ -27,13 +28,31 @@ describe("Projekt Manager API integration", () => {
   let app: FastifyInstance | undefined;
   let api: ReturnType<typeof request.agent>;
   let tempDir: string;
-  let closeDatabase: (() => void) | null = null;
+  let testDbName: string;
+  let closeDatabase: (() => Promise<void>) | null = null;
 
   beforeAll(async () => {
     tempDir = path.join(vitestRuntimeRoot, "app-integration");
     await fs.rm(tempDir, { recursive: true, force: true });
-    await fs.mkdir(path.join(tempDir, "data"), { recursive: true });
-    process.env.DATABASE_PATH = path.join(tempDir, "data", "taskmanager.sqlite");
+
+    // Create isolated MySQL test DB before importing any app modules
+    testDbName = `taskmanager_test_appint_${crypto.randomUUID().replace(/-/g, "")}`;
+    const connConfig = {
+      host: process.env.TEST_DB_HOST ?? process.env.DB_HOST ?? "localhost",
+      port: Number(process.env.TEST_DB_PORT ?? process.env.DB_PORT ?? 3306),
+      user: process.env.TEST_DB_USER ?? process.env.DB_USER ?? "root",
+      password: process.env.TEST_DB_PASSWORD ?? process.env.DB_PASSWORD ?? ""
+    };
+    const adminConn = await mysql.createConnection(connConfig);
+    await adminConn.execute(`CREATE DATABASE \`${testDbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    await adminConn.end();
+
+    // Set DB_* before importing db/client.ts so the module-level pool connects to the test DB
+    process.env.DB_HOST = connConfig.host;
+    process.env.DB_PORT = String(connConfig.port);
+    process.env.DB_USER = connConfig.user;
+    process.env.DB_PASSWORD = connConfig.password;
+    process.env.DB_NAME = testDbName;
     process.env.UPLOAD_DIR = path.join(tempDir, "uploads");
     process.env.PREVIEW_CACHE_DIR = path.join(tempDir, "previews");
     process.env.CONTENT_DIR = path.join(tempDir, "content");
@@ -45,25 +64,28 @@ describe("Projekt Manager API integration", () => {
     process.env.ADMIN_INITIAL_PASSWORD = "password123";
     process.env.SESSION_SECRET = "integration-session-secret-change-me-12345";
 
-    const dbModule = await import("../../../apps/api/src/db/client.js");
+    const { db, closeDatabase: closeFn } = await import("../../../apps/api/src/db/client.js");
+    const { migrate } = await import("drizzle-orm/mysql2/migrator");
     const migrationsFolder = fileURLToPath(new URL("../../../apps/api/src/db/migrations", import.meta.url));
+    await migrate(db, { migrationsFolder, migrationsTable: "__drizzle_migrations_taskmanager" });
 
-    dbModule.sqlite.pragma("foreign_keys = OFF");
-    migrateLegacyTestDb(dbModule.sqlite, migrationsFolder);
-    dbModule.sqlite.pragma("foreign_keys = ON");
-    expect(dbModule.sqlite.pragma("foreign_key_check")).toEqual([]);
-    closeDatabase = () => dbModule.sqlite.close();
+    closeDatabase = async () => {
+      await closeFn();
+      const dropConn = await mysql.createConnection(connConfig);
+      await dropConn.execute(`DROP DATABASE IF EXISTS \`${testDbName}\``);
+      await dropConn.end();
+    };
 
     const appModule = await import("../../../apps/api/src/app.js");
     app = await appModule.buildApp();
     await app.ready();
     api = request.agent(app.server);
     await api.post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
-  }, 60_000);
+  }, 120_000);
 
   afterAll(async () => {
     await app?.close();
-    closeDatabase?.();
+    await closeDatabase?.();
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 

@@ -1,17 +1,24 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import fs from "node:fs";
-import path from "node:path";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { config } from "../config.js";
-import { assertSafeTestDatabasePath } from "../runtime-safety.js";
-import * as schema from "./schema.js";
 
-assertSafeTestDatabasePath(config.databasePath);
-fs.mkdirSync(path.dirname(config.databasePath), { recursive: true });
+export const mysqlPool = mysql.createPool({
+  host: config.db.host,
+  port: config.db.port,
+  database: config.db.name,
+  user: config.db.user,
+  password: config.db.password,
+  ssl: config.db.ssl ? { rejectUnauthorized: true } : undefined,
+  waitForConnections: true,
+  connectionLimit: 10
+});
 
-export const sqlite = new Database(config.databasePath);
-sqlite.pragma("foreign_keys = ON");
+export const db = drizzle({ client: mysqlPool });
 
-export const db = drizzle({ client: sqlite, schema });
 export type DbClient = Omit<typeof db, "$client">;
-export type DbSession = DbClient;
+type DbTransaction = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
+export type DbSession = DbClient | DbTransaction;
+
+export async function closeDatabase(): Promise<void> {
+  await mysqlPool.end();
+}

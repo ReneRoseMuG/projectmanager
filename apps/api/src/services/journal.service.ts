@@ -248,7 +248,7 @@ function normalizeContexts(object: JournalObjectRef, contexts: JournalContextCre
   });
 }
 
-export function recordJournalEntry(database: DbSession, input: JournalWriteInput): void {
+export async function recordJournalEntry(database: DbSession, input: JournalWriteInput): Promise<void> {
   const summary = input.summary.trim();
   if (!summary) {
     throw badRequest("Journal summary is required");
@@ -265,7 +265,7 @@ export function recordJournalEntry(database: DbSession, input: JournalWriteInput
     changes: input.changes ?? [],
     contexts: normalizeContexts(input.object, input.contexts)
   };
-  journalRepository.create(database, data);
+  await journalRepository.create(database, data);
 }
 
 function mapChange(record: JournalChangeRecord): JournalChange {
@@ -322,20 +322,20 @@ function normalizeQuery(input: JournalQueryInput): JournalEntryFilters {
   };
 }
 
-export function listJournalEntries(database: DbClient, input: JournalQueryInput): JournalListResponse {
+export async function listJournalEntries(database: DbClient, input: JournalQueryInput): Promise<JournalListResponse> {
   const filters = normalizeQuery(input);
   const requestedLimit = filters.limit - 1;
-  const records = journalRepository.list(database, filters);
+  const records = await journalRepository.list(database, filters);
   const page = records.slice(0, requestedLimit);
   const ids = page.map((record) => record.id);
-  const changes = journalRepository.listChanges(database, ids);
-  const contexts = journalRepository.listContexts(database, ids);
+  const changes = await journalRepository.listChanges(database, ids);
+  const contexts = await journalRepository.listContexts(database, ids);
   return {
     entries: page.map((record) => mapEntry(record, changes, contexts)),
     nextCursor: records.length > requestedLimit ? records[requestedLimit]?.id ?? null : null
   };
 }
 
-export function listObjectJournalEntries(database: DbClient, objectType: JournalObjectType, objectId: number, input: JournalQueryInput): JournalListResponse {
+export async function listObjectJournalEntries(database: DbClient, objectType: JournalObjectType, objectId: number, input: JournalQueryInput): Promise<JournalListResponse> {
   return listJournalEntries(database, { ...input, objectType, objectId });
 }

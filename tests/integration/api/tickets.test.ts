@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope: Tickets API
  *
  * Covered rules:
@@ -52,11 +52,11 @@ describe("Tickets API", () => {
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
     config.uploadDir = uploadDir;
     config.previewCacheDir = previewCacheDir;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableMultipart: true });
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => { await truncateAll(testDb.pool); });
 
   afterEach(async () => {
     await fs.rm(uploadDir, { recursive: true, force: true });
@@ -66,8 +66,8 @@ describe("Tickets API", () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
     config.uploadDir = originalUploadDir;
     config.previewCacheDir = originalPreviewCacheDir;
     await fs.rm(uploadDir, { recursive: true, force: true });

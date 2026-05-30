@@ -1,4 +1,4 @@
-import type { DayPlanUpdate, EventInput, TaskInput } from "@taskmanager/shared-types";
+﻿import type { DayPlanUpdate, EventInput, TaskInput } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
 import { requireCurrentUser } from "../plugins/auth.js";
 import {
@@ -102,7 +102,7 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     "/day-plans/:date",
     { schema: { params: dateParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return findOrCreateDayPlanByUserAndDate(app.db, currentUser.id, request.params.date, createJournalActor(currentUser));
     }
   );
@@ -111,7 +111,7 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     "/day-plans/:date",
     { schema: { params: dateParamSchema, body: dayPlanPatchSchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return updateDayPlanForUserAndDate(app.db, currentUser.id, request.params.date, request.body, createJournalActor(currentUser));
     }
   );
@@ -120,8 +120,8 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     "/day-plans/:date/tasks",
     { schema: { params: dateParamSchema, body: taskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const currentUser = requireCurrentUser(request);
-      const task = createDayPlanTask(app.db, currentUser.id, request.params.date, request.body, createJournalActor(currentUser));
+      const currentUser = await requireCurrentUser(request);
+      const task = await createDayPlanTask(app.db, currentUser.id, request.params.date, request.body, createJournalActor(currentUser));
       return reply.status(201).send(task);
     }
   );
@@ -130,7 +130,7 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     "/day-plans/:date/tasks/:taskId",
     { schema: { params: dateTaskParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return linkDayPlanTask(app.db, currentUser.id, request.params.date, request.params.taskId, createJournalActor(currentUser));
     }
   );
@@ -139,8 +139,8 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     "/day-plans/:date/tasks/:taskId",
     { schema: { params: dateTaskParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      const currentUser = requireCurrentUser(request);
-      unlinkDayPlanTask(app.db, currentUser.id, request.params.date, request.params.taskId, createJournalActor(currentUser));
+      const currentUser = await requireCurrentUser(request);
+      await unlinkDayPlanTask(app.db, currentUser.id, request.params.date, request.params.taskId, createJournalActor(currentUser));
       return reply.status(204).send();
     }
   );
@@ -149,8 +149,8 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     "/day-plans/:date/events",
     { schema: { params: dateParamSchema, body: eventBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const currentUser = requireCurrentUser(request);
-      const event = createDayPlanEvent(app.db, currentUser.id, request.params.date, request.body, createJournalActor(currentUser));
+      const currentUser = await requireCurrentUser(request);
+      const event = await createDayPlanEvent(app.db, currentUser.id, request.params.date, request.body, createJournalActor(currentUser));
       return reply.status(201).send(event);
     }
   );
@@ -159,7 +159,7 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     "/day-plans/:date/events/:eventId",
     { schema: { params: dateEventParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return linkDayPlanEvent(app.db, currentUser.id, request.params.date, request.params.eventId, createJournalActor(currentUser));
     }
   );
@@ -168,8 +168,8 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     "/day-plans/:date/events/:eventId",
     { schema: { params: dateEventParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      const currentUser = requireCurrentUser(request);
-      unlinkDayPlanEvent(app.db, currentUser.id, request.params.date, request.params.eventId, createJournalActor(currentUser));
+      const currentUser = await requireCurrentUser(request);
+      await unlinkDayPlanEvent(app.db, currentUser.id, request.params.date, request.params.eventId, createJournalActor(currentUser));
       return reply.status(204).send();
     }
   );

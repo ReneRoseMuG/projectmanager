@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import type { EventInput, EventUpdate } from "@taskmanager/shared-types";
 import { createEvent, deleteEvent, getEvent, listEvents, updateEvent } from "../services/events.service.js";
 import { createJournalActor } from "../services/journal.service.js";
@@ -63,7 +63,7 @@ export async function registerEventsRoutes(app: FastifyInstance): Promise<void> 
   app.post<{ Body: EventInput }>(
     "/events",
     { schema: { body: eventBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createEvent(app.db, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createEvent(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -82,7 +82,7 @@ export async function registerEventsRoutes(app: FastifyInstance): Promise<void> 
     "/events/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteEvent(app.db, request.params.id, createJournalActor(request.currentUser));
+      await deleteEvent(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

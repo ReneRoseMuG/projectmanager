@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Test-Ebene:
@@ -37,17 +37,17 @@ describe("Wiki API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => {
-    truncateAll(testDb.sqlite);
+  beforeEach(async () => {
+    await truncateAll(testDb.pool);
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("Root-Seite anlegen", async () => {
@@ -57,7 +57,8 @@ describe("Wiki API", () => {
     expect(res.body).not.toHaveProperty("slug");
     expect(res.body).not.toHaveProperty("projectId");
     expect(res.body).not.toHaveProperty("contentPath");
-    const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(res.body.id) as { content: string };
+    const [wikiRows1] = await testDb.pool.execute("SELECT content FROM wiki_pages WHERE id = ?", [res.body.id]);
+    const row = (wikiRows1 as Array<{ content: string }>)[0];
     expect(row.content).toBe("# Einführung");
   });
 
@@ -71,7 +72,8 @@ describe("Wiki API", () => {
 
     expect(res.body.parentId).toBe(root.id);
     expect(res.body).not.toHaveProperty("contentPath");
-    const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(res.body.id) as { content: string };
+    const [wikiRows1] = await testDb.pool.execute("SELECT content FROM wiki_pages WHERE id = ?", [res.body.id]);
+    const row = (wikiRows1 as Array<{ content: string }>)[0];
     expect(row.content).toBe("# Installation");
   });
 
@@ -131,7 +133,8 @@ describe("Wiki API", () => {
     const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ content: "# Neu", expectedVersion: page.version }).expect(200);
 
     expect(res.body.content).toBe("# Neu");
-    const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(page.id) as { content: string };
+    const [wikiRows2] = await testDb.pool.execute("SELECT content FROM wiki_pages WHERE id = ?", [page.id]);
+    const row = (wikiRows2 as Array<{ content: string }>)[0];
     expect(row.content).toBe("# Neu");
   });
 
@@ -141,7 +144,8 @@ describe("Wiki API", () => {
     const res = await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ title: "Wiki New", expectedVersion: page.version }).expect(200);
 
     expect(res.body).not.toHaveProperty("contentPath");
-    const row = testDb.sqlite.prepare("SELECT content FROM wiki_pages WHERE id = ?").get(page.id) as { content: string };
+    const [wikiRows2] = await testDb.pool.execute("SELECT content FROM wiki_pages WHERE id = ?", [page.id]);
+    const row = (wikiRows2 as Array<{ content: string }>)[0];
     expect(row.content).toBe("# Inhalt");
   });
 
@@ -224,11 +228,12 @@ describe("Wiki API", () => {
     await supertest(app.server).post(`/api/wiki/${page.id}/tickets`).send({ ticketId: ticket.id }).expect(201);
     await supertest(app.server).delete(`/api/wiki/${page.id}`).expect(204);
 
-    const relation = testDb.sqlite
-      .prepare("SELECT source_wiki_page_id FROM wiki_page_relations WHERE source_wiki_page_id = ? OR target_wiki_page_id = ?")
-      .get(page.id, page.id);
-    const taskLink = testDb.sqlite.prepare("SELECT owner_id FROM wiki_page_tasks WHERE owner_id = ?").get(page.id);
-    const ticketLink = testDb.sqlite.prepare("SELECT owner_id FROM wiki_page_tickets WHERE owner_id = ?").get(page.id);
+    const [relRows2] = await testDb.pool.execute("SELECT source_wiki_page_id FROM wiki_page_relations WHERE source_wiki_page_id = ? OR target_wiki_page_id = ?", [page.id, page.id]);
+    const relation = (relRows2 as unknown[])[0] ?? undefined;
+    const [taskLinkRows] = await testDb.pool.execute("SELECT owner_id FROM wiki_page_tasks WHERE owner_id = ?", [page.id]);
+    const taskLink = (taskLinkRows as unknown[])[0] ?? undefined;
+    const [ticketLinkRows] = await testDb.pool.execute("SELECT owner_id FROM wiki_page_tickets WHERE owner_id = ?", [page.id]);
+    const ticketLink = (ticketLinkRows as unknown[])[0] ?? undefined;
     expect(relation).toBeUndefined();
     expect(taskLink).toBeUndefined();
     expect(ticketLink).toBeUndefined();

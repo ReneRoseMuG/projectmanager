@@ -52,7 +52,7 @@ export async function registerContentImageRoutes(app: FastifyInstance): Promise<
     "/content/images",
     { config: { auth: { resource: "contentImages", action: "write" } }, schema: { ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const response = createContentImage(app.db, await readUpload(request), createJournalActor(request.currentUser));
+      const response = await createContentImage(app.db, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(response);
     }
   );
@@ -61,7 +61,7 @@ export async function registerContentImageRoutes(app: FastifyInstance): Promise<
     "/content/images/:id",
     { config: { auth: { resource: "contentImages", action: "read" } }, schema: { params: contentImageParamsSchema } },
     async (request, reply) => {
-      const image = getContentImage(app.db, request.params.id);
+      const image = await getContentImage(app.db, request.params.id);
       return reply.header("Content-Type", image.mimeType).send(image.data);
     }
   );

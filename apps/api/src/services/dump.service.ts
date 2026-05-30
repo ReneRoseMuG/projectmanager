@@ -13,7 +13,6 @@ import type {
 } from "@taskmanager/shared-types";
 import * as archiverPackage from "archiver";
 import type { Archiver } from "archiver";
-import type Database from "better-sqlite3";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -21,10 +20,24 @@ import path from "node:path";
 import { Transform } from "node:stream";
 import unzipper from "unzipper";
 import { config } from "../config.js";
+import { mysqlPool as _productionPool } from "../db/client.js";
 import {
-  assertSafeTestDatabasePath,
   assertSafeTestDirectoryPath,
 } from "../runtime-safety.js";
+
+let _poolOverride: typeof _productionPool | null = null;
+
+export function setMysqlPoolForTests(pool: typeof _productionPool | null): void {
+  _poolOverride = pool;
+}
+
+const mysqlPool = new Proxy(_productionPool, {
+  get(target, prop, _receiver) {
+    const pool = _poolOverride ?? target;
+    const value = Reflect.get(pool as object, prop, pool);
+    return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(pool) : value;
+  }
+});
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import {
   downloadBackupSftpFile,
@@ -213,28 +226,6 @@ interface LegacyStandardAdminFallback {
   row: Record<string, unknown>;
 }
 
-interface ForeignKeyViolation {
-  table: string;
-  rowid: number;
-  parent: string;
-  fkid: number;
-}
-
-interface ForeignKeyDefinition {
-  id: number;
-  seq: number;
-  table: string;
-  from: string;
-  to: string;
-}
-
-interface MissingUserReference {
-  table: string;
-  rowid: number;
-  column: string;
-  userId: number;
-}
-
 interface RestoreTablesResult {
   restored: number;
   refreshedTableKeys: Set<DumpTableKey>;
@@ -242,10 +233,7 @@ interface RestoreTablesResult {
 
 interface ApplyDumpOptions {
   afterFileSwap?: () => void;
-  afterTablesRestore?: (
-    sqlite: Database.Database,
-    preview: InspectedDump,
-  ) => void;
+  afterTablesRestore?: (preview: InspectedDump) => void;
   progressCallback?: BackupProgressCallback;
 }
 
@@ -308,8 +296,7 @@ function ensureWorkDir(): string {
 }
 
 function localBackupManifestPath(): string {
-  const dataDir = path.dirname(config.databasePath);
-  fs.mkdirSync(dataDir, { recursive: true });
+  const dataDir = ensureWorkDir();
   return path.join(dataDir, "last-backup-manifest.json");
 }
 
@@ -411,7 +398,6 @@ function mapRemoteBackupFile(
 }
 
 function assertSafeDumpRuntimeTargets(): void {
-  assertSafeTestDatabasePath(config.databasePath);
   assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   assertSafeTestDirectoryPath(getContentBaseDir(), "CONTENT_DIR");
   assertSafeTestDirectoryPath(config.backupWorkDir, "BACKUP_WORK_DIR");
@@ -565,14 +551,13 @@ function deserializeTableRow(
   return result;
 }
 
-function selectTableRows(
-  sqlite: Database.Database,
+async function selectTableRows(
   tableName: string,
-): Array<Record<string, unknown>> {
-  return sqlite
-    .prepare(`SELECT * FROM ${quoteIdentifier(tableName)} ORDER BY rowid`)
-    .all()
-    .map((row) => serializeTableRow(tableName, row as Record<string, unknown>));
+): Promise<Array<Record<string, unknown>>> {
+  const [rows] = await mysqlPool.execute(`SELECT * FROM \`${tableName}\``);
+  return (rows as Array<Record<string, unknown>>).map((row) =>
+    serializeTableRow(tableName, row),
+  );
 }
 
 function buildRoleCodeById(
@@ -635,12 +620,20 @@ function normalizeDumpPayload(payload: DumpPayload): DumpPayload {
   };
 }
 
-function collectDumpTableRows(sqlite: Database.Database): DumpTableRows {
+async function collectDumpTableRows(): Promise<DumpTableRows> {
   const result = {} as DumpTableRows;
   for (const entry of DUMP_TABLES) {
-    result[entry.key] = selectTableRows(sqlite, entry.tableName);
+    result[entry.key] = await selectTableRows(entry.tableName);
   }
   return normalizeDumpTables(result);
+}
+
+async function collectRawTableRows(): Promise<DumpTableRows> {
+  const result = {} as DumpTableRows;
+  for (const entry of DUMP_TABLES) {
+    result[entry.key] = await selectTableRows(entry.tableName);
+  }
+  return result;
 }
 
 function buildTableManifest(
@@ -790,15 +783,14 @@ function buildFileRootSummaries(manifest: DumpManifest): DumpFileRootSummary[] {
   ];
 }
 
-function buildDumpSnapshot(
-  sqlite: Database.Database,
+async function buildDumpSnapshot(
   options: BuildDumpSnapshotOptions = {},
-): DumpSnapshot {
+): Promise<DumpSnapshot> {
   assertSafeDumpRuntimeTargets();
   const exportedAt = nowIso();
   const dumpId = buildDumpId(exportedAt);
   const schemaRevision = getSchemaRevision();
-  const tables = collectDumpTableRows(sqlite);
+  const tables = await collectDumpTableRows();
   const fileRoots = options.deferFileRoots
     ? {
         uploads: buildEmptyFileRootManifest("uploads"),
@@ -995,20 +987,18 @@ async function writeDumpArchiveFile(
 }
 
 async function createDatabaseSnapshot(
-  sqlite: Database.Database,
-  targetPath: string,
+  _targetPath: string,
 ): Promise<void> {
-  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-  await sqlite.backup(targetPath);
+  // MySQL: no file snapshot needed, the JSON dump is the backup
 }
 
-export async function buildDumpArchive(sqlite: Database.Database): Promise<{
+export async function buildDumpArchive(): Promise<{
   buffer: Buffer;
   dumpId: string;
   filename: string;
   manifest: DumpManifest;
 }> {
-  const snapshot = buildDumpSnapshot(sqlite, { deferFileRoots: true });
+  const snapshot = await buildDumpSnapshot({ deferFileRoots: true });
   const tempDir = makeTempDir("taskmanager-dump-archive-");
   const filePath = path.join(tempDir, snapshot.filename);
   try {
@@ -1303,9 +1293,9 @@ function validatePartialLocalBase(
 
 function buildConfirmationPhrase(
   dumpId: string,
-  targetDatabasePath: string,
+  targetDbName: string,
 ): string {
-  return `AKTUALISIERE TASKMANAGER ${dumpId} NACH ${path.basename(targetDatabasePath)}`;
+  return `AKTUALISIERE TASKMANAGER ${dumpId} NACH ${targetDbName}`;
 }
 
 export async function inspectDumpArchive(
@@ -1445,7 +1435,7 @@ export async function inspectDumpArchive(
     fileHash: sha256Buffer(buffer),
     dumpId: payload.dumpId,
     backupFile,
-    targetDatabasePath: config.databasePath,
+    targetDatabasePath: config.db.name,
     transferReadiness:
       blockingIssues.length > 0
         ? "blocked"
@@ -1456,7 +1446,7 @@ export async function inspectDumpArchive(
     warnings,
     confirmationPhrase: buildConfirmationPhrase(
       payload.dumpId,
-      config.databasePath,
+      config.db.name,
     ),
     manifestPresent: manifest !== null,
     schemaRevision: manifest?.schemaRevision ?? null,
@@ -1611,17 +1601,16 @@ function restoreSwappedFileRoots(swaps: FileRootSwap[]): void {
   }
 }
 
-function selectSingleRow(
-  sqlite: Database.Database,
+async function selectSingleRow(
   tableName: string,
   whereSql: string,
   params: unknown[],
-): Record<string, unknown> | null {
-  return (
-    (sqlite
-      .prepare(`SELECT * FROM ${quoteIdentifier(tableName)} WHERE ${whereSql}`)
-      .get(...params) as Record<string, unknown> | undefined) ?? null
+): Promise<Record<string, unknown> | null> {
+  const [rows] = await mysqlPool.execute(
+    `SELECT * FROM \`${tableName}\` WHERE ${whereSql} LIMIT 1`,
+    params as never[],
   );
+  return (rows as Array<Record<string, unknown>>)[0] ?? null;
 }
 
 function parseRemoteImportHistory(
@@ -1654,36 +1643,29 @@ function parseRemoteImportHistory(
   }
 }
 
-function readRemoteImportHistory(
-  sqlite: Database.Database,
-): RemoteDumpImportHistoryEntry[] {
-  const row = selectSingleRow(
-    sqlite,
+async function readRemoteImportHistory(): Promise<RemoteDumpImportHistoryEntry[]> {
+  const row = await selectSingleRow(
     "app_settings",
-    `${quoteIdentifier("key")} = ?`,
+    "`key` = ?",
     [REMOTE_IMPORT_HISTORY_SETTING_KEY],
   );
   return parseRemoteImportHistory(row?.value);
 }
 
-function remoteImportHistoryByFileId(
-  sqlite: Database.Database,
-): Map<string, RemoteDumpImportHistoryEntry> {
+async function remoteImportHistoryByFileId(): Promise<Map<string, RemoteDumpImportHistoryEntry>> {
   return new Map(
-    readRemoteImportHistory(sqlite).map((entry) => [entry.fileId, entry]),
+    (await readRemoteImportHistory()).map((entry) => [entry.fileId, entry]),
   );
 }
 
-function writeRemoteImportHistory(
-  sqlite: Database.Database,
+async function writeRemoteImportHistory(
   entries: RemoteDumpImportHistoryEntry[],
-): void {
-  sqlite
-    .prepare(
-      `DELETE FROM ${quoteIdentifier("app_settings")} WHERE ${quoteIdentifier("key")} = ?`,
-    )
-    .run(REMOTE_IMPORT_HISTORY_SETTING_KEY);
-  insertRows(sqlite, "app_settings", [
+): Promise<void> {
+  await mysqlPool.execute(
+    "DELETE FROM `app_settings` WHERE `key` = ?",
+    [REMOTE_IMPORT_HISTORY_SETTING_KEY],
+  );
+  await insertRows("app_settings", [
     {
       key: REMOTE_IMPORT_HISTORY_SETTING_KEY,
       value: JSON.stringify(entries),
@@ -1692,25 +1674,22 @@ function writeRemoteImportHistory(
   ]);
 }
 
-function recordRemoteDumpImport(
-  sqlite: Database.Database,
+async function recordRemoteDumpImport(
   entry: RemoteDumpImportHistoryEntry,
-): void {
-  const byFileId = remoteImportHistoryByFileId(sqlite);
+): Promise<void> {
+  const byFileId = await remoteImportHistoryByFileId();
   byFileId.set(entry.fileId, entry);
-  writeRemoteImportHistory(
-    sqlite,
+  await writeRemoteImportHistory(
     [...byFileId.values()].sort(
       (a, b) => Date.parse(b.importedAt) - Date.parse(a.importedAt),
     ),
   );
 }
 
-function assertRemoteDumpWasNotImported(
-  sqlite: Database.Database,
+async function assertRemoteDumpWasNotImported(
   fileId: string,
-): void {
-  if (remoteImportHistoryByFileId(sqlite).has(fileId)) {
+): Promise<void> {
+  if ((await remoteImportHistoryByFileId()).has(fileId)) {
     throw conflict("Remote backup file was already imported");
   }
 }
@@ -1722,37 +1701,28 @@ function payloadHasAdminUser(payload: DumpPayload): boolean {
   });
 }
 
-function selectLocalAdminFallback(
-  sqlite: Database.Database,
-): Record<string, unknown> | null {
-  const configuredAdmin = selectSingleRow(sqlite, "users", "lower(email) = ?", [
+async function selectLocalAdminFallback(): Promise<Record<string, unknown> | null> {
+  const configuredAdmin = await selectSingleRow("users", "LOWER(email) = ?", [
     standardAdminEmail(),
   ]);
   if (configuredAdmin) {
     return configuredAdmin;
   }
 
-  return (
-    (sqlite
-      .prepare(
-        `SELECT ${quoteIdentifier("users")}.* FROM ${quoteIdentifier("users")} ` +
-          `INNER JOIN ${quoteIdentifier("roles")} ON ${quoteIdentifier("users")}.${quoteIdentifier("role_id")} = ${quoteIdentifier("roles")}.${quoteIdentifier("id")} ` +
-          `WHERE ${quoteIdentifier("roles")}.${quoteIdentifier("key")} = 'admin' ` +
-          `ORDER BY ${quoteIdentifier("users")}.${quoteIdentifier("id")} LIMIT 1`,
-      )
-      .get() as Record<string, unknown> | undefined) ?? null
+  const [rows] = await mysqlPool.execute(
+    "SELECT `users`.* FROM `users` INNER JOIN `roles` ON `users`.`role_id` = `roles`.`id` WHERE `roles`.`key` = 'admin' ORDER BY `users`.`id` LIMIT 1",
   );
+  return (rows as Array<Record<string, unknown>>)[0] ?? null;
 }
 
-function createLegacyStandardAdminFallback(
-  sqlite: Database.Database,
+async function createLegacyStandardAdminFallback(
   payload: DumpPayload,
-): LegacyStandardAdminFallback | null {
+): Promise<LegacyStandardAdminFallback | null> {
   if (payloadHasAdminUser(payload)) {
     return null;
   }
 
-  const admin = selectLocalAdminFallback(sqlite);
+  const admin = await selectLocalAdminFallback();
   const adminId = admin ? numericValue(admin.id) : null;
   if (!admin || adminId === null) {
     return null;
@@ -1761,46 +1731,45 @@ function createLegacyStandardAdminFallback(
   return { id: adminId, row: admin };
 }
 
-function tableColumns(sqlite: Database.Database, tableName: string): string[] {
-  const rows = sqlite
-    .prepare(`PRAGMA table_info(${quoteIdentifier(tableName)})`)
-    .all() as Array<{ name: string }>;
-  return rows.map((row) => row.name);
+async function tableColumns(tableName: string): Promise<string[]> {
+  const [rows] = await mysqlPool.execute(
+    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION",
+    [tableName],
+  );
+  return (rows as Array<{ COLUMN_NAME: string }>).map((r) => r.COLUMN_NAME);
 }
 
-function insertRows(
-  sqlite: Database.Database,
+async function insertRows(
   tableName: string,
   rows: Array<Record<string, unknown>>,
-): void {
+): Promise<void> {
   if (rows.length === 0) {
     return;
   }
 
-  const columns = tableColumns(sqlite, tableName);
-  const columnSql = columns.map(quoteIdentifier).join(", ");
+  const columns = await tableColumns(tableName);
+  const columnSql = columns.map((c) => `\`${c}\``).join(", ");
   const placeholders = columns.map(() => "?").join(", ");
-  const statement = sqlite.prepare(
-    `INSERT INTO ${quoteIdentifier(tableName)} (${columnSql}) VALUES (${placeholders})`,
-  );
   for (const row of rows) {
     const nextRow = deserializeTableRow(tableName, row);
-    statement.run(columns.map((column) => nextRow[column] ?? null));
+    await mysqlPool.execute(
+      `INSERT INTO \`${tableName}\` (${columnSql}) VALUES (${placeholders})`,
+      columns.map((c) => nextRow[c] ?? null) as never[],
+    );
   }
 }
 
-function roleIdsByCode(sqlite: Database.Database): Map<string, number> {
-  const rows = sqlite
-    .prepare(`SELECT id, key FROM ${quoteIdentifier("roles")}`)
-    .all() as Array<{ id: number; key: string }>;
-  return new Map(rows.map((row) => [row.key, row.id]));
+async function roleIdsByCode(): Promise<Map<string, number>> {
+  const [rows] = await mysqlPool.execute("SELECT id, `key` FROM `roles`");
+  return new Map(
+    (rows as Array<{ id: number; key: string }>).map((r) => [r.key, r.id]),
+  );
 }
 
-function prepareUserRowsForRestore(
-  sqlite: Database.Database,
+async function prepareUserRowsForRestore(
   rows: Array<Record<string, unknown>>,
-): Array<Record<string, unknown>> {
-  const roleIds = roleIdsByCode(sqlite);
+): Promise<Array<Record<string, unknown>>> {
+  const roleIds = await roleIdsByCode();
   return rows.map((row) => {
     const result = { ...row };
     const roleCode = stringValue(result.roleCode);
@@ -1819,60 +1788,101 @@ function prepareUserRowsForRestore(
   });
 }
 
-function userIdExists(sqlite: Database.Database, id: number): boolean {
-  const row = sqlite
-    .prepare(
-      `SELECT 1 AS existsRow FROM ${quoteIdentifier("users")} WHERE id = ?`,
-    )
-    .get(id) as { existsRow: number } | undefined;
-  return Boolean(row);
+async function userIdExists(id: number): Promise<boolean> {
+  const [rows] = await mysqlPool.execute(
+    "SELECT 1 AS existsRow FROM `users` WHERE id = ?",
+    [id],
+  );
+  return (rows as unknown[]).length > 0;
 }
 
-function adminRoleId(sqlite: Database.Database): number {
-  const row = sqlite
-    .prepare(
-      `SELECT id FROM ${quoteIdentifier("roles")} WHERE ${quoteIdentifier("key")} = 'admin'`,
-    )
-    .get() as { id: number } | undefined;
+async function adminRoleId(): Promise<number> {
+  const [rows] = await mysqlPool.execute(
+    "SELECT id FROM `roles` WHERE `key` = 'admin'",
+  );
+  const row = (rows as Array<{ id: number }>)[0];
   if (!row) {
     throw badRequest("Dump import requires an admin role");
   }
   return row.id;
 }
 
-function restoreLegacyStandardAdminFallback(
-  sqlite: Database.Database,
+async function restoreLegacyStandardAdminFallback(
   fallback: LegacyStandardAdminFallback | null,
-): Set<DumpTableKey> {
+): Promise<Set<DumpTableKey>> {
   const refreshedTableKeys = new Set<DumpTableKey>();
   if (!fallback) {
     return refreshedTableKeys;
   }
 
-  if (!userIdExists(sqlite, fallback.id)) {
-    const row = { ...fallback.row };
-    row.id = fallback.id;
-    row.role_id = adminRoleId(sqlite);
-    insertRows(sqlite, "users", [row]);
+  if (!(await userIdExists(fallback.id))) {
+    const row = { ...fallback.row, id: fallback.id, role_id: await adminRoleId() };
+    await insertRows("users", [row]);
     refreshedTableKeys.add("users");
   }
 
-  const errors = sqlite.pragma("foreign_key_check") as ForeignKeyViolation[];
-  for (const reference of missingUserReferences(sqlite, errors)) {
-    sqlite
-      .prepare(
-        `UPDATE ${quoteIdentifier(reference.table)} SET ${quoteIdentifier(reference.column)} = ? WHERE rowid = ?`,
-      )
-      .run(fallback.id, reference.rowid);
-    const tableKey = DUMP_TABLES.find(
-      (entry) => entry.tableName === reference.table,
-    )?.key;
-    if (tableKey) {
-      refreshedTableKeys.add(tableKey);
+  // Replace orphaned user FK references with the fallback admin's ID.
+  // This only applies to legacy dumps that have no admin user: missing user references
+  // are silently replaced with the local admin so the restore can succeed.
+  const [fkRows] = await mysqlPool.execute(
+    `SELECT TABLE_NAME, COLUMN_NAME
+     FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
+       AND REFERENCED_TABLE_NAME = 'users'
+       AND REFERENCED_COLUMN_NAME = 'id'`,
+  );
+  const tableNameToKey = new Map<string, DumpTableKey>(DUMP_TABLES.map((entry) => [entry.tableName, entry.key]));
+  for (const fkRow of fkRows as Array<{ TABLE_NAME: string; COLUMN_NAME: string }>) {
+    const [result] = await mysqlPool.execute(
+      `UPDATE \`${fkRow.TABLE_NAME}\` SET \`${fkRow.COLUMN_NAME}\` = ?
+       WHERE \`${fkRow.COLUMN_NAME}\` IS NOT NULL
+         AND \`${fkRow.COLUMN_NAME}\` NOT IN (SELECT id FROM \`users\`)`,
+      [fallback.id],
+    );
+    const affectedRows = (result as { affectedRows: number }).affectedRows;
+    if (affectedRows > 0) {
+      const key = tableNameToKey.get(fkRow.TABLE_NAME);
+      if (key) {
+        refreshedTableKeys.add(key as DumpTableKey);
+      }
     }
   }
 
   return refreshedTableKeys;
+}
+
+async function validateAllForeignKeysInPayload(payload: DumpPayload): Promise<void> {
+  const [fkRows] = await mysqlPool.execute(
+    `SELECT TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+     FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
+       AND REFERENCED_TABLE_NAME IS NOT NULL`,
+  );
+  const tableNameToKey = new Map<string, DumpTableKey>(DUMP_TABLES.map((e) => [e.tableName, e.key as DumpTableKey]));
+  for (const fkRow of fkRows as Array<{ TABLE_NAME: string; COLUMN_NAME: string; REFERENCED_TABLE_NAME: string; REFERENCED_COLUMN_NAME: string }>) {
+    const key = tableNameToKey.get(fkRow.TABLE_NAME);
+    const refKey = tableNameToKey.get(fkRow.REFERENCED_TABLE_NAME);
+    if (!key || !refKey) continue;
+    const rows = payload.tables[key];
+    const refRows = payload.tables[refKey];
+    if (!rows?.length || !refRows) continue;
+    const validIds = new Set(
+      refRows
+        .map((r) => numericValue(r[fkRow.REFERENCED_COLUMN_NAME]))
+        .filter((id): id is number => id !== null && id > 0),
+    );
+    for (const row of rows) {
+      const rawVal = row[fkRow.COLUMN_NAME];
+      if (rawVal === null || rawVal === undefined) continue;
+      const refId = numericValue(rawVal);
+      if (refId !== null && refId > 0 && !validIds.has(refId)) {
+        if (fkRow.REFERENCED_TABLE_NAME === "users") {
+          throw badRequest("Dump import is missing referenced users.id values");
+        }
+        throw badRequest(`Dump import has an invalid ${fkRow.TABLE_NAME}.${fkRow.COLUMN_NAME} reference`);
+      }
+    }
+  }
 }
 
 function refreshExpectedTableSummary(
@@ -1893,124 +1903,38 @@ function refreshExpectedTableSummary(
   expectedTables.push(nextSummary);
 }
 
-function restoreTables(
-  sqlite: Database.Database,
+async function restoreTables(
   payload: DumpPayload,
-): RestoreTablesResult {
-  const legacyStandardAdminFallback = createLegacyStandardAdminFallback(
-    sqlite,
-    payload,
-  );
-  for (const entry of [...DUMP_TABLES].reverse()) {
-    sqlite.prepare(`DELETE FROM ${quoteIdentifier(entry.tableName)}`).run();
-    sqlite
-      .prepare("DELETE FROM sqlite_sequence WHERE name = ?")
-      .run(entry.tableName);
+): Promise<RestoreTablesResult> {
+  const legacyStandardAdminFallback = await createLegacyStandardAdminFallback(payload);
+
+  // Validate user FK references before making any DB changes so no rollback is needed.
+  if (legacyStandardAdminFallback === null) {
+    await validateAllForeignKeysInPayload(payload);
   }
 
-  let restored = 0;
-  for (const entry of DUMP_TABLES) {
-    const rows =
-      entry.key === "users"
-        ? prepareUserRowsForRestore(sqlite, payload.tables.users)
-        : payload.tables[entry.key];
-    insertRows(sqlite, entry.tableName, rows);
-    if (rows.length > 0) {
-      restored += 1;
-    }
-  }
-  const refreshedTableKeys = restoreLegacyStandardAdminFallback(
-    sqlite,
-    legacyStandardAdminFallback,
-  );
-  return { restored, refreshedTableKeys };
-}
-
-function foreignKeyDefinitions(
-  sqlite: Database.Database,
-  tableName: string,
-): ForeignKeyDefinition[] {
-  return sqlite
-    .prepare(`PRAGMA foreign_key_list(${quoteIdentifier(tableName)})`)
-    .all() as ForeignKeyDefinition[];
-}
-
-function missingUserReferences(
-  sqlite: Database.Database,
-  errors: ForeignKeyViolation[],
-): MissingUserReference[] {
-  return errors.flatMap((error) => {
-    if (error.parent !== "users") {
-      return [];
-    }
-    const definition = foreignKeyDefinitions(sqlite, error.table).find(
-      (entry) => entry.id === error.fkid && entry.seq === 0,
-    );
-    if (!definition) {
-      return [];
-    }
-    const row = sqlite
-      .prepare(
-        `SELECT ${quoteIdentifier(definition.from)} AS value FROM ${quoteIdentifier(error.table)} WHERE rowid = ?`,
-      )
-      .get(error.rowid) as { value: unknown } | undefined;
-    const userId = numericValue(row?.value);
-    if (userId === null) {
-      return [];
-    }
-    return [
-      {
-        table: error.table,
-        rowid: error.rowid,
-        column: definition.from,
-        userId,
-      },
-    ];
-  });
-}
-
-function foreignKeyErrorMessage(
-  sqlite: Database.Database,
-  errors: ForeignKeyViolation[],
-): string {
-  const missingUsers = missingUserReferences(sqlite, errors);
-  if (missingUsers.length === 0) {
-    return `Dump import produced foreign key errors: ${JSON.stringify(errors)}`;
-  }
-
-  const details = missingUsers
-    .map(
-      (reference) =>
-        `${reference.table}.${reference.column}=${reference.userId} (rowid ${reference.rowid})`,
-    )
-    .join(", ");
-  return `Dump import is missing referenced users.id values: ${details}`;
-}
-
-function assertForeignKeys(sqlite: Database.Database): void {
-  const errors = sqlite.pragma("foreign_key_check") as ForeignKeyViolation[];
-  if (errors.length > 0) {
-    throw badRequest(foreignKeyErrorMessage(sqlite, errors));
-  }
-}
-
-function beginImportTransaction(sqlite: Database.Database): void {
-  sqlite.pragma("foreign_keys = OFF");
-  sqlite.exec("BEGIN IMMEDIATE");
-}
-
-function finishImportTransaction(sqlite: Database.Database): void {
-  sqlite.exec("COMMIT");
-  sqlite.pragma("foreign_keys = ON");
-}
-
-function rollbackImportTransaction(sqlite: Database.Database): void {
+  await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 0");
   try {
-    sqlite.exec("ROLLBACK");
-  } catch {
-    // The transaction may already be closed by SQLite after a hard error.
+    for (const entry of [...DUMP_TABLES].reverse()) {
+      await mysqlPool.execute(`DELETE FROM \`${entry.tableName}\``);
+    }
+
+    let restored = 0;
+    for (const entry of DUMP_TABLES) {
+      const rows =
+        entry.key === "users"
+          ? await prepareUserRowsForRestore(payload.tables.users)
+          : payload.tables[entry.key];
+      await insertRows(entry.tableName, rows);
+      if (rows.length > 0) {
+        restored += 1;
+      }
+    }
+    const refreshedTableKeys = await restoreLegacyStandardAdminFallback(legacyStandardAdminFallback);
+    return { restored, refreshedTableKeys };
+  } finally {
+    await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 1");
   }
-  sqlite.pragma("foreign_keys = ON");
 }
 
 function currentFileRootSummaries(): DumpFileRootSummary[] {
@@ -2025,15 +1949,14 @@ function currentFileRootSummaries(): DumpFileRootSummary[] {
   }));
 }
 
-function verifyRestoredTables(
-  sqlite: Database.Database,
+async function verifyRestoredTables(
   expectedTables: DumpTableSummary[],
-): string[] {
+): Promise<string[]> {
   const issues: string[] = [];
   const expectedByKey = new Map(
     expectedTables.map((entry) => [entry.key, entry]),
   );
-  const restoredTables = collectDumpTableRows(sqlite);
+  const restoredTables = await collectDumpTableRows();
   for (const entry of DUMP_TABLES) {
     const rows = restoredTables[entry.key];
     const expected = expectedByKey.get(entry.key);
@@ -2093,7 +2016,6 @@ function remoteUploadNotAttempted(error: string): DumpRemoteUploadResult {
 }
 
 async function uploadDumpArchiveToRemote(
-  sqlite: Database.Database,
   filename: string,
   filePath: string,
   sizeBytes: number,
@@ -2138,7 +2060,7 @@ async function uploadDumpArchiveToRemote(
       success: true,
       remoteFile: mapRemoteBackupFile(
         uploadedFile,
-        remoteImportHistoryByFileId(sqlite),
+        await remoteImportHistoryByFileId(),
       ),
       error: null,
     };
@@ -2153,10 +2075,9 @@ async function uploadDumpArchiveToRemote(
 }
 
 export async function saveDumpToLocalBackup(
-  sqlite: Database.Database,
   options: DumpProgressOptions = {},
 ): Promise<DumpBackupSaveResult> {
-  const snapshot = buildDumpSnapshot(sqlite, { deferFileRoots: true });
+  const snapshot = await buildDumpSnapshot({ deferFileRoots: true });
   emitBackupProgress(options.progressCallback, {
     operation: "full_backup",
     phase: "db_export",
@@ -2188,7 +2109,6 @@ export async function saveDumpToLocalBackup(
     detail: snapshot.filename,
   });
   const remoteUpload = await uploadDumpArchiveToRemote(
-    sqlite,
     snapshot.filename,
     filePath,
     archive.sizeBytes,
@@ -2211,9 +2131,7 @@ export async function saveDumpToLocalBackup(
   };
 }
 
-export async function getRemoteBackupStatus(
-  sqlite: Database.Database,
-): Promise<DumpRemoteBackupStatus> {
+export async function getRemoteBackupStatus(): Promise<DumpRemoteBackupStatus> {
   const readiness = getBackupSftpReadiness();
   if (!readiness.ready) {
     return {
@@ -2229,7 +2147,7 @@ export async function getRemoteBackupStatus(
   }
 
   try {
-    const importedByFileId = remoteImportHistoryByFileId(sqlite);
+    const importedByFileId = await remoteImportHistoryByFileId();
     const files = (await listBackupSftpFiles()).map((file) =>
       mapRemoteBackupFile(file, importedByFileId),
     );
@@ -2260,7 +2178,6 @@ export async function getRemoteBackupStatus(
 }
 
 async function readRemoteBackupFile(
-  sqlite: Database.Database,
   fileId?: string | null,
 ): Promise<{ backupFile: DumpRemoteBackupFile; buffer: Buffer }> {
   const safeFileId = fileId ? validateBackupFileId(fileId) : null;
@@ -2279,7 +2196,7 @@ async function readRemoteBackupFile(
   return {
     backupFile: mapRemoteBackupFile(
       selectedFile,
-      remoteImportHistoryByFileId(sqlite),
+      await remoteImportHistoryByFileId(),
     ),
     buffer: await downloadBackupSftpFile(selectedFile.name),
   };
@@ -2329,13 +2246,9 @@ function takeRemotePreviewSession(
 }
 
 export async function previewRemoteDump(
-  sqlite: Database.Database,
   params: { fileId?: string | null } = {},
 ): Promise<DumpBackupPreviewResult> {
-  const { backupFile, buffer } = await readRemoteBackupFile(
-    sqlite,
-    params.fileId,
-  );
+  const { backupFile, buffer } = await readRemoteBackupFile(params.fileId);
   const preview = await inspectDumpArchive(buffer, backupFile);
   const previewWithWarnings: InspectedDump = backupFile.imported
     ? {
@@ -2382,7 +2295,6 @@ export async function previewLatestLocalDump(): Promise<DumpBackupPreviewResult>
 }
 
 export async function applyLocalDump(
-  sqlite: Database.Database,
   params: { fileId: string; fileHash: string; confirmationPhrase: string },
   options: ApplyDumpOptions = {},
 ): Promise<DumpBackupApplyResult> {
@@ -2401,11 +2313,24 @@ export async function applyLocalDump(
     );
   }
 
-  return applyInspectedDump(sqlite, preview, options);
+  return applyInspectedDump(preview, options);
+}
+
+async function rollbackTableSnapshot(snapshot: DumpTableRows): Promise<void> {
+  await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 0");
+  try {
+    for (const entry of [...DUMP_TABLES].reverse()) {
+      await mysqlPool.execute(`DELETE FROM \`${entry.tableName}\``);
+    }
+    for (const entry of DUMP_TABLES) {
+      await insertRows(entry.tableName, snapshot[entry.key] ?? []);
+    }
+  } finally {
+    await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 1");
+  }
 }
 
 async function applyInspectedDump(
-  sqlite: Database.Database,
   preview: InspectedDump,
   options: ApplyDumpOptions = {},
 ): Promise<DumpBackupApplyResult> {
@@ -2414,8 +2339,8 @@ async function applyInspectedDump(
   try {
     const workDir = ensureWorkDir();
     transferDir = fs.mkdtempSync(path.join(workDir, "transfer-"));
-    const targetBackupPath = path.join(transferDir, "target-before-import.sqlite");
-    await createDatabaseSnapshot(sqlite, targetBackupPath);
+    const targetBackupPath = "";
+    await createDatabaseSnapshot(targetBackupPath);
 
     const stagedRoots = await stageFileRoots(
       preview.zipFileBuffers,
@@ -2437,13 +2362,12 @@ async function applyInspectedDump(
     let swaps: FileRootSwap[] = [];
     let tablesRestored = 0;
     let fileRootsTouched = false;
-    let committed = false;
+    const dbSnapshot = await collectRawTableRows();
 
     try {
-      beginImportTransaction(sqlite);
-      const restoreResult = restoreTables(sqlite, preview.payload);
+      const restoreResult = await restoreTables(preview.payload);
       tablesRestored = restoreResult.restored;
-      const restoredTables = collectDumpTableRows(sqlite);
+      const restoredTables = await collectDumpTableRows();
       for (const key of restoreResult.refreshedTableKeys) {
         refreshExpectedTableSummary(
           preview.expectedTables,
@@ -2458,8 +2382,7 @@ async function applyInspectedDump(
         total: DUMP_TABLE_KEYS.length,
         detail: preview.dumpId,
       });
-      options.afterTablesRestore?.(sqlite, preview);
-      assertForeignKeys(sqlite);
+      await options.afterTablesRestore?.(preview);
       swaps = replaceFileRoots(stagedRoots, transferDir);
       fileRootsTouched = true;
       emitBackupProgress(options.progressCallback, {
@@ -2470,14 +2393,10 @@ async function applyInspectedDump(
         detail: preview.dumpId,
       });
       options.afterFileSwap?.();
-      finishImportTransaction(sqlite);
-      committed = true;
     } catch (error) {
-      if (!committed) {
-        rollbackImportTransaction(sqlite);
-      }
       if (fileRootsTouched) {
         restoreSwappedFileRoots(swaps);
+        await rollbackTableSnapshot(dbSnapshot);
       }
       throw error;
     } finally {
@@ -2486,7 +2405,7 @@ async function applyInspectedDump(
     }
 
     const blockingIssues = [
-      ...verifyRestoredTables(sqlite, preview.expectedTables),
+      ...(await verifyRestoredTables(preview.expectedTables)),
       ...verifyRestoredFileRoots(preview.expectedFileRoots),
     ];
     const verificationPassed = blockingIssues.length === 0;
@@ -2529,7 +2448,6 @@ async function applyInspectedDump(
 }
 
 export async function applyRemoteDump(
-  sqlite: Database.Database,
   params: { fileId: string; fileHash: string; previewToken: string; confirmed: boolean },
   options: DumpProgressOptions = {},
 ): Promise<DumpBackupApplyResult> {
@@ -2545,7 +2463,7 @@ export async function applyRemoteDump(
   activeRemoteImports.add(safeFileId);
   let preview: InspectedDump | null = null;
   try {
-    assertRemoteDumpWasNotImported(sqlite, safeFileId);
+    await assertRemoteDumpWasNotImported(safeFileId);
     preview = takeRemotePreviewSession(params.previewToken, safeFileId, params.fileHash);
     if (preview.fileHash !== params.fileHash) {
       throw conflict("Dump file hash changed since preview");
@@ -2555,11 +2473,11 @@ export async function applyRemoteDump(
         `Dump import is blocked: ${preview.blockingIssues.join(" | ")}`,
       );
     }
-    assertRemoteDumpWasNotImported(sqlite, safeFileId);
-    return await applyInspectedDump(sqlite, preview, {
+    await assertRemoteDumpWasNotImported(safeFileId);
+    return await applyInspectedDump(preview, {
       progressCallback: options.progressCallback,
-      afterTablesRestore: (database, inspectedPreview) => {
-        recordRemoteDumpImport(database, {
+      afterTablesRestore: async (inspectedPreview) => {
+        await recordRemoteDumpImport({
           fileId: safeFileId,
           fileHash: inspectedPreview.fileHash,
           dumpId: inspectedPreview.dumpId,
@@ -2568,7 +2486,7 @@ export async function applyRemoteDump(
         refreshExpectedTableSummary(
           inspectedPreview.expectedTables,
           "appSettings",
-          selectTableRows(database, "app_settings"),
+          await selectTableRows("app_settings"),
         );
       },
     });

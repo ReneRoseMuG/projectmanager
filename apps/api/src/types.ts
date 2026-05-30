@@ -1,5 +1,4 @@
 import type { DbClient } from "./db/client.js";
-import type Database from "better-sqlite3";
 import type { FileOpener } from "./services/file-opener.service.js";
 import type { RealtimeEventBus } from "./services/realtime-event-bus.service.js";
 import type { AuthAction, AuthResource, CurrentUser } from "@taskmanager/shared-types";
@@ -7,7 +6,6 @@ import type { AuthAction, AuthResource, CurrentUser } from "@taskmanager/shared-
 declare module "fastify" {
   interface FastifyInstance {
     db: DbClient;
-    sqlite: Database.Database;
     fileOpener: FileOpener;
     realtimeBus: RealtimeEventBus;
   }

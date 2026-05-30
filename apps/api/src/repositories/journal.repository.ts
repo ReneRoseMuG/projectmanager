@@ -1,6 +1,7 @@
-import type { JournalContextRelation, JournalObjectType, JournalOperation, JsonValue } from "@taskmanager/shared-types";
+﻿import type { JournalContextRelation, JournalObjectType, JournalOperation, JsonValue } from "@taskmanager/shared-types";
 import { and, desc, eq, gte, inArray, like, lt, lte, or, sql } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
+import { firstRow, insertId } from "../db/query-utils.js";
 import { journalEntries, journalEntryChanges, journalEntryContexts } from "../db/schema.js";
 
 export type JournalEntryRecord = typeof journalEntries.$inferSelect;
@@ -56,8 +57,8 @@ function stringifyJsonValue(value: JsonValue): string {
 }
 
 export const journalRepository = {
-  create(database: DbSession, data: JournalEntryCreateData): JournalEntryRecord {
-    const created = database
+  async create(database: DbSession, data: JournalEntryCreateData): Promise<JournalEntryRecord> {
+    const result = await database
       .insert(journalEntries)
       .values({
         operation: data.operation,
@@ -68,12 +69,14 @@ export const journalRepository = {
         actorUserId: data.actorUserId,
         actorName: data.actorName,
         createdAt: new Date().toISOString()
-      })
-      .returning()
-      .get();
+      });
+    const created = firstRow(await database.select().from(journalEntries).where(eq(journalEntries.id, insertId(result))));
+    if (!created) {
+      throw new Error("Created journal entry could not be loaded");
+    }
 
     for (const change of data.changes) {
-      database
+      await database
         .insert(journalEntryChanges)
         .values({
           journalEntryId: created.id,
@@ -84,28 +87,26 @@ export const journalRepository = {
           newValueJson: stringifyJsonValue(change.newValue),
           newValueLabel: change.newValueLabel,
           summary: change.summary
-        })
-        .run();
+        });
     }
 
     for (const context of data.contexts) {
-      database
+      await database
         .insert(journalEntryContexts)
+        .ignore()
         .values({
           journalEntryId: created.id,
           objectType: context.objectType,
           objectId: context.objectId,
           objectLabel: context.objectLabel,
           relation: context.relation
-        })
-        .onConflictDoNothing()
-        .run();
+        });
     }
 
     return created;
   },
 
-  list(database: DbClient, filters: JournalEntryFilters): JournalEntryRecord[] {
+  async list(database: DbSession, filters: JournalEntryFilters): Promise<JournalEntryRecord[]> {
     const conditions = [];
     if (filters.cursor !== undefined) {
       conditions.push(lt(journalEntries.id, filters.cursor));
@@ -145,8 +146,7 @@ export const journalRepository = {
         .where(and(...conditions, eq(journalEntryContexts.objectType, filters.objectType), eq(journalEntryContexts.objectId, filters.objectId)))
         .groupBy(journalEntries.id)
         .orderBy(desc(journalEntries.id))
-        .limit(filters.limit)
-        .all();
+        .limit(filters.limit);
     }
 
     if (filters.objectType !== undefined) {
@@ -158,21 +158,21 @@ export const journalRepository = {
       .from(journalEntries)
       .where(conditions.length > 0 ? and(...conditions) : sql`1 = 1`)
       .orderBy(desc(journalEntries.id))
-      .limit(filters.limit)
-      .all();
+      .limit(filters.limit);
   },
 
-  listChanges(database: DbClient, journalEntryIds: number[]): JournalChangeRecord[] {
+  async listChanges(database: DbSession, journalEntryIds: number[]): Promise<JournalChangeRecord[]> {
     if (journalEntryIds.length === 0) {
       return [];
     }
-    return database.select().from(journalEntryChanges).where(inArray(journalEntryChanges.journalEntryId, journalEntryIds)).orderBy(journalEntryChanges.id).all();
+    return database.select().from(journalEntryChanges).where(inArray(journalEntryChanges.journalEntryId, journalEntryIds)).orderBy(journalEntryChanges.id);
   },
 
-  listContexts(database: DbClient, journalEntryIds: number[]): JournalContextRecord[] {
+  async listContexts(database: DbSession, journalEntryIds: number[]): Promise<JournalContextRecord[]> {
     if (journalEntryIds.length === 0) {
       return [];
     }
-    return database.select().from(journalEntryContexts).where(inArray(journalEntryContexts.journalEntryId, journalEntryIds)).orderBy(journalEntryContexts.id).all();
+    return database.select().from(journalEntryContexts).where(inArray(journalEntryContexts.journalEntryId, journalEntryIds)).orderBy(journalEntryContexts.id);
   }
 };
+

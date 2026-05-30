@@ -49,6 +49,13 @@ export function createProjectManagerStartPlan(mode: ProjectManagerStartMode, env
     ? ["npm run start -w apps/api", "npm run preview -w apps/web -- --host 0.0.0.0 --port 5173"]
     : ["npm run dev -w apps/api", "npm run dev -w apps/web"];
   const warnings: string[] = [];
+
+  const dbTunnelAutostart = booleanEnv(env.DB_MYSQL_TUNNEL_AUTOSTART);
+  if (dbTunnelAutostart) {
+    names.unshift("DB-TUNNEL");
+    commands.unshift("node scripts/mysql-tunnel.mjs");
+  }
+
   const mcpAutostart = booleanEnv(env.PROJECT_MANAGER_MCP_AUTOSTART);
   const tunnelCommand = stringEnv(env.MCP_TUNNEL_COMMAND);
   const tunnelAutostart = booleanEnv(env.PROJECT_MANAGER_MCP_TUNNEL_AUTOSTART);

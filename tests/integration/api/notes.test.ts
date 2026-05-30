@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope: Notes API
  *
  * Covers project/task note links, note CRUD, JSON content persistence, and join cleanup.
@@ -26,15 +26,15 @@ describe("Notes API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => { await truncateAll(testDb.pool); });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("POST /api/projects/:id/notes erstellt Notiz und verknuepft mit Projekt", async () => {

@@ -27,6 +27,7 @@ import {
   wikiPageComments,
   wikiPages
 } from "../db/schema.js";
+import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
 import { commentRepository, type CommentRecord } from "../repositories/comment.repository.js";
 import { notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
@@ -59,10 +60,10 @@ const commentJournalFields: Array<JournalFieldDefinition<CommentRecord>> = [
   { key: "body", label: "Kommentar" }
 ];
 
-function mapComment(database: DbClient, record: CommentRecord): Comment {
+async function mapComment(database: DbClient, record: CommentRecord): Promise<Comment> {
   return {
     id: record.id,
-    owners: listCommentOwners(database, record.id),
+    owners: await listCommentOwners(database, record.id),
     body: record.body,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -70,146 +71,146 @@ function mapComment(database: DbClient, record: CommentRecord): Comment {
   };
 }
 
-function ensureProjectExists(database: DbClient, projectId: number): void {
-  const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
+async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {
+  const project = firstRow(await database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)));
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
 }
 
-function ensureTaskExists(database: DbClient, taskId: number): void {
-  const task = database.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)).get();
+async function ensureTaskExists(database: DbClient, taskId: number): Promise<void> {
+  const task = firstRow(await database.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)));
   if (!task) {
     throw notFound(`Task with id ${taskId} not found`);
   }
 }
 
-function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
-  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+async function ensureMilestoneExists(database: DbClient, milestoneId: number): Promise<void> {
+  const milestone = firstRow(await database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)));
   if (!milestone) {
     throw notFound(`Milestone with id ${milestoneId} not found`);
   }
 }
 
-function ensureFeatureExists(database: DbClient, featureId: number): void {
-  const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
+async function ensureFeatureExists(database: DbClient, featureId: number): Promise<void> {
+  const feature = firstRow(await database.select({ id: features.id }).from(features).where(eq(features.id, featureId)));
   if (!feature) {
     throw notFound(`Feature with id ${featureId} not found`);
   }
 }
 
-function ensureUseCaseExists(database: DbClient, useCaseId: number): void {
-  const useCase = database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, useCaseId)).get();
+async function ensureUseCaseExists(database: DbClient, useCaseId: number): Promise<void> {
+  const useCase = firstRow(await database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, useCaseId)));
   if (!useCase) {
     throw notFound(`Use case with id ${useCaseId} not found`);
   }
 }
 
-function ensureBacklogItemExists(database: DbClient, backlogItemId: number): void {
-  const item = database.select({ id: backlogItems.id }).from(backlogItems).where(eq(backlogItems.id, backlogItemId)).get();
+async function ensureBacklogItemExists(database: DbClient, backlogItemId: number): Promise<void> {
+  const item = firstRow(await database.select({ id: backlogItems.id }).from(backlogItems).where(eq(backlogItems.id, backlogItemId)));
   if (!item) {
     throw notFound(`Backlog item with id ${backlogItemId} not found`);
   }
 }
 
-function ensureWikiPageExists(database: DbClient, wikiPageId: number): void {
-  const page = database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)).get();
+async function ensureWikiPageExists(database: DbClient, wikiPageId: number): Promise<void> {
+  const page = firstRow(await database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)));
   if (!page) {
     throw notFound(`Wiki page with id ${wikiPageId} not found`);
   }
 }
 
-function ensureTicketExists(database: DbClient, ticketId: number): void {
-  const ticket = database.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)).get();
+async function ensureTicketExists(database: DbClient, ticketId: number): Promise<void> {
+  const ticket = firstRow(await database.select({ id: tickets.id }).from(tickets).where(eq(tickets.id, ticketId)));
   if (!ticket) {
     throw notFound(`Ticket with id ${ticketId} not found`);
   }
 }
 
-function ensureDayPlanExists(database: DbClient, dayPlanId: number): void {
-  const dayPlan = database.select({ id: dayPlans.id }).from(dayPlans).where(eq(dayPlans.id, dayPlanId)).get();
+async function ensureDayPlanExists(database: DbClient, dayPlanId: number): Promise<void> {
+  const dayPlan = firstRow(await database.select({ id: dayPlans.id }).from(dayPlans).where(eq(dayPlans.id, dayPlanId)));
   if (!dayPlan) {
     throw notFound(`Day plan with id ${dayPlanId} not found`);
   }
 }
 
-export function ensureDayPlanCommentAccess(database: DbClient, dayPlanId: number, userId: number): void {
-  const dayPlan = database.select({ id: dayPlans.id }).from(dayPlans).where(and(eq(dayPlans.id, dayPlanId), eq(dayPlans.userId, userId))).get();
+export async function ensureDayPlanCommentAccess(database: DbClient, dayPlanId: number, userId: number): Promise<void> {
+  const dayPlan = firstRow(await database.select({ id: dayPlans.id }).from(dayPlans).where(and(eq(dayPlans.id, dayPlanId), eq(dayPlans.userId, userId))));
   if (!dayPlan) {
     throw notFound("Day plan not found");
   }
 }
 
-function ensureOwnerExists(database: DbClient, owner: CommentOwner): void {
+async function ensureOwnerExists(database: DbClient, owner: CommentOwner): Promise<void> {
   if (owner.type === "project") {
-    ensureProjectExists(database, owner.id);
+    await ensureProjectExists(database, owner.id);
     return;
   }
   if (owner.type === "task") {
-    ensureTaskExists(database, owner.id);
+    await ensureTaskExists(database, owner.id);
     return;
   }
   if (owner.type === "milestone") {
-    ensureMilestoneExists(database, owner.id);
+    await ensureMilestoneExists(database, owner.id);
     return;
   }
   if (owner.type === "feature") {
-    ensureFeatureExists(database, owner.id);
+    await ensureFeatureExists(database, owner.id);
     return;
   }
   if (owner.type === "useCase") {
-    ensureUseCaseExists(database, owner.id);
+    await ensureUseCaseExists(database, owner.id);
     return;
   }
   if (owner.type === "backlogItem") {
-    ensureBacklogItemExists(database, owner.id);
+    await ensureBacklogItemExists(database, owner.id);
     return;
   }
   if (owner.type === "wikiPage") {
-    ensureWikiPageExists(database, owner.id);
+    await ensureWikiPageExists(database, owner.id);
     return;
   }
   if (owner.type === "dayPlan") {
-    ensureDayPlanExists(database, owner.id);
+    await ensureDayPlanExists(database, owner.id);
     return;
   }
-  ensureTicketExists(database, owner.id);
+  await ensureTicketExists(database, owner.id);
 }
 
-function getOwnerJournalObject(database: DbClient, owner: CommentOwner): JournalObjectRef {
+async function getOwnerJournalObject(database: DbClient, owner: CommentOwner): Promise<JournalObjectRef> {
   if (owner.type === "project") {
-    const project = database.select({ name: projects.name }).from(projects).where(eq(projects.id, owner.id)).get();
+    const project = firstRow(await database.select({ name: projects.name }).from(projects).where(eq(projects.id, owner.id)));
     return makeJournalObject("project", owner.id, project?.name ?? `Projekt ${owner.id}`);
   }
   if (owner.type === "task") {
-    const task = database.select({ title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)).get();
+    const task = firstRow(await database.select({ title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)));
     return makeJournalObject("task", owner.id, task?.title ?? `Aufgabe ${owner.id}`);
   }
   if (owner.type === "milestone") {
-    const milestone = database.select({ name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
+    const milestone = firstRow(await database.select({ name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)));
     return makeJournalObject("milestone", owner.id, milestone?.name ?? `Meilenstein ${owner.id}`);
   }
   if (owner.type === "feature") {
-    const feature = database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)).get();
+    const feature = firstRow(await database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)));
     return makeJournalObject("feature", owner.id, feature?.title ?? `Feature ${owner.id}`);
   }
   if (owner.type === "useCase") {
-    const useCase = database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)).get();
+    const useCase = firstRow(await database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)));
     return makeJournalObject("useCase", owner.id, useCase?.title ?? `Use Case ${owner.id}`);
   }
   if (owner.type === "backlogItem") {
-    const item = database.select({ title: backlogItems.title }).from(backlogItems).where(eq(backlogItems.id, owner.id)).get();
+    const item = firstRow(await database.select({ title: backlogItems.title }).from(backlogItems).where(eq(backlogItems.id, owner.id)));
     return makeJournalObject("backlogItem", owner.id, item?.title ?? `Backlog-Eintrag ${owner.id}`);
   }
   if (owner.type === "wikiPage") {
-    const page = database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)).get();
+    const page = firstRow(await database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)));
     return makeJournalObject("wikiPage", owner.id, page?.title ?? `Wiki-Seite ${owner.id}`);
   }
   if (owner.type === "dayPlan") {
-    const dayPlan = database.select({ date: dayPlans.date }).from(dayPlans).where(eq(dayPlans.id, owner.id)).get();
+    const dayPlan = firstRow(await database.select({ date: dayPlans.date }).from(dayPlans).where(eq(dayPlans.id, owner.id)));
     return makeJournalObject("dayPlan", owner.id, dayPlan?.date ? `Persönliche Planung ${dayPlan.date}` : `Persönliche Planung ${owner.id}`);
   }
-  const ticket = database.select({ title: tickets.title }).from(tickets).where(eq(tickets.id, owner.id)).get();
+  const ticket = firstRow(await database.select({ title: tickets.title }).from(tickets).where(eq(tickets.id, owner.id)));
   return makeJournalObject("ticket", owner.id, ticket?.title ?? `Ticket ${owner.id}`);
 }
 
@@ -217,108 +218,104 @@ function commentJournalObject(comment: Pick<CommentRecord, "id" | "body">): Jour
   return makeJournalObject("comment", comment.id, comment.body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || `Kommentar ${comment.id}`);
 }
 
-function listCommentOwners(database: DbClient, commentId: number): CommentOwner[] {
+async function listCommentOwners(database: DbClient, commentId: number): Promise<CommentOwner[]> {
+  const [projectRows, taskRows, milestoneRows, featureRows, useCaseRows, backlogRows, wikiRows, dayPlanRows, ticketRows] = await Promise.all([
+    database.select({ id: projectComments.projectId }).from(projectComments).where(eq(projectComments.commentId, commentId)),
+    database.select({ id: taskComments.taskId }).from(taskComments).where(eq(taskComments.commentId, commentId)),
+    database.select({ id: milestoneComments.milestoneId }).from(milestoneComments).where(eq(milestoneComments.commentId, commentId)),
+    database.select({ id: featureComments.featureId }).from(featureComments).where(eq(featureComments.commentId, commentId)),
+    database.select({ id: useCaseComments.useCaseId }).from(useCaseComments).where(eq(useCaseComments.commentId, commentId)),
+    database.select({ id: backlogItemComments.backlogItemId }).from(backlogItemComments).where(eq(backlogItemComments.commentId, commentId)),
+    database.select({ id: wikiPageComments.wikiPageId }).from(wikiPageComments).where(eq(wikiPageComments.commentId, commentId)),
+    database.select({ id: dayPlanComments.dayPlanId }).from(dayPlanComments).where(eq(dayPlanComments.commentId, commentId)),
+    database.select({ id: ticketComments.ticketId }).from(ticketComments).where(eq(ticketComments.commentId, commentId))
+  ]);
+
   return [
-    ...database.select({ id: projectComments.projectId }).from(projectComments).where(eq(projectComments.commentId, commentId)).all().map((row) => ({ type: "project" as const, id: row.id })),
-    ...database.select({ id: taskComments.taskId }).from(taskComments).where(eq(taskComments.commentId, commentId)).all().map((row) => ({ type: "task" as const, id: row.id })),
-    ...database.select({ id: milestoneComments.milestoneId }).from(milestoneComments).where(eq(milestoneComments.commentId, commentId)).all().map((row) => ({ type: "milestone" as const, id: row.id })),
-    ...database.select({ id: featureComments.featureId }).from(featureComments).where(eq(featureComments.commentId, commentId)).all().map((row) => ({ type: "feature" as const, id: row.id })),
-    ...database.select({ id: useCaseComments.useCaseId }).from(useCaseComments).where(eq(useCaseComments.commentId, commentId)).all().map((row) => ({ type: "useCase" as const, id: row.id })),
-    ...database
-      .select({ id: backlogItemComments.backlogItemId })
-      .from(backlogItemComments)
-      .where(eq(backlogItemComments.commentId, commentId))
-      .all()
-      .map((row) => ({ type: "backlogItem" as const, id: row.id })),
-    ...database
-      .select({ id: wikiPageComments.wikiPageId })
-      .from(wikiPageComments)
-      .where(eq(wikiPageComments.commentId, commentId))
-      .all()
-      .map((row) => ({ type: "wikiPage" as const, id: row.id })),
-    ...database
-      .select({ id: dayPlanComments.dayPlanId })
-      .from(dayPlanComments)
-      .where(eq(dayPlanComments.commentId, commentId))
-      .all()
-      .map((row) => ({ type: "dayPlan" as const, id: row.id })),
-    ...database.select({ id: ticketComments.ticketId }).from(ticketComments).where(eq(ticketComments.commentId, commentId)).all().map((row) => ({ type: "ticket" as const, id: row.id }))
+    ...projectRows.map((row) => ({ type: "project" as const, id: row.id })),
+    ...taskRows.map((row) => ({ type: "task" as const, id: row.id })),
+    ...milestoneRows.map((row) => ({ type: "milestone" as const, id: row.id })),
+    ...featureRows.map((row) => ({ type: "feature" as const, id: row.id })),
+    ...useCaseRows.map((row) => ({ type: "useCase" as const, id: row.id })),
+    ...backlogRows.map((row) => ({ type: "backlogItem" as const, id: row.id })),
+    ...wikiRows.map((row) => ({ type: "wikiPage" as const, id: row.id })),
+    ...dayPlanRows.map((row) => ({ type: "dayPlan" as const, id: row.id })),
+    ...ticketRows.map((row) => ({ type: "ticket" as const, id: row.id }))
   ];
 }
 
-function insertCommentLink(database: DbSession, owner: CommentOwner, commentId: number): void {
+async function insertCommentLink(database: DbSession, owner: CommentOwner, commentId: number): Promise<void> {
   if (owner.type === "project") {
-    database.insert(projectComments).values({ projectId: owner.id, commentId }).onConflictDoNothing().run();
+    await database.insert(projectComments).ignore().values({ projectId: owner.id, commentId });
     return;
   }
   if (owner.type === "task") {
-    database.insert(taskComments).values({ taskId: owner.id, commentId }).onConflictDoNothing().run();
+    await database.insert(taskComments).ignore().values({ taskId: owner.id, commentId });
     return;
   }
   if (owner.type === "milestone") {
-    database.insert(milestoneComments).values({ milestoneId: owner.id, commentId }).onConflictDoNothing().run();
+    await database.insert(milestoneComments).ignore().values({ milestoneId: owner.id, commentId });
     return;
   }
   if (owner.type === "feature") {
-    database.insert(featureComments).values({ featureId: owner.id, commentId }).onConflictDoNothing().run();
+    await database.insert(featureComments).ignore().values({ featureId: owner.id, commentId });
     return;
   }
   if (owner.type === "useCase") {
-    database.insert(useCaseComments).values({ useCaseId: owner.id, commentId }).onConflictDoNothing().run();
+    await database.insert(useCaseComments).ignore().values({ useCaseId: owner.id, commentId });
     return;
   }
   if (owner.type === "backlogItem") {
-    database.insert(backlogItemComments).values({ backlogItemId: owner.id, commentId }).onConflictDoNothing().run();
+    await database.insert(backlogItemComments).ignore().values({ backlogItemId: owner.id, commentId });
     return;
   }
   if (owner.type === "wikiPage") {
-    database.insert(wikiPageComments).values({ wikiPageId: owner.id, commentId }).onConflictDoNothing().run();
+    await database.insert(wikiPageComments).ignore().values({ wikiPageId: owner.id, commentId });
     return;
   }
   if (owner.type === "dayPlan") {
-    database.insert(dayPlanComments).values({ dayPlanId: owner.id, commentId }).onConflictDoNothing().run();
+    await database.insert(dayPlanComments).ignore().values({ dayPlanId: owner.id, commentId });
     return;
   }
-  database.insert(ticketComments).values({ ticketId: owner.id, commentId }).onConflictDoNothing().run();
+  await database.insert(ticketComments).ignore().values({ ticketId: owner.id, commentId });
 }
 
-function deleteCommentLink(database: DbClient, owner: CommentOwner, commentId: number): number {
+async function deleteCommentLink(database: DbClient, owner: CommentOwner, commentId: number): Promise<number> {
   if (owner.type === "project") {
-    return database.delete(projectComments).where(and(eq(projectComments.projectId, owner.id), eq(projectComments.commentId, commentId))).run().changes;
+    return mutationAffectedRows(await database.delete(projectComments).where(and(eq(projectComments.projectId, owner.id), eq(projectComments.commentId, commentId))));
   }
   if (owner.type === "task") {
-    return database.delete(taskComments).where(and(eq(taskComments.taskId, owner.id), eq(taskComments.commentId, commentId))).run().changes;
+    return mutationAffectedRows(await database.delete(taskComments).where(and(eq(taskComments.taskId, owner.id), eq(taskComments.commentId, commentId))));
   }
   if (owner.type === "milestone") {
-    return database.delete(milestoneComments).where(and(eq(milestoneComments.milestoneId, owner.id), eq(milestoneComments.commentId, commentId))).run().changes;
+    return mutationAffectedRows(await database.delete(milestoneComments).where(and(eq(milestoneComments.milestoneId, owner.id), eq(milestoneComments.commentId, commentId))));
   }
   if (owner.type === "feature") {
-    return database.delete(featureComments).where(and(eq(featureComments.featureId, owner.id), eq(featureComments.commentId, commentId))).run().changes;
+    return mutationAffectedRows(await database.delete(featureComments).where(and(eq(featureComments.featureId, owner.id), eq(featureComments.commentId, commentId))));
   }
   if (owner.type === "useCase") {
-    return database.delete(useCaseComments).where(and(eq(useCaseComments.useCaseId, owner.id), eq(useCaseComments.commentId, commentId))).run().changes;
+    return mutationAffectedRows(await database.delete(useCaseComments).where(and(eq(useCaseComments.useCaseId, owner.id), eq(useCaseComments.commentId, commentId))));
   }
   if (owner.type === "backlogItem") {
-    return database.delete(backlogItemComments).where(and(eq(backlogItemComments.backlogItemId, owner.id), eq(backlogItemComments.commentId, commentId))).run().changes;
+    return mutationAffectedRows(await database.delete(backlogItemComments).where(and(eq(backlogItemComments.backlogItemId, owner.id), eq(backlogItemComments.commentId, commentId))));
   }
   if (owner.type === "wikiPage") {
-    return database.delete(wikiPageComments).where(and(eq(wikiPageComments.wikiPageId, owner.id), eq(wikiPageComments.commentId, commentId))).run().changes;
+    return mutationAffectedRows(await database.delete(wikiPageComments).where(and(eq(wikiPageComments.wikiPageId, owner.id), eq(wikiPageComments.commentId, commentId))));
   }
   if (owner.type === "dayPlan") {
-    return database.delete(dayPlanComments).where(and(eq(dayPlanComments.dayPlanId, owner.id), eq(dayPlanComments.commentId, commentId))).run().changes;
+    return mutationAffectedRows(await database.delete(dayPlanComments).where(and(eq(dayPlanComments.dayPlanId, owner.id), eq(dayPlanComments.commentId, commentId))));
   }
-  return database.delete(ticketComments).where(and(eq(ticketComments.ticketId, owner.id), eq(ticketComments.commentId, commentId))).run().changes;
+  return mutationAffectedRows(await database.delete(ticketComments).where(and(eq(ticketComments.ticketId, owner.id), eq(ticketComments.commentId, commentId))));
 }
 
-function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRecord[] {
+async function selectOwnerComments(database: DbClient, owner: CommentOwner): Promise<CommentRecord[]> {
   if (owner.type === "project") {
     return database
       .select(commentSelect)
       .from(projectComments)
       .innerJoin(comments, eq(projectComments.commentId, comments.id))
       .where(eq(projectComments.projectId, owner.id))
-      .orderBy(comments.createdAt, comments.id)
-      .all();
+      .orderBy(comments.createdAt, comments.id);
   }
   if (owner.type === "task") {
     return database
@@ -326,8 +323,7 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
       .from(taskComments)
       .innerJoin(comments, eq(taskComments.commentId, comments.id))
       .where(eq(taskComments.taskId, owner.id))
-      .orderBy(comments.createdAt, comments.id)
-      .all();
+      .orderBy(comments.createdAt, comments.id);
   }
   if (owner.type === "milestone") {
     return database
@@ -335,8 +331,7 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
       .from(milestoneComments)
       .innerJoin(comments, eq(milestoneComments.commentId, comments.id))
       .where(eq(milestoneComments.milestoneId, owner.id))
-      .orderBy(comments.createdAt, comments.id)
-      .all();
+      .orderBy(comments.createdAt, comments.id);
   }
   if (owner.type === "feature") {
     return database
@@ -344,8 +339,7 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
       .from(featureComments)
       .innerJoin(comments, eq(featureComments.commentId, comments.id))
       .where(eq(featureComments.featureId, owner.id))
-      .orderBy(comments.createdAt, comments.id)
-      .all();
+      .orderBy(comments.createdAt, comments.id);
   }
   if (owner.type === "useCase") {
     return database
@@ -353,8 +347,7 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
       .from(useCaseComments)
       .innerJoin(comments, eq(useCaseComments.commentId, comments.id))
       .where(eq(useCaseComments.useCaseId, owner.id))
-      .orderBy(comments.createdAt, comments.id)
-      .all();
+      .orderBy(comments.createdAt, comments.id);
   }
   if (owner.type === "backlogItem") {
     return database
@@ -362,8 +355,7 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
       .from(backlogItemComments)
       .innerJoin(comments, eq(backlogItemComments.commentId, comments.id))
       .where(eq(backlogItemComments.backlogItemId, owner.id))
-      .orderBy(comments.createdAt, comments.id)
-      .all();
+      .orderBy(comments.createdAt, comments.id);
   }
   if (owner.type === "wikiPage") {
     return database
@@ -371,8 +363,7 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
       .from(wikiPageComments)
       .innerJoin(comments, eq(wikiPageComments.commentId, comments.id))
       .where(eq(wikiPageComments.wikiPageId, owner.id))
-      .orderBy(comments.createdAt, comments.id)
-      .all();
+      .orderBy(comments.createdAt, comments.id);
   }
   if (owner.type === "dayPlan") {
     return database
@@ -380,16 +371,14 @@ function selectOwnerComments(database: DbClient, owner: CommentOwner): CommentRe
       .from(dayPlanComments)
       .innerJoin(comments, eq(dayPlanComments.commentId, comments.id))
       .where(eq(dayPlanComments.dayPlanId, owner.id))
-      .orderBy(comments.createdAt, comments.id)
-      .all();
+      .orderBy(comments.createdAt, comments.id);
   }
   return database
     .select(commentSelect)
     .from(ticketComments)
     .innerJoin(comments, eq(ticketComments.commentId, comments.id))
     .where(eq(ticketComments.ticketId, owner.id))
-    .orderBy(comments.createdAt, comments.id)
-    .all();
+    .orderBy(comments.createdAt, comments.id);
 }
 
 type RecentCommentOwner = { type: "project" | "milestone" | "task" | "dayPlan"; id: number };
@@ -411,11 +400,11 @@ function authorName(row: Pick<RecentCommentRow, "authorFullName" | "authorEmail"
   return name || row.authorEmail || "System";
 }
 
-function collectTaskDescendantIds(database: DbClient, rootIds: number[]): number[] {
+async function collectTaskDescendantIds(database: DbClient, rootIds: number[]): Promise<number[]> {
   const result = new Set(rootIds);
   let frontier = [...new Set(rootIds)];
   while (frontier.length > 0) {
-    const rows = database.select({ id: tasks.id }).from(tasks).where(inArray(tasks.parentId, frontier)).all();
+    const rows = await database.select({ id: tasks.id }).from(tasks).where(inArray(tasks.parentId, frontier));
     frontier = rows.map((row) => row.id).filter((id) => !result.has(id));
     for (const id of frontier) {
       result.add(id);
@@ -424,53 +413,53 @@ function collectTaskDescendantIds(database: DbClient, rootIds: number[]): number
   return [...result];
 }
 
-function projectMilestoneIds(database: DbClient, projectId: number): number[] {
-  return database.select({ id: milestones.id }).from(milestones).where(eq(milestones.projectId, projectId)).all().map((row) => row.id);
+async function projectMilestoneIds(database: DbClient, projectId: number): Promise<number[]> {
+  return (await database.select({ id: milestones.id }).from(milestones).where(eq(milestones.projectId, projectId))).map((row) => row.id);
 }
 
-function taskIdsForOwner(database: DbClient, owner: RecentCommentOwner): number[] {
+async function taskIdsForOwner(database: DbClient, owner: RecentCommentOwner): Promise<number[]> {
   if (owner.type === "task") {
     return [owner.id];
   }
-  const direct =
-    owner.type === "project"
-      ? database.select({ id: projectTasks.taskId }).from(projectTasks).where(eq(projectTasks.ownerId, owner.id)).all().map((row) => row.id)
-      : database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(eq(milestoneTasks.ownerId, owner.id)).all().map((row) => row.id);
+  const directRows = owner.type === "project"
+    ? await database.select({ id: projectTasks.taskId }).from(projectTasks).where(eq(projectTasks.ownerId, owner.id))
+    : await database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(eq(milestoneTasks.ownerId, owner.id));
+  const direct = directRows.map((row) => row.id);
   if (owner.type === "project") {
-    const milestoneIds = projectMilestoneIds(database, owner.id);
+    const milestoneIds = await projectMilestoneIds(database, owner.id);
     const milestoneLinked =
       milestoneIds.length === 0
         ? []
-        : database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(inArray(milestoneTasks.ownerId, milestoneIds)).all().map((row) => row.id);
+        : (await database.select({ id: milestoneTasks.taskId }).from(milestoneTasks).where(inArray(milestoneTasks.ownerId, milestoneIds))).map((row) => row.id);
     return collectTaskDescendantIds(database, [...direct, ...milestoneLinked]);
   }
   return collectTaskDescendantIds(database, direct);
 }
 
-function ticketIdsForOwner(database: DbClient, owner: RecentCommentOwner): number[] {
+async function ticketIdsForOwner(database: DbClient, owner: RecentCommentOwner): Promise<number[]> {
   if (owner.type === "task") {
     return [];
   }
-  const direct =
-    owner.type === "project"
-      ? database.select({ id: projectTickets.ticketId }).from(projectTickets).where(eq(projectTickets.ownerId, owner.id)).all().map((row) => row.id)
-      : database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(eq(milestoneTickets.ownerId, owner.id)).all().map((row) => row.id);
+  const directRows = owner.type === "project"
+    ? await database.select({ id: projectTickets.ticketId }).from(projectTickets).where(eq(projectTickets.ownerId, owner.id))
+    : await database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(eq(milestoneTickets.ownerId, owner.id));
+  const direct = directRows.map((row) => row.id);
   if (owner.type === "project") {
-    const milestoneIds = projectMilestoneIds(database, owner.id);
+    const milestoneIds = await projectMilestoneIds(database, owner.id);
     const milestoneLinked =
       milestoneIds.length === 0
         ? []
-        : database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(inArray(milestoneTickets.ownerId, milestoneIds)).all().map((row) => row.id);
+        : (await database.select({ id: milestoneTickets.ticketId }).from(milestoneTickets).where(inArray(milestoneTickets.ownerId, milestoneIds))).map((row) => row.id);
     return [...new Set([...direct, ...milestoneLinked])];
   }
   return [...new Set(direct)];
 }
 
-function recentProjectCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+async function recentProjectCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  return (await database
     .select({
       id: comments.id,
       body: comments.body,
@@ -486,16 +475,15 @@ function recentProjectCommentRows(database: DbClient, ids: number[], mineUserId?
     .innerJoin(projects, eq(projectComments.projectId, projects.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(projectComments.projectId, ids) : and(inArray(projectComments.projectId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id))
-    .all()
+    .orderBy(desc(comments.updatedAt), desc(comments.id)))
     .map((row) => ({ ...row, entityType: "project" as const }));
 }
 
-function recentMilestoneCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+async function recentMilestoneCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  return (await database
     .select({
       id: comments.id,
       body: comments.body,
@@ -511,16 +499,15 @@ function recentMilestoneCommentRows(database: DbClient, ids: number[], mineUserI
     .innerJoin(milestones, eq(milestoneComments.milestoneId, milestones.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(milestoneComments.milestoneId, ids) : and(inArray(milestoneComments.milestoneId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id))
-    .all()
+    .orderBy(desc(comments.updatedAt), desc(comments.id)))
     .map((row) => ({ ...row, entityType: "milestone" as const }));
 }
 
-function recentFeatureCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+async function recentFeatureCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  return (await database
     .select({
       id: comments.id,
       body: comments.body,
@@ -536,16 +523,15 @@ function recentFeatureCommentRows(database: DbClient, ids: number[], mineUserId?
     .innerJoin(features, eq(featureComments.featureId, features.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(featureComments.featureId, ids) : and(inArray(featureComments.featureId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id))
-    .all()
+    .orderBy(desc(comments.updatedAt), desc(comments.id)))
     .map((row) => ({ ...row, entityType: "feature" as const }));
 }
 
-function recentUseCaseCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+async function recentUseCaseCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  return (await database
     .select({
       id: comments.id,
       body: comments.body,
@@ -561,16 +547,15 @@ function recentUseCaseCommentRows(database: DbClient, ids: number[], mineUserId?
     .innerJoin(useCases, eq(useCaseComments.useCaseId, useCases.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(useCaseComments.useCaseId, ids) : and(inArray(useCaseComments.useCaseId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id))
-    .all()
+    .orderBy(desc(comments.updatedAt), desc(comments.id)))
     .map((row) => ({ ...row, entityType: "useCase" as const }));
 }
 
-function recentBacklogItemCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+async function recentBacklogItemCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  return (await database
     .select({
       id: comments.id,
       body: comments.body,
@@ -586,16 +571,15 @@ function recentBacklogItemCommentRows(database: DbClient, ids: number[], mineUse
     .innerJoin(backlogItems, eq(backlogItemComments.backlogItemId, backlogItems.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(backlogItemComments.backlogItemId, ids) : and(inArray(backlogItemComments.backlogItemId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id))
-    .all()
+    .orderBy(desc(comments.updatedAt), desc(comments.id)))
     .map((row) => ({ ...row, entityType: "backlogItem" as const }));
 }
 
-function recentWikiPageCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+async function recentWikiPageCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  return (await database
     .select({
       id: comments.id,
       body: comments.body,
@@ -611,12 +595,11 @@ function recentWikiPageCommentRows(database: DbClient, ids: number[], mineUserId
     .innerJoin(wikiPages, eq(wikiPageComments.wikiPageId, wikiPages.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(wikiPageComments.wikiPageId, ids) : and(inArray(wikiPageComments.wikiPageId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id))
-    .all()
+    .orderBy(desc(comments.updatedAt), desc(comments.id)))
     .map((row) => ({ ...row, entityType: "wikiPage" as const }));
 }
 
-function recentDayPlanCommentRows(database: DbClient, ids: number[], mineUserId?: number, ownerUserId?: number): RecentCommentRow[] {
+async function recentDayPlanCommentRows(database: DbClient, ids: number[], mineUserId?: number, ownerUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
@@ -627,7 +610,7 @@ function recentDayPlanCommentRows(database: DbClient, ids: number[], mineUserId?
   if (ownerUserId !== undefined) {
     conditions.push(eq(dayPlans.userId, ownerUserId));
   }
-  return database
+  return (await database
     .select({
       id: comments.id,
       body: comments.body,
@@ -643,16 +626,15 @@ function recentDayPlanCommentRows(database: DbClient, ids: number[], mineUserId?
     .innerJoin(dayPlans, eq(dayPlanComments.dayPlanId, dayPlans.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(and(...conditions))
-    .orderBy(desc(comments.updatedAt), desc(comments.id))
-    .all()
+    .orderBy(desc(comments.updatedAt), desc(comments.id)))
     .map((row) => ({ ...row, entityType: "dayPlan" as const, entityLabel: `Persönliche Planung ${row.entityLabel}` }));
 }
 
-function recentTaskCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+async function recentTaskCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  return (await database
     .select({
       id: comments.id,
       body: comments.body,
@@ -668,16 +650,15 @@ function recentTaskCommentRows(database: DbClient, ids: number[], mineUserId?: n
     .innerJoin(tasks, eq(taskComments.taskId, tasks.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(taskComments.taskId, ids) : and(inArray(taskComments.taskId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id))
-    .all()
+    .orderBy(desc(comments.updatedAt), desc(comments.id)))
     .map((row) => ({ ...row, entityType: "task" as const }));
 }
 
-function recentTicketCommentRows(database: DbClient, ids: number[], mineUserId?: number): RecentCommentRow[] {
+async function recentTicketCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
-  return database
+  return (await database
     .select({
       id: comments.id,
       body: comments.body,
@@ -693,27 +674,28 @@ function recentTicketCommentRows(database: DbClient, ids: number[], mineUserId?:
     .innerJoin(tickets, eq(ticketComments.ticketId, tickets.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(ticketComments.ticketId, ids) : and(inArray(ticketComments.ticketId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id))
-    .all()
+    .orderBy(desc(comments.updatedAt), desc(comments.id)))
     .map((row) => ({ ...row, entityType: "ticket" as const }));
 }
 
-function recentCommentRowsForOwner(database: DbClient, owner: RecentCommentOwner): RecentCommentRow[] {
+async function recentCommentRowsForOwner(database: DbClient, owner: RecentCommentOwner): Promise<RecentCommentRow[]> {
   if (owner.type === "project") {
-    const milestoneIds = projectMilestoneIds(database, owner.id);
-    return [
-      ...recentProjectCommentRows(database, [owner.id]),
-      ...recentMilestoneCommentRows(database, milestoneIds),
-      ...recentTaskCommentRows(database, taskIdsForOwner(database, owner)),
-      ...recentTicketCommentRows(database, ticketIdsForOwner(database, owner))
-    ];
+    const milestoneIds = await projectMilestoneIds(database, owner.id);
+    const [projectRows, milestoneRows, taskRows, ticketRows] = await Promise.all([
+      recentProjectCommentRows(database, [owner.id]),
+      recentMilestoneCommentRows(database, milestoneIds),
+      taskIdsForOwner(database, owner).then((ids) => recentTaskCommentRows(database, ids)),
+      ticketIdsForOwner(database, owner).then((ids) => recentTicketCommentRows(database, ids))
+    ]);
+    return [...projectRows, ...milestoneRows, ...taskRows, ...ticketRows];
   }
   if (owner.type === "milestone") {
-    return [
-      ...recentMilestoneCommentRows(database, [owner.id]),
-      ...recentTaskCommentRows(database, taskIdsForOwner(database, owner)),
-      ...recentTicketCommentRows(database, ticketIdsForOwner(database, owner))
-    ];
+    const [milestoneRows, taskRows, ticketRows] = await Promise.all([
+      recentMilestoneCommentRows(database, [owner.id]),
+      taskIdsForOwner(database, owner).then((ids) => recentTaskCommentRows(database, ids)),
+      ticketIdsForOwner(database, owner).then((ids) => recentTicketCommentRows(database, ids))
+    ]);
+    return [...milestoneRows, ...taskRows, ...ticketRows];
   }
   if (owner.type === "dayPlan") {
     return recentDayPlanCommentRows(database, [owner.id]);
@@ -721,37 +703,65 @@ function recentCommentRowsForOwner(database: DbClient, owner: RecentCommentOwner
   return recentTaskCommentRows(database, [owner.id]);
 }
 
-function recentOwnCommentRows(database: DbClient, userId: number): RecentCommentRow[] {
-  return [
-    ...recentProjectCommentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id), userId),
-    ...recentMilestoneCommentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id), userId),
-    ...recentFeatureCommentRows(database, database.select({ id: features.id }).from(features).all().map((row) => row.id), userId),
-    ...recentUseCaseCommentRows(database, database.select({ id: useCases.id }).from(useCases).all().map((row) => row.id), userId),
-    ...recentBacklogItemCommentRows(database, database.select({ id: backlogItems.id }).from(backlogItems).all().map((row) => row.id), userId),
-    ...recentWikiPageCommentRows(database, database.select({ id: wikiPages.id }).from(wikiPages).all().map((row) => row.id), userId),
-    ...recentDayPlanCommentRows(database, database.select({ id: dayPlans.id }).from(dayPlans).where(eq(dayPlans.userId, userId)).all().map((row) => row.id), userId, userId),
-    ...recentTaskCommentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id), userId),
-    ...recentTicketCommentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id), userId)
-  ];
+async function recentOwnCommentRows(database: DbClient, userId: number): Promise<RecentCommentRow[]> {
+  const [allProjectIds, allMilestoneIds, allFeatureIds, allUseCaseIds, allBacklogIds, allWikiIds, allDayPlanIds, allTaskIds, allTicketIds] = await Promise.all([
+    database.select({ id: projects.id }).from(projects).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: milestones.id }).from(milestones).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: features.id }).from(features).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: useCases.id }).from(useCases).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: backlogItems.id }).from(backlogItems).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: wikiPages.id }).from(wikiPages).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: dayPlans.id }).from(dayPlans).where(eq(dayPlans.userId, userId)).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: tasks.id }).from(tasks).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: tickets.id }).from(tickets).then((rows) => rows.map((r) => r.id))
+  ]);
+
+  const results = await Promise.all([
+    recentProjectCommentRows(database, allProjectIds, userId),
+    recentMilestoneCommentRows(database, allMilestoneIds, userId),
+    recentFeatureCommentRows(database, allFeatureIds, userId),
+    recentUseCaseCommentRows(database, allUseCaseIds, userId),
+    recentBacklogItemCommentRows(database, allBacklogIds, userId),
+    recentWikiPageCommentRows(database, allWikiIds, userId),
+    recentDayPlanCommentRows(database, allDayPlanIds, userId, userId),
+    recentTaskCommentRows(database, allTaskIds, userId),
+    recentTicketCommentRows(database, allTicketIds, userId)
+  ]);
+
+  return results.flat();
 }
 
-function recentAllCommentRows(database: DbClient, userId: number): RecentCommentRow[] {
-  return [
-    ...recentProjectCommentRows(database, database.select({ id: projects.id }).from(projects).all().map((row) => row.id)),
-    ...recentMilestoneCommentRows(database, database.select({ id: milestones.id }).from(milestones).all().map((row) => row.id)),
-    ...recentFeatureCommentRows(database, database.select({ id: features.id }).from(features).all().map((row) => row.id)),
-    ...recentUseCaseCommentRows(database, database.select({ id: useCases.id }).from(useCases).all().map((row) => row.id)),
-    ...recentBacklogItemCommentRows(database, database.select({ id: backlogItems.id }).from(backlogItems).all().map((row) => row.id)),
-    ...recentWikiPageCommentRows(database, database.select({ id: wikiPages.id }).from(wikiPages).all().map((row) => row.id)),
-    ...recentDayPlanCommentRows(database, database.select({ id: dayPlans.id }).from(dayPlans).where(eq(dayPlans.userId, userId)).all().map((row) => row.id), undefined, userId),
-    ...recentTaskCommentRows(database, database.select({ id: tasks.id }).from(tasks).all().map((row) => row.id)),
-    ...recentTicketCommentRows(database, database.select({ id: tickets.id }).from(tickets).all().map((row) => row.id))
-  ];
+async function recentAllCommentRows(database: DbClient, userId: number): Promise<RecentCommentRow[]> {
+  const [allProjectIds, allMilestoneIds, allFeatureIds, allUseCaseIds, allBacklogIds, allWikiIds, allDayPlanIds, allTaskIds, allTicketIds] = await Promise.all([
+    database.select({ id: projects.id }).from(projects).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: milestones.id }).from(milestones).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: features.id }).from(features).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: useCases.id }).from(useCases).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: backlogItems.id }).from(backlogItems).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: wikiPages.id }).from(wikiPages).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: dayPlans.id }).from(dayPlans).where(eq(dayPlans.userId, userId)).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: tasks.id }).from(tasks).then((rows) => rows.map((r) => r.id)),
+    database.select({ id: tickets.id }).from(tickets).then((rows) => rows.map((r) => r.id))
+  ]);
+
+  const results = await Promise.all([
+    recentProjectCommentRows(database, allProjectIds),
+    recentMilestoneCommentRows(database, allMilestoneIds),
+    recentFeatureCommentRows(database, allFeatureIds),
+    recentUseCaseCommentRows(database, allUseCaseIds),
+    recentBacklogItemCommentRows(database, allBacklogIds),
+    recentWikiPageCommentRows(database, allWikiIds),
+    recentDayPlanCommentRows(database, allDayPlanIds, undefined, userId),
+    recentTaskCommentRows(database, allTaskIds),
+    recentTicketCommentRows(database, allTicketIds)
+  ]);
+
+  return results.flat();
 }
 
-export function listRecentComments(database: DbClient, options: { owner?: RecentCommentOwner; currentUserId: number; limit?: number; mine?: boolean }): RecentComment[] {
+export async function listRecentComments(database: DbClient, options: { owner?: RecentCommentOwner; currentUserId: number; limit?: number; mine?: boolean }): Promise<RecentComment[]> {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
-  const rows = options.owner ? recentCommentRowsForOwner(database, options.owner) : options.mine === true ? recentOwnCommentRows(database, options.currentUserId) : recentAllCommentRows(database, options.currentUserId);
+  const rows = options.owner ? await recentCommentRowsForOwner(database, options.owner) : options.mine === true ? await recentOwnCommentRows(database, options.currentUserId) : await recentAllCommentRows(database, options.currentUserId);
   return rows
     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime() || right.id - left.id)
     .slice(0, limit)
@@ -767,25 +777,26 @@ export function listRecentComments(database: DbClient, options: { owner?: Recent
     }));
 }
 
-export function listEntityComments(database: DbClient, entityType: CommentEntityType, entityId: number): Comment[] {
+export async function listEntityComments(database: DbClient, entityType: CommentEntityType, entityId: number): Promise<Comment[]> {
   const owner = { type: entityType, id: entityId };
-  ensureOwnerExists(database, owner);
-  return selectOwnerComments(database, owner).map((comment) => mapComment(database, comment));
+  await ensureOwnerExists(database, owner);
+  const records = await selectOwnerComments(database, owner);
+  return Promise.all(records.map((comment) => mapComment(database, comment)));
 }
 
-export function createEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, input: CommentInput, actor?: JournalActor | null): Comment {
+export async function createEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, input: CommentInput, actor?: JournalActor | null): Promise<Comment> {
   const owner = { type: entityType, id: entityId };
-  ensureOwnerExists(database, owner);
+  await ensureOwnerExists(database, owner);
   const body = requireNonEmpty(input.body, "body");
-  const created = database.transaction((tx) => {
+  const created = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const comment = commentRepository.create(tx, {
+    const comment = await commentRepository.create(tx, {
       body
     });
-    insertCommentLink(tx, owner, comment.id);
+    await insertCommentLink(tx, owner, comment.id);
     const commentObject = commentJournalObject(comment);
-    const ownerObject = getOwnerJournalObject(txDb, owner);
-    recordJournalEntry(txDb, {
+    const ownerObject = await getOwnerJournalObject(txDb, owner);
+    await recordJournalEntry(txDb, {
       operation: "create",
       object: commentObject,
       summary: `${objectTypeLabel(commentObject.type)} wurde zu ${objectTypeLabel(ownerObject.type)} "${ownerObject.label}" hinzugefügt.`,
@@ -798,19 +809,19 @@ export function createEntityComment(database: DbClient, entityType: CommentEntit
   return mapComment(database, created);
 }
 
-export function linkEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, commentId: number, actor?: JournalActor | null): Comment {
+export async function linkEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, commentId: number, actor?: JournalActor | null): Promise<Comment> {
   const owner = { type: entityType, id: entityId };
-  ensureOwnerExists(database, owner);
-  const comment = commentRepository.findById(database, commentId);
+  await ensureOwnerExists(database, owner);
+  const comment = await commentRepository.findById(database, commentId);
   if (!comment) {
     throw notFound(`Comment with id ${commentId} not found`);
   }
-  database.transaction((tx) => {
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    insertCommentLink(tx, owner, commentId);
+    await insertCommentLink(tx, owner, commentId);
     const commentObject = commentJournalObject(comment);
-    const ownerObject = getOwnerJournalObject(txDb, owner);
-    recordJournalEntry(txDb, {
+    const ownerObject = await getOwnerJournalObject(txDb, owner);
+    await recordJournalEntry(txDb, {
       operation: "link",
       object: commentObject,
       summary: buildLinkSummary(ownerObject, commentObject),
@@ -821,28 +832,28 @@ export function linkEntityComment(database: DbClient, entityType: CommentEntityT
   return mapComment(database, comment);
 }
 
-export function updateComment(database: DbClient, id: number, input: CommentUpdate, actor?: JournalActor | null): Comment {
+export async function updateComment(database: DbClient, id: number, input: CommentUpdate, actor?: JournalActor | null): Promise<Comment> {
   const body = requireNonEmpty(input.body, "body");
-  const updated = database.transaction((tx) => {
+  const updated = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const current = commentRepository.findById(tx, id);
+    const current = await commentRepository.findById(tx, id);
     if (!current) {
       throw notFound(`Comment with id ${id} not found`);
     }
-    const comment = commentRepository.update(tx, id, input.expectedVersion, { body }, actor?.actorUserId ?? undefined);
+    const comment = await commentRepository.update(tx, id, input.expectedVersion, { body }, actor?.actorUserId ?? undefined);
     if (!comment) {
       throw notFound(`Comment with id ${id} not found`);
     }
     const commentObject = commentJournalObject(comment);
     const changes = buildJournalChanges(current, comment, commentJournalFields);
-    const owners = listCommentOwners(txDb, id);
-    recordJournalEntry(txDb, {
+    const owners = await listCommentOwners(txDb, id);
+    await recordJournalEntry(txDb, {
       operation: "update",
       object: commentObject,
       summary: buildUpdateSummary(commentObject, changes),
       actor,
       changes,
-      contexts: owners.map((owner) => makeJournalContext(getOwnerJournalObject(txDb, owner), "owner"))
+      contexts: await Promise.all(owners.map(async (owner) => makeJournalContext(await getOwnerJournalObject(txDb, owner), "owner")))
     });
     return comment;
   });
@@ -850,22 +861,22 @@ export function updateComment(database: DbClient, id: number, input: CommentUpda
   return mapComment(database, updated);
 }
 
-export function deleteEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, id: number, actor?: JournalActor | null): void {
+export async function deleteEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, id: number, actor?: JournalActor | null): Promise<void> {
   const owner = { type: entityType, id: entityId };
-  ensureOwnerExists(database, owner);
-  const comment = commentRepository.findById(database, id);
+  await ensureOwnerExists(database, owner);
+  const comment = await commentRepository.findById(database, id);
   if (!comment) {
     throw notFound(`Comment with id ${id} not found`);
   }
-  database.transaction((tx) => {
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const changes = deleteCommentLink(txDb, owner, id);
+    const changes = await deleteCommentLink(txDb, owner, id);
     if (changes === 0) {
       throw notFound(`Comment with id ${id} not found`);
     }
     const commentObject = commentJournalObject(comment);
-    const ownerObject = getOwnerJournalObject(txDb, owner);
-    recordJournalEntry(txDb, {
+    const ownerObject = await getOwnerJournalObject(txDb, owner);
+    await recordJournalEntry(txDb, {
       operation: "unlink",
       object: commentObject,
       summary: buildUnlinkSummary(ownerObject, commentObject),
@@ -875,31 +886,92 @@ export function deleteEntityComment(database: DbClient, entityType: CommentEntit
   });
 }
 
-export function listComments(database: DbClient, taskId: number): Comment[] {
+export async function listComments(database: DbClient, taskId: number): Promise<Comment[]> {
   return listEntityComments(database, "task", taskId);
 }
 
-export function createComment(database: DbClient, taskId: number, input: CommentInput, actor?: JournalActor | null): Comment {
+export async function createComment(database: DbClient, taskId: number, input: CommentInput, actor?: JournalActor | null): Promise<Comment> {
   return createEntityComment(database, "task", taskId, input, actor);
 }
 
-export function deleteComment(database: DbClient, id: number, actor?: JournalActor | null): void {
-  const comment = commentRepository.findById(database, id);
+async function deleteCommentsByIds(database: DbClient, commentIds: number[]): Promise<void> {
+  if (commentIds.length === 0) return;
+  await database.delete(comments).where(inArray(comments.id, commentIds));
+}
+
+export async function deleteMilestoneCommentsForIds(database: DbClient, milestoneIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(milestoneIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: milestoneComments.commentId }).from(milestoneComments).where(inArray(milestoneComments.milestoneId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteProjectCommentsForIds(database: DbClient, projectIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(projectIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: projectComments.commentId }).from(projectComments).where(inArray(projectComments.projectId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteTaskCommentsForIds(database: DbClient, taskIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(taskIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: taskComments.commentId }).from(taskComments).where(inArray(taskComments.taskId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteFeatureCommentsForIds(database: DbClient, featureIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(featureIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: featureComments.commentId }).from(featureComments).where(inArray(featureComments.featureId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteUseCaseCommentsForIds(database: DbClient, useCaseIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(useCaseIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: useCaseComments.commentId }).from(useCaseComments).where(inArray(useCaseComments.useCaseId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteTicketCommentsForIds(database: DbClient, ticketIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(ticketIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: ticketComments.commentId }).from(ticketComments).where(inArray(ticketComments.ticketId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteBacklogItemCommentsForIds(database: DbClient, backlogItemIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(backlogItemIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: backlogItemComments.commentId }).from(backlogItemComments).where(inArray(backlogItemComments.backlogItemId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteWikiPageCommentsForIds(database: DbClient, wikiPageIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(wikiPageIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: wikiPageComments.commentId }).from(wikiPageComments).where(inArray(wikiPageComments.wikiPageId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteComment(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
+  const comment = await commentRepository.findById(database, id);
   if (!comment) {
     throw notFound(`Comment with id ${id} not found`);
   }
-  const owners = listCommentOwners(database, id);
-  database.transaction((tx) => {
+  const owners = await listCommentOwners(database, id);
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
     const commentObject = commentJournalObject(comment);
-    recordJournalEntry(txDb, {
+    await recordJournalEntry(txDb, {
       operation: "delete",
       object: commentObject,
       summary: buildDeleteSummary(commentObject),
       actor,
-      contexts: owners.map((owner) => makeJournalContext(getOwnerJournalObject(txDb, owner), "owner"))
+      contexts: await Promise.all(owners.map(async (owner) => makeJournalContext(await getOwnerJournalObject(txDb, owner), "owner")))
     });
-    if (commentRepository.delete(tx, id) === 0) {
+    if (await commentRepository.delete(tx, id) === 0) {
       throw notFound(`Comment with id ${id} not found`);
     }
   });

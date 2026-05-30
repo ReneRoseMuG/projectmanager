@@ -1,4 +1,4 @@
-import type { AdminUserInput, AdminUserUpdate } from "@taskmanager/shared-types";
+﻿import type { AdminUserInput, AdminUserUpdate } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
 import { requireCurrentUser } from "../plugins/auth.js";
 import { createAdminUser, deleteAdminUser, getAdminUser, listAdminUsers, updateAdminUser } from "../services/users.service.js";
@@ -71,8 +71,8 @@ export async function registerAdminUserRoutes(app: FastifyInstance): Promise<voi
     "/admin/users/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      const actor = requireCurrentUser(request);
-      deleteAdminUser(app.db, request.params.id, actor.id);
+      const actor = await requireCurrentUser(request);
+      await deleteAdminUser(app.db, request.params.id, actor.id);
       return reply.status(204).send();
     }
   );

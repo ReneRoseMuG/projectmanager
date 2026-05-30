@@ -1,5 +1,6 @@
-import { and, asc, desc, eq } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { and, asc, desc, eq } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { comments, dayPlanComments, dayPlanEvents, dayPlanNotes, dayPlans, dayPlanTasks, events, notes, tasks } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -69,17 +70,17 @@ function nowIso(): string {
 }
 
 export const dayPlanRepository = {
-  findById(database: DbClient, id: number): DayPlanRecord | undefined {
-    return database.select().from(dayPlans).where(eq(dayPlans.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<DayPlanRecord | undefined> {
+    return firstRow(await database.select().from(dayPlans).where(eq(dayPlans.id, id)));
   },
 
-  findByUserAndDate(database: DbClient, userId: number, date: string): DayPlanRecord | undefined {
-    return database.select().from(dayPlans).where(and(eq(dayPlans.userId, userId), eq(dayPlans.date, date))).get();
+  async findByUserAndDate(database: DbSession, userId: number, date: string): Promise<DayPlanRecord | undefined> {
+    return firstRow(await database.select().from(dayPlans).where(and(eq(dayPlans.userId, userId), eq(dayPlans.date, date))));
   },
 
-  createForUserAndDate(database: DbClient, userId: number, date: string, actorUserId?: number): DayPlanRecord {
+  async createForUserAndDate(database: DbSession, userId: number, date: string, actorUserId?: number): Promise<DayPlanRecord> {
     const now = nowIso();
-    return database
+    const result = await database
       .insert(dayPlans)
       .values({
         userId,
@@ -90,98 +91,97 @@ export const dayPlanRepository = {
         updatedBy: actorUserId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, insertId(result));
+    if (!created) {
+      throw new Error("Created day plan could not be loaded");
+    }
+    return created;
   },
 
-  listTasks(database: DbClient, dayPlanId: number): DayPlanTaskRow[] {
+  async listTasks(database: DbSession, dayPlanId: number): Promise<DayPlanTaskRow[]> {
     return database
       .select(taskSelect)
       .from(dayPlanTasks)
       .innerJoin(tasks, eq(dayPlanTasks.taskId, tasks.id))
       .where(eq(dayPlanTasks.ownerId, dayPlanId))
-      .orderBy(asc(dayPlanTasks.position), asc(tasks.id))
-      .all();
+      .orderBy(asc(dayPlanTasks.position), asc(tasks.id));
   },
 
-  listEvents(database: DbClient, dayPlanId: number): DayPlanEventRow[] {
+  async listEvents(database: DbSession, dayPlanId: number): Promise<DayPlanEventRow[]> {
     return database
       .select(eventSelect)
       .from(dayPlanEvents)
       .innerJoin(events, eq(dayPlanEvents.eventId, events.id))
       .where(eq(dayPlanEvents.ownerId, dayPlanId))
-      .orderBy(asc(dayPlanEvents.position), asc(events.startTime), asc(events.id))
-      .all();
+      .orderBy(asc(dayPlanEvents.position), asc(events.startTime), asc(events.id));
   },
 
-  addTask(database: DbClient, dayPlanId: number, taskId: number, position: number): void {
-    database.insert(dayPlanTasks).values({ ownerId: dayPlanId, taskId, position }).onConflictDoNothing().run();
+  async addTask(database: DbSession, dayPlanId: number, taskId: number, position: number): Promise<void> {
+    await database.insert(dayPlanTasks).ignore().values({ ownerId: dayPlanId, taskId, position });
   },
 
-  updateTaskPosition(database: DbClient, dayPlanId: number, taskId: number, position: number): void {
-    database.update(dayPlanTasks).set({ position }).where(and(eq(dayPlanTasks.ownerId, dayPlanId), eq(dayPlanTasks.taskId, taskId))).run();
+  async updateTaskPosition(database: DbSession, dayPlanId: number, taskId: number, position: number): Promise<void> {
+    await database.update(dayPlanTasks).set({ position }).where(and(eq(dayPlanTasks.ownerId, dayPlanId), eq(dayPlanTasks.taskId, taskId)));
   },
 
-  removeTask(database: DbClient, dayPlanId: number, taskId: number): number {
-    return database.delete(dayPlanTasks).where(and(eq(dayPlanTasks.ownerId, dayPlanId), eq(dayPlanTasks.taskId, taskId))).run().changes;
+  async removeTask(database: DbSession, dayPlanId: number, taskId: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(dayPlanTasks).where(and(eq(dayPlanTasks.ownerId, dayPlanId), eq(dayPlanTasks.taskId, taskId))));
   },
 
-  addEvent(database: DbClient, dayPlanId: number, eventId: number, position: number): void {
-    database.insert(dayPlanEvents).values({ ownerId: dayPlanId, eventId, position }).onConflictDoNothing().run();
+  async addEvent(database: DbSession, dayPlanId: number, eventId: number, position: number): Promise<void> {
+    await database.insert(dayPlanEvents).ignore().values({ ownerId: dayPlanId, eventId, position });
   },
 
-  updateEventPosition(database: DbClient, dayPlanId: number, eventId: number, position: number): void {
-    database.update(dayPlanEvents).set({ position }).where(and(eq(dayPlanEvents.ownerId, dayPlanId), eq(dayPlanEvents.eventId, eventId))).run();
+  async updateEventPosition(database: DbSession, dayPlanId: number, eventId: number, position: number): Promise<void> {
+    await database.update(dayPlanEvents).set({ position }).where(and(eq(dayPlanEvents.ownerId, dayPlanId), eq(dayPlanEvents.eventId, eventId)));
   },
 
-  removeEvent(database: DbClient, dayPlanId: number, eventId: number): number {
-    return database.delete(dayPlanEvents).where(and(eq(dayPlanEvents.ownerId, dayPlanId), eq(dayPlanEvents.eventId, eventId))).run().changes;
+  async removeEvent(database: DbSession, dayPlanId: number, eventId: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(dayPlanEvents).where(and(eq(dayPlanEvents.ownerId, dayPlanId), eq(dayPlanEvents.eventId, eventId))));
   },
 
-  listNotes(database: DbClient, dayPlanId: number): DayPlanNoteRow[] {
+  async listNotes(database: DbSession, dayPlanId: number): Promise<DayPlanNoteRow[]> {
     return database
       .select(noteSelect)
       .from(dayPlanNotes)
       .innerJoin(notes, eq(dayPlanNotes.noteId, notes.id))
       .where(eq(dayPlanNotes.dayPlanId, dayPlanId))
-      .orderBy(desc(notes.updatedAt), desc(notes.id))
-      .all();
+      .orderBy(desc(notes.updatedAt), desc(notes.id));
   },
 
-  addNote(database: DbClient, dayPlanId: number, noteId: number): void {
-    database.insert(dayPlanNotes).values({ dayPlanId, noteId }).onConflictDoNothing().run();
+  async addNote(database: DbSession, dayPlanId: number, noteId: number): Promise<void> {
+    await database.insert(dayPlanNotes).ignore().values({ dayPlanId, noteId });
   },
 
-  removeNote(database: DbClient, dayPlanId: number, noteId: number): number {
-    return database.delete(dayPlanNotes).where(and(eq(dayPlanNotes.dayPlanId, dayPlanId), eq(dayPlanNotes.noteId, noteId))).run().changes;
+  async removeNote(database: DbSession, dayPlanId: number, noteId: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(dayPlanNotes).where(and(eq(dayPlanNotes.dayPlanId, dayPlanId), eq(dayPlanNotes.noteId, noteId))));
   },
 
-  listComments(database: DbClient, dayPlanId: number): DayPlanCommentRow[] {
+  async listComments(database: DbSession, dayPlanId: number): Promise<DayPlanCommentRow[]> {
     return database
       .select(commentSelect)
       .from(dayPlanComments)
       .innerJoin(comments, eq(dayPlanComments.commentId, comments.id))
       .where(eq(dayPlanComments.dayPlanId, dayPlanId))
-      .orderBy(asc(comments.createdAt), asc(comments.id))
-      .all();
+      .orderBy(asc(comments.createdAt), asc(comments.id));
   },
 
-  addComment(database: DbClient, dayPlanId: number, commentId: number): void {
-    database.insert(dayPlanComments).values({ dayPlanId, commentId }).onConflictDoNothing().run();
+  async addComment(database: DbSession, dayPlanId: number, commentId: number): Promise<void> {
+    await database.insert(dayPlanComments).ignore().values({ dayPlanId, commentId });
   },
 
-  removeComment(database: DbClient, dayPlanId: number, commentId: number): number {
-    return database.delete(dayPlanComments).where(and(eq(dayPlanComments.dayPlanId, dayPlanId), eq(dayPlanComments.commentId, commentId))).run().changes;
+  async removeComment(database: DbSession, dayPlanId: number, commentId: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(dayPlanComments).where(and(eq(dayPlanComments.dayPlanId, dayPlanId), eq(dayPlanComments.commentId, commentId))));
   },
 
-  update(database: DbClient, dayPlanId: number, expectedVersion: number, values: Partial<Pick<DayPlanRecord, "status">>, actorUserId?: number): DayPlanRecord | undefined {
-    const current = this.findById(database, dayPlanId);
+  async update(database: DbSession, dayPlanId: number, expectedVersion: number, values: Partial<Pick<DayPlanRecord, "status">>, actorUserId?: number): Promise<DayPlanRecord | undefined> {
+    const current = await this.findById(database, dayPlanId);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    return database
+    await database
       .update(dayPlans)
       .set({
         ...values,
@@ -189,8 +189,8 @@ export const dayPlanRepository = {
         updatedBy: actorUserId ?? null,
         updatedAt: nowIso()
       })
-      .where(eq(dayPlans.id, dayPlanId))
-      .returning()
-      .get();
+      .where(eq(dayPlans.id, dayPlanId));
+    return this.findById(database, dayPlanId);
   }
 };
+

@@ -83,32 +83,32 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   app.get<{ Querystring: { context: DashboardContext } }>(
     "/dashboards",
     { schema: { querystring: dashboardListQuerySchema, response: { 200: objectResponseSchema } } },
-    async (request) => listDashboards(app.db, request.query.context, requireCurrentUser(request))
+    async (request) => listDashboards(app.db, request.query.context, await requireCurrentUser(request))
   );
 
   app.post<{ Body: DashboardInput }>(
     "/dashboards",
     { schema: { body: dashboardBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createDashboard(app.db, request.body, requireCurrentUser(request)))
+    async (request, reply) => reply.status(201).send(await createDashboard(app.db, request.body, await requireCurrentUser(request)))
   );
 
   app.get<{ Params: { id: number } }>(
     "/dashboards/:id",
     { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
-    async (request) => getDashboard(app.db, request.params.id, requireCurrentUser(request))
+    async (request) => getDashboard(app.db, request.params.id, await requireCurrentUser(request))
   );
 
   app.put<{ Params: { id: number }; Body: DashboardUpdate }>(
     "/dashboards/:id",
     { schema: { params: idParamSchema, body: dashboardUpdateBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateDashboard(app.db, request.params.id, request.body, requireCurrentUser(request))
+    async (request) => updateDashboard(app.db, request.params.id, request.body, await requireCurrentUser(request))
   );
 
   app.delete<{ Params: { id: number } }>(
     "/dashboards/:id",
     { config: { auth: { resource: "dashboards", action: "write" } }, schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteDashboard(app.db, request.params.id, requireCurrentUser(request));
+      await deleteDashboard(app.db, request.params.id, await requireCurrentUser(request));
       return reply.status(204).send();
     }
   );
@@ -116,6 +116,6 @@ export async function registerDashboardRoutes(app: FastifyInstance): Promise<voi
   app.post<{ Params: { id: number }; Body: SetDashboardDefaultRequest }>(
     "/dashboards/:id/default",
     { schema: { params: idParamSchema, body: dashboardDefaultBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => setDefaultDashboard(app.db, request.params.id, request.body.scopeType, request.body.expectedVersion, requireCurrentUser(request))
+    async (request) => setDefaultDashboard(app.db, request.params.id, request.body.scopeType, request.body.expectedVersion, await requireCurrentUser(request))
   );
 }

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -27,15 +27,15 @@ describe("Events API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => { await truncateAll(testDb.pool); });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("POST /api/events erstellt einen globalen Termin ohne Owner", async () => {
@@ -97,7 +97,7 @@ describe("Events API", () => {
     const event = await createEvent(app, { owners: [{ type: "project", id: project.id }] });
 
     expect(event.owners).toEqual([{ type: "project", id: project.id }]);
-    expect(testDb.db.select().from(projectEvents).where(eq(projectEvents.eventId, event.id)).all()).toEqual([
+    expect((await testDb.db.select().from(projectEvents).where(eq(projectEvents.eventId, event.id)))).toEqual([
       expect.objectContaining({ projectId: project.id, eventId: event.id })
     ]);
   });
@@ -108,7 +108,7 @@ describe("Events API", () => {
     const event = await createEvent(app, { owners: [{ type: "task", id: task.id }] });
 
     expect(event.owners).toEqual([{ type: "task", id: task.id }]);
-    expect(testDb.db.select().from(taskEvents).where(eq(taskEvents.eventId, event.id)).all()).toEqual([
+    expect((await testDb.db.select().from(taskEvents).where(eq(taskEvents.eventId, event.id)))).toEqual([
       expect.objectContaining({ taskId: task.id, eventId: event.id })
     ]);
   });
@@ -127,8 +127,8 @@ describe("Events API", () => {
       { type: "project", id: project.id },
       { type: "task", id: task.id }
     ]);
-    expect(testDb.db.select().from(projectEvents).where(eq(projectEvents.eventId, event.id)).all()).toHaveLength(1);
-    expect(testDb.db.select().from(taskEvents).where(eq(taskEvents.eventId, event.id)).all()).toHaveLength(1);
+    expect((await testDb.db.select().from(projectEvents).where(eq(projectEvents.eventId, event.id)))).toHaveLength(1);
+    expect((await testDb.db.select().from(taskEvents).where(eq(taskEvents.eventId, event.id)))).toHaveLength(1);
   });
 
   it("POST mit nicht existierendem Owner gibt 404 zurück", async () => {
@@ -268,8 +268,8 @@ describe("Events API", () => {
 
     await supertest(app.server).delete(`/api/events/${event.id}`).expect(204);
     await supertest(app.server).get(`/api/events/${event.id}`).expect(404);
-    expect(testDb.db.select().from(projectEvents).where(eq(projectEvents.eventId, event.id)).all()).toHaveLength(0);
-    expect(testDb.db.select().from(taskEvents).where(eq(taskEvents.eventId, event.id)).all()).toHaveLength(0);
+    expect((await testDb.db.select().from(projectEvents).where(eq(projectEvents.eventId, event.id)))).toHaveLength(0);
+    expect((await testDb.db.select().from(taskEvents).where(eq(taskEvents.eventId, event.id)))).toHaveLength(0);
   });
 
   it("Löschen eines verknüpften Projekts entfernt nur den Project-Owner", async () => {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -38,12 +38,12 @@ describe("Features API", () => {
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
     config.uploadDir = uploadDir;
     config.previewCacheDir = previewCacheDir;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableMultipart: true });
   });
 
-  beforeEach(() => {
-    truncateAll(testDb.sqlite);
+  beforeEach(async () => {
+    await truncateAll(testDb.pool);
     fs.rmSync(uploadDir, { recursive: true, force: true });
     fs.rmSync(previewCacheDir, { recursive: true, force: true });
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -52,10 +52,10 @@ describe("Features API", () => {
 
   afterAll(async () => {
     if (app) {
-      await app.close();
+      await app?.close();
     }
     if (testDb) {
-      testDb.sqlite.close();
+      await testDb?.close();
     }
     config.uploadDir = originalUploadDir;
     config.previewCacheDir = originalPreviewCacheDir;
@@ -72,7 +72,8 @@ describe("Features API", () => {
     expect(res.body).toMatchObject({ title: "FT-01", status: "draft" });
     expect(res.body).not.toHaveProperty("slug");
     expect(res.body).not.toHaveProperty("contentPath");
-    const row = testDb.sqlite.prepare("SELECT content FROM features WHERE id = ?").get(res.body.id) as { content: string };
+    const [featureRows] = await testDb.pool.execute("SELECT content FROM features WHERE id = ?", [res.body.id]);
+    const row = (featureRows as Array<{ content: string }>)[0];
     expect(row.content).toBe("# FT-01\n\nBeschreibung.");
   });
 
@@ -147,7 +148,8 @@ describe("Features API", () => {
     const res = await supertest(app.server).patch(`/api/features/${feature.id}`).send({ content: "# Neu", expectedVersion: feature.version }).expect(200);
 
     expect(res.body.content).toBe("# Neu");
-    const row = testDb.sqlite.prepare("SELECT content FROM features WHERE id = ?").get(feature.id) as { content: string };
+    const [featureRows] = await testDb.pool.execute("SELECT content FROM features WHERE id = ?", [feature.id]);
+    const row = (featureRows as Array<{ content: string }>)[0];
     expect(row.content).toBe("# Neu");
   });
 
@@ -167,7 +169,8 @@ describe("Features API", () => {
     const res = await supertest(app.server).patch(`/api/features/${feature.id}`).send({ title: "Neuer Titel", expectedVersion: feature.version }).expect(200);
 
     expect(res.body).not.toHaveProperty("contentPath");
-    const row = testDb.sqlite.prepare("SELECT content FROM features WHERE id = ?").get(feature.id) as { content: string };
+    const [featureRows] = await testDb.pool.execute("SELECT content FROM features WHERE id = ?", [feature.id]);
+    const row = (featureRows as Array<{ content: string }>)[0];
     expect(row.content).toBe("# Inhalt");
   });
 
@@ -175,8 +178,8 @@ describe("Features API", () => {
     const feature = await createFeature(app, { title: "LÃ¶schfeature" });
     await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-    const row = testDb.sqlite.prepare("SELECT id FROM features WHERE id = ?").get(feature.id);
-    expect(row).toBeUndefined();
+    const [existRows] = await testDb.pool.execute("SELECT id FROM features WHERE id = ?", [feature.id]);
+    expect((existRows as unknown[]).length).toBe(0);
     await supertest(app.server).get(`/api/features/${feature.id}`).expect(404);
   });
 

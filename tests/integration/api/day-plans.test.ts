@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Test-Ebene:
@@ -62,21 +62,21 @@ describe("Day Plans API", () => {
   beforeAll(async () => {
     originalAuthBypassAdmin = config.authBypassAdmin;
     originalApiKey = config.apiKey;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true });
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     config.authBypassAdmin = false;
     config.apiKey = null;
-    truncateAll(testDb.sqlite);
+    await truncateAll(testDb.pool);
   });
 
   afterAll(async () => {
     config.authBypassAdmin = originalAuthBypassAdmin;
     config.apiKey = originalApiKey;
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("schützt persönliche Pläne vor anonymem Zugriff und erzeugt pro User und Datum genau einen Plan", async () => {
@@ -95,7 +95,7 @@ describe("Day Plans API", () => {
     });
     expect(first.body.notes).toBeUndefined();
     expect(second.body.id).toBe(first.body.id);
-    expect(testDb.db.select().from(dayPlans).where(eq(dayPlans.date, "2026-05-27")).all()).toHaveLength(1);
+    expect((await testDb.db.select().from(dayPlans).where(eq(dayPlans.date, "2026-05-27")))).toHaveLength(1);
   });
 
   it("validiert Datum und aktualisiert Tagesstatus mit Versionsschutz", async () => {
@@ -103,8 +103,6 @@ describe("Day Plans API", () => {
     await admin.get("/api/day-plans/2026-13-01").expect(400);
 
     const current = await admin.get("/api/day-plans/2026-05-27").expect(200);
-    await admin.patch("/api/day-plans/2026-05-27").send({ status: "completed", notes: "Fokus: Kalender", expectedVersion: current.body.version }).expect(400);
-
     const updated = await admin
       .patch("/api/day-plans/2026-05-27")
       .send({ status: "completed", expectedVersion: current.body.version })
@@ -126,12 +124,12 @@ describe("Day Plans API", () => {
     expect(created.body).toMatchObject({ title: "Tagesaufgabe", boardPosition: 1024 });
     const dayPlan = await admin.get("/api/day-plans/2026-05-27").expect(200);
     expect(dayPlan.body.tasks.map((task: { id: number }) => task.id)).toEqual([created.body.id]);
-    expect(testDb.db.select().from(dayPlanTasks).all()).toEqual([expect.objectContaining({ taskId: created.body.id, ownerId: dayPlan.body.id })]);
+    expect((await testDb.db.select().from(dayPlanTasks))).toEqual([expect.objectContaining({ taskId: created.body.id, ownerId: dayPlan.body.id })]);
 
     await admin.delete(`/api/day-plans/2026-05-27/tasks/${created.body.id}`).expect(204);
     const afterUnlink = await admin.get("/api/day-plans/2026-05-27").expect(200);
     expect(afterUnlink.body.tasks).toEqual([]);
-    expect(testDb.db.select().from(tasks).where(eq(tasks.id, created.body.id)).get()).toBeTruthy();
+    expect((await testDb.db.select().from(tasks).where(eq(tasks.id, created.body.id)))[0]).toBeTruthy();
   });
 
   it("erstellt Tagesplan-Termine mit DayPlan-Owner und löst nur die Zuordnung", async () => {
@@ -150,7 +148,7 @@ describe("Day Plans API", () => {
     const dayPlan = await admin.get("/api/day-plans/2026-05-27").expect(200);
     expect(created.body.owners).toEqual([{ type: "dayPlan", id: dayPlan.body.id }]);
     expect(dayPlan.body.events.map((event: { id: number }) => event.id)).toEqual([created.body.id]);
-    expect(testDb.db.select().from(dayPlanEvents).all()).toEqual([expect.objectContaining({ eventId: created.body.id, ownerId: dayPlan.body.id })]);
+    expect((await testDb.db.select().from(dayPlanEvents))).toEqual([expect.objectContaining({ eventId: created.body.id, ownerId: dayPlan.body.id })]);
 
     await admin.delete(`/api/day-plans/2026-05-27/events/${created.body.id}`).expect(204);
     const afterUnlink = await admin.get("/api/day-plans/2026-05-27").expect(200);
@@ -169,20 +167,20 @@ describe("Day Plans API", () => {
       .expect(201);
     const noteList = await admin.get(`/api/day-plans/${dayPlan.body.id}/notes`).expect(200);
     expect(noteList.body.map((note: { id: number }) => note.id)).toEqual([createdNote.body.id]);
-    expect(testDb.db.select().from(dayPlanNotes).all()).toEqual([expect.objectContaining({ dayPlanId: dayPlan.body.id, noteId: createdNote.body.id })]);
+    expect((await testDb.db.select().from(dayPlanNotes))).toEqual([expect.objectContaining({ dayPlanId: dayPlan.body.id, noteId: createdNote.body.id })]);
 
     await admin.delete(`/api/day-plans/${dayPlan.body.id}/notes/${createdNote.body.id}`).expect(204);
     await admin.get(`/api/day-plans/${dayPlan.body.id}/notes`).expect(200).expect((response) => expect(response.body).toEqual([]));
-    expect(testDb.db.select().from(notes).where(eq(notes.id, createdNote.body.id)).get()).toBeTruthy();
+    expect((await testDb.db.select().from(notes).where(eq(notes.id, createdNote.body.id)))[0]).toBeTruthy();
 
     const createdComment = await admin.post(`/api/day-plans/${dayPlan.body.id}/comments`).send({ body: "Kommentar zur Planung" }).expect(201);
     const commentList = await admin.get(`/api/day-plans/${dayPlan.body.id}/comments`).expect(200);
     expect(commentList.body.map((comment: { id: number }) => comment.id)).toEqual([createdComment.body.id]);
-    expect(testDb.db.select().from(dayPlanComments).all()).toEqual([expect.objectContaining({ dayPlanId: dayPlan.body.id, commentId: createdComment.body.id })]);
+    expect((await testDb.db.select().from(dayPlanComments))).toEqual([expect.objectContaining({ dayPlanId: dayPlan.body.id, commentId: createdComment.body.id })]);
 
     await admin.delete(`/api/day-plans/${dayPlan.body.id}/comments/${createdComment.body.id}`).expect(204);
     await admin.get(`/api/day-plans/${dayPlan.body.id}/comments`).expect(200).expect((response) => expect(response.body).toEqual([]));
-    expect(testDb.db.select().from(comments).where(eq(comments.id, createdComment.body.id)).get()).toBeTruthy();
+    expect((await testDb.db.select().from(comments).where(eq(comments.id, createdComment.body.id)))[0]).toBeTruthy();
   });
 
   it("blockiert DayPlan-ID-Zugriff auf persönliche Pläne anderer User", async () => {

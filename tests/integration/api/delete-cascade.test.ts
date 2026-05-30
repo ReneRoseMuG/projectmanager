@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -133,15 +133,15 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => { await truncateAll(testDb.pool); });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   // =========================================================================
@@ -155,7 +155,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remainingLinks = testDb.db.select().from(projectTasks).where(eq(projectTasks.ownerId, project.id)).all();
+      const remainingLinks = (await testDb.db.select().from(projectTasks).where(eq(projectTasks.ownerId, project.id)));
       expect(remainingLinks).toHaveLength(0);
       await supertest(app.server).get(`/api/tasks/${task.id}`).expect(200);
     });
@@ -177,11 +177,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(1);
     });
 
@@ -191,11 +191,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(0);
     });
 
@@ -206,11 +206,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(0);
     });
 
@@ -221,11 +221,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(1);
     });
 
@@ -237,11 +237,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(1);
     });
 
@@ -251,7 +251,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(notes).where(eq(notes.id, note.id)).all();
+      const remaining = (await testDb.db.select().from(notes).where(eq(notes.id, note.id)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -262,7 +262,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(notes).where(eq(notes.id, note.id)).all();
+      const remaining = (await testDb.db.select().from(notes).where(eq(notes.id, note.id)));
       expect(remaining).toHaveLength(1);
     });
 
@@ -273,7 +273,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(notes).where(eq(notes.id, noteId)).all();
+      const remaining = (await testDb.db.select().from(notes).where(eq(notes.id, noteId)));
       expect(remaining).toHaveLength(1);
     });
 
@@ -284,7 +284,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(projectTags).where(eq(projectTags.projectId, project.id)).all();
+      const remaining = (await testDb.db.select().from(projectTags).where(eq(projectTags.projectId, project.id)));
       expect(remaining).toHaveLength(0);
 
       // Tag selbst muss noch existieren
@@ -299,7 +299,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(backlogItems).where(eq(backlogItems.id, item.id)).all();
+      const remaining = (await testDb.db.select().from(backlogItems).where(eq(backlogItems.id, item.id)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -310,13 +310,13 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remainingLinks = testDb.db.select().from(projectTickets).where(eq(projectTickets.ownerId, project.id)).all();
+      const remainingLinks = (await testDb.db.select().from(projectTickets).where(eq(projectTickets.ownerId, project.id)));
       expect(remainingLinks).toHaveLength(0);
 
-      const remainingTicket = testDb.db.select().from(tickets).where(eq(tickets.id, ticket.id)).all();
+      const remainingTicket = (await testDb.db.select().from(tickets).where(eq(tickets.id, ticket.id)));
       expect(remainingTicket).toHaveLength(1);
 
-      const remainingSub = testDb.db.select().from(tickets).where(eq(tickets.id, sub.id)).all();
+      const remainingSub = (await testDb.db.select().from(tickets).where(eq(tickets.id, sub.id)));
       expect(remainingSub).toHaveLength(1);
     });
 
@@ -338,7 +338,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       const event = await supertest(app.server).get(`/api/events/${eventId}`).expect(200);
       expect(event.body.owners).toEqual([]);
-      expect(testDb.db.select().from(projectEvents).where(eq(projectEvents.eventId, eventId)).all()).toHaveLength(0);
+      expect((await testDb.db.select().from(projectEvents).where(eq(projectEvents.eventId, eventId)))).toHaveLength(0);
     });
 
     it("behält WikiPage beim Löschen des verknüpften Projekts", async () => {
@@ -348,7 +348,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(wikiPages).where(eq(wikiPages.id, wiki.id)).all();
+      const remaining = (await testDb.db.select().from(wikiPages).where(eq(wikiPages.id, wiki.id)));
       expect(remaining).toHaveLength(1);
       expect(remaining[0].title).toBe(wiki.title);
     });
@@ -360,10 +360,10 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const joinRemaining = testDb.db.select().from(projectFeatures).where(eq(projectFeatures.projectId, project.id)).all();
+      const joinRemaining = (await testDb.db.select().from(projectFeatures).where(eq(projectFeatures.projectId, project.id)));
       expect(joinRemaining).toHaveLength(0);
 
-      const featureStillExists = testDb.db.select().from(features).where(eq(features.id, feature.id)).all();
+      const featureStillExists = (await testDb.db.select().from(features).where(eq(features.id, feature.id)));
       expect(featureStillExists).toHaveLength(1);
     });
   });
@@ -394,11 +394,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(0);
     });
 
@@ -410,7 +410,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(notes).where(eq(notes.id, note.id)).all();
+      const remaining = (await testDb.db.select().from(notes).where(eq(notes.id, note.id)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -423,7 +423,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(notes).where(eq(notes.id, note.id)).all();
+      const remaining = (await testDb.db.select().from(notes).where(eq(notes.id, note.id)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -436,7 +436,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await supertest(app.server).delete(`/api/projects/${project.id}/tasks/${task.id}`).expect(204);
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(taskTags).where(eq(taskTags.taskId, task.id)).all();
+      const remaining = (await testDb.db.select().from(taskTags).where(eq(taskTags.taskId, task.id)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -449,10 +449,10 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(409);
 
-      const remaining = testDb.db.select().from(featureTasks).where(eq(featureTasks.taskId, task.id)).all();
+      const remaining = (await testDb.db.select().from(featureTasks).where(eq(featureTasks.taskId, task.id)));
       expect(remaining).toHaveLength(1);
 
-      const featureStillExists = testDb.db.select().from(features).where(eq(features.id, feature.id)).all();
+      const featureStillExists = (await testDb.db.select().from(features).where(eq(features.id, feature.id)));
       expect(featureStillExists).toHaveLength(1);
     });
 
@@ -467,10 +467,10 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tasks/${task.id}`).expect(409);
 
-      const remaining = testDb.db.select().from(useCaseTasks).where(eq(useCaseTasks.taskId, task.id)).all();
+      const remaining = (await testDb.db.select().from(useCaseTasks).where(eq(useCaseTasks.taskId, task.id)));
       expect(remaining).toHaveLength(1);
 
-      const ucStillExists = testDb.db.select().from(useCases).where(eq(useCases.id, useCase.id)).all();
+      const ucStillExists = (await testDb.db.select().from(useCases).where(eq(useCases.id, useCase.id)));
       expect(ucStillExists).toHaveLength(1);
     });
   });
@@ -487,7 +487,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(useCases).where(eq(useCases.featureId, feature.id)).all();
+      const remaining = (await testDb.db.select().from(useCases).where(eq(useCases.featureId, feature.id)));
       expect(remaining).toHaveLength(0);
       await supertest(app.server).get(`/api/use-cases/${uc1.id}`).expect(404);
       await supertest(app.server).get(`/api/use-cases/${uc2.id}`).expect(404);
@@ -499,11 +499,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(0);
     });
 
@@ -514,11 +514,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(0);
     });
 
@@ -532,7 +532,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(useCaseTasks).where(eq(useCaseTasks.ownerId, uc.id)).all();
+      const remaining = (await testDb.db.select().from(useCaseTasks).where(eq(useCaseTasks.ownerId, uc.id)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -542,21 +542,21 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await setFeatureRelation(app, featureA.id, featureB.id);
 
       // Relation A→B existiert
-      const before = testDb.db
+      const before = await testDb.db
         .select()
         .from(featureRelations)
-        .where(eq(featureRelations.sourceFeatureId, featureA.id))
-        .all();
+        .where(eq(featureRelations.sourceFeatureId, featureA.id));
+
       expect(before).toHaveLength(1);
 
       // Feature B löschen – Relation muss verschwinden (target-Seite cascade)
       await supertest(app.server).delete(`/api/features/${featureB.id}`).expect(204);
 
-      const after = testDb.db
+      const after = await testDb.db
         .select()
         .from(featureRelations)
-        .where(eq(featureRelations.sourceFeatureId, featureA.id))
-        .all();
+        .where(eq(featureRelations.sourceFeatureId, featureA.id));
+
       expect(after).toHaveLength(0);
     });
 
@@ -567,11 +567,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${featureA.id}`).expect(204);
 
-      const after = testDb.db
+      const after = await testDb.db
         .select()
         .from(featureRelations)
-        .where(eq(featureRelations.targetFeatureId, featureB.id))
-        .all();
+        .where(eq(featureRelations.targetFeatureId, featureB.id));
+
       expect(after).toHaveLength(0);
     });
 
@@ -584,7 +584,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(featureTasks).where(eq(featureTasks.ownerId, feature.id)).all();
+      const remaining = (await testDb.db.select().from(featureTasks).where(eq(featureTasks.ownerId, feature.id)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -595,7 +595,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(projectFeatures).where(eq(projectFeatures.featureId, feature.id)).all();
+      const remaining = (await testDb.db.select().from(projectFeatures).where(eq(projectFeatures.featureId, feature.id)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -606,7 +606,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(backlogItems).where(eq(backlogItems.id, item.id)).all();
+      const remaining = (await testDb.db.select().from(backlogItems).where(eq(backlogItems.id, item.id)));
       expect(remaining).toHaveLength(1);
       expect(remaining[0].featureId).toBeNull();
     });
@@ -624,11 +624,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/use-cases/${uc.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(0);
     });
 
@@ -642,7 +642,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/use-cases/${uc.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(useCaseTasks).where(eq(useCaseTasks.ownerId, uc.id)).all();
+      const remaining = (await testDb.db.select().from(useCaseTasks).where(eq(useCaseTasks.ownerId, uc.id)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -654,7 +654,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/use-cases/${uc.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(backlogItems).where(eq(backlogItems.id, item.id)).all();
+      const remaining = (await testDb.db.select().from(backlogItems).where(eq(backlogItems.id, item.id)));
       expect(remaining).toHaveLength(1);
       expect(remaining[0].useCaseId).toBeNull();
     });
@@ -680,11 +680,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(0);
     });
 
@@ -695,11 +695,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tickets/${sub.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(0);
     });
 
@@ -709,7 +709,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(notes).where(eq(notes.id, noteId)).all();
+      const remaining = (await testDb.db.select().from(notes).where(eq(notes.id, noteId)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -720,7 +720,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tickets/${sub.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(notes).where(eq(notes.id, noteId)).all();
+      const remaining = (await testDb.db.select().from(notes).where(eq(notes.id, noteId)));
       expect(remaining).toHaveLength(0);
     });
 
@@ -733,20 +733,20 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
         .send({ targetTicketId: ticketB.id, relationType: "related" })
         .expect(201);
 
-      const before = testDb.db
+      const before = await testDb.db
         .select()
         .from(ticketRelations)
-        .where(eq(ticketRelations.sourceTicketId, ticketA.id))
-        .all();
+        .where(eq(ticketRelations.sourceTicketId, ticketA.id));
+
       expect(before).toHaveLength(1);
 
       await supertest(app.server).delete(`/api/tickets/${ticketB.id}`).expect(409);
 
-      const after = testDb.db
+      const after = await testDb.db
         .select()
         .from(ticketRelations)
-        .where(eq(ticketRelations.sourceTicketId, ticketA.id))
-        .all();
+        .where(eq(ticketRelations.sourceTicketId, ticketA.id));
+
       expect(after).toHaveLength(1);
     });
 
@@ -757,7 +757,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(ticketTags).where(eq(ticketTags.ticketId, ticket.id)).all();
+      const remaining = (await testDb.db.select().from(ticketTags).where(eq(ticketTags.ticketId, ticket.id)));
       expect(remaining).toHaveLength(0);
     });
   });
@@ -774,11 +774,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/backlog/${item.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(0);
     });
   });
@@ -794,11 +794,11 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/wiki/${page.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(comments)
-        .where(eq(comments.id, commentId))
-        .all();
+        .where(eq(comments.id, commentId));
+
       expect(remaining).toHaveLength(0);
     });
 
@@ -822,7 +822,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tags/${tag.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(projectTags).where(eq(projectTags.tagId, tag.id)).all();
+      const remaining = (await testDb.db.select().from(projectTags).where(eq(projectTags.tagId, tag.id)));
       expect(remaining).toHaveLength(0);
 
       await supertest(app.server).get(`/api/projects/${project.id}`).expect(200);
@@ -836,7 +836,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tags/${tag.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(taskTags).where(eq(taskTags.tagId, tag.id)).all();
+      const remaining = (await testDb.db.select().from(taskTags).where(eq(taskTags.tagId, tag.id)));
       expect(remaining).toHaveLength(0);
 
       await supertest(app.server).get(`/api/tasks/${task.id}`).expect(200);
@@ -850,7 +850,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tags/${tag.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(ticketTags).where(eq(ticketTags.tagId, tag.id)).all();
+      const remaining = (await testDb.db.select().from(ticketTags).where(eq(ticketTags.tagId, tag.id)));
       expect(remaining).toHaveLength(0);
 
       await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
@@ -882,7 +882,7 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/tags/${tagA.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(taskTags).where(eq(taskTags.taskId, task.id)).all();
+      const remaining = (await testDb.db.select().from(taskTags).where(eq(taskTags.taskId, task.id)));
       expect(remaining).toHaveLength(1);
       expect(remaining[0].tagId).toBe(tagB.id);
     });
@@ -895,16 +895,16 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/features/${featureA.id}`).expect(204);
 
-      const remaining = testDb.db
+      const remaining = await testDb.db
         .select()
         .from(featureRelations)
-        .where(eq(featureRelations.sourceFeatureId, featureB.id))
-        .all();
+        .where(eq(featureRelations.sourceFeatureId, featureB.id));
+
       expect(remaining).toHaveLength(1);
     });
 
     it("keine verwaisten notes-Einträge nach mehrfachen Löschvorgängen", async () => {
-      const notesBefore = testDb.db.select().from(notes).all();
+      const notesBefore = (await testDb.db.select().from(notes));
       expect(notesBefore).toHaveLength(0);
 
       const project = await createProject(app);
@@ -912,12 +912,12 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await createNoteForProject(app, project.id);
       await createNoteForTask(app, task.id);
 
-      const notesDuring = testDb.db.select().from(notes).all();
+      const notesDuring = (await testDb.db.select().from(notes));
       expect(notesDuring).toHaveLength(2);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
-      const notesAfter = testDb.db.select().from(notes).all();
+      const notesAfter = (await testDb.db.select().from(notes));
       expect(notesAfter).toHaveLength(1);
     });
 
@@ -932,13 +932,13 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       await postComment(app, "use-cases", uc.id);
       await postComment(app, "wiki", wiki.id);
 
-      expect(testDb.db.select().from(comments).all()).toHaveLength(4);
+      expect((await testDb.db.select().from(comments))).toHaveLength(4);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
       await supertest(app.server).delete(`/api/wiki/${wiki.id}`).expect(204);
 
-      const remaining = testDb.db.select().from(comments).all();
+      const remaining = (await testDb.db.select().from(comments));
       expect(remaining).toHaveLength(0);
     });
   });

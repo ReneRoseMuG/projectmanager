@@ -36,7 +36,7 @@ export async function registerPushRoutes(app: FastifyInstance): Promise<void> {
   app.get("/push/vapid-key", { schema: { response: { 200: objectResponseSchema } } }, async () => getPushVapidKey(config));
 
   app.get("/push/subscription", { schema: { response: { 200: objectResponseSchema } } }, async (request) => {
-    const currentUser = requireCurrentUser(request);
+    const currentUser = await requireCurrentUser(request);
     return getPushSubscriptionStatus(app.db, currentUser.id);
   });
 
@@ -44,7 +44,7 @@ export async function registerPushRoutes(app: FastifyInstance): Promise<void> {
     "/push/subscribe",
     { schema: { body: pushSubscriptionBodySchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return subscribeToPushNotifications(app.db, currentUser.id, request.body);
     }
   );
@@ -53,7 +53,7 @@ export async function registerPushRoutes(app: FastifyInstance): Promise<void> {
     "/push/subscribe",
     { schema: { body: pushUnsubscribeBodySchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      const currentUser = requireCurrentUser(request);
+      const currentUser = await requireCurrentUser(request);
       return unsubscribeFromPushNotifications(app.db, currentUser.id, request.body.endpoint);
     }
   );

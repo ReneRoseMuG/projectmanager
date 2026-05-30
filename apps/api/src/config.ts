@@ -3,9 +3,17 @@ import path from "node:path";
 import { apiRoot, repoRoot } from "./runtime-safety.js";
 
 export interface AppConfig {
-  databasePath: string;
+  db: {
+    host: string;
+    port: number;
+    name: string;
+    user: string;
+    password: string;
+    ssl: boolean;
+  };
   port: number;
   corsOrigin: string;
+  attachmentBasePath: string;
   uploadDir: string;
   previewCacheDir: string;
   previewTextMaxBytes: number;
@@ -75,10 +83,18 @@ const configuredApiKey = process.env.API_KEY?.trim();
 const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim() || "admin@local";
 
 export const config: AppConfig = {
-  databasePath: resolveFromApiRoot(process.env.DATABASE_PATH ?? "./data/taskmanager.sqlite"),
+  db: {
+    host: process.env.DB_HOST?.trim() ?? "localhost",
+    port: numberFromEnv(process.env.DB_PORT, 3306),
+    name: process.env.DB_NAME?.trim() ?? "taskmanager",
+    user: process.env.DB_USER?.trim() ?? "taskmanager",
+    password: process.env.DB_PASSWORD ?? "",
+    ssl: booleanFromEnv(process.env.DB_SSL)
+  },
   port: Number(process.env.PORT ?? 3001),
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
-  uploadDir: resolveFromApiRoot(process.env.UPLOAD_DIR ?? "./uploads"),
+  attachmentBasePath: resolveFromApiRoot(process.env.ATTACHMENT_BASE_PATH ?? process.env.UPLOAD_DIR ?? "./uploads"),
+  uploadDir: resolveFromApiRoot(process.env.ATTACHMENT_BASE_PATH ?? process.env.UPLOAD_DIR ?? "./uploads"),
   previewCacheDir: resolveFromApiRoot(process.env.PREVIEW_CACHE_DIR ?? "./previews"),
   previewTextMaxBytes: numberFromEnv(process.env.PREVIEW_TEXT_MAX_BYTES, 100 * 1024),
   previewConversionMaxBytes: numberFromEnv(process.env.PREVIEW_CONVERSION_MAX_BYTES, 25 * 1024 * 1024),

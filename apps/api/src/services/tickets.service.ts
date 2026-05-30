@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Ticket,
   TicketDetail,
   TicketInput,
@@ -14,11 +14,12 @@ import type {
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureTickets, features, milestoneTickets, milestones, projectTickets, projects, taskTickets, tasks, ticketAttachments, ticketComments, ticketNotes, ticketRelations, tickets, useCases, useCaseTickets, wikiPageTickets, wikiPages } from "../db/schema.js";
+import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
 import { ticketRepository, type TicketRecord } from "../repositories/ticket.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
 import { ensureCatalogEntryExists, isCatalogEntryClosed, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
-import { listEntityComments } from "./comments.service.js";
+import { deleteTicketCommentsForIds, listEntityComments } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 import {
   buildCreateSummary,
@@ -94,99 +95,99 @@ const ticketJournalFields: Array<JournalFieldDefinition<TicketRecord>> = [
   { key: "position", label: "Position" }
 ];
 
-function ensureProjectExists(database: DbClient, projectId: number): void {
-  const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
+async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {
+  const project = firstRow(await database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)));
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
 }
 
-function ensureTaskExists(database: DbClient, taskId: number): void {
-  const task = database.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)).get();
+async function ensureTaskExists(database: DbClient, taskId: number): Promise<void> {
+  const task = firstRow(await database.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, taskId)));
   if (!task) {
     throw notFound(`Task with id ${taskId} not found`);
   }
 }
 
-function ensureMilestoneExists(database: DbClient, milestoneId: number): void {
-  const milestone = database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)).get();
+async function ensureMilestoneExists(database: DbClient, milestoneId: number): Promise<void> {
+  const milestone = firstRow(await database.select({ id: milestones.id }).from(milestones).where(eq(milestones.id, milestoneId)));
   if (!milestone) {
     throw notFound(`Milestone with id ${milestoneId} not found`);
   }
 }
 
-function ensureFeatureExists(database: DbClient, featureId: number): void {
-  const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
+async function ensureFeatureExists(database: DbClient, featureId: number): Promise<void> {
+  const feature = firstRow(await database.select({ id: features.id }).from(features).where(eq(features.id, featureId)));
   if (!feature) {
     throw notFound(`Feature with id ${featureId} not found`);
   }
 }
 
-function ensureUseCaseExists(database: DbClient, useCaseId: number): void {
-  const useCase = database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, useCaseId)).get();
+async function ensureUseCaseExists(database: DbClient, useCaseId: number): Promise<void> {
+  const useCase = firstRow(await database.select({ id: useCases.id }).from(useCases).where(eq(useCases.id, useCaseId)));
   if (!useCase) {
     throw notFound(`Use case with id ${useCaseId} not found`);
   }
 }
 
-function ensureWikiPageExists(database: DbClient, wikiPageId: number): void {
-  const page = database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)).get();
+async function ensureWikiPageExists(database: DbClient, wikiPageId: number): Promise<void> {
+  const page = firstRow(await database.select({ id: wikiPages.id }).from(wikiPages).where(eq(wikiPages.id, wikiPageId)));
   if (!page) {
     throw notFound(`Wiki page with id ${wikiPageId} not found`);
   }
 }
 
-function ensureOwnerExists(database: DbClient, owner: TicketOwner): void {
+async function ensureOwnerExists(database: DbClient, owner: TicketOwner): Promise<void> {
   if (owner.type === "project") {
-    ensureProjectExists(database, owner.id);
+    await ensureProjectExists(database, owner.id);
     return;
   }
   if (owner.type === "task") {
-    ensureTaskExists(database, owner.id);
+    await ensureTaskExists(database, owner.id);
     return;
   }
   if (owner.type === "milestone") {
-    ensureMilestoneExists(database, owner.id);
+    await ensureMilestoneExists(database, owner.id);
     return;
   }
   if (owner.type === "feature") {
-    ensureFeatureExists(database, owner.id);
+    await ensureFeatureExists(database, owner.id);
     return;
   }
   if (owner.type === "wikiPage") {
-    ensureWikiPageExists(database, owner.id);
+    await ensureWikiPageExists(database, owner.id);
     return;
   }
-  ensureUseCaseExists(database, owner.id);
+  await ensureUseCaseExists(database, owner.id);
 }
 
-function getOwnerJournalObject(database: DbClient, owner: TicketOwner): JournalObjectRef {
+async function getOwnerJournalObject(database: DbClient, owner: TicketOwner): Promise<JournalObjectRef> {
   if (owner.type === "project") {
-    const project = database.select({ name: projects.name }).from(projects).where(eq(projects.id, owner.id)).get();
+    const project = firstRow(await database.select({ name: projects.name }).from(projects).where(eq(projects.id, owner.id)));
     return makeJournalObject("project", owner.id, project?.name ?? `Projekt ${owner.id}`);
   }
   if (owner.type === "milestone") {
-    const milestone = database.select({ name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)).get();
+    const milestone = firstRow(await database.select({ name: milestones.name }).from(milestones).where(eq(milestones.id, owner.id)));
     return makeJournalObject("milestone", owner.id, milestone?.name ?? `Meilenstein ${owner.id}`);
   }
   if (owner.type === "task") {
-    const task = database.select({ title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)).get();
+    const task = firstRow(await database.select({ title: tasks.title }).from(tasks).where(eq(tasks.id, owner.id)));
     return makeJournalObject("task", owner.id, task?.title ?? `Aufgabe ${owner.id}`);
   }
   if (owner.type === "feature") {
-    const feature = database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)).get();
+    const feature = firstRow(await database.select({ title: features.title }).from(features).where(eq(features.id, owner.id)));
     return makeJournalObject("feature", owner.id, feature?.title ?? `Feature ${owner.id}`);
   }
   if (owner.type === "wikiPage") {
-    const page = database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)).get();
+    const page = firstRow(await database.select({ title: wikiPages.title }).from(wikiPages).where(eq(wikiPages.id, owner.id)));
     return makeJournalObject("wikiPage", owner.id, page?.title ?? `Wiki-Seite ${owner.id}`);
   }
-  const useCase = database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)).get();
+  const useCase = firstRow(await database.select({ title: useCases.title }).from(useCases).where(eq(useCases.id, owner.id)));
   return makeJournalObject("useCase", owner.id, useCase?.title ?? `Use Case ${owner.id}`);
 }
 
-function visibleParentForOwner(database: DbClient, owner: TicketOwner, origin: VisibleParentContext["origin"]): VisibleParentContext {
-  const ownerObject = getOwnerJournalObject(database, owner);
+async function visibleParentForOwner(database: DbClient, owner: TicketOwner, origin: VisibleParentContext["origin"]): Promise<VisibleParentContext> {
+  const ownerObject = await getOwnerJournalObject(database, owner);
   return {
     type: owner.type,
     id: owner.id,
@@ -203,21 +204,21 @@ function ticketJournalObject(ticket: Pick<TicketRecord, "id" | "title">): Journa
   return makeJournalObject("ticket", ticket.id, ticket.title);
 }
 
-function getTicketRecord(database: DbClient, id: number): TicketRecord {
-  const ticket = ticketRepository.findById(database, id);
+async function getTicketRecord(database: DbClient, id: number): Promise<TicketRecord> {
+  const ticket = await ticketRepository.findById(database, id);
   if (!ticket) {
     throw notFound(`Ticket with id ${id} not found`);
   }
   return ticket;
 }
 
-function getSubTicketCounts(database: DbClient, ticketIds: number[]): Map<number, number> {
+async function getSubTicketCounts(database: DbClient, ticketIds: number[]): Promise<Map<number, number>> {
   const counts = new Map<number, number>();
   if (ticketIds.length === 0) {
     return counts;
   }
 
-  const rows = database.select({ parentId: tickets.parentId }).from(tickets).where(inArray(tickets.parentId, ticketIds)).all();
+  const rows = await database.select({ parentId: tickets.parentId }).from(tickets).where(inArray(tickets.parentId, ticketIds));
   for (const row of rows) {
     if (row.parentId !== null) {
       counts.set(row.parentId, (counts.get(row.parentId) ?? 0) + 1);
@@ -227,7 +228,7 @@ function getSubTicketCounts(database: DbClient, ticketIds: number[]): Map<number
   return counts;
 }
 
-function getTicketSupportCounts(database: DbClient, ticketIds: number[]): Map<number, SupportCounts> {
+async function getTicketSupportCounts(database: DbClient, ticketIds: number[]): Promise<Map<number, SupportCounts>> {
   const counts = new Map<number, SupportCounts>();
   if (ticketIds.length === 0) {
     return counts;
@@ -243,17 +244,18 @@ function getTicketSupportCounts(database: DbClient, ticketIds: number[]): Map<nu
     return nextCounts;
   };
 
-  const attachmentRows = database.select({ ticketId: ticketAttachments.ticketId }).from(ticketAttachments).where(inArray(ticketAttachments.ticketId, ticketIds)).all();
+  const [attachmentRows, noteRows, commentRows] = await Promise.all([
+    database.select({ ticketId: ticketAttachments.ticketId }).from(ticketAttachments).where(inArray(ticketAttachments.ticketId, ticketIds)),
+    database.select({ ticketId: ticketNotes.ticketId }).from(ticketNotes).where(inArray(ticketNotes.ticketId, ticketIds)),
+    database.select({ ticketId: ticketComments.ticketId }).from(ticketComments).where(inArray(ticketComments.ticketId, ticketIds))
+  ]);
+
   for (const row of attachmentRows) {
     ensureCounts(row.ticketId).attachmentCount += 1;
   }
-
-  const noteRows = database.select({ ticketId: ticketNotes.ticketId }).from(ticketNotes).where(inArray(ticketNotes.ticketId, ticketIds)).all();
   for (const row of noteRows) {
     ensureCounts(row.ticketId).noteCount += 1;
   }
-
-  const commentRows = database.select({ ticketId: ticketComments.ticketId }).from(ticketComments).where(inArray(ticketComments.ticketId, ticketIds)).all();
   for (const row of commentRows) {
     ensureCounts(row.ticketId).commentCount += 1;
   }
@@ -261,9 +263,9 @@ function getTicketSupportCounts(database: DbClient, ticketIds: number[]): Map<nu
   return counts;
 }
 
-function collectTicketSubtreeIds(database: DbClient, ticketId: number): number[] {
-  getTicketRecord(database, ticketId);
-  const rows = ticketRepository.findAll(database);
+async function collectTicketSubtreeIds(database: DbClient, ticketId: number): Promise<number[]> {
+  await getTicketRecord(database, ticketId);
+  const rows = await ticketRepository.findAll(database);
   const childrenByParent = new Map<number, number[]>();
 
   for (const row of rows) {
@@ -287,21 +289,20 @@ function collectTicketSubtreeIds(database: DbClient, ticketId: number): number[]
   return ids;
 }
 
-function nextPosition(database: DbClient, status: TicketRecord["status"], parentId: number | null): number {
-  const positions = ticketRepository.findPositions(database, status, parentId);
+async function nextPosition(database: DbClient, status: TicketRecord["status"], parentId: number | null): Promise<number> {
+  const positions = await ticketRepository.findPositions(database, status, parentId);
   const max = positions.reduce((current, row) => Math.max(current, row.position), 0);
   return max + 1024;
 }
 
-function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRecordWithBoardPosition[] {
+async function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): Promise<TicketRecordWithBoardPosition[]> {
   if (owner.type === "project") {
     return database
       .select({ ...ticketSelect, boardPosition: projectTickets.position })
       .from(projectTickets)
       .innerJoin(tickets, eq(projectTickets.ticketId, tickets.id))
       .where(and(eq(projectTickets.ownerId, owner.id), isNull(tickets.parentId)))
-      .orderBy(tickets.status, projectTickets.position)
-      .all();
+      .orderBy(tickets.status, projectTickets.position);
   }
   if (owner.type === "task") {
     return database
@@ -309,8 +310,7 @@ function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRe
       .from(taskTickets)
       .innerJoin(tickets, eq(taskTickets.ticketId, tickets.id))
       .where(and(eq(taskTickets.ownerId, owner.id), isNull(tickets.parentId)))
-      .orderBy(tickets.status, taskTickets.position)
-      .all();
+      .orderBy(tickets.status, taskTickets.position);
   }
   if (owner.type === "milestone") {
     return database
@@ -318,8 +318,7 @@ function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRe
       .from(milestoneTickets)
       .innerJoin(tickets, eq(milestoneTickets.ticketId, tickets.id))
       .where(and(eq(milestoneTickets.ownerId, owner.id), isNull(tickets.parentId)))
-      .orderBy(tickets.status, milestoneTickets.position)
-      .all();
+      .orderBy(tickets.status, milestoneTickets.position);
   }
   if (owner.type === "feature") {
     return database
@@ -327,8 +326,7 @@ function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRe
       .from(featureTickets)
       .innerJoin(tickets, eq(featureTickets.ticketId, tickets.id))
       .where(and(eq(featureTickets.ownerId, owner.id), isNull(tickets.parentId)))
-      .orderBy(tickets.status, featureTickets.position)
-      .all();
+      .orderBy(tickets.status, featureTickets.position);
   }
   if (owner.type === "wikiPage") {
     return database
@@ -336,8 +334,7 @@ function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRe
       .from(wikiPageTickets)
       .innerJoin(tickets, eq(wikiPageTickets.ticketId, tickets.id))
       .where(and(eq(wikiPageTickets.ownerId, owner.id), isNull(tickets.parentId)))
-      .orderBy(tickets.status, wikiPageTickets.position)
-      .all();
+      .orderBy(tickets.status, wikiPageTickets.position);
   }
 
   return database
@@ -345,12 +342,11 @@ function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRe
     .from(useCaseTickets)
     .innerJoin(tickets, eq(useCaseTickets.ticketId, tickets.id))
     .where(and(eq(useCaseTickets.ownerId, owner.id), isNull(tickets.parentId)))
-    .orderBy(tickets.status, useCaseTickets.position)
-    .all();
+    .orderBy(tickets.status, useCaseTickets.position);
 }
 
-function selectProjectMilestoneTicketRows(database: DbClient, projectId: number): TicketRecordWithBoardPosition[] {
-  const milestoneRows = database
+async function selectProjectMilestoneTicketRows(database: DbClient, projectId: number): Promise<TicketRecordWithBoardPosition[]> {
+  const milestoneRows = await database
     .select({
       ...ticketSelect,
       boardPosition: milestoneTickets.position,
@@ -361,8 +357,7 @@ function selectProjectMilestoneTicketRows(database: DbClient, projectId: number)
     .innerJoin(milestones, eq(milestoneTickets.ownerId, milestones.id))
     .innerJoin(tickets, eq(milestoneTickets.ticketId, tickets.id))
     .where(and(eq(milestones.projectId, projectId), isNull(tickets.parentId)))
-    .orderBy(tickets.status, milestoneTickets.position)
-    .all();
+    .orderBy(tickets.status, milestoneTickets.position);
 
   return milestoneRows.map((row) => {
     const { milestoneId, milestoneName, ...ticketRow } = row;
@@ -378,67 +373,68 @@ function selectProjectMilestoneTicketRows(database: DbClient, projectId: number)
   });
 }
 
-function selectVisibleOwnerTicketRows(database: DbClient, owner: TicketOwner): TicketRecordWithBoardPosition[] {
-  const directRows = withVisibleParent(selectOwnerTicketRows(database, owner), visibleParentForOwner(database, owner, "direct"));
+async function selectVisibleOwnerTicketRows(database: DbClient, owner: TicketOwner): Promise<TicketRecordWithBoardPosition[]> {
+  const directRows = withVisibleParent(await selectOwnerTicketRows(database, owner), await visibleParentForOwner(database, owner, "direct"));
   if (owner.type !== "project") {
     return directRows;
   }
 
   const directIds = new Set(directRows.map((row) => row.id));
-  const inheritedRows = selectProjectMilestoneTicketRows(database, owner.id).filter((row) => !directIds.has(row.id));
+  const inheritedRows = (await selectProjectMilestoneTicketRows(database, owner.id)).filter((row) => !directIds.has(row.id));
   return [...directRows, ...inheritedRows];
 }
 
-function getOwnerTicketRow(database: DbClient, owner: TicketOwner, ticketId: number): TicketRecordWithBoardPosition | undefined {
-  return selectOwnerTicketRows(database, owner).find((ticket) => ticket.id === ticketId);
+function getOwnerTicketRow(rows: TicketRecordWithBoardPosition[], ticketId: number): TicketRecordWithBoardPosition | undefined {
+  return rows.find((ticket) => ticket.id === ticketId);
 }
 
-function nextOwnerPosition(database: DbClient, owner: TicketOwner, status: TicketRecord["status"]): number {
-  const rows = selectOwnerTicketRows(database, owner).filter((ticket) => ticket.status === status);
-  return rows.reduce((current, row) => Math.max(current, row.boardPosition), 0) + 1024;
+async function nextOwnerPosition(database: DbClient, owner: TicketOwner, status: TicketRecord["status"]): Promise<number> {
+  const rows = await selectOwnerTicketRows(database, owner);
+  const filtered = rows.filter((ticket) => ticket.status === status);
+  return filtered.reduce((current, row) => Math.max(current, row.boardPosition), 0) + 1024;
 }
 
-function insertOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number, position: number): void {
+async function insertOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number, position: number): Promise<void> {
   if (owner.type === "project") {
-    database.insert(projectTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+    await database.insert(projectTickets).ignore().values({ ownerId: owner.id, ticketId, position });
     return;
   }
   if (owner.type === "task") {
-    database.insert(taskTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+    await database.insert(taskTickets).ignore().values({ ownerId: owner.id, ticketId, position });
     return;
   }
   if (owner.type === "milestone") {
-    database.insert(milestoneTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+    await database.insert(milestoneTickets).ignore().values({ ownerId: owner.id, ticketId, position });
     return;
   }
   if (owner.type === "feature") {
-    database.insert(featureTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+    await database.insert(featureTickets).ignore().values({ ownerId: owner.id, ticketId, position });
     return;
   }
   if (owner.type === "wikiPage") {
-    database.insert(wikiPageTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+    await database.insert(wikiPageTickets).ignore().values({ ownerId: owner.id, ticketId, position });
     return;
   }
-  database.insert(useCaseTickets).values({ ownerId: owner.id, ticketId, position }).onConflictDoNothing().run();
+  await database.insert(useCaseTickets).ignore().values({ ownerId: owner.id, ticketId, position });
 }
 
-function deleteOwnerTicketLink(database: DbClient, owner: TicketOwner, ticketId: number): number {
+async function deleteOwnerTicketLink(database: DbClient, owner: TicketOwner, ticketId: number): Promise<number> {
   if (owner.type === "project") {
-    return database.delete(projectTickets).where(and(eq(projectTickets.ownerId, owner.id), eq(projectTickets.ticketId, ticketId))).run().changes;
+    return mutationAffectedRows(await database.delete(projectTickets).where(and(eq(projectTickets.ownerId, owner.id), eq(projectTickets.ticketId, ticketId))));
   }
   if (owner.type === "task") {
-    return database.delete(taskTickets).where(and(eq(taskTickets.ownerId, owner.id), eq(taskTickets.ticketId, ticketId))).run().changes;
+    return mutationAffectedRows(await database.delete(taskTickets).where(and(eq(taskTickets.ownerId, owner.id), eq(taskTickets.ticketId, ticketId))));
   }
   if (owner.type === "milestone") {
-    return database.delete(milestoneTickets).where(and(eq(milestoneTickets.ownerId, owner.id), eq(milestoneTickets.ticketId, ticketId))).run().changes;
+    return mutationAffectedRows(await database.delete(milestoneTickets).where(and(eq(milestoneTickets.ownerId, owner.id), eq(milestoneTickets.ticketId, ticketId))));
   }
   if (owner.type === "feature") {
-    return database.delete(featureTickets).where(and(eq(featureTickets.ownerId, owner.id), eq(featureTickets.ticketId, ticketId))).run().changes;
+    return mutationAffectedRows(await database.delete(featureTickets).where(and(eq(featureTickets.ownerId, owner.id), eq(featureTickets.ticketId, ticketId))));
   }
   if (owner.type === "wikiPage") {
-    return database.delete(wikiPageTickets).where(and(eq(wikiPageTickets.ownerId, owner.id), eq(wikiPageTickets.ticketId, ticketId))).run().changes;
+    return mutationAffectedRows(await database.delete(wikiPageTickets).where(and(eq(wikiPageTickets.ownerId, owner.id), eq(wikiPageTickets.ticketId, ticketId))));
   }
-  return database.delete(useCaseTickets).where(and(eq(useCaseTickets.ownerId, owner.id), eq(useCaseTickets.ticketId, ticketId))).run().changes;
+  return mutationAffectedRows(await database.delete(useCaseTickets).where(and(eq(useCaseTickets.ownerId, owner.id), eq(useCaseTickets.ticketId, ticketId))));
 }
 
 function relationEntryId(sourceTicketId: number, targetTicketId: number, relationType: TicketRelationType, direction: "outgoing" | "incoming"): number {
@@ -447,15 +443,15 @@ function relationEntryId(sourceTicketId: number, targetTicketId: number, relatio
   return sourceTicketId * 1_000_000 + targetTicketId * 10 + relationOffset + directionOffset;
 }
 
-function insertTicketRecord(database: DbClient, input: TicketInput, parentId: number | null = null, actor?: JournalActor | null): TicketRecord {
+async function insertTicketRecord(database: DbClient, input: TicketInput, parentId: number | null = null, actor?: JournalActor | null): Promise<TicketRecord> {
   const title = requireNonEmpty(input.title, "title");
-  const type = input.type ?? resolveDefaultCatalogEntryKey(database, "ticketType", "bug");
-  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "open");
-  const priority = input.priority ?? resolveDefaultCatalogEntryKey(database, "priority", "medium");
-  ensureCatalogEntryExists(database, "ticketType", type);
-  ensureCatalogEntryExists(database, "workStatus", status);
-  ensureCatalogEntryExists(database, "priority", priority);
-  const resolvedAt = isCatalogEntryClosed(database, "workStatus", status) ? nowIso() : null;
+  const type = input.type ?? await resolveDefaultCatalogEntryKey(database, "ticketType", "bug");
+  const status = input.status ?? await resolveDefaultCatalogEntryKey(database, "workStatus", "open");
+  const priority = input.priority ?? await resolveDefaultCatalogEntryKey(database, "priority", "medium");
+  await ensureCatalogEntryExists(database, "ticketType", type);
+  await ensureCatalogEntryExists(database, "workStatus", status);
+  await ensureCatalogEntryExists(database, "priority", priority);
+  const resolvedAt = await isCatalogEntryClosed(database, "workStatus", status) ? nowIso() : null;
   return ticketRepository.create(
     database,
     {
@@ -466,64 +462,57 @@ function insertTicketRecord(database: DbClient, input: TicketInput, parentId: nu
       status,
       priority,
       resolution: null,
-      reporterUserId: normalizeAssignableUserId(database, input.reporterUserId ?? actor?.actorUserId ?? null, "reporterUserId"),
-      responsibleUserId: normalizeAssignableUserId(database, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId"),
+      reporterUserId: await normalizeAssignableUserId(database, input.reporterUserId ?? actor?.actorUserId ?? null, "reporterUserId"),
+      responsibleUserId: await normalizeAssignableUserId(database, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId"),
       environment: cleanNullable(input.environment) ?? null,
       affectedVersion: cleanNullable(input.affectedVersion) ?? null,
       dueDate: cleanNullable(input.dueDate) ?? null,
       resolvedAt,
-      position: nextPosition(database, status, parentId)
+      position: await nextPosition(database, status, parentId)
     },
     actor?.actorUserId ?? undefined
   );
 }
 
-function ticketDeleteBlockers(database: DbClient, ticketId: number): string[] {
+async function ticketDeleteBlockers(database: DbClient, ticketId: number): Promise<string[]> {
   const blockers: string[] = [];
 
-  if (database.select({ ownerId: projectTickets.ownerId }).from(projectTickets).where(eq(projectTickets.ticketId, ticketId)).get()) {
-    blockers.push("Projekt-Verknüpfungen");
-  }
-  if (database.select({ ownerId: taskTickets.ownerId }).from(taskTickets).where(eq(taskTickets.ticketId, ticketId)).get()) {
-    blockers.push("Aufgaben-Verknüpfungen");
-  }
-  if (database.select({ ownerId: milestoneTickets.ownerId }).from(milestoneTickets).where(eq(milestoneTickets.ticketId, ticketId)).get()) {
-    blockers.push("Meilenstein-Verknüpfungen");
-  }
-  if (database.select({ ownerId: featureTickets.ownerId }).from(featureTickets).where(eq(featureTickets.ticketId, ticketId)).get()) {
-    blockers.push("Feature-Verknüpfungen");
-  }
-  if (database.select({ ownerId: useCaseTickets.ownerId }).from(useCaseTickets).where(eq(useCaseTickets.ticketId, ticketId)).get()) {
-    blockers.push("Use-Case-Verknüpfungen");
-  }
-  if (database.select({ ownerId: wikiPageTickets.ownerId }).from(wikiPageTickets).where(eq(wikiPageTickets.ticketId, ticketId)).get()) {
-    blockers.push("Wiki-VerknÃ¼pfungen");
-  }
-  if (database.select({ id: tickets.id }).from(tickets).where(eq(tickets.parentId, ticketId)).get()) {
-    blockers.push("Sub-Tickets");
-  }
-  if (
+  const [projRow, taskRow, mileRow, featRow, ucRow, wikiRow, subRow, relRow] = await Promise.all([
+    database.select({ ownerId: projectTickets.ownerId }).from(projectTickets).where(eq(projectTickets.ticketId, ticketId)).then(firstRow),
+    database.select({ ownerId: taskTickets.ownerId }).from(taskTickets).where(eq(taskTickets.ticketId, ticketId)).then(firstRow),
+    database.select({ ownerId: milestoneTickets.ownerId }).from(milestoneTickets).where(eq(milestoneTickets.ticketId, ticketId)).then(firstRow),
+    database.select({ ownerId: featureTickets.ownerId }).from(featureTickets).where(eq(featureTickets.ticketId, ticketId)).then(firstRow),
+    database.select({ ownerId: useCaseTickets.ownerId }).from(useCaseTickets).where(eq(useCaseTickets.ticketId, ticketId)).then(firstRow),
+    database.select({ ownerId: wikiPageTickets.ownerId }).from(wikiPageTickets).where(eq(wikiPageTickets.ticketId, ticketId)).then(firstRow),
+    database.select({ id: tickets.id }).from(tickets).where(eq(tickets.parentId, ticketId)).then(firstRow),
     database
       .select({ sourceTicketId: ticketRelations.sourceTicketId })
       .from(ticketRelations)
       .where(or(eq(ticketRelations.sourceTicketId, ticketId), eq(ticketRelations.targetTicketId, ticketId)))
-      .get()
-  ) {
-    blockers.push("Ticket-Relationen");
-  }
+      .then(firstRow)
+  ]);
+
+  if (projRow) blockers.push("Projekt-Verknüpfungen");
+  if (taskRow) blockers.push("Aufgaben-Verknüpfungen");
+  if (mileRow) blockers.push("Meilenstein-Verknüpfungen");
+  if (featRow) blockers.push("Feature-Verknüpfungen");
+  if (ucRow) blockers.push("Use-Case-Verknüpfungen");
+  if (wikiRow) blockers.push("Wiki-Verknüpfungen");
+  if (subRow) blockers.push("Sub-Tickets");
+  if (relRow) blockers.push("Ticket-Relationen");
 
   return blockers;
 }
 
-export function mapTicket(
+export async function mapTicket(
   database: DbClient,
   record: TicketRecord,
   tags = getTicketTags(database, record.id),
-  subTicketCount = getSubTicketCounts(database, [record.id]).get(record.id) ?? 0,
+  subTicketCount = getSubTicketCounts(database, [record.id]).then((m) => m.get(record.id) ?? 0),
   position = record.position,
   visibleParent?: VisibleParentContext | null,
-  supportCounts = getTicketSupportCounts(database, [record.id]).get(record.id) ?? emptySupportCounts
-): Ticket {
+  supportCounts = getTicketSupportCounts(database, [record.id]).then((m) => m.get(record.id) ?? emptySupportCounts)
+): Promise<Ticket> {
   return {
     id: record.id,
     parentId: record.parentId,
@@ -534,9 +523,9 @@ export function mapTicket(
     priority: record.priority,
     resolution: record.resolution,
     reporterUserId: record.reporterUserId,
-    reporterUser: getUserOption(database, record.reporterUserId),
+    reporterUser: await getUserOption(database, record.reporterUserId),
     responsibleUserId: record.responsibleUserId,
-    responsibleUser: getUserOption(database, record.responsibleUserId),
+    responsibleUser: await getUserOption(database, record.responsibleUserId),
     environment: record.environment,
     affectedVersion: record.affectedVersion,
     dueDate: record.dueDate,
@@ -545,73 +534,85 @@ export function mapTicket(
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
-    tags,
-    subTicketCount,
-    attachmentCount: supportCounts.attachmentCount,
-    noteCount: supportCounts.noteCount,
-    commentCount: supportCounts.commentCount,
+    tags: await tags,
+    subTicketCount: await subTicketCount,
+    attachmentCount: (await supportCounts).attachmentCount,
+    noteCount: (await supportCounts).noteCount,
+    commentCount: (await supportCounts).commentCount,
     visibleParent
   };
 }
 
-export function listTickets(database: DbClient): Ticket[] {
-  const rows = ticketRepository.findRootTickets(database);
+export async function listTickets(database: DbClient): Promise<Ticket[]> {
+  const rows = await ticketRepository.findRootTickets(database);
   const ids = rows.map((ticket) => ticket.id);
-  const tagsByTicket = getTicketTagsMap(database, ids);
-  const subTicketCounts = getSubTicketCounts(database, ids);
-  const supportCounts = getTicketSupportCounts(database, ids);
+  const [tagsByTicket, subTicketCounts, supportCountsMap] = await Promise.all([
+    getTicketTagsMap(database, ids),
+    getSubTicketCounts(database, ids),
+    getTicketSupportCounts(database, ids)
+  ]);
 
-  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0, ticket.position, undefined, supportCounts.get(ticket.id) ?? emptySupportCounts));
+  return Promise.all(rows.map((ticket) => mapTicket(database, ticket, Promise.resolve(tagsByTicket.get(ticket.id) ?? []), Promise.resolve(subTicketCounts.get(ticket.id) ?? 0), ticket.position, undefined, Promise.resolve(supportCountsMap.get(ticket.id) ?? emptySupportCounts))));
 }
 
-export function listTicketLinkCandidates(database: DbClient, owner: TicketOwner): Ticket[] {
-  ensureOwnerExists(database, owner);
-  const linkedTicketIds = new Set(selectVisibleOwnerTicketRows(database, owner).map((ticket) => ticket.id));
-  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
+export async function listTicketLinkCandidates(database: DbClient, owner: TicketOwner): Promise<Ticket[]> {
+  await ensureOwnerExists(database, owner);
+  const ownerTicketRows = await selectVisibleOwnerTicketRows(database, owner);
+  const linkedTicketIds = new Set(ownerTicketRows.map((ticket) => ticket.id));
+  const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
+  const allTickets = await listTickets(database);
+
   if (owner.type === "wikiPage") {
-    return listTickets(database).filter((ticket) => !linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status));
+    return allTickets.filter((ticket) => !linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status));
   }
 
-  const ownerContext = ticketOwnerProjectContext(database, owner);
-
-  return listTickets(database).filter(
-    (ticket) => !linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status) && projectContextsAreCompatible(ownerContext, ticketProjectContext(database, ticket.id))
-  );
+  const ownerContext = await ticketOwnerProjectContext(database, owner);
+  const candidates: Ticket[] = [];
+  for (const ticket of allTickets) {
+    if (!linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status) && projectContextsAreCompatible(ownerContext, await ticketProjectContext(database, ticket.id))) {
+      candidates.push(ticket);
+    }
+  }
+  return candidates;
 }
 
-export function listOwnerTickets(database: DbClient, owner: TicketOwner): Ticket[] {
-  ensureOwnerExists(database, owner);
-  const rows = selectVisibleOwnerTicketRows(database, owner);
+export async function listOwnerTickets(database: DbClient, owner: TicketOwner): Promise<Ticket[]> {
+  await ensureOwnerExists(database, owner);
+  const rows = await selectVisibleOwnerTicketRows(database, owner);
   const ids = rows.map((ticket) => ticket.id);
-  const tagsByTicket = getTicketTagsMap(database, ids);
-  const subTicketCounts = getSubTicketCounts(database, ids);
-  const supportCounts = getTicketSupportCounts(database, ids);
+  const [tagsByTicket, subTicketCounts, supportCountsMap] = await Promise.all([
+    getTicketTagsMap(database, ids),
+    getSubTicketCounts(database, ids),
+    getTicketSupportCounts(database, ids)
+  ]);
 
-  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0, ticket.boardPosition, ticket.visibleParent, supportCounts.get(ticket.id) ?? emptySupportCounts));
+  return Promise.all(rows.map((ticket) => mapTicket(database, ticket, Promise.resolve(tagsByTicket.get(ticket.id) ?? []), Promise.resolve(subTicketCounts.get(ticket.id) ?? 0), ticket.boardPosition, ticket.visibleParent, Promise.resolve(supportCountsMap.get(ticket.id) ?? emptySupportCounts))));
 }
 
-export function listProjectTickets(database: DbClient, projectId: number): Ticket[] {
+export async function listProjectTickets(database: DbClient, projectId: number): Promise<Ticket[]> {
   return listOwnerTickets(database, { type: "project", id: projectId });
 }
 
-export function listSubTickets(database: DbClient, parentId: number): Ticket[] {
-  getTicketRecord(database, parentId);
-  const rows = ticketRepository.findChildren(database, parentId);
+export async function listSubTickets(database: DbClient, parentId: number): Promise<Ticket[]> {
+  await getTicketRecord(database, parentId);
+  const rows = await ticketRepository.findChildren(database, parentId);
   const ids = rows.map((ticket) => ticket.id);
-  const tagsByTicket = getTicketTagsMap(database, ids);
-  const subTicketCounts = getSubTicketCounts(database, ids);
-  const supportCounts = getTicketSupportCounts(database, ids);
+  const [tagsByTicket, subTicketCounts, supportCountsMap] = await Promise.all([
+    getTicketTagsMap(database, ids),
+    getSubTicketCounts(database, ids),
+    getTicketSupportCounts(database, ids)
+  ]);
 
-  return rows.map((ticket) => mapTicket(database, ticket, tagsByTicket.get(ticket.id) ?? [], subTicketCounts.get(ticket.id) ?? 0, undefined, undefined, supportCounts.get(ticket.id) ?? emptySupportCounts));
+  return Promise.all(rows.map((ticket) => mapTicket(database, ticket, Promise.resolve(tagsByTicket.get(ticket.id) ?? []), Promise.resolve(subTicketCounts.get(ticket.id) ?? 0), undefined, undefined, Promise.resolve(supportCountsMap.get(ticket.id) ?? emptySupportCounts))));
 }
 
-function listDashboardTickets(database: DbClient, owner?: DashboardTicketOwner): Ticket[] {
+async function listDashboardTickets(database: DbClient, owner?: DashboardTicketOwner): Promise<Ticket[]> {
   if (!owner) {
     return listTickets(database);
   }
   if (owner.type === "project") {
     const seen = new Set<number>();
-    return listOwnerTickets(database, owner).filter((ticket) => {
+    return (await listOwnerTickets(database, owner)).filter((ticket) => {
       if (seen.has(ticket.id)) {
         return false;
       }
@@ -627,9 +628,9 @@ function dateKey(value: string): number {
   return Number.isFinite(time) ? time : 0;
 }
 
-export function getTicketStats(database: DbClient, owner?: DashboardTicketOwner): TicketStats {
+export async function getTicketStats(database: DbClient, owner?: DashboardTicketOwner): Promise<TicketStats> {
   const statusCounts: Record<string, number> = {};
-  for (const ticket of listDashboardTickets(database, owner)) {
+  for (const ticket of await listDashboardTickets(database, owner)) {
     statusCounts[ticket.status] = (statusCounts[ticket.status] ?? 0) + 1;
   }
   return {
@@ -638,113 +639,86 @@ export function getTicketStats(database: DbClient, owner?: DashboardTicketOwner)
   };
 }
 
-export function listRecentTickets(
+export async function listRecentTickets(
   database: DbClient,
   options: { owner?: DashboardTicketOwner; limit?: number; sort?: "createdAt" | "updatedAt" } = {}
-): Ticket[] {
+): Promise<Ticket[]> {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
   const sort = options.sort ?? "updatedAt";
-  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
-  return [...listDashboardTickets(database, options.owner)]
+  const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
+  return [...(await listDashboardTickets(database, options.owner))]
     .filter((ticket) => !closedStatusKeys.has(ticket.status))
     .sort((left, right) => dateKey(right[sort]) - dateKey(left[sort]) || right.id - left.id)
     .slice(0, limit);
 }
 
-function ticketParentContexts(database: DbClient, ticket: TicketRecord): VisibleParentContext[] {
+async function ticketParentContexts(database: DbClient, ticket: TicketRecord): Promise<VisibleParentContext[]> {
   const contexts: VisibleParentContext[] = [];
   if (ticket.parentId !== null) {
-    const parentTicket = database.select({ id: tickets.id, label: tickets.title }).from(tickets).where(eq(tickets.id, ticket.parentId)).get();
+    const parentTicket = firstRow(await database.select({ id: tickets.id, label: tickets.title }).from(tickets).where(eq(tickets.id, ticket.parentId)));
     if (parentTicket) {
       contexts.push({ type: "ticket", id: parentTicket.id, label: parentTicket.label, origin: "direct" });
     }
   }
 
+  const [projectRows, milestoneRows, taskRows, featureRows, useCaseRows, wikiRows] = await Promise.all([
+    database.select({ id: projects.id, label: projects.name }).from(projectTickets).innerJoin(projects, eq(projectTickets.ownerId, projects.id)).where(eq(projectTickets.ticketId, ticket.id)),
+    database.select({ id: milestones.id, label: milestones.name }).from(milestoneTickets).innerJoin(milestones, eq(milestoneTickets.ownerId, milestones.id)).where(eq(milestoneTickets.ticketId, ticket.id)),
+    database.select({ id: tasks.id, label: tasks.title }).from(taskTickets).innerJoin(tasks, eq(taskTickets.ownerId, tasks.id)).where(eq(taskTickets.ticketId, ticket.id)),
+    database.select({ id: features.id, label: features.title }).from(featureTickets).innerJoin(features, eq(featureTickets.ownerId, features.id)).where(eq(featureTickets.ticketId, ticket.id)),
+    database.select({ id: useCases.id, label: useCases.title }).from(useCaseTickets).innerJoin(useCases, eq(useCaseTickets.ownerId, useCases.id)).where(eq(useCaseTickets.ticketId, ticket.id)),
+    database.select({ id: wikiPages.id, label: wikiPages.title }).from(wikiPageTickets).innerJoin(wikiPages, eq(wikiPageTickets.ownerId, wikiPages.id)).where(eq(wikiPageTickets.ticketId, ticket.id))
+  ]);
+
   contexts.push(
-    ...database
-      .select({ id: projects.id, label: projects.name })
-      .from(projectTickets)
-      .innerJoin(projects, eq(projectTickets.ownerId, projects.id))
-      .where(eq(projectTickets.ticketId, ticket.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "project", id: row.id, label: row.label, origin: "direct" })),
-    ...database
-      .select({ id: milestones.id, label: milestones.name })
-      .from(milestoneTickets)
-      .innerJoin(milestones, eq(milestoneTickets.ownerId, milestones.id))
-      .where(eq(milestoneTickets.ticketId, ticket.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "milestone", id: row.id, label: row.label, origin: "direct" })),
-    ...database
-      .select({ id: tasks.id, label: tasks.title })
-      .from(taskTickets)
-      .innerJoin(tasks, eq(taskTickets.ownerId, tasks.id))
-      .where(eq(taskTickets.ticketId, ticket.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "task", id: row.id, label: row.label, origin: "direct" })),
-    ...database
-      .select({ id: features.id, label: features.title })
-      .from(featureTickets)
-      .innerJoin(features, eq(featureTickets.ownerId, features.id))
-      .where(eq(featureTickets.ticketId, ticket.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "feature", id: row.id, label: row.label, origin: "direct" })),
-    ...database
-      .select({ id: useCases.id, label: useCases.title })
-      .from(useCaseTickets)
-      .innerJoin(useCases, eq(useCaseTickets.ownerId, useCases.id))
-      .where(eq(useCaseTickets.ticketId, ticket.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "useCase", id: row.id, label: row.label, origin: "direct" })),
-    ...database
-      .select({ id: wikiPages.id, label: wikiPages.title })
-      .from(wikiPageTickets)
-      .innerJoin(wikiPages, eq(wikiPageTickets.ownerId, wikiPages.id))
-      .where(eq(wikiPageTickets.ticketId, ticket.id))
-      .all()
-      .map((row): VisibleParentContext => ({ type: "wikiPage", id: row.id, label: row.label, origin: "direct" }))
+    ...projectRows.map((row): VisibleParentContext => ({ type: "project", id: row.id, label: row.label, origin: "direct" })),
+    ...milestoneRows.map((row): VisibleParentContext => ({ type: "milestone", id: row.id, label: row.label, origin: "direct" })),
+    ...taskRows.map((row): VisibleParentContext => ({ type: "task", id: row.id, label: row.label, origin: "direct" })),
+    ...featureRows.map((row): VisibleParentContext => ({ type: "feature", id: row.id, label: row.label, origin: "direct" })),
+    ...useCaseRows.map((row): VisibleParentContext => ({ type: "useCase", id: row.id, label: row.label, origin: "direct" })),
+    ...wikiRows.map((row): VisibleParentContext => ({ type: "wikiPage", id: row.id, label: row.label, origin: "direct" }))
   );
 
   return contexts;
 }
 
-export function getTicketDetail(database: DbClient, id: number): TicketDetail {
-  const record = getTicketRecord(database, id);
-  const ticket = mapTicket(database, record);
+export async function getTicketDetail(database: DbClient, id: number): Promise<TicketDetail> {
+  const record = await getTicketRecord(database, id);
+  const ticket = await mapTicket(database, record);
 
   return {
     ...ticket,
-    parentContexts: ticketParentContexts(database, record),
-    comments: listEntityComments(database, "ticket", id),
-    notes: listTicketNotes(database, id),
-    attachments: listTicketAttachments(database, id),
-    relations: listTicketRelations(database, id),
-    subTickets: listSubTickets(database, id)
+    parentContexts: await ticketParentContexts(database, record),
+    comments: await listEntityComments(database, "ticket", id),
+    notes: await listTicketNotes(database, id),
+    attachments: await listTicketAttachments(database, id),
+    relations: await listTicketRelations(database, id),
+    subTickets: await listSubTickets(database, id)
   };
 }
 
-export function createTicket(database: DbClient, input: TicketInput, actor?: JournalActor | null): Ticket {
-  const created = database.transaction((tx) => {
+export async function createTicket(database: DbClient, input: TicketInput, actor?: JournalActor | null): Promise<Ticket> {
+  const created = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const ticket = insertTicketRecord(txDb, input, null, actor);
+    const ticket = await insertTicketRecord(txDb, input, null, actor);
     const ticketObject = ticketJournalObject(ticket);
-    recordJournalEntry(txDb, { operation: "create", object: ticketObject, summary: buildCreateSummary(ticketObject), actor });
+    await recordJournalEntry(txDb, { operation: "create", object: ticketObject, summary: buildCreateSummary(ticketObject), actor });
     return ticket;
   });
-  return mapTicket(database, created, [], 0);
+  return mapTicket(database, created, Promise.resolve([]), Promise.resolve(0));
 }
 
-export function createOwnerTicket(database: DbClient, owner: TicketOwner, input: TicketInput, actor?: JournalActor | null): Ticket {
-  ensureOwnerExists(database, owner);
-  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "workStatus", "open");
-  const position = nextOwnerPosition(database, owner, status);
-  const created = database.transaction((tx) => {
+export async function createOwnerTicket(database: DbClient, owner: TicketOwner, input: TicketInput, actor?: JournalActor | null): Promise<Ticket> {
+  await ensureOwnerExists(database, owner);
+  const status = input.status ?? await resolveDefaultCatalogEntryKey(database, "workStatus", "open");
+  const position = await nextOwnerPosition(database, owner, status);
+  const created = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const ticket = insertTicketRecord(txDb, input, null, actor);
-    insertOwnerTicket(txDb, owner, ticket.id, position);
+    const ticket = await insertTicketRecord(txDb, input, null, actor);
+    await insertOwnerTicket(txDb, owner, ticket.id, position);
     const ticketObject = ticketJournalObject(ticket);
-    const ownerObject = getOwnerJournalObject(txDb, owner);
-    recordJournalEntry(txDb, {
+    const ownerObject = await getOwnerJournalObject(txDb, owner);
+    await recordJournalEntry(txDb, {
       operation: "create",
       object: ticketObject,
       summary: buildCreateSummary(ticketObject),
@@ -754,26 +728,27 @@ export function createOwnerTicket(database: DbClient, owner: TicketOwner, input:
     return ticket;
   });
 
-  return mapTicket(database, created, [], 0, position);
+  return mapTicket(database, created, Promise.resolve([]), Promise.resolve(0), position);
 }
 
-export function linkOwnerTicket(
+export async function linkOwnerTicket(
   database: DbClient,
   owner: TicketOwner,
   ticketId: number,
   actor?: JournalActor | null,
   options: { conflictOnExisting?: boolean } = {}
-): Ticket {
-  ensureOwnerExists(database, owner);
-  const ticket = getTicketRecord(database, ticketId);
+): Promise<Ticket> {
+  await ensureOwnerExists(database, owner);
+  const ticket = await getTicketRecord(database, ticketId);
   if (ticket.parentId !== null) {
     throw badRequest("Sub-tickets cannot be linked to owners");
   }
-  if (listClosedCatalogEntryKeys(database, "workStatus").has(ticket.status)) {
+  if ((await listClosedCatalogEntryKeys(database, "workStatus")).has(ticket.status)) {
     throw badRequest("Closed tickets cannot be linked to owners");
   }
 
-  const existing = getOwnerTicketRow(database, owner, ticketId);
+  const ownerTicketRows = await selectOwnerTicketRows(database, owner);
+  const existing = getOwnerTicketRow(ownerTicketRows, ticketId);
   if (existing) {
     if (options.conflictOnExisting === true) {
       throw conflict(`Ticket ${ticketId} is already linked to ${owner.type} ${owner.id}`);
@@ -782,16 +757,16 @@ export function linkOwnerTicket(
   }
 
   if (owner.type !== "wikiPage") {
-    assertCompatibleProjectContexts(ticketOwnerProjectContext(database, owner), ticketProjectContext(database, ticketId));
+    assertCompatibleProjectContexts(await ticketOwnerProjectContext(database, owner), await ticketProjectContext(database, ticketId));
   }
 
-  const position = nextOwnerPosition(database, owner, ticket.status);
-  database.transaction((tx) => {
+  const position = await nextOwnerPosition(database, owner, ticket.status);
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    insertOwnerTicket(txDb, owner, ticketId, position);
+    await insertOwnerTicket(txDb, owner, ticketId, position);
     const ticketObject = ticketJournalObject(ticket);
-    const ownerObject = getOwnerJournalObject(txDb, owner);
-    recordJournalEntry(txDb, {
+    const ownerObject = await getOwnerJournalObject(txDb, owner);
+    await recordJournalEntry(txDb, {
       operation: "link",
       object: ticketObject,
       summary: buildLinkSummary(ownerObject, ticketObject),
@@ -802,18 +777,18 @@ export function linkOwnerTicket(
   return mapTicket(database, ticket, undefined, undefined, position);
 }
 
-export function unlinkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number, actor?: JournalActor | null): void {
-  ensureOwnerExists(database, owner);
-  const ticket = getTicketRecord(database, ticketId);
-  database.transaction((tx) => {
+export async function unlinkOwnerTicket(database: DbClient, owner: TicketOwner, ticketId: number, actor?: JournalActor | null): Promise<void> {
+  await ensureOwnerExists(database, owner);
+  const ticket = await getTicketRecord(database, ticketId);
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const changes = deleteOwnerTicketLink(txDb, owner, ticketId);
+    const changes = await deleteOwnerTicketLink(txDb, owner, ticketId);
     if (changes === 0) {
       throw notFound(`Ticket ${ticketId} is not linked to ${owner.type} ${owner.id}`);
     }
     const ticketObject = ticketJournalObject(ticket);
-    const ownerObject = getOwnerJournalObject(txDb, owner);
-    recordJournalEntry(txDb, {
+    const ownerObject = await getOwnerJournalObject(txDb, owner);
+    await recordJournalEntry(txDb, {
       operation: "unlink",
       object: ticketObject,
       summary: buildUnlinkSummary(ownerObject, ticketObject),
@@ -823,14 +798,14 @@ export function unlinkOwnerTicket(database: DbClient, owner: TicketOwner, ticket
   });
 }
 
-export function createSubTicket(database: DbClient, parentId: number, input: TicketInput, actor?: JournalActor | null): Ticket {
-  const parent = getTicketRecord(database, parentId);
-  const created = database.transaction((tx) => {
+export async function createSubTicket(database: DbClient, parentId: number, input: TicketInput, actor?: JournalActor | null): Promise<Ticket> {
+  const parent = await getTicketRecord(database, parentId);
+  const created = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const ticket = insertTicketRecord(txDb, { ...input, type: input.type ?? parent.type, priority: input.priority ?? parent.priority }, parentId, actor);
+    const ticket = await insertTicketRecord(txDb, { ...input, type: input.type ?? parent.type, priority: input.priority ?? parent.priority }, parentId, actor);
     const ticketObject = ticketJournalObject(ticket);
     const parentObject = ticketJournalObject(parent);
-    recordJournalEntry(txDb, {
+    await recordJournalEntry(txDb, {
       operation: "create",
       object: ticketObject,
       summary: buildCreateSummary(ticketObject),
@@ -839,11 +814,11 @@ export function createSubTicket(database: DbClient, parentId: number, input: Tic
     });
     return ticket;
   });
-  return mapTicket(database, created, [], 0);
+  return mapTicket(database, created, Promise.resolve([]), Promise.resolve(0));
 }
 
-export function updateTicket(database: DbClient, id: number, input: TicketUpdate, actor?: JournalActor | null): Ticket {
-  const existing = getTicketRecord(database, id);
+export async function updateTicket(database: DbClient, id: number, input: TicketUpdate, actor?: JournalActor | null): Promise<Ticket> {
+  const existing = await getTicketRecord(database, id);
   const values: Partial<
     Pick<
       TicketRecord,
@@ -866,31 +841,31 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
     values.title = requireNonEmpty(input.title, "title");
   }
   if (input.type !== undefined) {
-    ensureCatalogEntryExists(database, "ticketType", input.type);
+    await ensureCatalogEntryExists(database, "ticketType", input.type);
     values.type = input.type;
   }
   if (input.description !== undefined) {
     values.description = cleanNullable(input.description) ?? null;
   }
   if (input.status !== undefined) {
-    ensureCatalogEntryExists(database, "workStatus", input.status);
+    await ensureCatalogEntryExists(database, "workStatus", input.status);
     values.status = input.status;
-    if (isCatalogEntryClosed(database, "workStatus", input.status) && existing.resolvedAt === null && input.resolvedAt === undefined) {
+    if (await isCatalogEntryClosed(database, "workStatus", input.status) && existing.resolvedAt === null && input.resolvedAt === undefined) {
       values.resolvedAt = nowIso();
     }
   }
   if (input.priority !== undefined) {
-    ensureCatalogEntryExists(database, "priority", input.priority);
+    await ensureCatalogEntryExists(database, "priority", input.priority);
     values.priority = input.priority;
   }
   if (input.resolution !== undefined) {
     values.resolution = input.resolution;
   }
   if (input.reporterUserId !== undefined) {
-    values.reporterUserId = normalizeAssignableUserId(database, input.reporterUserId, "reporterUserId");
+    values.reporterUserId = await normalizeAssignableUserId(database, input.reporterUserId, "reporterUserId");
   }
   if (input.responsibleUserId !== undefined) {
-    values.responsibleUserId = normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
+    values.responsibleUserId = await normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
   }
   if (input.environment !== undefined) {
     values.environment = cleanNullable(input.environment) ?? null;
@@ -909,16 +884,16 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
     throw badRequest("No ticket fields provided");
   }
 
-  const updated = database.transaction((tx) => {
+  const updated = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const current = getTicketRecord(txDb, id);
-    const ticket = ticketRepository.update(txDb, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    const current = await getTicketRecord(txDb, id);
+    const ticket = await ticketRepository.update(txDb, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
     if (!ticket) {
       throw notFound(`Ticket with id ${id} not found`);
     }
     const ticketObject = ticketJournalObject(ticket);
     const changes = buildJournalChanges(current, ticket, ticketJournalFields);
-    recordJournalEntry(txDb, {
+    await recordJournalEntry(txDb, {
       operation: "update",
       object: ticketObject,
       summary: buildUpdateSummary(ticketObject, changes),
@@ -932,27 +907,27 @@ export function updateTicket(database: DbClient, id: number, input: TicketUpdate
   return mapTicket(database, updated);
 }
 
-export function updateTicketPosition(database: DbClient, id: number, input: TicketPositionInput, actor?: JournalActor | null): Ticket {
-  const existing = getTicketRecord(database, id);
-  ensureCatalogEntryExists(database, "workStatus", input.status);
+export async function updateTicketPosition(database: DbClient, id: number, input: TicketPositionInput, actor?: JournalActor | null): Promise<Ticket> {
+  const existing = await getTicketRecord(database, id);
+  await ensureCatalogEntryExists(database, "workStatus", input.status);
   const values: Partial<Pick<TicketRecord, "status" | "position" | "resolvedAt">> = {
     status: input.status,
     position: input.position
   };
 
-  if (isCatalogEntryClosed(database, "workStatus", input.status) && existing.resolvedAt === null) {
+  if (await isCatalogEntryClosed(database, "workStatus", input.status) && existing.resolvedAt === null) {
     values.resolvedAt = nowIso();
   }
 
-  const updated = database.transaction((tx) => {
+  const updated = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const ticket = ticketRepository.update(txDb, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    const ticket = await ticketRepository.update(txDb, id, input.expectedVersion, values, actor?.actorUserId ?? undefined);
     if (!ticket) {
       throw notFound(`Ticket with id ${id} not found`);
     }
     const ticketObject = ticketJournalObject(ticket);
     const changes = buildJournalChanges(existing, ticket, ticketJournalFields);
-    recordJournalEntry(txDb, { operation: "update", object: ticketObject, summary: buildUpdateSummary(ticketObject, changes), actor, changes });
+    await recordJournalEntry(txDb, { operation: "update", object: ticketObject, summary: buildUpdateSummary(ticketObject, changes), actor, changes });
     return ticket;
   });
 
@@ -960,39 +935,42 @@ export function updateTicketPosition(database: DbClient, id: number, input: Tick
 }
 
 export async function deleteTicket(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
-  const ticket = getTicketRecord(database, id);
-  const blockers = ticketDeleteBlockers(database, id);
+  const ticket = await getTicketRecord(database, id);
+  const blockers = await ticketDeleteBlockers(database, id);
   if (blockers.length > 0) {
     throw conflict(`Ticket kann nicht gelöscht werden, solange Beziehungen bestehen: ${blockers.join(", ")}.`);
   }
 
-  const ticketIds = collectTicketSubtreeIds(database, id);
+  const ticketIds = await collectTicketSubtreeIds(database, id);
 
   await deleteTicketAttachmentsForIds(database, ticketIds);
-  deleteTicketNotesForIds(database, ticketIds);
+  await deleteTicketNotesForIds(database, ticketIds);
+  await deleteTicketCommentsForIds(database, ticketIds);
 
-  database.transaction((tx) => {
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
     const ticketObject = ticketJournalObject(ticket);
-    recordJournalEntry(txDb, { operation: "delete", object: ticketObject, summary: buildDeleteSummary(ticketObject), actor });
-    if (ticketRepository.delete(txDb, id) === 0) {
+    await recordJournalEntry(txDb, { operation: "delete", object: ticketObject, summary: buildDeleteSummary(ticketObject), actor });
+    if (await ticketRepository.delete(txDb, id) === 0) {
       throw notFound(`Ticket with id ${id} not found`);
     }
   });
 }
 
-export function listTicketRelations(database: DbClient, ticketId: number): TicketRelationEntry[] {
-  getTicketRecord(database, ticketId);
+export async function listTicketRelations(database: DbClient, ticketId: number): Promise<TicketRelationEntry[]> {
+  await getTicketRecord(database, ticketId);
 
-  const outgoing = database.select().from(ticketRelations).where(eq(ticketRelations.sourceTicketId, ticketId)).all();
-  const incoming = database.select().from(ticketRelations).where(eq(ticketRelations.targetTicketId, ticketId)).all();
+  const [outgoing, incoming] = await Promise.all([
+    database.select().from(ticketRelations).where(eq(ticketRelations.sourceTicketId, ticketId)),
+    database.select().from(ticketRelations).where(eq(ticketRelations.targetTicketId, ticketId))
+  ]);
   const relatedIds = [...outgoing.map((relation) => relation.targetTicketId), ...incoming.map((relation) => relation.sourceTicketId)];
 
   if (relatedIds.length === 0) {
     return [];
   }
 
-  const relatedRows = database.select().from(tickets).where(inArray(tickets.id, relatedIds)).all();
+  const relatedRows = await database.select().from(tickets).where(inArray(tickets.id, relatedIds));
   const relatedById = new Map(relatedRows.map((ticket) => [ticket.id, ticket]));
   const entries: TicketRelationEntry[] = [];
 
@@ -1002,7 +980,7 @@ export function listTicketRelations(database: DbClient, ticketId: number): Ticke
       entries.push({
         id: relationEntryId(relation.sourceTicketId, relation.targetTicketId, relation.relationType, "outgoing"),
         relationType: relation.relationType,
-        ticket: mapTicket(database, related),
+        ticket: await mapTicket(database, related),
         direction: "outgoing"
       });
     }
@@ -1014,7 +992,7 @@ export function listTicketRelations(database: DbClient, ticketId: number): Ticke
       entries.push({
         id: relationEntryId(relation.sourceTicketId, relation.targetTicketId, relation.relationType, "incoming"),
         relationType: relation.relationType,
-        ticket: mapTicket(database, related),
+        ticket: await mapTicket(database, related),
         direction: "incoming"
       });
     }
@@ -1023,33 +1001,37 @@ export function listTicketRelations(database: DbClient, ticketId: number): Ticke
   return entries;
 }
 
-function ticketRelationPeerIds(database: DbClient, ticketId: number): Set<number> {
-  const rows = database
+async function ticketRelationPeerIds(database: DbClient, ticketId: number): Promise<Set<number>> {
+  const rows = await database
     .select({ sourceTicketId: ticketRelations.sourceTicketId, targetTicketId: ticketRelations.targetTicketId })
     .from(ticketRelations)
-    .where(or(eq(ticketRelations.sourceTicketId, ticketId), eq(ticketRelations.targetTicketId, ticketId)))
-    .all();
+    .where(or(eq(ticketRelations.sourceTicketId, ticketId), eq(ticketRelations.targetTicketId, ticketId)));
   return new Set(rows.map((row) => (row.sourceTicketId === ticketId ? row.targetTicketId : row.sourceTicketId)));
 }
 
-export function listTicketRelationCandidates(database: DbClient, ticketId: number): Ticket[] {
-  const source = getTicketRecord(database, ticketId);
-  const sourceContext = ticketProjectContext(database, ticketId);
-  const relatedTicketIds = ticketRelationPeerIds(database, ticketId);
-  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
+export async function listTicketRelationCandidates(database: DbClient, ticketId: number): Promise<Ticket[]> {
+  const source = await getTicketRecord(database, ticketId);
+  const sourceContext = await ticketProjectContext(database, ticketId);
+  const relatedTicketIds = await ticketRelationPeerIds(database, ticketId);
+  const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
   if (closedStatusKeys.has(source.status)) {
     return [];
   }
 
-  return listTickets(database).filter(
-    (ticket) => ticket.id !== ticketId && !relatedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status) && projectContextsAreCompatible(sourceContext, ticketProjectContext(database, ticket.id))
-  );
+  const allTickets = await listTickets(database);
+  const candidates: Ticket[] = [];
+  for (const ticket of allTickets) {
+    if (ticket.id !== ticketId && !relatedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status) && projectContextsAreCompatible(sourceContext, await ticketProjectContext(database, ticket.id))) {
+      candidates.push(ticket);
+    }
+  }
+  return candidates;
 }
 
-export function addTicketRelation(database: DbClient, ticketId: number, input: TicketRelationInput, actor?: JournalActor | null): void {
-  const source = getTicketRecord(database, ticketId);
-  const target = getTicketRecord(database, input.targetTicketId);
-  const closedStatusKeys = listClosedCatalogEntryKeys(database, "workStatus");
+export async function addTicketRelation(database: DbClient, ticketId: number, input: TicketRelationInput, actor?: JournalActor | null): Promise<void> {
+  const source = await getTicketRecord(database, ticketId);
+  const target = await getTicketRecord(database, input.targetTicketId);
+  const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
 
   if (ticketId === input.targetTicketId) {
     throw badRequest("Ticket cannot be related to itself");
@@ -1058,7 +1040,7 @@ export function addTicketRelation(database: DbClient, ticketId: number, input: T
     throw badRequest("Closed tickets cannot be linked to tickets");
   }
 
-  const existing = database
+  const existing = firstRow(await database
     .select()
     .from(ticketRelations)
     .where(
@@ -1067,29 +1049,27 @@ export function addTicketRelation(database: DbClient, ticketId: number, input: T
         eq(ticketRelations.targetTicketId, input.targetTicketId),
         eq(ticketRelations.relationType, input.relationType)
       )
-    )
-    .get();
+    ));
 
   if (existing) {
     throw badRequest("Ticket relation already exists");
   }
 
-  assertCompatibleProjectContexts(ticketProjectContext(database, ticketId), ticketProjectContext(database, input.targetTicketId));
+  assertCompatibleProjectContexts(await ticketProjectContext(database, ticketId), await ticketProjectContext(database, input.targetTicketId));
 
-  database.transaction((tx) => {
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    txDb
+    await txDb
       .insert(ticketRelations)
       .values({
         sourceTicketId: ticketId,
         targetTicketId: input.targetTicketId,
         relationType: input.relationType,
         createdAt: nowIso()
-      })
-      .run();
+      });
     const sourceObject = ticketJournalObject(source);
     const targetObject = ticketJournalObject(target);
-    recordJournalEntry(txDb, {
+    await recordJournalEntry(txDb, {
       operation: "link",
       object: sourceObject,
       summary: buildLinkSummary(sourceObject, targetObject),
@@ -1099,12 +1079,12 @@ export function addTicketRelation(database: DbClient, ticketId: number, input: T
   });
 }
 
-export function removeTicketRelation(database: DbClient, ticketId: number, targetTicketId: number, relationType: TicketRelationType, actor?: JournalActor | null): void {
-  const source = getTicketRecord(database, ticketId);
-  const target = getTicketRecord(database, targetTicketId);
-  database.transaction((tx) => {
+export async function removeTicketRelation(database: DbClient, ticketId: number, targetTicketId: number, relationType: TicketRelationType, actor?: JournalActor | null): Promise<void> {
+  const source = await getTicketRecord(database, ticketId);
+  const target = await getTicketRecord(database, targetTicketId);
+  await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
-    const result = txDb
+    const result = await txDb
       .delete(ticketRelations)
       .where(
         and(
@@ -1114,15 +1094,14 @@ export function removeTicketRelation(database: DbClient, ticketId: number, targe
             and(eq(ticketRelations.sourceTicketId, targetTicketId), eq(ticketRelations.targetTicketId, ticketId))
           )
         )
-      )
-      .run();
+      );
 
-    if (result.changes === 0) {
+    if (mutationAffectedRows(result) === 0) {
       throw notFound("Ticket relation not found");
     }
     const sourceObject = ticketJournalObject(source);
     const targetObject = ticketJournalObject(target);
-    recordJournalEntry(txDb, {
+    await recordJournalEntry(txDb, {
       operation: "unlink",
       object: sourceObject,
       summary: buildUnlinkSummary(sourceObject, targetObject),

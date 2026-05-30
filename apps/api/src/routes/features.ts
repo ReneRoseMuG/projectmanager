@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import { createFeature, deleteFeature, getFeature, listFeatures, updateFeature, type FeatureInput } from "../services/features.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
@@ -33,7 +33,7 @@ export async function registerFeaturesRoutes(app: FastifyInstance): Promise<void
   app.post<{ Body: FeatureInput }>(
     "/features",
     { schema: { body: featureBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createFeature(app.db, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createFeature(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(

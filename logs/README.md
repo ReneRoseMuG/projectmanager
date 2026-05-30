@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 29.05.26 | 10:32:01 | 2 | MySQL-Migrationsanalyse | ✅ |
+| 29.05.26 | 10:30:39 | 1 | Branching MS-26 | ✅ |
 | 29.05.26 | 09:52:58 | Nachtrag | MS-24 Formular-Testabdeckung | ⚠️ |
 | 29.05.26 | 09:17:55 | 4 | Formulare und Tests | ✅ |
 | 29.05.26 | 09:17:54 | 3 | Rich-Text-Editor | ✅ |

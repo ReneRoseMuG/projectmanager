@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -44,19 +44,19 @@ describe("Dashboard widget data API", () => {
     previousPreviewCacheDir = process.env.PREVIEW_CACHE_DIR;
     process.env.UPLOAD_DIR = uploadDir;
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true, enableMultipart: true });
   });
 
-  beforeEach(() => {
-    truncateAll(testDb.sqlite);
+  beforeEach(async () => {
+    await truncateAll(testDb.pool);
   });
 
   afterAll(async () => {
     if (app) {
-      await app.close();
+      await app?.close();
     }
-    testDb.sqlite.close();
+    await testDb?.close();
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
     if (previousUploadDir === undefined) {
