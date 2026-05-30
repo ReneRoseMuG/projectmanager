@@ -1,5 +1,6 @@
-import { eq, inArray } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { eq, inArray } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { tags } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -12,29 +13,29 @@ function nowIso(): string {
 }
 
 export const tagRepository = {
-  findById(database: DbClient, id: number): TagRecord | undefined {
-    return database.select().from(tags).where(eq(tags.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<TagRecord | undefined> {
+    return firstRow(await database.select().from(tags).where(eq(tags.id, id)));
   },
 
-  findByName(database: DbClient, name: string): TagRecord | undefined {
-    return database.select().from(tags).where(eq(tags.name, name)).get();
+  async findByName(database: DbSession, name: string): Promise<TagRecord | undefined> {
+    return firstRow(await database.select().from(tags).where(eq(tags.name, name)));
   },
 
-  findByIds(database: DbClient, ids: number[]): TagRecord[] {
+  async findByIds(database: DbSession, ids: number[]): Promise<TagRecord[]> {
     const uniqueIds = [...new Set(ids)];
     if (uniqueIds.length === 0) {
       return [];
     }
-    return database.select().from(tags).where(inArray(tags.id, uniqueIds)).all();
+    return database.select().from(tags).where(inArray(tags.id, uniqueIds));
   },
 
-  findAll(database: DbClient): TagRecord[] {
-    return database.select().from(tags).all();
+  async findAll(database: DbSession): Promise<TagRecord[]> {
+    return database.select().from(tags);
   },
 
-  create(database: DbClient, data: TagCreateData, userId?: number): TagRecord {
+  async create(database: DbSession, data: TagCreateData, userId?: number): Promise<TagRecord> {
     const now = nowIso();
-    return database
+    const result = await database
       .insert(tags)
       .values({
         ...data,
@@ -43,18 +44,21 @@ export const tagRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, insertId(result));
+    if (!created) {
+      throw new Error("Created tag could not be loaded");
+    }
+    return created;
   },
 
-  update(database: DbClient, id: number, expectedVersion: number, data: TagUpdateData, userId?: number): TagRecord | undefined {
-    const current = this.findById(database, id);
+  async update(database: DbSession, id: number, expectedVersion: number, data: TagUpdateData, userId?: number): Promise<TagRecord | undefined> {
+    const current = await this.findById(database, id);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    return database
+    await database
       .update(tags)
       .set({
         ...data,
@@ -62,12 +66,12 @@ export const tagRepository = {
         updatedBy: userId ?? null,
         updatedAt: nowIso()
       })
-      .where(eq(tags.id, id))
-      .returning()
-      .get();
+      .where(eq(tags.id, id));
+    return this.findById(database, id);
   },
 
-  delete(database: DbClient, id: number): number {
-    return database.delete(tags).where(eq(tags.id, id)).run().changes;
+  async delete(database: DbSession, id: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(tags).where(eq(tags.id, id)));
   }
 };
+

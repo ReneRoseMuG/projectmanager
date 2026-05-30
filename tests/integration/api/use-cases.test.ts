@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -24,17 +24,17 @@ describe("Use Cases API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => {
-    truncateAll(testDb.sqlite);
+  beforeEach(async () => {
+    await truncateAll(testDb.pool);
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("POST erstellt Use Case mit DB-Content", async () => {
@@ -48,7 +48,8 @@ describe("Use Cases API", () => {
     expect(res.body.featureId).toBe(feature.id);
     expect(res.body).not.toHaveProperty("slug");
     expect(res.body).not.toHaveProperty("contentPath");
-    const row = testDb.sqlite.prepare("SELECT content FROM use_cases WHERE id = ?").get(res.body.id) as { content: string };
+    const [ucRows1] = await testDb.pool.execute("SELECT content FROM use_cases WHERE id = ?", [res.body.id]);
+    const row = (ucRows1 as Array<{ content: string }>)[0];
     expect(row.content).toBe("# UC-01");
   });
 
@@ -112,8 +113,8 @@ describe("Use Cases API", () => {
 
     await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
-    const row = testDb.sqlite.prepare("SELECT id FROM use_cases WHERE id = ?").get(useCase.id);
-    expect(row).toBeUndefined();
+    const [existRows] = await testDb.pool.execute("SELECT id FROM use_cases WHERE id = ?", [useCase.id]);
+    expect((existRows as unknown[]).length).toBe(0);
     await supertest(app.server).get(`/api/use-cases/${useCase.id}`).expect(404);
   });
 
@@ -124,7 +125,8 @@ describe("Use Cases API", () => {
     const res = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ title: "Neuer Use Case", expectedVersion: useCase.version }).expect(200);
 
     expect(res.body).not.toHaveProperty("contentPath");
-    const row = testDb.sqlite.prepare("SELECT content FROM use_cases WHERE id = ?").get(useCase.id) as { content: string };
+    const [ucRows2] = await testDb.pool.execute("SELECT content FROM use_cases WHERE id = ?", [useCase.id]);
+    const row = (ucRows2 as Array<{ content: string }>)[0];
     expect(row.content).toBe("# Test Use Case");
   });
 
@@ -146,8 +148,8 @@ describe("Use Cases API", () => {
 
     await supertest(app.server).delete(`/api/use-cases/${useCase.id}`).expect(204);
 
-    const row = testDb.sqlite.prepare("SELECT id FROM use_cases WHERE id = ?").get(useCase.id);
-    expect(row).toBeUndefined();
+    const [existRows] = await testDb.pool.execute("SELECT id FROM use_cases WHERE id = ?", [useCase.id]);
+    expect((existRows as unknown[]).length).toBe(0);
     await supertest(app.server).get(`/api/use-cases/${useCase.id}`).expect(404);
   });
 
@@ -160,7 +162,8 @@ describe("Use Cases API", () => {
 
     const updated = await supertest(app.server).patch(`/api/use-cases/${useCase.id}`).send({ content: "# Neu", expectedVersion: useCase.version }).expect(200);
     expect(updated.body.content).toBe("# Neu");
-    const row = testDb.sqlite.prepare("SELECT content FROM use_cases WHERE id = ?").get(useCase.id) as { content: string };
+    const [ucRows2] = await testDb.pool.execute("SELECT content FROM use_cases WHERE id = ?", [useCase.id]);
+    const row = (ucRows2 as Array<{ content: string }>)[0];
     expect(row.content).toBe("# Neu");
   });
 });

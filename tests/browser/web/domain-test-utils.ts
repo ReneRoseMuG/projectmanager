@@ -112,9 +112,7 @@ export async function ensureApiAuth(request: APIRequestContext) {
 export async function authenticatedGoto(page: Page, path: string) {
   if (!authenticatedPages.has(page)) {
     await page.goto("/login");
-    await page.getByLabel("E-Mail").fill("admin@local");
-    await page.getByLabel("Passwort").fill("password123");
-    await page.getByRole("button", { name: "Anmelden" }).click();
+    await page.getByRole("button", { name: "Als Rene anmelden" }).click();
     await expect(
       page.getByRole("heading", { name: "Startseite", exact: true }),
     ).toBeVisible();

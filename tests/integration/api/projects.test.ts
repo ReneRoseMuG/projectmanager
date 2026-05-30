@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope: Projects API
  *
  * Covers project CRUD, defaults, card-footer counts, timestamps, and cascade behavior.
@@ -17,11 +17,9 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const uploadDir = path.join(os.tmpdir(), `taskmanager-api-project-counts-${process.pid}`);
 const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-project-count-previews-${process.pid}`);
 
-function insertWikiPage(testDb: TestDb, title = "Projekt-Wiki"): number {
-  const result = testDb.sqlite
-    .prepare("INSERT INTO wiki_pages (title, sort_order, version, created_at, updated_at) VALUES (?, 0, 1, datetime('now'), datetime('now'))")
-    .run(title);
-  return Number(result.lastInsertRowid);
+async function insertWikiPage(testDb: TestDb, title = "Projekt-Wiki"): Promise<number> {
+  const [result] = await testDb.pool.execute("INSERT INTO wiki_pages (title, sort_order, version, created_at, updated_at) VALUES (?, 0, 1, NOW(), NOW())", [title]);
+  return (result as { insertId: number }).insertId;
 }
 
 describe("Projects API", () => {
@@ -37,12 +35,12 @@ describe("Projects API", () => {
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
     config.uploadDir = uploadDir;
     config.previewCacheDir = previewCacheDir;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableMultipart: true });
   });
 
   beforeEach(async () => {
-    truncateAll(testDb.sqlite);
+    await truncateAll(testDb.pool);
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
     await fs.mkdir(uploadDir, { recursive: true });
@@ -50,8 +48,8 @@ describe("Projects API", () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
     config.uploadDir = originalUploadDir;
     config.previewCacheDir = originalPreviewCacheDir;
     await fs.rm(uploadDir, { recursive: true, force: true });
@@ -198,7 +196,7 @@ describe("Projects API", () => {
 
   it("PATCH /api/projects/:id setzt Wiki-Startseite", async () => {
     const project = await createProject(app);
-    const wikiPageId = insertWikiPage(testDb, "Projektstart");
+    const wikiPageId = await insertWikiPage(testDb, "Projektstart");
 
     const res = await supertest(app.server).patch(`/api/projects/${project.id}`).send({ wikiPageId, expectedVersion: project.version }).expect(200);
 
@@ -213,7 +211,7 @@ describe("Projects API", () => {
 
   it("PATCH /api/projects/:id loest Wiki-Startseite", async () => {
     const project = await createProject(app);
-    const wikiPageId = insertWikiPage(testDb, "Zu loesen");
+    const wikiPageId = await insertWikiPage(testDb, "Zu loesen");
     const linked = await supertest(app.server).patch(`/api/projects/${project.id}`).send({ wikiPageId, expectedVersion: project.version }).expect(200);
 
     const res = await supertest(app.server).patch(`/api/projects/${project.id}`).send({ wikiPageId: null, expectedVersion: linked.body.version }).expect(200);
@@ -223,7 +221,7 @@ describe("Projects API", () => {
 
   it("DELETE /api/wiki/:id setzt Projekt-Wiki-Startseite auf null", async () => {
     const project = await createProject(app);
-    const wikiPageId = insertWikiPage(testDb, "Cascade Wiki");
+    const wikiPageId = await insertWikiPage(testDb, "Cascade Wiki");
     await supertest(app.server).patch(`/api/projects/${project.id}`).send({ wikiPageId, expectedVersion: project.version }).expect(200);
 
     await supertest(app.server).delete(`/api/wiki/${wikiPageId}`).expect(204);

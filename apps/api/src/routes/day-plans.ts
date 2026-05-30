@@ -1,4 +1,4 @@
-import type { DayPlanUpdate, EventInput, TaskInput } from "@taskmanager/shared-types";
+﻿import type { DayPlanUpdate, EventInput, TaskInput } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
 import { requireCurrentUser } from "../plugins/auth.js";
 import {
@@ -121,7 +121,7 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     { schema: { params: dateParamSchema, body: taskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
       const currentUser = await requireCurrentUser(request);
-      const task = createDayPlanTask(app.db, currentUser.id, request.params.date, request.body, createJournalActor(currentUser));
+      const task = await createDayPlanTask(app.db, currentUser.id, request.params.date, request.body, createJournalActor(currentUser));
       return reply.status(201).send(task);
     }
   );
@@ -140,7 +140,7 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     { schema: { params: dateTaskParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
       const currentUser = await requireCurrentUser(request);
-      unlinkDayPlanTask(app.db, currentUser.id, request.params.date, request.params.taskId, createJournalActor(currentUser));
+      await unlinkDayPlanTask(app.db, currentUser.id, request.params.date, request.params.taskId, createJournalActor(currentUser));
       return reply.status(204).send();
     }
   );
@@ -150,7 +150,7 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     { schema: { params: dateParamSchema, body: eventBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
       const currentUser = await requireCurrentUser(request);
-      const event = createDayPlanEvent(app.db, currentUser.id, request.params.date, request.body, createJournalActor(currentUser));
+      const event = await createDayPlanEvent(app.db, currentUser.id, request.params.date, request.body, createJournalActor(currentUser));
       return reply.status(201).send(event);
     }
   );
@@ -169,7 +169,7 @@ export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void>
     { schema: { params: dateEventParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
       const currentUser = await requireCurrentUser(request);
-      unlinkDayPlanEvent(app.db, currentUser.id, request.params.date, request.params.eventId, createJournalActor(currentUser));
+      await unlinkDayPlanEvent(app.db, currentUser.id, request.params.date, request.params.eventId, createJournalActor(currentUser));
       return reply.status(204).send();
     }
   );

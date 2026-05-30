@@ -20,6 +20,7 @@ import {
   type JournalFieldDefinition,
   type JournalObjectRef
 } from "./journal.service.js";
+import { deleteMilestoneCommentsForIds } from "./comments.service.js";
 import { deleteMilestoneNotesForIds } from "./notes.service.js";
 import { getMilestoneTags, getMilestoneTagsMap } from "./tags.service.js";
 import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
@@ -313,6 +314,7 @@ export async function deleteMilestone(database: DbClient, id: number, actor?: Jo
 
   await deleteMilestoneAttachmentsForIds(database, [id]);
   await deleteMilestoneNotesForIds(database, [id]);
+  await deleteMilestoneCommentsForIds(database, [id]);
 
   await database.transaction(async (tx) => {
     const journalObject = milestoneJournalObject(milestone);
@@ -334,4 +336,5 @@ export async function deleteMilestoneOwnedSupportForProjectIds(database: DbClien
   const milestoneIds = rows.map((row) => row.id);
   await deleteMilestoneAttachmentsForIds(database, milestoneIds);
   await deleteMilestoneNotesForIds(database, milestoneIds);
+  await deleteMilestoneCommentsForIds(database, milestoneIds);
 }

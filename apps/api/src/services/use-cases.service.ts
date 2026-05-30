@@ -7,6 +7,7 @@ import { assertVersion } from "../repositories/base.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { useCaseRepository, type UseCaseRecord, type UseCaseUpdateData } from "../repositories/use-case.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
+import { deleteUseCaseCommentsForIds } from "./comments.service.js";
 import { readContentFromDb } from "./content.service.js";
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
@@ -301,6 +302,7 @@ export async function updateUseCase(database: DbClient, id: number, input: UseCa
 
 export async function deleteUseCase(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
   const useCase = await getUseCaseRecord(database, id);
+  await deleteUseCaseCommentsForIds(database, [id]);
   const featureObject = await getFeatureJournalObject(database, useCase.featureId);
   await database.transaction(async (tx) => {
     const journalObject = useCaseJournalObject(useCase);

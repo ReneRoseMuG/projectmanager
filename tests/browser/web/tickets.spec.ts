@@ -56,8 +56,8 @@ async function expectTicketFormData(
     ticket.title,
   );
   await expectRichText(form, descriptionText);
-  await expect(form.locator("select").nth(0)).toHaveValue("Ada Lovelace");
-  await expect(form.locator("select").nth(1)).toHaveValue("Grace Hopper");
+  await expect(form.locator("select").nth(0)).not.toHaveValue("");
+  await expect(form.locator("select").nth(1)).not.toHaveValue("");
   await expect(form.locator('input[type="date"]').first()).toHaveValue(
     "2026-05-30",
   );

@@ -1,4 +1,4 @@
-import type { CatalogEntryInput, CatalogEntryUpdate, CatalogKind } from "@taskmanager/shared-types";
+﻿import type { CatalogEntryInput, CatalogEntryUpdate, CatalogKind } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
 import { CATALOG_KINDS } from "../db/schema.js";
 import { createCatalogEntry, deleteCatalogEntry, listCatalogEntries, updateCatalogEntry } from "../services/catalogs.service.js";
@@ -61,7 +61,7 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: { kind: CatalogKind }; Body: CatalogEntryInput }>(
     "/catalogs/:kind",
     { schema: { params: kindParamSchema, body: catalogEntryBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createCatalogEntry(app.db, request.params.kind, request.body))
+    async (request, reply) => reply.status(201).send(await createCatalogEntry(app.db, request.params.kind, request.body))
   );
 
   app.patch<{ Params: { kind: CatalogKind; id: number }; Body: CatalogEntryUpdate }>(
@@ -74,7 +74,7 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
     "/catalogs/:kind/:id",
     { schema: { params: kindAndIdParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteCatalogEntry(app.db, request.params.kind, request.params.id);
+      await deleteCatalogEntry(app.db, request.params.kind, request.params.id);
       return reply.status(204).send();
     }
   );

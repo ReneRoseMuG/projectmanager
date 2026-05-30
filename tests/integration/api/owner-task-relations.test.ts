@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -78,15 +78,15 @@ describe("Owner task relation API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => { await truncateAll(testDb.pool); });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   for (const ownerCase of ownerCases) {

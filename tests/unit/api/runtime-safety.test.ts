@@ -1,9 +1,7 @@
-import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   apiRoot,
-  assertSafeTestDatabasePath,
   assertSafeTestDirectoryPath,
   assertSafeTestRuntimeTargets,
   isTestRuntime,
@@ -15,14 +13,14 @@ import {
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Test-Runtimes dürfen keine App-DB und keine App-Dateiverzeichnisse verwenden.
+ * - Test-Runtimes dürfen keine App-Dateiverzeichnisse verwenden.
  * - Temp-Verzeichnisse und tests/.runtime sind als isolierte Testziele erlaubt.
  *
  * Fehlerfälle:
- * - Standard-DB, uploads/, previews/, content/ und backups/ werden im Testmodus blockiert.
+ * - uploads/, previews/, content/ und backups/ werden im Testmodus blockiert.
  *
  * Ziel:
- * Datenbank- und Dateisystemtests technisch gegen produktive Laufzeitpfade absichern.
+ * Dateisystemtests technisch gegen produktive Laufzeitpfade absichern.
  */
 
 const originalNodeEnv = process.env.NODE_ENV;
@@ -50,21 +48,6 @@ describe("runtime safety guard", () => {
     expect(isTestRuntime({ VITEST: "true" })).toBe(true);
   });
 
-  it("blockiert die normale App-Datenbank im Testmodus", () => {
-    enableTestRuntime();
-
-    expect(() => assertSafeTestDatabasePath(path.join(apiRoot, "data", "taskmanager.sqlite"))).toThrow(/application data directory/);
-    expect(() => assertSafeTestDatabasePath(path.join(apiRoot, "data", "test.sqlite"))).toThrow(/application data directory/);
-  });
-
-  it("erlaubt nur isolierte Datenbanken im Testmodus", () => {
-    enableTestRuntime();
-
-    expect(() => assertSafeTestDatabasePath(":memory:")).not.toThrow();
-    expect(() => assertSafeTestDatabasePath(path.join(os.tmpdir(), "taskmanager-test.sqlite"))).not.toThrow();
-    expect(() => assertSafeTestDatabasePath(path.join(testRuntimeRoot, "e2e", "taskmanager.sqlite"))).not.toThrow();
-  });
-
   it("blockiert normale App-Dateiverzeichnisse im Testmodus", () => {
     enableTestRuntime();
 
@@ -79,7 +62,6 @@ describe("runtime safety guard", () => {
 
     expect(() =>
       assertSafeTestRuntimeTargets({
-        databasePath: path.join(testRuntimeRoot, "e2e", "data", "taskmanager.sqlite"),
         uploadDir: path.join(testRuntimeRoot, "e2e", "uploads"),
         previewCacheDir: path.join(testRuntimeRoot, "e2e", "previews"),
         contentDir: path.join(testRuntimeRoot, "e2e", "content"),

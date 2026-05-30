@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -59,18 +59,18 @@ describe("Settings API", () => {
   beforeAll(async () => {
     originalAdminInitialPassword = config.adminInitialPassword;
     config.adminInitialPassword = "password123";
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true });
   });
 
-  beforeEach(() => {
-    truncateAll(testDb.sqlite);
+  beforeEach(async () => {
+    await truncateAll(testDb.pool);
   });
 
   afterAll(async () => {
     config.adminInitialPassword = originalAdminInitialPassword;
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("schützt Settings-Routen vor nicht authentifizierten Zugriffen", async () => {
@@ -181,7 +181,7 @@ describe("Settings API", () => {
     const readerToastSetting = settingByKey(readerResponse.body.settings as ResolvedSetting[], "ui.toastPosition");
     expect(readerToastSetting).toMatchObject({ resolvedValue: "bottom-left", resolvedScope: "GLOBAL", resolvedVersion: 1 });
 
-    testDb.sqlite.prepare("UPDATE settings_values SET value_json = '\"center\"' WHERE setting_key = 'ui.toastPosition' AND scope_type = 'GLOBAL'").run();
+    await testDb.pool.execute(`UPDATE settings_values SET value_json = '"center"' WHERE setting_key = 'ui.toastPosition' AND scope_type = 'GLOBAL'`);
 
     const fallbackResponse = await reader.get("/api/settings/resolved").expect(200);
     const fallbackToastSetting = settingByKey(fallbackResponse.body.settings as ResolvedSetting[], "ui.toastPosition");

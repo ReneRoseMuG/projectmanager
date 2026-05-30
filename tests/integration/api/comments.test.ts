@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope: Comments API
  *
  * Covers comment creation, validation, listing order, deletion, and missing resources.
@@ -30,15 +30,15 @@ describe("Comments API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => { await truncateAll(testDb.pool); });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("POST /api/tasks/:id/comments erstellt einen Kommentar", async () => {

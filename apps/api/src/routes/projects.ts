@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import type { ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { createProject, deleteProject, getProject, listProjects, updateProject } from "../services/projects.service.js";
 import { createJournalActor } from "../services/journal.service.js";
@@ -37,7 +37,7 @@ export async function registerProjectsRoutes(app: FastifyInstance): Promise<void
     "/projects",
     { schema: { body: projectBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const project = createProject(app.db, request.body, createJournalActor(request.currentUser));
+      const project = await createProject(app.db, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(project);
     }
   );

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -45,17 +45,17 @@ describe("Dashboard API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true });
   });
 
-  beforeEach(() => {
-    truncateAll(testDb.sqlite);
+  beforeEach(async () => {
+    await truncateAll(testDb.pool);
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("liefert System-Standarddashboards für Leser und blockiert anonyme oder schreibende Leser-Zugriffe", async () => {

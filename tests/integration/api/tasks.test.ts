@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope: Tasks API
  *
  * Covers task CRUD, owner-board positions, task details, status transitions, and cascades.
@@ -42,12 +42,12 @@ describe("Tasks API", () => {
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
     config.uploadDir = uploadDir;
     config.previewCacheDir = previewCacheDir;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableMultipart: true });
   });
 
   beforeEach(async () => {
-    truncateAll(testDb.sqlite);
+    await truncateAll(testDb.pool);
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
     await fs.mkdir(uploadDir, { recursive: true });
@@ -55,8 +55,8 @@ describe("Tasks API", () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
     config.uploadDir = originalUploadDir;
     config.previewCacheDir = originalPreviewCacheDir;
     await fs.rm(uploadDir, { recursive: true, force: true });

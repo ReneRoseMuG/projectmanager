@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import {
   createTag,
   deleteTag,
@@ -37,7 +37,7 @@ export async function registerTagsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: { name?: string; color?: string } }>(
     "/tags",
     { schema: { body: tagBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createTag(app.db, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createTag(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
   app.patch<{ Params: { id: number }; Body: { name?: string; color?: string; expectedVersion: number } }>(
@@ -50,7 +50,7 @@ export async function registerTagsRoutes(app: FastifyInstance): Promise<void> {
     "/tags/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteTag(app.db, request.params.id, createJournalActor(request.currentUser));
+      await deleteTag(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

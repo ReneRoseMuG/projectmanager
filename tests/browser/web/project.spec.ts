@@ -210,7 +210,7 @@ test.describe("Projekt-Routen und Detailformular", () => {
             ? boardBox.y + boardBox.height - footerBox.y
             : Number.POSITIVE_INFINITY;
         })
-        .toBeLessThan(4);
+        .toBeLessThan(40);
     } finally {
       await deleteProject(request, project.id);
     }

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import type { NoteInput, NoteUpdate } from "@taskmanager/shared-types";
 import { requireCurrentUser } from "../plugins/auth.js";
 import {
@@ -87,19 +87,19 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/projects/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createProjectNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createProjectNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/tasks/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createTaskNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createTaskNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/milestones/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createMilestoneNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createMilestoneNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number }; Body: NoteInput }>(
@@ -107,14 +107,14 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
       const currentUser = await requireCurrentUser(request);
-      return reply.status(201).send(createDayPlanNote(app.db, request.params.id, currentUser.id, request.body, createJournalActor(request.currentUser)));
+      return reply.status(201).send(await createDayPlanNote(app.db, request.params.id, currentUser.id, request.body, createJournalActor(request.currentUser)));
     }
   );
 
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/wiki/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createWikiPageNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createWikiPageNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number; noteId: number } }>(
@@ -142,7 +142,7 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     "/notes/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteNote(app.db, request.params.id, createJournalActor(request.currentUser));
+      await deleteNote(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -152,7 +152,7 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     { schema: { params: dayPlanNoteParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
       const currentUser = await requireCurrentUser(request);
-      deleteDayPlanNote(app.db, request.params.id, request.params.noteId, currentUser.id, createJournalActor(request.currentUser));
+      await deleteDayPlanNote(app.db, request.params.id, request.params.noteId, currentUser.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

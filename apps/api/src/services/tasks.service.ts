@@ -1,4 +1,4 @@
-import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskStats, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
+﻿import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskStats, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { dayPlanTasks, featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks, wikiPageTasks, wikiPages } from "../db/schema.js";
@@ -23,6 +23,7 @@ import {
   type JournalFieldDefinition,
   type JournalObjectRef
 } from "./journal.service.js";
+import { deleteTaskCommentsForIds } from "./comments.service.js";
 import { deleteTaskNotesForIds, listTaskNotes } from "./notes.service.js";
 import { assertCompatibleProjectContexts, projectContextsAreCompatible, taskOwnerProjectContext, taskProjectContext } from "./project-context.service.js";
 import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
@@ -871,6 +872,7 @@ export async function deleteTask(database: DbClient, id: number, actor?: Journal
 
   await deleteTaskAttachmentsForIds(database, taskIds);
   await deleteTaskNotesForIds(database, taskIds);
+  await deleteTaskCommentsForIds(database, taskIds);
 
   await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;

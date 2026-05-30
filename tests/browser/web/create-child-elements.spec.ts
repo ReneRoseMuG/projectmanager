@@ -12,6 +12,7 @@ import {
   deleteTask,
   deleteTicket,
   ensureApiAuth,
+  fillRichText,
   formPage,
   itemCard,
   safeFilename,
@@ -65,10 +66,13 @@ async function openFormTab(form: Locator, label: string) {
   await tabButton(form, label).click();
 }
 
-async function addPendingComment(scope: Locator, text: string) {
-  await scope.getByPlaceholder("Kommentar vormerken").fill(text);
-  await scope.getByRole("button", { name: "Hinzufügen" }).click();
-  await expect(scope).toContainText(text);
+async function addPendingComment(page: Page, scope: Locator, text: string) {
+  await scope.getByRole("button", { name: "Kommentar vormerken" }).click();
+  // Modal portals outside scope — use page to find it
+  const modal = formPage(page, "Kommentar vormerken");
+  await fillRichText(modal, "pending-comment-create-editor", text);
+  await modal.getByRole("button", { name: "Hinzufügen" }).click();
+  await expect(scope).toContainText("Vorgemerkter Kommentar");
 }
 
 async function addPendingNote(page: Page, form: Locator, title: string) {
@@ -96,7 +100,7 @@ async function addPendingFile(form: Locator, filename: string) {
 async function addPendingChildren(page: Page, form: Locator, children: PendingChildren) {
   if (children.comment) {
     await openFormTab(form, "Kommentare");
-    await addPendingComment(form, children.comment);
+    await addPendingComment(page, form, children.comment);
   }
   if (children.note) {
     await addPendingNote(page, form, children.note);
@@ -353,7 +357,7 @@ test.describe("Create-Flows verknüpfen vorgemerkte Kindobjekte", () => {
       await authenticatedGoto(page, `/backlog/new?projectId=${project.id}`);
       const form = formPage(page, "Backlog-Item anlegen");
       await form.locator("input[required]").first().fill(backlogTitle);
-      await addPendingComment(form, children.comment ?? "");
+      await addPendingComment(page, form, children.comment ?? "");
 
       const createResponsePromise = waitForApiPost(page, `/api/projects/${project.id}/backlog`);
       await form.getByRole("button", { name: "Speichern" }).click();
@@ -379,7 +383,8 @@ test.describe("Create-Flows verknüpfen vorgemerkte Kindobjekte", () => {
       const form = formPage(page, "Wiki-Seite anlegen");
       await form.locator("input[required]").first().fill(pageTitle);
       const titledForm = formPage(page, pageTitle);
-      await addPendingComment(titledForm, children.comment ?? "");
+      await openFormTab(titledForm, "Kommentare");
+      await addPendingComment(page, titledForm, children.comment ?? "");
 
       const createResponsePromise = waitForApiPost(page, "/api/wiki");
       await titledForm.getByRole("button", { name: "Veröffentlichen" }).click();

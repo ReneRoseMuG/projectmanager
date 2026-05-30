@@ -1,6 +1,7 @@
-import type { DashboardContext, DashboardDefaultScope, DashboardWidgetLayout } from "@taskmanager/shared-types";
+﻿import type { DashboardContext, DashboardDefaultScope, DashboardWidgetLayout } from "@taskmanager/shared-types";
 import { and, asc, eq, inArray, or } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { dashboardDefaults, dashboardWidgets, dashboards } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -38,24 +39,23 @@ function widgetValues(dashboardId: number, widgets: DashboardWidgetLayout[]): Ar
 }
 
 export const dashboardRepository = {
-  findById(database: DbClient, id: number): DashboardRecord | undefined {
-    return database.select().from(dashboards).where(eq(dashboards.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<DashboardRecord | undefined> {
+    return firstRow(await database.select().from(dashboards).where(eq(dashboards.id, id)));
   },
 
-  findByTemplateKey(database: DbClient, templateKey: string): DashboardRecord | undefined {
-    return database.select().from(dashboards).where(eq(dashboards.templateKey, templateKey)).get();
+  async findByTemplateKey(database: DbSession, templateKey: string): Promise<DashboardRecord | undefined> {
+    return firstRow(await database.select().from(dashboards).where(eq(dashboards.templateKey, templateKey)));
   },
 
-  findByContextForUser(database: DbClient, context: DashboardContext, userId: number): DashboardRecord[] {
+  async findByContextForUser(database: DbSession, context: DashboardContext, userId: number): Promise<DashboardRecord[]> {
     return database
       .select()
       .from(dashboards)
       .where(and(eq(dashboards.context, context), or(eq(dashboards.isSystem, true), eq(dashboards.ownerId, userId))))
-      .orderBy(asc(dashboards.isSystem), asc(dashboards.name), asc(dashboards.id))
-      .all();
+      .orderBy(asc(dashboards.isSystem), asc(dashboards.name), asc(dashboards.id));
   },
 
-  findWidgetsByDashboardIds(database: DbClient, dashboardIds: number[]): DashboardWidgetRecord[] {
+  async findWidgetsByDashboardIds(database: DbSession, dashboardIds: number[]): Promise<DashboardWidgetRecord[]> {
     if (dashboardIds.length === 0) {
       return [];
     }
@@ -63,19 +63,17 @@ export const dashboardRepository = {
       .select()
       .from(dashboardWidgets)
       .where(inArray(dashboardWidgets.dashboardId, dashboardIds))
-      .orderBy(asc(dashboardWidgets.row), asc(dashboardWidgets.col), asc(dashboardWidgets.id))
-      .all();
+      .orderBy(asc(dashboardWidgets.row), asc(dashboardWidgets.col), asc(dashboardWidgets.id));
   },
 
-  findDefault(database: DbClient, scope: DashboardDefaultScopeRef): DashboardDefaultRecord | undefined {
-    return database
+  async findDefault(database: DbSession, scope: DashboardDefaultScopeRef): Promise<DashboardDefaultRecord | undefined> {
+    return firstRow(await database
       .select()
       .from(dashboardDefaults)
-      .where(and(eq(dashboardDefaults.scopeType, scope.scopeType), eq(dashboardDefaults.scopeId, scope.scopeId), eq(dashboardDefaults.context, scope.context)))
-      .get();
+      .where(and(eq(dashboardDefaults.scopeType, scope.scopeType), eq(dashboardDefaults.scopeId, scope.scopeId), eq(dashboardDefaults.context, scope.context))));
   },
 
-  findDefaultsForContext(database: DbClient, context: DashboardContext, userId: number): DashboardDefaultRecord[] {
+  async findDefaultsForContext(database: DbSession, context: DashboardContext, userId: number): Promise<DashboardDefaultRecord[]> {
     return database
       .select()
       .from(dashboardDefaults)
@@ -87,13 +85,12 @@ export const dashboardRepository = {
             and(eq(dashboardDefaults.scopeType, "USER"), eq(dashboardDefaults.scopeId, String(userId)))
           )
         )
-      )
-      .all();
+      );
   },
 
-  create(database: DbClient, data: DashboardCreateData, widgets: DashboardWidgetLayout[], userId?: number): DashboardRecord {
+  async create(database: DbSession, data: DashboardCreateData, widgets: DashboardWidgetLayout[], userId?: number): Promise<DashboardRecord> {
     const now = nowIso();
-    const dashboard = database
+    const result = await database
       .insert(dashboards)
       .values({
         name: data.name,
@@ -106,23 +103,25 @@ export const dashboardRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const dashboard = await this.findById(database, insertId(result));
+    if (!dashboard) {
+      throw new Error("Created dashboard could not be loaded");
+    }
     const values = widgetValues(dashboard.id, widgets);
     if (values.length > 0) {
-      database.insert(dashboardWidgets).values(values).run();
+      await database.insert(dashboardWidgets).values(values);
     }
     return dashboard;
   },
 
-  update(database: DbClient, id: number, expectedVersion: number, data: Pick<DashboardCreateData, "name" | "context" | "isSystem" | "ownerId">, widgets: DashboardWidgetLayout[], userId?: number): DashboardRecord | undefined {
-    const current = this.findById(database, id);
+  async update(database: DbSession, id: number, expectedVersion: number, data: Pick<DashboardCreateData, "name" | "context" | "isSystem" | "ownerId">, widgets: DashboardWidgetLayout[], userId?: number): Promise<DashboardRecord | undefined> {
+    const current = await this.findById(database, id);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    const updated = database
+    await database
       .update(dashboards)
       .set({
         name: data.name,
@@ -133,26 +132,28 @@ export const dashboardRepository = {
         updatedBy: userId ?? null,
         updatedAt: nowIso()
       })
-      .where(eq(dashboards.id, id))
-      .returning()
-      .get();
-    database.delete(dashboardWidgets).where(eq(dashboardWidgets.dashboardId, id)).run();
+      .where(eq(dashboards.id, id));
+    const updated = await this.findById(database, id);
+    if (!updated) {
+      throw new Error("Updated dashboard could not be loaded");
+    }
+    await database.delete(dashboardWidgets).where(eq(dashboardWidgets.dashboardId, id));
     const values = widgetValues(id, widgets);
     if (values.length > 0) {
-      database.insert(dashboardWidgets).values(values).run();
+      await database.insert(dashboardWidgets).values(values);
     }
     return updated;
   },
 
-  delete(database: DbClient, id: number): number {
-    return database.delete(dashboards).where(eq(dashboards.id, id)).run().changes;
+  async delete(database: DbSession, id: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(dashboards).where(eq(dashboards.id, id)));
   },
 
-  setDefault(database: DbClient, scope: DashboardDefaultScopeRef, dashboardId: number, expectedVersion: number, userId?: number): DashboardDefaultRecord {
-    const current = this.findDefault(database, scope);
+  async setDefault(database: DbSession, scope: DashboardDefaultScopeRef, dashboardId: number, expectedVersion: number, userId?: number): Promise<DashboardDefaultRecord> {
+    const current = await this.findDefault(database, scope);
     if (current) {
       assertVersion(current.version, expectedVersion);
-      return database
+      await database
         .update(dashboardDefaults)
         .set({
           dashboardId,
@@ -160,13 +161,16 @@ export const dashboardRepository = {
           updatedBy: userId ?? null,
           updatedAt: nowIso()
         })
-        .where(eq(dashboardDefaults.id, current.id))
-        .returning()
-        .get();
+        .where(eq(dashboardDefaults.id, current.id));
+      const updated = await this.findDefault(database, scope);
+      if (!updated) {
+        throw new Error("Updated dashboard default could not be loaded");
+      }
+      return updated;
     }
     assertVersion(0, expectedVersion);
     const now = nowIso();
-    return database
+    const result = await database
       .insert(dashboardDefaults)
       .values({
         scopeType: scope.scopeType,
@@ -178,8 +182,12 @@ export const dashboardRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = firstRow(await database.select().from(dashboardDefaults).where(eq(dashboardDefaults.id, insertId(result))));
+    if (!created) {
+      throw new Error("Created dashboard default could not be loaded");
+    }
+    return created;
   }
 };
+

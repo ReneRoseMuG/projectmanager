@@ -1,0 +1,14 @@
+{
+  "version": "6",
+  "dialect": "mysql",
+  "id": "42d00f89-0ba2-48f6-9c74-e44f7bf4e35a",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "tables": {},
+  "indexes": {},
+  "foreignKeys": {},
+  "compositePrimaryKeys": {},
+  "uniqueConstraints": {},
+  "checkConstraints": {}
+}

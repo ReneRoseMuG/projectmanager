@@ -1,4 +1,4 @@
-import type { JsonValue, WikiPageRelationSummary } from "@taskmanager/shared-types";
+﻿import type { JsonValue, WikiPageRelationSummary } from "@taskmanager/shared-types";
 import { and, eq, inArray, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { wikiPageAttachments, wikiPageRelations, wikiPageTasks, wikiPageTickets } from "../db/schema.js";
@@ -9,6 +9,7 @@ import { wikiPageRepository, type WikiPageRecord, type WikiPageUpdateData } from
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { readContentFromDb } from "./content.service.js";
 import { requireNonEmpty } from "./helpers.js";
+import { deleteWikiPageCommentsForIds } from "./comments.service.js";
 import { deleteWikiPageNotesForIds } from "./notes.service.js";
 import {
   buildLinkSummary,
@@ -359,6 +360,7 @@ export async function deleteWikiPage(database: DbClient, id: number, actor?: Jou
   }
 
   await deleteWikiPageNotesForIds(database, [id]);
+  await deleteWikiPageCommentsForIds(database, [id]);
 
   await database.transaction(async (tx) => {
     const journalObject = wikiJournalObject(page);

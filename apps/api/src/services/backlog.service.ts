@@ -1,3 +1,4 @@
+﻿import { deleteBacklogItemCommentsForIds } from "./comments.service.js";
 import { eq } from "drizzle-orm";
 import type { UserSummary, VisibleParentContext } from "@taskmanager/shared-types";
 import type { DbClient } from "../db/client.js";
@@ -295,6 +296,7 @@ export async function updateBacklogItem(database: DbClient, id: number, input: B
 
 export async function deleteBacklogItem(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
   const current = await getBacklogRecord(database, id);
+  await deleteBacklogItemCommentsForIds(database, [id]);
   await database.transaction(async (tx) => {
     const journalObject = backlogJournalObject(current);
     await recordJournalEntry(tx, {

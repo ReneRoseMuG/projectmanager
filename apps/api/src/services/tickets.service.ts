@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Ticket,
   TicketDetail,
   TicketInput,
@@ -19,7 +19,7 @@ import { ticketRepository, type TicketRecord } from "../repositories/ticket.repo
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
 import { ensureCatalogEntryExists, isCatalogEntryClosed, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
-import { listEntityComments } from "./comments.service.js";
+import { deleteTicketCommentsForIds, listEntityComments } from "./comments.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 import {
   buildCreateSummary,
@@ -945,6 +945,7 @@ export async function deleteTicket(database: DbClient, id: number, actor?: Journ
 
   await deleteTicketAttachmentsForIds(database, ticketIds);
   await deleteTicketNotesForIds(database, ticketIds);
+  await deleteTicketCommentsForIds(database, ticketIds);
 
   await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;

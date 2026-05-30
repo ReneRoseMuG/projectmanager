@@ -21,7 +21,27 @@ if not defined APP_DIR (
 cd /d "%APP_DIR%"
 set "APP_DIR=%CD%"
 set "API_DIR=%APP_DIR%\apps\api"
-set "DATABASE_PATH=%API_DIR%\data\taskmanager.sqlite"
+
+REM MySQL-Datenbankverbindung (aus .env oder Umgebungsvariablen)
+if exist "%API_DIR%\.env" (
+  echo Lade MySQL-Konfiguration aus %API_DIR%\.env
+  for /f "usebackq tokens=1,* delims==" %%a in ("%API_DIR%\.env") do (
+    if "%%a"=="DB_HOST" set "DB_HOST=%%b"
+    if "%%a"=="DB_PORT" set "DB_PORT=%%b"
+    if "%%a"=="DB_NAME" set "DB_NAME=%%b"
+    if "%%a"=="DB_USER" set "DB_USER=%%b"
+    if "%%a"=="DB_PASSWORD" set "DB_PASSWORD=%%b"
+    if "%%a"=="DB_SSL" set "DB_SSL=%%b"
+  )
+)
+
+if not defined DB_HOST set "DB_HOST=localhost"
+if not defined DB_PORT set "DB_PORT=3306"
+if not defined DB_NAME set "DB_NAME=taskmanager"
+if not defined DB_USER set "DB_USER=taskmanager"
+if not defined DB_PASSWORD set "DB_PASSWORD="
+if not defined DB_SSL set "DB_SSL=false"
+
 set "UPLOAD_DIR=%API_DIR%\uploads"
 set "PREVIEW_CACHE_DIR=%API_DIR%\previews"
 set "CONTENT_DIR=%API_DIR%\content"
@@ -35,7 +55,7 @@ set "AUTH_BYPASS_ADMIN=true"
 
 echo Starte Projekt Manager im lokalen Produktionsmodus.
 echo Projektordner: %APP_DIR%
-echo Geschützte Datenbank: %DATABASE_PATH%
+echo MySQL-Datenbank: %DB_HOST%:%DB_PORT%/%DB_NAME%
 echo Stoppe laufende Projekt Manager-Ports...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 3001,5173,3010 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"
 timeout /t 1 /nobreak > nul
@@ -46,6 +66,13 @@ if errorlevel 1 (
   echo Build fehlgeschlagen.
   pause
   exit /b 1
+)
+
+REM SSH-Tunnel starten wenn DB_PORT auf einen Tunnel-Port zeigt (nicht Standard 3306)
+if not "%DB_PORT%"=="3306" (
+  echo Starte SSH-Tunnel auf Port %DB_PORT%...
+  start "" /B node scripts\mysql-tunnel.mjs
+  timeout /t 4 /nobreak > nul
 )
 
 echo Aktualisiere Datenbankschema ohne Datenlöschung...

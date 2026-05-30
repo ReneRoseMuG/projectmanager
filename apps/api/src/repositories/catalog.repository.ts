@@ -1,6 +1,7 @@
 import { and, asc, eq, ne } from "drizzle-orm";
 import type { CatalogKind } from "@taskmanager/shared-types";
 import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { catalogEntries } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -13,30 +14,30 @@ function nowIso(): string {
 }
 
 export const catalogRepository = {
-  findAll(database: DbSession): CatalogEntryRecord[] {
-    return database.select().from(catalogEntries).orderBy(catalogEntries.kind, catalogEntries.sortOrder, catalogEntries.label).all();
+  async findAll(database: DbSession): Promise<CatalogEntryRecord[]> {
+    return database.select().from(catalogEntries).orderBy(catalogEntries.kind, catalogEntries.sortOrder, catalogEntries.label);
   },
 
-  findByKind(database: DbSession, kind: CatalogKind): CatalogEntryRecord[] {
-    return database.select().from(catalogEntries).where(eq(catalogEntries.kind, kind)).orderBy(asc(catalogEntries.sortOrder), asc(catalogEntries.label)).all();
+  async findByKind(database: DbSession, kind: CatalogKind): Promise<CatalogEntryRecord[]> {
+    return database.select().from(catalogEntries).where(eq(catalogEntries.kind, kind)).orderBy(asc(catalogEntries.sortOrder), asc(catalogEntries.label));
   },
 
-  findById(database: DbSession, id: number): CatalogEntryRecord | undefined {
-    return database.select().from(catalogEntries).where(eq(catalogEntries.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<CatalogEntryRecord | undefined> {
+    return firstRow(await database.select().from(catalogEntries).where(eq(catalogEntries.id, id)));
   },
 
-  findByKindAndKey(database: DbSession, kind: CatalogKind, key: string): CatalogEntryRecord | undefined {
-    return database.select().from(catalogEntries).where(and(eq(catalogEntries.kind, kind), eq(catalogEntries.key, key))).get();
+  async findByKindAndKey(database: DbSession, kind: CatalogKind, key: string): Promise<CatalogEntryRecord | undefined> {
+    return firstRow(await database.select().from(catalogEntries).where(and(eq(catalogEntries.kind, kind), eq(catalogEntries.key, key))));
   },
 
-  findLowestByKind(database: DbSession, kind: CatalogKind, excludedId?: number): CatalogEntryRecord | undefined {
+  async findLowestByKind(database: DbSession, kind: CatalogKind, excludedId?: number): Promise<CatalogEntryRecord | undefined> {
     const condition = excludedId === undefined ? eq(catalogEntries.kind, kind) : and(eq(catalogEntries.kind, kind), ne(catalogEntries.id, excludedId));
-    return database.select().from(catalogEntries).where(condition).orderBy(asc(catalogEntries.sortOrder), asc(catalogEntries.label)).get();
+    return firstRow(await database.select().from(catalogEntries).where(condition).orderBy(asc(catalogEntries.sortOrder), asc(catalogEntries.label)));
   },
 
-  create(database: DbSession, data: CatalogEntryCreateData, userId?: number): CatalogEntryRecord {
+  async create(database: DbSession, data: CatalogEntryCreateData, userId?: number): Promise<CatalogEntryRecord> {
     const now = nowIso();
-    return database
+    const result = await database
       .insert(catalogEntries)
       .values({
         ...data,
@@ -45,18 +46,21 @@ export const catalogRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, insertId(result));
+    if (!created) {
+      throw new Error("Created catalog entry could not be loaded");
+    }
+    return created;
   },
 
-  update(database: DbSession, id: number, expectedVersion: number, data: CatalogEntryUpdateData, userId?: number): CatalogEntryRecord | undefined {
-    const current = this.findById(database, id);
+  async update(database: DbSession, id: number, expectedVersion: number, data: CatalogEntryUpdateData, userId?: number): Promise<CatalogEntryRecord | undefined> {
+    const current = await this.findById(database, id);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    return database
+    await database
       .update(catalogEntries)
       .set({
         ...data,
@@ -64,12 +68,11 @@ export const catalogRepository = {
         updatedBy: userId ?? null,
         updatedAt: nowIso()
       })
-      .where(eq(catalogEntries.id, id))
-      .returning()
-      .get();
+      .where(eq(catalogEntries.id, id));
+    return this.findById(database, id);
   },
 
-  delete(database: DbSession, id: number): number {
-    return database.delete(catalogEntries).where(eq(catalogEntries.id, id)).run().changes;
+  async delete(database: DbSession, id: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(catalogEntries).where(eq(catalogEntries.id, id)));
   }
 };

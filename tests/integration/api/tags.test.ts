@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope: Tags API
  *
  * Covers global tag CRUD, project/task assignments, replacement semantics, uniqueness, and cascades.
@@ -14,15 +14,15 @@ describe("Tags API", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => { await truncateAll(testDb.pool); });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("POST /api/tags erstellt einen Tag", async () => {

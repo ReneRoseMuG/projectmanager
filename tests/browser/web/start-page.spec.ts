@@ -38,8 +38,7 @@ test.describe("Startseite", () => {
       await authenticatedGoto(page, "/");
 
       await expect(page.getByTestId("dashboard-view-home")).toBeVisible();
-      await page.getByRole("button", { name: "Anpassen" }).click();
-      await page.getByRole("button", { name: "Neues Dashboard" }).click();
+      await page.getByRole("button", { name: "Neue Ansicht" }).click();
       await expect(page.getByRole("heading", { name: "Dashboard-Editor" })).toBeVisible();
 
       const saveResponse = page.waitForResponse((response) => response.url().includes("/api/dashboards") && response.request().method() === "POST");

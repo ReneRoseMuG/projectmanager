@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -96,15 +96,15 @@ describe("Realtime API", () => {
   beforeEach(async () => {
     originalAuthBypassAdmin = config.authBypassAdmin;
     config.authBypassAdmin = false;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true });
-    truncateAll(testDb.sqlite);
+    await truncateAll(testDb.pool);
   });
 
   afterEach(async () => {
     config.authBypassAdmin = originalAuthBypassAdmin;
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("schützt den SSE-Stream vor anonymen und nicht berechtigten Nutzern", async () => {

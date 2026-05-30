@@ -1831,7 +1831,7 @@ async function restoreLegacyStandardAdminFallback(
        AND REFERENCED_TABLE_NAME = 'users'
        AND REFERENCED_COLUMN_NAME = 'id'`,
   );
-  const tableNameToKey = new Map(DUMP_TABLES.map((entry) => [entry.tableName, entry.key]));
+  const tableNameToKey = new Map<string, DumpTableKey>(DUMP_TABLES.map((entry) => [entry.tableName, entry.key]));
   for (const fkRow of fkRows as Array<{ TABLE_NAME: string; COLUMN_NAME: string }>) {
     const [result] = await mysqlPool.execute(
       `UPDATE \`${fkRow.TABLE_NAME}\` SET \`${fkRow.COLUMN_NAME}\` = ?
@@ -1858,7 +1858,7 @@ async function validateAllForeignKeysInPayload(payload: DumpPayload): Promise<vo
      WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
        AND REFERENCED_TABLE_NAME IS NOT NULL`,
   );
-  const tableNameToKey = new Map(DUMP_TABLES.map((e) => [e.tableName, e.key as DumpTableKey]));
+  const tableNameToKey = new Map<string, DumpTableKey>(DUMP_TABLES.map((e) => [e.tableName, e.key as DumpTableKey]));
   for (const fkRow of fkRows as Array<{ TABLE_NAME: string; COLUMN_NAME: string; REFERENCED_TABLE_NAME: string; REFERENCED_COLUMN_NAME: string }>) {
     const key = tableNameToKey.get(fkRow.TABLE_NAME);
     const refKey = tableNameToKey.get(fkRow.REFERENCED_TABLE_NAME);

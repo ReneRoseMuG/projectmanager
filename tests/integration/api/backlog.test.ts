@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -31,19 +31,19 @@ describe("Backlog API", () => {
   beforeAll(async () => {
     tmpContentDir = fs.mkdtempSync(path.join(os.tmpdir(), "taskmanager-content-"));
     setContentBaseDir(tmpContentDir);
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
 
-  beforeEach(() => {
-    truncateAll(testDb.sqlite);
+  beforeEach(async () => {
+    await truncateAll(testDb.pool);
     fs.rmSync(tmpContentDir, { recursive: true, force: true });
     fs.mkdirSync(tmpContentDir, { recursive: true });
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
     fs.rmSync(tmpContentDir, { recursive: true, force: true });
   });
 

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import type { TaskInput } from "@taskmanager/shared-types";
 import { createSubtask, listSubtasks } from "../services/tasks.service.js";
 import { createJournalActor } from "../services/journal.service.js";
@@ -29,7 +29,7 @@ export async function registerSubtasksRoutes(app: FastifyInstance): Promise<void
     "/tasks/:taskId/subtasks",
     { schema: { params: taskIdParamSchema, body: subtaskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const subtask = createSubtask(app.db, request.params.taskId, request.body, createJournalActor(request.currentUser));
+      const subtask = await createSubtask(app.db, request.params.taskId, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(subtask);
     }
   );

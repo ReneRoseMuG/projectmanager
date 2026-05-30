@@ -1,8 +1,8 @@
-import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
+﻿import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
-import { milestones, projectAttachments, projectComments, projectNotes, projects, projectTasks, projectTickets, tasks, wikiPages } from "../db/schema.js";
+import { backlogItems, milestones, projectAttachments, projectComments, projectNotes, projects, projectTasks, projectTickets, tasks, wikiPages } from "../db/schema.js";
 import { projectRepository, type ProjectRecord } from "../repositories/project.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
@@ -19,6 +19,7 @@ import {
   type JournalFieldDefinition
 } from "./journal.service.js";
 import { deleteMilestoneOwnedSupportForProjectIds } from "./milestones.service.js";
+import { deleteBacklogItemCommentsForIds, deleteProjectCommentsForIds } from "./comments.service.js";
 import { deleteProjectNotesForIds } from "./notes.service.js";
 import { getProjectTags, getProjectTagsMap } from "./tags.service.js";
 import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
@@ -293,6 +294,13 @@ export async function deleteProject(database: DbClient, id: number, actor?: Jour
   await deleteMilestoneOwnedSupportForProjectIds(database, [id]);
 
   await deleteProjectNotesForIds(database, [id]);
+  await deleteProjectCommentsForIds(database, [id]);
+
+  // Delete comments of backlog items belonging to this project
+  const backlogRows = await database.select({ id: backlogItems.id }).from(backlogItems).where(eq(backlogItems.projectId, id));
+  if (backlogRows.length > 0) {
+    await deleteBacklogItemCommentsForIds(database, backlogRows.map((r) => r.id));
+  }
 
   await database.transaction(async (tx) => {
     const journalObject = makeJournalObject("project", project.id, project.name);

@@ -1,5 +1,6 @@
-import { asc, eq, inArray } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { asc, eq, inArray } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { permissions, roles } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -14,73 +15,75 @@ function nowIso(): string {
 }
 
 export const roleRepository = {
-  findAll(database: DbClient): RoleRecord[] {
-    return database.select().from(roles).orderBy(asc(roles.label)).all();
+  async findAll(database: DbSession): Promise<RoleRecord[]> {
+    return database.select().from(roles).orderBy(asc(roles.label));
   },
 
-  findById(database: DbClient, id: number): RoleRecord | undefined {
-    return database.select().from(roles).where(eq(roles.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<RoleRecord | undefined> {
+    return firstRow(await database.select().from(roles).where(eq(roles.id, id)));
   },
 
-  findByKey(database: DbClient, key: string): RoleRecord | undefined {
-    return database.select().from(roles).where(eq(roles.key, key)).get();
+  async findByKey(database: DbSession, key: string): Promise<RoleRecord | undefined> {
+    return firstRow(await database.select().from(roles).where(eq(roles.key, key)));
   },
 
-  findPermissionsByRoleId(database: DbClient, roleId: number): PermissionRecord[] {
-    return database.select().from(permissions).where(eq(permissions.roleId, roleId)).orderBy(asc(permissions.resource), asc(permissions.action)).all();
+  async findPermissionsByRoleId(database: DbSession, roleId: number): Promise<PermissionRecord[]> {
+    return database.select().from(permissions).where(eq(permissions.roleId, roleId)).orderBy(asc(permissions.resource), asc(permissions.action));
   },
 
-  findPermissionsByRoleIds(database: DbClient, roleIds: number[]): PermissionRecord[] {
+  async findPermissionsByRoleIds(database: DbSession, roleIds: number[]): Promise<PermissionRecord[]> {
     if (roleIds.length === 0) {
       return [];
     }
-    return database.select().from(permissions).where(inArray(permissions.roleId, roleIds)).orderBy(asc(permissions.resource), asc(permissions.action)).all();
+    return database.select().from(permissions).where(inArray(permissions.roleId, roleIds)).orderBy(asc(permissions.resource), asc(permissions.action));
   },
 
-  create(database: DbClient, data: RoleCreateData): RoleRecord {
+  async create(database: DbSession, data: RoleCreateData): Promise<RoleRecord> {
     const now = nowIso();
-    return database
+    const result = await database
       .insert(roles)
       .values({
         ...data,
         version: 1,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, insertId(result));
+    if (!created) {
+      throw new Error("Created role could not be loaded");
+    }
+    return created;
   },
 
-  update(database: DbClient, id: number, expectedVersion: number, data: RoleUpdateData): RoleRecord | undefined {
-    const current = this.findById(database, id);
+  async update(database: DbSession, id: number, expectedVersion: number, data: RoleUpdateData): Promise<RoleRecord | undefined> {
+    const current = await this.findById(database, id);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    return database
+    await database
       .update(roles)
       .set({
         ...data,
         version: current.version + 1,
         updatedAt: nowIso()
       })
-      .where(eq(roles.id, id))
-      .returning()
-      .get();
+      .where(eq(roles.id, id));
+    return this.findById(database, id);
   },
 
-  replacePermissions(database: DbClient, roleId: number, permissionValues: PermissionCreateData[]): PermissionRecord[] {
-    database.delete(permissions).where(eq(permissions.roleId, roleId)).run();
+  async replacePermissions(database: DbSession, roleId: number, permissionValues: PermissionCreateData[]): Promise<PermissionRecord[]> {
+    await database.delete(permissions).where(eq(permissions.roleId, roleId));
     if (permissionValues.length > 0) {
-      database
+      await database
         .insert(permissions)
-        .values(permissionValues.map((permission) => ({ ...permission, roleId })))
-        .run();
+        .values(permissionValues.map((permission) => ({ ...permission, roleId })));
     }
     return this.findPermissionsByRoleId(database, roleId);
   },
 
-  delete(database: DbClient, id: number): number {
-    return database.delete(roles).where(eq(roles.id, id)).run().changes;
+  async delete(database: DbSession, id: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(roles).where(eq(roles.id, id)));
   }
 };
+

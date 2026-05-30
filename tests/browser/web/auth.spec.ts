@@ -3,17 +3,15 @@ import { apiBaseUrl, authenticatedGoto, ensureApiAuth, uniqueTitle } from "./dom
 
 test("Direktaufruf ohne Session landet beim Login und kehrt nach Login zur Route zurück", async ({ page }) => {
   await page.goto("/projects");
-  await expect(page.getByRole("button", { name: "Anmelden" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Als Rene anmelden" })).toBeVisible();
 
-  await page.getByLabel("E-Mail").fill("admin@local");
-  await page.getByLabel("Passwort").fill("password123");
-  await page.getByRole("button", { name: "Anmelden" }).click();
+  await page.getByRole("button", { name: "Als Rene anmelden" }).click();
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { name: "Startseite", exact: true })).toBeVisible();
 });
 
-test("Admin legt Benutzer in der UI an; Nicht-Admin sieht keine Administration", async ({ page }) => {
+test("Admin legt Benutzer in der UI an; Nicht-Admin sieht keine Administration", async ({ page, request }) => {
   await authenticatedGoto(page, "/admin/users");
 
   const email = `${uniqueTitle("reader").toLowerCase().replace(/[^a-z0-9]+/g, ".")}@example.test`;
@@ -26,13 +24,17 @@ test("Admin legt Benutzer in der UI an; Nicht-Admin sieht keine Administration",
   await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page.getByText(email)).toBeVisible();
+
+  // Log out and log in as the newly created reader via API (login page has no email/password form)
   await page.getByRole("button", { name: "Abmelden" }).click();
-  await expect(page.getByRole("button", { name: "Anmelden" })).toBeVisible();
-  await page.getByLabel("E-Mail").fill(email);
-  await page.getByLabel("Passwort").fill("password123");
-  const readerLoginResponse = page.waitForResponse((response) => response.url().endsWith("/api/auth/login") && response.request().method() === "POST");
-  await page.getByRole("button", { name: "Anmelden" }).click();
-  await expect((await readerLoginResponse).status()).toBe(200);
+  await expect(page.getByRole("button", { name: "Als Rene anmelden" })).toBeVisible();
+
+  const loginResp = await page.request.post(`${apiBaseUrl}/auth/login`, {
+    data: { email, password: "password123" }
+  });
+  expect(loginResp.ok()).toBeTruthy();
+
+  await page.goto("/");
   await expect(page.getByRole("heading", { name: "Startseite", exact: true })).toBeVisible();
 
   await expect(page.getByText("Administration")).toHaveCount(0);
@@ -40,7 +42,7 @@ test("Admin legt Benutzer in der UI an; Nicht-Admin sieht keine Administration",
   await expect(page.getByRole("heading", { name: "Kein Zugriff auf dieses Projekt." })).toBeVisible();
 });
 
-test("Inaktiver Benutzer kann sich nicht anmelden", async ({ request, page }) => {
+test("Inaktiver Benutzer kann sich nicht anmelden", async ({ request }) => {
   await ensureApiAuth(request);
   const rolesResponse = await request.get(`${apiBaseUrl}/admin/roles`);
   expect(rolesResponse.ok()).toBeTruthy();
@@ -53,10 +55,11 @@ test("Inaktiver Benutzer kann sich nicht anmelden", async ({ request, page }) =>
   });
   expect(createResponse.ok()).toBeTruthy();
 
-  await page.goto("/login");
-  await page.getByLabel("E-Mail").fill(email);
-  await page.getByLabel("Passwort").fill("password123");
-  await page.getByRole("button", { name: "Anmelden" }).click();
-
-  await expect(page.getByText("Account is disabled")).toBeVisible();
+  // Login page no longer has an email/password form; test the API directly
+  const loginResponse = await request.post(`${apiBaseUrl}/auth/login`, {
+    data: { email, password: "password123" }
+  });
+  expect(loginResponse.status()).toBe(403);
+  const body = await loginResponse.json() as { message: string };
+  expect(body.message).toMatch(/disabled/i);
 });

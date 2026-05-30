@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import type { MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
 import { createMilestone, deleteMilestone, getMilestone, listMilestones, listProjectMilestones, updateMilestone } from "../services/milestones.service.js";
 import { createJournalActor } from "../services/journal.service.js";
@@ -57,13 +57,13 @@ export async function registerMilestoneRoutes(app: FastifyInstance): Promise<voi
   app.post<{ Body: MilestoneInput }>(
     "/milestones",
     { schema: { body: milestoneBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createMilestone(app.db, request.body, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createMilestone(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number }; Body: Omit<MilestoneInput, "projectId"> }>(
     "/projects/:id/milestones",
     { schema: { params: idParamSchema, body: projectMilestoneBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createMilestone(app.db, { ...request.body, projectId: request.params.id }, createJournalActor(request.currentUser)))
+    async (request, reply) => reply.status(201).send(await createMilestone(app.db, { ...request.body, projectId: request.params.id }, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(

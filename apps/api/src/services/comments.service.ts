@@ -894,6 +894,67 @@ export async function createComment(database: DbClient, taskId: number, input: C
   return createEntityComment(database, "task", taskId, input, actor);
 }
 
+async function deleteCommentsByIds(database: DbClient, commentIds: number[]): Promise<void> {
+  if (commentIds.length === 0) return;
+  await database.delete(comments).where(inArray(comments.id, commentIds));
+}
+
+export async function deleteMilestoneCommentsForIds(database: DbClient, milestoneIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(milestoneIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: milestoneComments.commentId }).from(milestoneComments).where(inArray(milestoneComments.milestoneId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteProjectCommentsForIds(database: DbClient, projectIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(projectIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: projectComments.commentId }).from(projectComments).where(inArray(projectComments.projectId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteTaskCommentsForIds(database: DbClient, taskIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(taskIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: taskComments.commentId }).from(taskComments).where(inArray(taskComments.taskId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteFeatureCommentsForIds(database: DbClient, featureIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(featureIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: featureComments.commentId }).from(featureComments).where(inArray(featureComments.featureId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteUseCaseCommentsForIds(database: DbClient, useCaseIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(useCaseIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: useCaseComments.commentId }).from(useCaseComments).where(inArray(useCaseComments.useCaseId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteTicketCommentsForIds(database: DbClient, ticketIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(ticketIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: ticketComments.commentId }).from(ticketComments).where(inArray(ticketComments.ticketId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteBacklogItemCommentsForIds(database: DbClient, backlogItemIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(backlogItemIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: backlogItemComments.commentId }).from(backlogItemComments).where(inArray(backlogItemComments.backlogItemId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
+export async function deleteWikiPageCommentsForIds(database: DbClient, wikiPageIds: number[]): Promise<void> {
+  const uniqueIds = [...new Set(wikiPageIds)];
+  if (uniqueIds.length === 0) return;
+  const rows = await database.select({ commentId: wikiPageComments.commentId }).from(wikiPageComments).where(inArray(wikiPageComments.wikiPageId, uniqueIds));
+  await deleteCommentsByIds(database, rows.map((r) => r.commentId));
+}
+
 export async function deleteComment(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
   const comment = await commentRepository.findById(database, id);
   if (!comment) {

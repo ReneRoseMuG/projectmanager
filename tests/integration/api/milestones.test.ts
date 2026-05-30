@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -35,9 +35,9 @@ import {
 const uploadDir = path.join(os.tmpdir(), `taskmanager-api-milestone-attachments-${process.pid}`);
 const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-milestone-previews-${process.pid}`);
 
-function countRows(testDb: TestDb, table: string, where: string, value: number): number {
-  const row = testDb.sqlite.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE ${where} = ?`).get(value) as { count: number };
-  return row.count;
+async function countRows(testDb: TestDb, table: string, where: string, value: number): Promise<number> {
+  const [rows] = await testDb.pool.execute(`SELECT COUNT(*) AS count FROM \`${table}\` WHERE \`${where}\` = ?`, [value]);
+  return Number((rows as Array<{ count: bigint | number }>)[0].count);
 }
 
 describe("Milestones API", () => {
@@ -47,11 +47,11 @@ describe("Milestones API", () => {
   beforeAll(async () => {
     process.env.UPLOAD_DIR = uploadDir;
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableMultipart: true });
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => { await truncateAll(testDb.pool); });
 
   afterEach(async () => {
     await fs.rm(uploadDir, { recursive: true, force: true });
@@ -61,8 +61,8 @@ describe("Milestones API", () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
   });
@@ -235,13 +235,13 @@ describe("Milestones API", () => {
     await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
     await supertest(app.server).get(`/api/features/${feature.id}`).expect(200);
 
-    expect(countRows(testDb, "notes", "id", note.body.id)).toBe(0);
-    expect(countRows(testDb, "comments", "id", comment.body.id)).toBe(0);
-    expect(countRows(testDb, "attachments", "id", attachment.body.id)).toBe(0);
-    expect(countRows(testDb, "milestone_tasks", "owner_id", milestone.id)).toBe(0);
-    expect(countRows(testDb, "milestone_tickets", "owner_id", milestone.id)).toBe(0);
-    expect(countRows(testDb, "milestone_features", "milestone_id", milestone.id)).toBe(0);
-    expect(countRows(testDb, "milestone_events", "milestone_id", milestone.id)).toBe(0);
+    expect(await countRows(testDb, "notes", "id", note.body.id)).toBe(0);
+    expect(await countRows(testDb, "comments", "id", comment.body.id)).toBe(0);
+    expect(await countRows(testDb, "attachments", "id", attachment.body.id)).toBe(0);
+    expect(await countRows(testDb, "milestone_tasks", "owner_id", milestone.id)).toBe(0);
+    expect(await countRows(testDb, "milestone_tickets", "owner_id", milestone.id)).toBe(0);
+    expect(await countRows(testDb, "milestone_features", "milestone_id", milestone.id)).toBe(0);
+    expect(await countRows(testDb, "milestone_events", "milestone_id", milestone.id)).toBe(0);
 
     const events = await supertest(app.server).get("/api/events").expect(200);
     const remainingEvent = events.body.find((item: { id: number }) => item.id === event.body.id);
@@ -261,8 +261,8 @@ describe("Milestones API", () => {
     await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
     await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(404);
-    expect(countRows(testDb, "notes", "id", note.body.id)).toBe(0);
-    expect(countRows(testDb, "attachments", "id", attachment.body.id)).toBe(0);
+    expect(await countRows(testDb, "notes", "id", note.body.id)).toBe(0);
+    expect(await countRows(testDb, "attachments", "id", attachment.body.id)).toBe(0);
   });
 
   it("zählt beliebige per Katalog geschlossene Aufgaben als erledigt", async () => {

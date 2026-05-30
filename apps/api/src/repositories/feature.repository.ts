@@ -1,5 +1,6 @@
-import { eq } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { eq } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { features } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -12,17 +13,17 @@ function nowIso(): string {
 }
 
 export const featureRepository = {
-  findById(database: DbClient, id: number): FeatureRecord | undefined {
-    return database.select().from(features).where(eq(features.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<FeatureRecord | undefined> {
+    return firstRow(await database.select().from(features).where(eq(features.id, id)));
   },
 
-  findAll(database: DbClient): FeatureRecord[] {
-    return database.select().from(features).orderBy(features.sortOrder, features.title).all();
+  async findAll(database: DbSession): Promise<FeatureRecord[]> {
+    return database.select().from(features).orderBy(features.sortOrder, features.title);
   },
 
-  create(database: DbClient, data: FeatureCreateData, userId?: number): FeatureRecord {
+  async create(database: DbSession, data: FeatureCreateData, userId?: number): Promise<FeatureRecord> {
     const now = nowIso();
-    return database
+    const result = await database
       .insert(features)
       .values({
         ...data,
@@ -31,18 +32,21 @@ export const featureRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, insertId(result));
+    if (!created) {
+      throw new Error("Created feature could not be loaded");
+    }
+    return created;
   },
 
-  update(database: DbClient, id: number, expectedVersion: number, data: FeatureUpdateData, userId?: number): FeatureRecord | undefined {
-    const current = this.findById(database, id);
+  async update(database: DbSession, id: number, expectedVersion: number, data: FeatureUpdateData, userId?: number): Promise<FeatureRecord | undefined> {
+    const current = await this.findById(database, id);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    return database
+    await database
       .update(features)
       .set({
         ...data,
@@ -50,12 +54,12 @@ export const featureRepository = {
         updatedBy: userId ?? null,
         updatedAt: nowIso()
       })
-      .where(eq(features.id, id))
-      .returning()
-      .get();
+      .where(eq(features.id, id));
+    return this.findById(database, id);
   },
 
-  delete(database: DbClient, id: number): number {
-    return database.delete(features).where(eq(features.id, id)).run().changes;
+  async delete(database: DbSession, id: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(features).where(eq(features.id, id)));
   }
 };
+
