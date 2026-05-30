@@ -2,7 +2,7 @@ import type { CatalogEntry, CatalogEntryInput, CatalogEntryUpdate, CatalogKind }
 import { CATALOG_KINDS } from "@taskmanager/shared-types";
 import { eq, sql } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
-import { backlogItems, features, milestones, projects, tasks, tickets, useCases } from "../db/schema.js";
+import { backlogItems, catalogEntries, features, milestones, projects, tasks, tickets, useCases } from "../db/schema.js";
 import { catalogRepository, type CatalogEntryRecord, type CatalogEntryUpdateData } from "../repositories/catalog.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
@@ -136,6 +136,42 @@ async function setPriorityFallback(database: DbSession, fromKey: string, fallbac
 async function setTicketTypeFallback(database: DbSession, fromKey: string, fallback: CatalogEntryRecord): Promise<void> {
   const now = nowIso();
   await database.update(tickets).set({ type: fallback.key, updatedAt: now, version: sql`${tickets.version} + 1` }).where(eq(tickets.type, fromKey));
+}
+
+const DEFAULT_CATALOG_ENTRIES: Array<[CatalogKind, string, string, number, boolean, string]> = [
+  ["workStatus", "active", "Aktiv", 100, false, "var(--color-fern)"],
+  ["workStatus", "on_hold", "Pausiert", 200, false, "var(--color-steel-500)"],
+  ["workStatus", "completed", "Abgeschlossen", 300, true, "var(--color-steel-500)"],
+  ["workStatus", "archived", "Archiviert", 400, true, "var(--color-steel-500)"],
+  ["workStatus", "todo", "Offen", 500, false, "var(--color-fern)"],
+  ["workStatus", "open", "Offen", 600, false, "var(--color-fern)"],
+  ["workStatus", "in_progress", "In Arbeit", 700, false, "var(--color-tangerine)"],
+  ["workStatus", "in_review", "In Prüfung", 800, false, "var(--color-mustard)"],
+  ["workStatus", "done", "Erledigt", 900, true, "var(--color-steel-500)"],
+  ["workStatus", "resolved", "Gelöst", 1000, true, "var(--color-steel-500)"],
+  ["workStatus", "closed", "Geschlossen", 1100, true, "var(--color-steel-500)"],
+  ["workStatus", "rejected", "Verworfen", 1200, true, "var(--color-steel-500)"],
+  ["featureStatus", "draft", "Entwurf", 100, false, "var(--color-violet)"],
+  ["featureStatus", "active", "Aktiv", 200, false, "var(--color-tangerine)"],
+  ["featureStatus", "done", "Erledigt", 300, true, "var(--color-steel-500)"],
+  ["featureStatus", "archived", "Archiviert", 400, true, "var(--color-steel-500)"],
+  ["priority", "low", "Niedrig", 100, false, "var(--color-steel-400)"],
+  ["priority", "medium", "Mittel", 200, false, "var(--color-mustard)"],
+  ["priority", "high", "Hoch", 300, false, "var(--color-tangerine)"],
+  ["priority", "urgent", "Dringend", 400, false, "var(--color-crimson)"],
+  ["ticketType", "bug", "Bug", 100, false, "var(--color-crimson)"],
+  ["ticketType", "improvement", "Verbesserung", 200, false, "var(--color-teal)"],
+  ["ticketType", "question", "Frage", 300, false, "var(--color-violet)"],
+  ["ticketType", "task", "Aufgabe", 400, false, "var(--color-steel-500)"]
+];
+
+export async function seedDefaultCatalogEntries(database: DbClient): Promise<void> {
+  const now = nowIso();
+  for (const [kind, key, label, sortOrder, isClosed, color] of DEFAULT_CATALOG_ENTRIES) {
+    await database.insert(catalogEntries)
+      .ignore()
+      .values({ kind, key, label, sortOrder, isClosed, color, version: 1, createdAt: now, updatedAt: now });
+  }
 }
 
 export async function listCatalogEntries(database: DbClient, kind?: string): Promise<CatalogEntry[]> {

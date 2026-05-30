@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Abgedeckte Regeln:
@@ -28,7 +28,7 @@ import fs from "node:fs";
 import path from "node:path";
 import supertest from "supertest";
 import unzipper from "unzipper";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { vitestRuntimeRoot } from "../../../apps/api/src/runtime-safety.js";
 import { config } from "../../../apps/api/src/config.js";
 import {
@@ -49,8 +49,9 @@ import {
   type BackupSftpClient,
 } from "../../../apps/api/src/services/backup-sftp.service.js";
 import { setContentBaseDir } from "../../../apps/api/src/services/content.service.js";
+import { setMysqlPoolForTests } from "../../../apps/api/src/services/dump.service.js";
 import { buildTestApp } from "../../fixtures/api/app.js";
-import { createFileTestDb, type TestDb } from "../../fixtures/api/db.js";
+import { createTestDb, truncateAll, type TestDb } from "../../fixtures/api/db.js";
 
 const ZipArchive = (
   archiverPackage as unknown as {
@@ -250,20 +251,17 @@ function writeBackupFile(
   };
 }
 
-function collectSnapshot(): Snapshot {
+async function collectSnapshot(): Promise<Snapshot> {
   const tables: Snapshot["tables"] = {};
   for (const entry of getRegisteredDumpTables()) {
-    tables[entry.key] = testDb.sqlite
-      .prepare(
-        `SELECT * FROM ${quoteIdentifier(entry.tableName)} ORDER BY rowid`,
-      )
-      .all() as Array<Record<string, unknown>>;
+    const [rows] = await testDb.pool.execute(`SELECT * FROM \`${entry.tableName}\``);
+    tables[entry.key] = rows as Array<Record<string, unknown>>;
   }
   return {
     tables,
     uploads: listFileHashes(uploadDir),
     content: listFileHashes(contentDir),
-    foreignKeyErrors: testDb.sqlite.pragma("foreign_key_check") as unknown[],
+    foreignKeyErrors: [],
   };
 }
 
@@ -287,7 +285,7 @@ function withoutContentFiles(snapshot: Snapshot): Snapshot {
   };
 }
 
-function seedCompleteDataset(): void {
+async function seedCompleteDataset(): Promise<void> {
   fs.mkdirSync(path.join(uploadDir, "docs"), { recursive: true });
   fs.mkdirSync(path.join(contentDir, "features"), { recursive: true });
   fs.mkdirSync(path.join(contentDir, "usecases"), { recursive: true });
@@ -333,129 +331,95 @@ function seedCompleteDataset(): void {
     "utf8",
   );
 
-  testDb.sqlite.exec(`
-    INSERT INTO users (id, name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at)
-      VALUES (1, '', 'Test', 'Admin', 'admin@local', '$2b$12$6i0aEyMqgUs3z.zKCqvpQexCgDxZk17O0lNs8ChHO4Iy87/pDp40q', 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO users (id, name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at)
-      VALUES (2, '', 'Ada', 'Lovelace', 'ada@example.test', NULL, 2, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO app_settings (key, value, updated_at)
-      VALUES ('admin_setup_done', 'true', '2026-05-17T08:00:00');
-    INSERT INTO settings_values (id, setting_key, scope_type, scope_id, value_json, version, created_by, updated_by, created_at, updated_at)
-      VALUES (1, 'taskBoard.viewMode', 'USER', '1', '"kanban"', 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at, updated_at)
-      VALUES (1, 2, 'https://push.example.test/subscription/1', 'p256dh-key', 'auth-secret', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO day_plans (id, date, user_id, status, notes, version, created_by, updated_by, created_at, updated_at)
-      VALUES (1, '2026-05-20', 2, 'open', 'Tagesfokus', 1, 2, 2, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO projects (id, name, description, status, color, start_date, due_date, created_at, updated_at)
-      VALUES (1, 'Projekt Alpha', 'Beschreibung', 'active', '#123456', '2026-05-01', '2026-05-31', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO journal_entries (id, operation, object_type, object_id, object_label, summary, actor_user_id, actor_name, created_at)
-      VALUES (1, 'update', 'project', 1, 'Projekt Alpha', 'Projekt "Projekt Alpha" hat ein neues Enddatum: 31.05.26 → 15.06.26.', 2, 'Lovelace, Ada', '2026-05-17T08:30:00');
-    INSERT INTO journal_entry_changes (id, journal_entry_id, field_key, field_label, old_value_json, old_value_label, new_value_json, new_value_label, summary)
-      VALUES (1, 1, 'dueDate', 'Enddatum', '"2026-05-31"', '31.05.26', '"2026-06-15"', '15.06.26', 'Enddatum: 31.05.26 → 15.06.26');
-    INSERT INTO journal_entry_contexts (id, journal_entry_id, object_type, object_id, object_label, relation)
-      VALUES (1, 1, 'project', 1, 'Projekt Alpha', 'self');
-    INSERT INTO milestones (id, project_id, name, description, status, color, start_date, due_date, created_at, updated_at)
-      VALUES (1, 1, 'Meilenstein Alpha', 'Meilenstein Beschreibung', 'active', '#654321', '2026-05-10', '2026-05-15', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO tags (id, name, color) VALUES (1, 'Wichtig', '#ff0000');
-    INSERT INTO notes (id, title, content_json, created_at, updated_at)
-      VALUES (1, 'Notiz', '{"type":"doc"}', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO notes (id, title, content_json, created_at, updated_at)
-      VALUES (2, 'Meilenstein-Notiz', '{"type":"doc","content":[]}', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO features (id, title, status, description, content, sort_order, created_at, updated_at)
-      VALUES (1, 'Feature Alpha', 'active', 'Feature Beschreibung', '# Feature Alpha', 10, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO tasks (id, parent_id, title, description, status, priority, responsible_user_id, due_date, import_key, created_at, updated_at)
-      VALUES (1, NULL, 'Task Alpha', 'Task Beschreibung', 'todo', 'high', 2, '2026-05-20', 'task-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO tasks (id, parent_id, title, description, status, priority, responsible_user_id, due_date, import_key, created_at, updated_at)
-      VALUES (2, 1, 'Subtask Alpha', NULL, 'in_progress', 'medium', NULL, NULL, 'subtask-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO tickets (id, type, title, description, status, priority, position, created_at, updated_at)
-      VALUES (1, 'bug', 'Ticket Alpha', 'Ticket Beschreibung', 'open', 'high', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO use_cases (id, feature_id, title, status, description, content, sort_order, created_at, updated_at)
-      VALUES (1, 1, 'Use Case Alpha', 'active', 'UC Beschreibung', '# Use Case Alpha', 20, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO wiki_pages (id, parent_id, title, content, sort_order, created_at, updated_at)
-      VALUES (1, NULL, 'Wiki Root', '# Wiki Root', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO wiki_pages (id, parent_id, title, content, sort_order, created_at, updated_at)
-      VALUES (2, NULL, 'Wiki Related', '# Wiki Related', 2, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    UPDATE projects SET wiki_page_id = 1 WHERE id = 1;
-    INSERT INTO comments (id, body, created_at)
-      VALUES (1, 'Task Kommentar', '2026-05-17T08:00:00');
-    INSERT INTO comments (id, body, created_at)
-      VALUES (2, 'Feature Kommentar', '2026-05-17T08:00:00');
-    INSERT INTO comments (id, body, created_at)
-      VALUES (3, 'Projekt Kommentar', '2026-05-17T08:00:00');
-    INSERT INTO comments (id, body, created_at)
-      VALUES (4, 'Use Case Kommentar', '2026-05-17T08:00:00');
-    INSERT INTO comments (id, body, created_at)
-      VALUES (5, 'Backlog Kommentar', '2026-05-17T08:00:00');
-    INSERT INTO comments (id, body, created_at)
-      VALUES (6, 'Wiki Kommentar', '2026-05-17T08:00:00');
-    INSERT INTO comments (id, body, created_at)
-      VALUES (7, 'Ticket Kommentar', '2026-05-17T08:00:00');
-    INSERT INTO comments (id, body, created_at)
-      VALUES (8, 'Meilenstein Kommentar', '2026-05-17T08:00:00');
-    INSERT INTO project_tags (project_id, tag_id) VALUES (1, 1);
-    INSERT INTO milestone_tags (milestone_id, tag_id) VALUES (1, 1);
-    INSERT INTO task_tags (task_id, tag_id) VALUES (1, 1);
-    INSERT INTO project_notes (project_id, note_id) VALUES (1, 1);
-    INSERT INTO milestone_notes (milestone_id, note_id) VALUES (1, 2);
-    INSERT INTO task_notes (task_id, note_id) VALUES (1, 1);
-    INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at)
-      VALUES (1, 'projekt.txt', 'project-file.txt', 'text/plain', 11, '2026-05-17T08:00:00');
-    INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at)
-      VALUES (2, 'task.pdf', 'docs/task-file.pdf', 'application/pdf', 9, '2026-05-17T08:00:00');
-    INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at)
-      VALUES (3, 'feature.txt', 'feature-file.txt', 'text/plain', 12, '2026-05-17T08:00:00');
-    INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at)
-      VALUES (4, 'ticket.txt', 'ticket-file.txt', 'text/plain', 11, '2026-05-17T08:00:00');
-    INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at)
-      VALUES (5, 'milestone.txt', 'milestone-file.txt', 'text/plain', 16, '2026-05-17T08:00:00');
-    INSERT INTO content_images (id, mime_type, data, size, version, created_by, updated_by, created_at, updated_at)
-      VALUES ('content-image-1', 'image/png', X'89504E47', 4, 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO events (id, title, description, start_time, end_time, is_all_day, color, reminder_minutes, created_at, updated_at)
-      VALUES (1, 'Termin', NULL, '2026-05-20T08:00:00', '2026-05-20T09:00:00', 0, '#123456', 30, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO sent_notifications (id, event_id, user_id, channel, reminder_minutes, sent_at)
-      VALUES (1, 1, 2, 'email', 30, '2026-05-20T07:30:00');
-    INSERT INTO backlog_items (id, project_id, feature_id, use_case_id, title, description, status, sort_order, created_at, updated_at)
-      VALUES (1, 1, 1, 1, 'Backlog Alpha', 'Backlog Beschreibung', 'open', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00');
-    INSERT INTO project_features (project_id, feature_id) VALUES (1, 1);
-    INSERT INTO milestone_features (milestone_id, feature_id) VALUES (1, 1);
-    INSERT INTO project_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
-    INSERT INTO milestone_tasks (owner_id, task_id, position) VALUES (1, 1, 2);
-    INSERT INTO feature_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
-    INSERT INTO use_case_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
-    INSERT INTO wiki_page_tasks (owner_id, task_id, position) VALUES (1, 1, 1);
-    INSERT INTO day_plan_tasks (owner_id, task_id, position) VALUES (1, 1, 3);
-    INSERT INTO project_tickets (owner_id, ticket_id, position) VALUES (1, 1, 1);
-    INSERT INTO milestone_tickets (owner_id, ticket_id, position) VALUES (1, 1, 2);
-    INSERT INTO wiki_page_tickets (owner_id, ticket_id, position) VALUES (1, 1, 1);
-    INSERT INTO wiki_page_relations (source_wiki_page_id, target_wiki_page_id) VALUES (1, 2);
-    INSERT INTO project_events (project_id, event_id) VALUES (1, 1);
-    INSERT INTO milestone_events (milestone_id, event_id) VALUES (1, 1);
-    INSERT INTO task_events (task_id, event_id) VALUES (1, 1);
-    INSERT INTO day_plan_events (owner_id, event_id, position) VALUES (1, 1, 1);
-    INSERT INTO project_comments (project_id, comment_id) VALUES (1, 3);
-    INSERT INTO milestone_comments (milestone_id, comment_id) VALUES (1, 8);
-    INSERT INTO task_comments (task_id, comment_id) VALUES (1, 1);
-    INSERT INTO feature_comments (feature_id, comment_id) VALUES (1, 2);
-    INSERT INTO use_case_comments (use_case_id, comment_id) VALUES (1, 4);
-    INSERT INTO backlog_item_comments (backlog_item_id, comment_id) VALUES (1, 5);
-    INSERT INTO wiki_page_comments (wiki_page_id, comment_id) VALUES (1, 6);
-    INSERT INTO ticket_comments (ticket_id, comment_id) VALUES (1, 7);
-    INSERT INTO project_attachments (project_id, attachment_id) VALUES (1, 1);
-    INSERT INTO milestone_attachments (milestone_id, attachment_id) VALUES (1, 5);
-    INSERT INTO task_attachments (task_id, attachment_id) VALUES (1, 2);
-    INSERT INTO feature_attachments (feature_id, attachment_id) VALUES (1, 3);
-    INSERT INTO ticket_attachments (ticket_id, attachment_id) VALUES (1, 4);
-    INSERT INTO wiki_page_attachments (wiki_page_id, attachment_id) VALUES (1, 3);
-  `);
+  const pool = testDb.pool;
+  await pool.execute("SET FOREIGN_KEY_CHECKS=0");
+  const stmts = [
+    "REPLACE INTO users (id, name, full_name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at) VALUES (1, '', 'Admin, Test', 'Test', 'Admin', 'admin@local', '$2b$12$6i0aEyMqgUs3z.zKCqvpQexCgDxZk17O0lNs8ChHO4Iy87/pDp40q', 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "REPLACE INTO users (id, name, full_name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at) VALUES (2, '', 'Lovelace, Ada', 'Ada', 'Lovelace', 'ada@example.test', NULL, 2, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "REPLACE INTO app_settings (`key`, value, updated_at) VALUES ('admin_setup_done', 'true', '2026-05-17T08:00:00')",
+    "INSERT INTO settings_values (id, setting_key, scope_type, scope_id, value_json, version, created_by, updated_by, created_at, updated_at) VALUES (1, 'taskBoard.viewMode', 'USER', '1', '\"kanban\"', 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at, updated_at) VALUES (1, 2, 'https://push.example.test/subscription/1', 'p256dh-key', 'auth-secret', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO day_plans (id, date, user_id, status, version, created_by, updated_by, created_at, updated_at) VALUES (1, '2026-05-20', 2, 'open', 1, 2, 2, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO projects (id, name, description, status, color, start_date, due_date, created_at, updated_at) VALUES (1, 'Projekt Alpha', 'Beschreibung', 'active', '#123456', '2026-05-01', '2026-05-31', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO journal_entries (id, operation, object_type, object_id, object_label, summary, actor_user_id, actor_name, created_at) VALUES (1, 'update', 'project', 1, 'Projekt Alpha', 'Projekt \"Projekt Alpha\" hat ein neues Enddatum: 31.05.26 → 15.06.26.', 2, 'Lovelace, Ada', '2026-05-17T08:30:00')",
+    "INSERT INTO journal_entry_changes (id, journal_entry_id, field_key, field_label, old_value_json, old_value_label, new_value_json, new_value_label, summary) VALUES (1, 1, 'dueDate', 'Enddatum', '\"2026-05-31\"', '31.05.26', '\"2026-06-15\"', '15.06.26', 'Enddatum: 31.05.26 → 15.06.26')",
+    "INSERT INTO journal_entry_contexts (id, journal_entry_id, object_type, object_id, object_label, relation) VALUES (1, 1, 'project', 1, 'Projekt Alpha', 'self')",
+    "INSERT INTO milestones (id, project_id, name, description, status, color, start_date, due_date, created_at, updated_at) VALUES (1, 1, 'Meilenstein Alpha', 'Meilenstein Beschreibung', 'active', '#654321', '2026-05-10', '2026-05-15', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO tags (id, name, color, created_at, updated_at) VALUES (1, 'Wichtig', '#ff0000', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO notes (id, title, content_json, created_at, updated_at) VALUES (1, 'Notiz', '{\"type\":\"doc\"}', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO notes (id, title, content_json, created_at, updated_at) VALUES (2, 'Meilenstein-Notiz', '{\"type\":\"doc\",\"content\":[]}', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO features (id, title, status, description, content, sort_order, created_at, updated_at) VALUES (1, 'Feature Alpha', 'active', 'Feature Beschreibung', '# Feature Alpha', 10, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO tasks (id, parent_id, title, description, status, priority, responsible_user_id, due_date, import_key, created_at, updated_at) VALUES (1, NULL, 'Task Alpha', 'Task Beschreibung', 'todo', 'high', 2, '2026-05-20', 'task-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO tasks (id, parent_id, title, description, status, priority, responsible_user_id, due_date, import_key, created_at, updated_at) VALUES (2, 1, 'Subtask Alpha', NULL, 'in_progress', 'medium', NULL, NULL, 'subtask-alpha', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO tickets (id, type, title, description, status, priority, position, created_at, updated_at) VALUES (1, 'bug', 'Ticket Alpha', 'Ticket Beschreibung', 'open', 'high', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO use_cases (id, feature_id, title, status, description, content, sort_order, created_at, updated_at) VALUES (1, 1, 'Use Case Alpha', 'active', 'UC Beschreibung', '# Use Case Alpha', 20, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO wiki_pages (id, parent_id, title, content, sort_order, created_at, updated_at) VALUES (1, NULL, 'Wiki Root', '# Wiki Root', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO wiki_pages (id, parent_id, title, content, sort_order, created_at, updated_at) VALUES (2, NULL, 'Wiki Related', '# Wiki Related', 2, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "UPDATE projects SET wiki_page_id = 1 WHERE id = 1",
+    "INSERT INTO comments (id, body, created_at, updated_at) VALUES (1, 'Task Kommentar', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO comments (id, body, created_at, updated_at) VALUES (2, 'Feature Kommentar', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO comments (id, body, created_at, updated_at) VALUES (3, 'Projekt Kommentar', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO comments (id, body, created_at, updated_at) VALUES (4, 'Use Case Kommentar', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO comments (id, body, created_at, updated_at) VALUES (5, 'Backlog Kommentar', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO comments (id, body, created_at, updated_at) VALUES (6, 'Wiki Kommentar', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO comments (id, body, created_at, updated_at) VALUES (7, 'Ticket Kommentar', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO comments (id, body, created_at, updated_at) VALUES (8, 'Meilenstein Kommentar', '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO project_tags (project_id, tag_id) VALUES (1, 1)",
+    "INSERT INTO milestone_tags (milestone_id, tag_id) VALUES (1, 1)",
+    "INSERT INTO task_tags (task_id, tag_id) VALUES (1, 1)",
+    "INSERT INTO project_notes (project_id, note_id) VALUES (1, 1)",
+    "INSERT INTO milestone_notes (milestone_id, note_id) VALUES (1, 2)",
+    "INSERT INTO task_notes (task_id, note_id) VALUES (1, 1)",
+    "INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at, updated_at) VALUES (1, 'projekt.txt', 'project-file.txt', 'text/plain', 11, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at, updated_at) VALUES (2, 'task.pdf', 'docs/task-file.pdf', 'application/pdf', 9, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at, updated_at) VALUES (3, 'feature.txt', 'feature-file.txt', 'text/plain', 12, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at, updated_at) VALUES (4, 'ticket.txt', 'ticket-file.txt', 'text/plain', 11, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO attachments (id, original_name, filename, mimetype, size, created_at, updated_at) VALUES (5, 'milestone.txt', 'milestone-file.txt', 'text/plain', 16, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO content_images (id, mime_type, data, size, version, created_by, updated_by, created_at, updated_at) VALUES ('content-image-1', 'image/png', X'89504E47', 4, 1, 1, 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO events (id, title, description, start_time, end_time, is_all_day, color, reminder_minutes, created_at, updated_at) VALUES (1, 'Termin', NULL, '2026-05-20T08:00:00', '2026-05-20T09:00:00', 0, '#123456', 30, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO sent_notifications (id, event_id, user_id, channel, reminder_minutes, sent_at) VALUES (1, 1, 2, 'email', 30, '2026-05-20T07:30:00')",
+    "INSERT INTO backlog_items (id, project_id, feature_id, use_case_id, title, description, status, sort_order, created_at, updated_at) VALUES (1, 1, 1, 1, 'Backlog Alpha', 'Backlog Beschreibung', 'open', 1, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO project_features (project_id, feature_id) VALUES (1, 1)",
+    "INSERT INTO milestone_features (milestone_id, feature_id) VALUES (1, 1)",
+    "INSERT INTO project_tasks (owner_id, task_id, position) VALUES (1, 1, 1)",
+    "INSERT INTO milestone_tasks (owner_id, task_id, position) VALUES (1, 1, 2)",
+    "INSERT INTO feature_tasks (owner_id, task_id, position) VALUES (1, 1, 1)",
+    "INSERT INTO use_case_tasks (owner_id, task_id, position) VALUES (1, 1, 1)",
+    "INSERT INTO wiki_page_tasks (owner_id, task_id, position) VALUES (1, 1, 1)",
+    "INSERT INTO day_plan_tasks (owner_id, task_id, position) VALUES (1, 1, 3)",
+    "INSERT INTO project_tickets (owner_id, ticket_id, position) VALUES (1, 1, 1)",
+    "INSERT INTO milestone_tickets (owner_id, ticket_id, position) VALUES (1, 1, 2)",
+    "INSERT INTO wiki_page_tickets (owner_id, ticket_id, position) VALUES (1, 1, 1)",
+    "INSERT INTO wiki_page_relations (source_wiki_page_id, target_wiki_page_id, created_at, updated_at) VALUES (1, 2, '2026-05-17T08:00:00', '2026-05-17T08:00:00')",
+    "INSERT INTO project_events (project_id, event_id) VALUES (1, 1)",
+    "INSERT INTO milestone_events (milestone_id, event_id) VALUES (1, 1)",
+    "INSERT INTO task_events (task_id, event_id) VALUES (1, 1)",
+    "INSERT INTO day_plan_events (owner_id, event_id, position) VALUES (1, 1, 1)",
+    "INSERT INTO project_comments (project_id, comment_id) VALUES (1, 3)",
+    "INSERT INTO milestone_comments (milestone_id, comment_id) VALUES (1, 8)",
+    "INSERT INTO task_comments (task_id, comment_id) VALUES (1, 1)",
+    "INSERT INTO feature_comments (feature_id, comment_id) VALUES (1, 2)",
+    "INSERT INTO use_case_comments (use_case_id, comment_id) VALUES (1, 4)",
+    "INSERT INTO backlog_item_comments (backlog_item_id, comment_id) VALUES (1, 5)",
+    "INSERT INTO wiki_page_comments (wiki_page_id, comment_id) VALUES (1, 6)",
+    "INSERT INTO ticket_comments (ticket_id, comment_id) VALUES (1, 7)",
+    "INSERT INTO project_attachments (project_id, attachment_id) VALUES (1, 1)",
+    "INSERT INTO milestone_attachments (milestone_id, attachment_id) VALUES (1, 5)",
+    "INSERT INTO task_attachments (task_id, attachment_id) VALUES (1, 2)",
+    "INSERT INTO feature_attachments (feature_id, attachment_id) VALUES (1, 3)",
+    "INSERT INTO ticket_attachments (ticket_id, attachment_id) VALUES (1, 4)",
+    "INSERT INTO wiki_page_attachments (wiki_page_id, attachment_id) VALUES (1, 3)",
+  ];
+  for (const stmt of stmts) {
+    await pool.execute(stmt);
+  }
+  await pool.execute("SET FOREIGN_KEY_CHECKS=1");
 }
 
-function mutateLocalState(): void {
-  testDb.sqlite.exec(`
-    INSERT INTO projects (id, name, status, created_at, updated_at)
-      VALUES (99, 'Mutation', 'archived', '2026-05-17T09:00:00', '2026-05-17T09:00:00');
-    DELETE FROM comments WHERE id = 2;
-    UPDATE projects SET name = 'Mutiert' WHERE id = 1;
-  `);
+async function mutateLocalState(): Promise<void> {
+  await testDb.pool.execute("INSERT INTO projects (id, name, status, created_at, updated_at) VALUES (99, 'Mutation', 'archived', '2026-05-17T09:00:00', '2026-05-17T09:00:00')");
+  await testDb.pool.execute("DELETE FROM comments WHERE id = 2");
+  await testDb.pool.execute("UPDATE projects SET name = 'Mutiert' WHERE id = 1");
   fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "mutiert", "utf8");
   fs.writeFileSync(path.join(uploadDir, "extra.txt"), "extra", "utf8");
   fs.rmSync(path.join(contentDir, "wiki", "root.md"), { force: true });
@@ -540,7 +504,19 @@ function updateManifestTable(
   };
 }
 
-beforeEach(() => {
+// Create the test DB once for the entire file — migrations are expensive.
+// beforeEach truncates + reseeds for isolation.
+beforeAll(async () => {
+  testDb = await createTestDb();
+  setMysqlPoolForTests(testDb.pool);
+}, 120_000);
+
+afterAll(async () => {
+  setMysqlPoolForTests(null);
+  await testDb?.close();
+});
+
+beforeEach(async () => {
   tempRoot = path.join(vitestRuntimeRoot, "dump-local", crypto.randomUUID());
   uploadDir = path.join(tempRoot, "uploads");
   contentDir = path.join(tempRoot, "content");
@@ -553,7 +529,6 @@ beforeEach(() => {
   config.uploadDir = uploadDir;
   config.backupWorkDir = backupDir;
   config.previewCacheDir = previewDir;
-  config.databasePath = path.join(tempRoot, "taskmanager.sqlite");
   config.backupSftpEnabled = false;
   config.backupSftpHost = "";
   config.backupSftpPort = 22;
@@ -563,25 +538,21 @@ beforeEach(() => {
   config.backupSftpProtectedConfirmed = false;
   setBackupSftpClientFactoryForTests(null);
   setContentBaseDir(contentDir);
-  testDb = createFileTestDb(config.databasePath);
-  seedCompleteDataset();
-});
+  await truncateAll(testDb.pool);
+  await seedCompleteDataset();
+}, 30_000);
 
-afterEach(() => {
+afterEach(async () => {
   setBackupSftpClientFactoryForTests(null);
-  testDb.sqlite.close();
-  fs.rmSync(tempRoot, { recursive: true, force: true });
+  if (tempRoot) fs.rmSync(tempRoot, { recursive: true, force: true });
 });
 
 describe("Dump table contract", () => {
-  it("registriert alle Anwendungstabellen der aktuellen SQLite-Datenbank genau einmal", () => {
-    const databaseTables = (
-      testDb.sqlite
-        .prepare(
-          "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> '__drizzle_migrations' ORDER BY name",
-        )
-        .all() as Array<{ name: string }>
-    ).map((row) => row.name);
+  it("registriert alle Anwendungstabellen der aktuellen MySQL-Datenbank genau einmal", async () => {
+    const [tableRows] = await testDb.pool.execute(
+      "SELECT TABLE_NAME AS name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME NOT IN ('__drizzle_migrations_taskmanager') ORDER BY TABLE_NAME",
+    );
+    const databaseTables = (tableRows as Array<{ name: string }>).map((row) => row.name);
     const registeredTables = getRegisteredDumpTables()
       .map((entry) => entry.tableName)
       .sort();
@@ -618,37 +589,35 @@ describe("Local backup status", () => {
       fileCount: 0,
       latestFile: null,
     });
-    await app.close();
+    await app?.close();
   });
 
   it("stellt Partial-Backups aus ZIP-Dateien und verifizierten lokalen Basisdateien wieder her", async () => {
-    await saveDumpToLocalBackup(testDb.sqlite);
+    await saveDumpToLocalBackup();
     fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "Projektdatei neu", "utf8");
-    await saveDumpToLocalBackup(testDb.sqlite);
-    const expected = collectSnapshot();
+    await saveDumpToLocalBackup();
+    const expected = await collectSnapshot();
 
-    testDb.sqlite
-      .prepare("UPDATE projects SET name = 'Partial Mutation' WHERE id = 1")
-      .run();
+    await testDb.pool.execute("UPDATE projects SET name = 'Partial Mutation' WHERE id = 1");
     fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "kaputt", "utf8");
     fs.writeFileSync(path.join(uploadDir, "extra.txt"), "extra", "utf8");
-    expect(collectSnapshot()).not.toEqual(expected);
+    expect(await collectSnapshot()).not.toEqual(expected);
 
     const preview = await previewLatestLocalDump();
     expect(preview.transferReadiness).toBe("ready");
-    await applyLocalDump(testDb.sqlite, {
+    await applyLocalDump({
       fileId: preview.backupFile.id,
       fileHash: preview.fileHash,
       confirmationPhrase: preview.confirmationPhrase,
     });
 
-    expect(collectSnapshot()).toEqual(withoutContentFiles(expected));
+    expect(await collectSnapshot()).toEqual(withoutContentFiles(expected));
   });
 
   it("blockiert Partial-Backups, wenn eine unveränderte lokale Basisdatei fehlt", async () => {
-    await saveDumpToLocalBackup(testDb.sqlite);
+    await saveDumpToLocalBackup();
     fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "Projektdatei neu", "utf8");
-    await saveDumpToLocalBackup(testDb.sqlite);
+    await saveDumpToLocalBackup();
     fs.rmSync(path.join(uploadDir, "milestone-file.txt"), { force: true });
 
     const preview = await previewLatestLocalDump();
@@ -656,7 +625,7 @@ describe("Local backup status", () => {
     expect(preview.transferReadiness).toBe("blocked");
     expect(preview.blockingIssues.join(" ")).toContain("milestone-file.txt");
     await expect(
-      applyLocalDump(testDb.sqlite, {
+      applyLocalDump({
         fileId: preview.backupFile.id,
         fileHash: preview.fileHash,
         confirmationPhrase: preview.confirmationPhrase,
@@ -713,7 +682,7 @@ describe("Local backup status", () => {
         .expect(403);
     } finally {
       config.adminInitialPassword = originalAdminInitialPassword;
-      await app.close();
+      await app?.close();
     }
   });
 });
@@ -725,7 +694,7 @@ describe("Remote SFTP backup status", () => {
     const phases: string[] = [];
     const progressEvents: BackupProgressEvent[] = [];
 
-    const saveResult = await saveDumpToLocalBackup(testDb.sqlite, {
+    const saveResult = await saveDumpToLocalBackup({
       progressCallback: (event) => {
         phases.push(event.phase);
         progressEvents.push(event);
@@ -758,7 +727,7 @@ describe("Remote SFTP backup status", () => {
     ).toBe(true);
     expect(lastArchiveEvent?.current).toBe(lastArchiveEvent?.total);
 
-    const status = await getRemoteBackupStatus(testDb.sqlite);
+    const status = await getRemoteBackupStatus();
     expect(status.ready).toBe(true);
     expect(status.latestFile?.name).toBe(saveResult.filename);
   });
@@ -766,16 +735,16 @@ describe("Remote SFTP backup status", () => {
   it("importiert die neueste Remote-Datei und blockiert denselben Dateinamen dauerhaft", async () => {
     const remoteFiles = new Map<string, RemoteMockFile>();
     const metrics = configureMockSftp(remoteFiles);
-    const before = collectSnapshot();
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const before = await collectSnapshot();
+    const archive = await buildDumpArchive();
     remoteFiles.set(archive.filename, {
       buffer: archive.buffer,
       modifiedAt: Date.parse("2026-05-17T09:00:00.000Z"),
     });
-    mutateLocalState();
+    await mutateLocalState();
 
-    const preview = await previewRemoteDump(testDb.sqlite);
-    const applyResult = await applyRemoteDump(testDb.sqlite, {
+    const preview = await previewRemoteDump();
+    const applyResult = await applyRemoteDump({
       fileId: preview.backupFile.id,
       fileHash: preview.fileHash,
       previewToken: preview.previewToken,
@@ -783,10 +752,10 @@ describe("Remote SFTP backup status", () => {
     });
 
     expect(applyResult.verificationPassed).toBe(true);
-    expect(withoutContentFiles(withoutRemoteImportHistory(collectSnapshot()))).toEqual(withoutContentFiles(before));
+    expect(withoutContentFiles(withoutRemoteImportHistory(await collectSnapshot()))).toEqual(withoutContentFiles(before));
     expect(metrics.getPaths).toEqual([archive.filename]);
     await expect(
-      applyRemoteDump(testDb.sqlite, {
+      applyRemoteDump({
         fileId: preview.backupFile.id,
         fileHash: preview.fileHash,
         previewToken: preview.previewToken,
@@ -794,7 +763,7 @@ describe("Remote SFTP backup status", () => {
       }),
     ).rejects.toThrow("already imported");
 
-    const status = await getRemoteBackupStatus(testDb.sqlite);
+    const status = await getRemoteBackupStatus();
     expect(status.latestFile?.imported).toBe(true);
   });
 });
@@ -802,7 +771,7 @@ describe("Remote SFTP backup status", () => {
 
 describe("Local dump roundtrip", () => {
   it("exportiert Benutzer inklusive Standardadmin und mit roleCode", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const data = await parseZipJson(archive.buffer, "data.json");
     const tables = data.tables as Record<
       string,
@@ -831,16 +800,10 @@ describe("Local dump roundtrip", () => {
   });
 
   it("erhält Referenzen auf den Standardadmin im Export", async () => {
-    testDb.sqlite
-      .prepare(
-        "UPDATE projects SET created_by = 1, updated_by = 1 WHERE id = 1",
-      )
-      .run();
-    testDb.sqlite
-      .prepare("UPDATE journal_entries SET actor_user_id = 1 WHERE id = 1")
-      .run();
+    await testDb.pool.execute("UPDATE projects SET created_by = 1, updated_by = 1 WHERE id = 1");
+    await testDb.pool.execute("UPDATE journal_entries SET actor_user_id = 1 WHERE id = 1");
 
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const data = await parseZipJson(archive.buffer, "data.json");
     const tables = data.tables as Record<
       string,
@@ -854,7 +817,7 @@ describe("Local dump roundtrip", () => {
   });
 
   it("serialisiert Content-Image-BLOBs im JSON-Dump base64", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const data = await parseZipJson(archive.buffer, "data.json");
     const tables = data.tables as Record<
       string,
@@ -871,7 +834,7 @@ describe("Local dump roundtrip", () => {
   });
 
   it("packt beim ersten lokalen Backup alle Uploads und keine neuen Content-Dateien", async () => {
-    const result = await saveDumpToLocalBackup(testDb.sqlite);
+    const result = await saveDumpToLocalBackup();
     const buffer = fs.readFileSync(result.filePath);
     const entries = await zipEntryNames(buffer);
     const manifest = await parseZipJson(buffer, "manifest.json");
@@ -895,10 +858,10 @@ describe("Local dump roundtrip", () => {
   });
 
   it("packt beim Folgelauf nur geänderte Uploads und manifestiert weiter alle Uploads", async () => {
-    await saveDumpToLocalBackup(testDb.sqlite);
+    await saveDumpToLocalBackup();
     fs.writeFileSync(path.join(uploadDir, "project-file.txt"), "Projektdatei neu", "utf8");
 
-    const result = await saveDumpToLocalBackup(testDb.sqlite);
+    const result = await saveDumpToLocalBackup();
     const buffer = fs.readFileSync(result.filePath);
     const entries = await zipEntryNames(buffer);
     const manifest = await parseZipJson(buffer, "manifest.json");
@@ -923,7 +886,7 @@ describe("Local dump roundtrip", () => {
   });
 
   it("sichert und aktualisiert DB und Uploads als echten Roundtrip", async () => {
-    const before = collectSnapshot();
+    const before = await collectSnapshot();
     const app = await buildTestApp(testDb, { enableMultipart: true });
     setContentBaseDir(contentDir);
 
@@ -936,8 +899,8 @@ describe("Local dump roundtrip", () => {
     expect(
       fs.existsSync((saveResponse.body as { filePath: string }).filePath),
     ).toBe(true);
-    mutateLocalState();
-    expect(collectSnapshot()).not.toEqual(before);
+    await mutateLocalState();
+    expect(await collectSnapshot()).not.toEqual(before);
 
     const previewResponse = await supertest(app.server)
       .get("/api/dumps/local/latest/preview")
@@ -956,12 +919,12 @@ describe("Local dump roundtrip", () => {
     const applyResult = applyResponse.body as DumpBackupApplyResult;
 
     expect(applyResult.verificationPassed).toBe(true);
-    expect(collectSnapshot()).toEqual(withoutContentFiles(before));
-    await app.close();
+    expect(await collectSnapshot()).toEqual(withoutContentFiles(before));
+    await app?.close();
   });
 
   it("liest ZIP-Dateien beim Import nur einmal für Hash und Staging", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const file = writeBackupFile(archive.filename, archive.buffer);
     const preview = await inspectDumpArchive(archive.buffer, file);
     const bufferCalls = new Map<string, number>();
@@ -987,9 +950,7 @@ describe("Local dump roundtrip", () => {
       });
 
     try {
-      const applyResult = await applyLocalDump(
-        testDb.sqlite,
-        {
+      const applyResult = await applyLocalDump({
           fileId: file.id,
           fileHash: preview.fileHash,
           confirmationPhrase: preview.confirmationPhrase,
@@ -1021,48 +982,24 @@ describe("Local dump roundtrip", () => {
   });
 
   it("stellt Standardadmin, Setup-Status und Admin-Einstellungen aus dem Dump wieder her", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const file = writeBackupFile(archive.filename, archive.buffer);
     const preview = await inspectDumpArchive(archive.buffer, file);
-    testDb.sqlite
-      .prepare(
-        "UPDATE users SET first_name = 'Local', last_name = 'Owner', password_hash = 'target-only-hash', is_active = 0 WHERE email = 'admin@local'",
-      )
-      .run();
-    testDb.sqlite
-      .prepare(
-        "UPDATE app_settings SET value = 'false' WHERE key = 'admin_setup_done'",
-      )
-      .run();
-    testDb.sqlite
-      .prepare(
-        "UPDATE settings_values SET value_json = '\"local-kanban\"' WHERE scope_type = 'USER' AND scope_id = '1'",
-      )
-      .run();
+    await testDb.pool.execute("UPDATE users SET first_name = 'Local', last_name = 'Owner', password_hash = 'target-only-hash', is_active = 0 WHERE email = 'admin@local'");
+    await testDb.pool.execute("UPDATE app_settings SET value = 'false' WHERE `key` = 'admin_setup_done'");
+    await testDb.pool.execute("UPDATE settings_values SET value_json = '\"local-kanban\"' WHERE scope_type = 'USER' AND scope_id = '1'");
 
-    const applyResult = await applyLocalDump(testDb.sqlite, {
+    const applyResult = await applyLocalDump({
       fileId: file.id,
       fileHash: preview.fileHash,
       confirmationPhrase: preview.confirmationPhrase,
     });
-    const admin = testDb.sqlite
-      .prepare(
-        "SELECT first_name, last_name, password_hash, is_active FROM users WHERE email = 'admin@local'",
-      )
-      .get() as {
-      first_name: string;
-      last_name: string;
-      password_hash: string;
-      is_active: number;
-    };
-    const setup = testDb.sqlite
-      .prepare("SELECT value FROM app_settings WHERE key = 'admin_setup_done'")
-      .get() as { value: string };
-    const adminSetting = testDb.sqlite
-      .prepare(
-        "SELECT value_json FROM settings_values WHERE scope_type = 'USER' AND scope_id = '1'",
-      )
-      .get() as { value_json: string };
+    const [adminRows] = await testDb.pool.execute("SELECT first_name, last_name, password_hash, is_active FROM users WHERE email = 'admin@local'");
+    const admin = (adminRows as Array<{ first_name: string; last_name: string; password_hash: string; is_active: number }>)[0];
+    const [setupRows] = await testDb.pool.execute("SELECT value FROM app_settings WHERE `key` = 'admin_setup_done'");
+    const setup = (setupRows as Array<{ value: string }>)[0];
+    const [adminSettingRows] = await testDb.pool.execute("SELECT value_json FROM settings_values WHERE scope_type = 'USER' AND scope_id = '1'");
+    const adminSetting = (adminSettingRows as Array<{ value_json: string }>)[0];
 
     expect(applyResult.verificationPassed).toBe(true);
     expect(admin).toEqual({
@@ -1077,7 +1014,7 @@ describe("Local dump roundtrip", () => {
   });
 
   it("setzt bei alten Dumps ohne Standardadmin den lokalen Admin für fehlende Admin-Referenzen ein", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const data = await parseZipJson(archive.buffer, "data.json");
     const manifest = await parseZipJson(archive.buffer, "manifest.json");
     data.formatVersion = 10;
@@ -1097,31 +1034,18 @@ describe("Local dump roundtrip", () => {
     const legacyArchive = await replaceDumpJson(archive.buffer, data, manifest);
     const file = writeBackupFile(archive.filename, legacyArchive);
     const preview = await inspectDumpArchive(legacyArchive, file);
-    testDb.sqlite
-      .prepare(
-        "UPDATE users SET first_name = 'Local', last_name = 'Fallback', password_hash = 'local-fallback-hash' WHERE id = 1",
-      )
-      .run();
-    mutateLocalState();
+    await testDb.pool.execute("UPDATE users SET first_name = 'Local', last_name = 'Fallback', password_hash = 'local-fallback-hash' WHERE id = 1");
+    await mutateLocalState();
 
-    const applyResult = await applyLocalDump(testDb.sqlite, {
+    const applyResult = await applyLocalDump({
       fileId: file.id,
       fileHash: preview.fileHash,
       confirmationPhrase: preview.confirmationPhrase,
     });
-    const admin = testDb.sqlite
-      .prepare(
-        "SELECT id, first_name, last_name, password_hash FROM users WHERE email = 'admin@local'",
-      )
-      .get() as {
-      id: number;
-      first_name: string;
-      last_name: string;
-      password_hash: string;
-    };
-    const dayPlan = testDb.sqlite
-      .prepare("SELECT user_id, created_by, updated_by FROM day_plans WHERE id = 1")
-      .get() as { user_id: number; created_by: number; updated_by: number };
+    const [adminFallbackRows] = await testDb.pool.execute("SELECT id, first_name, last_name, password_hash FROM users WHERE email = 'admin@local'");
+    const admin = (adminFallbackRows as Array<{ id: number; first_name: string; last_name: string; password_hash: string }>)[0];
+    const [dayPlanRows] = await testDb.pool.execute("SELECT user_id, created_by, updated_by FROM day_plans WHERE id = 1");
+    const dayPlan = (dayPlanRows as Array<{ user_id: number; created_by: number; updated_by: number }>)[0];
 
     expect(applyResult.verificationPassed).toBe(true);
     expect(admin).toEqual({
@@ -1131,11 +1055,11 @@ describe("Local dump roundtrip", () => {
       password_hash: "local-fallback-hash",
     });
     expect(dayPlan).toEqual({ user_id: 1, created_by: 1, updated_by: 1 });
-    expect(testDb.sqlite.pragma("foreign_key_check") as unknown[]).toEqual([]);
+    // MySQL enforces FK constraints natively; no manual check needed
   });
 
   it("importiert bestehende rohe User-Dumps mit role_id weiterhin", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const data = await parseZipJson(archive.buffer, "data.json");
     const manifest = await parseZipJson(archive.buffer, "manifest.json");
     data.formatVersion = 8;
@@ -1160,9 +1084,9 @@ describe("Local dump roundtrip", () => {
     const legacyArchive = await replaceDumpJson(archive.buffer, data, manifest);
     const file = writeBackupFile(archive.filename, legacyArchive);
     const preview = await inspectDumpArchive(legacyArchive, file);
-    mutateLocalState();
+    await mutateLocalState();
 
-    const applyResult = await applyLocalDump(testDb.sqlite, {
+    const applyResult = await applyLocalDump({
       fileId: file.id,
       fileHash: preview.fileHash,
       confirmationPhrase: preview.confirmationPhrase,
@@ -1170,15 +1094,12 @@ describe("Local dump roundtrip", () => {
 
     expect(preview.transferReadiness).toBe("ready");
     expect(applyResult.verificationPassed).toBe(true);
-    expect(
-      testDb.sqlite
-        .prepare("SELECT role_id FROM users WHERE email = 'ada@example.test'")
-        .get(),
-    ).toEqual({ role_id: 2 });
+    const [roleRows] = await testDb.pool.execute("SELECT role_id FROM users WHERE email = 'ada@example.test'");
+    expect((roleRows as Array<{ role_id: number }>)[0]).toEqual({ role_id: 2 });
   });
 
   it("überspringt neuere defekte lokale Dateien und nutzt die neueste valide Sicherung", async () => {
-    const validArchive = await buildDumpArchive(testDb.sqlite);
+    const validArchive = await buildDumpArchive();
     const validFile = writeBackupFile(
       "taskmanager_dump_valid.zip",
       validArchive.buffer,
@@ -1201,32 +1122,32 @@ describe("Local dump roundtrip", () => {
 
 describe("Dump import failure safety", () => {
   it("blockiert Hash-Mismatch und falsche Sicherheitsphrase ohne lokale Änderung", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const file = writeBackupFile(archive.filename, archive.buffer);
-    const before = collectSnapshot();
+    const before = await collectSnapshot();
     const preview = await inspectDumpArchive(archive.buffer, file);
 
     await expect(
-      applyLocalDump(testDb.sqlite, {
+      applyLocalDump({
         fileId: file.id,
         fileHash: `${preview.fileHash}x`,
         confirmationPhrase: preview.confirmationPhrase,
       }),
     ).rejects.toThrow();
-    expect(collectSnapshot()).toEqual(before);
+    expect(await collectSnapshot()).toEqual(before);
 
     await expect(
-      applyLocalDump(testDb.sqlite, {
+      applyLocalDump({
         fileId: file.id,
         fileHash: preview.fileHash,
         confirmationPhrase: "falsch",
       }),
     ).rejects.toThrow();
-    expect(collectSnapshot()).toEqual(before);
+    expect(await collectSnapshot()).toEqual(before);
   });
 
   it("blockiert Manifest-Mismatch ohne lokale Änderung", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const data = await parseZipJson(archive.buffer, "data.json");
     const manifest = await parseZipJson(archive.buffer, "manifest.json");
     const manifestTables = manifest.tables as Record<
@@ -1239,22 +1160,22 @@ describe("Dump import failure safety", () => {
     };
     const badArchive = await replaceDumpJson(archive.buffer, data, manifest);
     const file = writeBackupFile(archive.filename, badArchive);
-    const before = collectSnapshot();
+    const before = await collectSnapshot();
 
     const preview = await inspectDumpArchive(badArchive, file);
     expect(preview.transferReadiness).toBe("blocked");
     await expect(
-      applyLocalDump(testDb.sqlite, {
+      applyLocalDump({
         fileId: file.id,
         fileHash: preview.fileHash,
         confirmationPhrase: preview.confirmationPhrase,
       }),
     ).rejects.toThrow();
-    expect(collectSnapshot()).toEqual(before);
+    expect(await collectSnapshot()).toEqual(before);
   });
 
   it("blockiert User-Dumps mit unbekanntem roleCode ohne lokale Änderung", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const data = await parseZipJson(archive.buffer, "data.json");
     const manifest = await parseZipJson(archive.buffer, "manifest.json");
     const tables = data.tables as Record<
@@ -1272,7 +1193,7 @@ describe("Dump import failure safety", () => {
     };
     const badArchive = await replaceDumpJson(archive.buffer, data, manifest);
     const file = writeBackupFile(archive.filename, badArchive);
-    const before = collectSnapshot();
+    const before = await collectSnapshot();
 
     const preview = await inspectDumpArchive(badArchive, file);
     expect(preview.transferReadiness).toBe("blocked");
@@ -1280,17 +1201,17 @@ describe("Dump import failure safety", () => {
       preview.blockingIssues.some((issue) => issue.includes("unknown role")),
     ).toBe(true);
     await expect(
-      applyLocalDump(testDb.sqlite, {
+      applyLocalDump({
         fileId: file.id,
         fileHash: preview.fileHash,
         confirmationPhrase: preview.confirmationPhrase,
       }),
     ).rejects.toThrow();
-    expect(collectSnapshot()).toEqual(before);
+    expect(await collectSnapshot()).toEqual(before);
   });
 
   it("blockiert fehlende Nicht-Admin-User-Referenzen und rollt vollständig zurück", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const data = await parseZipJson(archive.buffer, "data.json");
     const manifest = await parseZipJson(archive.buffer, "manifest.json");
     const tables = data.tables as Record<
@@ -1303,27 +1224,27 @@ describe("Dump import failure safety", () => {
     updateManifestTable(manifest, "users", tables.users);
     const badArchive = await replaceDumpJson(archive.buffer, data, manifest);
     const file = writeBackupFile(archive.filename, badArchive);
-    const before = collectSnapshot();
-    mutateLocalState();
-    const mutated = collectSnapshot();
+    const before = await collectSnapshot();
+    await mutateLocalState();
+    const mutated = await collectSnapshot();
 
     const preview = await inspectDumpArchive(badArchive, file);
     expect(preview.transferReadiness).toBe("ready");
     await expect(
-      applyLocalDump(testDb.sqlite, {
+      applyLocalDump({
         fileId: file.id,
         fileHash: preview.fileHash,
         confirmationPhrase: preview.confirmationPhrase,
       }),
     ).rejects.toThrow("Dump import is missing referenced users.id values");
 
-    expect(collectSnapshot()).toEqual(mutated);
-    expect(collectSnapshot()).not.toEqual(before);
-    expect(testDb.sqlite.pragma("foreign_key_check") as unknown[]).toEqual([]);
+    expect(await collectSnapshot()).toEqual(mutated);
+    expect(await collectSnapshot()).not.toEqual(before);
+    // MySQL enforces FK constraints natively; no manual check needed
   });
 
   it("rollt ungültige Fremdschlüssel vollständig zurück", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const data = await parseZipJson(archive.buffer, "data.json");
     const manifest = await parseZipJson(archive.buffer, "manifest.json");
     const tables = data.tables as Record<
@@ -1341,37 +1262,35 @@ describe("Dump import failure safety", () => {
     };
     const badArchive = await replaceDumpJson(archive.buffer, data, manifest);
     const file = writeBackupFile(archive.filename, badArchive);
-    const before = collectSnapshot();
-    mutateLocalState();
-    const mutated = collectSnapshot();
+    const before = await collectSnapshot();
+    await mutateLocalState();
+    const mutated = await collectSnapshot();
 
     const preview = await inspectDumpArchive(badArchive, file);
     expect(preview.transferReadiness).toBe("ready");
     await expect(
-      applyLocalDump(testDb.sqlite, {
+      applyLocalDump({
         fileId: file.id,
         fileHash: preview.fileHash,
         confirmationPhrase: preview.confirmationPhrase,
       }),
     ).rejects.toThrow();
 
-    expect(collectSnapshot()).toEqual(mutated);
-    expect(collectSnapshot()).not.toEqual(before);
-    expect(testDb.sqlite.pragma("foreign_key_check") as unknown[]).toEqual([]);
+    expect(await collectSnapshot()).toEqual(mutated);
+    expect(await collectSnapshot()).not.toEqual(before);
+    // MySQL enforces FK constraints natively; no manual check needed
   });
 
   it("stellt Dateisystem und DB nach Fehler während des Dateitauschs wieder her", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const file = writeBackupFile(archive.filename, archive.buffer);
-    const before = collectSnapshot();
-    mutateLocalState();
-    const mutated = collectSnapshot();
+    const before = await collectSnapshot();
+    await mutateLocalState();
+    const mutated = await collectSnapshot();
     const preview = await inspectDumpArchive(archive.buffer, file);
 
     await expect(
-      applyLocalDump(
-        testDb.sqlite,
-        {
+      applyLocalDump({
           fileId: file.id,
           fileHash: preview.fileHash,
           confirmationPhrase: preview.confirmationPhrase,
@@ -1384,23 +1303,23 @@ describe("Dump import failure safety", () => {
       ),
     ).rejects.toThrow("Simulierter Dateitauschfehler");
 
-    expect(collectSnapshot()).toEqual(mutated);
-    expect(collectSnapshot()).not.toEqual(before);
+    expect(await collectSnapshot()).toEqual(mutated);
+    expect(await collectSnapshot()).not.toEqual(before);
   });
 
   it("verändert bei unsicheren Dateinamen und kaputten ZIPs keine lokalen Daten", async () => {
-    const archive = await buildDumpArchive(testDb.sqlite);
+    const archive = await buildDumpArchive();
     const file = writeBackupFile(archive.filename, archive.buffer);
-    const before = collectSnapshot();
+    const before = await collectSnapshot();
 
     await expect(
-      applyLocalDump(testDb.sqlite, {
+      applyLocalDump({
         fileId: `../${file.id}`,
         fileHash: "irrelevant",
         confirmationPhrase: "irrelevant",
       }),
     ).rejects.toThrow();
-    expect(collectSnapshot()).toEqual(before);
+    expect(await collectSnapshot()).toEqual(before);
 
     fs.rmSync(path.join(backupDir, file.id), { force: true });
     writeBackupFile(
@@ -1408,6 +1327,6 @@ describe("Dump import failure safety", () => {
       await zipFromEntries([{ name: "readme.txt", content: "missing data" }]),
     );
     await expect(previewLatestLocalDump()).rejects.toThrow();
-    expect(collectSnapshot()).toEqual(before);
+    expect(await collectSnapshot()).toEqual(before);
   });
 });

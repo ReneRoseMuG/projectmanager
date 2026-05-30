@@ -1,5 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { db, sqlite } from "./db/client.js";
+import { db } from "./db/client.js";
 import { registerCors } from "./plugins/cors.js";
 import { registerAuthPlugins, registerGlobalAuthGuard } from "./plugins/auth.js";
 import { registerMultipart } from "./plugins/multipart.js";
@@ -41,19 +41,17 @@ import { stopAllAttachmentWatchers } from "./services/attachment-watcher.service
 import { createRealtimeEventBus } from "./services/realtime-event-bus.service.js";
 import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
 import { seedAuthData } from "./services/auth.service.js";
+import { seedDefaultCatalogEntries } from "./services/catalogs.service.js";
 import { errorHandler } from "./utils/errors.js";
-import type Database from "better-sqlite3";
 
 export async function buildApp(
-  injectedDb: typeof db = db,
-  injectedSqlite: Database.Database = sqlite
+  injectedDb: typeof db = db
 ): Promise<FastifyInstance> {
   assertSafeTestRuntimeTargets(config);
 
   const app = Fastify({ logger: true });
 
   app.decorate("db", injectedDb);
-  app.decorate("sqlite", injectedSqlite);
   app.decorate("fileOpener", openFileWithDefaultApp);
   app.decorate("realtimeBus", createRealtimeEventBus());
   app.setErrorHandler(errorHandler);
@@ -67,6 +65,7 @@ export async function buildApp(
   await registerStatic(app);
   await registerRealtimePublisher(app);
   await seedAuthData(injectedDb);
+  await seedDefaultCatalogEntries(injectedDb);
 
   app.get("/health", async () => ({ ok: true }));
 

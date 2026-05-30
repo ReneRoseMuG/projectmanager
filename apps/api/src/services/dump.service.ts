@@ -20,11 +20,24 @@ import path from "node:path";
 import { Transform } from "node:stream";
 import unzipper from "unzipper";
 import { config } from "../config.js";
-import { mysqlPool } from "../db/client.js";
+import { mysqlPool as _productionPool } from "../db/client.js";
 import {
-  assertSafeTestDatabasePath,
   assertSafeTestDirectoryPath,
 } from "../runtime-safety.js";
+
+let _poolOverride: typeof _productionPool | null = null;
+
+export function setMysqlPoolForTests(pool: typeof _productionPool | null): void {
+  _poolOverride = pool;
+}
+
+const mysqlPool = new Proxy(_productionPool, {
+  get(target, prop, _receiver) {
+    const pool = _poolOverride ?? target;
+    const value = Reflect.get(pool as object, prop, pool);
+    return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(pool) : value;
+  }
+});
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import {
   downloadBackupSftpFile,
@@ -283,8 +296,7 @@ function ensureWorkDir(): string {
 }
 
 function localBackupManifestPath(): string {
-  const dataDir = path.dirname(config.databasePath);
-  fs.mkdirSync(dataDir, { recursive: true });
+  const dataDir = ensureWorkDir();
   return path.join(dataDir, "last-backup-manifest.json");
 }
 
@@ -386,7 +398,6 @@ function mapRemoteBackupFile(
 }
 
 function assertSafeDumpRuntimeTargets(): void {
-  assertSafeTestDatabasePath(config.databasePath);
   assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   assertSafeTestDirectoryPath(getContentBaseDir(), "CONTENT_DIR");
   assertSafeTestDirectoryPath(config.backupWorkDir, "BACKUP_WORK_DIR");
@@ -615,6 +626,14 @@ async function collectDumpTableRows(): Promise<DumpTableRows> {
     result[entry.key] = await selectTableRows(entry.tableName);
   }
   return normalizeDumpTables(result);
+}
+
+async function collectRawTableRows(): Promise<DumpTableRows> {
+  const result = {} as DumpTableRows;
+  for (const entry of DUMP_TABLES) {
+    result[entry.key] = await selectTableRows(entry.tableName);
+  }
+  return result;
 }
 
 function buildTableManifest(
@@ -1274,9 +1293,9 @@ function validatePartialLocalBase(
 
 function buildConfirmationPhrase(
   dumpId: string,
-  targetDatabasePath: string,
+  targetDbName: string,
 ): string {
-  return `AKTUALISIERE TASKMANAGER ${dumpId} NACH ${path.basename(targetDatabasePath)}`;
+  return `AKTUALISIERE TASKMANAGER ${dumpId} NACH ${targetDbName}`;
 }
 
 export async function inspectDumpArchive(
@@ -1416,7 +1435,7 @@ export async function inspectDumpArchive(
     fileHash: sha256Buffer(buffer),
     dumpId: payload.dumpId,
     backupFile,
-    targetDatabasePath: config.databasePath,
+    targetDatabasePath: config.db.name,
     transferReadiness:
       blockingIssues.length > 0
         ? "blocked"
@@ -1427,7 +1446,7 @@ export async function inspectDumpArchive(
     warnings,
     confirmationPhrase: buildConfirmationPhrase(
       payload.dumpId,
-      config.databasePath,
+      config.db.name,
     ),
     manifestPresent: manifest !== null,
     schemaRevision: manifest?.schemaRevision ?? null,
@@ -1802,7 +1821,68 @@ async function restoreLegacyStandardAdminFallback(
     refreshedTableKeys.add("users");
   }
 
+  // Replace orphaned user FK references with the fallback admin's ID.
+  // This only applies to legacy dumps that have no admin user: missing user references
+  // are silently replaced with the local admin so the restore can succeed.
+  const [fkRows] = await mysqlPool.execute(
+    `SELECT TABLE_NAME, COLUMN_NAME
+     FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
+       AND REFERENCED_TABLE_NAME = 'users'
+       AND REFERENCED_COLUMN_NAME = 'id'`,
+  );
+  const tableNameToKey = new Map(DUMP_TABLES.map((entry) => [entry.tableName, entry.key]));
+  for (const fkRow of fkRows as Array<{ TABLE_NAME: string; COLUMN_NAME: string }>) {
+    const [result] = await mysqlPool.execute(
+      `UPDATE \`${fkRow.TABLE_NAME}\` SET \`${fkRow.COLUMN_NAME}\` = ?
+       WHERE \`${fkRow.COLUMN_NAME}\` IS NOT NULL
+         AND \`${fkRow.COLUMN_NAME}\` NOT IN (SELECT id FROM \`users\`)`,
+      [fallback.id],
+    );
+    const affectedRows = (result as { affectedRows: number }).affectedRows;
+    if (affectedRows > 0) {
+      const key = tableNameToKey.get(fkRow.TABLE_NAME);
+      if (key) {
+        refreshedTableKeys.add(key as DumpTableKey);
+      }
+    }
+  }
+
   return refreshedTableKeys;
+}
+
+async function validateAllForeignKeysInPayload(payload: DumpPayload): Promise<void> {
+  const [fkRows] = await mysqlPool.execute(
+    `SELECT TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+     FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
+       AND REFERENCED_TABLE_NAME IS NOT NULL`,
+  );
+  const tableNameToKey = new Map(DUMP_TABLES.map((e) => [e.tableName, e.key as DumpTableKey]));
+  for (const fkRow of fkRows as Array<{ TABLE_NAME: string; COLUMN_NAME: string; REFERENCED_TABLE_NAME: string; REFERENCED_COLUMN_NAME: string }>) {
+    const key = tableNameToKey.get(fkRow.TABLE_NAME);
+    const refKey = tableNameToKey.get(fkRow.REFERENCED_TABLE_NAME);
+    if (!key || !refKey) continue;
+    const rows = payload.tables[key];
+    const refRows = payload.tables[refKey];
+    if (!rows?.length || !refRows) continue;
+    const validIds = new Set(
+      refRows
+        .map((r) => numericValue(r[fkRow.REFERENCED_COLUMN_NAME]))
+        .filter((id): id is number => id !== null && id > 0),
+    );
+    for (const row of rows) {
+      const rawVal = row[fkRow.COLUMN_NAME];
+      if (rawVal === null || rawVal === undefined) continue;
+      const refId = numericValue(rawVal);
+      if (refId !== null && refId > 0 && !validIds.has(refId)) {
+        if (fkRow.REFERENCED_TABLE_NAME === "users") {
+          throw badRequest("Dump import is missing referenced users.id values");
+        }
+        throw badRequest(`Dump import has an invalid ${fkRow.TABLE_NAME}.${fkRow.COLUMN_NAME} reference`);
+      }
+    }
+  }
 }
 
 function refreshExpectedTableSummary(
@@ -1827,6 +1907,11 @@ async function restoreTables(
   payload: DumpPayload,
 ): Promise<RestoreTablesResult> {
   const legacyStandardAdminFallback = await createLegacyStandardAdminFallback(payload);
+
+  // Validate user FK references before making any DB changes so no rollback is needed.
+  if (legacyStandardAdminFallback === null) {
+    await validateAllForeignKeysInPayload(payload);
+  }
 
   await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 0");
   try {
@@ -2231,6 +2316,20 @@ export async function applyLocalDump(
   return applyInspectedDump(preview, options);
 }
 
+async function rollbackTableSnapshot(snapshot: DumpTableRows): Promise<void> {
+  await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 0");
+  try {
+    for (const entry of [...DUMP_TABLES].reverse()) {
+      await mysqlPool.execute(`DELETE FROM \`${entry.tableName}\``);
+    }
+    for (const entry of DUMP_TABLES) {
+      await insertRows(entry.tableName, snapshot[entry.key] ?? []);
+    }
+  } finally {
+    await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 1");
+  }
+}
+
 async function applyInspectedDump(
   preview: InspectedDump,
   options: ApplyDumpOptions = {},
@@ -2263,6 +2362,7 @@ async function applyInspectedDump(
     let swaps: FileRootSwap[] = [];
     let tablesRestored = 0;
     let fileRootsTouched = false;
+    const dbSnapshot = await collectRawTableRows();
 
     try {
       const restoreResult = await restoreTables(preview.payload);
@@ -2296,6 +2396,7 @@ async function applyInspectedDump(
     } catch (error) {
       if (fileRootsTouched) {
         restoreSwappedFileRoots(swaps);
+        await rollbackTableSnapshot(dbSnapshot);
       }
       throw error;
     } finally {

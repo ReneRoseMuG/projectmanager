@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  * Attachments API
  *
@@ -62,7 +62,7 @@ describe("Attachments API", () => {
   beforeAll(async () => {
     process.env.UPLOAD_DIR = uploadDir;
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     openedPaths = [];
     openerError = null;
     app = await buildTestApp(testDb, {
@@ -76,10 +76,10 @@ describe("Attachments API", () => {
     });
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     openedPaths = [];
     openerError = null;
-    truncateAll(testDb.sqlite);
+    await truncateAll(testDb.pool);
   });
 
   afterEach(async () => {
@@ -94,8 +94,8 @@ describe("Attachments API", () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
   });
@@ -215,7 +215,8 @@ describe("Attachments API", () => {
 
     const listed = await supertest(app.server).get(`/api/wiki/${page.id}/attachments`).expect(200);
     expect(listed.body).toEqual([]);
-    expect(testDb.sqlite.prepare("SELECT id FROM attachments WHERE id = ?").get(created.body.id)).toBeUndefined();
+    const [existRows] = await testDb.pool.execute("SELECT id FROM attachments WHERE id = ?", [created.body.id]);
+    expect((existRows as unknown[]).length).toBe(0);
   });
 
   it("POST zu nicht existierendem Projekt gibt 404 zurueck", async () => {
@@ -299,11 +300,8 @@ describe("Attachments API", () => {
       .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("vorher"), { filename: "watch.txt", contentType: "text/plain" })
       .expect(201);
-    const before = testDb.sqlite.prepare("SELECT size, version, updated_at FROM attachments WHERE id = ?").get(upload.body.id) as {
-      size: number;
-      version: number;
-      updated_at: string;
-    };
+    const [beforeRows] = await testDb.pool.execute("SELECT size, version, updated_at FROM attachments WHERE id = ?", [upload.body.id]);
+    const before = (beforeRows as Array<{ size: number; version: number; updated_at: string }>)[0];
 
     setAttachmentWatcherPollIntervalForTests(20);
     await supertest(app.server).post(`/api/attachments/${upload.body.id}/open`).expect(204);
@@ -313,10 +311,8 @@ describe("Attachments API", () => {
     await fs.writeFile(diskPath, "nachher-groesser", "utf8");
 
     await waitForCondition(() => getActiveAttachmentWatcherCountForTests() === 0, 3000);
-    const after = testDb.sqlite.prepare("SELECT size, version FROM attachments WHERE id = ?").get(upload.body.id) as {
-      size: number;
-      version: number;
-    };
+    const [afterRows] = await testDb.pool.execute("SELECT size, version FROM attachments WHERE id = ?", [upload.body.id]);
+    const after = (afterRows as Array<{ size: number; version: number }>)[0];
     expect(after).toMatchObject({
       size: Buffer.byteLength("nachher-groesser"),
       version: before.version + 1
@@ -332,14 +328,16 @@ describe("Attachments API", () => {
       .post(`/api/projects/${project.id}/attachments`)
       .attach("file", Buffer.from("timeout"), { filename: "timeout.txt", contentType: "text/plain" })
       .expect(201);
-    const before = testDb.sqlite.prepare("SELECT size, version FROM attachments WHERE id = ?").get(upload.body.id) as { size: number; version: number };
+    const [beforeRows2] = await testDb.pool.execute("SELECT size, version FROM attachments WHERE id = ?", [upload.body.id]);
+    const before = (beforeRows2 as Array<{ size: number; version: number }>)[0];
 
     await supertest(app.server).post(`/api/attachments/${upload.body.id}/open`).expect(204);
     await waitForCondition(() => getActiveAttachmentWatcherCountForTests() === 0);
     await fs.writeFile(path.join(uploadDir, upload.body.filename), "timeout-geändert", "utf8");
     await new Promise((resolve) => setTimeout(resolve, 80));
 
-    const after = testDb.sqlite.prepare("SELECT size, version FROM attachments WHERE id = ?").get(upload.body.id) as { size: number; version: number };
+    const [afterRows2] = await testDb.pool.execute("SELECT size, version FROM attachments WHERE id = ?", [upload.body.id]);
+    const after = (afterRows2 as Array<{ size: number; version: number }>)[0];
     expect(after).toEqual(before);
   });
 
@@ -386,7 +384,7 @@ describe("Attachments API Auth", () => {
   beforeAll(async () => {
     process.env.UPLOAD_DIR = uploadDir;
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, {
       enableAuth: true,
       enableMultipart: true,
@@ -394,7 +392,7 @@ describe("Attachments API Auth", () => {
     });
   });
 
-  beforeEach(() => truncateAll(testDb.sqlite));
+  beforeEach(async () => { await truncateAll(testDb.pool); });
 
   afterEach(async () => {
     await fs.rm(uploadDir, { recursive: true, force: true });
@@ -404,8 +402,8 @@ describe("Attachments API Auth", () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
   });
@@ -433,7 +431,8 @@ describe("Attachments API Auth", () => {
   it("POST /api/attachments/:id/open erlaubt Readern mit attachments:read den POST", async () => {
     const attachment = await createAttachmentWithAdmin();
     const admin = await loginAdmin();
-    const readerRole = testDb.sqlite.prepare("SELECT id FROM roles WHERE key = 'reader'").get() as { id: number };
+    const [readerRoleRows] = await testDb.pool.execute("SELECT id FROM roles WHERE `key` = 'reader'");
+    const readerRole = (readerRoleRows as Array<{ id: number }>)[0];
     await admin
       .post("/api/admin/users")
       .send({ firstName: "Read", lastName: "Only", email: "attachment-reader@example.test", roleId: readerRole.id, password: "password123", isActive: true })

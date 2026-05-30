@@ -400,7 +400,7 @@ export async function createComment(
 }
 
 export async function createEvent(
-  app: FastifyInstance,
+  appOrAgent: FastifyInstance | ReturnType<typeof supertest.agent>,
   overrides: Partial<{
     title: string;
     startTime: string;
@@ -422,7 +422,8 @@ export async function createEvent(
     ...overrides
   };
 
-  const res = await supertest(app.server).post("/api/events").send(body).expect(201);
+  const client = "server" in appOrAgent ? supertest(appOrAgent.server) : appOrAgent;
+  const res = await client.post("/api/events").send(body).expect(201);
   return res.body as TestEvent;
 }
 

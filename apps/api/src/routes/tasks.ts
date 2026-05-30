@@ -1,4 +1,4 @@
-import type { TaskBoardPositionInput, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+﻿import type { TaskBoardPositionInput, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requireCurrentUser } from "../plugins/auth.js";
 import {
@@ -125,7 +125,7 @@ async function ensureDashboardDayPlanAccess(app: FastifyInstance, request: Fasti
     return;
   }
   const currentUser = await requireCurrentUser(request);
-  ensureDayPlanOwnedByUser(app.db, owner.id, currentUser.id);
+  await ensureDayPlanOwnedByUser(app.db, owner.id, currentUser.id);
 }
 
 export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
@@ -136,7 +136,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     { schema: { querystring: dashboardTaskQuerySchema, response: { 200: objectResponseSchema } } },
     async (request) => {
       const owner = taskOwnerFromQuery(request.query);
-      ensureDashboardDayPlanAccess(app, request, owner);
+      await ensureDashboardDayPlanAccess(app, request, owner);
       return getTaskStats(app.db, owner);
     }
   );
@@ -146,7 +146,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     { schema: { querystring: dashboardTaskQuerySchema, response: { 200: arrayResponseSchema } } },
     async (request) => {
       const owner = taskOwnerFromQuery(request.query);
-      ensureDashboardDayPlanAccess(app, request, owner);
+      await ensureDashboardDayPlanAccess(app, request, owner);
       return listRecentTasks(app.db, { owner, limit: request.query.limit, sort: request.query.sort });
     }
   );
@@ -156,7 +156,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     { schema: { querystring: dashboardOverdueTaskQuerySchema, response: { 200: arrayResponseSchema } } },
     async (request) => {
       const owner = overdueTaskOwnerFromQuery(request.query);
-      ensureDashboardDayPlanAccess(app, request, owner);
+      await ensureDashboardDayPlanAccess(app, request, owner);
       return listOverdueTasks(app.db, { owner, limit: request.query.limit });
     }
   );
@@ -177,7 +177,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/projects/:id/tasks",
     { schema: { params: idParamSchema, body: taskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const task = createOwnerTask(app.db, { type: "project", id: request.params.id }, request.body, createJournalActor(request.currentUser));
+      const task = await createOwnerTask(app.db, { type: "project", id: request.params.id }, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(task);
     }
   );
@@ -192,7 +192,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/milestones/:id/tasks",
     { schema: { params: idParamSchema, body: taskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const task = createOwnerTask(app.db, { type: "milestone", id: request.params.id }, request.body, createJournalActor(request.currentUser));
+      const task = await createOwnerTask(app.db, { type: "milestone", id: request.params.id }, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(task);
     }
   );
@@ -207,7 +207,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/features/:id/tasks",
     { schema: { params: idParamSchema, body: taskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const task = createOwnerTask(app.db, { type: "feature", id: request.params.id }, request.body, createJournalActor(request.currentUser));
+      const task = await createOwnerTask(app.db, { type: "feature", id: request.params.id }, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(task);
     }
   );
@@ -222,7 +222,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/use-cases/:id/tasks",
     { schema: { params: idParamSchema, body: taskBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const task = createOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.body, createJournalActor(request.currentUser));
+      const task = await createOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(task);
     }
   );
@@ -262,7 +262,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
       `${basePath}/:id/tasks`,
       { schema: { params: idParamSchema, body: taskLinkBodySchema, response: { 201: objectResponseSchema } } },
       async (request, reply) => {
-        const task = linkOwnerTask(
+        const task = await linkOwnerTask(
           app.db,
           { type: "wikiPage", id: request.params.id },
           request.body.taskId,
@@ -277,7 +277,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
       `${basePath}/:id/tasks/:taskId`,
       { schema: { params: ownerTaskParamSchema, response: { 204: { type: "null" } } } },
       async (request, reply) => {
-        unlinkOwnerTask(app.db, { type: "wikiPage", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
+        await unlinkOwnerTask(app.db, { type: "wikiPage", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
         return reply.status(204).send();
       }
     );
@@ -287,7 +287,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/projects/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      unlinkOwnerTask(app.db, { type: "project", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
+      await unlinkOwnerTask(app.db, { type: "project", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -296,7 +296,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/milestones/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      unlinkOwnerTask(app.db, { type: "milestone", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
+      await unlinkOwnerTask(app.db, { type: "milestone", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -305,7 +305,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/features/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      unlinkOwnerTask(app.db, { type: "feature", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
+      await unlinkOwnerTask(app.db, { type: "feature", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -314,7 +314,7 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/use-cases/:id/tasks/:taskId",
     { schema: { params: ownerTaskParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      unlinkOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
+      await unlinkOwnerTask(app.db, { type: "useCase", id: request.params.id }, request.params.taskId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

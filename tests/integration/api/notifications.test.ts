@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Test-Ebene:
  * - Integration
  *
  * Realitätsgrad:
- * - Echte Fastify-App, echte SQLite-Testdatenbank, echte Rollen und Sessions.
+ * - Echte Fastify-App, echte MySQL-Testdatenbank, echte Rollen und Sessions.
  *
  * Mock-Entscheidung:
  * - Nur externe Versandkanäle werden ersetzt: SMTP-Transport und Web-Push-Sender.
@@ -57,30 +57,31 @@ function notificationConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   };
 }
 
-function roleId(key: string, testDb: TestDb): number {
-  const row = testDb.sqlite.prepare("SELECT id FROM roles WHERE key = ?").get(key) as { id: number } | undefined;
-  if (!row) {
-    throw new Error(`Role ${key} not found`);
-  }
+async function getRoleId(testDb: TestDb, key: string): Promise<number> {
+  const [rows] = await testDb.pool.execute("SELECT id FROM roles WHERE `key` = ?", [key]);
+  const row = (rows as Array<{ id: number }>)[0];
+  if (!row) throw new Error(`Role ${key} not found`);
   return row.id;
 }
 
-function createUser(testDb: TestDb, data: { email: string; roleKey: string; firstName?: string; lastName?: string }): number {
+async function createUser(testDb: TestDb, data: { email: string; roleKey: string; firstName?: string; lastName?: string }): Promise<number> {
   const hash = bcrypt.hashSync(password, 4);
-  const result = testDb.sqlite
-    .prepare(
-      "INSERT INTO users (name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at) VALUES ('', ?, ?, ?, ?, ?, 1, 1, datetime('now'), datetime('now'))"
-    )
-    .run(data.firstName ?? "Test", data.lastName ?? "User", data.email, hash, roleId(data.roleKey, testDb));
-  return Number(result.lastInsertRowid);
+  const rid = await getRoleId(testDb, data.roleKey);
+  const firstName = data.firstName ?? "Test";
+  const lastName = data.lastName ?? "User";
+  const [result] = await testDb.pool.execute(
+    "INSERT INTO users (name, full_name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at) VALUES ('', ?, ?, ?, ?, ?, ?, 1, 1, NOW(), NOW())",
+    [`${lastName}, ${firstName}`, firstName, lastName, data.email, hash, rid]
+  );
+  return (result as { insertId: number }).insertId;
 }
 
-function createRoleWithoutNotificationWrite(testDb: TestDb): number {
-  const result = testDb.sqlite
-    .prepare("INSERT INTO roles (key, label, is_system, version, created_at, updated_at) VALUES ('custom_reader', 'Custom Reader', 0, 1, datetime('now'), datetime('now'))")
-    .run();
-  const id = Number(result.lastInsertRowid);
-  testDb.sqlite.prepare("INSERT INTO permissions (role_id, resource, action) VALUES (?, '*', 'read')").run(id);
+async function createRoleWithoutNotificationWrite(testDb: TestDb): Promise<number> {
+  const [result] = await testDb.pool.execute(
+    "INSERT INTO roles (`key`, label, is_system, version, created_at, updated_at) VALUES ('custom_reader', 'Custom Reader', 0, 1, NOW(), NOW())"
+  );
+  const id = (result as { insertId: number }).insertId;
+  await testDb.pool.execute("INSERT INTO permissions (role_id, resource, action) VALUES (?, '*', 'read')", [id]);
   return id;
 }
 
@@ -95,22 +96,23 @@ describe("MS-14 notifications", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true });
   });
 
-  beforeEach(() => {
-    truncateAll(testDb.sqlite);
+  beforeEach(async () => {
+    await truncateAll(testDb.pool);
   });
 
   afterAll(async () => {
-    await app.close();
-    testDb.sqlite.close();
+    await app?.close();
+    await testDb?.close();
   });
 
   it("versendet fällige E-Mail-Erinnerungen genau einmal pro berechtigtem aktivem Nutzer", async () => {
-    createUser(testDb, { email: "reader@example.test", roleKey: "reader", firstName: "Rita", lastName: "Reader" });
-    await createEvent(app, {
+    await createUser(testDb, { email: "reader@example.test", roleKey: "reader", firstName: "Rita", lastName: "Reader" });
+    const admin = await login(app, "admin@local");
+    await createEvent(admin, {
       title: "Kundentermin",
       startTime: "2026-06-01T10:00:00.000Z",
       endTime: "2026-06-01T11:00:00.000Z",
@@ -128,15 +130,16 @@ describe("MS-14 notifications", () => {
     });
 
     expect(transport.sendMail).toHaveBeenCalledTimes(2);
-    const rows = testDb.sqlite.prepare("SELECT channel, reminder_minutes FROM sent_notifications ORDER BY user_id").all() as Array<{ channel: string; reminder_minutes: number }>;
-    expect(rows).toEqual([
+    const [notifRows] = await testDb.pool.execute("SELECT channel, reminder_minutes FROM sent_notifications ORDER BY user_id");
+    expect(notifRows as Array<{ channel: string; reminder_minutes: number }>).toEqual([
       { channel: "email", reminder_minutes: 60 },
       { channel: "email", reminder_minutes: 60 }
     ]);
   });
 
   it("sendet keine E-Mail, wenn Notifications oder SMTP deaktiviert sind", async () => {
-    await createEvent(app, {
+    const admin = await login(app, "admin@local");
+    await createEvent(admin, {
       startTime: "2026-06-01T10:00:00.000Z",
       endTime: "2026-06-01T11:00:00.000Z",
       reminderMinutes: 60
@@ -156,20 +159,23 @@ describe("MS-14 notifications", () => {
   });
 
   it("versendet Push-Erinnerungen und löscht ungültige Subscriptions bei 410 Gone", async () => {
-    const readerId = createUser(testDb, { email: "push-reader@example.test", roleKey: "reader" });
-    const goneReaderId = createUser(testDb, { email: "gone-reader@example.test", roleKey: "reader" });
-    await createEvent(app, {
+    const readerId = await createUser(testDb, { email: "push-reader@example.test", roleKey: "reader" });
+    const goneReaderId = await createUser(testDb, { email: "gone-reader@example.test", roleKey: "reader" });
+    const admin = await login(app, "admin@local");
+    await createEvent(admin, {
       title: "Push Termin",
       startTime: "2026-06-01T10:00:00.000Z",
       endTime: "2026-06-01T11:00:00.000Z",
       reminderMinutes: 60
     });
-    testDb.sqlite
-      .prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at, updated_at) VALUES (?, ?, 'key', 'auth', datetime('now'), datetime('now'))")
-      .run(readerId, "https://push.example.test/ok");
-    testDb.sqlite
-      .prepare("INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at, updated_at) VALUES (?, ?, 'key', 'auth', datetime('now'), datetime('now'))")
-      .run(goneReaderId, "https://push.example.test/gone");
+    await testDb.pool.execute(
+      "INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at, updated_at) VALUES (?, ?, 'key', 'auth', NOW(), NOW())",
+      [readerId, "https://push.example.test/ok"]
+    );
+    await testDb.pool.execute(
+      "INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, created_at, updated_at) VALUES (?, ?, 'key', 'auth', NOW(), NOW())",
+      [goneReaderId, "https://push.example.test/gone"]
+    );
     const sendNotification = vi.fn().mockImplementation((subscription: { endpoint: string }) => {
       if (subscription.endpoint.endsWith("/gone")) {
         return Promise.reject({ statusCode: 410 });
@@ -183,24 +189,26 @@ describe("MS-14 notifications", () => {
     });
 
     expect(sendNotification).toHaveBeenCalledTimes(2);
-    expect(testDb.sqlite.prepare("SELECT COUNT(*) AS count FROM sent_notifications WHERE channel = 'push'").get()).toEqual({ count: 1 });
-    expect(testDb.sqlite.prepare("SELECT COUNT(*) AS count FROM push_subscriptions WHERE endpoint LIKE '%gone'").get()).toEqual({ count: 0 });
+    const [pushCountRows] = await testDb.pool.execute("SELECT COUNT(*) AS count FROM sent_notifications WHERE channel = 'push'");
+    expect(Number((pushCountRows as Array<{ count: bigint | number }>)[0].count)).toBe(1);
+    const [goneCountRows] = await testDb.pool.execute("SELECT COUNT(*) AS count FROM push_subscriptions WHERE endpoint LIKE '%gone'");
+    expect(Number((goneCountRows as Array<{ count: bigint | number }>)[0].count)).toBe(0);
   });
 
   it("schützt Push-Routen und erlaubt Lesern eigene Subscriptions", async () => {
-    const readerId = createUser(testDb, { email: "route-reader@example.test", roleKey: "reader" });
-    const customRoleId = createRoleWithoutNotificationWrite(testDb);
-    testDb.sqlite
-      .prepare(
-        "INSERT INTO users (name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at) VALUES ('', 'No', 'Write', 'no-write@example.test', ?, ?, 1, 1, datetime('now'), datetime('now'))"
-      )
-      .run(bcrypt.hashSync(password, 4), customRoleId);
+    const readerId = await createUser(testDb, { email: "route-reader@example.test", roleKey: "reader" });
+    const customRoleId = await createRoleWithoutNotificationWrite(testDb);
+    await testDb.pool.execute(
+      "INSERT INTO users (name, full_name, first_name, last_name, email, password_hash, role_id, is_active, version, created_at, updated_at) VALUES ('', 'Write, No', 'No', 'Write', 'no-write@example.test', ?, ?, 1, 1, NOW(), NOW())",
+      [bcrypt.hashSync(password, 4), customRoleId]
+    );
 
     await supertest(app.server).post("/api/push/subscribe").send({ endpoint: "https://push.example.test/anon", keys: { p256dh: "key", auth: "auth" } }).expect(401);
 
     const reader = await login(app, "route-reader@example.test");
     await reader.post("/api/push/subscribe").send({ endpoint: "https://push.example.test/reader", keys: { p256dh: "key", auth: "auth" } }).expect(200);
-    expect(testDb.sqlite.prepare("SELECT user_id FROM push_subscriptions WHERE endpoint = ?").get("https://push.example.test/reader")).toEqual({ user_id: readerId });
+    const [subRows] = await testDb.pool.execute("SELECT user_id FROM push_subscriptions WHERE endpoint = ?", ["https://push.example.test/reader"]);
+    expect((subRows as Array<{ user_id: number }>)[0]).toEqual({ user_id: readerId });
 
     const noWrite = await login(app, "no-write@example.test");
     await noWrite.post("/api/push/subscribe").send({ endpoint: "https://push.example.test/no-write", keys: { p256dh: "key", auth: "auth" } }).expect(403);

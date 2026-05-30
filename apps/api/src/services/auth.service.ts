@@ -103,6 +103,7 @@ export async function loginConfiguredAdmin(database: DbClient, appConfig: AppCon
   if (!user.isActive) {
     throw forbidden("Account is disabled");
   }
+  await setAppSetting(database, adminSetupSettingKey, "true");
   return { ...(await mapCurrentUser(database, user, appConfig)), requiresPasswordSetup: false };
 }
 

@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+﻿import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { CommentEntityType, CommentInput, CommentUpdate } from "@taskmanager/shared-types";
 import { requireCurrentUser } from "../plugins/auth.js";
 import { createComment, createEntityComment, deleteComment, deleteEntityComment, ensureDayPlanCommentAccess, linkEntityComment, listComments, listEntityComments, listRecentComments, updateComment } from "../services/comments.service.js";
@@ -72,14 +72,14 @@ function registerEntityCommentRoutes(app: FastifyInstance, path: string, entityT
       return;
     }
     const currentUser = await requireCurrentUser(request);
-    ensureDayPlanCommentAccess(app.db, id, currentUser.id);
+    await ensureDayPlanCommentAccess(app.db, id, currentUser.id);
   }
 
   app.get<{ Params: { id: number } }>(
     `${path}/:id/comments`,
     { schema: { params: entityCommentParamsSchema, response: { 200: arrayResponseSchema } } },
     async (request) => {
-      ensureDayPlanRouteAccess(request.params.id, request);
+      await ensureDayPlanRouteAccess(request.params.id, request);
       return listEntityComments(app.db, entityType, request.params.id);
     }
   );
@@ -88,8 +88,8 @@ function registerEntityCommentRoutes(app: FastifyInstance, path: string, entityT
     `${path}/:id/comments`,
     { schema: { params: entityCommentParamsSchema, body: commentBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      ensureDayPlanRouteAccess(request.params.id, request);
-      return reply.status(201).send(createEntityComment(app.db, entityType, request.params.id, request.body, createJournalActor(request.currentUser)));
+      await ensureDayPlanRouteAccess(request.params.id, request);
+      return reply.status(201).send(await createEntityComment(app.db, entityType, request.params.id, request.body, createJournalActor(request.currentUser)));
     }
   );
 
@@ -97,7 +97,7 @@ function registerEntityCommentRoutes(app: FastifyInstance, path: string, entityT
     `${path}/:id/comments/:commentId`,
     { schema: { params: entityCommentDeleteParamsSchema, response: { 200: objectResponseSchema } } },
     async (request) => {
-      ensureDayPlanRouteAccess(request.params.id, request);
+      await ensureDayPlanRouteAccess(request.params.id, request);
       return linkEntityComment(app.db, entityType, request.params.id, request.params.commentId, createJournalActor(request.currentUser));
     }
   );
@@ -106,8 +106,8 @@ function registerEntityCommentRoutes(app: FastifyInstance, path: string, entityT
     `${path}/:id/comments/:commentId`,
     { schema: { params: entityCommentDeleteParamsSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      ensureDayPlanRouteAccess(request.params.id, request);
-      deleteEntityComment(app.db, entityType, request.params.id, request.params.commentId, createJournalActor(request.currentUser));
+      await ensureDayPlanRouteAccess(request.params.id, request);
+      await deleteEntityComment(app.db, entityType, request.params.id, request.params.commentId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -121,7 +121,7 @@ export async function registerCommentsRoutes(app: FastifyInstance): Promise<void
       const currentUser = await requireCurrentUser(request);
       const owner = recentCommentOwnerFromQuery(request.query);
       if (owner?.type === "dayPlan") {
-        ensureDayPlanCommentAccess(app.db, owner.id, currentUser.id);
+        await ensureDayPlanCommentAccess(app.db, owner.id, currentUser.id);
       }
       return listRecentComments(app.db, { owner, currentUserId: currentUser.id, limit: request.query.limit, mine: request.query.mine });
     }
@@ -137,7 +137,7 @@ export async function registerCommentsRoutes(app: FastifyInstance): Promise<void
     "/tasks/:taskId/comments",
     { schema: { params: taskIdParamSchema, body: commentBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const comment = createComment(app.db, request.params.taskId, request.body, createJournalActor(request.currentUser));
+      const comment = await createComment(app.db, request.params.taskId, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send(comment);
     }
   );
@@ -152,7 +152,7 @@ export async function registerCommentsRoutes(app: FastifyInstance): Promise<void
     "/comments/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteComment(app.db, request.params.id, createJournalActor(request.currentUser));
+      await deleteComment(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

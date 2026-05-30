@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Scope:
  *
  * Test-Ebene:
@@ -39,20 +39,20 @@ describe("Content Images API", () => {
   beforeAll(async () => {
     originalAdminInitialPassword = config.adminInitialPassword;
     config.adminInitialPassword = "password123";
-    testDb = createTestDb();
+    testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true });
   });
 
-  beforeEach(() => {
-    truncateAll(testDb.sqlite);
+  beforeEach(async () => {
+    await truncateAll(testDb.pool);
   });
 
   afterAll(async () => {
     if (app) {
-      await app.close();
+      await app?.close();
     }
     if (testDb) {
-      testDb.sqlite.close();
+      await testDb?.close();
     }
     config.adminInitialPassword = originalAdminInitialPassword;
   });
@@ -65,7 +65,8 @@ describe("Content Images API", () => {
 
   async function loginReader() {
     const admin = await loginAdmin();
-    const readerRole = testDb.sqlite.prepare("SELECT id FROM roles WHERE key = 'reader'").get() as { id: number };
+    const [readerRoleRows] = await testDb.pool.execute("SELECT id FROM roles WHERE `key` = 'reader'");
+    const readerRole = (readerRoleRows as Array<{ id: number }>)[0];
     await admin
       .post("/api/admin/users")
       .send({ firstName: "Read", lastName: "Only", email: "content-image-reader@example.test", roleId: readerRole.id, password: "password123", isActive: true })
@@ -94,11 +95,8 @@ describe("Content Images API", () => {
 
     expect(created.body.url).toMatch(/^\/api\/content\/images\/[0-9a-f-]+$/);
     const id = created.body.url.split("/").at(-1) as string;
-    const row = testDb.sqlite.prepare("SELECT mime_type, size, data FROM content_images WHERE id = ?").get(id) as {
-      mime_type: string;
-      size: number;
-      data: Buffer;
-    };
+    const [imgRows] = await testDb.pool.execute("SELECT mime_type, size, data FROM content_images WHERE id = ?", [id]);
+    const row = (imgRows as Array<{ mime_type: string; size: number; data: Buffer }>)[0];
     expect(row.mime_type).toBe("image/png");
     expect(row.size).toBe(Buffer.byteLength("png-image-bytes"));
     expect(Buffer.from(row.data).toString("utf8")).toBe("png-image-bytes");
