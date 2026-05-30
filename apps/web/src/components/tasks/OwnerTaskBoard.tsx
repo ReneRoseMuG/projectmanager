@@ -3,8 +3,10 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { TaskOwner } from "../../api/tasks";
 import { errorMessage } from "../../hooks/errors";
+import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTasks } from "../../hooks/useTasks";
 import { useViewMode } from "../../hooks/useViewMode";
+import { resolveCatalogEntryKey } from "../../utils/catalogs";
 import { OwnerRelationBoard } from "../ui/OwnerRelationBoard";
 import { useToast } from "../ui/ToastProvider";
 import { TaskLinkDialog } from "./TaskLinkDialog";
@@ -19,13 +21,43 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
   const location = useLocation();
   const { showToast } = useToast();
   const taskController = useTasks(owner);
+  const catalogs = useCatalogs();
   const { viewMode, setViewMode } = useViewMode();
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
 
   const returnTo = `${location.pathname}${location.search}`;
+  const defaultStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", "active", "active") ?? "active";
 
-  const openTaskForm = (status: TaskStatus = "todo") => {
-    navigate(`/tasks/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${status}&returnTo=${encodeURIComponent(returnTo)}`);
+  const openTaskForm = (status: TaskStatus = defaultStatus) => {
+    const resolvedStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "active") ?? defaultStatus;
+    navigate(`/tasks/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${resolvedStatus}&returnTo=${encodeURIComponent(returnTo)}`);
+  };
+
+  const updateTaskStatus = async (task: TaskBoardItem, status: TaskStatus) => {
+    try {
+      await taskController.updateTaskStatus(task.id, status, task.version);
+    } catch (taskError) {
+      showToast({ tone: "error", title: "Aufgabenstatus konnte nicht geändert werden", message: errorMessage(taskError) });
+      throw taskError;
+    }
+  };
+
+  const updateTaskDueDate = async (task: TaskBoardItem, dueDate: string | null) => {
+    try {
+      await taskController.updateTask(task.id, { dueDate, expectedVersion: task.version });
+    } catch (taskError) {
+      showToast({ tone: "error", title: "Aufgabendatum konnte nicht geändert werden", message: errorMessage(taskError) });
+      throw taskError;
+    }
+  };
+
+  const updateTaskTags = async (taskId: number, tagIds: number[]) => {
+    try {
+      await taskController.updateTaskTags(taskId, tagIds);
+    } catch (taskError) {
+      showToast({ tone: "error", title: "Aufgabentags konnten nicht geÃ¤ndert werden", message: errorMessage(taskError) });
+      throw taskError;
+    }
   };
 
   return (
@@ -33,7 +65,7 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
       <OwnerRelationBoard<TaskBoardItem>
         items={taskController.tasks}
         loading={taskController.loading}
-        onCreateItem={(status) => openTaskForm(toTaskStatus(status))}
+        onCreateItem={(status) => openTaskForm(status ?? defaultStatus)}
         onLinkItem={() => setLinkDialogOpen(true)}
         onUnlinkItem={(task) => taskController.unlinkTask(task.id)}
         onOpenItem={(task) => navigate(`/tasks/${task.id}?returnTo=${encodeURIComponent(returnTo)}`)}
@@ -49,6 +81,9 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
             onAddStatus={(status) => props.onAddStatus?.(status)}
             onOpen={(task) => props.onOpen(task as TaskBoardItem)}
             onDelete={(task) => props.onDelete(task as TaskBoardItem)}
+            onStatusChange={(task, status) => updateTaskStatus(task as TaskBoardItem, status)}
+            onDueDateChange={(task, dueDate) => updateTaskDueDate(task as TaskBoardItem, dueDate)}
+            onTagsChange={updateTaskTags}
             linkAction={props.linkAction}
           />
         )}
@@ -56,6 +91,7 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
 
       <TaskLinkDialog
         open={linkDialogOpen}
+        owner={owner}
         currentTasks={taskController.tasks}
         onLink={async (task) => {
           try {
@@ -70,11 +106,4 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
       />
     </>
   );
-}
-
-function toTaskStatus(status?: string): TaskStatus {
-  if (status === "in_progress" || status === "done") {
-    return status;
-  }
-  return "todo";
 }

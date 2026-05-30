@@ -8,6 +8,7 @@ import {
   getOwnerTickets,
   getTickets,
   linkOwnerTicket as linkOwnerTicketRequest,
+  setTicketTags,
   type TicketOwner,
   unlinkOwnerTicket as unlinkOwnerTicketRequest,
   updateTicket as updateTicketRequest,
@@ -32,6 +33,9 @@ function ownerTicketKey(owner?: TicketOwner | null) {
   }
   if (owner.type === "feature") {
     return queryKeys.features.tickets(owner.id);
+  }
+  if (owner.type === "wikiPage") {
+    return queryKeys.wiki.tickets(owner.id);
   }
   return queryKeys.useCases.tickets(owner.id);
 }
@@ -91,6 +95,13 @@ export function useTickets(owner?: TicketOwner | null) {
     }
   });
 
+  const updateTicketTagsMutation = useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTicketTags(id, tagIds),
+    onSuccess: async (_tags, { id }) => {
+      await invalidateTicketScope(queryClient, validOwner, id);
+    }
+  });
+
   const updateTicketPositionMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TicketPositionInput }) => updateTicketPositionRequest(id, input),
     onSuccess: async (updated) => {
@@ -140,6 +151,13 @@ export function useTickets(owner?: TicketOwner | null) {
     [updateTicketPositionMutation]
   );
 
+  const updateTicketTags = useCallback(
+    async (id: number, tagIds: number[]) => {
+      return updateTicketTagsMutation.mutateAsync({ id, tagIds });
+    },
+    [updateTicketTagsMutation]
+  );
+
   const removeTicket = useCallback(
     async (id: number) => {
       await removeTicketMutation.mutateAsync(id);
@@ -157,6 +175,7 @@ export function useTickets(owner?: TicketOwner | null) {
     unlinkTicket,
     updateTicket,
     updateTicketPosition,
+    updateTicketTags,
     removeTicket
   };
 }

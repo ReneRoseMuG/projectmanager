@@ -1,31 +1,38 @@
 import { Columns3, ListTodo } from "lucide-react";
 import type { ViewMode } from "../../types";
-import { Button } from "./Button";
 
 interface ViewToggleProps {
   value: ViewMode;
   onChange: (value: ViewMode) => void;
 }
 
+function toggleButtonClass(active: boolean): string {
+  return `inline-flex h-8 w-8 items-center justify-center rounded-md border transition hover:border-steel-500 hover:text-ink ${
+    active ? "border-steel-900 bg-steel-900 text-white shadow-sm hover:border-steel-900 hover:bg-steel-800 hover:text-white" : "border-line bg-white text-steel-700"
+  }`;
+}
+
 export function ViewToggle({ value, onChange }: ViewToggleProps) {
   return (
-    <div className="inline-flex rounded-md border border-line bg-white p-1">
-      <Button
+    <div className="inline-flex gap-1 rounded-lg border border-line bg-steel-100 p-1">
+      <button
+        type="button"
         aria-label="Liste"
         title="Liste"
-        icon={<ListTodo size={20} />}
-        variant={value === "list" ? "primary" : "ghost"}
-        className="h-10 w-10"
+        className={toggleButtonClass(value === "list")}
         onClick={() => onChange("list")}
-      />
-      <Button
+      >
+        <ListTodo size={18} strokeWidth={2.3} />
+      </button>
+      <button
+        type="button"
         aria-label="Kanban"
         title="Kanban"
-        icon={<Columns3 size={20} />}
-        variant={value === "kanban" ? "primary" : "ghost"}
-        className="h-10 w-10"
+        className={toggleButtonClass(value === "kanban")}
         onClick={() => onChange("kanban")}
-      />
+      >
+        <Columns3 size={18} strokeWidth={2.3} />
+      </button>
     </div>
   );
 }

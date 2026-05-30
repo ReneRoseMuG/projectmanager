@@ -1,6 +1,6 @@
 import { Edit3, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { Button } from "./Button";
+import { ActionMenu, type ActionMenuItem } from "./ActionMenu";
 import { ItemCard } from "./ItemCard";
 import { ItemRow } from "./ItemRow";
 import { ProgressBar } from "./ProgressBar";
@@ -15,14 +15,17 @@ interface PlanningItemCardProps {
   title: string;
   description: string;
   accentColor: string;
+  objectReference?: string;
   icon: ReactNode;
-  subtitle?: string;
+  subtitle?: ReactNode;
   pills?: ReactNode;
+  footerMeta?: ReactNode;
   taskStats: PlanningTaskStats;
   variant?: "card" | "row";
+  extraMenuItems?: ActionMenuItem[];
   onOpen: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
 }
 
 function progressValue(stats: PlanningTaskStats) {
@@ -34,47 +37,44 @@ function TaskProgress({ stats, accentColor }: { stats: PlanningTaskStats; accent
     <div className="grid gap-2 border-t border-line pt-3">
       <div className="flex min-w-0 items-center justify-between gap-3 text-xs">
         <span className="font-semibold text-ink">Aufgaben</span>
-        <span className="min-w-0 truncate font-medium text-slate-500">{stats.totalTasks > 0 ? `${stats.doneTasks} / ${stats.totalTasks} erledigt` : "Keine Aufgaben"}</span>
+        <span className="min-w-0 truncate font-medium text-steel-500">{stats.totalTasks > 0 ? `${stats.doneTasks} / ${stats.totalTasks} erledigt` : "Keine Aufgaben"}</span>
       </div>
       <ProgressBar value={progressValue(stats)} color={accentColor} />
-      <span className="justify-self-end text-xs font-semibold text-slate-500">{stats.openTasks} offen</span>
+      <span className="justify-self-end text-xs font-semibold text-steel-500">{stats.openTasks} offen</span>
     </div>
   );
 }
 
 function TaskMeta({ stats }: { stats: PlanningTaskStats }) {
   return (
-    <span className="grid justify-items-end gap-0.5 text-xs font-semibold text-slate-500">
-      <span className="text-[11px] uppercase tracking-wide text-slate-400">Aufgaben</span>
+    <span className="grid justify-items-end gap-0.5 text-xs font-semibold text-steel-500">
+      <span className="text-[11px] uppercase tracking-wide text-steel-400">Aufgaben</span>
       <span>{stats.openTasks} offen</span>
     </span>
   );
 }
 
-function PlanningAvatar({ accentColor, icon }: { accentColor: string; icon: ReactNode }) {
-  return (
-    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ backgroundColor: accentColor }} aria-hidden="true">
-      {icon}
-    </span>
-  );
-}
-
-function PlanningHeader({ title, subtitle, accentColor, icon, pills }: Pick<PlanningItemCardProps, "title" | "subtitle" | "accentColor" | "icon" | "pills">) {
+function PlanningHeader({ title, subtitle, pills }: Pick<PlanningItemCardProps, "title" | "subtitle" | "pills">) {
   return (
     <div className="grid min-w-0 gap-3">
-      <div className="flex min-w-0 items-start gap-3">
-        <PlanningAvatar accentColor={accentColor} icon={icon} />
-        <div className="min-w-0">
-          <h2 className="line-clamp-2 break-words text-base font-semibold text-ink">{title}</h2>
-          {subtitle ? <p className="mt-1 text-xs font-semibold text-slate-500">{subtitle}</p> : null}
-        </div>
+      <div className="min-w-0">
+        <h2 className="line-clamp-2 break-words text-base font-semibold text-ink">{title}</h2>
+        {subtitle ? <div className="mt-1 text-xs font-semibold text-steel-500">{subtitle}</div> : null}
       </div>
       {pills ? <div className="flex min-w-0 flex-wrap items-center gap-2">{pills}</div> : null}
     </div>
   );
 }
 
-export function PlanningItemCard({ title, description, accentColor, icon, subtitle, pills, taskStats, variant = "card", onOpen, onEdit, onDelete }: PlanningItemCardProps) {
+function actionItems(onEdit: () => void, extraMenuItems: ActionMenuItem[], onDelete?: () => void): ActionMenuItem[] {
+  return [
+    { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: onEdit },
+    ...extraMenuItems,
+    ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: onDelete, danger: true }] : []),
+  ];
+}
+
+export function PlanningItemCard({ title, description, accentColor, objectReference, icon, subtitle, pills, footerMeta, taskStats, variant = "card", extraMenuItems = [], onOpen, onEdit, onDelete }: PlanningItemCardProps) {
   if (variant === "row") {
     return (
       <>
@@ -83,10 +83,13 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
             title={title}
             description={description}
             accentColor={accentColor}
+            objectReference={objectReference}
             icon={icon}
             subtitle={subtitle}
             pills={pills}
+            footerMeta={footerMeta}
             taskStats={taskStats}
+            extraMenuItems={extraMenuItems}
             onOpen={onOpen}
             onEdit={onEdit}
             onDelete={onDelete}
@@ -95,18 +98,20 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
         <div className="hidden md:block">
           <ItemRow
             accentColor={accentColor}
-            statusIndicator={<PlanningAvatar accentColor={accentColor} icon={icon} />}
+            objectReference={objectReference}
             title={title}
             description={description}
             pills={pills}
             pillsClassName="max-w-64 flex-wrap justify-end"
             meta={<TaskMeta stats={taskStats} />}
+            footer={footerMeta}
             actions={
-              <>
-                <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={onEdit} />
-                <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={onDelete} />
-              </>
+              <ActionMenu
+                objectReference={objectReference}
+                items={actionItems(onEdit, extraMenuItems, onDelete)}
+              />
             }
+            actionsIncludeObjectReference
             onOpen={onOpen}
           />
         </div>
@@ -117,11 +122,18 @@ export function PlanningItemCard({ title, description, accentColor, icon, subtit
   return (
     <ItemCard
       accentColor={accentColor}
-      header={<PlanningHeader title={title} subtitle={subtitle} accentColor={accentColor} icon={icon} pills={pills} />}
-      body={description ? <p className="line-clamp-3 text-sm text-slate-600">{description}</p> : null}
-      footer={<TaskProgress stats={taskStats} accentColor={accentColor} />}
+      objectReference={objectReference}
+      header={<PlanningHeader title={title} subtitle={subtitle} pills={pills} />}
+      body={description ? <p className="line-clamp-3 text-sm text-steel-600">{description}</p> : null}
+      footer={
+        <div className="grid gap-3">
+          <TaskProgress stats={taskStats} accentColor={accentColor} />
+          {footerMeta}
+        </div>
+      }
       onOpen={onOpen}
       onEdit={onEdit}
+      extraMenuItems={extraMenuItems}
       onDelete={onDelete}
       className="h-full min-h-60"
     />

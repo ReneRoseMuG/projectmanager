@@ -1,4 +1,4 @@
-import type { TaskBoardPositionInput, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+import type { TaskBoardItem, TaskBoardPositionInput, TaskInput, TaskStatus, TaskUpdate } from "@taskmanager/shared-types";
 import type { QueryClient } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
@@ -6,13 +6,15 @@ import {
   createOwnerTask as createOwnerTaskRequest,
   deleteTask as deleteTaskRequest,
   getOwnerTasks,
+  getTasks,
   linkOwnerTask as linkOwnerTaskRequest,
   type TaskOwner,
   unlinkOwnerTask as unlinkOwnerTaskRequest,
   updateOwnerTaskBoard as updateOwnerTaskBoardRequest,
   updateTask as updateTaskRequest
 } from "../api/tasks";
-import { invalidateFeatureScope, invalidateMilestoneScope, invalidateProjectScope, invalidateTaskScope, invalidateUseCaseScope } from "../queries/invalidation";
+import { setTaskTags } from "../api/tags";
+import { invalidateFeatureScope, invalidateMilestoneScope, invalidateProjectScope, invalidateTaskScope, invalidateUseCaseScope, invalidateWiki } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
@@ -29,6 +31,9 @@ function ownerTaskKey(owner?: TaskOwner) {
   if (owner.type === "feature") {
     return queryKeys.features.tasks(owner.id);
   }
+  if (owner.type === "wikiPage") {
+    return queryKeys.wiki.tasks(owner.id);
+  }
   return queryKeys.useCases.tasks(owner.id);
 }
 
@@ -41,11 +46,65 @@ async function invalidateOwner(queryClient: QueryClient, owner?: TaskOwner, task
     await invalidateFeatureScope(queryClient, owner.id);
   } else if (owner?.type === "useCase") {
     await invalidateUseCaseScope(queryClient, undefined, owner.id);
+  } else if (owner?.type === "wikiPage") {
+    await invalidateWiki(queryClient);
   }
   await invalidateTaskScope(queryClient, taskId);
 }
 
-export function useTasks(owner?: TaskOwner) {
+function toGlobalTaskBoardItems(tasks: TaskBoardItem[]): TaskBoardItem[] {
+  return tasks.map((task, index) => ({
+    ...task,
+    boardPosition: task.boardPosition ?? (index + 1) * 1024
+  }));
+}
+
+export function useGlobalTasks(enabled = true) {
+  const queryClient = useQueryClient();
+
+  const tasksQuery = useQuery({
+    queryKey: queryKeys.tasks.list(),
+    queryFn: async () => toGlobalTaskBoardItems((await getTasks()) as TaskBoardItem[]),
+    enabled
+  });
+
+  const reload = useCallback(async () => {
+    await tasksQuery.refetch();
+  }, [tasksQuery]);
+
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: TaskUpdate }) => updateTaskRequest(id, input),
+    onSuccess: async (updated) => {
+      await invalidateTaskScope(queryClient, updated.id);
+    }
+  });
+
+  const updateTaskTagsMutation = useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTaskTags(id, tagIds),
+    onSuccess: async (_tags, { id }) => {
+      await invalidateTaskScope(queryClient, id);
+    }
+  });
+
+  const removeTaskMutation = useMutation({
+    mutationFn: deleteTaskRequest,
+    onSuccess: async (_result, id) => {
+      await invalidateTaskScope(queryClient, id);
+    }
+  });
+
+  return {
+    tasks: tasksQuery.data ?? [],
+    loading: tasksQuery.isLoading,
+    error: toQueryError(tasksQuery.error),
+    reload,
+    updateTask: (id: number, input: TaskUpdate) => updateTaskMutation.mutateAsync({ id, input }),
+    updateTaskTags: (id: number, tagIds: number[]) => updateTaskTagsMutation.mutateAsync({ id, tagIds }),
+    removeTask: (id: number) => removeTaskMutation.mutateAsync(id)
+  };
+}
+
+export function useTasks(owner?: TaskOwner | null) {
   const queryClient = useQueryClient();
   const validOwner = owner && Number.isFinite(owner.id) ? owner : undefined;
 
@@ -104,6 +163,45 @@ export function useTasks(owner?: TaskOwner) {
     }
   });
 
+  const updateTaskTagsMutation = useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTaskTags(id, tagIds),
+    onSuccess: async (_tags, { id }) => {
+      await invalidateOwner(queryClient, validOwner, id);
+    }
+  });
+
+  const updateTaskStatusMutation = useMutation({
+    mutationFn: ({ id, status, expectedVersion }: { id: number; status: TaskStatus; expectedVersion: number }) => updateTaskRequest(id, { status, expectedVersion }),
+    onMutate: async ({ id, status }) => {
+      const queryKey = ownerTaskKey(validOwner);
+      await queryClient.cancelQueries({ queryKey });
+      const previousTasks = queryClient.getQueryData<TaskBoardItem[]>(queryKey);
+
+      queryClient.setQueryData<TaskBoardItem[]>(queryKey, (currentTasks) =>
+        currentTasks?.map((task) =>
+          task.id === id
+            ? {
+                ...task,
+                status,
+                version: task.version + 1
+              }
+            : task
+        )
+      );
+
+      return { previousTasks };
+    },
+    onError: (_error, _variables, context) => {
+      const queryKey = ownerTaskKey(validOwner);
+      if (context?.previousTasks) {
+        queryClient.setQueryData(queryKey, context.previousTasks);
+      }
+    },
+    onSuccess: async (updated) => {
+      await invalidateOwner(queryClient, validOwner, updated.id);
+    }
+  });
+
   const updateTaskBoardMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TaskBoardPositionInput }) => {
       if (validOwner === undefined) {
@@ -151,6 +249,20 @@ export function useTasks(owner?: TaskOwner) {
     [updateTaskMutation]
   );
 
+  const updateTaskStatus = useCallback(
+    async (id: number, status: TaskStatus, expectedVersion: number) => {
+      return updateTaskStatusMutation.mutateAsync({ id, status, expectedVersion });
+    },
+    [updateTaskStatusMutation]
+  );
+
+  const updateTaskTags = useCallback(
+    async (id: number, tagIds: number[]) => {
+      return updateTaskTagsMutation.mutateAsync({ id, tagIds });
+    },
+    [updateTaskTagsMutation]
+  );
+
   const updateTaskBoard = useCallback(
     async (id: number, input: TaskBoardPositionInput) => {
       return updateTaskBoardMutation.mutateAsync({ id, input });
@@ -174,6 +286,8 @@ export function useTasks(owner?: TaskOwner) {
     linkTask,
     unlinkTask,
     updateTask,
+    updateTaskStatus,
+    updateTaskTags,
     updateTaskBoard,
     removeTask
   };

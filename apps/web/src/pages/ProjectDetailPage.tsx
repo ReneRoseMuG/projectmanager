@@ -1,4 +1,11 @@
-import type { DraftComment, DraftNote, DraftTask, DraftTicket, Project, ProjectInput } from "@taskmanager/shared-types";
+import type {
+  DraftComment,
+  DraftNote,
+  DraftTask,
+  DraftTicket,
+  Project,
+  ProjectInput,
+} from "@taskmanager/shared-types";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { uploadProjectAttachment } from "../api/attachments";
@@ -7,12 +14,18 @@ import { setProjectFeatures } from "../api/doc-links";
 import { createProjectNote } from "../api/notes";
 import { createOwnerTask, linkOwnerTask } from "../api/tasks";
 import { createOwnerTicket, linkOwnerTicket } from "../api/tickets";
-import { ProjectForm } from "../components/projects/ProjectForm";
+import {
+  parseProjectFormTab,
+  ProjectForm,
+} from "../components/projects/ProjectForm";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useProjects } from "../hooks/useProjects";
+import { useStatusCascadeWorkflow } from "../hooks/useStatusCascadeWorkflow";
+import { withStandaloneView } from "../utils/standalone";
 import type { DraftFile } from "../types";
 
 export function ProjectDetailPage() {
@@ -21,17 +34,21 @@ export function ProjectDetailPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const statusCascade = useStatusCascadeWorkflow();
   const isCreateMode = params.id === undefined;
   const projectId = isCreateMode ? undefined : Number(params.id);
-  const { project, loading, createProject, updateProject, removeProject } = useProjects(projectId);
+  const { project, loading, createProject, updateProject, removeProject } =
+    useProjects(projectId);
+  useDocumentTitle(isCreateMode ? "Projekt: Neu" : project ? `Projekt: ${project.name}` : "Projekt");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
+  const initialTab = parseProjectFormTab(searchParams.get("tab"));
 
-  const returnTo = searchParams.get("returnTo") ?? "/projects";
+  const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/projects") : "/projects");
   const closePage = () => navigate(returnTo);
   const openInTab =
     !isCreateMode && projectId !== undefined && Number.isFinite(projectId)
       ? () => {
-          window.open(`/projects/${projectId}`, "_blank");
+          window.open(withStandaloneView(`/projects/${projectId}`), "_blank");
           navigate(returnTo);
         }
       : undefined;
@@ -39,8 +56,13 @@ export function ProjectDetailPage() {
   const submitProject = async (input: ProjectInput, tagIds: number[]) => {
     try {
       if (project) {
-        const updated = await updateProject(project.id, { ...input, expectedVersion: project.version }, tagIds);
+        const updated = await updateProject(
+          project.id,
+          { ...input, expectedVersion: project.version },
+          tagIds,
+        );
         showToast({ tone: "success", title: "Projekt gespeichert" });
+        await statusCascade.startProjectCascade(project, updated);
         return updated;
       }
 
@@ -48,14 +70,25 @@ export function ProjectDetailPage() {
       showToast({ tone: "success", title: "Projekt erstellt" });
       return created;
     } catch (projectError) {
-      showToast({ tone: "error", title: "Projekt konnte nicht gespeichert werden", message: errorMessage(projectError) });
+      showToast({
+        tone: "error",
+        title: "Projekt konnte nicht gespeichert werden",
+        message: errorMessage(projectError),
+      });
       throw projectError;
     }
   };
 
   const postCreateProject = async (
     projectId: number,
-    pending: { tasks: DraftTask[]; tickets: DraftTicket[]; featureIds: number[]; comments: DraftComment[]; notes: DraftNote[]; files: DraftFile[] }
+    pending: {
+      tasks: DraftTask[];
+      tickets: DraftTicket[];
+      featureIds: number[];
+      comments: DraftComment[];
+      notes: DraftNote[];
+      files: DraftFile[];
+    },
   ) => {
     const owner = { type: "project" as const, id: projectId };
     try {
@@ -87,13 +120,19 @@ export function ProjectDetailPage() {
         if (!file) {
           continue;
         }
-        setSavingLabel(`Speichern… (Datei ${index + 1} von ${pending.files.length})`);
+        setSavingLabel(
+          `Speichern… (Datei ${index + 1} von ${pending.files.length})`,
+        );
         await uploadProjectAttachment(projectId, file.file);
       }
       showToast({ tone: "success", title: "Projekt-Zuordnungen gespeichert" });
-      navigate(`/projects/${projectId}`);
     } catch (postCreateError) {
-      showToast({ tone: "error", title: "Projekt wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
+      showToast({
+        tone: "error",
+        title:
+          "Projekt wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden",
+        message: errorMessage(postCreateError),
+      });
       throw postCreateError;
     } finally {
       setSavingLabel(undefined);
@@ -105,7 +144,7 @@ export function ProjectDetailPage() {
       title: "Projekt löschen?",
       body: `Das Projekt "${targetProject.name}" wird entfernt.`,
       severity: "danger",
-      confirmLabel: "Löschen"
+      confirmLabel: "Löschen",
     });
     if (!approved) {
       return false;
@@ -113,16 +152,24 @@ export function ProjectDetailPage() {
     try {
       await removeProject(targetProject.id);
       showToast({ tone: "success", title: "Projekt gelöscht" });
-      navigate("/projects");
+      navigate(returnTo);
       return true;
     } catch (projectError) {
-      showToast({ tone: "error", title: "Projekt konnte nicht gelöscht werden", message: errorMessage(projectError) });
+      showToast({
+        tone: "error",
+        title: "Projekt konnte nicht gelöscht werden",
+        message: errorMessage(projectError),
+      });
       return false;
     }
   };
 
   if (!isCreateMode && !Number.isFinite(projectId)) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Projekt nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
+        Projekt nicht gefunden
+      </div>
+    );
   }
 
   if (!isCreateMode && loading) {
@@ -130,23 +177,28 @@ export function ProjectDetailPage() {
   }
 
   if (!isCreateMode && !project) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Projekt nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
+        Projekt nicht gefunden
+      </div>
+    );
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
       <ProjectForm
         open
         project={project}
         variant="page"
+        initialTab={initialTab}
         onSubmit={submitProject}
         onDelete={deleteProject}
         savingLabel={savingLabel}
         onPostCreate={postCreateProject}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />
+      {statusCascade.dialog}
     </div>
   );
 }

@@ -1,32 +1,40 @@
-import { eq } from "drizzle-orm";
+import type { JsonValue, UserSummary, VisibleParentContext } from "@taskmanager/shared-types";
+import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { features } from "../db/schema.js";
+import { firstRow } from "../db/query-utils.js";
+import { features, useCaseComments } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
+import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { useCaseRepository, type UseCaseRecord, type UseCaseUpdateData } from "../repositories/use-case.repository.js";
-import { badRequest, conflict, notFound } from "../utils/errors.js";
-import {
-  buildFilename,
-  buildStoredContentPath,
-  deleteContent,
-  readContent,
-  renameContent,
-  resolveContentPath,
-  resolveStoredContentPath,
-  writeContent
-} from "./content.service.js";
+import { badRequest, notFound } from "../utils/errors.js";
+import { deleteUseCaseCommentsForIds } from "./comments.service.js";
+import { readContentFromDb } from "./content.service.js";
 import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
+import {
+  buildCreateSummary,
+  buildDeleteSummary,
+  buildJournalChanges,
+  buildUpdateSummary,
+  makeJournalContext,
+  makeJournalObject,
+  recordJournalEntry,
+  type JournalActor,
+  type JournalFieldDefinition,
+  type JournalObjectRef
+} from "./journal.service.js";
+import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
 
 type UseCaseStatus = UseCaseRecord["status"];
 
 export interface UseCaseInput {
   featureId?: number;
   title?: string;
-  slug?: string;
   status?: UseCaseStatus;
   description?: string | null;
   content?: string;
   sortOrder?: number;
+  responsibleUserId?: number | null;
   expectedVersion?: number;
 }
 
@@ -34,131 +42,214 @@ export interface UseCaseDto {
   id: number;
   featureId: number;
   title: string;
-  slug: string;
   status: UseCaseStatus;
   description: string | null;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   version: number;
   createdAt: string;
   updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
-function contentFilename(id: number, slug: string): string {
-  return buildFilename("usecase", id, slug);
+interface UseCaseSupportCounts {
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
 }
 
-function mapUseCase(record: UseCaseRecord, content?: string): UseCaseDto {
+const emptyUseCaseSupportCounts: UseCaseSupportCounts = {
+  attachmentCount: 0,
+  noteCount: 0,
+  commentCount: 0
+};
+
+const useCaseJournalFields: Array<JournalFieldDefinition<UseCaseRecord>> = [
+  { key: "title", label: "Titel" },
+  { key: "status", label: "Status" },
+  { key: "description", label: "Beschreibung" },
+  { key: "sortOrder", label: "Sortierung" },
+  { key: "responsibleUserId", label: "Verantwortlich" }
+];
+
+async function mapUseCase(database: DbClient, record: UseCaseRecord, content?: string, supportCounts = emptyUseCaseSupportCounts, parentContexts?: VisibleParentContext[]): Promise<UseCaseDto> {
   return {
     id: record.id,
     featureId: record.featureId,
     title: record.title,
-    slug: record.slug,
     status: record.status,
     description: record.description,
     content,
-    contentPath: record.contentPath,
     sortOrder: record.sortOrder,
+    responsibleUserId: record.responsibleUserId,
+    responsibleUser: await getUserOption(database, record.responsibleUserId),
+    attachmentCount: supportCounts.attachmentCount,
+    noteCount: supportCounts.noteCount,
+    commentCount: supportCounts.commentCount,
     version: record.version,
     createdAt: record.createdAt,
-    updatedAt: record.updatedAt
+    updatedAt: record.updatedAt,
+    parentContexts
   };
 }
 
-function ensureFeatureExists(database: DbClient, featureId: number): void {
-  const feature = database.select({ id: features.id }).from(features).where(eq(features.id, featureId)).get();
+async function useCaseParentContexts(database: DbClient, featureId: number): Promise<VisibleParentContext[]> {
+  const feature = firstRow(await database.select({ id: features.id, label: features.title }).from(features).where(eq(features.id, featureId)));
+  return feature ? [{ type: "feature", id: feature.id, label: feature.label, origin: "direct" }] : [];
+}
+
+async function getUseCaseSupportCounts(database: DbClient, useCaseIds: number[]): Promise<Map<number, UseCaseSupportCounts>> {
+  const counts = new Map<number, UseCaseSupportCounts>();
+  if (useCaseIds.length === 0) {
+    return counts;
+  }
+
+  const ensureCounts = (useCaseId: number): UseCaseSupportCounts => {
+    const current = counts.get(useCaseId);
+    if (current) {
+      return current;
+    }
+    const nextCounts = { ...emptyUseCaseSupportCounts };
+    counts.set(useCaseId, nextCounts);
+    return nextCounts;
+  };
+
+  const commentRows = await database.select({ useCaseId: useCaseComments.useCaseId }).from(useCaseComments).where(inArray(useCaseComments.useCaseId, useCaseIds));
+  for (const row of commentRows) {
+    ensureCounts(row.useCaseId).commentCount += 1;
+  }
+
+  return counts;
+}
+
+async function ensureFeatureExists(database: DbClient, featureId: number): Promise<void> {
+  const feature = firstRow(await database.select({ id: features.id }).from(features).where(eq(features.id, featureId)));
   if (!feature) {
     throw notFound(`Feature with id ${featureId} not found`);
   }
 }
 
-function getUseCaseRecord(database: DbClient, id: number): UseCaseRecord {
-  const useCase = useCaseRepository.findById(database, id);
+async function getFeatureJournalObject(database: DbClient, featureId: number): Promise<JournalObjectRef> {
+  const feature = firstRow(await database.select({ id: features.id, title: features.title }).from(features).where(eq(features.id, featureId)));
+  if (!feature) {
+    throw notFound(`Feature with id ${featureId} not found`);
+  }
+  return makeJournalObject("feature", feature.id, feature.title);
+}
+
+async function getUseCaseRecord(database: DbClient, id: number): Promise<UseCaseRecord> {
+  const useCase = await useCaseRepository.findById(database, id);
   if (!useCase) {
     throw notFound(`Use case with id ${id} not found`);
   }
   return useCase;
 }
 
-function ensureSlugIsUnique(database: DbClient, slug: string, exceptId?: number): void {
-  const existing = useCaseRepository.findBySlug(database, slug).find((row) => row.id !== exceptId);
-  if (existing) {
-    throw conflict(`Use case slug "${slug}" already exists`);
+async function readUseCaseContent(database: DbClient, record: UseCaseRecord): Promise<string> {
+  return readContentFromDb(database, record.id, "usecases");
+}
+
+function useCaseJournalObject(record: UseCaseRecord): JournalObjectRef {
+  return makeJournalObject("useCase", record.id, record.title);
+}
+
+function contentValueLabel(value: string): string | null {
+  return value.trim() === "" ? null : `${value.length} Zeichen`;
+}
+
+function contentValue(value: string): JsonValue {
+  return { length: value.length };
+}
+
+function buildContentChange(before: string, after: string): JournalChangeCreateData[] {
+  if (before === after) {
+    return [];
   }
+  const oldValueLabel = contentValueLabel(before);
+  const newValueLabel = contentValueLabel(after);
+  return [
+    {
+      fieldKey: "content",
+      fieldLabel: "Inhalt",
+      oldValue: contentValue(before),
+      oldValueLabel,
+      newValue: contentValue(after),
+      newValueLabel,
+      summary: `Inhalt: ${oldValueLabel ?? "leer"} → ${newValueLabel ?? "leer"}`
+    }
+  ];
 }
 
-function readUseCaseContent(record: UseCaseRecord): string {
-  return record.contentPath ? readContent(resolveStoredContentPath(record.contentPath)) : "";
+export async function listUseCases(database: DbClient, featureId: number): Promise<UseCaseDto[]> {
+  await ensureFeatureExists(database, featureId);
+  const rows = await useCaseRepository.findByFeatureId(database, featureId);
+  const ids = rows.map((useCase) => useCase.id);
+  const supportCounts = await getUseCaseSupportCounts(database, ids);
+  return Promise.all(rows.map((useCase) => mapUseCase(database, useCase, undefined, supportCounts.get(useCase.id) ?? emptyUseCaseSupportCounts)));
 }
 
-export function listUseCases(database: DbClient, featureId: number): UseCaseDto[] {
-  ensureFeatureExists(database, featureId);
-  return useCaseRepository.findByFeatureId(database, featureId).map((useCase) => mapUseCase(useCase));
+export async function getUseCase(database: DbClient, id: number): Promise<UseCaseDto> {
+  const useCase = await getUseCaseRecord(database, id);
+  const supportCounts = (await getUseCaseSupportCounts(database, [id])).get(id) ?? emptyUseCaseSupportCounts;
+  return mapUseCase(database, useCase, await readUseCaseContent(database, useCase), supportCounts, await useCaseParentContexts(database, useCase.featureId));
 }
 
-export function getUseCase(database: DbClient, id: number): UseCaseDto {
-  const useCase = getUseCaseRecord(database, id);
-  return mapUseCase(useCase, readUseCaseContent(useCase));
-}
-
-export function createUseCase(database: DbClient, featureId: number, input: UseCaseInput): UseCaseDto {
+export async function createUseCase(database: DbClient, featureId: number, input: UseCaseInput, actor?: JournalActor | null): Promise<UseCaseDto> {
   const targetFeatureId = input.featureId ?? featureId;
-  ensureFeatureExists(database, targetFeatureId);
+  const featureObject = await getFeatureJournalObject(database, targetFeatureId);
   const title = requireNonEmpty(input.title, "title");
-  const slug = requireNonEmpty(input.slug, "slug");
-  ensureSlugIsUnique(database, slug);
-  const status = input.status ?? resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
-  ensureCatalogEntryExists(database, "featureStatus", status);
+  const status = input.status ?? await resolveDefaultCatalogEntryKey(database, "featureStatus", "draft");
+  await ensureCatalogEntryExists(database, "featureStatus", status);
 
-  const created = useCaseRepository.create(database, {
-    featureId: targetFeatureId,
-    title,
-    slug,
-    status,
-    description: cleanNullable(input.description) ?? null,
-    contentPath: null,
-    sortOrder: input.sortOrder ?? 0
+  const content = input.content ?? "";
+  const created = await database.transaction(async (tx) => {
+    const useCase = await useCaseRepository.create(
+      tx,
+      {
+        featureId: targetFeatureId,
+        title,
+        status,
+        description: cleanNullable(input.description) ?? null,
+        content,
+        sortOrder: input.sortOrder ?? 0,
+        responsibleUserId: await normalizeAssignableUserId(tx, input.responsibleUserId ?? actor?.actorUserId ?? null, "responsibleUserId")
+      },
+      actor?.actorUserId ?? undefined
+    );
+      const journalObject = useCaseJournalObject(useCase);
+      await recordJournalEntry(tx, {
+        operation: "create",
+        object: journalObject,
+        summary: buildCreateSummary(journalObject),
+        actor,
+        contexts: [makeJournalContext(featureObject, "owner")]
+      });
+    return useCase;
   });
 
-  const filename = contentFilename(created.id, slug);
-  const absolutePath = resolveContentPath("usecases", filename);
-  const storedPath = buildStoredContentPath("usecases", filename);
-
-  try {
-    writeContent(absolutePath, input.content ?? "");
-    const updated = useCaseRepository.setContentPath(database, created.id, storedPath);
-    if (!updated) {
-      throw notFound(`Use case with id ${created.id} not found`);
-    }
-
-    return mapUseCase(updated, input.content ?? "");
-  } catch (error) {
-    useCaseRepository.delete(database, created.id);
-    deleteContent(absolutePath);
-    throw error;
-  }
+  return mapUseCase(database, created, content);
 }
 
-export function updateUseCase(database: DbClient, id: number, input: UseCaseInput): UseCaseDto {
-  const current = getUseCaseRecord(database, id);
+export async function updateUseCase(database: DbClient, id: number, input: UseCaseInput, actor?: JournalActor | null): Promise<UseCaseDto> {
+  const current = await getUseCaseRecord(database, id);
+  const previousContent = await readUseCaseContent(database, current);
   assertVersion(current.version, input.expectedVersion ?? 0);
   const values: UseCaseUpdateData = {};
-  let contentPath = current.contentPath;
 
   if (input.title !== undefined) {
     values.title = requireNonEmpty(input.title, "title");
   }
   if (input.featureId !== undefined) {
-    ensureFeatureExists(database, input.featureId);
+    await ensureFeatureExists(database, input.featureId);
     values.featureId = input.featureId;
   }
-  if (input.slug !== undefined) {
-    values.slug = requireNonEmpty(input.slug, "slug");
-    ensureSlugIsUnique(database, values.slug, id);
-  }
   if (input.status !== undefined) {
-    ensureCatalogEntryExists(database, "featureStatus", input.status);
+    await ensureCatalogEntryExists(database, "featureStatus", input.status);
     values.status = input.status;
   }
   if (input.description !== undefined) {
@@ -167,46 +258,61 @@ export function updateUseCase(database: DbClient, id: number, input: UseCaseInpu
   if (input.sortOrder !== undefined) {
     values.sortOrder = input.sortOrder;
   }
+  if (input.responsibleUserId !== undefined) {
+    values.responsibleUserId = await normalizeAssignableUserId(database, input.responsibleUserId, "responsibleUserId");
+  }
 
   if (Object.keys(values).length === 0 && input.content === undefined) {
     throw badRequest("No use case fields provided");
   }
 
-  const nextSlug = values.slug ?? current.slug;
-  if (nextSlug !== current.slug || !contentPath) {
-    const nextFilename = contentFilename(id, nextSlug);
-    const nextAbsolutePath = resolveContentPath("usecases", nextFilename);
-    const nextStoredPath = buildStoredContentPath("usecases", nextFilename);
-
-    if (contentPath) {
-      renameContent(resolveStoredContentPath(contentPath), nextAbsolutePath);
-    } else {
-      writeContent(nextAbsolutePath, "");
-    }
-
-    contentPath = nextStoredPath;
-    values.contentPath = nextStoredPath;
-  }
-
   if (input.content !== undefined) {
-    if (!contentPath) {
-      throw badRequest("Use case content path is missing");
-    }
-    writeContent(resolveStoredContentPath(contentPath), input.content);
+    values.content = input.content;
   }
 
-  const updated = useCaseRepository.update(database, id, input.expectedVersion ?? 0, values);
+  const updated = await database.transaction(async (tx) => {
+    const useCase = await useCaseRepository.update(tx, id, input.expectedVersion ?? 0, values, actor?.actorUserId ?? undefined);
+    if (!useCase) {
+      throw notFound(`Use case with id ${id} not found`);
+    }
+    const featureField: JournalFieldDefinition<UseCaseRecord> = {
+      key: "featureId",
+      label: "Feature",
+      format: (value) => (typeof value === "number" ? `Feature ${value}` : null)
+    };
+    const nextContent = input.content ?? previousContent;
+    const journalObject = useCaseJournalObject(useCase);
+    const changes = [...buildJournalChanges(current, useCase, [featureField, ...useCaseJournalFields]), ...buildContentChange(previousContent, nextContent)];
+    await recordJournalEntry(tx, {
+      operation: "update",
+      object: journalObject,
+      summary: buildUpdateSummary(journalObject, changes),
+      actor,
+      changes,
+      contexts: [makeJournalContext(await getFeatureJournalObject(database, useCase.featureId), "owner")]
+    });
+    return useCase;
+  });
   if (!updated) {
     throw notFound(`Use case with id ${id} not found`);
   }
-  return mapUseCase(updated, input.content ?? readUseCaseContent(updated));
+  const supportCounts = (await getUseCaseSupportCounts(database, [id])).get(id) ?? emptyUseCaseSupportCounts;
+  return mapUseCase(database, updated, input.content ?? await readUseCaseContent(database, updated), supportCounts);
 }
 
-export function deleteUseCase(database: DbClient, id: number): void {
-  const useCase = getUseCaseRecord(database, id);
-  useCaseRepository.delete(database, id);
-
-  if (useCase.contentPath) {
-    deleteContent(resolveStoredContentPath(useCase.contentPath));
-  }
+export async function deleteUseCase(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
+  const useCase = await getUseCaseRecord(database, id);
+  await deleteUseCaseCommentsForIds(database, [id]);
+  const featureObject = await getFeatureJournalObject(database, useCase.featureId);
+  await database.transaction(async (tx) => {
+    const journalObject = useCaseJournalObject(useCase);
+    await recordJournalEntry(tx, {
+      operation: "delete",
+      object: journalObject,
+      summary: buildDeleteSummary(journalObject),
+      actor,
+      contexts: [makeJournalContext(featureObject, "owner")]
+    });
+    await useCaseRepository.delete(tx, id);
+  });
 }

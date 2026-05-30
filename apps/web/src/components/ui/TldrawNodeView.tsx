@@ -1,6 +1,6 @@
 import type { ReactNodeViewProps } from "@tiptap/react";
 import * as TiptapReact from "@tiptap/react";
-import { exportToBlob, Tldraw, type Editor, type TLEditorSnapshot } from "@tldraw/tldraw";
+import { Tldraw, type Editor, type TLEditorSnapshot } from "@tldraw/tldraw";
 import { Loader2, PenLine } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -66,12 +66,12 @@ export function TldrawNodeView({ node, updateAttributes, selected }: ReactNodeVi
       updateAttributes({ snapshot: JSON.stringify(editor.getSnapshot()) });
 
       try {
-        const svgBlob = await exportToBlob({
-          editor,
-          ids: shapeIds,
-          format: "svg",
-          opts: { background: false }
-        });
+        const svgExport = await editor.getSvgString(shapeIds, { background: false });
+        if (!svgExport) {
+          replacePreviewSvg(null);
+          return;
+        }
+        const svgBlob = new Blob([svgExport.svg], { type: "image/svg+xml" });
         replacePreviewSvg(URL.createObjectURL(svgBlob));
       } catch {
         replacePreviewSvg(null);
@@ -96,7 +96,7 @@ export function TldrawNodeView({ node, updateAttributes, selected }: ReactNodeVi
           {previewSvg ? (
             <img src={previewSvg} alt="Zeichnung" className="w-full rounded-md" />
           ) : (
-            <div className="flex h-32 items-center justify-center gap-2 text-sm text-slate-500">
+            <div className="flex h-32 items-center justify-center gap-2 text-sm text-steel-500">
               <PenLine className="h-4 w-4" />
               Zeichnung — Doppelklick zum Bearbeiten
             </div>
@@ -121,7 +121,7 @@ export function TldrawNodeView({ node, updateAttributes, selected }: ReactNodeVi
           <button
             type="button"
             onClick={handleCancel}
-            className="rounded px-3 py-1.5 text-sm text-slate-600 hover:bg-line/50"
+            className="rounded px-3 py-1.5 text-sm text-steel-600 hover:bg-line/50"
             data-testid="tldraw-node-cancel"
             disabled={isCommitting}
           >

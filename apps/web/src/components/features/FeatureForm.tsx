@@ -10,29 +10,47 @@ import type {
   Project,
   TaskStatus,
   TicketStatus,
-  TicketType
+  TicketType,
 } from "@taskmanager/shared-types";
-import { BookOpen, Bug, FileText, FolderKanban, LinkIcon, ListTodo, Paperclip, Trash2 } from "lucide-react";
+import {
+  BookOpen,
+  Bug,
+  FileText,
+  ListTodo,
+  Trash2,
+} from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
+import { uploadContentImage } from "../../api/content-images";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
+import { useAuth } from "../../hooks/useAuth";
 import { useCatalogs } from "../../hooks/useCatalogs";
-import { useEntityComments } from "../../hooks/useEntityComments";
 import { useFeatureProjectLinks } from "../../hooks/useDocLinks";
+import { useEntityComments } from "../../hooks/useEntityComments";
 import { useProjects } from "../../hooks/useProjects";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
 import { useUseCases } from "../../hooks/useUseCases";
-import { catalogLabel, countOpenStatusItems, isCatalogStatusClosed } from "../../utils/catalogs";
-import { ticketTypeLabels } from "../../utils/domainLabels";
+import { objectReference } from "../../lib/references";
+import {
+  catalogEntriesByKind,
+  catalogColor,
+  catalogLabel,
+  countOpenStatusItems,
+  resolveCatalogEntryKey,
+} from "../../utils/catalogs";
+import { formatHumanDate } from "../../utils/date";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
+import { JournalPanel } from "../journal/JournalPanel";
+import type { TaskOwner } from "../../api/tasks";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
+import type { TicketOwner } from "../../api/tickets";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { UseCaseListBoardView } from "../usecases/UseCaseListBoardView";
 import { Button } from "../ui/Button";
@@ -40,21 +58,24 @@ import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
+import { ParentContextField } from "../ui/ParentContextField";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
-import { SectionHeader } from "../ui/SectionHeader";
 import { Select } from "../ui/Select";
+import { SelectParent, type SelectParentItem } from "../ui/SelectParent";
 import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
-import { FeatureProjectPanel } from "./FeatureProjectPanel";
+import { UserSelectField } from "../users/UserSelectField";
+import { useHasPermission } from "../../hooks/usePermissions";
 
 interface FeatureFormProps {
   open: boolean;
@@ -63,6 +84,8 @@ interface FeatureFormProps {
   onClose: () => void;
   onDelete?: (feature: Feature) => Promise<boolean>;
   savingLabel?: string;
+  initialProjectId?: number;
+  initialTab?: FeatureFormTab;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
   onOpenInTab?: () => void;
@@ -75,51 +98,162 @@ interface FeatureFormProps {
       projectIds: number[];
       comments: DraftComment[];
       files: DraftFile[];
-    }
+    },
   ) => Promise<void>;
 }
 
-type FeatureFormTab = "details" | "useCases" | "tasks" | "tickets" | "projects" | "comments" | "attachments";
+export type FeatureFormTab =
+  | "details"
+  | "useCases"
+  | "tasks"
+  | "tickets"
+  | "comments"
+  | "attachments"
+  | "journal";
 
 const tabs: Array<Tab<FeatureFormTab>> = [
   { value: "details", label: "Details" },
   { value: "useCases", label: "Use Cases" },
   { value: "tasks", label: "Aufgaben" },
   { value: "tickets", label: "Tickets" },
-  { value: "projects", label: "Projekte" },
   { value: "comments", label: "Kommentare" },
-  { value: "attachments", label: "Dateien" }
+  { value: "attachments", label: "Dateien" },
+  { value: "journal", label: "Journal" },
 ];
 
-export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab, onPostCreate }: FeatureFormProps) {
+export function parseFeatureFormTab(
+  value: string | null | undefined,
+): FeatureFormTab | undefined {
+  return tabs.some((tab) => tab.value === value)
+    ? (value as FeatureFormTab)
+    : undefined;
+}
+
+function featureStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "draft",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "featureStatus", value, preferredKey) ??
+    preferredKey
+  );
+}
+
+function workStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "active",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ??
+    preferredKey
+  );
+}
+
+function priorityValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "medium",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "priority", value, preferredKey) ??
+    preferredKey
+  );
+}
+
+function ticketTypeValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "bug",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "ticketType", value, preferredKey) ??
+    preferredKey
+  );
+}
+
+function projectParentItem(project: Project): SelectParentItem {
+  const metaParts = [`${project.openTaskCount} offene Aufgaben`];
+  const dueDate = formatHumanDate(project.dueDate);
+  if (dueDate) {
+    metaParts.push(dueDate);
+  }
+
+  return {
+    id: project.id,
+    title: project.name,
+    accentColor: project.color ?? undefined,
+    statusKind: "workStatus",
+    statusValue: project.status,
+    meta: metaParts.join(" · "),
+  };
+}
+
+export function FeatureForm({
+  open,
+  feature,
+  onSubmit,
+  onClose,
+  onDelete,
+  savingLabel,
+  initialProjectId,
+  initialTab,
+  variant = "modal",
+  closeOnSubmit = true,
+  onOpenInTab,
+  onPostCreate,
+}: FeatureFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const featureId = feature?.id;
+  const stableInitialProjectId =
+    initialProjectId !== undefined && Number.isFinite(initialProjectId)
+      ? initialProjectId
+      : undefined;
+  const taskCandidateOwner: TaskOwner | null = featureId
+    ? { type: "feature", id: featureId }
+    : stableInitialProjectId !== undefined
+      ? { type: "project", id: stableInitialProjectId }
+      : null;
+  const ticketCandidateOwner: TicketOwner | null = featureId
+    ? { type: "feature", id: featureId }
+    : stableInitialProjectId !== undefined
+      ? { type: "project", id: stableInitialProjectId }
+      : null;
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const auth = useAuth();
+  const canReadJournal = useHasPermission("journal", "read");
+  const canWriteProjectRelations = useHasPermission("projects", "write");
   const projects = useProjects();
-  const useCases = useUseCases(featureId);
-  const tasks = useTasks(featureId ? { type: "feature", id: featureId } : undefined);
-  const tickets = useTickets(featureId ? { type: "feature", id: featureId } : null);
-  const catalogs = useCatalogs();
   const projectLinks = useFeatureProjectLinks(featureId);
+  const useCases = useUseCases(featureId);
+  const tasks = useTasks(
+    featureId ? { type: "feature", id: featureId } : undefined,
+  );
+  const tickets = useTickets(
+    featureId ? { type: "feature", id: featureId } : null,
+  );
+  const catalogs = useCatalogs();
   const comments = useEntityComments("feature", featureId);
-  const attachments = useAttachments(featureId ? { type: "feature", id: featureId } : null);
+  const attachments = useAttachments(
+    featureId ? { type: "feature", id: featureId } : null,
+  );
   const [activeTab, setActiveTab] = useState<FeatureFormTab>("details");
   const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
   const [status, setStatus] = useState<FeatureStatus>("draft");
-  const [description, setDescription] = useState("");
-  const [sortOrder, setSortOrder] = useState(0);
+  const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [useCaseViewMode, setUseCaseViewMode] = useState<ViewMode>("kanban");
-  const [projectViewMode, setProjectViewMode] = useState<ViewMode>("kanban");
   const [pendingUseCases, setPendingUseCases] = useState<DraftUseCase[]>([]);
   const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
   const [pendingTickets, setPendingTickets] = useState<DraftTicket[]>([]);
-  const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
+  const [pendingProjectId, setPendingProjectId] = useState<number | null>(
+    stableInitialProjectId ?? null,
+  );
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
   const [pendingFiles, setPendingFiles] = useState<DraftFile[]>([]);
   const [useCaseDraftOpen, setUseCaseDraftOpen] = useState(false);
@@ -127,14 +261,24 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
   const [taskDraftOpen, setTaskDraftOpen] = useState(false);
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
-  const [projectLinkOpen, setProjectLinkOpen] = useState(false);
+  const prevOpenRef = useRef(false);
+
+  const handleTabChange = (nextTab: FeatureFormTab) => {
+    setActiveTab(nextTab);
+    if (variant !== "page") {
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    params.set("tab", nextTab);
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+  };
 
   useEffect(() => {
     if (!open) {
       setPendingUseCases([]);
       setPendingTasks([]);
       setPendingTickets([]);
-      setPendingProjects([]);
+      setPendingProjectId(stableInitialProjectId ?? null);
       setPendingComments([]);
       setPendingFiles([]);
       setUseCaseDraftOpen(false);
@@ -142,31 +286,65 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
       setTaskDraftOpen(false);
       setTicketLinkOpen(false);
       setTicketDraftOpen(false);
-      setProjectLinkOpen(false);
+      prevOpenRef.current = false;
+      return;
+    }
+    if (!prevOpenRef.current) {
+      setActiveTab(initialTab ?? "details");
+    }
+    prevOpenRef.current = true;
+  }, [initialTab, open, stableInitialProjectId]);
+
+  useEffect(() => {
+    if (!open) {
       return;
     }
     setTitle(feature?.title ?? "");
-    setSlug(feature?.slug ?? "");
     setStatus(feature?.status ?? "draft");
-    setDescription(feature?.description ?? "");
-    setSortOrder(feature?.sortOrder ?? 0);
+    setResponsibleUserId(feature ? feature.responsibleUserId : (auth.user?.id ?? null));
     setContent(feature?.content ?? "");
-    setActiveTab("details");
-  }, [feature, open]);
+  }, [auth.user?.id, feature, open]);
+
+  useEffect(() => {
+    if (open && !feature) {
+      setPendingProjectId(stableInitialProjectId ?? null);
+    }
+  }, [feature, open, stableInitialProjectId]);
+
+  useEffect(() => {
+    if (open) {
+      setStatus((currentStatus) =>
+        featureStatusValue(catalogs.entries, currentStatus, "draft"),
+      );
+    }
+  }, [catalogs.entries, open]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
     try {
-      const created = await onSubmit({ title, slug, status, description, sortOrder, content });
+      const created = await onSubmit({
+        title,
+        status: resolveCatalogEntryKey(
+          catalogs.entries,
+          "featureStatus",
+          status,
+          "draft",
+        ),
+        responsibleUserId,
+        content,
+      });
       if (!feature && created && onPostCreate) {
         await onPostCreate(created.id, {
           tasks: pendingTasks,
           tickets: pendingTickets,
           useCases: pendingUseCases,
-          projectIds: pendingProjects.map((project) => project.id),
+          projectIds:
+            canWriteProjectRelations && pendingProjectId
+              ? [pendingProjectId]
+              : [],
           comments: pendingComments,
-          files: pendingFiles
+          files: pendingFiles,
         });
       }
       if (closeOnSubmit) {
@@ -200,32 +378,124 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {
-      showToast({ tone: "error", title: "Datei konnte nicht hochgeladen werden", message: errorMessage(attachmentError) });
+      showToast({
+        tone: "error",
+        title: "Datei konnte nicht hochgeladen werden",
+        message: errorMessage(attachmentError),
+      });
       throw attachmentError;
     }
   };
 
-  const tabItems = tabs.map((tab) => {
+  const projectParentItems = useMemo(
+    () => projects.projects.map(projectParentItem),
+    [projects.projects],
+  );
+  const selectedParentProject = feature
+    ? (projectLinks.linkedProjects[0] ?? null)
+    : (projects.projects.find((project) => project.id === pendingProjectId) ??
+      null);
+  const selectedParentItem = selectedParentProject
+    ? projectParentItem(selectedParentProject)
+    : null;
+  const parentProjectDisabled =
+    projects.loading ||
+    Boolean(feature && projectLinks.loading) ||
+    !canWriteProjectRelations;
+  const showParentContexts =
+    stableInitialProjectId === undefined &&
+    (feature?.parentContexts?.length ?? 0) > 0;
+
+  const changeParentProject = async (item: SelectParentItem | null) => {
+    const nextProjectId = item ? Number(item.id) : null;
+    if (!feature) {
+      setPendingProjectId(nextProjectId);
+      return;
+    }
+
+    if (!canWriteProjectRelations) {
+      return;
+    }
+
+    try {
+      await projectLinks.setProjectsForFeature(
+        nextProjectId ? [nextProjectId] : [],
+      );
+      showToast({
+        tone: "success",
+        title: nextProjectId
+          ? "Parent-Projekt gespeichert"
+          : "Parent-Projekt entfernt",
+      });
+    } catch (projectError) {
+      showToast({
+        tone: "error",
+        title: "Parent-Projekt konnte nicht gespeichert werden",
+        message: errorMessage(projectError),
+      });
+      throw projectError;
+    }
+  };
+
+  const visibleTabs = feature
+    ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
+    : tabs.filter((tab) => tab.value !== "journal");
+  const tabItems = visibleTabs.map((tab) => {
+    if (tab.value === "details") {
+      return tab;
+    }
     if (tab.value === "useCases") {
-      const pending = pendingUseCases.map((item) => (item.kind === "existing" ? item.useCase : item.draft));
-      return { ...tab, count: feature ? countOpenStatusItems(useCases.useCases, catalogs.entries, "featureStatus") : countOpenStatusItems(pending, catalogs.entries, "featureStatus") };
+      const pending = pendingUseCases.map((item) =>
+        item.kind === "existing" ? item.useCase : item.draft,
+      );
+      return {
+        ...tab,
+        count: feature
+          ? countOpenStatusItems(
+              useCases.useCases,
+              catalogs.entries,
+              "featureStatus",
+            )
+          : countOpenStatusItems(pending, catalogs.entries, "featureStatus"),
+      };
     }
     if (tab.value === "tasks") {
-      const pending = pendingTasks.map((item) => (item.kind === "existing" ? item.task : item.draft));
-      return { ...tab, count: feature ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
+      const pending = pendingTasks.map((item) =>
+        item.kind === "existing" ? item.task : item.draft,
+      );
+      return {
+        ...tab,
+        count: feature
+          ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus")
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "tickets") {
-      const pending = pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft));
-      return { ...tab, count: feature ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
-    }
-    if (tab.value === "projects") {
-      return { ...tab, count: feature ? countOpenStatusItems(projectLinks.linkedProjects, catalogs.entries, "workStatus") : countOpenStatusItems(pendingProjects, catalogs.entries, "workStatus") };
+      const pending = pendingTickets.map((item) =>
+        item.kind === "existing" ? item.ticket : item.draft,
+      );
+      return {
+        ...tab,
+        count: feature
+          ? countOpenStatusItems(
+              tickets.tickets,
+              catalogs.entries,
+              "workStatus",
+            )
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "comments") {
-      return { ...tab, count: feature ? comments.comments.length : pendingComments.length };
+      return {
+        ...tab,
+        count: feature ? comments.comments.length : pendingComments.length,
+      };
     }
     if (tab.value === "attachments") {
-      return { ...tab, count: feature ? attachments.attachments.length : pendingFiles.length };
+      return {
+        ...tab,
+        count: feature ? attachments.attachments.length : pendingFiles.length,
+      };
     }
     return { ...tab, count: 0 };
   });
@@ -235,13 +505,26 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
       <FormModal
         open={open}
         title={feature ? "Feature bearbeiten" : "Neues Feature"}
+        objectReference={feature ? objectReference("feature", feature.id) : undefined}
         icon={<BookOpen size={20} />}
         breadcrumb={["Features", feature ? "Bearbeiten" : "Neu"]}
-        submitLabel={saving ? savingLabel ?? "Speichern…" : feature ? "Speichern" : "Feature anlegen"}
+        submitLabel={
+          saving
+            ? (savingLabel ?? "Speichern…")
+            : feature
+              ? "Speichern"
+              : "Feature anlegen"
+        }
         saving={saving}
         footerStart={
           feature && onDelete ? (
-            <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" disabled={deleting} onClick={() => void deleteCurrentFeature()}>
+            <Button
+              className="text-crimson hover:bg-crimson/10"
+              icon={<Trash2 size={18} />}
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => void deleteCurrentFeature()}
+            >
               Löschen
             </Button>
           ) : undefined
@@ -250,38 +533,73 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        contentLayout={activeTab === "details" ? "flush" : "default"}
+        contentClassName={
+          activeTab === "details" ? "" : ""
+        }
+        tabBar={
+          <TabBar tabs={tabItems} active={activeTab} onChange={handleTabChange} />
+        }
       >
-        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
-
         {activeTab === "details" ? (
-          <>
-            <Section title="Stammdaten">
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_10rem]">
-                <FormField label="Titel" required className="min-w-0">
-                  <Input autoFocus={!feature} value={title} onChange={(event) => setTitle(event.target.value)} required />
-                </FormField>
-                <FormField label="Slug" required className="min-w-0">
-                  <Input iconLeft={<LinkIcon size={16} />} variant="mono" value={slug} onChange={(event) => setSlug(event.target.value)} required />
-                </FormField>
-                <FormField label="Sortierung" className="min-w-0">
-                  <Input type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
-                </FormField>
+          <div className="flex min-h-0 w-full flex-1">
+            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
+              <div className="mx-auto grid w-full max-w-5xl gap-4">
+                {showParentContexts ? <ParentContextField parents={feature?.parentContexts} /> : null}
+                <Section>
+                  <FormField label="Titel" required className="min-w-0">
+                    <Input
+                      autoFocus={!feature}
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      required
+                    />
+                  </FormField>
+                </Section>
+                <Section title="Inhalt">
+                  <RichTextInlineField
+                    value={content}
+                    placeholder="Feature-Inhalt"
+                    testIdPrefix="feature-form-content"
+                    onImageUpload={uploadContentImage}
+                    onChange={setContent}
+                  />
+                </Section>
               </div>
-            </Section>
-            <Section title="Status">
-              <StatusToggle kind="featureStatus" value={status} onChange={setStatus} />
-            </Section>
-            <Section title="Kurzbeschreibung">
-              <RichTextInlineField value={description} placeholder="Kurzbeschreibung" minRows={12} testIdPrefix="feature-form-description" onChange={setDescription} />
-            </Section>
-            <Section title="Inhalt">
-              <RichTextInlineField value={content} placeholder="Feature-Inhalt" testIdPrefix="feature-form-content" onChange={setContent} />
-            </Section>
-          </>
+            </div>
+            <FormSidebar storageKey="feature-form-sidebar">
+              <div className="grid gap-4">
+                <FormField label="Status">
+                  <StatusToggle
+                    kind="featureStatus"
+                    value={status}
+                    onChange={setStatus}
+                  />
+                </FormField>
+                <UserSelectField
+                  label="Verantwortlich"
+                  value={responsibleUserId}
+                  selectedUser={feature?.responsibleUser ?? null}
+                  onChange={setResponsibleUserId}
+                />
+              </div>
+              <SelectParent
+                type="project"
+                label="Projekt"
+                placeholder="Projekt wählen ..."
+                items={projectParentItems}
+                value={selectedParentItem}
+                disabled={parentProjectDisabled}
+                onChange={(item) => {
+                  void changeParentProject(item);
+                }}
+              />
+            </FormSidebar>
+          </div>
         ) : null}
 
         {activeTab === "useCases" ? (
-          <Section title="Use Cases">
+          <Section fill={Boolean(feature)}>
             {feature ? (
               useCases.loading ? (
                 <TaskListSkeleton />
@@ -290,27 +608,44 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                   useCases={useCases.useCases}
                   viewMode={useCaseViewMode}
                   onViewModeChange={setUseCaseViewMode}
-                  onCreate={() => navigate(`/use-cases/new?featureId=${feature.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
-                  onOpen={(useCase) => navigate(`/use-cases/${useCase.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                  onCreate={() =>
+                    navigate(
+                      `/use-cases/new?featureId=${feature.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
+                  onOpen={(useCase) =>
+                    navigate(
+                      `/use-cases/${useCase.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
+                  onStatusChange={(useCase, status) => useCases.updateUseCase(useCase.id, { status, expectedVersion: useCase.version })}
                 />
               )
             ) : (
               <PendingRelationList
                 existingItems={[]}
-                draftItems={pendingUseCases.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingUseCases.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<FileText size={22} />}
                 emptyTitle="Keine Use Cases vorgemerkt"
                 showLinkExisting={false}
                 onCreateNew={() => setUseCaseDraftOpen(true)}
                 onRemoveExisting={() => undefined}
-                onRemoveDraft={(index) => setPendingUseCases((items) => items.filter((_, itemIndex) => itemIndex !== index))}
+                onRemoveDraft={(index) =>
+                  setPendingUseCases((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
               />
             )}
           </Section>
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section title="Aufgaben">
+          <Section fill={Boolean(feature)}>
             {feature ? (
               <OwnerTaskBoard owner={{ type: "feature", id: feature.id }} />
             ) : (
@@ -321,26 +656,47 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                         {
                           id: item.task.id,
                           title: item.task.title,
-                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.task.status),
-                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.task.status) ? "steel" : "fern"
-                        }
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.task.status,
+                          ),
+                          statusColor: catalogColor(
+                            catalogs.entries,
+                            "workStatus",
+                            item.task.status,
+                          ),
+                        },
                       ]
-                    : []
+                    : [],
                 )}
-                draftItems={pendingTasks.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTasks.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Aufgaben vorgemerkt"
+                showLinkExisting={taskCandidateOwner !== null}
                 onLinkExisting={() => setTaskLinkOpen(true)}
                 onCreateNew={() => setTaskDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "new", index))}
+                onRemoveExisting={(index) =>
+                  setPendingTasks((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTasks((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets">
+          <Section fill={Boolean(feature)}>
             {feature ? (
               <OwnerTicketBoard owner={{ type: "feature", id: feature.id }} />
             ) : (
@@ -351,67 +707,80 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                         {
                           id: item.ticket.id,
                           title: item.ticket.title,
-                          statusLabel: catalogLabel(catalogs.entries, "workStatus", item.ticket.status),
-                          statusTone: isCatalogStatusClosed(catalogs.entries, "workStatus", item.ticket.status) ? "steel" : "fern"
-                        }
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.ticket.status,
+                          ),
+                          statusColor: catalogColor(
+                            catalogs.entries,
+                            "workStatus",
+                            item.ticket.status,
+                          ),
+                        },
                       ]
-                    : []
+                    : [],
                 )}
-                draftItems={pendingTickets.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTickets.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<Bug size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
+                showLinkExisting={ticketCandidateOwner !== null}
                 onLinkExisting={() => setTicketLinkOpen(true)}
                 onCreateNew={() => setTicketDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "new", index))}
-              />
-            )}
-          </Section>
-        ) : null}
-
-        {activeTab === "projects" ? (
-          <Section title="Projekte">
-            {feature ? (
-              <FeatureProjectPanel
-                projects={projectLinks.linkedProjects}
-                availableProjects={projectLinks.projects}
-                viewMode={projectViewMode}
-                onViewModeChange={setProjectViewMode}
-                onAddProject={(project) => projectLinks.addProjectToFeature(project.id)}
-                onRemoveProject={(project) => projectLinks.removeProjectFromFeature(project.id)}
-                onOpen={(project) => navigate(`/projects/${project.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
-              />
-            ) : (
-              <PendingRelationList
-                existingItems={pendingProjects.map((project) => ({ id: project.id, title: project.name }))}
-                draftItems={[]}
-                emptyIcon={<FolderKanban size={22} />}
-                emptyTitle="Keine Projekte vorgemerkt"
-                showCreateNew={false}
-                onLinkExisting={() => setProjectLinkOpen(true)}
-                onRemoveExisting={(index) => setPendingProjects((items) => items.filter((_, itemIndex) => itemIndex !== index))}
-                onRemoveDraft={() => undefined}
+                onRemoveExisting={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section title="Kommentare">
+          <Section>
             {feature ? (
-              <CommentThread comments={comments.comments} entityLabel="Feature" onCreate={comments.createComment} onDelete={comments.removeComment} />
+              <CommentThread
+                comments={comments.comments}
+                entityLabel="Feature"
+                onCreate={comments.createComment}
+                onUpdate={comments.updateComment}
+                onDelete={comments.removeComment}
+              />
             ) : (
-              <PendingCommentList comments={pendingComments} onAdd={(comment) => setPendingComments((items) => [...items, comment])} onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingCommentList
+                comments={pendingComments}
+                onAdd={(comment) =>
+                  setPendingComments((items) => [...items, comment])
+                }
+                onUpdate={(index, comment) =>
+                  setPendingComments((items) =>
+                    items.map((item, itemIndex) =>
+                      itemIndex === index ? comment : item,
+                    ),
+                  )
+                }
+                onRemove={(index) =>
+                  setPendingComments((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
 
         {activeTab === "attachments" ? (
           <Section>
-            <div className="mb-4 flex items-center gap-2">
-              <Paperclip size={18} className="text-fern" />
-              <SectionHeader title="Dateien" />
-            </div>
             {feature ? (
               <div className="grid gap-4">
                 <AttachmentUploader onUpload={uploadAttachment} />
@@ -422,28 +791,60 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
                       title: "Datei löschen?",
                       body: attachment.originalName,
                       severity: "danger",
-                      confirmLabel: "Löschen"
+                      confirmLabel: "Löschen",
                     }).then((approved) => {
                       if (approved) {
                         void attachments
                           .removeAttachment(attachment.id)
-                          .then(() => showToast({ tone: "success", title: "Datei gelöscht" }))
-                          .catch((attachmentError: unknown) => showToast({ tone: "error", title: "Datei konnte nicht gelöscht werden", message: errorMessage(attachmentError) }));
+                          .then(() =>
+                            showToast({
+                              tone: "success",
+                              title: "Datei gelöscht",
+                            }),
+                          )
+                          .catch((attachmentError: unknown) =>
+                            showToast({
+                              tone: "error",
+                              title: "Datei konnte nicht gelöscht werden",
+                              message: errorMessage(attachmentError),
+                            }),
+                          );
                       }
                     });
                   }}
+                  onOpen={(attachment) => attachments.openAttachment(attachment.id)}
+                  openingAttachmentId={attachments.openingAttachmentId}
                 />
               </div>
             ) : (
-              <PendingFileList files={pendingFiles} onAdd={(files) => setPendingFiles((items) => [...items, ...files])} onRemove={(index) => setPendingFiles((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingFileList
+                files={pendingFiles}
+                onAdd={(files) =>
+                  setPendingFiles((items) => [...items, ...files])
+                }
+                onRemove={(index) =>
+                  setPendingFiles((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
+          </Section>
+        ) : null}
+
+        {activeTab === "journal" && feature ? (
+          <Section fill>
+            <JournalPanel objectType="feature" objectId={feature.id} />
           </Section>
         ) : null}
       </FormModal>
 
       <TaskLinkDialog
         open={taskLinkOpen}
-        currentTasks={pendingTasks.flatMap((item) => (item.kind === "existing" ? [item.task] : []))}
+        owner={taskCandidateOwner}
+        currentTasks={pendingTasks.flatMap((item) =>
+          item.kind === "existing" ? [item.task] : [],
+        )}
         onLink={async (task) => {
           setPendingTasks((items) => [...items, { kind: "existing", task }]);
           setTaskLinkOpen(false);
@@ -452,40 +853,49 @@ export function FeatureForm({ open, feature, onSubmit, onClose, onDelete, saving
       />
       <TicketLinkDialog
         open={ticketLinkOpen}
-        currentTickets={pendingTickets.flatMap((item) => (item.kind === "existing" ? [item.ticket] : []))}
+        owner={ticketCandidateOwner}
+        currentTickets={pendingTickets.flatMap((item) =>
+          item.kind === "existing" ? [item.ticket] : [],
+        )}
         onLink={async (ticket) => {
-          setPendingTickets((items) => [...items, { kind: "existing", ticket }]);
+          setPendingTickets((items) => [
+            ...items,
+            { kind: "existing", ticket },
+          ]);
           setTicketLinkOpen(false);
         }}
         onClose={() => setTicketLinkOpen(false)}
       />
-      <ProjectLinkDialog
-        open={projectLinkOpen}
-        projects={projects.projects}
-        excludeIds={pendingProjects.map((project) => project.id)}
-        onLink={(project) => setPendingProjects((items) => [...items, project])}
-        onClose={() => setProjectLinkOpen(false)}
-      />
       <UseCaseDraftDialog
         open={useCaseDraftOpen}
-        onCreate={(draft) => setPendingUseCases((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingUseCases((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setUseCaseDraftOpen(false)}
       />
       <TaskDraftDialog
         open={taskDraftOpen}
-        onCreate={(draft) => setPendingTasks((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingTasks((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setTaskDraftOpen(false)}
       />
       <TicketDraftDialog
         open={ticketDraftOpen}
-        onCreate={(draft) => setPendingTickets((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingTickets((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setTicketDraftOpen(false)}
       />
     </>
   );
 }
 
-function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(items: TItem[], kind: TItem["kind"], removeIndex: number): TItem[] {
+function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(
+  items: TItem[],
+  kind: TItem["kind"],
+  removeIndex: number,
+): TItem[] {
   let currentIndex = -1;
   return items.filter((item) => {
     if (item.kind !== kind) {
@@ -496,66 +906,37 @@ function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(item
   });
 }
 
-function ProjectLinkDialog({ open, projects, excludeIds, onLink, onClose }: { open: boolean; projects: Project[]; excludeIds: number[]; onLink: (project: Project) => void; onClose: () => void }) {
-  const [selectedProjectId, setSelectedProjectId] = useState<number | "">("");
-  const availableProjects = projects.filter((project) => !excludeIds.includes(project.id));
-  const firstProjectId = availableProjects[0]?.id ?? "";
-
-  useEffect(() => {
-    if (open) {
-      setSelectedProjectId(firstProjectId);
-    }
-  }, [firstProjectId, open]);
-
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.stopPropagation();
-    event.preventDefault();
-    const project = availableProjects.find((item) => item.id === selectedProjectId);
-    if (!project) {
-      return;
-    }
-    onLink(project);
-    onClose();
-  };
-
-  return (
-    <Modal open={open} title="Projekt verknüpfen" size="md" onClose={onClose}>
-      <form className="grid gap-4" onSubmit={submit}>
-        <Select label="Projekt" value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value ? Number(event.target.value) : "")}>
-          {availableProjects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </Select>
-        <footer className="flex justify-end gap-2">
-          <Button onClick={onClose}>Abbrechen</Button>
-          <Button type="submit" variant="primary" disabled={!selectedProjectId}>
-            Verknüpfen
-          </Button>
-        </footer>
-      </form>
-    </Modal>
-  );
-}
-
-function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftUseCase, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function UseCaseDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftUseCase, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
+  const catalogs = useCatalogs();
   const [status, setStatus] = useState<FeatureStatus>("draft");
   const trimmedTitle = title.trim();
-  const trimmedSlug = slug.trim();
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
     event.preventDefault();
-    if (!trimmedTitle || !trimmedSlug) {
+    if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, slug: trimmedSlug, status });
+    onCreate({
+      title: trimmedTitle,
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "featureStatus",
+        status,
+        "draft",
+      ),
+    });
     setTitle("");
-    setSlug("");
-    setStatus("draft");
+    setStatus(featureStatusValue(catalogs.entries, "draft", "draft"));
     onClose();
   };
 
@@ -563,17 +944,27 @@ function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
     <Modal open={open} title="Use Case vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
-        </FormField>
-        <FormField label="Slug" required>
-          <Input value={slug} onChange={(event) => setSlug(event.target.value)} required variant="mono" />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
         <FormField label="Status">
-          <StatusToggle kind="featureStatus" value={status} onChange={setStatus} />
+          <StatusToggle
+            kind="featureStatus"
+            value={status}
+            onChange={setStatus}
+          />
         </FormField>
         <footer className="flex justify-end gap-2">
           <Button onClick={onClose}>Abbrechen</Button>
-          <Button type="submit" variant="primary" disabled={!trimmedTitle || !trimmedSlug}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!trimmedTitle}
+          >
             Vormerken
           </Button>
         </footer>
@@ -582,9 +973,18 @@ function UseCaseDraftDialog({ open, onCreate, onClose }: { open: boolean; onCrea
   );
 }
 
-function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TaskDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
-  const [status, setStatus] = useState<TaskStatus>("todo");
+  const catalogs = useCatalogs();
+  const [status, setStatus] = useState<TaskStatus>("active");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
 
@@ -594,10 +994,24 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, status, priority });
+    onCreate({
+      title: trimmedTitle,
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "workStatus",
+        status,
+        "active",
+      ),
+      priority: resolveCatalogEntryKey(
+        catalogs.entries,
+        "priority",
+        priority,
+        "medium",
+      ),
+    });
     setTitle("");
-    setStatus("todo");
-    setPriority("medium");
+    setStatus(workStatusValue(catalogs.entries, "active", "active"));
+    setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
   };
 
@@ -605,11 +1019,20 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     <Modal open={open} title="Aufgabe vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />
@@ -626,12 +1049,28 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
   );
 }
 
-function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TicketDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<TicketType>("bug");
+  const catalogs = useCatalogs();
   const [status, setStatus] = useState<TicketStatus>("open");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
+  const ticketTypeOptions = useMemo(() => catalogEntriesByKind(catalogs.entries, "ticketType"), [catalogs.entries]);
+
+  useEffect(() => {
+    if (open) {
+      setType((currentType) => ticketTypeValue(catalogs.entries, currentType));
+    }
+  }, [catalogs.entries, open]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
@@ -639,11 +1078,26 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, type, status, priority });
+    onCreate({
+      title: trimmedTitle,
+      type: ticketTypeValue(catalogs.entries, type),
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "workStatus",
+        status,
+        "open",
+      ),
+      priority: resolveCatalogEntryKey(
+        catalogs.entries,
+        "priority",
+        priority,
+        "medium",
+      ),
+    });
     setTitle("");
-    setType("bug");
-    setStatus("open");
-    setPriority("medium");
+    setType(ticketTypeValue(catalogs.entries, "bug"));
+    setStatus(workStatusValue(catalogs.entries, "open", "open"));
+    setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
   };
 
@@ -651,17 +1105,31 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     <Modal open={open} title="Ticket vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
-        <Select label="Typ" value={type} onChange={(event) => setType(event.target.value as TicketType)}>
-          <option value="bug">{ticketTypeLabels.bug}</option>
-          <option value="improvement">{ticketTypeLabels.improvement}</option>
-          <option value="question">{ticketTypeLabels.question}</option>
-          <option value="task">{ticketTypeLabels.task}</option>
+        <Select
+          label="Typ"
+          value={type}
+          onChange={(event) => setType(event.target.value as TicketType)}
+        >
+          {ticketTypeOptions.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
         </Select>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />

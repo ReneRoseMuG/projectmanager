@@ -1,7 +1,7 @@
-import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskUpdate } from "@taskmanager/shared-types";
 import { api } from "./client";
 
-export type TaskOwner = { type: "project" | "milestone" | "feature" | "useCase"; id: number };
+export type { TaskOwner };
 
 function ownerPath(owner: TaskOwner): string {
   if (owner.type === "project") {
@@ -12,6 +12,9 @@ function ownerPath(owner: TaskOwner): string {
   }
   if (owner.type === "feature") {
     return `features/${owner.id}`;
+  }
+  if (owner.type === "wikiPage") {
+    return `wiki/${owner.id}`;
   }
   return `use-cases/${owner.id}`;
 }
@@ -28,7 +31,14 @@ export async function getTasks(): Promise<Task[]> {
   return api.get("tasks").json<Task[]>();
 }
 
+export async function getTaskLinkCandidates(owner: TaskOwner): Promise<Task[]> {
+  return api.get("tasks/link-candidates", { searchParams: { ownerType: owner.type, ownerId: owner.id } }).json<Task[]>();
+}
+
 export async function createOwnerTask(owner: TaskOwner, input: TaskInput): Promise<TaskBoardItem> {
+  if (owner.type === "wikiPage") {
+    throw new Error("Wiki pages can only link existing tasks");
+  }
   return api.post(`${ownerPath(owner)}/tasks`, { json: input }).json<TaskBoardItem>();
 }
 
@@ -37,6 +47,9 @@ export async function createTask(projectId: number, input: TaskInput): Promise<T
 }
 
 export async function linkOwnerTask(owner: TaskOwner, taskId: number): Promise<TaskBoardItem> {
+  if (owner.type === "wikiPage") {
+    return api.post(`${ownerPath(owner)}/tasks`, { json: { taskId } }).json<TaskBoardItem>();
+  }
   return api.post(`${ownerPath(owner)}/tasks/${taskId}`).json<TaskBoardItem>();
 }
 
@@ -45,6 +58,9 @@ export async function unlinkOwnerTask(owner: TaskOwner, taskId: number): Promise
 }
 
 export async function updateOwnerTaskBoard(owner: TaskOwner, taskId: number, input: TaskBoardPositionInput): Promise<TaskBoardItem> {
+  if (owner.type === "wikiPage") {
+    throw new Error("Wiki page task links cannot be moved on a board");
+  }
   return api.patch(`${ownerPath(owner)}/tasks/${taskId}/board`, { json: input }).json<TaskBoardItem>();
 }
 

@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Spinner } from "./Spinner";
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "inverted" | "onColor";
 type ButtonSize = "sm" | "md";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -14,18 +14,20 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const variants: Record<ButtonVariant, string> = {
   primary: "bg-steel-700 text-white hover:bg-steel-600",
   secondary: "border border-line bg-white text-ink hover:border-fern",
-  ghost: "text-ink hover:bg-line/50",
-  danger: "bg-crimson text-white hover:bg-crimson/90"
+  ghost: "text-ink hover:bg-steel-100",
+  danger: "bg-crimson text-white hover:bg-crimson/90",
+  inverted: "bg-white text-steel-700 hover:bg-steel-50",
+  onColor: "border border-white/25 bg-white/10 text-white hover:bg-white/20",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
   sm: "h-8",
-  md: "h-10"
+  md: "h-10",
 };
 
 const iconOnlySizeClasses: Record<ButtonSize, string> = {
   sm: "w-8",
-  md: "w-10"
+  md: "w-10",
 };
 
 function hasUtilityClass(className: string, prefix: string) {
@@ -33,10 +35,23 @@ function hasUtilityClass(className: string, prefix: string) {
 }
 
 /** Shared button atom with variants, icon support, sizes and loading state. */
-export function Button({ variant = "secondary", size = "md", icon, loading = false, className = "", children, type = "button", disabled, ...props }: ButtonProps) {
+export function Button({
+  variant = "secondary",
+  size = "md",
+  icon,
+  loading = false,
+  className = "",
+  children,
+  type = "button",
+  disabled,
+  ...props
+}: ButtonProps) {
   const iconOnly = Boolean(icon || loading) && !children;
   const heightClass = hasUtilityClass(className, "h-") ? "" : sizeClasses[size];
-  const widthClass = iconOnly && !hasUtilityClass(className, "w-") ? iconOnlySizeClasses[size] : "";
+  const widthClass =
+    iconOnly && !hasUtilityClass(className, "w-")
+      ? iconOnlySizeClasses[size]
+      : "";
 
   return (
     <button

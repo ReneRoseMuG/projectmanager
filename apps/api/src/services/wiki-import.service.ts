@@ -12,14 +12,8 @@ import fs from "node:fs";
 import path from "node:path";
 import type { DbClient } from "../db/client.js";
 import { backlogItems, featureRelations, features, featureTasks, projectFeatures, projects, projectTasks, tasks, useCases, useCaseTasks } from "../db/schema.js";
+import { firstRow, insertId } from "../db/query-utils.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import {
-  buildFilename,
-  buildStoredContentPath,
-  resolveContentPath,
-  resolveStoredContentPath,
-  writeContent
-} from "./content.service.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 
 interface ParsedWiki {
@@ -33,7 +27,7 @@ interface ParsedWiki {
 
 interface ParsedFeature {
   title: string;
-  slug: string;
+  sourceKey: string;
   description: string | null;
   content: string;
   sortOrder: number;
@@ -43,7 +37,7 @@ interface ParsedFeature {
 }
 
 interface ParsedFeatureRelation {
-  targetSlug: string;
+  targetFeatureKey: string;
   targetCode: string;
   relationType: FeatureRelationType;
   description: string | null;
@@ -52,7 +46,7 @@ interface ParsedFeatureRelation {
 type BacklogStatus = typeof backlogItems.$inferSelect["status"];
 
 interface ParsedBacklogItem {
-  featureSlug: string;
+  featureKey: string;
   title: string;
   description: string | null;
   status: BacklogStatus;
@@ -62,9 +56,9 @@ interface ParsedBacklogItem {
 }
 
 interface ParsedUseCase {
-  featureSlug: string;
+  featureKey: string;
   title: string;
-  slug: string;
+  sourceKey: string;
   description: string | null;
   content: string;
   sortOrder: number;
@@ -77,21 +71,19 @@ interface ParsedTask {
   description: string;
   priority: Priority;
   sourcePath: string;
-  featureSlugs: string[];
-  useCaseSlugs: string[];
+  featureKeys: string[];
+  useCaseKeys: string[];
 }
 
 interface StoredFeature {
   id: number;
-  slug: string;
-  contentPath: string | null;
+  title: string;
 }
 
 interface StoredUseCase {
   id: number;
   featureId: number;
-  slug: string;
-  contentPath: string | null;
+  title: string;
 }
 
 interface StoredTask {
@@ -300,8 +292,8 @@ function featureCoreContent(content: string): string {
   return contentBeforeHeading(content, /^##\s+Use Cases\s*$/i);
 }
 
-function numberFromSlug(slug: string): number {
-  const match = slug.match(/^(?:ft|uc)-(\d+)(?:-(\d+))?/i);
+function numberFromSourceKey(sourceKey: string): number {
+  const match = sourceKey.match(/^(?:ft|uc)-(\d+)(?:-(\d+))?/i);
   if (!match) {
     return 0;
   }
@@ -311,8 +303,8 @@ function numberFromSlug(slug: string): number {
   return Number.isFinite(major) ? major * 100 + minor : 0;
 }
 
-function featureCodeFromSlug(slug: string): string | null {
-  const match = slug.match(/^ft-(\d+)/i);
+function featureCodeFromSourceKey(sourceKey: string): string | null {
+  const match = sourceKey.match(/^ft-(\d+)/i);
   return match ? `ft-${(match[1] ?? "").padStart(2, "0")}` : null;
 }
 
@@ -346,8 +338,8 @@ function relationTypeFromContext(context: string): FeatureRelationType {
 
 function parseFeatureRelations(
   content: string,
-  sourceSlug: string,
-  featureCodeToSlug: Map<string, string>,
+  sourceKey: string,
+  featureCodeToKey: Map<string, string>,
   sourcePath: string,
   warnings: WikiImportItemResult[]
 ): ParsedFeatureRelation[] {
@@ -386,25 +378,25 @@ function parseFeatureRelations(
     }
 
     for (const targetCode of featureCodesFromText(line)) {
-      const targetSlug = featureCodeToSlug.get(targetCode);
-      if (!targetSlug) {
+      const targetFeatureKey = featureCodeToKey.get(targetCode);
+      if (!targetFeatureKey) {
         warnings.push({
           type: "featureRelation",
           action: "warning",
-          title: sourceSlug,
-          slug: sourceSlug,
+          title: sourceKey,
+          importKey: sourceKey,
           sourcePath,
           message: `Feature reference "${targetCode.toUpperCase()}" is not part of the import source`
         });
         continue;
       }
-      if (targetSlug === sourceSlug) {
+      if (targetFeatureKey === sourceKey) {
         continue;
       }
 
       const relationType = relationTypeFromContext(context);
-      relations.set(`${targetSlug}:${relationType}`, {
-        targetSlug,
+      relations.set(`${targetFeatureKey}:${relationType}`, {
+        targetFeatureKey,
         targetCode,
         relationType,
         description: cleanNullable(line.replace(/^\s*-\s*/, "")) ?? null
@@ -412,7 +404,7 @@ function parseFeatureRelations(
     }
   }
 
-  return [...relations.values()].sort((first, second) => first.targetSlug.localeCompare(second.targetSlug) || first.relationType.localeCompare(second.relationType));
+  return [...relations.values()].sort((first, second) => first.targetFeatureKey.localeCompare(second.targetFeatureKey) || first.relationType.localeCompare(second.relationType));
 }
 
 function parsePriority(content: string): Priority {
@@ -492,7 +484,7 @@ function markdownH2Sections(content: string): Array<{ title: string; body: strin
   return sections;
 }
 
-function parseBacklogItems(featureSlug: string, backlogDir: string, sourcePath: string): ParsedBacklogItem[] {
+function parseBacklogItems(featureKey: string, backlogDir: string, sourcePath: string): ParsedBacklogItem[] {
   const parsedBacklogItems: ParsedBacklogItem[] = [];
   for (const backlogFile of listMarkdownFiles(backlogDir)) {
     const content = readMarkdown(backlogFile);
@@ -501,11 +493,11 @@ function parseBacklogItems(featureSlug: string, backlogDir: string, sourcePath: 
     for (const section of markdownH2Sections(content)) {
       const description = cleanNullable(section.body);
       parsedBacklogItems.push({
-        featureSlug,
+        featureKey,
         title: section.title,
         description: description ? markdownToHtml(description) : null,
         status: parseBacklogStatus(section.body),
-        sortOrder: numberFromSlug(featureSlug) + section.index,
+        sortOrder: numberFromSourceKey(featureKey) + section.index,
         importKey: `wiki:${sourceRelativePath.toLowerCase()}#${normalizePathSegment(section.title)}`,
         sourcePath: sourceRelativePath
       });
@@ -528,37 +520,37 @@ function parseLinkTargets(content: string): string[] {
   return targets;
 }
 
-function parseTaskRelations(content: string, featureCodeToSlug: Map<string, string>, useCaseSlugToFeatureSlug: Map<string, string>) {
-  const featureSlugs = new Set<string>();
-  const useCaseSlugs = new Set<string>();
+function parseTaskRelations(content: string, featureCodeToKey: Map<string, string>, useCaseKeyToFeatureKey: Map<string, string>) {
+  const featureKeys = new Set<string>();
+  const useCaseKeys = new Set<string>();
 
   for (const target of parseLinkTargets(content)) {
     const featureMatch = target.match(/features\/(ft-[^/]+)/i);
     if (featureMatch) {
-      featureSlugs.add(normalizePathSegment(featureMatch[1] ?? ""));
+      featureKeys.add(normalizePathSegment(featureMatch[1] ?? ""));
     }
 
     const useCaseMatch = target.match(/features\/[^/]+\/use-cases\/(uc-[^/#)]+)\.md/i);
     if (useCaseMatch) {
-      const useCaseSlug = normalizePathSegment(useCaseMatch[1] ?? "");
-      useCaseSlugs.add(useCaseSlug);
-      const featureSlug = useCaseSlugToFeatureSlug.get(useCaseSlug);
-      if (featureSlug) {
-        featureSlugs.add(featureSlug);
+      const useCaseKey = normalizePathSegment(useCaseMatch[1] ?? "");
+      useCaseKeys.add(useCaseKey);
+      const featureKey = useCaseKeyToFeatureKey.get(useCaseKey);
+      if (featureKey) {
+        featureKeys.add(featureKey);
       }
     }
   }
 
   for (const match of content.matchAll(/\bFT\s*\(?\s*(\d{1,2})\s*\)?/gi)) {
-    const featureSlug = featureCodeToSlug.get(`ft-${(match[1] ?? "").padStart(2, "0")}`);
-    if (featureSlug) {
-      featureSlugs.add(featureSlug);
+    const featureKey = featureCodeToKey.get(`ft-${(match[1] ?? "").padStart(2, "0")}`);
+    if (featureKey) {
+      featureKeys.add(featureKey);
     }
   }
 
   return {
-    featureSlugs: [...featureSlugs].sort(),
-    useCaseSlugs: [...useCaseSlugs].sort()
+    featureKeys: [...featureKeys].sort(),
+    useCaseKeys: [...useCaseKeys].sort()
   };
 }
 
@@ -601,8 +593,8 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
   const parsedFeatures: ParsedFeature[] = [];
   const parsedUseCases: ParsedUseCase[] = [];
   const parsedBacklogItems: ParsedBacklogItem[] = [];
-  const featureCodeToSlug = new Map<string, string>();
-  const useCaseSlugToFeatureSlug = new Map<string, string>();
+  const featureCodeToKey = new Map<string, string>();
+  const useCaseKeyToFeatureKey = new Map<string, string>();
 
   const featureDirs = fs
     .readdirSync(featuresDir, { withFileTypes: true })
@@ -611,61 +603,61 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
     .sort((first, second) => first.localeCompare(second));
 
   for (const featureDir of featureDirs) {
-    const featureSlug = normalizePathSegment(path.basename(featureDir));
-    const featureCode = featureCodeFromSlug(featureSlug);
+    const featureKey = normalizePathSegment(path.basename(featureDir));
+    const featureCode = featureCodeFromSourceKey(featureKey);
     if (featureCode) {
-      featureCodeToSlug.set(featureCode, featureSlug);
+      featureCodeToKey.set(featureCode, featureKey);
     }
   }
 
   for (const featureDir of featureDirs) {
-    const featureSlug = normalizePathSegment(path.basename(featureDir));
+    const featureKey = normalizePathSegment(path.basename(featureDir));
     const featureDoc =
-      listMarkdownFiles(featureDir).find((filePath) => normalizePathSegment(path.basename(filePath, ".md")) === featureSlug) ??
+      listMarkdownFiles(featureDir).find((filePath) => normalizePathSegment(path.basename(filePath, ".md")) === featureKey) ??
       listMarkdownFiles(featureDir).find((filePath) => /^ft-\d+/i.test(path.basename(filePath)));
 
     if (!featureDoc) {
       warnings.push({
         type: "feature",
         action: "warning",
-        title: featureSlug,
-        slug: featureSlug,
+        title: featureKey,
+        importKey: featureKey,
         sourcePath: relativeSourcePath(sourcePath, featureDir),
         message: "Feature directory has no direct feature markdown file"
       });
       continue;
     }
 
-    const featureCode = featureCodeFromSlug(featureSlug);
+    const featureCode = featureCodeFromSourceKey(featureKey);
     const sourceRelativePath = relativeSourcePath(sourcePath, featureDoc);
     const content = readMarkdown(featureDoc);
     const coreContent = featureCoreContent(content);
 
     parsedFeatures.push({
-      title: markdownTitle(content, featureSlug),
-      slug: featureSlug,
+      title: markdownTitle(content, featureKey),
+      sourceKey: featureKey,
       description: descriptionFromSection(coreContent, ["Ziel / Zweck", "Fachliche Beschreibung"]),
       content: markdownToHtml(coreContent),
-      sortOrder: numberFromSlug(featureSlug),
+      sortOrder: numberFromSourceKey(featureKey),
       sourcePath: sourceRelativePath,
       featureCode,
-      relations: parseFeatureRelations(content, featureSlug, featureCodeToSlug, sourceRelativePath, warnings)
+      relations: parseFeatureRelations(content, featureKey, featureCodeToKey, sourceRelativePath, warnings)
     });
 
-    parsedBacklogItems.push(...parseBacklogItems(featureSlug, path.join(featureDir, "backlog"), sourcePath));
+    parsedBacklogItems.push(...parseBacklogItems(featureKey, path.join(featureDir, "backlog"), sourcePath));
 
     const useCaseDir = path.join(featureDir, "use-cases");
     for (const useCaseFile of listMarkdownFiles(useCaseDir).filter((filePath) => /^uc-\d+/i.test(path.basename(filePath)))) {
-      const useCaseSlug = normalizePathSegment(path.basename(useCaseFile, ".md"));
+      const useCaseKey = normalizePathSegment(path.basename(useCaseFile, ".md"));
       const useCaseContent = readMarkdown(useCaseFile);
-      useCaseSlugToFeatureSlug.set(useCaseSlug, featureSlug);
+      useCaseKeyToFeatureKey.set(useCaseKey, featureKey);
       parsedUseCases.push({
-        featureSlug,
-        title: markdownTitle(useCaseContent, useCaseSlug),
-        slug: useCaseSlug,
+        featureKey,
+        title: markdownTitle(useCaseContent, useCaseKey),
+        sourceKey: useCaseKey,
         description: descriptionFromSection(useCaseContent, ["Ziel", "Beschreibung"]),
         content: markdownToHtml(useCaseContent),
-        sortOrder: numberFromSlug(useCaseSlug),
+        sortOrder: numberFromSourceKey(useCaseKey),
         sourcePath: relativeSourcePath(sourcePath, useCaseFile)
       });
     }
@@ -679,7 +671,7 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
         })
         .map((filePath) => {
           const content = readMarkdown(filePath);
-          const relations = parseTaskRelations(content, featureCodeToSlug, useCaseSlugToFeatureSlug);
+          const relations = parseTaskRelations(content, featureCodeToKey, useCaseKeyToFeatureKey);
           const sourceRelativePath = relativeSourcePath(sourcePath, filePath);
           return {
             title: markdownTitle(content, path.basename(filePath, ".md")),
@@ -687,8 +679,8 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
             description: markdownToHtml(content),
             priority: parsePriority(content),
             sourcePath: sourceRelativePath,
-            featureSlugs: relations.featureSlugs,
-            useCaseSlugs: relations.useCaseSlugs
+            featureKeys: relations.featureKeys,
+            useCaseKeys: relations.useCaseKeys
           };
         })
     : [];
@@ -703,53 +695,49 @@ function parseWikiSource(sourcePathInput: string): ParsedWiki {
   };
 }
 
-function ensureProjectExists(database: DbClient, projectId: number): void {
-  const project = database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)).get();
+async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {
+  const project = firstRow(await database.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId)));
   if (!project) {
     throw notFound(`Project with id ${projectId} not found`);
   }
 }
 
-function getFeatureBySlug(database: DbClient, slug: string): StoredFeature | undefined {
-  return database
-    .select({ id: features.id, slug: features.slug, contentPath: features.contentPath })
+async function getFeatureByTitle(database: DbClient, title: string): Promise<StoredFeature | undefined> {
+  return firstRow(await database
+    .select({ id: features.id, title: features.title })
     .from(features)
-    .where(eq(features.slug, slug))
-    .get();
+    .where(eq(features.title, title)));
 }
 
-function getUseCaseBySlug(database: DbClient, slug: string): StoredUseCase | undefined {
-  return database
-    .select({ id: useCases.id, featureId: useCases.featureId, slug: useCases.slug, contentPath: useCases.contentPath })
+async function getUseCaseByFeatureAndTitle(database: DbClient, featureId: number, title: string): Promise<StoredUseCase | undefined> {
+  return firstRow(await database
+    .select({ id: useCases.id, featureId: useCases.featureId, title: useCases.title })
     .from(useCases)
-    .where(eq(useCases.slug, slug))
-    .get();
+    .where(and(eq(useCases.featureId, featureId), eq(useCases.title, title))));
 }
 
-function getTaskByImportKey(database: DbClient, projectId: number, importKey: string): StoredTask | undefined {
-  return database
+async function getTaskByImportKey(database: DbClient, projectId: number, importKey: string): Promise<StoredTask | undefined> {
+  return firstRow(await database
     .select({ id: tasks.id, importKey: tasks.importKey })
     .from(projectTasks)
     .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
-    .where(and(eq(projectTasks.ownerId, projectId), eq(tasks.importKey, importKey)))
-    .get();
+    .where(and(eq(projectTasks.ownerId, projectId), eq(tasks.importKey, importKey))));
 }
 
-function getBacklogItemByImportKey(database: DbClient, projectId: number, importKey: string): StoredBacklogItem | undefined {
-  return database
+async function getBacklogItemByImportKey(database: DbClient, projectId: number, importKey: string): Promise<StoredBacklogItem | undefined> {
+  return firstRow(await database
     .select({ id: backlogItems.id, projectId: backlogItems.projectId, importKey: backlogItems.importKey })
     .from(backlogItems)
-    .where(and(eq(backlogItems.projectId, projectId), eq(backlogItems.importKey, importKey)))
-    .get();
+    .where(and(eq(backlogItems.projectId, projectId), eq(backlogItems.importKey, importKey))));
 }
 
-function getFeatureRelation(
+async function getFeatureRelation(
   database: DbClient,
   sourceFeatureId: number,
   targetFeatureId: number,
   relationType: FeatureRelationType
-): StoredFeatureRelation | undefined {
-  return database
+): Promise<StoredFeatureRelation | undefined> {
+  return firstRow(await database
     .select({
       sourceFeatureId: featureRelations.sourceFeatureId,
       targetFeatureId: featureRelations.targetFeatureId,
@@ -762,210 +750,174 @@ function getFeatureRelation(
         eq(featureRelations.targetFeatureId, targetFeatureId),
         eq(featureRelations.relationType, relationType)
       )
-    )
-    .get();
+    ));
 }
 
-function featureContentPath(featureId: number, slug: string): string {
-  return buildStoredContentPath("features", buildFilename("feature", featureId, slug));
-}
-
-function makeUseCaseContentPath(useCaseId: number, slug: string): string {
-  return buildStoredContentPath("usecases", buildFilename("usecase", useCaseId, slug));
-}
-
-function writeStoredContent(contentPath: string, content: string): void {
-  writeContent(resolveStoredContentPath(contentPath), content);
-}
-
-function nextTaskPosition(database: DbClient, projectId: number): number {
-  const rows = database
+async function nextTaskPosition(database: DbClient, projectId: number): Promise<number> {
+  const rows = await database
     .select({ position: projectTasks.position })
     .from(projectTasks)
     .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
-    .where(and(eq(projectTasks.ownerId, projectId), eq(tasks.status, "todo")))
-    .all();
+    .where(and(eq(projectTasks.ownerId, projectId), eq(tasks.status, "todo")));
 
   return rows.reduce((current, row) => Math.max(current, row.position), 0) + 1024;
 }
 
-function hasProjectFeature(database: DbClient, projectId: number, featureId: number): boolean {
+async function hasProjectFeature(database: DbClient, projectId: number, featureId: number): Promise<boolean> {
   return Boolean(
-    database
+    firstRow(await database
       .select({ projectId: projectFeatures.projectId })
       .from(projectFeatures)
-      .where(and(eq(projectFeatures.projectId, projectId), eq(projectFeatures.featureId, featureId)))
-      .get()
+      .where(and(eq(projectFeatures.projectId, projectId), eq(projectFeatures.featureId, featureId))))
   );
 }
 
-function hasTaskFeature(database: DbClient, taskId: number, featureId: number): boolean {
+async function hasTaskFeature(database: DbClient, taskId: number, featureId: number): Promise<boolean> {
   return Boolean(
-    database
+    firstRow(await database
       .select({ taskId: featureTasks.taskId })
       .from(featureTasks)
-      .where(and(eq(featureTasks.taskId, taskId), eq(featureTasks.ownerId, featureId)))
-      .get()
+      .where(and(eq(featureTasks.taskId, taskId), eq(featureTasks.ownerId, featureId))))
   );
 }
 
-function hasTaskUseCase(database: DbClient, taskId: number, useCaseId: number): boolean {
+async function hasTaskUseCase(database: DbClient, taskId: number, useCaseId: number): Promise<boolean> {
   return Boolean(
-    database
+    firstRow(await database
       .select({ taskId: useCaseTasks.taskId })
       .from(useCaseTasks)
-      .where(and(eq(useCaseTasks.taskId, taskId), eq(useCaseTasks.ownerId, useCaseId)))
-      .get()
+      .where(and(eq(useCaseTasks.taskId, taskId), eq(useCaseTasks.ownerId, useCaseId))))
   );
 }
 
-function reportProjectFeatureLink(report: WikiImportReport, database: DbClient, projectId: number, feature: StoredFeature, execute: boolean): void {
+async function reportProjectFeatureLink(report: WikiImportReport, database: DbClient, projectId: number, feature: StoredFeature, execute: boolean): Promise<void> {
   if (!execute && feature.id <= 0) {
     addResult(report, {
       type: "projectFeature",
       action: "created",
-      title: feature.slug,
-      slug: feature.slug,
+      title: feature.title,
       message: "Feature will be linked to project"
     });
     return;
   }
 
-  if (hasProjectFeature(database, projectId, feature.id)) {
+  if (await hasProjectFeature(database, projectId, feature.id)) {
     addResult(report, {
       type: "projectFeature",
       action: "skipped",
-      title: feature.slug,
-      slug: feature.slug,
+      title: feature.title,
       message: "Feature is already linked to project"
     });
     return;
   }
 
   if (execute) {
-    database.insert(projectFeatures).values({ projectId, featureId: feature.id }).run();
+    await database.insert(projectFeatures).values({ projectId, featureId: feature.id });
   }
 
   addResult(report, {
     type: "projectFeature",
     action: "created",
-    title: feature.slug,
-    slug: feature.slug,
+    title: feature.title,
     message: "Feature linked to project"
   });
 }
 
-function upsertFeature(database: DbClient, feature: ParsedFeature, execute: boolean, now: string): { record?: StoredFeature; action: WikiImportAction } {
-  const existing = getFeatureBySlug(database, feature.slug);
+async function upsertFeature(database: DbClient, feature: ParsedFeature, execute: boolean, now: string): Promise<{ record?: StoredFeature; action: WikiImportAction }> {
+  const existing = await getFeatureByTitle(database, feature.title);
   if (!execute) {
     return { record: existing, action: existing ? "updated" : "created" };
   }
 
   if (existing) {
-    const contentPath = existing.contentPath ?? featureContentPath(existing.id, existing.slug);
-    database
+    await database
       .update(features)
       .set({
         title: feature.title,
         description: feature.description,
         sortOrder: feature.sortOrder,
-        contentPath,
+        content: feature.content,
         updatedAt: now
       })
-      .where(eq(features.id, existing.id))
-      .run();
-    writeStoredContent(contentPath, feature.content);
-    return { record: { ...existing, contentPath }, action: "updated" };
+      .where(eq(features.id, existing.id));
+    return { record: existing, action: "updated" };
   }
 
-  const created = database
+  const id = insertId(await database
     .insert(features)
     .values({
       title: feature.title,
-      slug: feature.slug,
       status: "active",
       description: feature.description,
-      contentPath: null,
+      content: feature.content,
       sortOrder: feature.sortOrder,
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: features.id, slug: features.slug, contentPath: features.contentPath })
-    .get();
-  const contentPath = featureContentPath(created.id, created.slug);
-  writeContent(resolveContentPath("features", path.basename(contentPath)), feature.content);
-  database.update(features).set({ contentPath, updatedAt: now }).where(eq(features.id, created.id)).run();
+  );
 
-  return { record: { ...created, contentPath }, action: "created" };
+  return { record: { id, title: feature.title }, action: "created" };
 }
 
-function upsertUseCase(
+async function upsertUseCase(
   database: DbClient,
   useCase: ParsedUseCase,
   featureId: number,
   execute: boolean,
   now: string
-): { record?: StoredUseCase; action: WikiImportAction } {
-  const existing = getUseCaseBySlug(database, useCase.slug);
+): Promise<{ record?: StoredUseCase; action: WikiImportAction }> {
+  const existing = await getUseCaseByFeatureAndTitle(database, featureId, useCase.title);
   if (!execute) {
     return { record: existing, action: existing ? "updated" : "created" };
   }
 
   if (existing) {
-    const contentPath = existing.contentPath ?? makeUseCaseContentPath(existing.id, existing.slug);
-    database
+    await database
       .update(useCases)
       .set({
         featureId,
         title: useCase.title,
         description: useCase.description,
         sortOrder: useCase.sortOrder,
-        contentPath,
+        content: useCase.content,
         updatedAt: now
       })
-      .where(eq(useCases.id, existing.id))
-      .run();
-    writeStoredContent(contentPath, useCase.content);
-    return { record: { ...existing, featureId, contentPath }, action: "updated" };
+      .where(eq(useCases.id, existing.id));
+    return { record: { ...existing, featureId }, action: "updated" };
   }
 
-  const created = database
+  const id = insertId(await database
     .insert(useCases)
     .values({
       featureId,
       title: useCase.title,
-      slug: useCase.slug,
       status: "active",
       description: useCase.description,
-      contentPath: null,
+      content: useCase.content,
       sortOrder: useCase.sortOrder,
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: useCases.id, featureId: useCases.featureId, slug: useCases.slug, contentPath: useCases.contentPath })
-    .get();
-  const contentPath = makeUseCaseContentPath(created.id, created.slug);
-  writeContent(resolveContentPath("usecases", path.basename(contentPath)), useCase.content);
-  database.update(useCases).set({ contentPath, updatedAt: now }).where(eq(useCases.id, created.id)).run();
+  );
 
-  return { record: { ...created, contentPath }, action: "created" };
+  return { record: { id, featureId, title: useCase.title }, action: "created" };
 }
 
-function upsertBacklogItem(
+async function upsertBacklogItem(
   database: DbClient,
   projectId: number,
   backlogItem: ParsedBacklogItem,
   featureId: number,
   execute: boolean,
   now: string
-): { record?: StoredBacklogItem; action: WikiImportAction } {
-  const existing = getBacklogItemByImportKey(database, projectId, backlogItem.importKey);
+): Promise<{ record?: StoredBacklogItem; action: WikiImportAction }> {
+  const existing = await getBacklogItemByImportKey(database, projectId, backlogItem.importKey);
   if (!execute) {
     return { record: existing, action: existing ? "updated" : "created" };
   }
 
   if (existing) {
-    database
+    await database
       .update(backlogItems)
       .set({
         featureId,
@@ -976,12 +928,11 @@ function upsertBacklogItem(
         sortOrder: backlogItem.sortOrder,
         updatedAt: now
       })
-      .where(eq(backlogItems.id, existing.id))
-      .run();
+      .where(eq(backlogItems.id, existing.id));
     return { record: existing, action: "updated" };
   }
 
-  const created = database
+  const id = insertId(await database
     .insert(backlogItems)
     .values({
       projectId,
@@ -995,20 +946,19 @@ function upsertBacklogItem(
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: backlogItems.id, projectId: backlogItems.projectId, importKey: backlogItems.importKey })
-    .get();
+  );
 
-  return { record: created, action: "created" };
+  return { record: { id, projectId, importKey: backlogItem.importKey }, action: "created" };
 }
 
-function upsertFeatureRelation(
+async function upsertFeatureRelation(
   database: DbClient,
   sourceFeature: StoredFeature,
   targetFeature: StoredFeature,
   relation: ParsedFeatureRelation,
   execute: boolean,
   now: string
-): WikiImportAction {
+): Promise<WikiImportAction> {
   if (sourceFeature.id === targetFeature.id) {
     return "skipped";
   }
@@ -1017,12 +967,12 @@ function upsertFeatureRelation(
     if (sourceFeature.id <= 0 || targetFeature.id <= 0) {
       return "created";
     }
-    return getFeatureRelation(database, sourceFeature.id, targetFeature.id, relation.relationType) ? "updated" : "created";
+    return (await getFeatureRelation(database, sourceFeature.id, targetFeature.id, relation.relationType)) ? "updated" : "created";
   }
 
-  const existing = getFeatureRelation(database, sourceFeature.id, targetFeature.id, relation.relationType);
+  const existing = await getFeatureRelation(database, sourceFeature.id, targetFeature.id, relation.relationType);
   if (existing) {
-    database
+    await database
       .update(featureRelations)
       .set({
         description: relation.description,
@@ -1034,12 +984,11 @@ function upsertFeatureRelation(
           eq(featureRelations.targetFeatureId, targetFeature.id),
           eq(featureRelations.relationType, relation.relationType)
         )
-      )
-      .run();
+      );
     return "updated";
   }
 
-  database
+  await database
     .insert(featureRelations)
     .values({
       sourceFeatureId: sourceFeature.id,
@@ -1048,20 +997,19 @@ function upsertFeatureRelation(
       description: relation.description,
       createdAt: now,
       updatedAt: now
-    })
-    .run();
+    });
 
   return "created";
 }
 
-function upsertTask(database: DbClient, projectId: number, task: ParsedTask, execute: boolean, now: string): { record?: StoredTask; action: WikiImportAction } {
-  const existing = getTaskByImportKey(database, projectId, task.importKey);
+async function upsertTask(database: DbClient, projectId: number, task: ParsedTask, execute: boolean, now: string): Promise<{ record?: StoredTask; action: WikiImportAction }> {
+  const existing = await getTaskByImportKey(database, projectId, task.importKey);
   if (!execute) {
     return { record: existing, action: existing ? "updated" : "created" };
   }
 
   if (existing) {
-    database
+    await database
       .update(tasks)
       .set({
         title: task.title,
@@ -1069,12 +1017,11 @@ function upsertTask(database: DbClient, projectId: number, task: ParsedTask, exe
         priority: task.priority,
         updatedAt: now
       })
-      .where(eq(tasks.id, existing.id))
-      .run();
+      .where(eq(tasks.id, existing.id));
     return { record: existing, action: "updated" };
   }
 
-  const created = database
+  const id = insertId(await database
     .insert(tasks)
     .values({
       parentId: null,
@@ -1082,92 +1029,86 @@ function upsertTask(database: DbClient, projectId: number, task: ParsedTask, exe
       description: task.description,
       status: "todo",
       priority: task.priority,
-      assignee: null,
+      responsibleUserId: null,
       dueDate: null,
       importKey: task.importKey,
       createdAt: now,
       updatedAt: now
     })
-    .returning({ id: tasks.id, importKey: tasks.importKey })
-    .get();
-  database.insert(projectTasks).values({ ownerId: projectId, taskId: created.id, position: nextTaskPosition(database, projectId) }).run();
+  );
 
-  return { record: created, action: "created" };
+  await database.insert(projectTasks).values({ ownerId: projectId, taskId: id, position: await nextTaskPosition(database, projectId) });
+
+  return { record: { id, importKey: task.importKey }, action: "created" };
 }
 
-function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, taskId: number, feature: StoredFeature, execute: boolean): void {
+async function reportTaskFeatureLink(report: WikiImportReport, database: DbClient, taskId: number, feature: StoredFeature, execute: boolean): Promise<void> {
   if (!execute && feature.id <= 0) {
     addResult(report, {
       type: "taskFeature",
       action: "created",
-      title: feature.slug,
-      slug: feature.slug,
+      title: feature.title,
       message: "Feature will be linked to task"
     });
     return;
   }
 
-  if (hasTaskFeature(database, taskId, feature.id)) {
+  if (await hasTaskFeature(database, taskId, feature.id)) {
     addResult(report, {
       type: "taskFeature",
       action: "skipped",
-      title: feature.slug,
-      slug: feature.slug,
+      title: feature.title,
       message: "Task already has feature link"
     });
     return;
   }
 
   if (execute) {
-    database.insert(featureTasks).values({ ownerId: feature.id, taskId, position: 0 }).run();
+    await database.insert(featureTasks).values({ ownerId: feature.id, taskId, position: 0 });
   }
 
   addResult(report, {
     type: "taskFeature",
     action: "created",
-    title: feature.slug,
-    slug: feature.slug,
+    title: feature.title,
     message: "Feature linked to task"
   });
 }
 
-function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, taskId: number, useCase: StoredUseCase, execute: boolean): void {
+async function reportTaskUseCaseLink(report: WikiImportReport, database: DbClient, taskId: number, useCase: StoredUseCase, execute: boolean): Promise<void> {
   if (!execute && useCase.id <= 0) {
     addResult(report, {
       type: "taskUseCase",
       action: "created",
-      title: useCase.slug,
-      slug: useCase.slug,
+      title: useCase.title,
       message: "Use case will be linked to task"
     });
     return;
   }
 
-  if (hasTaskUseCase(database, taskId, useCase.id)) {
+  if (await hasTaskUseCase(database, taskId, useCase.id)) {
     addResult(report, {
       type: "taskUseCase",
       action: "skipped",
-      title: useCase.slug,
-      slug: useCase.slug,
+      title: useCase.title,
       message: "Task already has use case link"
     });
     return;
   }
 
   if (execute) {
-    database.insert(useCaseTasks).values({ ownerId: useCase.id, taskId, position: 0 }).run();
+    await database.insert(useCaseTasks).values({ ownerId: useCase.id, taskId, position: 0 });
   }
 
   addResult(report, {
     type: "taskUseCase",
     action: "created",
-    title: useCase.slug,
-    slug: useCase.slug,
+    title: useCase.title,
     message: "Use case linked to task"
   });
 }
 
-function buildImportReport(database: DbClient, projectId: number, parsed: ParsedWiki, mode: WikiImportReport["mode"], execute: boolean): WikiImportReport {
+async function buildImportReport(database: DbClient, projectId: number, parsed: ParsedWiki, mode: WikiImportReport["mode"], execute: boolean): Promise<WikiImportReport> {
   const report: WikiImportReport = {
     projectId,
     sourcePath: parsed.sourcePath,
@@ -1176,8 +1117,8 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
     items: []
   };
   const now = nowIso();
-  const featureRecordsBySlug = new Map<string, StoredFeature>();
-  const useCaseRecordsBySlug = new Map<string, StoredUseCase>();
+  const featureRecordsByKey = new Map<string, StoredFeature>();
+  const useCaseRecordsByKey = new Map<string, StoredUseCase>();
   let previewFeatureId = -1;
   let previewUseCaseId = -1;
 
@@ -1186,47 +1127,47 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
   }
 
   for (const feature of parsed.features) {
-    const result = upsertFeature(database, feature, execute, now);
-    const record = result.record ?? getFeatureBySlug(database, feature.slug) ?? (!execute ? { id: previewFeatureId--, slug: feature.slug, contentPath: null } : undefined);
+    const result = await upsertFeature(database, feature, execute, now);
+    const record = result.record ?? await getFeatureByTitle(database, feature.title) ?? (!execute ? { id: previewFeatureId--, title: feature.title } : undefined);
     if (record) {
-      featureRecordsBySlug.set(feature.slug, record);
-      reportProjectFeatureLink(report, database, projectId, record, execute);
+      featureRecordsByKey.set(feature.sourceKey, record);
+      await reportProjectFeatureLink(report, database, projectId, record, execute);
     }
     addResult(report, {
       type: "feature",
       action: result.action,
       title: feature.title,
-      slug: feature.slug,
+      importKey: feature.sourceKey,
       sourcePath: feature.sourcePath
     });
   }
 
   for (const feature of parsed.features) {
-    const sourceFeature = featureRecordsBySlug.get(feature.slug) ?? getFeatureBySlug(database, feature.slug);
+    const sourceFeature = featureRecordsByKey.get(feature.sourceKey) ?? await getFeatureByTitle(database, feature.title);
     if (!sourceFeature) {
       continue;
     }
 
     for (const relation of feature.relations) {
-      const targetFeature = featureRecordsBySlug.get(relation.targetSlug) ?? getFeatureBySlug(database, relation.targetSlug);
+      const targetFeature = featureRecordsByKey.get(relation.targetFeatureKey);
       if (!targetFeature) {
         addResult(report, {
           type: "featureRelation",
           action: "warning",
-          title: feature.slug,
-          slug: feature.slug,
+          title: feature.title,
+          importKey: feature.sourceKey,
           sourcePath: feature.sourcePath,
           message: `Feature "${relation.targetCode.toUpperCase()}" is missing`
         });
         continue;
       }
 
-      const action = upsertFeatureRelation(database, sourceFeature, targetFeature, relation, execute, now);
+      const action = await upsertFeatureRelation(database, sourceFeature, targetFeature, relation, execute, now);
       addResult(report, {
         type: "featureRelation",
         action,
-        title: `${feature.slug} -> ${relation.targetSlug}`,
-        slug: relation.targetSlug,
+        title: `${feature.sourceKey} -> ${relation.targetFeatureKey}`,
+        importKey: relation.targetFeatureKey,
         sourcePath: feature.sourcePath,
         message: `${relation.relationType} relation ${action}`
       });
@@ -1234,35 +1175,35 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
   }
 
   for (const useCase of parsed.useCases) {
-    const feature = featureRecordsBySlug.get(useCase.featureSlug) ?? getFeatureBySlug(database, useCase.featureSlug);
+    const feature = featureRecordsByKey.get(useCase.featureKey);
     if (!feature) {
       addResult(report, {
         type: "useCase",
         action: "error",
         title: useCase.title,
-        slug: useCase.slug,
+        importKey: useCase.sourceKey,
         sourcePath: useCase.sourcePath,
-        message: `Feature "${useCase.featureSlug}" is missing`
+        message: `Feature "${useCase.featureKey}" is missing`
       });
       continue;
     }
 
-    const result = upsertUseCase(database, useCase, feature.id, execute, now);
-    const record = result.record ?? getUseCaseBySlug(database, useCase.slug) ?? (!execute ? { id: previewUseCaseId--, featureId: feature.id, slug: useCase.slug, contentPath: null } : undefined);
+    const result = await upsertUseCase(database, useCase, feature.id, execute, now);
+    const record = result.record ?? await getUseCaseByFeatureAndTitle(database, feature.id, useCase.title) ?? (!execute ? { id: previewUseCaseId--, featureId: feature.id, title: useCase.title } : undefined);
     if (record) {
-      useCaseRecordsBySlug.set(useCase.slug, record);
+      useCaseRecordsByKey.set(useCase.sourceKey, record);
     }
     addResult(report, {
       type: "useCase",
       action: result.action,
       title: useCase.title,
-      slug: useCase.slug,
+      importKey: useCase.sourceKey,
       sourcePath: useCase.sourcePath
     });
   }
 
   for (const backlogItem of parsed.backlogItems) {
-    const feature = featureRecordsBySlug.get(backlogItem.featureSlug) ?? getFeatureBySlug(database, backlogItem.featureSlug);
+    const feature = featureRecordsByKey.get(backlogItem.featureKey);
     if (!feature) {
       addResult(report, {
         type: "backlogItem",
@@ -1270,12 +1211,12 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
         title: backlogItem.title,
         importKey: backlogItem.importKey,
         sourcePath: backlogItem.sourcePath,
-        message: `Feature "${backlogItem.featureSlug}" is missing`
+        message: `Feature "${backlogItem.featureKey}" is missing`
       });
       continue;
     }
 
-    const result = upsertBacklogItem(database, projectId, backlogItem, feature.id, execute, now);
+    const result = await upsertBacklogItem(database, projectId, backlogItem, feature.id, execute, now);
     addResult(report, {
       type: "backlogItem",
       action: result.action,
@@ -1286,8 +1227,8 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
   }
 
   for (const task of parsed.tasks) {
-    const result = upsertTask(database, projectId, task, execute, now);
-    const record = result.record ?? getTaskByImportKey(database, projectId, task.importKey);
+    const result = await upsertTask(database, projectId, task, execute, now);
+    const record = result.record ?? await getTaskByImportKey(database, projectId, task.importKey);
     addResult(report, {
       type: "task",
       action: result.action,
@@ -1301,22 +1242,22 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
     }
 
     const linkedFeatureIds = new Set<number>();
-    for (const featureSlug of task.featureSlugs) {
-      const feature = featureRecordsBySlug.get(featureSlug) ?? getFeatureBySlug(database, featureSlug);
+    for (const featureKey of task.featureKeys) {
+      const feature = featureRecordsByKey.get(featureKey);
       if (feature && !linkedFeatureIds.has(feature.id)) {
         linkedFeatureIds.add(feature.id);
-        reportTaskFeatureLink(report, database, record.id, feature, execute);
+        await reportTaskFeatureLink(report, database, record.id, feature, execute);
       }
     }
 
-    for (const useCaseSlug of task.useCaseSlugs) {
-      const useCase = useCaseRecordsBySlug.get(useCaseSlug) ?? getUseCaseBySlug(database, useCaseSlug);
+    for (const useCaseKey of task.useCaseKeys) {
+      const useCase = useCaseRecordsByKey.get(useCaseKey);
       if (useCase) {
-        reportTaskUseCaseLink(report, database, record.id, useCase, execute);
-        const feature = [...featureRecordsBySlug.values()].find((candidate) => candidate.id === useCase.featureId) ?? getFeatureBySlug(database, task.featureSlugs.find((slug) => featureRecordsBySlug.get(slug)?.id === useCase.featureId) ?? "");
+        await reportTaskUseCaseLink(report, database, record.id, useCase, execute);
+        const feature = [...featureRecordsByKey.values()].find((candidate) => candidate.id === useCase.featureId);
         if (feature && !linkedFeatureIds.has(feature.id)) {
           linkedFeatureIds.add(feature.id);
-          reportTaskFeatureLink(report, database, record.id, feature, execute);
+          await reportTaskFeatureLink(report, database, record.id, feature, execute);
         }
       }
     }
@@ -1325,14 +1266,14 @@ function buildImportReport(database: DbClient, projectId: number, parsed: Parsed
   return report;
 }
 
-export function previewWikiImport(database: DbClient, projectId: number, input: WikiImportRunRequest): WikiImportReport {
-  ensureProjectExists(database, projectId);
+export async function previewWikiImport(database: DbClient, projectId: number, input: WikiImportRunRequest): Promise<WikiImportReport> {
+  await ensureProjectExists(database, projectId);
   const parsed = parseWikiSource(input.sourcePath);
   return buildImportReport(database, projectId, parsed, "preview", false);
 }
 
-export function runWikiImport(database: DbClient, projectId: number, input: WikiImportRunRequest): WikiImportReport {
-  ensureProjectExists(database, projectId);
+export async function runWikiImport(database: DbClient, projectId: number, input: WikiImportRunRequest): Promise<WikiImportReport> {
+  await ensureProjectExists(database, projectId);
   const parsed = parseWikiSource(input.sourcePath);
   return database.transaction((tx) => buildImportReport(tx as unknown as DbClient, projectId, parsed, "run", true));
 }

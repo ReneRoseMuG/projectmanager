@@ -1,12 +1,14 @@
 import type { Feature } from "@taskmanager/shared-types";
-import { BookOpen, Edit3, FileText } from "lucide-react";
+import { BookOpen, Edit3, Trash2 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import type { ViewMode } from "../../types";
 import { useCatalogs } from "../../hooks/useCatalogs";
-import { catalogLabel } from "../../utils/catalogs";
+import type { ViewMode } from "../../types";
+import { objectReference } from "../../lib/references";
+import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
 import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
+import { ActionMenu } from "../ui/ActionMenu";
 import { EmptyState } from "../ui/EmptyState";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
@@ -19,6 +21,14 @@ interface ProjectFeaturePanelProps {
   onViewModeChange: (viewMode: ViewMode) => void;
   onCreate: () => void;
   onOpen: (feature: Feature) => void;
+  onRemove?: (feature: Feature) => void;
+  removeLabel?: string;
+  onStatusChange?: (
+    feature: Feature,
+    status: Feature["status"],
+  ) => void | Promise<unknown>;
+  secondaryAction?: ReactNode;
+  emptyBody?: ReactNode;
 }
 
 function sortFeatures(features: Feature[]) {
@@ -36,32 +46,17 @@ function toViewMode(mode: ListBoardMode): ViewMode {
   return mode === "board" ? "kanban" : "list";
 }
 
-function matchesSearch(feature: Feature, searchValue: string, statusLabel: string) {
+function matchesSearch(feature: Feature, searchValue: string) {
   const normalized = searchValue.trim().toLocaleLowerCase("de-DE");
   if (!normalized) {
     return true;
   }
 
-  const values = [
-    feature.title,
-    feature.slug,
-    statusLabel,
-    richTextToPlainText(feature.description),
-    String(getUseCaseCount(feature)),
-  ];
-  return values.some((value) =>
-    String(value ?? "")
-      .toLocaleLowerCase("de-DE")
-      .includes(normalized),
-  );
+  return feature.title.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
 function getUseCaseCount(feature: Feature): number {
   return Number.isFinite(feature.useCaseCount) ? feature.useCaseCount : 0;
-}
-
-function getFeaturePath(feature: Feature): string {
-  return feature.slug ? `/features/${feature.slug}` : "";
 }
 
 /** Project feature surface built on the shared list/board toolbar. */
@@ -71,14 +66,17 @@ export function ProjectFeaturePanel({
   onViewModeChange,
   onCreate,
   onOpen,
+  onRemove,
+  removeLabel = "Entfernen",
+  onStatusChange,
+  secondaryAction,
+  emptyBody = "Für dieses Projekt sind keine Features vorhanden.",
 }: ProjectFeaturePanelProps) {
-  const catalogs = useCatalogs();
   const [searchValue, setSearchValue] = useState("");
   const sortedFeatures = useMemo(() => sortFeatures(features), [features]);
   const visibleFeatures = useMemo(
-    () =>
-      sortedFeatures.filter((feature) => matchesSearch(feature, searchValue, catalogLabel(catalogs.entries, "featureStatus", feature.status))),
-    [catalogs.entries, searchValue, sortedFeatures],
+    () => sortedFeatures.filter((feature) => matchesSearch(feature, searchValue)),
+    [searchValue, sortedFeatures],
   );
 
   return (
@@ -88,23 +86,25 @@ export function ProjectFeaturePanel({
       onModeChange={(mode) => onViewModeChange(toViewMode(mode))}
       onAdd={onCreate}
       addLabel="Neues Feature"
+      secondaryAction={secondaryAction}
       statusKey="status"
       statusCatalogKind="featureStatus"
+      onItemStatusChange={onStatusChange}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
       emptyState={
         <EmptyState
           icon={<BookOpen size={22} />}
           title="Keine Features"
-          body="Für dieses Projekt sind keine Features vorhanden."
+          body={emptyBody}
           tone="violet"
           variant="tinted"
         />
       }
       renderCard={(feature) => (
-        <FeatureBoardCard feature={feature} onOpen={onOpen} />
+        <FeatureBoardCard feature={feature} onOpen={onOpen} onRemove={onRemove} removeLabel={removeLabel} />
       )}
-      renderRow={(feature) => <FeatureRow feature={feature} onOpen={onOpen} />}
+      renderRow={(feature) => <FeatureRow feature={feature} onOpen={onOpen} onRemove={onRemove} removeLabel={removeLabel} />}
     />
   );
 }
@@ -112,18 +112,36 @@ export function ProjectFeaturePanel({
 function FeatureBoardCard({
   feature,
   onOpen,
+  onRemove,
+  removeLabel,
 }: {
   feature: Feature;
   onOpen: (feature: Feature) => void;
+  onRemove?: (feature: Feature) => void;
+  removeLabel: string;
 }) {
+  const catalogs = useCatalogs();
   const description = richTextToPlainText(feature.description);
-  const featurePath = getFeaturePath(feature);
+  const statusColor = catalogColor(catalogs.entries, "featureStatus", feature.status);
 
   return (
     <ItemCard
-      accentColor="var(--color-steel-600)"
+      accentColor={statusColor}
+      objectReference={objectReference("feature", feature.id)}
       onOpen={() => onOpen(feature)}
       onEdit={() => onOpen(feature)}
+      extraMenuItems={
+        onRemove
+          ? [
+              {
+                label: removeLabel,
+                icon: <Trash2 size={16} />,
+                onClick: () => onRemove(feature),
+                danger: true,
+              },
+            ]
+          : []
+      }
       header={
         <div className="grid gap-2">
           <h3 className="line-clamp-2 text-sm font-semibold text-ink">
@@ -137,15 +155,7 @@ function FeatureBoardCard({
       }
       body={
         description ? (
-          <p className="line-clamp-3 text-xs text-slate-600">{description}</p>
-        ) : null
-      }
-      footer={
-        featurePath ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-steel-700">
-            <FileText size={14} />
-            {featurePath}
-          </span>
+          <p className="line-clamp-3 text-xs text-steel-600">{description}</p>
         ) : null
       }
     />
@@ -155,16 +165,22 @@ function FeatureBoardCard({
 function FeatureRow({
   feature,
   onOpen,
+  onRemove,
+  removeLabel,
 }: {
   feature: Feature;
   onOpen: (feature: Feature) => void;
+  onRemove?: (feature: Feature) => void;
+  removeLabel: string;
 }) {
+  const catalogs = useCatalogs();
   const description = richTextToPlainText(feature.description);
-  const featurePath = getFeaturePath(feature);
+  const statusColor = catalogColor(catalogs.entries, "featureStatus", feature.status);
 
   return (
     <ItemRow
-      accentColor="var(--color-steel-600)"
+      accentColor={statusColor}
+      objectReference={objectReference("feature", feature.id)}
       title={feature.title}
       description={description}
       pills={
@@ -173,24 +189,27 @@ function FeatureRow({
           <Badge tone="steel">{getUseCaseCount(feature)} Use Cases</Badge>
         </>
       }
-      meta={
-        <span className="block truncate font-mono text-xs text-slate-500">
-          {featurePath}
-        </span>
-      }
       actions={
-        <Button
-          aria-label="Bearbeiten"
-          title="Bearbeiten"
-          className="h-10 w-10"
-          icon={<Edit3 size={18} />}
-          variant="ghost"
-          onClick={() => onOpen(feature)}
+        <ActionMenu
+          objectReference={objectReference("feature", feature.id)}
+          items={[
+            { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(feature) },
+            ...(onRemove
+              ? [
+                  {
+                    label: removeLabel,
+                    icon: <Trash2 size={16} />,
+                    onClick: () => onRemove(feature),
+                    danger: true,
+                  },
+                ]
+              : []),
+          ]}
         />
       }
+      actionsIncludeObjectReference
       onOpen={() => onOpen(feature)}
       pillsClassName="w-52"
-      metaClassName="w-72"
     />
   );
 }

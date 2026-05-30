@@ -39,7 +39,7 @@ export function UseCaseRelationPanel({
       onSave={onSave}
       saving={saving}
       title={title}
-      searchKeys={["title", "slug", "description"]}
+      searchKeys={["title", "description"]}
       groupBy="featureId"
       groupLabel={groupLabel}
       emptyAvailable={emptyAvailable}
@@ -47,12 +47,11 @@ export function UseCaseRelationPanel({
       showSave={showSave}
       renderItem={(useCase) => (
         <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto]">
-          <span className="flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-fern/10 text-fern" aria-hidden="true">
+          <span className="flex h-[38px] w-[38px] items-center justify-center rounded-lg bg-fern/10 text-fern" aria-hidden="true">
             <FileText size={17} />
           </span>
           <span className="min-w-0">
             <span className="block truncate text-[14px] font-semibold text-ink">{useCase.title}</span>
-            <span className="block truncate font-mono text-[11px] text-slate-500">/use-cases/{useCase.slug}</span>
           </span>
           <span className="hidden md:inline-flex">
             <StatusPill kind="featureStatus" value={useCase.status} />

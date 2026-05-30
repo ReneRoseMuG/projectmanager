@@ -1,10 +1,37 @@
-import type { CommentEntityType } from "@taskmanager/shared-types";
+import type { CommentEntityType, DashboardContext, DashboardWidgetId, DashboardWidgetParams, JournalObjectType } from "@taskmanager/shared-types";
 
-export type NoteOwnerType = "project" | "milestone" | "task" | "ticket";
-export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket";
-export type TicketOwnerType = "project" | "milestone" | "task" | "feature" | "useCase";
+export type NoteOwnerType = "project" | "milestone" | "task" | "ticket" | "dayPlan" | "wikiPage";
+export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket" | "wikiPage";
+export type TaskOwnerType = "project" | "milestone" | "feature" | "useCase" | "wikiPage";
+export type TicketOwnerType = "project" | "milestone" | "task" | "feature" | "useCase" | "wikiPage";
 
 export const queryKeys = {
+  auth: {
+    root: ["auth"] as const,
+    me: () => [...queryKeys.auth.root, "me"] as const
+  },
+  dashboards: {
+    root: ["dashboards"] as const,
+    list: (context: DashboardContext) => [...queryKeys.dashboards.root, "list", context] as const,
+    detail: (dashboardId: number) => [...queryKeys.dashboards.root, "detail", dashboardId] as const,
+    widgetData: (widgetId: DashboardWidgetId, ownerKey: string, params: DashboardWidgetParams = {}) =>
+      [...queryKeys.dashboards.root, "widgetData", widgetId, ownerKey, params] as const
+  },
+  adminUsers: {
+    root: ["adminUsers"] as const,
+    list: () => [...queryKeys.adminUsers.root, "list"] as const,
+    detail: (userId: number) => [...queryKeys.adminUsers.root, "detail", userId] as const
+  },
+  users: {
+    root: ["users"] as const,
+    list: () => [...queryKeys.users.root, "list"] as const
+  },
+  adminRoles: {
+    root: ["adminRoles"] as const,
+    list: () => [...queryKeys.adminRoles.root, "list"] as const,
+    detail: (roleId: number) => [...queryKeys.adminRoles.root, "detail", roleId] as const,
+    permissionCatalog: () => [...queryKeys.adminRoles.root, "permissionCatalog"] as const
+  },
   projects: {
     root: ["projects"] as const,
     list: () => [...queryKeys.projects.root, "list"] as const,
@@ -13,10 +40,6 @@ export const queryKeys = {
     tickets: (projectId: number) => [...queryKeys.projects.detail(projectId), "tickets"] as const,
     backlog: (projectId: number) => [...queryKeys.projects.detail(projectId), "backlog"] as const,
     features: (projectId: number) => [...queryKeys.projects.detail(projectId), "features"] as const
-  },
-  ai: {
-    root: ["ai"] as const,
-    models: () => [...queryKeys.ai.root, "models"] as const
   },
   milestones: {
     root: ["milestones"] as const,
@@ -31,6 +54,7 @@ export const queryKeys = {
     root: ["tasks"] as const,
     list: () => [...queryKeys.tasks.root, "list"] as const,
     detail: (taskId: number) => [...queryKeys.tasks.root, "detail", taskId] as const,
+    linkCandidates: (ownerType: TaskOwnerType, ownerId: number) => [...queryKeys.tasks.root, "linkCandidates", ownerType, ownerId] as const,
     tickets: (taskId: number) => [...queryKeys.tasks.detail(taskId), "tickets"] as const,
     features: (taskId: number) => [...queryKeys.tasks.detail(taskId), "features"] as const,
     useCases: (taskId: number) => [...queryKeys.tasks.detail(taskId), "useCases"] as const
@@ -71,14 +95,35 @@ export const queryKeys = {
     root: ["catalogs"] as const,
     list: () => [...queryKeys.catalogs.root, "list"] as const
   },
+  settings: {
+    root: ["settings"] as const,
+    resolved: () => [...queryKeys.settings.root, "resolved"] as const
+  },
+  pushNotifications: {
+    root: ["pushNotifications"] as const,
+    vapidKey: () => [...queryKeys.pushNotifications.root, "vapidKey"] as const,
+    status: () => [...queryKeys.pushNotifications.root, "status"] as const
+  },
   wiki: {
     root: ["wiki"] as const,
     tree: () => [...queryKeys.wiki.root, "tree"] as const,
-    detail: (pageId: number) => [...queryKeys.wiki.root, "detail", pageId] as const
+    detail: (pageId: number) => [...queryKeys.wiki.root, "detail", pageId] as const,
+    relations: (pageId: number) => [...queryKeys.wiki.detail(pageId), "relations"] as const,
+    tasks: (pageId: number) => [...queryKeys.wiki.detail(pageId), "tasks"] as const,
+    tickets: (pageId: number) => [...queryKeys.wiki.detail(pageId), "tickets"] as const
   },
   events: {
     root: ["events"] as const,
     list: (rangeKey: string) => [...queryKeys.events.root, "list", rangeKey] as const
+  },
+  dayPlans: {
+    root: ["dayPlans"] as const,
+    detail: (date: string) => [...queryKeys.dayPlans.root, "detail", date] as const
+  },
+  journal: {
+    root: ["journal"] as const,
+    list: (filters: object = {}) => [...queryKeys.journal.root, "list", filters] as const,
+    object: (objectType: JournalObjectType, objectId: number, filters: object = {}) => [...queryKeys.journal.root, "object", objectType, objectId, filters] as const
   },
   calendarTasks: {
     root: ["calendarTasks"] as const,
@@ -86,15 +131,18 @@ export const queryKeys = {
   },
   dumps: {
     root: ["dumps"] as const,
-    driveConfig: () => [...queryKeys.dumps.root, "driveConfig"] as const
+    localStatus: () => [...queryKeys.dumps.root, "localStatus"] as const,
+    remoteStatus: () => [...queryKeys.dumps.root, "remoteStatus"] as const
   },
   tickets: {
     root: ["tickets"] as const,
     list: () => [...queryKeys.tickets.root, "list"] as const,
     detail: (ticketId: number) => [...queryKeys.tickets.root, "detail", ticketId] as const,
     byOwner: (ownerType: TicketOwnerType, ownerId: number) => [...queryKeys.tickets.root, ownerType, ownerId] as const,
+    linkCandidates: (ownerType: TicketOwnerType, ownerId: number) => [...queryKeys.tickets.root, "linkCandidates", ownerType, ownerId] as const,
     byProject: (projectId: number) => queryKeys.projects.tickets(projectId),
     relations: (ticketId: number) => [...queryKeys.tickets.detail(ticketId), "relations"] as const,
+    relationCandidates: (ticketId: number) => [...queryKeys.tickets.detail(ticketId), "relationCandidates"] as const,
     subTickets: (ticketId: number) => [...queryKeys.tickets.detail(ticketId), "subTickets"] as const
   },
   globalSearch: {

@@ -1,43 +1,44 @@
-import { eq, inArray, isNull } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { eq, inArray, isNull } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { tasks } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
 export type TaskRecord = typeof tasks.$inferSelect;
 export type TaskCreateData = Omit<typeof tasks.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type TaskUpdateData = Partial<Pick<TaskCreateData, "title" | "description" | "status" | "priority" | "assignee" | "dueDate">>;
+export type TaskUpdateData = Partial<Pick<TaskCreateData, "title" | "description" | "status" | "priority" | "responsibleUserId" | "dueDate">>;
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
 export const taskRepository = {
-  findById(database: DbClient, id: number): TaskRecord | undefined {
-    return database.select().from(tasks).where(eq(tasks.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<TaskRecord | undefined> {
+    return firstRow(await database.select().from(tasks).where(eq(tasks.id, id)));
   },
 
-  findAll(database: DbClient): TaskRecord[] {
-    return database.select().from(tasks).all();
+  async findAll(database: DbSession): Promise<TaskRecord[]> {
+    return database.select().from(tasks);
   },
 
-  findRootTasks(database: DbClient): TaskRecord[] {
-    return database.select().from(tasks).where(isNull(tasks.parentId)).orderBy(tasks.status, tasks.updatedAt).all();
+  async findRootTasks(database: DbSession): Promise<TaskRecord[]> {
+    return database.select().from(tasks).where(isNull(tasks.parentId)).orderBy(tasks.status, tasks.updatedAt);
   },
 
-  findChildren(database: DbClient, parentId: number): TaskRecord[] {
-    return database.select().from(tasks).where(eq(tasks.parentId, parentId)).orderBy(tasks.createdAt, tasks.id).all();
+  async findChildren(database: DbSession, parentId: number): Promise<TaskRecord[]> {
+    return database.select().from(tasks).where(eq(tasks.parentId, parentId)).orderBy(tasks.createdAt, tasks.id);
   },
 
-  findByIds(database: DbClient, ids: number[]): TaskRecord[] {
+  async findByIds(database: DbSession, ids: number[]): Promise<TaskRecord[]> {
     if (ids.length === 0) {
       return [];
     }
-    return database.select().from(tasks).where(inArray(tasks.id, ids)).all();
+    return database.select().from(tasks).where(inArray(tasks.id, ids));
   },
 
-  create(database: DbClient, data: TaskCreateData, userId?: number): TaskRecord {
+  async create(database: DbSession, data: TaskCreateData, userId?: number): Promise<TaskRecord> {
     const now = nowIso();
-    return database
+    const result = await database
       .insert(tasks)
       .values({
         ...data,
@@ -46,18 +47,21 @@ export const taskRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, insertId(result));
+    if (!created) {
+      throw new Error("Created task could not be loaded");
+    }
+    return created;
   },
 
-  update(database: DbClient, id: number, expectedVersion: number, data: TaskUpdateData, userId?: number): TaskRecord | undefined {
-    const current = this.findById(database, id);
+  async update(database: DbSession, id: number, expectedVersion: number, data: TaskUpdateData, userId?: number): Promise<TaskRecord | undefined> {
+    const current = await this.findById(database, id);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    return database
+    await database
       .update(tasks)
       .set({
         ...data,
@@ -65,12 +69,12 @@ export const taskRepository = {
         updatedBy: userId ?? null,
         updatedAt: nowIso()
       })
-      .where(eq(tasks.id, id))
-      .returning()
-      .get();
+      .where(eq(tasks.id, id));
+    return this.findById(database, id);
   },
 
-  delete(database: DbClient, id: number): number {
-    return database.delete(tasks).where(eq(tasks.id, id)).run().changes;
+  async delete(database: DbSession, id: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(tasks).where(eq(tasks.id, id)));
   }
 };
+

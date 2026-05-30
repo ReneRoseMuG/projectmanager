@@ -1,6 +1,7 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import type { EventInput, EventUpdate } from "@taskmanager/shared-types";
 import { createEvent, deleteEvent, getEvent, listEvents, updateEvent } from "../services/events.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const eventOwnerSchema = {
@@ -8,7 +9,7 @@ const eventOwnerSchema = {
   required: ["type", "id"],
   additionalProperties: false,
   properties: {
-    type: { type: "string", enum: ["project", "milestone", "task"] },
+    type: { type: "string", enum: ["project", "milestone", "task", "dayPlan"] },
     id: { type: "integer", minimum: 1 }
   }
 } as const;
@@ -24,6 +25,8 @@ const eventBodySchema = {
     endTime: { type: "string" },
     isAllDay: { type: "boolean" },
     color: { type: ["string", "null"] },
+    reminderMinutes: { type: "integer", minimum: 1 },
+    responsibleUserId: { type: ["integer", "null"], minimum: 1 },
     owners: {
       type: "array",
       items: eventOwnerSchema
@@ -60,7 +63,7 @@ export async function registerEventsRoutes(app: FastifyInstance): Promise<void> 
   app.post<{ Body: EventInput }>(
     "/events",
     { schema: { body: eventBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createEvent(app.db, request.body))
+    async (request, reply) => reply.status(201).send(await createEvent(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -72,14 +75,14 @@ export async function registerEventsRoutes(app: FastifyInstance): Promise<void> 
   app.patch<{ Params: { id: number }; Body: EventUpdate }>(
     "/events/:id",
     { schema: { params: idParamSchema, body: eventPatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateEvent(app.db, request.params.id, request.body)
+    async (request) => updateEvent(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number } }>(
     "/events/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteEvent(app.db, request.params.id);
+      await deleteEvent(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

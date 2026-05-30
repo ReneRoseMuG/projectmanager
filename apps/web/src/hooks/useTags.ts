@@ -6,11 +6,12 @@ import { invalidateTags } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
-export function useTags() {
+export function useTags(enabled = true) {
   const queryClient = useQueryClient();
   const tagsQuery = useQuery({
     queryKey: queryKeys.tags.list(),
-    queryFn: getTags
+    queryFn: getTags,
+    enabled
   });
 
   const reload = useCallback(async () => {

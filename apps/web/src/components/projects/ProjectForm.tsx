@@ -13,48 +13,73 @@ import type {
   ProjectStatus,
   Tag,
   TaskStatus,
-  TicketStatus
+  TicketStatus,
 } from "@taskmanager/shared-types";
-import { Flag, FolderKanban, Inbox, ListTodo, Paperclip, StickyNote, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Flag,
+  FolderKanban,
+  Inbox,
+  ListTodo,
+  Trash2,
+} from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
-import { errorMessage } from "../../hooks/errors";
+import { uploadTaskAttachment } from "../../api/attachments";
+import { createEntityComment } from "../../api/comments";
+import { uploadContentImage } from "../../api/content-images";
+import { createTaskNote } from "../../api/notes";
+import { createSubtask } from "../../api/subtasks";
+import { setTaskTags } from "../../api/tags";
+import { addTicketRelation, createOwnerTicket, createSubTicket, createTicketNote, linkOwnerTicket, setTicketTags, uploadTicketAttachment } from "../../api/tickets";
+import { errorMessage, errorMessageAsync } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
+import { useAuth } from "../../hooks/useAuth";
 import { useBacklog } from "../../hooks/useBacklog";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useFeatures } from "../../hooks/useFeatures";
 import { useMilestones } from "../../hooks/useMilestones";
 import { useNotes } from "../../hooks/useNotes";
 import { useProjectFeatureLinks } from "../../hooks/useDocLinks";
+import { useProjectWikiRelation } from "../../hooks/useProjectWikiRelation";
 import { useCatalogs } from "../../hooks/useCatalogs";
+import { useStatusCascadeWorkflow } from "../../hooks/useStatusCascadeWorkflow";
 import { useTasks } from "../../hooks/useTasks";
 import { useTickets } from "../../hooks/useTickets";
-import { useWikiImport } from "../../hooks/useWikiImport";
-import { taskStatusLabels, taskStatusTones, ticketStatusLabels, ticketStatusTones } from "../../utils/domainLabels";
-import { countOpenStatusItems } from "../../utils/catalogs";
+import { objectReference } from "../../lib/references";
+import { invalidateTags } from "../../queries/invalidation";
+import {
+  catalogColor,
+  catalogLabel,
+  countOpenStatusItems,
+  resolveCatalogEntryKey,
+} from "../../utils/catalogs";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { BacklogListBoardView } from "../backlog/BacklogListBoardView";
+import { ProjectDashboard } from "../dashboard/DashboardView";
 import { ProjectFeaturePanel } from "../features/ProjectFeaturePanel";
-import { WikiImportPanel } from "../imports/WikiImportPanel";
+import { JournalPanel } from "../journal/JournalPanel";
 import { MilestoneListBoardView } from "../milestones/MilestoneListBoardView";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { TagPicker } from "../tags/TagPicker";
+import { TaskForm, type TaskFormInput } from "../tasks/TaskForm";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
+import { TicketForm, type TicketFormInput } from "../tickets/TicketForm";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
 import { Button } from "../ui/Button";
-import { ColorPicker } from "../ui/ColorPicker";
 import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { DatePicker } from "../ui/DatePicker";
 import { EmptyState } from "../ui/EmptyState";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
 import { PendingCommentList } from "../ui/PendingCommentList";
@@ -64,12 +89,14 @@ import { PendingRelationList } from "../ui/PendingRelationList";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
-import { SectionHeader } from "../ui/SectionHeader";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
+import { UserSelectField } from "../users/UserSelectField";
+import { useHasPermission } from "../../hooks/usePermissions";
+import { ProjectWikiPanel } from "./ProjectWikiPanel";
 
 interface ProjectFormProps {
   open: boolean;
@@ -78,6 +105,7 @@ interface ProjectFormProps {
   onClose: () => void;
   onDelete?: (project: Project) => Promise<boolean>;
   savingLabel?: string;
+  initialTab?: ProjectFormTab;
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
   onOpenInTab?: () => void;
@@ -90,65 +118,106 @@ interface ProjectFormProps {
       comments: DraftComment[];
       notes: DraftNote[];
       files: DraftFile[];
-    }
+    },
   ) => Promise<void>;
 }
 
-type ProjectFormTab = "details" | "milestones" | "features" | "tasks" | "tickets" | "comments" | "notes" | "attachments" | "backlog" | "import";
+export type ProjectFormTab =
+  | "overview"
+  | "details"
+  | "milestones"
+  | "features"
+  | "tasks"
+  | "tickets"
+  | "comments"
+  | "notes"
+  | "attachments"
+  | "backlog"
+  | "journal";
 
 const baseTabs: Array<Tab<ProjectFormTab>> = [
+  { value: "overview", label: "Übersicht" },
   { value: "details", label: "Details" },
   { value: "milestones", label: "Meilensteine" },
-  { value: "features", label: "Features" },
   { value: "tasks", label: "Aufgaben" },
   { value: "tickets", label: "Tickets" },
+  { value: "features", label: "Features" },
   { value: "comments", label: "Kommentare" },
   { value: "notes", label: "Notizen" },
   { value: "attachments", label: "Dateien" },
   { value: "backlog", label: "Backlog" },
-  { value: "import", label: "Import" }
+  { value: "journal", label: "Journal" },
 ];
 
-const swatches = [
-  "var(--color-steel-700)",
-  "var(--color-crimson)",
-  "var(--color-tangerine)",
-  "var(--color-mustard)",
-  "var(--color-fern)",
-  "var(--color-teal)",
-  "var(--color-violet)",
-  "var(--color-magenta)",
-  "var(--color-ink)"
-];
-
-function projectCode(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 5)
-    .toUpperCase();
+export function parseProjectFormTab(
+  value: string | null | undefined,
+): ProjectFormTab | undefined {
+  return baseTabs.some((tab) => tab.value === value)
+    ? (value as ProjectFormTab)
+    : undefined;
 }
 
-export function ProjectForm({ open, project, onSubmit, onClose, onDelete, savingLabel, variant = "modal", closeOnSubmit = true, onOpenInTab, onPostCreate }: ProjectFormProps) {
+function workStatusValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "active",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "workStatus", value, preferredKey) ??
+    preferredKey
+  );
+}
+
+function priorityValue(
+  entries: Parameters<typeof resolveCatalogEntryKey>[0],
+  value: string,
+  preferredKey = "medium",
+) {
+  return (
+    resolveCatalogEntryKey(entries, "priority", value, preferredKey) ??
+    preferredKey
+  );
+}
+
+export function ProjectForm({
+  open,
+  project,
+  onSubmit,
+  onClose,
+  onDelete,
+  savingLabel,
+  initialTab,
+  variant = "modal",
+  closeOnSubmit = true,
+  onOpenInTab,
+  onPostCreate,
+}: ProjectFormProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const projectId = project?.id;
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const auth = useAuth();
+  const statusCascade = useStatusCascadeWorkflow();
   const allFeatures = useFeatures();
   const milestones = useMilestones(null, projectId);
   const featureLinks = useProjectFeatureLinks(projectId);
-  const taskOwner = projectId ? { type: "project" as const, id: projectId } : undefined;
+  const taskOwner = projectId
+    ? { type: "project" as const, id: projectId }
+    : undefined;
   const tasks = useTasks(taskOwner);
-  const tickets = useTickets(projectId ? { type: "project", id: projectId } : null);
+  const tickets = useTickets(
+    projectId ? { type: "project", id: projectId } : null,
+  );
   const backlog = useBacklog(projectId);
   const catalogs = useCatalogs();
   const notes = useNotes(projectId ? { type: "project", id: projectId } : null);
-  const attachments = useAttachments(projectId ? { type: "project", id: projectId } : null);
+  const projectWikiRelation = useProjectWikiRelation(project);
+  const attachments = useAttachments(
+    projectId ? { type: "project", id: projectId } : null,
+  );
   const comments = useEntityComments("project", projectId);
-  const wikiImport = useWikiImport(projectId);
   const [activeTab, setActiveTab] = useState<ProjectFormTab>("details");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -159,10 +228,14 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
   const [deleting, setDeleting] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [milestoneViewMode, setMilestoneViewMode] = useState<ViewMode>("kanban");
+  const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
+  const [milestoneViewMode, setMilestoneViewMode] =
+    useState<ViewMode>("kanban");
   const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const [wikiImportSourcePath, setWikiImportSourcePath] = useState("");
+  const canReadJournal = useHasPermission("journal", "read");
+  const canCreateTasks = useHasPermission("tasks", "write");
+  const canCreateTickets = useHasPermission("tickets", "write");
   const [pendingFeatures, setPendingFeatures] = useState<Feature[]>([]);
   const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
   const [pendingTickets, setPendingTickets] = useState<DraftTicket[]>([]);
@@ -174,7 +247,26 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
   const [taskDraftOpen, setTaskDraftOpen] = useState(false);
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
-  const code = useMemo(() => projectCode(name), [name]);
+  const [createTaskForMilestone, setCreateTaskForMilestone] = useState<Milestone | null>(null);
+  const [createTicketForMilestone, setCreateTicketForMilestone] = useState<Milestone | null>(null);
+  const prevOpenRef = useRef(false);
+  const createTaskOwner = createTaskForMilestone ? { type: "milestone" as const, id: createTaskForMilestone.id } : null;
+  const createTicketOwner = createTicketForMilestone ? { type: "milestone" as const, id: createTicketForMilestone.id } : null;
+  const milestoneTaskActions = useTasks(createTaskOwner);
+  const milestoneTicketActions = useTickets(createTicketOwner);
+  const featureLinkExcludeIds = project
+    ? featureLinks.features.map((feature) => feature.id)
+    : pendingFeatures.map((feature) => feature.id);
+
+  const handleTabChange = (nextTab: ProjectFormTab) => {
+    setActiveTab(nextTab);
+    if (variant !== "page") {
+      return;
+    }
+    const params = new URLSearchParams(location.search);
+    params.set("tab", nextTab);
+    navigate(`${location.pathname}?${params.toString()}`, { replace: true });
+  };
 
   useEffect(() => {
     if (!open) {
@@ -189,9 +281,21 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       setTaskDraftOpen(false);
       setTicketLinkOpen(false);
       setTicketDraftOpen(false);
+      setCreateTaskForMilestone(null);
+      setCreateTicketForMilestone(null);
+      prevOpenRef.current = false;
       return;
     }
+    if (!prevOpenRef.current) {
+      setActiveTab(initialTab ?? "details");
+    }
+    prevOpenRef.current = true;
+  }, [initialTab, open]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
     setName(project?.name ?? "");
     setDescription(project?.description ?? "");
     setStatus(project?.status ?? "active");
@@ -199,8 +303,16 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
     setSelectedTags(project?.tags ?? []);
     setStartDate(project?.startDate ?? "");
     setDueDate(project?.dueDate ?? "");
-    setActiveTab("details");
-  }, [open, project]);
+    setResponsibleUserId(project ? project.responsibleUserId : (auth.user?.id ?? null));
+  }, [auth.user?.id, open, project]);
+
+  useEffect(() => {
+    if (open) {
+      setStatus((currentStatus) =>
+        workStatusValue(catalogs.entries, currentStatus, "active"),
+      );
+    }
+  }, [catalogs.entries, open]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -210,12 +322,18 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         {
           name,
           description,
-          status,
+          status: resolveCatalogEntryKey(
+            catalogs.entries,
+            "workStatus",
+            status,
+            "active",
+          ),
           color,
           startDate: startDate || null,
-          dueDate: dueDate || null
+          dueDate: dueDate || null,
+          responsibleUserId,
         },
-        selectedTags.map((tag) => tag.id)
+        selectedTags.map((tag) => tag.id),
       );
       if (!project && created && onPostCreate) {
         await onPostCreate(created.id, {
@@ -224,7 +342,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
           featureIds: pendingFeatures.map((feature) => feature.id),
           comments: pendingComments,
           notes: pendingNotes,
-          files: pendingFiles
+          files: pendingFiles,
         });
       }
       if (closeOnSubmit) {
@@ -252,15 +370,27 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
     }
   };
 
+  const updateMilestoneStatus = async (milestone: Milestone, nextStatus: Milestone["status"]) => {
+    const updated = await milestones.updateMilestone(milestone.id, { status: nextStatus, expectedVersion: milestone.version });
+    await statusCascade.startMilestoneCascade(milestone, updated);
+  };
+
   const createNote = async () => {
     try {
-      const note = await notes.createNote({ title: "Ohne Titel", contentJson: {} });
+      const note = await notes.createNote({
+        title: "Ohne Titel",
+        contentJson: {},
+      });
       if (note) {
         setEditingNote(note);
         showToast({ tone: "success", title: "Notiz erstellt" });
       }
     } catch (noteError) {
-      showToast({ tone: "error", title: "Notiz konnte nicht erstellt werden", message: errorMessage(noteError) });
+      showToast({
+        tone: "error",
+        title: "Notiz konnte nicht erstellt werden",
+        message: errorMessage(noteError),
+      });
     }
   };
 
@@ -270,7 +400,11 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {
-      showToast({ tone: "error", title: "Datei konnte nicht hochgeladen werden", message: errorMessage(attachmentError) });
+      showToast({
+        tone: "error",
+        title: "Datei konnte nicht hochgeladen werden",
+        message: errorMessage(attachmentError),
+      });
       throw attachmentError;
     }
   };
@@ -280,7 +414,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       title: "Backlog-Item löschen?",
       body: `Das Backlog-Item "${item.title}" wird entfernt.`,
       severity: "danger",
-      confirmLabel: "Löschen"
+      confirmLabel: "Löschen",
     });
     if (!approved) {
       return;
@@ -289,7 +423,11 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       await backlog.removeItem(item.id);
       showToast({ tone: "success", title: "Backlog-Item gelöscht" });
     } catch (backlogError) {
-      showToast({ tone: "error", title: "Backlog-Item konnte nicht gelöscht werden", message: errorMessage(backlogError) });
+      showToast({
+        tone: "error",
+        title: "Backlog-Item konnte nicht gelöscht werden",
+        message: errorMessage(backlogError),
+      });
     }
   };
 
@@ -298,7 +436,7 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       title: "Meilenstein löschen?",
       body: `Der Meilenstein "${milestone.name}" wird entfernt.`,
       severity: "danger",
-      confirmLabel: "Löschen"
+      confirmLabel: "Löschen",
     });
     if (!approved) {
       return;
@@ -307,61 +445,298 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       await milestones.removeMilestone(milestone.id);
       showToast({ tone: "success", title: "Meilenstein gelöscht" });
     } catch (milestoneError) {
-      showToast({ tone: "error", title: "Meilenstein konnte nicht gelöscht werden", message: errorMessage(milestoneError) });
+      showToast({
+        tone: "error",
+        title: "Meilenstein konnte nicht gelöscht werden",
+        message: errorMessage(milestoneError),
+      });
     }
   };
 
-  const previewWikiImport = async () => {
+  const changeMilestoneTags = async (milestoneId: number, tagIds: number[]) => {
     try {
-      const report = await wikiImport.previewImport(wikiImportSourcePath);
-      if (report) {
-        showToast({ tone: "success", title: "Import-Vorschau erstellt" });
-      }
-    } catch (importError) {
-      showToast({ tone: "error", title: "Import-Vorschau fehlgeschlagen", message: errorMessage(importError) });
+      await milestones.updateMilestoneTags(milestoneId, tagIds);
+    } catch (milestoneError) {
+      showToast({
+        tone: "error",
+        title: "Meilenstein-Tags konnten nicht geändert werden",
+        message: errorMessage(milestoneError),
+      });
+      throw milestoneError;
     }
   };
 
-  const runWikiImport = async () => {
+  const createMilestoneTask = async (input: TaskFormInput) => {
+    const {
+      tagIds,
+      pendingSubtasks,
+      pendingTickets,
+      pendingComments,
+      pendingNotes,
+      pendingFiles,
+      ...taskInput
+    } = input;
+    let created: Awaited<ReturnType<typeof milestoneTaskActions.createTask>> | null = null;
     try {
-      const report = await wikiImport.runImport(wikiImportSourcePath);
-      if (report) {
-        await allFeatures.reload();
-        await featureLinks.reload();
-        showToast({ tone: "success", title: "Wiki importiert" });
+      created = await milestoneTaskActions.createTask(taskInput);
+      if (!created) {
+        throw new Error("Aufgabe konnte nicht angelegt werden");
       }
-    } catch (importError) {
-      showToast({ tone: "error", title: "Wiki-Import fehlgeschlagen", message: errorMessage(importError) });
+      if (tagIds.length > 0) {
+        await setTaskTags(created.id, tagIds);
+        await invalidateTags(queryClient);
+      }
+      for (const subtask of pendingSubtasks) {
+        await createSubtask(created.id, subtask);
+      }
+      const ticketOwner = { type: "task" as const, id: created.id };
+      for (const ticket of pendingTickets) {
+        if (ticket.kind === "existing") {
+          await linkOwnerTicket(ticketOwner, ticket.ticket.id);
+        } else {
+          await createOwnerTicket(ticketOwner, ticket.draft);
+        }
+      }
+      for (const comment of pendingComments) {
+        await createEntityComment("task", created.id, { body: comment.text });
+      }
+      for (const note of pendingNotes) {
+        await createTaskNote(created.id, note);
+      }
+      for (const file of pendingFiles) {
+        await uploadTaskAttachment(created.id, file.file);
+      }
+      showToast({ tone: "success", title: "Aufgabe angelegt" });
+      return created;
+    } catch (taskError) {
+      showToast({
+        tone: "error",
+        title: created
+          ? "Aufgabe wurde angelegt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Aufgabe konnte nicht angelegt werden",
+        message: errorMessage(taskError),
+      });
+      throw taskError;
     }
   };
 
-  const visibleTabs = project ? baseTabs : baseTabs.filter((tab) => tab.value !== "import");
+  const createMilestoneTicket = async (input: TicketFormInput) => {
+    const { tagIds, pendingSubTickets, pendingRelations, pendingComments, pendingNotes, pendingFiles } = input;
+    const ticketInput = {
+      title: input.title,
+      type: input.type,
+      description: input.description,
+      status: input.status,
+      priority: input.priority,
+      reporterUserId: input.reporterUserId,
+      responsibleUserId: input.responsibleUserId,
+      environment: input.environment,
+      affectedVersion: input.affectedVersion,
+      dueDate: input.dueDate,
+    };
+    let created: Awaited<ReturnType<typeof milestoneTicketActions.createTicket>> | null = null;
+    try {
+      created = await milestoneTicketActions.createTicket(ticketInput);
+      if (!created) {
+        throw new Error("Ticket konnte nicht angelegt werden");
+      }
+      if (tagIds.length > 0) {
+        await setTicketTags(created.id, tagIds);
+      }
+      for (const subTicket of pendingSubTickets) {
+        await createSubTicket(created.id, subTicket);
+      }
+      for (const relation of pendingRelations) {
+        await addTicketRelation(created.id, {
+          targetTicketId: relation.ticket.id,
+          relationType: relation.relationType,
+        });
+      }
+      for (const comment of pendingComments) {
+        await createEntityComment("ticket", created.id, { body: comment.text });
+      }
+      for (const note of pendingNotes) {
+        await createTicketNote(created.id, note);
+      }
+      for (const file of pendingFiles) {
+        await uploadTicketAttachment(created.id, file.file);
+      }
+      showToast({ tone: "success", title: "Ticket angelegt" });
+      return created;
+    } catch (ticketError) {
+      showToast({
+        tone: "error",
+        title: created
+          ? "Ticket wurde angelegt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Ticket konnte nicht angelegt werden",
+        message: await errorMessageAsync(ticketError),
+      });
+      throw ticketError;
+    }
+  };
+
+  const updateProjectFeatureStatus = async (
+    feature: Feature,
+    status: Feature["status"],
+  ) => {
+    try {
+      await allFeatures.updateFeature(feature.id, {
+        status,
+        expectedVersion: feature.version,
+      });
+    } catch (featureError) {
+      showToast({
+        tone: "error",
+        title: "Featurestatus konnte nicht geändert werden",
+        message: errorMessage(featureError),
+      });
+      throw featureError;
+    }
+  };
+
+  const linkFeature = async (targetFeature: Feature) => {
+    if (!projectId) {
+      setPendingFeatures((items) =>
+        items.some((feature) => feature.id === targetFeature.id)
+          ? items
+          : [...items, targetFeature],
+      );
+      return true;
+    }
+
+    const currentFeatureIds = featureLinks.features.map((feature) => feature.id);
+    if (currentFeatureIds.includes(targetFeature.id)) {
+      return true;
+    }
+
+    try {
+      await featureLinks.setFeaturesForProject([
+        ...currentFeatureIds,
+        targetFeature.id,
+      ]);
+      showToast({ tone: "success", title: "Feature verknüpft" });
+      return true;
+    } catch (featureError) {
+      showToast({
+        tone: "error",
+        title: "Feature konnte nicht verknüpft werden",
+        message: errorMessage(featureError),
+      });
+      return false;
+    }
+  };
+
+  const setProjectWikiPage = async (wikiPageId: number | null) => {
+    try {
+      await projectWikiRelation.setProjectWikiPageId(wikiPageId);
+      showToast({
+        tone: "success",
+        title:
+          wikiPageId === null
+            ? "Wiki-Verknüpfung entfernt"
+            : "Wiki-Seite verknüpft",
+      });
+    } catch (wikiError) {
+      showToast({
+        tone: "error",
+        title:
+          wikiPageId === null
+            ? "Wiki-Verknüpfung konnte nicht entfernt werden"
+            : "Wiki-Seite konnte nicht verknüpft werden",
+        message: errorMessage(wikiError),
+      });
+      throw wikiError;
+    }
+  };
+
+  const visibleTabs = project
+    ? baseTabs.filter((tab) => tab.value !== "journal" || canReadJournal)
+    : baseTabs.filter(
+        (tab) => tab.value !== "overview" && tab.value !== "journal",
+      );
   const tabItems = visibleTabs.map((tab) => {
+    if (tab.value === "details") {
+      return tab;
+    }
     if (tab.value === "milestones") {
-      return { ...tab, count: project ? countOpenStatusItems(milestones.milestones, catalogs.entries, "workStatus") : 0 };
+      return {
+        ...tab,
+        count: project
+          ? countOpenStatusItems(
+              milestones.milestones,
+              catalogs.entries,
+              "workStatus",
+            )
+          : 0,
+      };
     }
     if (tab.value === "features") {
-      return { ...tab, count: project ? countOpenStatusItems(featureLinks.features, catalogs.entries, "featureStatus") : countOpenStatusItems(pendingFeatures, catalogs.entries, "featureStatus") };
+      return {
+        ...tab,
+        count: project
+          ? countOpenStatusItems(
+              featureLinks.features,
+              catalogs.entries,
+              "featureStatus",
+            )
+          : countOpenStatusItems(
+              pendingFeatures,
+              catalogs.entries,
+              "featureStatus",
+            ),
+      };
     }
     if (tab.value === "tasks") {
-      const pending = pendingTasks.map((item) => (item.kind === "existing" ? item.task : item.draft));
-      return { ...tab, count: project ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
+      const pending = pendingTasks.map((item) =>
+        item.kind === "existing" ? item.task : item.draft,
+      );
+      return {
+        ...tab,
+        count: project
+          ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus")
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "tickets") {
-      const pending = pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft));
-      return { ...tab, count: project ? countOpenStatusItems(tickets.tickets, catalogs.entries, "workStatus") : countOpenStatusItems(pending, catalogs.entries, "workStatus") };
+      const pending = pendingTickets.map((item) =>
+        item.kind === "existing" ? item.ticket : item.draft,
+      );
+      return {
+        ...tab,
+        count: project
+          ? countOpenStatusItems(
+              tickets.tickets,
+              catalogs.entries,
+              "workStatus",
+            )
+          : countOpenStatusItems(pending, catalogs.entries, "workStatus"),
+      };
     }
     if (tab.value === "comments") {
-      return { ...tab, count: project ? comments.comments.length : pendingComments.length };
+      return {
+        ...tab,
+        count: project ? comments.comments.length : pendingComments.length,
+      };
     }
     if (tab.value === "notes") {
-      return { ...tab, count: project ? notes.notes.length : pendingNotes.length };
+      return {
+        ...tab,
+        count: project ? notes.notes.length : pendingNotes.length,
+      };
     }
     if (tab.value === "attachments") {
-      return { ...tab, count: project ? attachments.attachments.length : pendingFiles.length };
+      return {
+        ...tab,
+        count: project ? attachments.attachments.length : pendingFiles.length,
+      };
     }
     if (tab.value === "backlog") {
-      return { ...tab, count: project ? countOpenStatusItems(backlog.items, catalogs.entries, "workStatus") : 0 };
+      return {
+        ...tab,
+        count: project
+          ? countOpenStatusItems(backlog.items, catalogs.entries, "workStatus")
+          : 0,
+      };
     }
     return { ...tab, count: 0 };
   });
@@ -371,14 +746,27 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       <FormModal
         open={open}
         title={project ? "Projekt bearbeiten" : "Projekt anlegen"}
+        objectReference={project ? objectReference("project", project.id) : undefined}
         icon={<FolderKanban size={21} />}
         breadcrumb={["Projekte", project ? project.name : "Neues Projekt"]}
         onSubmit={submit}
         saving={saving}
-        submitLabel={saving ? savingLabel ?? "Speichern…" : project ? "Speichern" : "Projekt anlegen"}
+        submitLabel={
+          saving
+            ? (savingLabel ?? "Speichern…")
+            : project
+              ? "Speichern"
+              : "Projekt anlegen"
+        }
         footerStart={
           project && onDelete ? (
-            <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={18} />} variant="ghost" disabled={deleting} onClick={() => void deleteCurrentProject()}>
+            <Button
+              className="text-crimson hover:bg-crimson/10"
+              icon={<Trash2 size={18} />}
+              variant="ghost"
+              disabled={deleting}
+              onClick={() => void deleteCurrentProject()}
+            >
               Löschen
             </Button>
           ) : undefined
@@ -386,66 +774,121 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        contentLayout={activeTab === "details" ? "flush" : "default"}
+        contentClassName={
+          activeTab === "overview" ? "w-full max-w-7xl self-center" : ""
+        }
+        tabBar={
+          <TabBar tabs={tabItems} active={activeTab} onChange={handleTabChange} />
+        }
       >
-        <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
+        {activeTab === "overview" && project ? (
+          <ProjectDashboard projectId={project.id} />
+        ) : null}
 
         {activeTab === "details" ? (
-          <>
-            <Section title="Stammdaten">
-              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10rem]">
-                <FormField label="Projektname" required className="min-w-0">
-                  <Input value={name} onChange={(event) => setName(event.target.value)} required />
-                </FormField>
-                <FormField label="Kürzel" className="min-w-0">
-                  <Input value={code} readOnly maxLength={5} variant="mono" className="uppercase text-slate-600" />
-                </FormField>
+          <div className="flex min-h-0 w-full flex-1">
+            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
+              <div className="mx-auto grid w-full max-w-5xl gap-4">
+                <Section>
+                  <FormField label="Projektname" required className="min-w-0">
+                    <Input
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Beschreibung" className="mt-4">
+                    <RichTextInlineField
+                      value={description}
+                      onChange={setDescription}
+                      placeholder="Worum geht es in diesem Projekt?"
+                      minRows={5}
+                      testIdPrefix="project-description"
+                      onImageUpload={uploadContentImage}
+                    />
+                  </FormField>
+                </Section>
               </div>
-              <FormField label="Beschreibung" className="mt-4">
-                <RichTextInlineField value={description} onChange={setDescription} placeholder="Worum geht es in diesem Projekt?" minRows={12} testIdPrefix="project-description" />
-              </FormField>
-            </Section>
-            <Section title="Identität">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <FormField label="Farbe">
-                  <ColorPicker value={color} onChange={setColor} swatches={swatches} />
-                </FormField>
+            </div>
+            <FormSidebar storageKey="project-form-sidebar">
+              <div className="grid gap-4">
                 <FormField label="Status">
-                  <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+                  <StatusToggle
+                    kind="workStatus"
+                    value={status}
+                    onChange={setStatus}
+                  />
                 </FormField>
+                <UserSelectField
+                  label="Verantwortlich"
+                  value={responsibleUserId}
+                  selectedUser={project?.responsibleUser ?? null}
+                  onChange={setResponsibleUserId}
+                />
               </div>
-            </Section>
-            <Section title="Zeitraum">
-              <div className="grid gap-4 md:grid-cols-2">
-                <DatePicker label="Start" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-                <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              <div className="grid gap-4">
+                <DatePicker
+                  label="Start"
+                  value={startDate}
+                  onChange={(event) => setStartDate(event.target.value)}
+                />
+                <DatePicker
+                  label="Fällig"
+                  value={dueDate}
+                  onChange={(event) => setDueDate(event.target.value)}
+                />
               </div>
-            </Section>
-            <Section title="Tags">
               <TagPicker selected={selectedTags} onChange={setSelectedTags} />
-            </Section>
-          </>
+              {project ? (
+                <ProjectWikiPanel
+                  wikiPageId={projectWikiRelation.wikiPageId}
+                  saving={projectWikiRelation.saving}
+                  onChange={setProjectWikiPage}
+                />
+              ) : null}
+            </FormSidebar>
+          </div>
         ) : null}
 
         {activeTab === "milestones" ? (
-          <Section title="Meilensteine">
+          <Section fill={Boolean(project)}>
             {project ? (
               <MilestoneListBoardView
                 milestones={milestones.milestones}
                 loading={milestones.loading}
                 viewMode={milestoneViewMode}
                 onViewModeChange={setMilestoneViewMode}
-                onCreate={() => navigate(`/milestones/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
-                onEdit={(milestone) => navigate(`/milestones/${milestone.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                onCreate={() =>
+                  navigate(
+                    `/milestones/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                  )
+                }
+                onEdit={(milestone) =>
+                  navigate(
+                    `/milestones/${milestone.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                  )
+                }
                 onDelete={(milestone) => void deleteMilestone(milestone)}
+                onStatusChange={updateMilestoneStatus}
+                onDueDateChange={(milestone, dueDate) => milestones.updateMilestone(milestone.id, { dueDate, expectedVersion: milestone.version })}
+                onTagsChange={changeMilestoneTags}
+                onCreateTask={canCreateTasks ? (milestone) => setCreateTaskForMilestone(milestone) : undefined}
+                onCreateTicket={canCreateTickets ? (milestone) => setCreateTicketForMilestone(milestone) : undefined}
               />
             ) : (
-              <EmptyState icon={<Flag size={22} />} title="Meilensteine sind nach dem Speichern verfügbar." tone="teal" variant="tinted" />
+              <EmptyState
+                icon={<Flag size={22} />}
+                title="Meilensteine sind nach dem Speichern verfügbar."
+                tone="teal"
+                variant="tinted"
+              />
             )}
           </Section>
         ) : null}
 
         {activeTab === "features" ? (
-          <Section title="Features">
+          <Section fill={Boolean(project)}>
             {project ? (
               featureLinks.loading ? (
                 <TaskListSkeleton />
@@ -454,19 +897,35 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
                   features={featureLinks.features}
                   viewMode={featureViewMode}
                   onViewModeChange={setFeatureViewMode}
-                  onCreate={() => navigate(`/features/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
-                  onOpen={(feature) => navigate(`/features/${feature.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                  onCreate={() =>
+                    navigate(
+                      `/features/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
+                  onOpen={(feature) =>
+                    navigate(
+                      `/features/${feature.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
+                  onStatusChange={updateProjectFeatureStatus}
                 />
               )
             ) : (
               <PendingRelationList
-                existingItems={pendingFeatures.map((feature) => ({ id: feature.id, title: feature.title }))}
+                existingItems={pendingFeatures.map((feature) => ({
+                  id: feature.id,
+                  title: feature.title,
+                }))}
                 draftItems={[]}
                 emptyIcon={<FolderKanban size={22} />}
                 emptyTitle="Keine Features vorgemerkt"
                 showCreateNew={false}
                 onLinkExisting={() => setFeatureLinkOpen(true)}
-                onRemoveExisting={(index) => setPendingFeatures((items) => items.filter((_, itemIndex) => itemIndex !== index))}
+                onRemoveExisting={(index) =>
+                  setPendingFeatures((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
                 onRemoveDraft={() => undefined}
               />
             )}
@@ -474,95 +933,203 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section title="Aufgaben">
+          <Section fill={Boolean(project)}>
             {project ? (
               <OwnerTaskBoard owner={{ type: "project", id: project.id }} />
             ) : (
               <PendingRelationList
                 existingItems={pendingTasks.flatMap((item) =>
-                  item.kind === "existing" ? [{ id: item.task.id, title: item.task.title, statusLabel: taskStatusLabels[item.task.status], statusTone: taskStatusTones[item.task.status] }] : []
+                  item.kind === "existing"
+                    ? [
+                        {
+                          id: item.task.id,
+                          title: item.task.title,
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.task.status,
+                          ),
+                          statusColor: catalogColor(
+                            catalogs.entries,
+                            "workStatus",
+                            item.task.status,
+                          ),
+                        },
+                      ]
+                    : [],
                 )}
-                draftItems={pendingTasks.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTasks.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Aufgaben vorgemerkt"
+                showLinkExisting={false}
                 onLinkExisting={() => setTaskLinkOpen(true)}
                 onCreateNew={() => setTaskDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTasks((items) => removeDraftByKindIndex(items, "new", index))}
+                onRemoveExisting={(index) =>
+                  setPendingTasks((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTasks((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section title="Tickets">
+          <Section fill={Boolean(project)}>
             {project ? (
               <OwnerTicketBoard owner={{ type: "project", id: project.id }} />
             ) : (
               <PendingRelationList
                 existingItems={pendingTickets.flatMap((item) =>
                   item.kind === "existing"
-                    ? [{ id: item.ticket.id, title: item.ticket.title, statusLabel: ticketStatusLabels[item.ticket.status], statusTone: ticketStatusTones[item.ticket.status] }]
-                    : []
+                    ? [
+                        {
+                          id: item.ticket.id,
+                          title: item.ticket.title,
+                          statusLabel: catalogLabel(
+                            catalogs.entries,
+                            "workStatus",
+                            item.ticket.status,
+                          ),
+                          statusColor: catalogColor(
+                            catalogs.entries,
+                            "workStatus",
+                            item.ticket.status,
+                          ),
+                        },
+                      ]
+                    : [],
                 )}
-                draftItems={pendingTickets.flatMap((item) => (item.kind === "new" ? [{ title: item.draft.title, badge: "Wird erstellt" }] : []))}
+                draftItems={pendingTickets.flatMap((item) =>
+                  item.kind === "new"
+                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
+                    : [],
+                )}
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
+                showLinkExisting={false}
                 onLinkExisting={() => setTicketLinkOpen(true)}
                 onCreateNew={() => setTicketDraftOpen(true)}
-                onRemoveExisting={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "existing", index))}
-                onRemoveDraft={(index) => setPendingTickets((items) => removeDraftByKindIndex(items, "new", index))}
+                onRemoveExisting={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "existing", index),
+                  )
+                }
+                onRemoveDraft={(index) =>
+                  setPendingTickets((items) =>
+                    removeDraftByKindIndex(items, "new", index),
+                  )
+                }
               />
             )}
           </Section>
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section title="Kommentare">
+          <Section>
             {project ? (
-              <CommentThread comments={comments.comments} entityLabel="Projekt" onCreate={comments.createComment} onDelete={comments.removeComment} />
+              <CommentThread
+                comments={comments.comments}
+                entityLabel="Projekt"
+                onCreate={comments.createComment}
+                onUpdate={comments.updateComment}
+                onDelete={comments.removeComment}
+              />
             ) : (
-              <PendingCommentList comments={pendingComments} onAdd={(comment) => setPendingComments((items) => [...items, comment])} onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingCommentList
+                comments={pendingComments}
+                onAdd={(comment) =>
+                  setPendingComments((items) => [...items, comment])
+                }
+                onUpdate={(index, comment) =>
+                  setPendingComments((items) =>
+                    items.map((item, itemIndex) =>
+                      itemIndex === index ? comment : item,
+                    ),
+                  )
+                }
+                onRemove={(index) =>
+                  setPendingComments((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
 
         {activeTab === "notes" ? (
-          <Section>
-            <div className="mb-4 flex items-center gap-2">
-              <StickyNote size={18} className="text-fern" />
-              <SectionHeader title="Notizen" />
-            </div>
+          <Section fill={Boolean(project)}>
             {project ? (
               <>
-                <NoteList notes={notes.notes} onCreate={createNote} onEdit={setEditingNote} onDelete={(note) => void notes.removeNote(note.id)} />
-                <NoteEditor note={editingNote} open={Boolean(editingNote)} onSave={notes.updateNote} onClose={() => setEditingNote(null)} />
+                <NoteList
+                  notes={notes.notes}
+                  onCreate={createNote}
+                  onEdit={setEditingNote}
+                  onDelete={(note) => void notes.removeNote(note.id)}
+                />
+                <NoteEditor
+                  note={editingNote}
+                  open={Boolean(editingNote)}
+                  onSave={notes.updateNote}
+                  onClose={() => setEditingNote(null)}
+                />
               </>
             ) : (
-              <PendingNoteList notes={pendingNotes} onAdd={(note) => setPendingNotes((items) => [...items, note])} onRemove={(index) => setPendingNotes((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingNoteList
+                notes={pendingNotes}
+                onAdd={(note) => setPendingNotes((items) => [...items, note])}
+                onRemove={(index) =>
+                  setPendingNotes((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
 
         {activeTab === "attachments" ? (
           <Section>
-            <div className="mb-4 flex items-center gap-2">
-              <Paperclip size={18} className="text-fern" />
-              <SectionHeader title="Dateien" />
-            </div>
             {project ? (
               <div className="grid gap-4">
                 <AttachmentUploader onUpload={uploadAttachment} />
-                <AttachmentList attachments={attachments.attachments} onDelete={(attachment) => void attachments.removeAttachment(attachment.id)} />
+                <AttachmentList
+                  attachments={attachments.attachments}
+                  onDelete={(attachment) =>
+                    void attachments.removeAttachment(attachment.id)
+                  }
+                  onOpen={(attachment) => attachments.openAttachment(attachment.id)}
+                  openingAttachmentId={attachments.openingAttachmentId}
+                />
               </div>
             ) : (
-              <PendingFileList files={pendingFiles} onAdd={(files) => setPendingFiles((items) => [...items, ...files])} onRemove={(index) => setPendingFiles((items) => items.filter((_, itemIndex) => itemIndex !== index))} />
+              <PendingFileList
+                files={pendingFiles}
+                onAdd={(files) =>
+                  setPendingFiles((items) => [...items, ...files])
+                }
+                onRemove={(index) =>
+                  setPendingFiles((items) =>
+                    items.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              />
             )}
           </Section>
         ) : null}
 
         {activeTab === "backlog" ? (
-          <Section title="Backlog">
+          <Section fill={Boolean(project)}>
             {project ? (
               backlog.loading || allFeatures.loading ? (
                 <TaskListSkeleton />
@@ -572,40 +1139,51 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
                   features={allFeatures.features}
                   statusFilter={backlog.statusFilter}
                   onStatusFilterChange={backlog.setStatusFilter}
-                  onCreate={() => navigate(`/backlog/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
-                  onEdit={(item) => navigate(`/backlog/${item.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
+                  onCreate={() =>
+                    navigate(
+                      `/backlog/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
+                  onEdit={(item) =>
+                    navigate(
+                      `/backlog/${item.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                    )
+                  }
                   onDelete={(item) => void deleteBacklogItem(item)}
+                  onStatusChange={(item, status) => backlog.updateItem(item.id, { status, expectedVersion: item.version })}
                 />
               )
             ) : (
-              <EmptyState icon={<Inbox size={22} />} title="Backlog ist nach dem Speichern verfügbar." tone="tangerine" variant="tinted" />
+              <EmptyState
+                icon={<Inbox size={22} />}
+                title="Backlog ist nach dem Speichern verfügbar."
+                tone="tangerine"
+                variant="tinted"
+              />
             )}
           </Section>
         ) : null}
 
-        {activeTab === "import" && project ? (
-          <WikiImportPanel
-            sourcePath={wikiImportSourcePath}
-            report={wikiImport.preview}
-            loading={wikiImport.loading}
-            error={wikiImport.error}
-            onSourcePathChange={setWikiImportSourcePath}
-            onPreview={() => void previewWikiImport()}
-            onRun={() => void runWikiImport()}
-          />
+        {activeTab === "journal" && project ? (
+          <Section fill>
+            <JournalPanel objectType="project" objectId={project.id} />
+          </Section>
         ) : null}
       </FormModal>
 
       <FeatureLinkDialog
         open={featureLinkOpen}
         features={allFeatures.features}
-        excludeIds={pendingFeatures.map((feature) => feature.id)}
-        onLink={(feature) => setPendingFeatures((items) => [...items, feature])}
+        excludeIds={featureLinkExcludeIds}
+        onLink={linkFeature}
         onClose={() => setFeatureLinkOpen(false)}
       />
       <TaskLinkDialog
         open={taskLinkOpen}
-        currentTasks={pendingTasks.flatMap((item) => (item.kind === "existing" ? [item.task] : []))}
+        owner={null}
+        currentTasks={pendingTasks.flatMap((item) =>
+          item.kind === "existing" ? [item.task] : [],
+        )}
         onLink={async (task) => {
           setPendingTasks((items) => [...items, { kind: "existing", task }]);
           setTaskLinkOpen(false);
@@ -614,28 +1192,57 @@ export function ProjectForm({ open, project, onSubmit, onClose, onDelete, saving
       />
       <TicketLinkDialog
         open={ticketLinkOpen}
-        currentTickets={pendingTickets.flatMap((item) => (item.kind === "existing" ? [item.ticket] : []))}
+        owner={null}
+        currentTickets={pendingTickets.flatMap((item) =>
+          item.kind === "existing" ? [item.ticket] : [],
+        )}
         onLink={async (ticket) => {
-          setPendingTickets((items) => [...items, { kind: "existing", ticket }]);
+          setPendingTickets((items) => [
+            ...items,
+            { kind: "existing", ticket },
+          ]);
           setTicketLinkOpen(false);
         }}
         onClose={() => setTicketLinkOpen(false)}
       />
       <TaskDraftDialog
         open={taskDraftOpen}
-        onCreate={(draft) => setPendingTasks((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingTasks((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setTaskDraftOpen(false)}
       />
       <TicketDraftDialog
         open={ticketDraftOpen}
-        onCreate={(draft) => setPendingTickets((items) => [...items, { kind: "new", draft }])}
+        onCreate={(draft) =>
+          setPendingTickets((items) => [...items, { kind: "new", draft }])
+        }
         onClose={() => setTicketDraftOpen(false)}
       />
+      <TaskForm
+        open={createTaskForMilestone !== null}
+        owner={createTaskOwner ?? undefined}
+        closeOnSubmit
+        onSubmit={createMilestoneTask}
+        onClose={() => setCreateTaskForMilestone(null)}
+      />
+      <TicketForm
+        open={createTicketForMilestone !== null}
+        owner={createTicketOwner ?? undefined}
+        closeOnSubmit
+        onSubmit={createMilestoneTicket}
+        onClose={() => setCreateTicketForMilestone(null)}
+      />
+      {statusCascade.dialog}
     </>
   );
 }
 
-function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(items: TItem[], kind: TItem["kind"], removeIndex: number): TItem[] {
+function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(
+  items: TItem[],
+  kind: TItem["kind"],
+  removeIndex: number,
+): TItem[] {
   let currentIndex = -1;
   return items.filter((item) => {
     if (item.kind !== kind) {
@@ -646,9 +1253,23 @@ function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(item
   });
 }
 
-function FeatureLinkDialog({ open, features, excludeIds, onLink, onClose }: { open: boolean; features: Feature[]; excludeIds: number[]; onLink: (feature: Feature) => void; onClose: () => void }) {
+function FeatureLinkDialog({
+  open,
+  features,
+  excludeIds,
+  onLink,
+  onClose,
+}: {
+  open: boolean;
+  features: Feature[];
+  excludeIds: number[];
+  onLink: (feature: Feature) => Promise<boolean>;
+  onClose: () => void;
+}) {
   const [selectedFeatureId, setSelectedFeatureId] = useState<number | "">("");
-  const availableFeatures = features.filter((feature) => !excludeIds.includes(feature.id));
+  const availableFeatures = features.filter(
+    (feature) => !excludeIds.includes(feature.id),
+  );
   const firstFeatureId = availableFeatures[0]?.id ?? "";
 
   useEffect(() => {
@@ -657,21 +1278,33 @@ function FeatureLinkDialog({ open, features, excludeIds, onLink, onClose }: { op
     }
   }, [firstFeatureId, open]);
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
     event.preventDefault();
-    const feature = availableFeatures.find((item) => item.id === selectedFeatureId);
+    const feature = availableFeatures.find(
+      (item) => item.id === selectedFeatureId,
+    );
     if (!feature) {
       return;
     }
-    onLink(feature);
-    onClose();
+    const linked = await onLink(feature);
+    if (linked) {
+      onClose();
+    }
   };
 
   return (
     <Modal open={open} title="Feature verknüpfen" size="md" onClose={onClose}>
-      <form className="grid gap-4" onSubmit={submit}>
-        <Select label="Feature" value={selectedFeatureId} onChange={(event) => setSelectedFeatureId(event.target.value ? Number(event.target.value) : "")}>
+      <form className="grid gap-4" onSubmit={(event) => void submit(event)}>
+        <Select
+          label="Feature"
+          value={selectedFeatureId}
+          onChange={(event) =>
+            setSelectedFeatureId(
+              event.target.value ? Number(event.target.value) : "",
+            )
+          }
+        >
           {availableFeatures.map((feature) => (
             <option key={feature.id} value={feature.id}>
               {feature.title}
@@ -689,9 +1322,18 @@ function FeatureLinkDialog({ open, features, excludeIds, onLink, onClose }: { op
   );
 }
 
-function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TaskDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftTask, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
-  const [status, setStatus] = useState<TaskStatus>("todo");
+  const catalogs = useCatalogs();
+  const [status, setStatus] = useState<TaskStatus>("active");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
 
@@ -701,10 +1343,24 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, status, priority });
+    onCreate({
+      title: trimmedTitle,
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "workStatus",
+        status,
+        "active",
+      ),
+      priority: resolveCatalogEntryKey(
+        catalogs.entries,
+        "priority",
+        priority,
+        "medium",
+      ),
+    });
     setTitle("");
-    setStatus("todo");
-    setPriority("medium");
+    setStatus(workStatusValue(catalogs.entries, "active", "active"));
+    setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
   };
 
@@ -712,11 +1368,20 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
     <Modal open={open} title="Aufgabe vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />
@@ -733,8 +1398,17 @@ function TaskDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate:
   );
 }
 
-function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void; onClose: () => void }) {
+function TicketDraftDialog({
+  open,
+  onCreate,
+  onClose,
+}: {
+  open: boolean;
+  onCreate: (draft: Extract<DraftTicket, { kind: "new" }>["draft"]) => void;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState("");
+  const catalogs = useCatalogs();
   const [status, setStatus] = useState<TicketStatus>("open");
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
@@ -745,10 +1419,25 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     if (!trimmedTitle) {
       return;
     }
-    onCreate({ title: trimmedTitle, type: "bug", status, priority });
+    onCreate({
+      title: trimmedTitle,
+      type: "bug",
+      status: resolveCatalogEntryKey(
+        catalogs.entries,
+        "workStatus",
+        status,
+        "open",
+      ),
+      priority: resolveCatalogEntryKey(
+        catalogs.entries,
+        "priority",
+        priority,
+        "medium",
+      ),
+    });
     setTitle("");
-    setStatus("open");
-    setPriority("medium");
+    setStatus(workStatusValue(catalogs.entries, "open", "open"));
+    setPriority(priorityValue(catalogs.entries, "medium", "medium"));
     onClose();
   };
 
@@ -756,11 +1445,20 @@ function TicketDraftDialog({ open, onCreate, onClose }: { open: boolean; onCreat
     <Modal open={open} title="Ticket vormerken" size="md" onClose={onClose}>
       <form className="grid gap-4" onSubmit={submit}>
         <FormField label="Titel" required>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          <Input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            required
+          />
         </FormField>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Status">
-            <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
+            <StatusToggle
+              kind="workStatus"
+              value={status}
+              onChange={setStatus}
+            />
           </FormField>
           <FormField label="Priorität">
             <PrioritySelect value={priority} onChange={setPriority} />

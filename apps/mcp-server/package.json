@@ -1,0 +1,23 @@
+{
+  "name": "@taskmanager/mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "start:stdio": "node dist/stdio.js",
+    "start:http": "node dist/http.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@taskmanager/shared-types": "file:../../packages/shared-types",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "typescript": "^5.4.5",
+    "vitest": "^4.1.7"
+  }
+}

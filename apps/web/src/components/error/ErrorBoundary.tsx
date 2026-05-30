@@ -33,11 +33,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     return (
       <div className="min-h-screen bg-shell p-6 text-ink">
-        <div className="mx-auto grid max-w-5xl gap-5 rounded-2xl border border-line bg-white p-6 shadow-panel">
-          <span className="inline-flex w-fit rounded-full bg-crimson/10 px-3 py-1 text-xs font-bold uppercase text-crimson">Crash abgefangen</span>
+        <div className="mx-auto grid max-w-5xl gap-5 rounded-lg border border-line bg-white p-6 shadow-panel">
+          <span className="inline-flex w-fit rounded-md bg-crimson/10 px-3 py-1 text-xs font-bold uppercase text-crimson">Crash abgefangen</span>
           <div>
             <h1 className="text-3xl font-bold tracking-normal">Etwas ist im Interface abgestürzt.</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Wir haben den Fehler in der Konsole protokolliert. Du kannst neu laden oder zur Startseite zurückkehren.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-steel-600">Wir haben den Fehler in der Konsole protokolliert. Du kannst neu laden oder zur Startseite zurückkehren.</p>
           </div>
           {import.meta.env.DEV ? (
             <pre className="max-h-80 overflow-auto rounded-lg bg-steel-900 p-4 font-mono text-xs text-white">

@@ -21,7 +21,27 @@ if not defined APP_DIR (
 cd /d "%APP_DIR%"
 set "APP_DIR=%CD%"
 set "API_DIR=%APP_DIR%\apps\api"
-set "DATABASE_PATH=%API_DIR%\data\taskmanager.sqlite"
+
+REM MySQL-Datenbankverbindung (aus .env oder Umgebungsvariablen)
+if exist "%API_DIR%\.env" (
+  echo Lade MySQL-Konfiguration aus %API_DIR%\.env
+  for /f "usebackq tokens=1,* delims==" %%a in ("%API_DIR%\.env") do (
+    if "%%a"=="DB_HOST" set "DB_HOST=%%b"
+    if "%%a"=="DB_PORT" set "DB_PORT=%%b"
+    if "%%a"=="DB_NAME" set "DB_NAME=%%b"
+    if "%%a"=="DB_USER" set "DB_USER=%%b"
+    if "%%a"=="DB_PASSWORD" set "DB_PASSWORD=%%b"
+    if "%%a"=="DB_SSL" set "DB_SSL=%%b"
+  )
+)
+
+if not defined DB_HOST set "DB_HOST=localhost"
+if not defined DB_PORT set "DB_PORT=3306"
+if not defined DB_NAME set "DB_NAME=taskmanager"
+if not defined DB_USER set "DB_USER=taskmanager"
+if not defined DB_PASSWORD set "DB_PASSWORD="
+if not defined DB_SSL set "DB_SSL=false"
+
 set "UPLOAD_DIR=%API_DIR%\uploads"
 set "PREVIEW_CACHE_DIR=%API_DIR%\previews"
 set "CONTENT_DIR=%API_DIR%\content"
@@ -31,25 +51,14 @@ set "CORS_ORIGIN=http://localhost:5173"
 set "VITE_API_URL=http://localhost:3001/api"
 set "NODE_ENV=production"
 set "TASKMANAGER_TEST_MODE="
-set "AI_BASE_URL=http://127.0.0.1:11434/api"
-set "AI_DEFAULT_MODEL=llama3.2:1b"
-set "AI_TIMEOUT_MS=60000"
-set "AI_MAX_INPUT_CHARS=12000"
+set "AUTH_BYPASS_ADMIN=true"
 
 echo Starte Projekt Manager im lokalen Produktionsmodus.
 echo Projektordner: %APP_DIR%
-echo Geschützte Datenbank: %DATABASE_PATH%
+echo MySQL-Datenbank: %DB_HOST%:%DB_PORT%/%DB_NAME%
 echo Stoppe laufende Projekt Manager-Ports...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 3001,5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 3001,5173,3010 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"
 timeout /t 1 /nobreak > nul
-
-echo Bereite lokale KI vor...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%APP_DIR%\scripts\start-local-ai.ps1" -AppDir "%APP_DIR%" -EnsureModel -Model "%AI_DEFAULT_MODEL%"
-if errorlevel 1 (
-  echo Lokale KI konnte nicht vorbereitet werden.
-  pause
-  exit /b 1
-)
 
 echo Baue Production-Bundle...
 call npm run build
@@ -57,6 +66,13 @@ if errorlevel 1 (
   echo Build fehlgeschlagen.
   pause
   exit /b 1
+)
+
+REM SSH-Tunnel starten wenn DB_PORT auf einen Tunnel-Port zeigt (nicht Standard 3306)
+if not "%DB_PORT%"=="3306" (
+  echo Starte SSH-Tunnel auf Port %DB_PORT%...
+  start "" /B node scripts\mysql-tunnel.mjs
+  timeout /t 4 /nobreak > nul
 )
 
 echo Aktualisiere Datenbankschema ohne Datenlöschung...
@@ -71,8 +87,8 @@ echo Starte API und Web im selben Terminal...
 start "" /B powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 5; Start-Process 'http://localhost:5173'"
 
 echo Projekt Manager läuft unter http://localhost:5173
-echo Dieses Fenster offen lassen; Strg+C beendet API und Web.
-call npx concurrently --names API,WEB --prefix "[{name}]" --kill-others-on-fail "npm run start -w apps/api" "npm run preview -w apps/web -- --host 0.0.0.0 --port 5173"
+echo Dieses Fenster offen lassen; Strg+C beendet API, Web, MCP und Tunnel.
+call node apps\mcp-server\dist\start-project-manager.js --production
 
 echo Projekt Manager wurde beendet.
 pause

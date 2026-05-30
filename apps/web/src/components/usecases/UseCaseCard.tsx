@@ -1,7 +1,11 @@
 import type { UseCase } from "@taskmanager/shared-types";
-import { BookOpen, Edit3 } from "lucide-react";
+import { Edit3 } from "lucide-react";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { objectReference } from "../../lib/references";
+import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
-import { Button } from "../ui/Button";
+import { ActionMenu } from "../ui/ActionMenu";
+import { CardFooterBar } from "../ui/CardFooterBar";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
 import { StatusPill } from "../ui/StatusPill";
@@ -10,33 +14,30 @@ interface UseCaseCardProps {
   useCase: UseCase;
   variant?: "card" | "row";
   onOpen: (useCase: UseCase) => void;
+  onStatusChange?: (useCase: UseCase, status: UseCase["status"]) => void | Promise<unknown>;
 }
 
-const statusAccent: Record<string, string> = {
-  draft: "var(--color-mustard)",
-  active: "var(--color-fern)",
-  done: "var(--color-violet)",
-  archived: "var(--color-steel-400)"
-};
-
-export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardProps) {
+export function UseCaseCard({ useCase, variant = "card", onOpen, onStatusChange }: UseCaseCardProps) {
+  const catalogs = useCatalogs();
   const description = richTextToPlainText(useCase.description);
+  const statusColor = catalogColor(catalogs.entries, "featureStatus", useCase.status);
 
   if (variant === "row") {
     return (
       <>
         <div className="md:hidden">
-          <UseCaseCard useCase={useCase} onOpen={onOpen} />
+          <UseCaseCard useCase={useCase} onOpen={onOpen} onStatusChange={onStatusChange} />
         </div>
         <div className="hidden md:block">
           <ItemRow
-            accentColor={statusAccent[useCase.status] ?? "var(--color-steel-400)"}
-            statusIndicator={<UseCaseBadge useCase={useCase} />}
+            accentColor={statusColor}
+            objectReference={objectReference("useCase", useCase.id)}
             title={useCase.title}
             description={description}
-            pills={<StatusPill kind="featureStatus" value={useCase.status} />}
-            meta={<span className="font-mono text-xs font-semibold text-slate-500">/uc/{useCase.slug}</span>}
-            actions={<Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(useCase)} />}
+            pills={<StatusPill kind="featureStatus" value={useCase.status} onChange={onStatusChange ? (status) => onStatusChange(useCase, status) : undefined} />}
+            footer={<CardFooterBar tags={[]} attachmentCount={useCase.attachmentCount} noteCount={useCase.noteCount} commentCount={useCase.commentCount} bordered={false} />}
+            actions={<ActionMenu objectReference={objectReference("useCase", useCase.id)} items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(useCase) }]} />}
+            actionsIncludeObjectReference
             onOpen={() => onOpen(useCase)}
           />
         </div>
@@ -46,36 +47,26 @@ export function UseCaseCard({ useCase, variant = "card", onOpen }: UseCaseCardPr
 
   return (
     <ItemCard
-      accentColor={statusAccent[useCase.status] ?? "var(--color-steel-400)"}
+      accentColor={statusColor}
+      objectReference={objectReference("useCase", useCase.id)}
       header={
         <div className="grid gap-2">
-          <div className="flex items-start gap-3">
-            <UseCaseBadge useCase={useCase} />
-            <div className="min-w-0">
-              <h3 className="line-clamp-2 text-sm font-semibold text-ink">{useCase.title}</h3>
-              <p className="mt-1 truncate font-mono text-[11px] text-slate-500">/uc/{useCase.slug}</p>
-            </div>
-          </div>
-          <StatusPill kind="featureStatus" value={useCase.status} />
+          <h3 className="line-clamp-2 text-sm font-semibold text-ink">{useCase.title}</h3>
+          <StatusPill kind="featureStatus" value={useCase.status} onChange={onStatusChange ? (status) => onStatusChange(useCase, status) : undefined} />
         </div>
       }
-      body={description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null}
+      body={description ? <p className="line-clamp-3 text-xs text-steel-600">{description}</p> : null}
       footer={
-        <div className="flex items-center justify-between border-t border-line pt-2 text-[11px] font-semibold text-slate-500">
+        <div className="grid gap-3">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-steel-500">
           <span>Doppelklick zum Öffnen</span>
-          <span>#{useCase.sortOrder}</span>
+            <span>#{useCase.sortOrder}</span>
+          </div>
+          <CardFooterBar tags={[]} attachmentCount={useCase.attachmentCount} noteCount={useCase.noteCount} commentCount={useCase.commentCount} />
         </div>
       }
       onOpen={() => onOpen(useCase)}
       onEdit={() => onOpen(useCase)}
     />
-  );
-}
-
-function UseCaseBadge({ useCase }: { useCase: UseCase }) {
-  return (
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: statusAccent[useCase.status] ?? "var(--color-steel-400)" }}>
-      <BookOpen size={18} />
-    </span>
   );
 }

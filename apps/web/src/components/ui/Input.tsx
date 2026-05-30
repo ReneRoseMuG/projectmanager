@@ -5,7 +5,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   iconLeft?: ReactNode;
 }
 
-const baseClassName = "h-11 w-full rounded-lg border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10";
+const baseClassName = "h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10";
 
 /** Shared text input atom with optional monospace mode and leading icon. */
 export function Input({ variant = "default", iconLeft, className = "", ...props }: InputProps) {
@@ -17,7 +17,7 @@ export function Input({ variant = "default", iconLeft, className = "", ...props 
 
   return (
     <span className="relative block">
-      <span className="pointer-events-none absolute left-3 top-1/2 flex -translate-y-1/2 text-slate-400">{iconLeft}</span>
+      <span className="pointer-events-none absolute left-3 top-1/2 flex -translate-y-1/2 text-steel-400">{iconLeft}</span>
       <input className={inputClassName} {...props} />
     </span>
   );

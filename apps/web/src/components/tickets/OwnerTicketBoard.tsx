@@ -3,8 +3,10 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { TicketOwner } from "../../api/tickets";
 import { errorMessageAsync } from "../../hooks/errors";
+import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTickets } from "../../hooks/useTickets";
 import { useViewMode } from "../../hooks/useViewMode";
+import { resolveCatalogEntryKey } from "../../utils/catalogs";
 import { OwnerRelationBoard } from "../ui/OwnerRelationBoard";
 import { useToast } from "../ui/ToastProvider";
 import { TicketLinkDialog } from "./TicketLinkDialog";
@@ -19,12 +21,43 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
   const location = useLocation();
   const { showToast } = useToast();
   const ticketController = useTickets(owner);
-  const { viewMode, setViewMode } = useViewMode("kanban");
+  const catalogs = useCatalogs();
+  const { viewMode, setViewMode } = useViewMode("kanban", "ticketBoard.viewMode");
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const returnTo = `${location.pathname}${location.search}`;
 
-  const openTicketForm = (status: TicketStatus = "open") => {
-    navigate(`/tickets/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${status}&returnTo=${encodeURIComponent(returnTo)}`);
+  const defaultStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", "open", "open") ?? "open";
+
+  const openTicketForm = (status: TicketStatus = defaultStatus) => {
+    const resolvedStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", status, "open") ?? defaultStatus;
+    navigate(`/tickets/new?ownerType=${owner.type}&ownerId=${owner.id}&status=${resolvedStatus}&returnTo=${encodeURIComponent(returnTo)}`);
+  };
+
+  const updateTicketStatus = async (ticket: Ticket, status: TicketStatus) => {
+    try {
+      await ticketController.updateTicket(ticket.id, { status, expectedVersion: ticket.version });
+    } catch (ticketError) {
+      showToast({ tone: "error", title: "Ticketstatus konnte nicht geändert werden", message: await errorMessageAsync(ticketError) });
+      throw ticketError;
+    }
+  };
+
+  const updateTicketDueDate = async (ticket: Ticket, dueDate: string | null) => {
+    try {
+      await ticketController.updateTicket(ticket.id, { dueDate, expectedVersion: ticket.version });
+    } catch (ticketError) {
+      showToast({ tone: "error", title: "Ticketdatum konnte nicht geändert werden", message: await errorMessageAsync(ticketError) });
+      throw ticketError;
+    }
+  };
+
+  const updateTicketTags = async (ticketId: number, tagIds: number[]) => {
+    try {
+      await ticketController.updateTicketTags(ticketId, tagIds);
+    } catch (ticketError) {
+      showToast({ tone: "error", title: "Tickettags konnten nicht geÃ¤ndert werden", message: await errorMessageAsync(ticketError) });
+      throw ticketError;
+    }
   };
 
   return (
@@ -32,7 +65,7 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
       <OwnerRelationBoard<Ticket>
         items={ticketController.tickets}
         loading={ticketController.loading}
-        onCreateItem={(status) => openTicketForm(toTicketStatus(status))}
+        onCreateItem={(status) => openTicketForm(status ?? defaultStatus)}
         onLinkItem={() => setLinkDialogOpen(true)}
         onUnlinkItem={(ticket) => ticketController.unlinkTicket(ticket.id)}
         onOpenItem={(ticket) => navigate(`/tickets/${ticket.id}?returnTo=${encodeURIComponent(returnTo)}`)}
@@ -48,6 +81,9 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
             onAddStatus={(status) => props.onAddStatus?.(status)}
             onOpen={props.onOpen}
             onDelete={props.onDelete}
+            onStatusChange={updateTicketStatus}
+            onDueDateChange={updateTicketDueDate}
+            onTagsChange={updateTicketTags}
             linkAction={props.linkAction}
           />
         )}
@@ -55,6 +91,7 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
 
       <TicketLinkDialog
         open={linkDialogOpen}
+        owner={owner}
         currentTickets={ticketController.tickets}
         onLink={async (ticket) => {
           try {
@@ -69,11 +106,4 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
       />
     </>
   );
-}
-
-function toTicketStatus(status?: string): TicketStatus {
-  if (status === "in_progress" || status === "in_review" || status === "resolved" || status === "closed") {
-    return status;
-  }
-  return "open";
 }

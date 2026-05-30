@@ -1,4 +1,4 @@
-import type { Comment, CommentEntityType, CommentInput } from "@taskmanager/shared-types";
+import type { Comment, CommentEntityType, CommentInput, CommentUpdate } from "@taskmanager/shared-types";
 import { api } from "./client";
 
 const entityPaths: Record<CommentEntityType, string> = {
@@ -9,7 +9,8 @@ const entityPaths: Record<CommentEntityType, string> = {
   useCase: "use-cases",
   backlogItem: "backlog",
   wikiPage: "wiki",
-  ticket: "tickets"
+  ticket: "tickets",
+  dayPlan: "day-plans"
 };
 
 export async function createComment(taskId: number, input: CommentInput): Promise<Comment> {
@@ -18,6 +19,10 @@ export async function createComment(taskId: number, input: CommentInput): Promis
 
 export async function deleteComment(id: number): Promise<void> {
   await api.delete(`comments/${id}`).json();
+}
+
+export async function updateComment(id: number, input: CommentUpdate): Promise<Comment> {
+  return api.patch(`comments/${id}`, { json: input }).json<Comment>();
 }
 
 export async function getEntityComments(entityType: CommentEntityType, entityId: number): Promise<Comment[]> {

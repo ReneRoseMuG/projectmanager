@@ -1,25 +1,11 @@
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { migrate } from "drizzle-orm/mysql2/migrator";
 import { fileURLToPath } from "node:url";
-import { db, sqlite } from "./client.js";
+import { closeDatabase, db } from "./client.js";
 
 const migrationsFolder = fileURLToPath(new URL("./migrations", import.meta.url));
 
-interface ForeignKeyViolation {
-  table: string;
-  rowid: number;
-  parent: string;
-  fkid: number;
-}
-
 try {
-  sqlite.pragma("foreign_keys = OFF");
-  migrate(db, { migrationsFolder });
-  sqlite.pragma("foreign_keys = ON");
-
-  const violations = sqlite.pragma("foreign_key_check") as ForeignKeyViolation[];
-  if (violations.length > 0) {
-    throw new Error(`Foreign key check failed after migration: ${JSON.stringify(violations)}`);
-  }
+  await migrate(db, { migrationsFolder, migrationsTable: "__drizzle_migrations_taskmanager" });
 } finally {
-  sqlite.close();
+  await closeDatabase();
 }

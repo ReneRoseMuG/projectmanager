@@ -1,8 +1,9 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+﻿import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { CommentInput, NoteInput, TicketInput, TicketPositionInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
-import { TICKET_RELATION_TYPES, TICKET_RESOLUTIONS, TICKET_TYPES } from "../db/schema.js";
+import { TICKET_RELATION_TYPES, TICKET_RESOLUTIONS } from "../db/schema.js";
 import { createTicketAttachment, deleteAttachment, listTicketAttachments } from "../services/attachments.service.js";
 import { createEntityComment, deleteEntityComment, listEntityComments } from "../services/comments.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { createTicketNote, deleteTicketNote, listTicketNotes } from "../services/notes.service.js";
 import { setTicketTags } from "../services/tags.service.js";
 import {
@@ -12,9 +13,13 @@ import {
   createTicket,
   deleteTicket,
   getTicketDetail,
+  getTicketStats,
   linkOwnerTicket,
+  listRecentTickets,
+  listTicketLinkCandidates,
   listOwnerTickets,
   listProjectTickets,
+  listTicketRelationCandidates,
   listSubTickets,
   listTicketRelations,
   listTickets,
@@ -23,7 +28,7 @@ import {
   updateTicket,
   updateTicketPosition
 } from "../services/tickets.service.js";
-import type { TicketOwner } from "../services/tickets.service.js";
+import type { DashboardTicketOwner, TicketOwner } from "../services/tickets.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, projectIdParamSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
 
@@ -43,12 +48,12 @@ const ticketBodySchema = {
   additionalProperties: false,
   properties: {
     title: { type: "string", minLength: 1 },
-    type: { type: "string", enum: TICKET_TYPES },
+    type: { type: "string", minLength: 1 },
     description: { type: ["string", "null"] },
     status: { type: "string", minLength: 1 },
     priority: { type: "string", minLength: 1 },
-    reporter: { type: ["string", "null"] },
-    assignee: { type: ["string", "null"] },
+    reporterUserId: { type: ["integer", "null"], minimum: 1 },
+    responsibleUserId: { type: ["integer", "null"], minimum: 1 },
     environment: { type: ["string", "null"] },
     affectedVersion: { type: ["string", "null"] },
     dueDate: { type: ["string", "null"] }
@@ -124,6 +129,46 @@ const ownerTicketParamSchema = {
   }
 } as const;
 
+const ticketLinkBodySchema = {
+  type: "object",
+  required: ["ticketId"],
+  additionalProperties: false,
+  properties: {
+    ticketId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+const ticketLinkCandidatesQuerySchema = {
+  type: "object",
+  required: ["ownerType", "ownerId"],
+  additionalProperties: false,
+  properties: {
+    ownerType: { type: "string", enum: ["project", "milestone", "task", "feature", "useCase", "wikiPage"] },
+    ownerId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+const dashboardTicketQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    ownerType: { type: "string", enum: ["project", "milestone"] },
+    ownerId: { type: "integer", minimum: 1 },
+    limit: { type: "integer", minimum: 1, maximum: 50 },
+    sort: { type: "string", enum: ["createdAt", "updatedAt"] }
+  }
+} as const;
+
+function ticketOwnerFromQuery(query: { ownerType?: DashboardTicketOwner["type"]; ownerId?: number }): DashboardTicketOwner | undefined {
+  if (query.ownerType === undefined && query.ownerId === undefined) {
+    return undefined;
+  }
+  if (query.ownerType === undefined || query.ownerId === undefined) {
+    throw badRequest("ownerType and ownerId must be provided together");
+  }
+  return { type: query.ownerType, id: query.ownerId };
+}
+
 const uploadBodySchema = {
   consumes: ["multipart/form-data"],
   body: {
@@ -152,10 +197,22 @@ async function readUpload(request: FastifyRequest) {
 export async function registerTicketsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/tickets", { schema: { response: { 200: arrayResponseSchema } } }, async () => listTickets(app.db));
 
+  app.get<{ Querystring: { ownerType?: DashboardTicketOwner["type"]; ownerId?: number } }>(
+    "/tickets/stats",
+    { schema: { querystring: dashboardTicketQuerySchema, response: { 200: objectResponseSchema } } },
+    async (request) => getTicketStats(app.db, ticketOwnerFromQuery(request.query))
+  );
+
+  app.get<{ Querystring: { ownerType?: DashboardTicketOwner["type"]; ownerId?: number; limit?: number; sort?: "createdAt" | "updatedAt" } }>(
+    "/tickets/recent",
+    { schema: { querystring: dashboardTicketQuerySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listRecentTickets(app.db, { owner: ticketOwnerFromQuery(request.query), limit: request.query.limit, sort: request.query.sort })
+  );
+
   app.post<{ Body: TicketInput }>(
     "/tickets",
     { schema: { body: ticketBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createTicket(app.db, request.body))
+    async (request, reply) => reply.status(201).send(await createTicket(app.db, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { projectId: number } }>(
@@ -167,7 +224,8 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: { projectId: number }; Body: TicketInput }>(
     "/projects/:projectId/tickets",
     { schema: { params: projectIdParamSchema, body: ticketBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createOwnerTicket(app.db, { type: "project", id: request.params.projectId }, request.body))
+    async (request, reply) =>
+      reply.status(201).send(await createOwnerTicket(app.db, { type: "project", id: request.params.projectId }, request.body, createJournalActor(request.currentUser)))
   );
 
   const ownerRoutes: Array<{ path: string; ownerType: TicketOwner["type"] }> = [
@@ -188,7 +246,8 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     app.post<{ Params: { id: number }; Body: TicketInput }>(
       route.path,
       { schema: { params: idParamSchema, body: ticketBodySchema, response: { 201: objectResponseSchema } } },
-      async (request, reply) => reply.status(201).send(createOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.body))
+      async (request, reply) =>
+        reply.status(201).send(await createOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.body, createJournalActor(request.currentUser)))
     );
   }
 
@@ -196,18 +255,56 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     app.post<{ Params: { id: number; ticketId: number } }>(
       `${route.path}/:ticketId`,
       { schema: { params: ownerTicketParamSchema, response: { 200: objectResponseSchema } } },
-      async (request) => linkOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.params.ticketId)
+      async (request) => linkOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.params.ticketId, createJournalActor(request.currentUser))
     );
 
     app.delete<{ Params: { id: number; ticketId: number } }>(
       `${route.path}/:ticketId`,
       { schema: { params: ownerTicketParamSchema, response: { 204: { type: "null" } } } },
       async (request, reply) => {
-        unlinkOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.params.ticketId);
+        await unlinkOwnerTicket(app.db, { type: route.ownerType, id: request.params.id }, request.params.ticketId, createJournalActor(request.currentUser));
         return reply.status(204).send();
       }
     );
   }
+
+  for (const basePath of ["/wiki", "/wiki-pages"]) {
+    app.get<{ Params: { id: number } }>(
+      `${basePath}/:id/tickets`,
+      { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+      async (request) => listOwnerTickets(app.db, { type: "wikiPage", id: request.params.id })
+    );
+
+    app.post<{ Params: { id: number }; Body: { ticketId: number } }>(
+      `${basePath}/:id/tickets`,
+      { schema: { params: idParamSchema, body: ticketLinkBodySchema, response: { 201: objectResponseSchema } } },
+      async (request, reply) => {
+        const ticket = await linkOwnerTicket(
+          app.db,
+          { type: "wikiPage", id: request.params.id },
+          request.body.ticketId,
+          createJournalActor(request.currentUser),
+          { conflictOnExisting: true }
+        );
+        return reply.status(201).send(ticket);
+      }
+    );
+
+    app.delete<{ Params: { id: number; ticketId: number } }>(
+      `${basePath}/:id/tickets/:ticketId`,
+      { schema: { params: ownerTicketParamSchema, response: { 204: { type: "null" } } } },
+      async (request, reply) => {
+        await unlinkOwnerTicket(app.db, { type: "wikiPage", id: request.params.id }, request.params.ticketId, createJournalActor(request.currentUser));
+        return reply.status(204).send();
+      }
+    );
+  }
+
+  app.get<{ Querystring: { ownerType: TicketOwner["type"]; ownerId: number } }>(
+    "/tickets/link-candidates",
+    { schema: { querystring: ticketLinkCandidatesQuerySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listTicketLinkCandidates(app.db, { type: request.query.ownerType, id: request.query.ownerId })
+  );
 
   app.get<{ Params: { id: number } }>(
     "/tickets/:id",
@@ -218,20 +315,20 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.patch<{ Params: { id: number }; Body: TicketUpdate }>(
     "/tickets/:id",
     { schema: { params: idParamSchema, body: ticketPatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateTicket(app.db, request.params.id, request.body)
+    async (request) => updateTicket(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.patch<{ Params: { id: number }; Body: TicketPositionInput }>(
     "/tickets/:id/position",
     { schema: { params: idParamSchema, body: ticketPositionSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateTicketPosition(app.db, request.params.id, request.body)
+    async (request) => updateTicketPosition(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number } }>(
     "/tickets/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      await deleteTicket(app.db, request.params.id);
+      await deleteTicket(app.db, request.params.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -245,7 +342,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: { id: number }; Body: TicketInput }>(
     "/tickets/:id/sub-tickets",
     { schema: { params: idParamSchema, body: ticketBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createSubTicket(app.db, request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(await createSubTicket(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -254,11 +351,17 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     async (request) => listTicketRelations(app.db, request.params.id)
   );
 
+  app.get<{ Params: { id: number } }>(
+    "/tickets/:id/relation-candidates",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listTicketRelationCandidates(app.db, request.params.id)
+  );
+
   app.post<{ Params: { id: number }; Body: TicketRelationInput }>(
     "/tickets/:id/relations",
     { schema: { params: idParamSchema, body: ticketRelationSchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      addTicketRelation(app.db, request.params.id, request.body);
+      await addTicketRelation(app.db, request.params.id, request.body, createJournalActor(request.currentUser));
       return reply.status(201).send({ ok: true });
     }
   );
@@ -267,7 +370,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     "/tickets/:id/relations",
     { schema: { params: idParamSchema, body: ticketRelationSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      removeTicketRelation(app.db, request.params.id, request.body.targetTicketId, request.body.relationType);
+      await removeTicketRelation(app.db, request.params.id, request.body.targetTicketId, request.body.relationType, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -275,7 +378,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.put<{ Params: { id: number }; Body: { tagIds: number[] } }>(
     "/tickets/:id/tags",
     { schema: { params: idParamSchema, body: tagIdsBodySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => setTicketTags(app.db, request.params.id, request.body.tagIds)
+    async (request) => setTicketTags(app.db, request.params.id, request.body.tagIds, createJournalActor(request.currentUser))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -287,14 +390,14 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/tickets/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createTicketNote(app.db, request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(await createTicketNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.delete<{ Params: { id: number; childId: number } }>(
     "/tickets/:id/notes/:childId",
     { schema: { params: idAndChildIdParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteTicketNote(app.db, request.params.id, request.params.childId);
+      await deleteTicketNote(app.db, request.params.id, request.params.childId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -308,14 +411,14 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: { id: number }; Body: CommentInput }>(
     "/tickets/:id/comments",
     { schema: { params: idParamSchema, body: commentBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createEntityComment(app.db, "ticket", request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(await createEntityComment(app.db, "ticket", request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.delete<{ Params: { id: number; childId: number } }>(
     "/tickets/:id/comments/:childId",
     { schema: { params: idAndChildIdParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteEntityComment(app.db, "ticket", request.params.id, request.params.childId);
+      await deleteEntityComment(app.db, "ticket", request.params.id, request.params.childId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );
@@ -330,7 +433,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     "/tickets/:id/attachments",
     { schema: { params: idParamSchema, ...uploadBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const attachment = await createTicketAttachment(app.db, request.params.id, await readUpload(request));
+      const attachment = await createTicketAttachment(app.db, request.params.id, await readUpload(request), createJournalActor(request.currentUser));
       return reply.status(201).send(attachment);
     }
   );
@@ -339,7 +442,7 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     "/tickets/:id/attachments/:childId",
     { schema: { params: idAndChildIdParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      await deleteAttachment(app.db, request.params.childId);
+      await deleteAttachment(app.db, request.params.childId, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

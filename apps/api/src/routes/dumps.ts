@@ -1,7 +1,14 @@
-import type { DumpDriveApplyRequest, DumpDriveConfigUpdateRequest } from "@taskmanager/shared-types";
+import type { BackupProgressEvent, DumpBackupApplyRequest, DumpRemoteBackupApplyRequest, DumpRemoteBackupPreviewRequest } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
-import { getDriveBackupConfig, updateDriveBackupConfig } from "../services/drive-config.service.js";
-import { applyDriveDump, previewLatestDriveDump, saveDumpToDrive } from "../services/dump.service.js";
+import {
+  applyLocalDump,
+  applyRemoteDump,
+  getLocalBackupStatus,
+  getRemoteBackupStatus,
+  previewLatestLocalDump,
+  previewRemoteDump,
+  saveDumpToLocalBackup
+} from "../services/dump.service.js";
 import { objectResponseSchema } from "../utils/route-schemas.js";
 
 const applyBodySchema = {
@@ -15,43 +22,76 @@ const applyBodySchema = {
   }
 } as const;
 
-const driveConfigBodySchema = {
+const remotePreviewBodySchema = {
   type: "object",
-  required: ["folderInput"],
   additionalProperties: false,
   properties: {
-    folderInput: { type: "string", minLength: 1 }
+    fileId: { type: "string", minLength: 1 }
   }
 } as const;
 
+const remoteApplyBodySchema = {
+  type: "object",
+  required: ["fileId", "fileHash", "previewToken", "confirmed"],
+  additionalProperties: false,
+  properties: {
+    fileId: { type: "string", minLength: 1 },
+    fileHash: { type: "string", minLength: 1 },
+    previewToken: { type: "string", minLength: 1 },
+    confirmed: { type: "boolean", const: true }
+  }
+} as const;
+
+function backupProgressPublisher(app: FastifyInstance): (event: BackupProgressEvent) => void {
+  return (event) => {
+    try {
+      app.realtimeBus.publish(event);
+    } catch {
+      // Progress publishing must not interrupt backup or import requests.
+    }
+  };
+}
+
 export async function registerDumpRoutes(app: FastifyInstance): Promise<void> {
   app.get(
-    "/dumps/drive/config",
+    "/dumps/local/status",
     { schema: { response: { 200: objectResponseSchema } } },
-    async () => getDriveBackupConfig(app.db)
-  );
-
-  app.put<{ Body: DumpDriveConfigUpdateRequest }>(
-    "/dumps/drive/config",
-    { schema: { body: driveConfigBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateDriveBackupConfig(app.db, request.body)
+    async () => getLocalBackupStatus()
   );
 
   app.post(
-    "/dumps/drive/save",
+    "/dumps/local/save",
     { schema: { response: { 200: objectResponseSchema } } },
-    async () => saveDumpToDrive(app.sqlite, app.driveClient)
+    async () => saveDumpToLocalBackup({ progressCallback: backupProgressPublisher(app) })
   );
 
-  app.post(
-    "/dumps/drive/latest/preview",
+  app.get(
+    "/dumps/local/latest/preview",
     { schema: { response: { 200: objectResponseSchema } } },
-    async () => previewLatestDriveDump(app.driveClient)
+    async () => previewLatestLocalDump()
   );
 
-  app.post<{ Body: DumpDriveApplyRequest }>(
-    "/dumps/drive/latest/apply",
+  app.post<{ Body: DumpBackupApplyRequest }>(
+    "/dumps/local/latest/apply",
     { schema: { body: applyBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => applyDriveDump(app.sqlite, app.driveClient, request.body)
+    async (request) => applyLocalDump(request.body, { progressCallback: backupProgressPublisher(app) })
+  );
+
+  app.get(
+    "/dumps/remote/status",
+    { schema: { response: { 200: objectResponseSchema } } },
+    async () => getRemoteBackupStatus()
+  );
+
+  app.post<{ Body: DumpRemoteBackupPreviewRequest }>(
+    "/dumps/remote/preview",
+    { config: { auth: { resource: "dumps", action: "read" } }, schema: { body: remotePreviewBodySchema, response: { 200: objectResponseSchema } } },
+    async (request) => previewRemoteDump(request.body)
+  );
+
+  app.post<{ Body: DumpRemoteBackupApplyRequest }>(
+    "/dumps/remote/apply",
+    { schema: { body: remoteApplyBodySchema, response: { 200: objectResponseSchema } } },
+    async (request) => applyRemoteDump(request.body, { progressCallback: backupProgressPublisher(app) })
   );
 }

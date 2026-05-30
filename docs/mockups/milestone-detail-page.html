@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup – Milestone Detail Page</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/tabler-icons.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --color-bg: #f5f4f0;
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f1efe8;
+  --color-border: rgba(0,0,0,0.12);
+  --color-border-secondary: rgba(0,0,0,0.2);
+  --color-text-primary: #1a1a18;
+  --color-text-secondary: #5f5e5a;
+  --color-text-tertiary: #888780;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1e1e1c;
+    --color-surface: #2a2a28;
+    --color-surface-secondary: #333330;
+    --color-border: rgba(255,255,255,0.1);
+    --color-border-secondary: rgba(255,255,255,0.2);
+    --color-text-primary: #f0ede6;
+    --color-text-secondary: #b4b2a9;
+    --color-text-tertiary: #888780;
+  }
+}
+body { font-family: var(--font); font-size: 14px; background: var(--color-bg); color: var(--color-text-primary); padding: 24px; min-height: 100vh; }
+.meta { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 20px; padding: 8px 12px; background: var(--color-surface); border: 0.5px solid var(--color-border); border-radius: var(--radius-md); display: flex; gap: 16px; flex-wrap: wrap; }
+.meta strong { color: var(--color-text-secondary); }
+.page { max-width: 900px; margin: 0 auto; }
+.header { background: var(--color-surface); border: 0.5px solid var(--color-border); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 8px; }
+.breadcrumb { font-size: 12px; color: var(--color-text-tertiary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.header-left { display: flex; align-items: center; gap: 10px; }
+.icon-box { width: 32px; height: 32px; border-radius: var(--radius-md); background: var(--color-surface-secondary); border: 0.5px solid var(--color-border); display: flex; align-items: center; justify-content: center; color: #0F6E56; }
+.page-title { font-size: 16px; font-weight: 500; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.btn-ghost { font-size: 13px; padding: 5px 12px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--radius-md); background: transparent; color: var(--color-text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: var(--font); }
+.btn-ghost:hover { background: var(--color-surface-secondary); }
+.btn-danger { font-size: 13px; padding: 5px 12px; border: 0.5px solid #F7C1C1; border-radius: var(--radius-md); background: transparent; color: #A32D2D; cursor: pointer; display: flex; align-items: center; gap: 6px; font-family: var(--font); }
+.btn-danger:hover { background: #FCEBEB; }
+.btn-primary { font-size: 13px; padding: 5px 14px; border: none; border-radius: var(--radius-md); background: #0F6E56; color: #fff; cursor: pointer; font-family: var(--font); }
+.btn-primary:hover { background: #085041; }
+.pill { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 999px; border: 0.5px solid; }
+.pill-teal  { background: #E1F5EE; color: #0F6E56; border-color: #9FE1CB; }
+.pill-green { background: #EAF3DE; color: #3B6D11; border-color: #C0DD97; }
+.pill-red   { background: #FCEBEB; color: #A32D2D; border-color: #F7C1C1; }
+.pill-blue  { background: #E6F1FB; color: #185FA5; border-color: #B5D4F4; }
+.pill-amber { background: #FAEEDA; color: #854F0B; border-color: #FAC775; }
+.pill-violet{ background: #EEEDFE; color: #534AB7; border-color: #CECBF6; }
+.pill-gray  { background: #F1EFE8; color: #5F5E5A; border-color: #D3D1C7; }
+.tabbar-wrap { background: var(--color-surface); border: 0.5px solid var(--color-border); border-radius: var(--radius-lg) var(--radius-lg) 0 0; border-bottom: none; overflow: hidden; }
+.tabbar { display: flex; border-bottom: 0.5px solid var(--color-border); padding: 0 2px; overflow-x: auto; }
+.tabbar::-webkit-scrollbar { display: none; }
+.tab { padding: 9px 14px; font-size: 13px; color: var(--color-text-secondary); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; user-select: none; }
+.tab.active { color: var(--color-text-primary); border-bottom: 2px solid #0F6E56; font-weight: 500; }
+.tab:hover:not(.active) { color: var(--color-text-primary); }
+.badge { display: inline-block; background: var(--color-surface-secondary); border: 0.5px solid var(--color-border); font-size: 10px; padding: 1px 6px; border-radius: 999px; margin-left: 4px; color: var(--color-text-secondary); }
+.content { background: var(--color-surface); border: 0.5px solid var(--color-border); border-radius: 0 0 var(--radius-lg) var(--radius-lg); border-top: none; padding: 20px; }
+.footer { background: var(--color-surface); border: 0.5px solid var(--color-border); border-top: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+.section { margin-bottom: 20px; }
+.section-title { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 0.5px solid var(--color-border); display: flex; align-items: center; gap: 6px; }
+.form-row { display: grid; gap: 12px; margin-bottom: 12px; }
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.form-row-2-asym { display: grid; grid-template-columns: 1fr 220px; gap: 12px; margin-bottom: 12px; }
+.field label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 4px; display: block; }
+.req { color: #E24B4A; }
+.mock-input { background: var(--color-surface-secondary); border: 0.5px solid var(--color-border); border-radius: var(--radius-md); padding: 8px 10px; font-size: 13px; color: var(--color-text-primary); min-height: 34px; width: 100%; display: flex; align-items: center; gap: 8px; }
+.mock-select { background: var(--color-surface-secondary); border: 0.5px solid var(--color-border); border-radius: var(--radius-md); padding: 8px 10px; font-size: 13px; color: var(--color-text-primary); width: 100%; display: flex; align-items: center; justify-content: space-between; }
+.mock-textarea { min-height: 90px; align-items: flex-start; padding-top: 8px; }
+.status-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
+.status-btn { font-size: 12px; padding: 4px 12px; border-radius: 999px; border: 0.5px solid; cursor: pointer; }
+.s-active  { background: #E1F5EE; color: #0F6E56; border-color: #9FE1CB; font-weight: 500; }
+.s-done    { background: #EAF3DE; color: #3B6D11; border-color: #C0DD97; }
+.s-blocked { background: #FCEBEB; color: #A32D2D; border-color: #F7C1C1; }
+.color-dot { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tag { font-size: 11px; padding: 3px 10px; border-radius: 999px; background: var(--color-surface-secondary); border: 0.5px solid var(--color-border); color: var(--color-text-secondary); }
+.tag-add { font-size: 11px; padding: 3px 10px; border-radius: 999px; border: 0.5px dashed var(--color-border-secondary); color: var(--color-text-tertiary); background: transparent; cursor: pointer; display: flex; align-items: center; gap: 4px; font-family: var(--font); }
+.list-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--color-surface-secondary); border-radius: var(--radius-md); border: 0.5px solid var(--color-border); }
+.list-item-accent { border-left: 3px solid #1D9E75; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; flex-shrink: 0; }
+.comment-bubble { flex: 1; background: var(--color-surface-secondary); border: 0.5px solid var(--color-border); border-radius: var(--radius-md); padding: 8px 10px; }
+.comment-meta { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 4px; }
+.comment-body { font-size: 13px; }
+.journal-row { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; }
+.journal-time { color: var(--color-text-tertiary); min-width: 130px; }
+.upload-zone { border: 1.5px dashed var(--color-border-secondary); border-radius: var(--radius-md); padding: 20px; text-align: center; color: var(--color-text-tertiary); font-size: 13px; cursor: pointer; }
+.event-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--color-surface-secondary); border-radius: var(--radius-md); border: 0.5px solid var(--color-border); border-left: 3px solid #1D9E75; }
+.progress-bar { height: 6px; background: var(--color-surface-secondary); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 3px; background: #1D9E75; }
+.tabcontent { display: none; }
+.tabcontent.active { display: block; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="meta">
+    <span><strong>Mockup:</strong> Milestone Detail Page</span>
+    <span><strong>Stand:</strong> 2026-05-23</span>
+    <span><strong>Quelle:</strong> MilestoneDetailPage.tsx · MilestoneForm.tsx · useMilestones.ts</span>
+  </div>
+
+  <div class="header">
+    <div class="breadcrumb">
+      <i class="ti ti-flag" aria-hidden="true"></i>
+      Meilensteine
+      <i class="ti ti-chevron-right" aria-hidden="true" style="font-size:10px"></i>
+      v2.0 – Neues Auth-System
+    </div>
+    <div class="header-row">
+      <div class="header-left">
+        <div class="icon-box"><i class="ti ti-flag" aria-hidden="true" style="font-size:17px"></i></div>
+        <span class="page-title">Meilenstein bearbeiten</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="pill pill-teal">Aktiv</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn-ghost"><i class="ti ti-external-link" aria-hidden="true" style="font-size:14px"></i>Tab öffnen</button>
+        <button class="btn-ghost"><i class="ti ti-x" aria-hidden="true" style="font-size:14px"></i>Schließen</button>
+        <button class="btn-primary">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabbar-wrap">
+    <div class="tabbar" id="tabbar">
+      <div class="tab" data-tab="overview">Übersicht</div>
+      <div class="tab active" data-tab="details">Stammdaten</div>
+      <div class="tab" data-tab="features">Features <span class="badge">3</span></div>
+      <div class="tab" data-tab="tasks">Aufgaben <span class="badge">5</span></div>
+      <div class="tab" data-tab="tickets">Tickets <span class="badge">2</span></div>
+      <div class="tab" data-tab="comments">Kommentare <span class="badge">4</span></div>
+      <div class="tab" data-tab="notes">Notizen <span class="badge">1</span></div>
+      <div class="tab" data-tab="attachments">Dateien <span class="badge">2</span></div>
+      <div class="tab" data-tab="events">Events <span class="badge">1</span></div>
+      <div class="tab" data-tab="journal">Journal</div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="tabcontent" id="tab-overview">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+        <div style="background:var(--color-surface-secondary);border-radius:var(--radius-md);padding:14px;border:0.5px solid var(--color-border)">
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">Features</div>
+          <div style="font-size:22px;font-weight:500">3 <span style="font-size:13px;color:var(--color-text-secondary)">/ 5</span></div>
+          <div class="progress-bar" style="margin-top:8px"><div class="progress-fill" style="width:60%"></div></div>
+        </div>
+        <div style="background:var(--color-surface-secondary);border-radius:var(--radius-md);padding:14px;border:0.5px solid var(--color-border)">
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">Aufgaben</div>
+          <div style="font-size:22px;font-weight:500">5 <span style="font-size:13px;color:var(--color-text-secondary)">offen</span></div>
+          <div class="progress-bar" style="margin-top:8px"><div class="progress-fill" style="width:40%"></div></div>
+        </div>
+        <div style="background:var(--color-surface-secondary);border-radius:var(--radius-md);padding:14px;border:0.5px solid var(--color-border)">
+          <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">Tickets</div>
+          <div style="font-size:22px;font-weight:500">2 <span style="font-size:13px;color:var(--color-text-secondary)">offen</span></div>
+          <div class="progress-bar" style="margin-top:8px"><div class="progress-fill" style="width:75%"></div></div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--color-text-tertiary);text-align:center">Dashboard-Ansicht wird aus Subtask- und Ticketdaten berechnet</div>
+    </div>
+
+    <div class="tabcontent active" id="tab-details">
+      <div class="section">
+        <div class="section-title">Stammdaten</div>
+        <div class="form-row-2-asym">
+          <div class="field">
+            <label>Name <span class="req">*</span></label>
+            <div class="mock-input">v2.0 – Neues Auth-System</div>
+          </div>
+          <div class="field">
+            <label>Projekt <span class="req">*</span></label>
+            <div class="mock-select">
+              <span>MuGPlan Core</span>
+              <i class="ti ti-chevron-down" aria-hidden="true" style="color:var(--color-text-tertiary)"></i>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Beschreibung</label>
+            <div class="mock-input mock-textarea" style="color:var(--color-text-secondary);font-size:12px">Vollständige Umstellung auf OAuth 2.0 mit PKCE-Flow. Betrifft Login, Session-Management und API-Authentifizierung…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Status</div>
+        <div class="field">
+          <label>Status</label>
+          <div class="status-toggle">
+            <span class="status-btn s-active">Aktiv</span>
+            <span class="status-btn s-done">Abgeschlossen</span>
+            <span class="status-btn s-blocked">Blockiert</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Zeitraum</div>
+        <div class="form-row-2">
+          <div class="field">
+            <label>Start</label>
+            <div class="mock-input">
+              <i class="ti ti-calendar" aria-hidden="true" style="color:var(--color-text-secondary)"></i>
+              <span>2026-05-01</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>Fällig</label>
+            <div class="mock-input">
+              <i class="ti ti-calendar" aria-hidden="true" style="color:var(--color-text-secondary)"></i>
+              <span>2026-07-31</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" style="margin-bottom:0">
+        <div class="section-title">Tags</div>
+        <div class="tag-list">
+          <span class="tag">Auth</span>
+          <span class="tag">Q3-2026</span>
+          <span class="tag">Backend</span>
+          <button class="tag-add"><i class="ti ti-plus" aria-hidden="true"></i> Tag hinzufügen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabcontent" id="tab-features">
+      <div class="section" style="margin-bottom:0">
+        <div class="section-title">Features</div>
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;flex-wrap:wrap">
+          <div class="field" style="flex:1;min-width:200px">
+            <label>Feature verknüpfen</label>
+            <div class="mock-select">
+              <span style="color:var(--color-text-tertiary)">Feature auswählen</span>
+              <i class="ti ti-chevron-down" aria-hidden="true" style="color:var(--color-text-tertiary)"></i>
+            </div>
+          </div>
+          <button class="btn-primary" style="background:#0F6E56">Verknüpfen</button>
+          <button class="btn-ghost">Neues Feature</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="list-item list-item-accent">
+            <i class="ti ti-folder-kanban" aria-hidden="true" style="color:#0F6E56;font-size:16px"></i>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500">FT-04 Login & Authentifizierung</div>
+              <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px">3 Use Cases</div>
+            </div>
+            <span class="pill pill-teal" style="font-size:10px">In Bearbeitung</span>
+            <i class="ti ti-pencil" aria-hidden="true" style="color:var(--color-text-tertiary);font-size:15px;cursor:pointer"></i>
+            <i class="ti ti-unlink" aria-hidden="true" style="color:var(--color-text-tertiary);font-size:15px;cursor:pointer"></i>
+          </div>
+          <div class="list-item list-item-accent">
+            <i class="ti ti-folder-kanban" aria-hidden="true" style="color:#0F6E56;font-size:16px"></i>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500">FT-07 Session-Management</div>
+              <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px">2 Use Cases</div>
+            </div>
+            <span class="pill pill-teal" style="font-size:10px">In Bearbeitung</span>
+            <i class="ti ti-pencil" aria-hidden="true" style="color:var(--color-text-tertiary);font-size:15px;cursor:pointer"></i>
+            <i class="ti ti-unlink" aria-hidden="true" style="color:var(--color-text-tertiary);font-size:15px;cursor:pointer"></i>
+          </div>
+          <div class="list-item list-item-accent">
+            <i class="ti ti-folder-kanban" aria-hidden="true" style="color:#0F6E56;font-size:16px"></i>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500">FT-12 API-Token Verwaltung</div>
+              <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px">1 Use Case</div>
+            </div>
+            <span class="pill pill-green" style="font-size:10px">Abgeschlossen</span>
+            <i class="ti ti-pencil" aria-hidden="true" style="color:var(--color-text-tertiary);font-size:15px;cursor:pointer"></i>
+            <i class="ti ti-unlink" aria-hidden="true" style="color:var(--color-text-tertiary);font-size:15px;cursor:pointer"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabcontent" id="tab-tasks">
+      <div class="section" style="margin-bottom:0">
+        <div class="section-title">Aufgaben</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="list-item">
+            <i class="ti ti-circle" aria-hidden="true" style="color:#185FA5;font-size:15px"></i>
+            <span style="flex:1;font-size:13px">OAuth-Provider konfigurieren</span>
+            <span class="pill pill-blue" style="font-size:10px">Aktiv</span>
+          </div>
+          <div class="list-item">
+            <i class="ti ti-circle" aria-hidden="true" style="color:#185FA5;font-size:15px"></i>
+            <span style="flex:1;font-size:13px">Refresh-Token-Rotation implementieren</span>
+            <span class="pill pill-blue" style="font-size:10px">Aktiv</span>
+          </div>
+          <div class="list-item">
+            <i class="ti ti-circle-check" aria-hidden="true" style="color:#3B6D11;font-size:15px"></i>
+            <span style="flex:1;font-size:13px;color:var(--color-text-secondary)">Keycloak-Integration testen</span>
+            <span class="pill pill-green" style="font-size:10px">Fertig</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabcontent" id="tab-tickets">
+      <div class="section" style="margin-bottom:0">
+        <div class="section-title">Tickets</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="list-item">
+            <i class="ti ti-bug" aria-hidden="true" style="color:#A32D2D;font-size:16px"></i>
+            <span style="flex:1;font-size:13px">Logout schlägt fehl bei abgelaufenem Token</span>
+            <span class="pill pill-red" style="font-size:10px">Bug · Offen</span>
+          </div>
+          <div class="list-item">
+            <i class="ti ti-bug" aria-hidden="true" style="color:#A32D2D;font-size:16px"></i>
+            <span style="flex:1;font-size:13px">PKCE code_verifier wird nicht gespeichert</span>
+            <span class="pill pill-red" style="font-size:10px">Bug · Offen</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabcontent" id="tab-comments">
+      <div class="section" style="margin-bottom:0">
+        <div class="section-title">Kommentare</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:10px">
+            <div class="avatar" style="background:#9FE1CB;color:#085041">RS</div>
+            <div class="comment-bubble">
+              <div class="comment-meta">Rene · vor 1 Tag</div>
+              <div class="comment-body">Keycloak läuft auf Port 8081 in der Dev-Umgebung, nicht 8080.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px">
+            <div class="avatar" style="background:#C0DD97;color:#27500A">MK</div>
+            <div class="comment-bubble">
+              <div class="comment-meta">Max · vor 3 Tagen</div>
+              <div class="comment-body">Prod-Deployment ist für KW 28 geplant – rechtzeitig QA einplanen.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <div class="avatar" style="background:#9FE1CB;color:#085041">RS</div>
+            <div class="mock-input" style="flex:1;color:var(--color-text-tertiary);font-size:12px">Kommentar zum Meilenstein hinzufügen…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabcontent" id="tab-notes">
+      <div class="section" style="margin-bottom:0">
+        <div class="section-title"><i class="ti ti-sticky-note" aria-hidden="true" style="color:#3B6D11"></i> Notizen</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="list-item">
+            <i class="ti ti-file-text" aria-hidden="true" style="color:var(--color-text-secondary)"></i>
+            <span style="flex:1;font-size:13px">Risikobewertung OAuth-Migration</span>
+            <span style="font-size:11px;color:var(--color-text-tertiary)">vor 2 Tagen</span>
+          </div>
+          <button class="btn-ghost" style="align-self:flex-start"><i class="ti ti-plus" aria-hidden="true"></i> Notiz erstellen</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabcontent" id="tab-attachments">
+      <div class="section" style="margin-bottom:0">
+        <div class="section-title"><i class="ti ti-paperclip" aria-hidden="true" style="color:#3B6D11"></i> Dateien</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+          <div class="list-item">
+            <i class="ti ti-file-description" aria-hidden="true" style="color:#185FA5"></i>
+            <span style="flex:1;font-size:13px">auth-konzept-v2.pdf</span>
+            <span style="font-size:11px;color:var(--color-text-tertiary)">142 KB</span>
+          </div>
+          <div class="list-item">
+            <i class="ti ti-file-description" aria-hidden="true" style="color:#185FA5"></i>
+            <span style="flex:1;font-size:13px">keycloak-setup.md</span>
+            <span style="font-size:11px;color:var(--color-text-tertiary)">8 KB</span>
+          </div>
+        </div>
+        <div class="upload-zone"><i class="ti ti-upload" aria-hidden="true" style="font-size:20px;display:block;margin-bottom:6px"></i>Weitere Dateien hinzufügen</div>
+      </div>
+    </div>
+
+    <div class="tabcontent" id="tab-events">
+      <div class="section" style="margin-bottom:0">
+        <div class="section-title">Events</div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+          <button class="btn-primary" style="background:#0F6E56;display:flex;align-items:center;gap:6px"><i class="ti ti-calendar-clock" aria-hidden="true"></i> Neuer Termin</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="event-item">
+            <i class="ti ti-calendar-event" aria-hidden="true" style="color:#0F6E56;font-size:18px"></i>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500">Milestone Review Meeting</div>
+              <div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px">2026-07-01 · 14:00 Uhr</div>
+            </div>
+            <span class="pill pill-teal" style="font-size:10px">Termin</span>
+            <i class="ti ti-pencil" aria-hidden="true" style="color:var(--color-text-tertiary);font-size:15px;cursor:pointer"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabcontent" id="tab-journal">
+      <div class="section" style="margin-bottom:0">
+        <div class="section-title">Journal</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="journal-row"><span class="journal-time">2026-05-23 10:22</span><span style="color:var(--color-text-secondary)"><strong style="color:var(--color-text-primary)">Rene</strong> hat Feature FT-12 verknüpft</span></div>
+          <div class="journal-row"><span class="journal-time">2026-05-22 09:00</span><span style="color:var(--color-text-secondary)"><strong style="color:var(--color-text-primary)">Max</strong> hat Status geändert → <span style="color:#0F6E56">Aktiv</span></span></div>
+          <div class="journal-row"><span class="journal-time">2026-05-20 14:45</span><span style="color:var(--color-text-secondary)"><strong style="color:var(--color-text-primary)">Rene</strong> hat Meilenstein erstellt</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <button class="btn-danger"><i class="ti ti-trash" aria-hidden="true" style="font-size:15px"></i> Löschen</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost"><i class="ti ti-x" aria-hidden="true" style="font-size:14px"></i>Schließen</button>
+      <button class="btn-primary">Speichern</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+document.getElementById('tabbar').addEventListener('click', function(e) {
+  const tab = e.target.closest('.tab');
+  if (!tab) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tabcontent').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  const el = document.getElementById('tab-' + tab.dataset.tab);
+  if (el) el.classList.add('active');
+});
+</script>
+</body>
+</html>

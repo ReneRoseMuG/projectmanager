@@ -15,20 +15,26 @@ import { invalidateMilestoneScope, invalidateMilestones } from "../queries/inval
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
-export function useMilestones(milestoneId?: number | null, projectId?: number | null) {
+interface UseMilestonesOptions {
+  enabled?: boolean;
+}
+
+export function useMilestones(milestoneId?: number | null, projectId?: number | null, options: UseMilestonesOptions = {}) {
   const queryClient = useQueryClient();
+  const enabled = options.enabled ?? true;
   const validMilestoneId = milestoneId !== null && milestoneId !== undefined && Number.isFinite(milestoneId) ? milestoneId : undefined;
   const validProjectId = projectId !== null && projectId !== undefined && Number.isFinite(projectId) ? projectId : undefined;
 
   const milestonesQuery = useQuery({
     queryKey: validProjectId !== undefined ? queryKeys.milestones.byProject(validProjectId) : queryKeys.milestones.list(),
-    queryFn: () => (validProjectId !== undefined ? getProjectMilestones(validProjectId) : getMilestones())
+    queryFn: () => (validProjectId !== undefined ? getProjectMilestones(validProjectId) : getMilestones()),
+    enabled
   });
 
   const milestoneQuery = useQuery({
     queryKey: queryKeys.milestones.detail(validMilestoneId ?? 0),
     queryFn: () => getMilestone(validMilestoneId as number),
-    enabled: validMilestoneId !== undefined
+    enabled: enabled && validMilestoneId !== undefined
   });
 
   const reload = useCallback(async () => {
@@ -74,6 +80,15 @@ export function useMilestones(milestoneId?: number | null, projectId?: number | 
     }
   });
 
+  const updateMilestoneTagsMutation = useMutation({
+    mutationFn: async ({ id, tagIds }: { id: number; tagIds: number[] }) => {
+      return setMilestoneTags(id, tagIds);
+    },
+    onSuccess: async (_tags, variables) => {
+      await invalidateMilestoneScope(queryClient, variables.id);
+    }
+  });
+
   const removeMilestoneMutation = useMutation({
     mutationFn: deleteMilestoneRequest,
     onSuccess: async () => {
@@ -95,6 +110,13 @@ export function useMilestones(milestoneId?: number | null, projectId?: number | 
     [updateMilestoneMutation]
   );
 
+  const updateMilestoneTags = useCallback(
+    async (id: number, tagIds: number[]) => {
+      await updateMilestoneTagsMutation.mutateAsync({ id, tagIds });
+    },
+    [updateMilestoneTagsMutation]
+  );
+
   const removeMilestone = useCallback(
     async (id: number) => {
       await removeMilestoneMutation.mutateAsync(id);
@@ -110,6 +132,7 @@ export function useMilestones(milestoneId?: number | null, projectId?: number | 
     reload,
     createMilestone,
     updateMilestone,
+    updateMilestoneTags,
     removeMilestone
   };
 }

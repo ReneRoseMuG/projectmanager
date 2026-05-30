@@ -47,7 +47,7 @@ export function FeatureRelationPanel({
       onSave={onSave}
       saving={saving}
       title={title}
-      searchKeys={["title", "slug", "description"]}
+      searchKeys={["title", "description"]}
       emptyAvailable={emptyAvailable}
       emptySelected={emptySelected}
       showSave={showSave}
@@ -56,17 +56,16 @@ export function FeatureRelationPanel({
 
         return (
           <span className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto_auto]">
-            <span className={`flex h-[38px] w-[38px] items-center justify-center rounded-xl ${featureToneMap[tone]}`} aria-hidden="true">
+            <span className={`flex h-[38px] w-[38px] items-center justify-center rounded-lg ${featureToneMap[tone]}`} aria-hidden="true">
               <BookOpen size={17} />
             </span>
             <span className="min-w-0">
               <span className="block truncate text-[14px] font-semibold text-ink">{feature.title}</span>
-              <span className="block truncate font-mono text-[11px] text-slate-500">/features/{feature.slug}</span>
             </span>
             <span className="hidden md:inline-flex">
               <StatusPill kind="featureStatus" value={feature.status} />
             </span>
-            <span className="hidden rounded-md bg-steel-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 md:inline-flex">{feature.useCaseCount} UCs</span>
+            <span className="hidden rounded-md bg-steel-100 px-2 py-0.5 text-[11px] font-semibold text-steel-500 md:inline-flex">{feature.useCaseCount} UCs</span>
           </span>
         );
       }}

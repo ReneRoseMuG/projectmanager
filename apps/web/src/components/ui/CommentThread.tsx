@@ -1,93 +1,198 @@
-import type { Comment } from "@taskmanager/shared-types";
-import { MessageSquare, Send, Trash2 } from "lucide-react";
+import type { Comment, CommentUpdate } from "@taskmanager/shared-types";
+import { MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useHasPermission } from "../../hooks/usePermissions";
 import { formatHumanDate } from "../../utils/date";
-import { Avatar } from "./Avatar";
 import { Button } from "./Button";
+import { CommentBodyModal, commentTextFromHtml, commentValueFormat } from "./CommentBodyModal";
 import { EmptyState } from "./EmptyState";
+import { ItemCard } from "./ItemCard";
+import { ItemRow } from "./ItemRow";
+import { ListBoardView, type ListBoardMode } from "./ListBoardView";
 import { RichTextInlineField } from "./rich-text-inline-field";
-import { Section } from "./Section";
 
 interface CommentThreadProps {
   comments: Comment[];
   onCreate: (input: { body: string }) => Promise<unknown>;
+  onUpdate: (id: number, input: CommentUpdate) => Promise<unknown>;
   onDelete: (id: number) => Promise<void>;
   entityLabel?: string;
 }
 
-function textFromHtml(value: string) {
-  return value.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+type CommentModalState =
+  | { mode: "create" }
+  | { mode: "edit"; comment: Comment };
+
+function commentPreview(comment: Comment) {
+  return commentTextFromHtml(comment.body) || "Leerer Kommentar";
 }
 
-function toHtmlContent(value: string) {
-  return value.trim().startsWith("<") ? value : `<p>${value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>`;
-}
+function CommentCard({
+  comment,
+  canWrite,
+  canDelete,
+  onEdit,
+  onDelete,
+}: {
+  comment: Comment;
+  canWrite: boolean;
+  canDelete: boolean;
+  onEdit: (comment: Comment) => void;
+  onDelete: (id: number) => Promise<void>;
+}) {
+  const valueFormat = commentValueFormat(comment.body);
 
-function CommentItem({ comment, index, onDelete }: { comment: Comment; index: number; onDelete: (id: number) => Promise<void> }) {
   return (
-    <article className="grid gap-3 rounded-lg border border-line bg-white p-4 shadow-card">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Avatar name={`User ${index + 1}`} />
-          <div className="min-w-0">
-            <p className="font-semibold text-ink">Single User</p>
-            <time className="text-xs text-slate-500">{formatHumanDate(comment.createdAt)}</time>
-          </div>
+    <ItemCard
+      onOpen={canWrite ? () => onEdit(comment) : undefined}
+      onEdit={canWrite ? () => onEdit(comment) : undefined}
+      onDelete={canDelete ? () => void onDelete(comment.id).catch(() => undefined) : undefined}
+      header={
+        <div className="grid gap-1">
+          <p className="text-sm font-semibold text-ink">Kommentar</p>
+          <time className="text-xs text-steel-500">{formatHumanDate(comment.createdAt)}</time>
         </div>
-        <Button aria-label="Löschen" title="Löschen" icon={<Trash2 size={18} />} variant="ghost" className="h-10 w-10" onClick={() => void onDelete(comment.id).catch(() => undefined)} />
-      </div>
-      <RichTextInlineField value={toHtmlContent(comment.body)} readOnly testIdPrefix={`comment-thread-comment-${comment.id}-body`} onChange={() => undefined} />
-      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3 text-xs font-semibold text-slate-500">
-        <span className="rounded-full bg-shell px-2 py-1">0 Reaktionen</span>
-        <span className="rounded-full bg-shell px-2 py-1">Antworten</span>
-      </div>
-    </article>
+      }
+      body={
+        <RichTextInlineField
+          value={comment.body}
+          valueFormat={valueFormat}
+          readOnly
+          testIdPrefix={`comment-thread-comment-${comment.id}-body`}
+          onChange={() => undefined}
+        />
+      }
+    />
   );
 }
 
-function CommentComposer({ onCreate }: { onCreate: (input: { body: string }) => Promise<unknown> }) {
-  const [body, setBody] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async () => {
-    if (!textFromHtml(body)) {
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await onCreate({ body });
-      setBody("");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+function CommentRow({
+  comment,
+  canWrite,
+  canDelete,
+  onEdit,
+  onDelete,
+}: {
+  comment: Comment;
+  canWrite: boolean;
+  canDelete: boolean;
+  onEdit: (comment: Comment) => void;
+  onDelete: (id: number) => Promise<void>;
+}) {
+  const actions =
+    canWrite || canDelete ? (
+      <>
+        {canWrite ? (
+          <Button
+            aria-label="Bearbeiten"
+            title="Bearbeiten"
+            variant="ghost"
+            icon={<Pencil size={16} />}
+            onClick={() => onEdit(comment)}
+          />
+        ) : null}
+        {canDelete ? (
+          <Button
+            aria-label="Löschen"
+            title="Löschen"
+            variant="ghost"
+            icon={<Trash2 size={17} />}
+            onClick={() => void onDelete(comment.id).catch(() => undefined)}
+          />
+        ) : null}
+      </>
+    ) : undefined;
 
   return (
-    <Section>
-      <div className="grid gap-3">
-        <RichTextInlineField value={body} placeholder="Kommentar schreiben" testIdPrefix="comment-thread-body" onChange={setBody} />
-        <div className="flex justify-end">
-          <Button variant="primary" icon={<Send size={16} />} loading={submitting} onClick={() => void submit()}>
-            Kommentar
-          </Button>
-        </div>
-      </div>
-    </Section>
+    <ItemRow
+      title="Kommentar"
+      description={commentPreview(comment)}
+      meta={<time className="text-xs text-steel-500">{formatHumanDate(comment.createdAt)}</time>}
+      actions={actions}
+      onOpen={canWrite ? () => onEdit(comment) : undefined}
+    />
   );
 }
 
 /** Generic comment thread organism for domain detail views. */
-export function CommentThread({ comments, onCreate, onDelete, entityLabel = "Objekt" }: CommentThreadProps) {
+export function CommentThread({
+  comments,
+  onCreate,
+  onUpdate,
+  onDelete,
+  entityLabel = "Objekt",
+}: CommentThreadProps) {
+  const canWriteComments = useHasPermission("comments", "write");
+  const canDeleteComments = useHasPermission("comments", "delete");
+  const [mode, setMode] = useState<ListBoardMode>("list");
+  const [modalState, setModalState] = useState<CommentModalState | null>(null);
+
+  const closeModal = () => setModalState(null);
+
+  const saveComment = async (body: string) => {
+    if (!modalState) {
+      return;
+    }
+    if (modalState.mode === "create") {
+      await onCreate({ body });
+      return;
+    }
+    await onUpdate(modalState.comment.id, {
+      body,
+      expectedVersion: modalState.comment.version,
+    });
+  };
+
+  const editingComment = modalState?.mode === "edit" ? modalState.comment : null;
+
   return (
-    <div className="grid gap-4">
-      <CommentComposer onCreate={onCreate} />
-      <section className="grid gap-3">
-        {comments.length === 0 ? <EmptyState icon={<MessageSquare size={22} />} title="Noch keine Kommentare" body={`Kommentare und Rückfragen zu diesem ${entityLabel} erscheinen hier.`} tone="neutral" variant="default" /> : null}
-        {comments.map((comment, index) => (
-          <CommentItem key={comment.id} comment={comment} index={index} onDelete={onDelete} />
-        ))}
-      </section>
+    <div className="min-h-0">
+      <ListBoardView
+        items={comments}
+        mode={mode}
+        onModeChange={setMode}
+        onAdd={() => setModalState({ mode: "create" })}
+        addLabel="Kommentar anlegen"
+        showToolbarAdd={canWriteComments}
+        emptyState={
+          <EmptyState
+            icon={<MessageSquare size={22} />}
+            title="Noch keine Kommentare"
+            body={`Kommentare und Rückfragen zu diesem ${entityLabel} erscheinen hier.`}
+            tone="neutral"
+            variant="default"
+          />
+        }
+        renderCard={(comment) => (
+          <CommentCard
+            comment={comment}
+            canWrite={canWriteComments}
+            canDelete={canDeleteComments}
+            onEdit={(item) => setModalState({ mode: "edit", comment: item })}
+            onDelete={onDelete}
+          />
+        )}
+        renderRow={(comment) => (
+          <CommentRow
+            comment={comment}
+            canWrite={canWriteComments}
+            canDelete={canDeleteComments}
+            onEdit={(item) => setModalState({ mode: "edit", comment: item })}
+            onDelete={onDelete}
+          />
+        )}
+      />
+      <CommentBodyModal
+        open={Boolean(modalState)}
+        title={modalState?.mode === "create" ? "Kommentar anlegen" : "Kommentar bearbeiten"}
+        breadcrumb={["Kommentare", modalState?.mode === "create" ? "Anlegen" : "Bearbeiten"]}
+        initialBody={editingComment?.body ?? ""}
+        placeholder={modalState?.mode === "create" ? "Kommentar schreiben" : "Kommentar bearbeiten"}
+        submitLabel={modalState?.mode === "create" ? "Anlegen" : "Speichern"}
+        testIdPrefix={editingComment ? `comment-thread-comment-${editingComment.id}-editor` : "comment-thread-create-editor"}
+        onSave={saveComment}
+        onClose={closeModal}
+      />
     </div>
   );
 }

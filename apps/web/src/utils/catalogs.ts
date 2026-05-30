@@ -1,8 +1,50 @@
 import type { CatalogEntry, CatalogKind, StatusCatalogKind } from "@taskmanager/shared-types";
 import { FEATURE_STATUSES, PRIORITIES, WORK_STATUSES } from "@taskmanager/shared-types";
-import { featureStatusLabels, priorityLabels, projectStatusLabels } from "./domainLabels";
+import { featureStatusLabels, priorityLabels, projectStatusLabels, ticketTypeLabels } from "./domainLabels";
+import type { CSSProperties } from "react";
 
 const now = "1970-01-01T00:00:00.000Z";
+
+const ticketTypeFallbackKeys = ["bug", "improvement", "question", "task"] as const;
+
+const defaultCatalogColors: Record<CatalogKind, Record<string, string>> = {
+  workStatus: {
+    active: "var(--color-fern)",
+    todo: "var(--color-fern)",
+    open: "var(--color-fern)",
+    in_progress: "var(--color-tangerine)",
+    in_review: "var(--color-mustard)",
+    on_hold: "var(--color-steel-500)",
+    completed: "var(--color-steel-500)",
+    archived: "var(--color-steel-500)",
+    done: "var(--color-steel-500)",
+    resolved: "var(--color-steel-500)",
+    closed: "var(--color-steel-500)",
+    rejected: "var(--color-steel-500)",
+  },
+  featureStatus: {
+    draft: "var(--color-violet)",
+    active: "var(--color-tangerine)",
+    done: "var(--color-steel-500)",
+    archived: "var(--color-steel-500)",
+  },
+  priority: {
+    low: "var(--color-steel-400)",
+    medium: "var(--color-mustard)",
+    high: "var(--color-tangerine)",
+    urgent: "var(--color-crimson)",
+  },
+  ticketType: {
+    bug: "var(--color-crimson)",
+    improvement: "var(--color-teal)",
+    question: "var(--color-violet)",
+    task: "var(--color-steel-500)",
+  },
+};
+
+export function defaultCatalogColor(kind: CatalogKind, key: string): string {
+  return defaultCatalogColors[kind][key] ?? "var(--color-steel-700)";
+}
 
 function fallbackEntry(kind: CatalogKind, key: string, label: string, sortOrder: number, isClosed = false): CatalogEntry {
   return {
@@ -12,6 +54,7 @@ function fallbackEntry(kind: CatalogKind, key: string, label: string, sortOrder:
     label,
     sortOrder,
     isClosed,
+    color: defaultCatalogColor(kind, key),
     version: 1,
     createdAt: now,
     updatedAt: now
@@ -21,7 +64,8 @@ function fallbackEntry(kind: CatalogKind, key: string, label: string, sortOrder:
 export const fallbackCatalogEntries: CatalogEntry[] = [
   ...WORK_STATUSES.map((status, index) => fallbackEntry("workStatus", status, projectStatusLabels[status] ?? status, (index + 1) * 100, ["completed", "archived", "done", "resolved", "closed", "rejected"].includes(status))),
   ...FEATURE_STATUSES.map((status, index) => fallbackEntry("featureStatus", status, featureStatusLabels[status] ?? status, (index + 1) * 100, status === "done" || status === "archived")),
-  ...PRIORITIES.map((priority, index) => fallbackEntry("priority", priority, priorityLabels[priority] ?? priority, (index + 1) * 100))
+  ...PRIORITIES.map((priority, index) => fallbackEntry("priority", priority, priorityLabels[priority] ?? priority, (index + 1) * 100)),
+  ...ticketTypeFallbackKeys.map((type, index) => fallbackEntry("ticketType", type, ticketTypeLabels[type] ?? type, (index + 1) * 100))
 ];
 
 export function catalogEntriesByKind(entries: CatalogEntry[], kind: CatalogKind): CatalogEntry[] {
@@ -29,8 +73,46 @@ export function catalogEntriesByKind(entries: CatalogEntry[], kind: CatalogKind)
   return source.filter((entry) => entry.kind === kind).sort((left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label));
 }
 
+export function actualCatalogEntriesByKind(entries: CatalogEntry[], kind: CatalogKind): CatalogEntry[] {
+  return entries.filter((entry) => entry.kind === kind).sort((left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label));
+}
+
+export function resolveCatalogEntryKey(entries: CatalogEntry[], kind: CatalogKind, value: string | null | undefined, preferredKey: string): string | undefined {
+  const actualEntries = actualCatalogEntriesByKind(entries, kind);
+  if (actualEntries.length === 0) {
+    return undefined;
+  }
+  if (value && actualEntries.some((entry) => entry.key === value)) {
+    return value;
+  }
+  return actualEntries.find((entry) => entry.key === preferredKey)?.key ?? actualEntries[0]?.key;
+}
+
 export function catalogLabel(entries: CatalogEntry[], kind: CatalogKind, key: string): string {
   return catalogEntriesByKind(entries, kind).find((entry) => entry.key === key)?.label ?? key;
+}
+
+export function catalogEntry(entries: CatalogEntry[], kind: CatalogKind, key: string): CatalogEntry | undefined {
+  return catalogEntriesByKind(entries, kind).find((entry) => entry.key === key);
+}
+
+export function catalogColor(entries: CatalogEntry[], kind: CatalogKind, key: string): string {
+  return catalogEntry(entries, kind, key)?.color ?? defaultCatalogColor(kind, key);
+}
+
+export function catalogFillStyle(color: string): CSSProperties {
+  return {
+    backgroundColor: color,
+    borderColor: color,
+    color: "#ffffff",
+  };
+}
+
+export function catalogSoftStyle(color: string): CSSProperties {
+  return {
+    backgroundColor: `color-mix(in srgb, ${color} 14%, white)`,
+    borderColor: `color-mix(in srgb, ${color} 50%, white)`,
+  };
 }
 
 export function isCatalogStatusClosed(entries: CatalogEntry[], kind: StatusCatalogKind, key: string): boolean {

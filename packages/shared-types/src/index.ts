@@ -5,12 +5,11 @@ export const FEATURE_STATUSES = ["draft", "active", "done", "archived"] as const
 export const FEATURE_RELATION_TYPES = ["related", "depends_on", "consumed_by"] as const;
 export const BACKLOG_STATUSES = WORK_STATUSES;
 export const PRIORITIES = ["low", "medium", "high", "urgent"] as const;
-export const TICKET_TYPES = ["bug", "improvement", "question", "task"] as const;
 export const TICKET_STATUSES = WORK_STATUSES;
 export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as const;
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
-export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "milestone", "useCase", "backlogItem", "wikiPage", "ticket"] as const;
-export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority"] as const;
+export const COMMENT_ENTITY_TYPES = ["task", "feature", "project", "milestone", "useCase", "backlogItem", "wikiPage", "dayPlan", "ticket"] as const;
+export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority", "ticketType"] as const;
 export const STATUS_CATALOG_KINDS = ["workStatus", "featureStatus"] as const;
 
 export type WorkStatus = string;
@@ -20,7 +19,7 @@ export type FeatureStatus = string;
 export type FeatureRelationType = (typeof FEATURE_RELATION_TYPES)[number];
 export type BacklogStatus = WorkStatus;
 export type Priority = string;
-export type TicketType = (typeof TICKET_TYPES)[number];
+export type TicketType = string;
 export type TicketStatus = WorkStatus;
 export type TicketResolution = (typeof TICKET_RESOLUTIONS)[number];
 export type TicketRelationType = (typeof TICKET_RELATION_TYPES)[number];
@@ -32,10 +31,471 @@ export type JsonPrimitive = string | number | boolean | null;
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonValue = JsonPrimitive | JsonValue[] | JsonObject;
 
+export const SETTING_SCOPE_TYPES = ["GLOBAL", "ROLE", "USER"] as const;
+export const SETTING_VALUE_TYPES = ["boolean", "number", "color", "enum", "string", "json"] as const;
+export const TOAST_POSITIONS = ["top-right", "top-left", "bottom-right", "bottom-left"] as const;
+
+export type SettingScopeType = (typeof SETTING_SCOPE_TYPES)[number];
+export type SettingValueType = (typeof SETTING_VALUE_TYPES)[number];
+export type ToastPosition = (typeof TOAST_POSITIONS)[number];
+
+export interface SettingConstraints {
+  options?: readonly string[];
+  optionLabels?: Readonly<Record<string, string>>;
+  min?: number;
+  max?: number;
+  step?: number;
+  integer?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+  format?: "hex";
+}
+
+export interface SettingDefinition<Value extends JsonValue = JsonValue> {
+  key: string;
+  label: string;
+  description: string;
+  valueType: SettingValueType;
+  defaultValue: Value;
+  allowedScopes: readonly SettingScopeType[];
+  constraints?: SettingConstraints;
+  validate: (value: unknown) => value is Value;
+}
+
+export const settingsRegistry = {
+  "taskBoard.viewMode": {
+    key: "taskBoard.viewMode",
+    label: "Aufgaben-Board Ansicht",
+    description: "Steuert die Standarddarstellung für Aufgabenlisten.",
+    valueType: "enum",
+    defaultValue: "list",
+    allowedScopes: ["GLOBAL", "USER"],
+    constraints: { options: ["list", "kanban"] },
+    validate: (value): value is "list" | "kanban" => value === "list" || value === "kanban"
+  },
+  "ticketBoard.viewMode": {
+    key: "ticketBoard.viewMode",
+    label: "Ticket-Board Ansicht",
+    description: "Steuert die Standarddarstellung für Ticketlisten.",
+    valueType: "enum",
+    defaultValue: "kanban",
+    allowedScopes: ["GLOBAL", "USER"],
+    constraints: { options: ["list", "kanban"] },
+    validate: (value): value is "list" | "kanban" => value === "list" || value === "kanban"
+  },
+  "ui.toastPosition": {
+    key: "ui.toastPosition",
+    label: "Toast-Position",
+    description: "Steuert die globale Einblendposition von Toast-Benachrichtigungen.",
+    valueType: "enum",
+    defaultValue: "top-right",
+    allowedScopes: ["GLOBAL"],
+    constraints: {
+      options: TOAST_POSITIONS,
+      optionLabels: {
+        "top-right": "Oben rechts",
+        "top-left": "Oben links",
+        "bottom-right": "Unten rechts",
+        "bottom-left": "Unten links"
+      }
+    },
+    validate: (value): value is ToastPosition => typeof value === "string" && (TOAST_POSITIONS as readonly string[]).includes(value)
+  }
+} as const satisfies Record<string, SettingDefinition>;
+
+export type SettingKey = keyof typeof settingsRegistry;
+export type SettingValueByKey = {
+  [Key in SettingKey]: (typeof settingsRegistry)[Key]["defaultValue"];
+};
+
+export interface SettingScopeValue {
+  value: JsonValue;
+  version: number;
+  updatedAt: string;
+  updatedBy: number | null;
+}
+
+export interface ResolvedSetting {
+  key: SettingKey;
+  label: string;
+  description: string;
+  valueType: SettingValueType;
+  constraints: SettingConstraints | null;
+  allowedScopes: readonly SettingScopeType[];
+  defaultValue: JsonValue;
+  values: Partial<Record<SettingScopeType, SettingScopeValue>>;
+  resolvedValue: JsonValue;
+  resolvedScope: SettingScopeType | "DEFAULT";
+  resolvedVersion: number | null;
+}
+
+export interface SettingsResolvedResponse {
+  settings: ResolvedSetting[];
+}
+
+export interface SetSettingValueRequest {
+  key: SettingKey;
+  scopeType: SettingScopeType;
+  scopeId?: string;
+  value: JsonValue;
+  expectedVersion: number;
+}
+
+export interface DeleteSettingValueRequest {
+  key: SettingKey;
+  scopeType: SettingScopeType;
+  scopeId?: string;
+  expectedVersion: number;
+}
+
+export function isSettingKey(value: string): value is SettingKey {
+  return Object.prototype.hasOwnProperty.call(settingsRegistry, value);
+}
+
+export function getSettingDefinition(key: string): SettingDefinition | undefined {
+  return isSettingKey(key) ? settingsRegistry[key] : undefined;
+}
+
+export const settingDefinitions = Object.values(settingsRegistry) as SettingDefinition[];
+
+export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar", "dayPlan"] as const;
+export const DASHBOARD_OWNER_TYPES = ["project", "milestone", "task", "dayPlan"] as const;
+export const DASHBOARD_WIDGET_IDS = [
+  "taskStatusReport",
+  "ticketStatusReport",
+  "taskJournal",
+  "ticketJournal",
+  "globalJournal",
+  "commentJournal",
+  "noteList",
+  "attachmentJournal",
+  "milestoneProgress",
+  "overdueTasks",
+  "calendar",
+  "upcomingEvents",
+  "taskBoard",
+  "taskList",
+  "ticketBoard",
+  "ticketList",
+  "milestoneBoard",
+  "milestoneList",
+  "milestoneListView",
+  "projectBoard",
+  "projectList"
+] as const;
+
+export type DashboardContext = (typeof DASHBOARD_CONTEXTS)[number];
+export type DashboardOwnerType = (typeof DASHBOARD_OWNER_TYPES)[number];
+export type DashboardWidgetId = (typeof DASHBOARD_WIDGET_IDS)[number];
+export type DashboardDefaultScope = "GLOBAL" | "USER";
+
+export interface DashboardOwner {
+  type: DashboardOwnerType;
+  id: number;
+}
+
+export interface DashboardWidgetParams {
+  limit?: number;
+  sort?: "createdAt" | "updatedAt";
+}
+
+export interface DashboardWidgetLayout {
+  widgetId: DashboardWidgetId;
+  col: 0 | 1;
+  row: number;
+  colSpan: 1 | 2;
+  params?: DashboardWidgetParams;
+}
+
+export interface Dashboard {
+  id: number;
+  name: string;
+  context: DashboardContext;
+  isSystem: boolean;
+  templateKey: string | null;
+  ownerId: number | null;
+  widgets: DashboardWidgetLayout[];
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  isGlobalDefault: boolean;
+  isUserDefault: boolean;
+}
+
+export interface DashboardInput {
+  name: string;
+  context: DashboardContext;
+  isSystem?: boolean;
+  widgets: DashboardWidgetLayout[];
+}
+
+export type DashboardUpdate = WithExpectedVersion<DashboardInput>;
+
+export interface DashboardListResponse {
+  dashboards: Dashboard[];
+  globalDefaultDashboardId: number | null;
+  globalDefaultVersion: number;
+  userDefaultDashboardId: number | null;
+  userDefaultVersion: number;
+}
+
+export interface SetDashboardDefaultRequest {
+  scopeType: DashboardDefaultScope;
+  expectedVersion: number;
+}
+
+export interface TaskStats {
+  statusCounts: Record<string, number>;
+  total: number;
+}
+
+export interface TicketStats {
+  statusCounts: Record<string, number>;
+  total: number;
+}
+
+export interface RecentComment {
+  id: number;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  authorName: string;
+  entityType: JournalObjectType;
+  entityId: number;
+  entityLabel: string;
+}
+
+export interface RecentAttachment {
+  id: number;
+  filename: string;
+  storageFilename: string;
+  mimetype: string;
+  fileSize: number;
+  url: string;
+  createdAt: string;
+  authorName: string;
+  entityType: JournalObjectType;
+  entityId: number;
+  entityLabel: string;
+}
+
+export const DASHBOARD_ALLOWED_WIDGETS = {
+  global: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
+  project: ["taskStatusReport", "ticketStatusReport", "milestoneProgress", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "globalJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView"],
+  milestone: ["taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList"],
+  task: ["taskStatusReport", "taskJournal", "commentJournal", "attachmentJournal"],
+  home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
+  calendar: ["calendar", "upcomingEvents", "overdueTasks", "taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
+  dayPlan: ["taskList", "taskBoard", "upcomingEvents", "overdueTasks", "commentJournal", "noteList", "globalJournal"]
+} as const satisfies Record<DashboardContext, readonly DashboardWidgetId[]>;
+
+export const DEFAULT_DASHBOARD_LAYOUTS = {
+  global: [
+    { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1 },
+    { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 },
+    { widgetId: "globalJournal", col: 0, row: 1, colSpan: 2, params: { limit: 20 } },
+    { widgetId: "taskJournal", col: 0, row: 2, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "ticketJournal", col: 1, row: 2, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "commentJournal", col: 0, row: 3, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "attachmentJournal", col: 1, row: 3, colSpan: 1, params: { limit: 10 } }
+  ],
+  project: [
+    { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1 },
+    { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 },
+    { widgetId: "milestoneProgress", col: 0, row: 1, colSpan: 2, params: { limit: 10 } },
+    { widgetId: "taskJournal", col: 0, row: 2, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "ticketJournal", col: 1, row: 2, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "commentJournal", col: 0, row: 3, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "attachmentJournal", col: 1, row: 3, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "globalJournal", col: 0, row: 4, colSpan: 2, params: { limit: 20 } }
+  ],
+  milestone: [
+    { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1 },
+    { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 },
+    { widgetId: "taskJournal", col: 0, row: 1, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "ticketJournal", col: 1, row: 1, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "commentJournal", col: 0, row: 2, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "attachmentJournal", col: 1, row: 2, colSpan: 1, params: { limit: 10 } }
+  ],
+  task: [
+    { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 2 },
+    { widgetId: "taskJournal", col: 0, row: 1, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "commentJournal", col: 1, row: 1, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "attachmentJournal", col: 0, row: 2, colSpan: 2, params: { limit: 10 } }
+  ],
+  home: [
+    { widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1 },
+    { widgetId: "ticketStatusReport", col: 1, row: 0, colSpan: 1 },
+    { widgetId: "calendar", col: 0, row: 1, colSpan: 1 },
+    { widgetId: "upcomingEvents", col: 1, row: 1, colSpan: 1 }
+  ],
+  calendar: [
+    { widgetId: "calendar", col: 0, row: 0, colSpan: 2 },
+    { widgetId: "upcomingEvents", col: 0, row: 1, colSpan: 1 },
+    { widgetId: "overdueTasks", col: 1, row: 1, colSpan: 1, params: { limit: 10 } }
+  ],
+  dayPlan: [
+    { widgetId: "taskList", col: 0, row: 0, colSpan: 1, params: { limit: 10, sort: "updatedAt" } },
+    { widgetId: "upcomingEvents", col: 1, row: 0, colSpan: 1 },
+    { widgetId: "noteList", col: 0, row: 1, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "commentJournal", col: 1, row: 1, colSpan: 1, params: { limit: 10 } },
+    { widgetId: "globalJournal", col: 0, row: 2, colSpan: 2, params: { limit: 15 } }
+  ]
+} as const satisfies Record<DashboardContext, readonly DashboardWidgetLayout[]>;
+
 export interface ApiErrorPayload {
-  error: "NOT_FOUND" | "BAD_REQUEST" | "CONFLICT" | "INTERNAL_ERROR";
+  error: "NOT_FOUND" | "BAD_REQUEST" | "CONFLICT" | "UNAUTHORIZED" | "FORBIDDEN" | "INTERNAL_ERROR";
   message: string;
   statusCode: number;
+}
+
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "dumps", "settings", "realtime", "users", "roles"] as const;
+export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
+
+export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";
+export type AuthAction = (typeof AUTH_ACTIONS)[number] | "*";
+
+export interface Permission {
+  id: number;
+  roleId: number;
+  resource: AuthResource;
+  action: AuthAction;
+}
+
+export interface PermissionInput {
+  resource: AuthResource;
+  action: AuthAction;
+}
+
+export interface Role {
+  id: number;
+  key: string;
+  label: string;
+  isSystem: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  permissions: Permission[];
+}
+
+export interface RoleInput {
+  key: string;
+  label: string;
+  permissions: PermissionInput[];
+}
+
+export type RoleUpdate = WithExpectedVersion<Partial<RoleInput>>;
+
+export interface PermissionCatalog {
+  resources: readonly (typeof AUTH_RESOURCES)[number][];
+  actions: readonly (typeof AUTH_ACTIONS)[number][];
+}
+
+export const REALTIME_INVALIDATION_SCOPES = [
+  "all",
+  "projects",
+  "milestones",
+  "tasks",
+  "tickets",
+  "features",
+  "useCases",
+  "backlog",
+  "wiki",
+  "comments",
+  "notes",
+  "attachments",
+  "tags",
+  "catalogs",
+  "events",
+  "dayPlans",
+  "dashboards",
+  "settings",
+  "dumps",
+  "adminUsers",
+  "adminRoles"
+] as const;
+
+export type RealtimeInvalidationScope = (typeof REALTIME_INVALIDATION_SCOPES)[number];
+
+export interface RealtimeInvalidationEvent {
+  type: "invalidate";
+  scope: RealtimeInvalidationScope;
+  sourceTabId: string | null;
+  occurredAt: string;
+}
+
+export type BackupProgressOperation = "full_backup" | "import";
+
+export interface BackupProgressEvent {
+  type: "backup_progress";
+  operation: BackupProgressOperation;
+  phase: string;
+  current: number;
+  total: number;
+  detail?: string;
+}
+
+export type RealtimeEvent = RealtimeInvalidationEvent | BackupProgressEvent;
+
+export interface AdminUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  address: string | null;
+  phone: string | null;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserOption {
+  id: number;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+}
+
+export type UserSummary = UserOption;
+
+export interface AdminUserInput {
+  firstName: string;
+  lastName: string;
+  address?: string | null;
+  phone?: string | null;
+  email: string;
+  roleId: number;
+  password?: string;
+  isActive?: boolean;
+}
+
+export type AdminUserUpdate = WithExpectedVersion<Partial<Omit<AdminUserInput, "password">> & {
+  password?: string;
+}>;
+
+export interface CurrentUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  role: Role;
+  permissions: Permission[];
+  requiresPasswordSetup: boolean;
+}
+
+export interface LoginRequest {
+  email: string;
+  password?: string;
+}
+
+export interface SetPasswordRequest {
+  password: string;
 }
 
 export interface VersionedUpdate {
@@ -51,6 +511,7 @@ export interface CatalogEntry {
   label: string;
   sortOrder: number;
   isClosed: boolean;
+  color: string;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -61,107 +522,71 @@ export interface CatalogEntryInput {
   label: string;
   sortOrder?: number;
   isClosed?: boolean;
+  color?: string;
 }
 
 export type CatalogEntryUpdate = WithExpectedVersion<Partial<Omit<CatalogEntryInput, "key">>>;
 
-export interface AiModelInfo {
-  name: string;
-  sizeBytes: number | null;
-  modifiedAt: string | null;
-  digest: string | null;
-}
-
-export interface AiModelsResponse {
-  provider: "ollama";
-  baseUrl: string;
-  defaultModel: string;
-  available: boolean;
-  models: AiModelInfo[];
-  message?: string;
-}
-
-export const AI_TEXT_OPERATIONS = ["rewrite", "formatParagraph"] as const;
-export type AiTextOperation = (typeof AI_TEXT_OPERATIONS)[number];
-
-export interface AiTextAssistRequest {
-  model?: string | null;
-  html: string;
-  operation: AiTextOperation;
-  instruction?: string | null;
-}
-
-export interface AiTextAssistResponse {
-  model: string;
-  html: string;
-}
-
-export const AI_AGENT_ACTION_TYPES = [
-  "createProject",
-  "createMilestone",
-  "createTask",
-  "createSubtask",
-  "createTicket",
-  "createSubTicket",
-  "createFeature",
-  "createUseCase",
-  "createWikiPage",
-  "createBacklogItem",
-  "createComment",
-  "createNote",
-  "createTag",
-  "createEvent",
-  "setProjectFeatures",
-  "setMilestoneFeatures",
-  "setFeatureRelations",
-  "linkOwnerTask",
-  "linkOwnerTicket",
-  "addTicketRelation",
-  "setProjectTags",
-  "setMilestoneTags",
-  "setTaskTags",
-  "setTicketTags"
+export const JOURNAL_OBJECT_TYPES = [
+  "project",
+  "milestone",
+  "task",
+  "feature",
+  "useCase",
+  "wikiPage",
+  "backlogItem",
+  "ticket",
+  "event",
+  "dayPlan",
+  "tag",
+  "note",
+  "attachment",
+  "comment"
 ] as const;
 
-export type AiAgentActionType = (typeof AI_AGENT_ACTION_TYPES)[number];
+export const JOURNAL_OPERATIONS = ["create", "update", "delete", "link", "unlink"] as const;
+export const JOURNAL_CONTEXT_RELATIONS = ["self", "owner", "parent", "related"] as const;
 
-export interface AiAgentAction {
-  type: AiAgentActionType;
-  label: string;
-  description: string;
-  payload: JsonObject;
-  requiresConfirmation: true;
+export type JournalObjectType = (typeof JOURNAL_OBJECT_TYPES)[number];
+export type JournalOperation = (typeof JOURNAL_OPERATIONS)[number];
+export type JournalContextRelation = (typeof JOURNAL_CONTEXT_RELATIONS)[number];
+
+export interface JournalChange {
+  id: number;
+  fieldKey: string;
+  fieldLabel: string;
+  oldValue: JsonValue;
+  oldValueLabel: string | null;
+  newValue: JsonValue;
+  newValueLabel: string | null;
+  summary: string;
 }
 
-export interface AiAgentPlanRequest {
-  model?: string | null;
-  prompt: string;
+export interface JournalContext {
+  id: number;
+  objectType: JournalObjectType;
+  objectId: number;
+  objectLabel: string;
+  relation: JournalContextRelation;
 }
 
-export interface AiAgentPlanResponse {
-  status: "ready" | "blocked";
-  model: string;
-  message: string;
-  actions: AiAgentAction[];
-  blockers: string[];
+export interface JournalEntry {
+  id: number;
+  operation: JournalOperation;
+  objectType: JournalObjectType;
+  objectId: number;
+  objectLabel: string;
+  summary: string;
+  actorUserId: number | null;
+  actorName: string;
+  createdAt: string;
+  changes: JournalChange[];
+  contexts: JournalContext[];
 }
 
-export interface AiAgentExecuteRequest {
-  actions: AiAgentAction[];
-}
-
-export interface AiAgentActionResult {
-  type: AiAgentActionType;
-  label: string;
-  success: boolean;
-  entityType: string | null;
-  entityId: number | null;
-  message: string;
-}
-
-export interface AiAgentExecuteResponse {
-  message: string;
-  results: AiAgentActionResult[];
+export interface JournalListResponse {
+  entries: JournalEntry[];
+  nextCursor: number | null;
 }
 
 export interface Tag {
@@ -179,12 +604,20 @@ export interface Project {
   color: string | null;
   startDate: string | null;
   dueDate: string | null;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
+  wikiPageId: number | null;
   version: number;
   createdAt: string;
   updatedAt: string;
+  milestoneCount: number;
   openTaskCount: number;
   doneTaskCount: number;
   totalTaskCount: number;
+  ticketCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   tags: Tag[];
 }
 
@@ -195,9 +628,10 @@ export interface ProjectInput {
   color?: string | null;
   startDate?: string | null;
   dueDate?: string | null;
+  responsibleUserId?: number | null;
 }
 
-export type ProjectUpdate = WithExpectedVersion<Partial<ProjectInput>>;
+export type ProjectUpdate = WithExpectedVersion<Partial<ProjectInput> & { wikiPageId?: number | null }>;
 
 export interface Milestone {
   id: number;
@@ -208,6 +642,8 @@ export interface Milestone {
   color: string | null;
   startDate: string | null;
   dueDate: string | null;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -217,6 +653,9 @@ export interface Milestone {
   totalTaskCount: number;
   ticketCount: number;
   featureCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   tags: Tag[];
 }
 
@@ -228,9 +667,19 @@ export interface MilestoneInput {
   color?: string | null;
   startDate?: string | null;
   dueDate?: string | null;
+  responsibleUserId?: number | null;
 }
 
 export type MilestoneUpdate = WithExpectedVersion<Partial<MilestoneInput>>;
+
+export type VisibleParentType = "project" | "milestone" | "task" | "ticket" | "feature" | "useCase" | "wikiPage";
+
+export interface VisibleParentContext {
+  type: VisibleParentType;
+  id: number;
+  label: string;
+  origin: "direct" | "inherited";
+}
 
 export interface Task {
   id: number;
@@ -239,13 +688,19 @@ export interface Task {
   description: string | null;
   status: TaskStatus;
   priority: Priority;
-  assignee: string | null;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   dueDate: string | null;
   version: number;
   createdAt: string;
   updatedAt: string;
   tags: Tag[];
   subtaskCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
+  visibleParent?: VisibleParentContext | null;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface TaskBoardItem extends Task {
@@ -257,7 +712,7 @@ export interface TaskInput {
   description?: string | null;
   status?: TaskStatus;
   priority?: Priority;
-  assignee?: string | null;
+  responsibleUserId?: number | null;
   dueDate?: string | null;
 }
 
@@ -268,6 +723,8 @@ export type TaskBoardPositionInput = WithExpectedVersion<{
   position: number;
 }>;
 
+export type TaskOwner = { type: "project" | "milestone" | "feature" | "useCase" | "wikiPage"; id: number };
+
 export interface Ticket {
   id: number;
   parentId: number | null;
@@ -277,8 +734,10 @@ export interface Ticket {
   status: TicketStatus;
   priority: Priority;
   resolution: TicketResolution | null;
-  reporter: string | null;
-  assignee: string | null;
+  reporterUserId: number | null;
+  reporterUser: UserSummary | null;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   environment: string | null;
   affectedVersion: string | null;
   dueDate: string | null;
@@ -289,6 +748,11 @@ export interface Ticket {
   updatedAt: string;
   tags: Tag[];
   subTicketCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
+  visibleParent?: VisibleParentContext | null;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface TicketRelationEntry {
@@ -312,8 +776,8 @@ export interface TicketInput {
   description?: string | null;
   status?: TicketStatus;
   priority?: Priority;
-  reporter?: string | null;
-  assignee?: string | null;
+  reporterUserId?: number | null;
+  responsibleUserId?: number | null;
   environment?: string | null;
   affectedVersion?: string | null;
   dueDate?: string | null;
@@ -334,6 +798,8 @@ export interface TicketRelationInput {
   relationType: TicketRelationType;
 }
 
+export type TicketOwner = { type: "project" | "milestone" | "task" | "feature" | "useCase" | "wikiPage"; id: number };
+
 export interface Comment {
   id: number;
   owners: CommentOwner[];
@@ -351,6 +817,8 @@ export type CommentOwner = {
 export interface CommentInput {
   body: string;
 }
+
+export type CommentUpdate = WithExpectedVersion<CommentInput>;
 
 export interface Note {
   id: number;
@@ -386,6 +854,7 @@ export type AttachmentOwner =
   | { type: "milestone"; id: number }
   | { type: "task"; id: number }
   | { type: "feature"; id: number }
+  | { type: "wikiPage"; id: number }
   | { type: "ticket"; id: number };
 
 export type AttachmentPreviewKind = "image" | "pdf" | "text" | "csv" | "audio" | "video" | "generatedPdf" | "unsupported";
@@ -418,6 +887,9 @@ export interface Event {
   endTime: string;
   isAllDay: boolean;
   color: string | null;
+  reminderMinutes: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -425,7 +897,7 @@ export interface Event {
 
 export type CalendarEvent = Event;
 
-export type EventOwner = { type: "project" | "milestone" | "task"; id: number };
+export type EventOwner = { type: "project" | "milestone" | "task" | "dayPlan"; id: number };
 
 export interface EventInput {
   title: string;
@@ -434,33 +906,81 @@ export interface EventInput {
   endTime: string;
   isAllDay?: boolean;
   color?: string | null;
+  reminderMinutes?: number;
+  responsibleUserId?: number | null;
   owners?: EventOwner[];
 }
 
 export type EventUpdate = WithExpectedVersion<Partial<EventInput>>;
 
-export interface Feature {
+export const DAY_PLAN_STATUSES = ["open", "completed"] as const;
+
+export type DayPlanStatus = (typeof DAY_PLAN_STATUSES)[number];
+
+export interface DayPlan {
   id: number;
-  title: string;
-  slug: string;
-  status: FeatureStatus;
-  description: string | null;
-  content?: string;
-  contentPath: string | null;
-  sortOrder: number;
-  useCaseCount: number;
+  date: string;
+  userId: number;
+  status: DayPlanStatus;
   version: number;
   createdAt: string;
   updatedAt: string;
+  tasks: TaskBoardItem[];
+  events: CalendarEvent[];
+}
+
+export interface DayPlanPatchInput {
+  status?: DayPlanStatus;
+}
+
+export type DayPlanUpdate = WithExpectedVersion<DayPlanPatchInput>;
+
+export interface PushSubscriptionKeysInput {
+  p256dh: string;
+  auth: string;
+}
+
+export interface PushSubscriptionInput {
+  endpoint: string;
+  keys: PushSubscriptionKeysInput;
+}
+
+export interface PushSubscriptionStatus {
+  subscribed: boolean;
+  endpoint: string | null;
+}
+
+export interface PushVapidKeyResponse {
+  publicKey: string;
+  enabled: boolean;
+}
+
+export interface Feature {
+  id: number;
+  title: string;
+  status: FeatureStatus;
+  description: string | null;
+  content?: string;
+  sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
+  useCaseCount: number;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface FeatureInput {
   title: string;
-  slug: string;
   status?: FeatureStatus;
   description?: string | null;
   content?: string;
   sortOrder?: number;
+  responsibleUserId?: number | null;
 }
 
 export type FeatureUpdate = WithExpectedVersion<Partial<FeatureInput>>;
@@ -485,25 +1005,29 @@ export interface UseCase {
   id: number;
   featureId: number;
   title: string;
-  slug: string;
   status: FeatureStatus;
   description: string | null;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
+  attachmentCount: number;
+  noteCount: number;
+  commentCount: number;
   version: number;
   createdAt: string;
   updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface UseCaseInput {
   featureId?: number;
   title: string;
-  slug: string;
   status?: FeatureStatus;
   description?: string | null;
   content?: string;
   sortOrder?: number;
+  responsibleUserId?: number | null;
 }
 
 export type UseCaseUpdate = WithExpectedVersion<Partial<UseCaseInput>>;
@@ -516,7 +1040,7 @@ export type DraftTicket =
   | { kind: "new"; draft: Pick<TicketInput, "title" | "type" | "status" | "priority"> }
   | { kind: "existing"; ticket: Ticket };
 
-export type DraftUseCase = { kind: "new"; draft: Pick<UseCaseInput, "title" | "slug" | "status"> } | { kind: "existing"; useCase: UseCase };
+export type DraftUseCase = { kind: "new"; draft: Pick<UseCaseInput, "title" | "status"> } | { kind: "existing"; useCase: UseCase };
 
 export type DraftSubtask = {
   title: string;
@@ -536,29 +1060,33 @@ export type DraftNote = {
 export interface WikiPage {
   id: number;
   parentId: number | null;
-  projectId: number | null;
   title: string;
-  slug: string;
   content?: string;
-  contentPath: string | null;
   sortOrder: number;
   childCount: number;
+  attachmentCount: number;
+  taskCount: number;
+  ticketCount: number;
+  relatedPages: WikiPageRelationSummary[];
   version: number;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface WikiPageRelationSummary {
+  id: number;
+  title: string;
+  parentId: number | null;
+}
+
 export interface WikiBreadcrumb {
   id: number;
   title: string;
-  slug: string;
 }
 
 export interface WikiPageInput {
   title: string;
-  slug: string;
   parentId?: number | null;
-  projectId?: number | null;
   content?: string;
   sortOrder?: number;
 }
@@ -575,9 +1103,12 @@ export interface BacklogItem {
   status: BacklogStatus;
   importKey: string | null;
   sortOrder: number;
+  responsibleUserId: number | null;
+  responsibleUser: UserSummary | null;
   version: number;
   createdAt: string;
   updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface BacklogItemInput {
@@ -588,6 +1119,7 @@ export interface BacklogItemInput {
   status?: BacklogStatus;
   importKey?: string | null;
   sortOrder?: number;
+  responsibleUserId?: number | null;
 }
 
 export type BacklogItemUpdate = WithExpectedVersion<Partial<BacklogItemInput>>;
@@ -621,7 +1153,6 @@ export interface WikiImportItemResult {
   type: WikiImportItemType;
   action: WikiImportAction;
   title: string;
-  slug?: string;
   importKey?: string;
   sourcePath?: string;
   message?: string;
@@ -637,11 +1168,11 @@ export interface WikiImportReport {
 
 export type DumpReadiness = "ready" | "warning" | "blocked";
 export type DumpImportStatus = "success" | "warning" | "error";
-export type DumpDriveConfigSource = "database" | "environment" | "missing";
 
-export interface DumpDriveFile {
+export interface DumpBackupFile {
   id: string;
   name: string;
+  path: string;
   createdTime: string;
   modifiedTime: string | null;
   sizeBytes: number;
@@ -658,19 +1189,57 @@ export interface DumpFileRootSummary {
   fileCount: number;
   totalBytes: number;
   sha256: string;
+  partial?: boolean;
 }
 
-export interface DumpDriveSaveResult {
+export interface DumpBackupStatus {
+  backupDirectory: string;
+  ready: boolean;
+  fileCount: number;
+  latestFile: DumpBackupFile | null;
+}
+
+export interface DumpRemoteBackupFile extends DumpBackupFile {
+  imported: boolean;
+  importedAt: string | null;
+}
+
+export interface DumpRemoteBackupStatus {
+  remoteDirectory: string;
+  configured: boolean;
+  protectedConfirmed: boolean;
+  ready: boolean;
+  fileCount: number;
+  latestFile: DumpRemoteBackupFile | null;
+  files: DumpRemoteBackupFile[];
+  blockingIssues: string[];
+}
+
+export interface DumpRemoteUploadResult {
+  attempted: boolean;
+  success: boolean;
+  remoteFile: DumpRemoteBackupFile | null;
+  error: string | null;
+}
+
+export interface ContentImageUploadResponse {
+  url: string;
+}
+
+export interface DumpBackupSaveResult {
   dumpId: string;
   filename: string;
+  filePath: string;
   sizeBytes: number;
-  driveFile: DumpDriveFile;
+  backupFile: DumpBackupFile;
+  remoteUpload: DumpRemoteUploadResult | null;
 }
 
-export interface DumpDrivePreviewResult {
+export interface DumpBackupPreviewResult {
+  previewToken?: string;
   fileHash: string;
   dumpId: string;
-  driveFile: DumpDriveFile;
+  backupFile: DumpBackupFile;
   targetDatabasePath: string;
   transferReadiness: DumpReadiness;
   blockingIssues: string[];
@@ -682,15 +1251,26 @@ export interface DumpDrivePreviewResult {
   expectedFileRoots: DumpFileRootSummary[];
 }
 
-export interface DumpDriveApplyRequest {
+export interface DumpBackupApplyRequest {
   fileId: string;
   fileHash: string;
   confirmationPhrase: string;
 }
 
-export interface DumpDriveApplyResult {
+export interface DumpRemoteBackupPreviewRequest {
+  fileId?: string | null;
+}
+
+export interface DumpRemoteBackupApplyRequest {
+  fileId: string;
+  fileHash: string;
+  previewToken: string;
+  confirmed: boolean;
+}
+
+export interface DumpBackupApplyResult {
   dumpId: string;
-  driveFile: DumpDriveFile;
+  backupFile: DumpBackupFile;
   targetBackupPath: string;
   verificationPassed: boolean;
   importStatus: DumpImportStatus;
@@ -700,15 +1280,3 @@ export interface DumpDriveApplyResult {
   blockingIssues: string[];
 }
 
-export interface DumpDriveConfig {
-  folderId: string | null;
-  folderUrl: string | null;
-  source: DumpDriveConfigSource;
-  oauthConfigured: boolean;
-  ready: boolean;
-  updatedAt: string | null;
-}
-
-export interface DumpDriveConfigUpdateRequest {
-  folderInput: string;
-}

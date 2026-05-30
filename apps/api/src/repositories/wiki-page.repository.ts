@@ -1,36 +1,33 @@
-import { eq, isNull } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { eq, isNull } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { wikiPages } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
 export type WikiPageRecord = typeof wikiPages.$inferSelect;
 export type WikiPageCreateData = Omit<typeof wikiPages.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type WikiPageUpdateData = Partial<Pick<WikiPageCreateData, "parentId" | "projectId" | "title" | "slug" | "contentPath" | "sortOrder">>;
+export type WikiPageUpdateData = Partial<Pick<WikiPageCreateData, "parentId" | "title" | "content" | "sortOrder">>;
 
 function nowIso(): string {
   return new Date().toISOString();
 }
 
 export const wikiPageRepository = {
-  findById(database: DbClient, id: number): WikiPageRecord | undefined {
-    return database.select().from(wikiPages).where(eq(wikiPages.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<WikiPageRecord | undefined> {
+    return firstRow(await database.select().from(wikiPages).where(eq(wikiPages.id, id)));
   },
 
-  findRootPages(database: DbClient): WikiPageRecord[] {
-    return database.select().from(wikiPages).where(isNull(wikiPages.parentId)).orderBy(wikiPages.sortOrder, wikiPages.title).all();
+  async findRootPages(database: DbSession): Promise<WikiPageRecord[]> {
+    return database.select().from(wikiPages).where(isNull(wikiPages.parentId)).orderBy(wikiPages.sortOrder, wikiPages.title);
   },
 
-  findChildren(database: DbClient, id: number): WikiPageRecord[] {
-    return database.select().from(wikiPages).where(eq(wikiPages.parentId, id)).orderBy(wikiPages.sortOrder, wikiPages.title).all();
+  async findChildren(database: DbSession, id: number): Promise<WikiPageRecord[]> {
+    return database.select().from(wikiPages).where(eq(wikiPages.parentId, id)).orderBy(wikiPages.sortOrder, wikiPages.title);
   },
 
-  findBySlug(database: DbClient, slug: string): WikiPageRecord[] {
-    return database.select().from(wikiPages).where(eq(wikiPages.slug, slug)).all();
-  },
-
-  create(database: DbClient, data: WikiPageCreateData, userId?: number): WikiPageRecord {
+  async create(database: DbSession, data: WikiPageCreateData, userId?: number): Promise<WikiPageRecord> {
     const now = nowIso();
-    return database
+    const result = await database
       .insert(wikiPages)
       .values({
         ...data,
@@ -39,18 +36,21 @@ export const wikiPageRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, insertId(result));
+    if (!created) {
+      throw new Error("Created wiki page could not be loaded");
+    }
+    return created;
   },
 
-  update(database: DbClient, id: number, expectedVersion: number, data: WikiPageUpdateData, userId?: number): WikiPageRecord | undefined {
-    const current = this.findById(database, id);
+  async update(database: DbSession, id: number, expectedVersion: number, data: WikiPageUpdateData, userId?: number): Promise<WikiPageRecord | undefined> {
+    const current = await this.findById(database, id);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    return database
+    await database
       .update(wikiPages)
       .set({
         ...data,
@@ -58,12 +58,12 @@ export const wikiPageRepository = {
         updatedBy: userId ?? null,
         updatedAt: nowIso()
       })
-      .where(eq(wikiPages.id, id))
-      .returning()
-      .get();
+      .where(eq(wikiPages.id, id));
+    return this.findById(database, id);
   },
 
-  delete(database: DbClient, id: number): number {
-    return database.delete(wikiPages).where(eq(wikiPages.id, id)).run().changes;
+  async delete(database: DbSession, id: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(wikiPages).where(eq(wikiPages.id, id)));
   }
 };
+

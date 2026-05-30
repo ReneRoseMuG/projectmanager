@@ -1,39 +1,81 @@
 import type {
-  DumpDriveApplyResult,
-  DumpDriveFile,
-  DumpDrivePreviewResult,
-  DumpDriveSaveResult,
+  BackupProgressEvent,
+  DumpBackupApplyResult,
+  DumpBackupFile,
+  DumpBackupPreviewResult,
+  DumpBackupSaveResult,
+  DumpBackupStatus,
   DumpFileRootSummary,
-  DumpTableSummary
+  DumpRemoteBackupFile,
+  DumpRemoteBackupStatus,
+  DumpRemoteUploadResult,
+  DumpTableSummary,
 } from "@taskmanager/shared-types";
 import * as archiverPackage from "archiver";
 import type { Archiver } from "archiver";
-import type Database from "better-sqlite3";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { Transform } from "node:stream";
 import unzipper from "unzipper";
 import { config } from "../config.js";
-import { assertSafeTestDatabasePath, assertSafeTestDirectoryPath } from "../runtime-safety.js";
+import { mysqlPool as _productionPool } from "../db/client.js";
+import {
+  assertSafeTestDirectoryPath,
+} from "../runtime-safety.js";
+
+let _poolOverride: typeof _productionPool | null = null;
+
+export function setMysqlPoolForTests(pool: typeof _productionPool | null): void {
+  _poolOverride = pool;
+}
+
+const mysqlPool = new Proxy(_productionPool, {
+  get(target, prop, _receiver) {
+    const pool = _poolOverride ?? target;
+    const value = Reflect.get(pool as object, prop, pool);
+    return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(pool) : value;
+  }
+});
 import { badRequest, conflict, notFound } from "../utils/errors.js";
+import {
+  downloadBackupSftpFile,
+  getBackupSftpReadiness,
+  listBackupSftpFiles,
+  uploadBackupSftpFile,
+} from "./backup-sftp.service.js";
 import { getContentBaseDir } from "./content.service.js";
-import type { GoogleDriveBackupClient } from "./google-drive.service.js";
 
 const APP_ID = "taskmanager";
-const DUMP_FORMAT_VERSION = 6;
+const DUMP_FORMAT_VERSION = 15;
+const SUPPORTED_DUMP_FORMAT_VERSIONS = [8, 9, 10, 11, 12, 13, 14, DUMP_FORMAT_VERSION] as const;
 const DUMP_FILENAME_PREFIX = "taskmanager_dump_";
-const ZipArchive = (archiverPackage as unknown as {
-  ZipArchive: new (options: { zlib: { level: number } }) => Archiver;
-}).ZipArchive;
+const REMOTE_IMPORT_HISTORY_SETTING_KEY = "remote_dump_import_history";
+const ZipArchive = (
+  archiverPackage as unknown as {
+    ZipArchive: new (options: { zlib: { level: number } }) => Archiver;
+  }
+).ZipArchive;
 
 function createArchive(): Archiver {
-  return new ZipArchive({ zlib: { level: 6 } });
+  return new ZipArchive({ zlib: { level: 1 } });
 }
 
 const DUMP_TABLES = [
   { key: "appSettings", tableName: "app_settings" },
+  { key: "roles", tableName: "roles" },
+  { key: "permissions", tableName: "permissions" },
   { key: "users", tableName: "users" },
+  { key: "pushSubscriptions", tableName: "push_subscriptions" },
+  { key: "dayPlans", tableName: "day_plans" },
+  { key: "journalEntries", tableName: "journal_entries" },
+  { key: "journalEntryChanges", tableName: "journal_entry_changes" },
+  { key: "journalEntryContexts", tableName: "journal_entry_contexts" },
+  { key: "settingsValues", tableName: "settings_values" },
+  { key: "dashboards", tableName: "dashboards" },
+  { key: "dashboardWidgets", tableName: "dashboard_widgets" },
+  { key: "dashboardDefaults", tableName: "dashboard_defaults" },
   { key: "catalogEntries", tableName: "catalog_entries" },
   { key: "projects", tableName: "projects" },
   { key: "milestones", tableName: "milestones" },
@@ -46,12 +88,16 @@ const DUMP_TABLES = [
   { key: "wikiPages", tableName: "wiki_pages" },
   { key: "comments", tableName: "comments" },
   { key: "attachments", tableName: "attachments" },
+  { key: "contentImages", tableName: "content_images" },
   { key: "events", tableName: "events" },
+  { key: "sentNotifications", tableName: "sent_notifications" },
   { key: "projectEvents", tableName: "project_events" },
   { key: "taskEvents", tableName: "task_events" },
   { key: "milestoneEvents", tableName: "milestone_events" },
+  { key: "dayPlanEvents", tableName: "day_plan_events" },
   { key: "backlogItems", tableName: "backlog_items" },
   { key: "featureRelations", tableName: "feature_relations" },
+  { key: "wikiPageRelations", tableName: "wiki_page_relations" },
   { key: "projectTags", tableName: "project_tags" },
   { key: "taskTags", tableName: "task_tags" },
   { key: "ticketTags", tableName: "ticket_tags" },
@@ -60,17 +106,22 @@ const DUMP_TABLES = [
   { key: "taskNotes", tableName: "task_notes" },
   { key: "ticketNotes", tableName: "ticket_notes" },
   { key: "milestoneNotes", tableName: "milestone_notes" },
+  { key: "dayPlanNotes", tableName: "day_plan_notes" },
+  { key: "wikiPageNotes", tableName: "wiki_page_notes" },
   { key: "projectFeatures", tableName: "project_features" },
   { key: "milestoneFeatures", tableName: "milestone_features" },
   { key: "projectTasks", tableName: "project_tasks" },
   { key: "milestoneTasks", tableName: "milestone_tasks" },
+  { key: "dayPlanTasks", tableName: "day_plan_tasks" },
   { key: "featureTasks", tableName: "feature_tasks" },
   { key: "useCaseTasks", tableName: "use_case_tasks" },
+  { key: "wikiPageTasks", tableName: "wiki_page_tasks" },
   { key: "projectTickets", tableName: "project_tickets" },
   { key: "milestoneTickets", tableName: "milestone_tickets" },
   { key: "taskTickets", tableName: "task_tickets" },
   { key: "featureTickets", tableName: "feature_tickets" },
   { key: "useCaseTickets", tableName: "use_case_tickets" },
+  { key: "wikiPageTickets", tableName: "wiki_page_tickets" },
   { key: "ticketRelations", tableName: "ticket_relations" },
   { key: "projectComments", tableName: "project_comments" },
   { key: "milestoneComments", tableName: "milestone_comments" },
@@ -80,11 +131,13 @@ const DUMP_TABLES = [
   { key: "backlogItemComments", tableName: "backlog_item_comments" },
   { key: "wikiPageComments", tableName: "wiki_page_comments" },
   { key: "ticketComments", tableName: "ticket_comments" },
+  { key: "dayPlanComments", tableName: "day_plan_comments" },
   { key: "projectAttachments", tableName: "project_attachments" },
   { key: "milestoneAttachments", tableName: "milestone_attachments" },
   { key: "taskAttachments", tableName: "task_attachments" },
   { key: "featureAttachments", tableName: "feature_attachments" },
-  { key: "ticketAttachments", tableName: "ticket_attachments" }
+  { key: "ticketAttachments", tableName: "ticket_attachments" },
+  { key: "wikiPageAttachments", tableName: "wiki_page_attachments" },
 ] as const;
 
 export const DUMP_TABLE_KEYS = DUMP_TABLES.map((entry) => entry.key);
@@ -94,7 +147,7 @@ type DumpTableRows = Record<DumpTableKey, Array<Record<string, unknown>>>;
 
 interface DumpPayload {
   appId: typeof APP_ID;
-  formatVersion: typeof DUMP_FORMAT_VERSION;
+  formatVersion: number;
   dumpId: string;
   exportedAt: string;
   schemaRevision: string;
@@ -107,13 +160,20 @@ interface DumpFileEntry {
   sha256: string;
 }
 
+interface DumpFileSourceEntry {
+  relativePath: string;
+  absolutePath: string;
+  sizeBytes: number;
+}
+
 interface DumpFileRootManifest extends DumpFileRootSummary {
   files: DumpFileEntry[];
+  partial?: boolean;
 }
 
 interface DumpManifest {
   appId: typeof APP_ID;
-  formatVersion: typeof DUMP_FORMAT_VERSION;
+  formatVersion: number;
   dumpId: string;
   exportedAt: string;
   schemaRevision: string;
@@ -121,26 +181,86 @@ interface DumpManifest {
   fileRoots: Record<"uploads" | "content", DumpFileRootManifest>;
 }
 
-interface InspectedDump extends DumpDrivePreviewResult {
+interface DumpSnapshot {
+  dumpId: string;
+  filename: string;
+  payload: DumpPayload;
+  manifest: DumpManifest;
+}
+
+interface BuildDumpSnapshotOptions {
+  deferFileRoots?: boolean;
+}
+
+interface ArchiveProgressState {
+  currentBytes: number;
+  totalBytes: number;
+  progressCallback?: BackupProgressCallback;
+}
+
+interface InspectedDump extends DumpBackupPreviewResult {
   payload: DumpPayload;
   directory: unzipper.CentralDirectory;
+  zipFileBuffers: ZipFileBufferCache;
+  manifest: DumpManifest | null;
 }
+
+type ZipFileBufferCache = Map<string, Buffer>;
 
 interface StagedFileRoots {
   uploads: string;
   content: string;
 }
 
-interface FileRootBackup {
+interface FileRootSwap {
   key: "uploads" | "content";
   targetDir: string;
-  backupDir: string;
-  existed: boolean;
+  previousDir: string;
+  stagedDir: string;
+  targetExisted: boolean;
+  swapped: boolean;
+}
+
+interface LegacyStandardAdminFallback {
+  id: number;
+  row: Record<string, unknown>;
+}
+
+interface RestoreTablesResult {
+  restored: number;
+  refreshedTableKeys: Set<DumpTableKey>;
 }
 
 interface ApplyDumpOptions {
   afterFileSwap?: () => void;
+  afterTablesRestore?: (preview: InspectedDump) => void;
+  progressCallback?: BackupProgressCallback;
 }
+
+interface DumpProgressOptions {
+  progressCallback?: BackupProgressCallback;
+}
+
+type BackupProgressCallback = (event: BackupProgressEvent) => void;
+
+interface RemoteDumpImportHistoryEntry {
+  fileId: string;
+  fileHash: string;
+  dumpId: string;
+  importedAt: string;
+}
+
+const activeRemoteImports = new Set<string>();
+const remotePreviewSessionTtlMs = 10 * 60 * 1000;
+
+interface RemotePreviewSession {
+  fileId: string;
+  fileHash: string;
+  preview: InspectedDump;
+  expiresAt: number;
+}
+
+const remotePreviewSessions = new Map<string, RemotePreviewSession>();
 
 function quoteIdentifier(value: string): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) {
@@ -175,8 +295,109 @@ function ensureWorkDir(): string {
   return config.backupWorkDir;
 }
 
+function localBackupManifestPath(): string {
+  const dataDir = ensureWorkDir();
+  return path.join(dataDir, "last-backup-manifest.json");
+}
+
+function readLastLocalBackupManifest(): DumpManifest | null {
+  try {
+    return parseManifest(JSON.parse(fs.readFileSync(localBackupManifestPath(), "utf8")) as unknown);
+  } catch {
+    return null;
+  }
+}
+
+function writeLastLocalBackupManifest(manifest: DumpManifest): void {
+  const manifestPath = localBackupManifestPath();
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+}
+
+function isDumpBackupFilename(filename: string): boolean {
+  return filename.startsWith(DUMP_FILENAME_PREFIX) && filename.endsWith(".zip");
+}
+
+function validateBackupFileId(fileId: string): string {
+  const normalized = fileId.trim();
+  if (
+    !isDumpBackupFilename(normalized) ||
+    normalized !== path.basename(normalized) ||
+    normalized.includes("/") ||
+    normalized.includes("\\")
+  ) {
+    throw badRequest("Backup file id is invalid");
+  }
+  return normalized;
+}
+
+function mapBackupFile(filePath: string): DumpBackupFile {
+  const stats = fs.statSync(filePath);
+  return {
+    id: path.basename(filePath),
+    name: path.basename(filePath),
+    path: filePath,
+    createdTime: stats.birthtime.toISOString(),
+    modifiedTime: stats.mtime.toISOString(),
+    sizeBytes: stats.size,
+  };
+}
+
+function listLocalBackupFiles(): DumpBackupFile[] {
+  const workDir = ensureWorkDir();
+  return fs
+    .readdirSync(workDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && isDumpBackupFilename(entry.name))
+    .map((entry) => mapBackupFile(path.join(workDir, entry.name)))
+    .sort((a, b) => {
+      const timeCompare =
+        Date.parse(b.modifiedTime ?? b.createdTime) -
+        Date.parse(a.modifiedTime ?? a.createdTime);
+      return timeCompare !== 0
+        ? timeCompare
+        : b.name.localeCompare(a.name, "en");
+    });
+}
+
+function readLocalBackupFile(fileId: string): {
+  backupFile: DumpBackupFile;
+  buffer: Buffer;
+} {
+  const safeFileId = validateBackupFileId(fileId);
+  const workDir = ensureWorkDir();
+  const filePath = path.resolve(workDir, safeFileId);
+  const workRoot = workDir.endsWith(path.sep)
+    ? workDir
+    : `${workDir}${path.sep}`;
+  if (!filePath.startsWith(workRoot)) {
+    throw badRequest("Backup file id is invalid");
+  }
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    throw notFound("Backup file was not found");
+  }
+  return {
+    backupFile: mapBackupFile(filePath),
+    buffer: fs.readFileSync(filePath),
+  };
+}
+
+function mapRemoteBackupFile(
+  file: { name: string; path: string; sizeBytes: number; modifiedTime: string },
+  importedByFileId: Map<string, RemoteDumpImportHistoryEntry>,
+): DumpRemoteBackupFile {
+  const imported = importedByFileId.get(file.name) ?? null;
+  return {
+    id: file.name,
+    name: file.name,
+    path: file.path,
+    createdTime: file.modifiedTime,
+    modifiedTime: file.modifiedTime,
+    sizeBytes: file.sizeBytes,
+    imported: imported !== null,
+    importedAt: imported?.importedAt ?? null,
+  };
+}
+
 function assertSafeDumpRuntimeTargets(): void {
-  assertSafeTestDatabasePath(config.databasePath);
   assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   assertSafeTestDirectoryPath(getContentBaseDir(), "CONTENT_DIR");
   assertSafeTestDirectoryPath(config.backupWorkDir, "BACKUP_WORK_DIR");
@@ -186,10 +407,60 @@ function makeTempDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
+function emitBackupProgress(
+  callback: BackupProgressCallback | undefined,
+  event: Omit<BackupProgressEvent, "type">,
+): void {
+  if (!callback) {
+    return;
+  }
+  try {
+    callback({ type: "backup_progress", ...event });
+  } catch {
+    // Progress events are advisory and must never abort a backup or import.
+  }
+}
+
+function createProgressReadStream(
+  filePath: string,
+  totalBytes: number,
+  onProgress: (current: number) => void,
+): NodeJS.ReadableStream {
+  let transferred = 0;
+  const counter = new Transform({
+    transform(
+      chunk: Buffer,
+      _encoding: BufferEncoding,
+      callback: (error?: Error | null, data?: Buffer) => void,
+    ) {
+      transferred += chunk.byteLength;
+      onProgress(transferred);
+      callback(null, chunk);
+    },
+  });
+  return fs.createReadStream(filePath).pipe(counter);
+}
+
 function getSchemaRevision(): string {
   const candidates = [
-    path.resolve(process.cwd(), "src", "db", "migrations", "meta", "_journal.json"),
-    path.resolve(process.cwd(), "apps", "api", "src", "db", "migrations", "meta", "_journal.json")
+    path.resolve(
+      process.cwd(),
+      "src",
+      "db",
+      "migrations",
+      "meta",
+      "_journal.json",
+    ),
+    path.resolve(
+      process.cwd(),
+      "apps",
+      "api",
+      "src",
+      "db",
+      "migrations",
+      "meta",
+      "_journal.json",
+    ),
   ];
 
   for (const candidate of candidates) {
@@ -198,7 +469,9 @@ function getSchemaRevision(): string {
         entries?: Array<{ idx?: number; tag?: string }>;
       };
       const lastEntry = Array.isArray(parsed.entries)
-        ? [...parsed.entries].sort((a, b) => Number(a.idx ?? 0) - Number(b.idx ?? 0)).at(-1)
+        ? [...parsed.entries]
+            .sort((a, b) => Number(a.idx ?? 0) - Number(b.idx ?? 0))
+            .at(-1)
         : null;
       if (typeof lastEntry?.tag === "string" && lastEntry.tag.length > 0) {
         return lastEntry.tag;
@@ -211,26 +484,168 @@ function getSchemaRevision(): string {
   return "unknown";
 }
 
-function selectTableRows(sqlite: Database.Database, tableName: string): Array<Record<string, unknown>> {
-  return sqlite.prepare(`SELECT * FROM ${quoteIdentifier(tableName)} ORDER BY rowid`).all() as Array<Record<string, unknown>>;
+function isSupportedDumpFormatVersion(
+  value: unknown,
+): value is (typeof SUPPORTED_DUMP_FORMAT_VERSIONS)[number] {
+  return SUPPORTED_DUMP_FORMAT_VERSIONS.includes(
+    value as (typeof SUPPORTED_DUMP_FORMAT_VERSIONS)[number],
+  );
 }
 
-function collectDumpTableRows(sqlite: Database.Database): DumpTableRows {
-  const result = {} as DumpTableRows;
-  for (const entry of DUMP_TABLES) {
-    result[entry.key] = selectTableRows(sqlite, entry.tableName);
+function standardAdminEmail(): string {
+  return config.adminEmail.toLowerCase();
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function numericValue(value: unknown): number | null {
+  const numeric = Number(value);
+  return Number.isInteger(numeric) ? numeric : null;
+}
+
+function isSerializedBlob(value: unknown): value is { __blobBase64: string } {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      typeof (value as { __blobBase64?: unknown }).__blobBase64 === "string",
+  );
+}
+
+function isBlobColumn(tableName: string, column: string): boolean {
+  return tableName === "content_images" && column === "data";
+}
+
+function serializeTableRow(
+  tableName: string,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...row };
+  for (const [column, value] of Object.entries(result)) {
+    if (isBlobColumn(tableName, column) && Buffer.isBuffer(value)) {
+      result[column] = { __blobBase64: value.toString("base64") };
+    }
   }
   return result;
 }
 
-function buildTableManifest(rows: DumpTableRows): Record<DumpTableKey, DumpTableSummary> {
+function deserializeTableRow(
+  tableName: string,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...row };
+  for (const [column, value] of Object.entries(result)) {
+    if (!isBlobColumn(tableName, column)) {
+      continue;
+    }
+    if (Buffer.isBuffer(value) || value === null || value === undefined) {
+      continue;
+    }
+    if (!isSerializedBlob(value)) {
+      throw badRequest(`Dump table '${tableName}' column '${column}' has an invalid blob value`);
+    }
+    result[column] = Buffer.from(value.__blobBase64, "base64");
+  }
+  return result;
+}
+
+async function selectTableRows(
+  tableName: string,
+): Promise<Array<Record<string, unknown>>> {
+  const [rows] = await mysqlPool.execute(`SELECT * FROM \`${tableName}\``);
+  return (rows as Array<Record<string, unknown>>).map((row) =>
+    serializeTableRow(tableName, row),
+  );
+}
+
+function buildRoleCodeById(
+  rows: Array<Record<string, unknown>>,
+): Map<number, string> {
+  const result = new Map<number, string>();
+  for (const row of rows) {
+    const id = numericValue(row.id);
+    const key = stringValue(row.key);
+    if (id !== null && key) {
+      result.set(id, key);
+    }
+  }
+  return result;
+}
+
+function normalizeUserRows(
+  rows: Array<Record<string, unknown>>,
+  roleCodeById: Map<number, string>,
+): Array<Record<string, unknown>> {
+  return rows.map((row) => {
+    const result = { ...row };
+    const roleCode = stringValue(result.roleCode);
+    if (!roleCode) {
+      const roleId = numericValue(result.role_id);
+      if (roleId === null) {
+        throw badRequest("Dump user is missing a role reference");
+      }
+      const mappedRoleCode = roleCodeById.get(roleId);
+      if (!mappedRoleCode) {
+        throw badRequest("Dump user references an unknown role");
+      }
+      result.roleCode = mappedRoleCode;
+    }
+    delete result.role_id;
+    return result;
+  });
+}
+
+function normalizeDumpTables(tables: DumpTableRows): DumpTableRows {
+  const result = {} as DumpTableRows;
+  const roleCodeById = buildRoleCodeById(tables.roles);
+
+  for (const entry of DUMP_TABLES) {
+    if (entry.key === "users") {
+      result.users = normalizeUserRows(tables.users, roleCodeById);
+      continue;
+    }
+    result[entry.key] = (tables[entry.key] ?? []).map((row) => ({ ...row }));
+  }
+
+  return result;
+}
+
+function normalizeDumpPayload(payload: DumpPayload): DumpPayload {
+  return {
+    ...payload,
+    formatVersion: DUMP_FORMAT_VERSION,
+    tables: normalizeDumpTables(payload.tables),
+  };
+}
+
+async function collectDumpTableRows(): Promise<DumpTableRows> {
+  const result = {} as DumpTableRows;
+  for (const entry of DUMP_TABLES) {
+    result[entry.key] = await selectTableRows(entry.tableName);
+  }
+  return normalizeDumpTables(result);
+}
+
+async function collectRawTableRows(): Promise<DumpTableRows> {
+  const result = {} as DumpTableRows;
+  for (const entry of DUMP_TABLES) {
+    result[entry.key] = await selectTableRows(entry.tableName);
+  }
+  return result;
+}
+
+function buildTableManifest(
+  rows: DumpTableRows,
+): Record<DumpTableKey, DumpTableSummary> {
   const result = {} as Record<DumpTableKey, DumpTableSummary>;
   for (const entry of DUMP_TABLES) {
     const tableRows = rows[entry.key];
     result[entry.key] = {
       key: entry.key,
       rowCount: tableRows.length,
-      sha256: sha256Json(tableRows)
+      sha256: sha256Json(tableRows),
     };
   }
   return result;
@@ -266,30 +681,87 @@ function listFilesRecursive(rootDir: string): DumpFileEntry[] {
         continue;
       }
 
-      const relativePath = path.relative(rootDir, targetPath).replace(/\\/g, "/");
+      const relativePath = path
+        .relative(rootDir, targetPath)
+        .replace(/\\/g, "/");
       assertSafeRelativePath(relativePath);
       const buffer = fs.readFileSync(targetPath);
       results.push({
         relativePath,
         sizeBytes: buffer.byteLength,
-        sha256: sha256Buffer(buffer)
+        sha256: sha256Buffer(buffer),
       });
     }
   };
 
   walk(rootDir);
-  return results.sort((a, b) => a.relativePath.localeCompare(b.relativePath, "en"));
+  return results.sort((a, b) =>
+    a.relativePath.localeCompare(b.relativePath, "en"),
+  );
 }
 
-function buildFileRootManifest(key: "uploads" | "content", rootDir: string): DumpFileRootManifest {
-  const files = listFilesRecursive(rootDir);
+function listFileSourcesRecursive(rootDir: string): DumpFileSourceEntry[] {
+  if (!fs.existsSync(rootDir)) {
+    return [];
+  }
+
+  const results: DumpFileSourceEntry[] = [];
+  const walk = (currentDir: string): void => {
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      const targetPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        walk(targetPath);
+        continue;
+      }
+      if (!entry.isFile()) {
+        continue;
+      }
+
+      const relativePath = path
+        .relative(rootDir, targetPath)
+        .replace(/\\/g, "/");
+      assertSafeRelativePath(relativePath);
+      results.push({
+        relativePath,
+        absolutePath: targetPath,
+        sizeBytes: fs.statSync(targetPath).size,
+      });
+    }
+  };
+
+  walk(rootDir);
+  return results.sort((a, b) =>
+    a.relativePath.localeCompare(b.relativePath, "en"),
+  );
+}
+
+function buildFileRootManifestFromEntries(
+  key: "uploads" | "content",
+  files: DumpFileEntry[],
+  partial = false,
+): DumpFileRootManifest {
   return {
     key,
     fileCount: files.length,
     totalBytes: files.reduce((sum, entry) => sum + entry.sizeBytes, 0),
     sha256: sha256Json(files),
-    files
+    files,
+    ...(partial ? { partial: true } : {}),
   };
+}
+
+function buildEmptyFileRootManifest(
+  key: "uploads" | "content",
+): DumpFileRootManifest {
+  return buildFileRootManifestFromEntries(key, []);
+}
+
+function buildFileRootManifest(
+  key: "uploads" | "content",
+  rootDir: string,
+): DumpFileRootManifest {
+  const files = listFilesRecursive(rootDir);
+  return buildFileRootManifestFromEntries(key, files);
 }
 
 function buildFileRootSummaries(manifest: DumpManifest): DumpFileRootSummary[] {
@@ -298,51 +770,43 @@ function buildFileRootSummaries(manifest: DumpManifest): DumpFileRootSummary[] {
       key: "uploads",
       fileCount: manifest.fileRoots.uploads.fileCount,
       totalBytes: manifest.fileRoots.uploads.totalBytes,
-      sha256: manifest.fileRoots.uploads.sha256
+      sha256: manifest.fileRoots.uploads.sha256,
+      ...(manifest.fileRoots.uploads.partial ? { partial: true } : {}),
     },
     {
       key: "content",
       fileCount: manifest.fileRoots.content.fileCount,
       totalBytes: manifest.fileRoots.content.totalBytes,
-      sha256: manifest.fileRoots.content.sha256
-    }
+      sha256: manifest.fileRoots.content.sha256,
+      ...(manifest.fileRoots.content.partial ? { partial: true } : {}),
+    },
   ];
 }
 
-function appendDirectoryIfExists(archive: Archiver, rootDir: string, archiveRoot: string): void {
-  if (fs.existsSync(rootDir)) {
-    archive.directory(rootDir, archiveRoot);
-  }
-}
-
-function archiveToBuffer(archive: Archiver): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    archive.on("data", (chunk: Buffer) => chunks.push(chunk));
-    archive.on("end", () => resolve(Buffer.concat(chunks)));
-    archive.on("error", reject);
-    void archive.finalize();
-  });
-}
-
-export async function buildDumpArchive(sqlite: Database.Database): Promise<{
-  buffer: Buffer;
-  dumpId: string;
-  filename: string;
-  manifest: DumpManifest;
-}> {
+async function buildDumpSnapshot(
+  options: BuildDumpSnapshotOptions = {},
+): Promise<DumpSnapshot> {
   assertSafeDumpRuntimeTargets();
   const exportedAt = nowIso();
   const dumpId = buildDumpId(exportedAt);
   const schemaRevision = getSchemaRevision();
-  const tables = collectDumpTableRows(sqlite);
+  const tables = await collectDumpTableRows();
+  const fileRoots = options.deferFileRoots
+    ? {
+        uploads: buildEmptyFileRootManifest("uploads"),
+        content: buildEmptyFileRootManifest("content"),
+      }
+    : {
+        uploads: buildFileRootManifest("uploads", config.uploadDir),
+        content: buildEmptyFileRootManifest("content"),
+      };
   const payload: DumpPayload = {
     appId: APP_ID,
     formatVersion: DUMP_FORMAT_VERSION,
     dumpId,
     exportedAt,
     schemaRevision,
-    tables
+    tables,
   };
   const manifest: DumpManifest = {
     appId: APP_ID,
@@ -351,24 +815,203 @@ export async function buildDumpArchive(sqlite: Database.Database): Promise<{
     exportedAt,
     schemaRevision,
     tables: buildTableManifest(tables),
-    fileRoots: {
-      uploads: buildFileRootManifest("uploads", config.uploadDir),
-      content: buildFileRootManifest("content", getContentBaseDir())
-    }
+    fileRoots,
   };
-
-  const archive = createArchive();
-  archive.append(`${JSON.stringify(payload, null, 2)}\n`, { name: "data.json" });
-  archive.append(`${JSON.stringify(manifest, null, 2)}\n`, { name: "manifest.json" });
-  appendDirectoryIfExists(archive, config.uploadDir, "uploads");
-  appendDirectoryIfExists(archive, getContentBaseDir(), "content");
-
   return {
-    buffer: await archiveToBuffer(archive),
     dumpId,
     filename: buildDumpFilename(dumpId),
-    manifest
+    payload,
+    manifest,
   };
+}
+
+function archiveToFile(archive: Archiver, targetPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    const output = fs.createWriteStream(targetPath);
+    let settled = false;
+    const fail = (error: unknown): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      output.destroy();
+      fs.rmSync(targetPath, { force: true });
+      reject(error);
+    };
+
+    output.on("close", () => {
+      if (!settled) {
+        settled = true;
+        resolve();
+      }
+    });
+    output.on("error", fail);
+    archive.on("error", fail);
+    archive.pipe(output);
+    try {
+      void Promise.resolve(archive.finalize()).catch(fail);
+    } catch (error) {
+      fail(error);
+    }
+  });
+}
+
+function emitArchiveProgress(
+  state: ArchiveProgressState | undefined,
+  detail: string,
+): void {
+  if (!state) {
+    return;
+  }
+  emitBackupProgress(state.progressCallback, {
+    operation: "full_backup",
+    phase: "archive",
+    current: state.currentBytes,
+    total: state.totalBytes,
+    detail,
+  });
+}
+
+function buildFileEntriesFromSources(
+  sources: DumpFileSourceEntry[],
+): DumpFileEntry[] {
+  return sources.map((source) => {
+    const buffer = fs.readFileSync(source.absolutePath);
+    return {
+      relativePath: source.relativePath,
+      sizeBytes: buffer.byteLength,
+      sha256: sha256Buffer(buffer),
+    };
+  });
+}
+
+function fileHashByRelativePath(
+  manifest: DumpFileRootManifest | null | undefined,
+): Map<string, string> {
+  return new Map((manifest?.files ?? []).map((file) => [file.relativePath, file.sha256]));
+}
+
+function selectChangedFileSources(
+  sources: DumpFileSourceEntry[],
+  currentFiles: DumpFileEntry[],
+  previousManifest: DumpFileRootManifest | null | undefined,
+): DumpFileSourceEntry[] {
+  const previousHashes = fileHashByRelativePath(previousManifest);
+  const currentByPath = new Map(currentFiles.map((file) => [file.relativePath, file]));
+  return sources.filter((source) => previousHashes.get(source.relativePath) !== currentByPath.get(source.relativePath)?.sha256);
+}
+
+function appendBufferedFileRoot(
+  archive: Archiver,
+  key: "uploads" | "content",
+  sources: DumpFileSourceEntry[],
+  progressState?: ArchiveProgressState,
+): DumpFileEntry[] {
+  const files: DumpFileEntry[] = [];
+  for (const source of sources) {
+    const buffer = fs.readFileSync(source.absolutePath);
+    archive.append(buffer, { name: `${key}/${source.relativePath}` });
+    files.push({
+      relativePath: source.relativePath,
+      sizeBytes: buffer.byteLength,
+      sha256: sha256Buffer(buffer),
+    });
+    if (progressState) {
+      progressState.currentBytes += buffer.byteLength;
+      emitArchiveProgress(progressState, `${key}/${source.relativePath}`);
+    }
+  }
+  return files;
+}
+
+function createArchiveFromSnapshot(
+  snapshot: DumpSnapshot,
+  progressCallback?: BackupProgressCallback,
+): Archiver {
+  const archive = createArchive();
+  archive.append(`${JSON.stringify(snapshot.payload, null, 2)}\n`, {
+    name: "data.json",
+  });
+  const uploadSources = listFileSourcesRecursive(config.uploadDir);
+  const currentUploadFiles = buildFileEntriesFromSources(uploadSources);
+  const previousManifest = readLastLocalBackupManifest();
+  const uploadSourcesToArchive = selectChangedFileSources(
+    uploadSources,
+    currentUploadFiles,
+    previousManifest?.fileRoots.uploads,
+  );
+  const totalBytes = uploadSourcesToArchive.reduce(
+    (sum, entry) => sum + entry.sizeBytes,
+    0,
+  );
+  const progressState = progressCallback
+    ? { currentBytes: 0, totalBytes, progressCallback }
+    : undefined;
+  if (progressState) {
+    emitArchiveProgress(progressState, snapshot.filename);
+  }
+  appendBufferedFileRoot(
+    archive,
+    "uploads",
+    uploadSourcesToArchive,
+    progressState,
+  );
+  snapshot.manifest.fileRoots = {
+    uploads: buildFileRootManifestFromEntries(
+      "uploads",
+      currentUploadFiles,
+      previousManifest !== null && uploadSourcesToArchive.length < uploadSources.length,
+    ),
+    content: buildEmptyFileRootManifest("content"),
+  };
+  archive.append(`${JSON.stringify(snapshot.manifest, null, 2)}\n`, {
+    name: "manifest.json",
+  });
+  return archive;
+}
+
+async function writeDumpArchiveFile(
+  snapshot: DumpSnapshot,
+  targetPath: string,
+  progressCallback?: BackupProgressCallback,
+): Promise<{ filePath: string; sizeBytes: number }> {
+  await archiveToFile(
+    createArchiveFromSnapshot(snapshot, progressCallback),
+    targetPath,
+  );
+  return {
+    filePath: targetPath,
+    sizeBytes: fs.statSync(targetPath).size,
+  };
+}
+
+async function createDatabaseSnapshot(
+  _targetPath: string,
+): Promise<void> {
+  // MySQL: no file snapshot needed, the JSON dump is the backup
+}
+
+export async function buildDumpArchive(): Promise<{
+  buffer: Buffer;
+  dumpId: string;
+  filename: string;
+  manifest: DumpManifest;
+}> {
+  const snapshot = await buildDumpSnapshot({ deferFileRoots: true });
+  const tempDir = makeTempDir("taskmanager-dump-archive-");
+  const filePath = path.join(tempDir, snapshot.filename);
+  try {
+    await writeDumpArchiveFile(snapshot, filePath);
+    return {
+      buffer: fs.readFileSync(filePath),
+      dumpId: snapshot.dumpId,
+      filename: snapshot.filename,
+      manifest: snapshot.manifest,
+    };
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 function parseObject(value: unknown, label: string): Record<string, unknown> {
@@ -383,15 +1026,21 @@ function parsePayload(raw: unknown): DumpPayload {
   if (candidate.appId !== APP_ID) {
     throw badRequest("Dump belongs to another application");
   }
-  if (candidate.formatVersion !== DUMP_FORMAT_VERSION) {
+  if (!isSupportedDumpFormatVersion(candidate.formatVersion)) {
     throw badRequest("Unsupported dump format version");
   }
-  if (typeof candidate.dumpId !== "string" || typeof candidate.exportedAt !== "string" || typeof candidate.schemaRevision !== "string") {
+  if (
+    typeof candidate.dumpId !== "string" ||
+    typeof candidate.exportedAt !== "string" ||
+    typeof candidate.schemaRevision !== "string"
+  ) {
     throw badRequest("Dump metadata is incomplete");
   }
 
   const rawTables = parseObject(candidate.tables, "data.json tables");
-  const unknownKeys = Object.keys(rawTables).filter((key) => !DUMP_TABLE_KEYS.includes(key as DumpTableKey));
+  const unknownKeys = Object.keys(rawTables).filter(
+    (key) => !DUMP_TABLE_KEYS.includes(key as DumpTableKey),
+  );
   if (unknownKeys.length > 0) {
     // Unknown table keys are intentionally ignored by the parser and reported as warnings later.
   }
@@ -407,20 +1056,29 @@ function parsePayload(raw: unknown): DumpPayload {
 
   return {
     appId: APP_ID,
-    formatVersion: DUMP_FORMAT_VERSION,
+    formatVersion: Number(candidate.formatVersion),
     dumpId: candidate.dumpId,
     exportedAt: candidate.exportedAt,
     schemaRevision: candidate.schemaRevision,
-    tables
+    tables,
   };
 }
 
-function parseFileRootManifest(raw: unknown, key: "uploads" | "content"): DumpFileRootManifest {
+function parseFileRootManifest(
+  raw: unknown,
+  key: "uploads" | "content",
+): DumpFileRootManifest {
   const candidate = parseObject(raw, `manifest ${key}`);
   const fileCount = Number(candidate.fileCount);
   const totalBytes = Number(candidate.totalBytes);
   const sha256 = candidate.sha256;
-  if (!Number.isInteger(fileCount) || fileCount < 0 || !Number.isInteger(totalBytes) || totalBytes < 0 || typeof sha256 !== "string") {
+  if (
+    !Number.isInteger(fileCount) ||
+    fileCount < 0 ||
+    !Number.isInteger(totalBytes) ||
+    totalBytes < 0 ||
+    typeof sha256 !== "string"
+  ) {
     throw badRequest(`manifest ${key} summary is invalid`);
   }
   if (!Array.isArray(candidate.files)) {
@@ -432,14 +1090,19 @@ function parseFileRootManifest(raw: unknown, key: "uploads" | "content"): DumpFi
     const relativePath = file.relativePath;
     const sizeBytes = Number(file.sizeBytes);
     const fileHash = file.sha256;
-    if (typeof relativePath !== "string" || !Number.isInteger(sizeBytes) || sizeBytes < 0 || typeof fileHash !== "string") {
+    if (
+      typeof relativePath !== "string" ||
+      !Number.isInteger(sizeBytes) ||
+      sizeBytes < 0 ||
+      typeof fileHash !== "string"
+    ) {
       throw badRequest(`manifest ${key} file entry is invalid`);
     }
     assertSafeRelativePath(relativePath);
     return {
       relativePath,
       sizeBytes,
-      sha256: fileHash
+      sha256: fileHash,
     };
   });
 
@@ -448,7 +1111,8 @@ function parseFileRootManifest(raw: unknown, key: "uploads" | "content"): DumpFi
     fileCount,
     totalBytes,
     sha256,
-    files
+    files,
+    ...(candidate.partial === true ? { partial: true } : {}),
   };
 }
 
@@ -457,10 +1121,14 @@ function parseManifest(raw: unknown): DumpManifest {
   if (candidate.appId !== APP_ID) {
     throw badRequest("manifest.json belongs to another application");
   }
-  if (candidate.formatVersion !== DUMP_FORMAT_VERSION) {
+  if (!isSupportedDumpFormatVersion(candidate.formatVersion)) {
     throw badRequest("manifest.json has an unsupported format version");
   }
-  if (typeof candidate.dumpId !== "string" || typeof candidate.exportedAt !== "string" || typeof candidate.schemaRevision !== "string") {
+  if (
+    typeof candidate.dumpId !== "string" ||
+    typeof candidate.exportedAt !== "string" ||
+    typeof candidate.schemaRevision !== "string"
+  ) {
     throw badRequest("manifest.json metadata is incomplete");
   }
 
@@ -470,32 +1138,39 @@ function parseManifest(raw: unknown): DumpManifest {
     const table = parseObject(tableValues[key], `manifest table '${key}'`);
     const rowCount = Number(table.rowCount);
     const tableHash = table.sha256;
-    if (!Number.isInteger(rowCount) || rowCount < 0 || typeof tableHash !== "string") {
+    if (
+      !Number.isInteger(rowCount) ||
+      rowCount < 0 ||
+      typeof tableHash !== "string"
+    ) {
       throw badRequest(`manifest table '${key}' is invalid`);
     }
     tables[key] = {
       key,
       rowCount,
-      sha256: tableHash
+      sha256: tableHash,
     };
   }
 
   const fileRoots = parseObject(candidate.fileRoots, "manifest fileRoots");
   return {
     appId: APP_ID,
-    formatVersion: DUMP_FORMAT_VERSION,
+    formatVersion: Number(candidate.formatVersion),
     dumpId: candidate.dumpId,
     exportedAt: candidate.exportedAt,
     schemaRevision: candidate.schemaRevision,
     tables,
     fileRoots: {
       uploads: parseFileRootManifest(fileRoots.uploads, "uploads"),
-      content: parseFileRootManifest(fileRoots.content, "content")
-    }
+      content: parseFileRootManifest(fileRoots.content, "content"),
+    },
   };
 }
 
-async function parseJsonFile(directory: unzipper.CentralDirectory, filename: string): Promise<unknown | null> {
+async function parseJsonFile(
+  directory: unzipper.CentralDirectory,
+  filename: string,
+): Promise<unknown | null> {
   const file = directory.files.find((entry) => entry.path === filename);
   if (!file) {
     return null;
@@ -508,17 +1183,24 @@ async function parseJsonFile(directory: unzipper.CentralDirectory, filename: str
   }
 }
 
-async function collectZipFiles(directory: unzipper.CentralDirectory, archiveRoot: "uploads" | "content"): Promise<DumpFileRootManifest> {
+async function collectZipFiles(
+  directory: unzipper.CentralDirectory,
+  archiveRoot: "uploads" | "content",
+  zipFileBuffers: ZipFileBufferCache,
+): Promise<DumpFileRootManifest> {
   const files: DumpFileEntry[] = [];
   const prefix = `${archiveRoot}/`;
-  for (const file of directory.files.filter((entry) => entry.path.startsWith(prefix) && !entry.path.endsWith("/"))) {
+  for (const file of directory.files.filter(
+    (entry) => entry.path.startsWith(prefix) && !entry.path.endsWith("/"),
+  )) {
     const relativePath = file.path.slice(prefix.length);
     assertSafeRelativePath(relativePath);
     const buffer = await file.buffer();
+    zipFileBuffers.set(file.path, buffer);
     files.push({
       relativePath,
       sizeBytes: buffer.byteLength,
-      sha256: sha256Buffer(buffer)
+      sha256: sha256Buffer(buffer),
     });
   }
 
@@ -528,15 +1210,98 @@ async function collectZipFiles(directory: unzipper.CentralDirectory, archiveRoot
     fileCount: files.length,
     totalBytes: files.reduce((sum, entry) => sum + entry.sizeBytes, 0),
     sha256: sha256Json(files),
-    files
+    files,
   };
 }
 
-function buildConfirmationPhrase(dumpId: string, targetDatabasePath: string): string {
-  return `AKTUALISIERE TASKMANAGER ${dumpId} NACH ${path.basename(targetDatabasePath)}`;
+function fileEntryKey(file: DumpFileEntry): string {
+  return `${file.relativePath}:${file.sizeBytes}:${file.sha256}`;
 }
 
-export async function inspectDumpArchive(buffer: Buffer, driveFile: DumpDriveFile): Promise<InspectedDump> {
+function validateZipFilesAgainstManifest(
+  root: "uploads" | "content",
+  manifestRoot: DumpFileRootManifest,
+  actualRoot: DumpFileRootManifest,
+): string[] {
+  const issues: string[] = [];
+  const expectedByPath = new Map(manifestRoot.files.map((file) => [file.relativePath, file]));
+  for (const actual of actualRoot.files) {
+    const expected = expectedByPath.get(actual.relativePath);
+    if (!expected) {
+      issues.push(`ZIP file '${root}/${actual.relativePath}' is not listed in the manifest.`);
+      continue;
+    }
+    if (fileEntryKey(actual) !== fileEntryKey(expected)) {
+      issues.push(`ZIP file '${root}/${actual.relativePath}' does not match the manifest.`);
+    }
+  }
+
+  if (!manifestRoot.partial) {
+    for (const expected of manifestRoot.files) {
+      if (!actualRoot.files.some((actual) => actual.relativePath === expected.relativePath)) {
+        issues.push(`Manifest file '${root}/${expected.relativePath}' is missing in the ZIP.`);
+      }
+    }
+  }
+  return issues;
+}
+
+function localRootDir(root: "uploads" | "content"): string {
+  return root === "uploads" ? config.uploadDir : getContentBaseDir();
+}
+
+function safeLocalFilePath(root: "uploads" | "content", relativePath: string): string {
+  assertSafeRelativePath(relativePath);
+  const rootDir = path.resolve(localRootDir(root));
+  const targetPath = path.resolve(rootDir, relativePath);
+  const safeRoot = rootDir.endsWith(path.sep) ? rootDir : `${rootDir}${path.sep}`;
+  if (!targetPath.startsWith(safeRoot)) {
+    throw badRequest("Dump contains an unsafe file path");
+  }
+  return targetPath;
+}
+
+function verifyLocalBaseFile(root: "uploads" | "content", file: DumpFileEntry): string | null {
+  const targetPath = safeLocalFilePath(root, file.relativePath);
+  if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isFile()) {
+    return `Partial dump requires local base file '${root}/${file.relativePath}', but it is missing.`;
+  }
+  const buffer = fs.readFileSync(targetPath);
+  if (buffer.byteLength !== file.sizeBytes || sha256Buffer(buffer) !== file.sha256) {
+    return `Partial dump requires local base file '${root}/${file.relativePath}', but its hash does not match.`;
+  }
+  return null;
+}
+
+function validatePartialLocalBase(
+  root: "uploads" | "content",
+  manifestRoot: DumpFileRootManifest,
+  actualRoot: DumpFileRootManifest,
+): string[] {
+  if (!manifestRoot.partial) {
+    return [];
+  }
+  const zipPaths = new Set(actualRoot.files.map((file) => file.relativePath));
+  return manifestRoot.files.flatMap((file) => {
+    if (zipPaths.has(file.relativePath)) {
+      return [];
+    }
+    const issue = verifyLocalBaseFile(root, file);
+    return issue ? [issue] : [];
+  });
+}
+
+function buildConfirmationPhrase(
+  dumpId: string,
+  targetDbName: string,
+): string {
+  return `AKTUALISIERE TASKMANAGER ${dumpId} NACH ${targetDbName}`;
+}
+
+export async function inspectDumpArchive(
+  buffer: Buffer,
+  backupFile: DumpBackupFile,
+): Promise<InspectedDump> {
   let directory: unzipper.CentralDirectory;
   try {
     directory = await unzipper.Open.buffer(buffer);
@@ -548,26 +1313,55 @@ export async function inspectDumpArchive(buffer: Buffer, driveFile: DumpDriveFil
   if (!rawPayload) {
     throw badRequest("Dump ZIP does not contain data.json");
   }
-  const payload = parsePayload(rawPayload);
+  const rawDumpPayload = parsePayload(rawPayload);
+  const payload = normalizeDumpPayload(rawDumpPayload);
   const rawManifest = await parseJsonFile(directory, "manifest.json");
   const manifest = rawManifest ? parseManifest(rawManifest) : null;
 
   const warnings: string[] = [];
   const blockingIssues: string[] = [];
-  const payloadTableKeys = new Set(Object.keys(parseObject((rawPayload as Record<string, unknown>).tables, "data.json tables")));
-  const unknownTableKeys = [...payloadTableKeys].filter((key) => !DUMP_TABLE_KEYS.includes(key as DumpTableKey));
+  const payloadTableKeys = new Set(
+    Object.keys(
+      parseObject(
+        (rawPayload as Record<string, unknown>).tables,
+        "data.json tables",
+      ),
+    ),
+  );
+  const unknownTableKeys = [...payloadTableKeys].filter(
+    (key) => !DUMP_TABLE_KEYS.includes(key as DumpTableKey),
+  );
   for (const key of unknownTableKeys) {
     warnings.push(`Unknown dump table '${key}' was ignored.`);
   }
 
-  const actualUploads = await collectZipFiles(directory, "uploads");
-  const actualContent = await collectZipFiles(directory, "content");
-  const expectedTables = manifest ? Object.values(manifest.tables) : Object.values(buildTableManifest(payload.tables));
+  const zipFileBuffers: ZipFileBufferCache = new Map();
+  const actualUploads = await collectZipFiles(
+    directory,
+    "uploads",
+    zipFileBuffers,
+  );
+  const actualContent = await collectZipFiles(
+    directory,
+    "content",
+    zipFileBuffers,
+  );
+  const expectedTables = Object.values(buildTableManifest(payload.tables));
   const expectedFileRoots = manifest
     ? buildFileRootSummaries(manifest)
     : [
-        { key: "uploads" as const, fileCount: actualUploads.fileCount, totalBytes: actualUploads.totalBytes, sha256: actualUploads.sha256 },
-        { key: "content" as const, fileCount: actualContent.fileCount, totalBytes: actualContent.totalBytes, sha256: actualContent.sha256 }
+        {
+          key: "uploads" as const,
+          fileCount: actualUploads.fileCount,
+          totalBytes: actualUploads.totalBytes,
+          sha256: actualUploads.sha256,
+        },
+        {
+          key: "content" as const,
+          fileCount: actualContent.fileCount,
+          totalBytes: actualContent.totalBytes,
+          sha256: actualContent.sha256,
+        },
       ];
 
   if (!manifest) {
@@ -576,36 +1370,56 @@ export async function inspectDumpArchive(buffer: Buffer, driveFile: DumpDriveFil
     if (manifest.dumpId !== payload.dumpId) {
       blockingIssues.push("manifest.json dumpId does not match data.json.");
     }
+    if (manifest.formatVersion !== rawDumpPayload.formatVersion) {
+      blockingIssues.push(
+        "manifest.json formatVersion does not match data.json.",
+      );
+    }
     if (manifest.schemaRevision !== getSchemaRevision()) {
-      blockingIssues.push(`Schema revision differs: dump=${manifest.schemaRevision}, target=${getSchemaRevision()}.`);
+      blockingIssues.push(
+        `Schema revision differs: dump=${manifest.schemaRevision}, target=${getSchemaRevision()}.`,
+      );
     }
     for (const key of DUMP_TABLE_KEYS) {
-      const actualRows = payload.tables[key];
+      const actualRows = rawDumpPayload.tables[key];
       const expected = manifest.tables[key];
       if (actualRows.length !== expected.rowCount) {
-        blockingIssues.push(`Manifest row count does not match table '${key}'.`);
+        blockingIssues.push(
+          `Manifest row count does not match table '${key}'.`,
+        );
       }
       if (sha256Json(actualRows) !== expected.sha256) {
         blockingIssues.push(`Manifest hash does not match table '${key}'.`);
       }
     }
-    if (
-      manifest.fileRoots.uploads.fileCount !== actualUploads.fileCount ||
-      manifest.fileRoots.uploads.totalBytes !== actualUploads.totalBytes ||
-      manifest.fileRoots.uploads.sha256 !== actualUploads.sha256
-    ) {
-      blockingIssues.push("Manifest upload summary does not match ZIP content.");
-    }
-    if (
-      manifest.fileRoots.content.fileCount !== actualContent.fileCount ||
-      manifest.fileRoots.content.totalBytes !== actualContent.totalBytes ||
-      manifest.fileRoots.content.sha256 !== actualContent.sha256
-    ) {
-      blockingIssues.push("Manifest content summary does not match ZIP content.");
+    blockingIssues.push(
+      ...validateZipFilesAgainstManifest("uploads", manifest.fileRoots.uploads, actualUploads),
+      ...validateZipFilesAgainstManifest("content", manifest.fileRoots.content, actualContent),
+      ...validatePartialLocalBase("uploads", manifest.fileRoots.uploads, actualUploads),
+      ...validatePartialLocalBase("content", manifest.fileRoots.content, actualContent),
+    );
+  }
+
+  const roleCodes = new Set(
+    payload.tables.roles
+      .map((row) => stringValue(row.key))
+      .filter((key): key is string => Boolean(key)),
+  );
+  for (const row of payload.tables.users) {
+    const roleCode = stringValue(row.roleCode);
+    if (!roleCode || !roleCodes.has(roleCode)) {
+      blockingIssues.push(
+        `Dump user '${stringValue(row.email) ?? "unknown"}' references an unknown role.`,
+      );
     }
   }
 
-  const knownZipRoots = new Set(["data.json", "manifest.json", "uploads", "content"]);
+  const knownZipRoots = new Set([
+    "data.json",
+    "manifest.json",
+    "uploads",
+    "content",
+  ]);
   for (const file of directory.files) {
     const root = file.path.split("/")[0] ?? "";
     if (!knownZipRoots.has(root)) {
@@ -616,35 +1430,53 @@ export async function inspectDumpArchive(buffer: Buffer, driveFile: DumpDriveFil
   return {
     payload,
     directory,
+    zipFileBuffers,
+    manifest,
     fileHash: sha256Buffer(buffer),
     dumpId: payload.dumpId,
-    driveFile,
-    targetDatabasePath: config.databasePath,
-    transferReadiness: blockingIssues.length > 0 ? "blocked" : warnings.length > 0 ? "warning" : "ready",
+    backupFile,
+    targetDatabasePath: config.db.name,
+    transferReadiness:
+      blockingIssues.length > 0
+        ? "blocked"
+        : warnings.length > 0
+          ? "warning"
+          : "ready",
     blockingIssues,
     warnings,
-    confirmationPhrase: buildConfirmationPhrase(payload.dumpId, config.databasePath),
+    confirmationPhrase: buildConfirmationPhrase(
+      payload.dumpId,
+      config.db.name,
+    ),
     manifestPresent: manifest !== null,
     schemaRevision: manifest?.schemaRevision ?? null,
     expectedTables,
-    expectedFileRoots
+    expectedFileRoots,
   };
 }
 
-async function stageZipRoot(directory: unzipper.CentralDirectory, archiveRoot: "uploads" | "content"): Promise<string> {
+async function stageZipRootWithoutManifest(
+  archiveRoot: "uploads" | "content",
+  zipFileBuffers: ZipFileBufferCache,
+): Promise<string> {
   const stageDir = makeTempDir(`taskmanager-dump-${archiveRoot}-`);
   const prefix = `${archiveRoot}/`;
   try {
-    for (const file of directory.files.filter((entry) => entry.path.startsWith(prefix) && !entry.path.endsWith("/"))) {
-      const relativePath = file.path.slice(prefix.length);
+    for (const [zipPath, buffer] of zipFileBuffers.entries()) {
+      if (!zipPath.startsWith(prefix)) {
+        continue;
+      }
+      const relativePath = zipPath.slice(prefix.length);
       assertSafeRelativePath(relativePath);
       const targetPath = path.resolve(stageDir, relativePath);
-      const stageRoot = stageDir.endsWith(path.sep) ? stageDir : `${stageDir}${path.sep}`;
+      const stageRoot = stageDir.endsWith(path.sep)
+        ? stageDir
+        : `${stageDir}${path.sep}`;
       if (!targetPath.startsWith(stageRoot)) {
         throw badRequest("Dump contains an unsafe file path");
       }
       fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-      fs.writeFileSync(targetPath, await file.buffer());
+      fs.writeFileSync(targetPath, buffer);
     }
     return stageDir;
   } catch (error) {
@@ -653,200 +1485,822 @@ async function stageZipRoot(directory: unzipper.CentralDirectory, archiveRoot: "
   }
 }
 
-async function stageFileRoots(directory: unzipper.CentralDirectory): Promise<StagedFileRoots> {
+async function stageFileRootFromManifest(
+  archiveRoot: "uploads" | "content",
+  zipFileBuffers: ZipFileBufferCache,
+  manifestRoot: DumpFileRootManifest,
+): Promise<string> {
+  const stageDir = makeTempDir(`taskmanager-dump-${archiveRoot}-`);
+  const prefix = `${archiveRoot}/`;
+  try {
+    for (const file of manifestRoot.files) {
+      const zipPath = `${prefix}${file.relativePath}`;
+      let buffer = zipFileBuffers.get(zipPath);
+      if (buffer) {
+        if (buffer.byteLength !== file.sizeBytes || sha256Buffer(buffer) !== file.sha256) {
+          throw badRequest(`Dump ZIP file '${zipPath}' does not match the manifest`);
+        }
+      } else {
+        if (!manifestRoot.partial) {
+          throw badRequest(`Dump ZIP file '${zipPath}' is missing`);
+        }
+        const issue = verifyLocalBaseFile(archiveRoot, file);
+        if (issue) {
+          throw badRequest(issue);
+        }
+        buffer = fs.readFileSync(safeLocalFilePath(archiveRoot, file.relativePath));
+      }
+      const targetPath = path.resolve(stageDir, file.relativePath);
+      const stageRoot = stageDir.endsWith(path.sep)
+        ? stageDir
+        : `${stageDir}${path.sep}`;
+      if (!targetPath.startsWith(stageRoot)) {
+        throw badRequest("Dump contains an unsafe file path");
+      }
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      fs.writeFileSync(targetPath, buffer);
+    }
+    return stageDir;
+  } catch (error) {
+    fs.rmSync(stageDir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function stageFileRoots(
+  zipFileBuffers: ZipFileBufferCache,
+  manifest: DumpManifest | null,
+): Promise<StagedFileRoots> {
+  if (!manifest) {
+    return {
+      uploads: await stageZipRootWithoutManifest("uploads", zipFileBuffers),
+      content: await stageZipRootWithoutManifest("content", zipFileBuffers),
+    };
+  }
   return {
-    uploads: await stageZipRoot(directory, "uploads"),
-    content: await stageZipRoot(directory, "content")
+    uploads: await stageFileRootFromManifest("uploads", zipFileBuffers, manifest.fileRoots.uploads),
+    content: await stageFileRootFromManifest("content", zipFileBuffers, manifest.fileRoots.content),
   };
 }
 
-function createFileRootBackups(backupRoot: string): FileRootBackup[] {
-  const roots: Array<{ key: "uploads" | "content"; targetDir: string }> = [
-    { key: "uploads", targetDir: config.uploadDir },
-    { key: "content", targetDir: getContentBaseDir() }
+function moveDirectoryWithCopyFallback(sourceDir: string, targetDir: string): void {
+  fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+  try {
+    fs.renameSync(sourceDir, targetDir);
+  } catch {
+    fs.cpSync(sourceDir, targetDir, { recursive: true, force: true });
+    fs.rmSync(sourceDir, { recursive: true, force: true });
+  }
+}
+
+function replaceFileRoots(stagedRoots: StagedFileRoots, transferDir: string): FileRootSwap[] {
+  const swaps: FileRootSwap[] = [
+    {
+      key: "uploads",
+      targetDir: config.uploadDir,
+      previousDir: path.join(transferDir, "previous-uploads"),
+      stagedDir: stagedRoots.uploads,
+      targetExisted: fs.existsSync(config.uploadDir),
+      swapped: false,
+    },
+    {
+      key: "content",
+      targetDir: getContentBaseDir(),
+      previousDir: path.join(transferDir, "previous-content"),
+      stagedDir: stagedRoots.content,
+      targetExisted: fs.existsSync(getContentBaseDir()),
+      swapped: false,
+    },
   ];
 
-  return roots.map((root) => {
-    const backupDir = path.join(backupRoot, root.key);
-    const existed = fs.existsSync(root.targetDir);
-    if (existed) {
-      fs.mkdirSync(path.dirname(backupDir), { recursive: true });
-      fs.cpSync(root.targetDir, backupDir, { recursive: true, force: true });
+  try {
+    for (const swap of swaps) {
+      fs.rmSync(swap.previousDir, { recursive: true, force: true });
+      if (swap.targetExisted) {
+        moveDirectoryWithCopyFallback(swap.targetDir, swap.previousDir);
+      }
+      moveDirectoryWithCopyFallback(swap.stagedDir, swap.targetDir);
+      swap.swapped = true;
     }
-    return { ...root, backupDir, existed };
+    return swaps;
+  } catch (error) {
+    restoreSwappedFileRoots(swaps);
+    throw error;
+  }
+}
+
+function restoreSwappedFileRoots(swaps: FileRootSwap[]): void {
+  for (const swap of [...swaps].reverse()) {
+    if (!swap.swapped && !fs.existsSync(swap.previousDir)) {
+      continue;
+    }
+    fs.rmSync(swap.targetDir, { recursive: true, force: true });
+    if (swap.targetExisted && fs.existsSync(swap.previousDir)) {
+      moveDirectoryWithCopyFallback(swap.previousDir, swap.targetDir);
+    }
+  }
+}
+
+async function selectSingleRow(
+  tableName: string,
+  whereSql: string,
+  params: unknown[],
+): Promise<Record<string, unknown> | null> {
+  const [rows] = await mysqlPool.execute(
+    `SELECT * FROM \`${tableName}\` WHERE ${whereSql} LIMIT 1`,
+    params as never[],
+  );
+  return (rows as Array<Record<string, unknown>>)[0] ?? null;
+}
+
+function parseRemoteImportHistory(
+  value: unknown,
+): RemoteDumpImportHistoryEntry[] {
+  if (typeof value !== "string" || value.trim() === "") {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.flatMap((entry) => {
+      if (
+        typeof entry === "object" &&
+        entry !== null &&
+        typeof (entry as { fileId?: unknown }).fileId === "string" &&
+        typeof (entry as { fileHash?: unknown }).fileHash === "string" &&
+        typeof (entry as { dumpId?: unknown }).dumpId === "string" &&
+        typeof (entry as { importedAt?: unknown }).importedAt === "string"
+      ) {
+        const typedEntry = entry as RemoteDumpImportHistoryEntry;
+        return [typedEntry];
+      }
+      return [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function readRemoteImportHistory(): Promise<RemoteDumpImportHistoryEntry[]> {
+  const row = await selectSingleRow(
+    "app_settings",
+    "`key` = ?",
+    [REMOTE_IMPORT_HISTORY_SETTING_KEY],
+  );
+  return parseRemoteImportHistory(row?.value);
+}
+
+async function remoteImportHistoryByFileId(): Promise<Map<string, RemoteDumpImportHistoryEntry>> {
+  return new Map(
+    (await readRemoteImportHistory()).map((entry) => [entry.fileId, entry]),
+  );
+}
+
+async function writeRemoteImportHistory(
+  entries: RemoteDumpImportHistoryEntry[],
+): Promise<void> {
+  await mysqlPool.execute(
+    "DELETE FROM `app_settings` WHERE `key` = ?",
+    [REMOTE_IMPORT_HISTORY_SETTING_KEY],
+  );
+  await insertRows("app_settings", [
+    {
+      key: REMOTE_IMPORT_HISTORY_SETTING_KEY,
+      value: JSON.stringify(entries),
+      updated_at: nowIso(),
+    },
+  ]);
+}
+
+async function recordRemoteDumpImport(
+  entry: RemoteDumpImportHistoryEntry,
+): Promise<void> {
+  const byFileId = await remoteImportHistoryByFileId();
+  byFileId.set(entry.fileId, entry);
+  await writeRemoteImportHistory(
+    [...byFileId.values()].sort(
+      (a, b) => Date.parse(b.importedAt) - Date.parse(a.importedAt),
+    ),
+  );
+}
+
+async function assertRemoteDumpWasNotImported(
+  fileId: string,
+): Promise<void> {
+  if ((await remoteImportHistoryByFileId()).has(fileId)) {
+    throw conflict("Remote backup file was already imported");
+  }
+}
+
+function payloadHasAdminUser(payload: DumpPayload): boolean {
+  return payload.tables.users.some((row) => {
+    const email = stringValue(row.email)?.toLowerCase();
+    return email === standardAdminEmail() || stringValue(row.roleCode) === "admin";
   });
 }
 
-function replaceFileRoots(stagedRoots: StagedFileRoots): void {
-  const replacements: Array<{ targetDir: string; stageDir: string }> = [
-    { targetDir: config.uploadDir, stageDir: stagedRoots.uploads },
-    { targetDir: getContentBaseDir(), stageDir: stagedRoots.content }
-  ];
-
-  for (const replacement of replacements) {
-    fs.rmSync(replacement.targetDir, { recursive: true, force: true });
-    fs.mkdirSync(path.dirname(replacement.targetDir), { recursive: true });
-    fs.cpSync(replacement.stageDir, replacement.targetDir, { recursive: true, force: true });
+async function selectLocalAdminFallback(): Promise<Record<string, unknown> | null> {
+  const configuredAdmin = await selectSingleRow("users", "LOWER(email) = ?", [
+    standardAdminEmail(),
+  ]);
+  if (configuredAdmin) {
+    return configuredAdmin;
   }
+
+  const [rows] = await mysqlPool.execute(
+    "SELECT `users`.* FROM `users` INNER JOIN `roles` ON `users`.`role_id` = `roles`.`id` WHERE `roles`.`key` = 'admin' ORDER BY `users`.`id` LIMIT 1",
+  );
+  return (rows as Array<Record<string, unknown>>)[0] ?? null;
 }
 
-function restoreFileRootBackups(backups: FileRootBackup[]): void {
-  for (const backup of backups) {
-    fs.rmSync(backup.targetDir, { recursive: true, force: true });
-    if (backup.existed) {
-      fs.mkdirSync(path.dirname(backup.targetDir), { recursive: true });
-      fs.cpSync(backup.backupDir, backup.targetDir, { recursive: true, force: true });
-    }
+async function createLegacyStandardAdminFallback(
+  payload: DumpPayload,
+): Promise<LegacyStandardAdminFallback | null> {
+  if (payloadHasAdminUser(payload)) {
+    return null;
   }
+
+  const admin = await selectLocalAdminFallback();
+  const adminId = admin ? numericValue(admin.id) : null;
+  if (!admin || adminId === null) {
+    return null;
+  }
+
+  return { id: adminId, row: admin };
 }
 
-function tableColumns(sqlite: Database.Database, tableName: string): string[] {
-  const rows = sqlite.prepare(`PRAGMA table_info(${quoteIdentifier(tableName)})`).all() as Array<{ name: string }>;
-  return rows.map((row) => row.name);
+async function tableColumns(tableName: string): Promise<string[]> {
+  const [rows] = await mysqlPool.execute(
+    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION",
+    [tableName],
+  );
+  return (rows as Array<{ COLUMN_NAME: string }>).map((r) => r.COLUMN_NAME);
 }
 
-function insertRows(sqlite: Database.Database, tableName: string, rows: Array<Record<string, unknown>>): void {
+async function insertRows(
+  tableName: string,
+  rows: Array<Record<string, unknown>>,
+): Promise<void> {
   if (rows.length === 0) {
     return;
   }
 
-  const columns = tableColumns(sqlite, tableName);
-  const columnSql = columns.map(quoteIdentifier).join(", ");
+  const columns = await tableColumns(tableName);
+  const columnSql = columns.map((c) => `\`${c}\``).join(", ");
   const placeholders = columns.map(() => "?").join(", ");
-  const statement = sqlite.prepare(`INSERT INTO ${quoteIdentifier(tableName)} (${columnSql}) VALUES (${placeholders})`);
   for (const row of rows) {
-    statement.run(columns.map((column) => row[column] ?? null));
+    const nextRow = deserializeTableRow(tableName, row);
+    await mysqlPool.execute(
+      `INSERT INTO \`${tableName}\` (${columnSql}) VALUES (${placeholders})`,
+      columns.map((c) => nextRow[c] ?? null) as never[],
+    );
   }
 }
 
-function restoreTables(sqlite: Database.Database, payload: DumpPayload): number {
-  for (const entry of [...DUMP_TABLES].reverse()) {
-    sqlite.prepare(`DELETE FROM ${quoteIdentifier(entry.tableName)}`).run();
-    sqlite.prepare("DELETE FROM sqlite_sequence WHERE name = ?").run(entry.tableName);
+async function roleIdsByCode(): Promise<Map<string, number>> {
+  const [rows] = await mysqlPool.execute("SELECT id, `key` FROM `roles`");
+  return new Map(
+    (rows as Array<{ id: number; key: string }>).map((r) => [r.key, r.id]),
+  );
+}
+
+async function prepareUserRowsForRestore(
+  rows: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> {
+  const roleIds = await roleIdsByCode();
+  return rows.map((row) => {
+    const result = { ...row };
+    const roleCode = stringValue(result.roleCode);
+    if (roleCode) {
+      const roleId = roleIds.get(roleCode);
+      if (!roleId) {
+        throw badRequest(
+          `Dump user '${stringValue(result.email) ?? "unknown"}' references an unknown role`,
+        );
+      }
+      result.role_id = roleId;
+      delete result.roleCode;
+      return result;
+    }
+    return result;
+  });
+}
+
+async function userIdExists(id: number): Promise<boolean> {
+  const [rows] = await mysqlPool.execute(
+    "SELECT 1 AS existsRow FROM `users` WHERE id = ?",
+    [id],
+  );
+  return (rows as unknown[]).length > 0;
+}
+
+async function adminRoleId(): Promise<number> {
+  const [rows] = await mysqlPool.execute(
+    "SELECT id FROM `roles` WHERE `key` = 'admin'",
+  );
+  const row = (rows as Array<{ id: number }>)[0];
+  if (!row) {
+    throw badRequest("Dump import requires an admin role");
+  }
+  return row.id;
+}
+
+async function restoreLegacyStandardAdminFallback(
+  fallback: LegacyStandardAdminFallback | null,
+): Promise<Set<DumpTableKey>> {
+  const refreshedTableKeys = new Set<DumpTableKey>();
+  if (!fallback) {
+    return refreshedTableKeys;
   }
 
-  let restored = 0;
-  for (const entry of DUMP_TABLES) {
-    const rows = payload.tables[entry.key];
-    insertRows(sqlite, entry.tableName, rows);
-    if (rows.length > 0) {
-      restored += 1;
+  if (!(await userIdExists(fallback.id))) {
+    const row = { ...fallback.row, id: fallback.id, role_id: await adminRoleId() };
+    await insertRows("users", [row]);
+    refreshedTableKeys.add("users");
+  }
+
+  // Replace orphaned user FK references with the fallback admin's ID.
+  // This only applies to legacy dumps that have no admin user: missing user references
+  // are silently replaced with the local admin so the restore can succeed.
+  const [fkRows] = await mysqlPool.execute(
+    `SELECT TABLE_NAME, COLUMN_NAME
+     FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
+       AND REFERENCED_TABLE_NAME = 'users'
+       AND REFERENCED_COLUMN_NAME = 'id'`,
+  );
+  const tableNameToKey = new Map<string, DumpTableKey>(DUMP_TABLES.map((entry) => [entry.tableName, entry.key]));
+  for (const fkRow of fkRows as Array<{ TABLE_NAME: string; COLUMN_NAME: string }>) {
+    const [result] = await mysqlPool.execute(
+      `UPDATE \`${fkRow.TABLE_NAME}\` SET \`${fkRow.COLUMN_NAME}\` = ?
+       WHERE \`${fkRow.COLUMN_NAME}\` IS NOT NULL
+         AND \`${fkRow.COLUMN_NAME}\` NOT IN (SELECT id FROM \`users\`)`,
+      [fallback.id],
+    );
+    const affectedRows = (result as { affectedRows: number }).affectedRows;
+    if (affectedRows > 0) {
+      const key = tableNameToKey.get(fkRow.TABLE_NAME);
+      if (key) {
+        refreshedTableKeys.add(key as DumpTableKey);
+      }
     }
   }
-  return restored;
+
+  return refreshedTableKeys;
 }
 
-function assertForeignKeys(sqlite: Database.Database): void {
-  const errors = sqlite.pragma("foreign_key_check") as unknown[];
-  if (errors.length > 0) {
-    throw badRequest(`Dump import produced foreign key errors: ${JSON.stringify(errors)}`);
+async function validateAllForeignKeysInPayload(payload: DumpPayload): Promise<void> {
+  const [fkRows] = await mysqlPool.execute(
+    `SELECT TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+     FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+     WHERE REFERENCED_TABLE_SCHEMA = DATABASE()
+       AND REFERENCED_TABLE_NAME IS NOT NULL`,
+  );
+  const tableNameToKey = new Map<string, DumpTableKey>(DUMP_TABLES.map((e) => [e.tableName, e.key as DumpTableKey]));
+  for (const fkRow of fkRows as Array<{ TABLE_NAME: string; COLUMN_NAME: string; REFERENCED_TABLE_NAME: string; REFERENCED_COLUMN_NAME: string }>) {
+    const key = tableNameToKey.get(fkRow.TABLE_NAME);
+    const refKey = tableNameToKey.get(fkRow.REFERENCED_TABLE_NAME);
+    if (!key || !refKey) continue;
+    const rows = payload.tables[key];
+    const refRows = payload.tables[refKey];
+    if (!rows?.length || !refRows) continue;
+    const validIds = new Set(
+      refRows
+        .map((r) => numericValue(r[fkRow.REFERENCED_COLUMN_NAME]))
+        .filter((id): id is number => id !== null && id > 0),
+    );
+    for (const row of rows) {
+      const rawVal = row[fkRow.COLUMN_NAME];
+      if (rawVal === null || rawVal === undefined) continue;
+      const refId = numericValue(rawVal);
+      if (refId !== null && refId > 0 && !validIds.has(refId)) {
+        if (fkRow.REFERENCED_TABLE_NAME === "users") {
+          throw badRequest("Dump import is missing referenced users.id values");
+        }
+        throw badRequest(`Dump import has an invalid ${fkRow.TABLE_NAME}.${fkRow.COLUMN_NAME} reference`);
+      }
+    }
   }
 }
 
-function beginImportTransaction(sqlite: Database.Database): void {
-  sqlite.pragma("foreign_keys = OFF");
-  sqlite.exec("BEGIN IMMEDIATE");
+function refreshExpectedTableSummary(
+  expectedTables: DumpTableSummary[],
+  key: DumpTableKey,
+  rows: Array<Record<string, unknown>>,
+): void {
+  const index = expectedTables.findIndex((entry) => entry.key === key);
+  const nextSummary: DumpTableSummary = {
+    key,
+    rowCount: rows.length,
+    sha256: sha256Json(rows),
+  };
+  if (index >= 0) {
+    expectedTables[index] = nextSummary;
+    return;
+  }
+  expectedTables.push(nextSummary);
 }
 
-function finishImportTransaction(sqlite: Database.Database): void {
-  sqlite.exec("COMMIT");
-  sqlite.pragma("foreign_keys = ON");
-}
+async function restoreTables(
+  payload: DumpPayload,
+): Promise<RestoreTablesResult> {
+  const legacyStandardAdminFallback = await createLegacyStandardAdminFallback(payload);
 
-function rollbackImportTransaction(sqlite: Database.Database): void {
+  // Validate user FK references before making any DB changes so no rollback is needed.
+  if (legacyStandardAdminFallback === null) {
+    await validateAllForeignKeysInPayload(payload);
+  }
+
+  await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 0");
   try {
-    sqlite.exec("ROLLBACK");
-  } catch {
-    // The transaction may already be closed by SQLite after a hard error.
+    for (const entry of [...DUMP_TABLES].reverse()) {
+      await mysqlPool.execute(`DELETE FROM \`${entry.tableName}\``);
+    }
+
+    let restored = 0;
+    for (const entry of DUMP_TABLES) {
+      const rows =
+        entry.key === "users"
+          ? await prepareUserRowsForRestore(payload.tables.users)
+          : payload.tables[entry.key];
+      await insertRows(entry.tableName, rows);
+      if (rows.length > 0) {
+        restored += 1;
+      }
+    }
+    const refreshedTableKeys = await restoreLegacyStandardAdminFallback(legacyStandardAdminFallback);
+    return { restored, refreshedTableKeys };
+  } finally {
+    await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 1");
   }
-  sqlite.pragma("foreign_keys = ON");
 }
 
 function currentFileRootSummaries(): DumpFileRootSummary[] {
   return [
     buildFileRootManifest("uploads", config.uploadDir),
-    buildFileRootManifest("content", getContentBaseDir())
-  ].map(({ key, fileCount, totalBytes, sha256 }) => ({ key, fileCount, totalBytes, sha256 }));
+    buildFileRootManifest("content", getContentBaseDir()),
+  ].map(({ key, fileCount, totalBytes, sha256 }) => ({
+    key,
+    fileCount,
+    totalBytes,
+    sha256,
+  }));
 }
 
-function verifyRestoredTables(sqlite: Database.Database, expectedTables: DumpTableSummary[]): string[] {
+async function verifyRestoredTables(
+  expectedTables: DumpTableSummary[],
+): Promise<string[]> {
   const issues: string[] = [];
-  const expectedByKey = new Map(expectedTables.map((entry) => [entry.key, entry]));
+  const expectedByKey = new Map(
+    expectedTables.map((entry) => [entry.key, entry]),
+  );
+  const restoredTables = await collectDumpTableRows();
   for (const entry of DUMP_TABLES) {
-    const rows = selectTableRows(sqlite, entry.tableName);
+    const rows = restoredTables[entry.key];
     const expected = expectedByKey.get(entry.key);
-    if (!expected || expected.rowCount !== rows.length || expected.sha256 !== sha256Json(rows)) {
-      issues.push(`Restored table '${entry.key}' does not match the dump manifest.`);
+    if (
+      !expected ||
+      expected.rowCount !== rows.length ||
+      expected.sha256 !== sha256Json(rows)
+    ) {
+      issues.push(
+        `Restored table '${entry.key}' does not match the dump manifest.`,
+      );
     }
   }
   return issues;
 }
 
-function verifyRestoredFileRoots(expectedFileRoots: DumpFileRootSummary[]): string[] {
+function verifyRestoredFileRoots(
+  expectedFileRoots: DumpFileRootSummary[],
+): string[] {
   const issues: string[] = [];
-  const actualByKey = new Map(currentFileRootSummaries().map((entry) => [entry.key, entry]));
+  const actualByKey = new Map(
+    currentFileRootSummaries().map((entry) => [entry.key, entry]),
+  );
   for (const expected of expectedFileRoots) {
     const actual = actualByKey.get(expected.key);
-    if (!actual || actual.fileCount !== expected.fileCount || actual.totalBytes !== expected.totalBytes || actual.sha256 !== expected.sha256) {
-      issues.push(`Restored file root '${expected.key}' does not match the dump manifest.`);
+    if (
+      !actual ||
+      actual.fileCount !== expected.fileCount ||
+      actual.totalBytes !== expected.totalBytes ||
+      actual.sha256 !== expected.sha256
+    ) {
+      issues.push(
+        `Restored file root '${expected.key}' does not match the dump manifest.`,
+      );
     }
   }
   return issues;
 }
 
-export async function saveDumpToDrive(sqlite: Database.Database, driveClient: GoogleDriveBackupClient): Promise<DumpDriveSaveResult> {
-  const archive = await buildDumpArchive(sqlite);
-  const driveFile = await driveClient.uploadDump(archive.filename, archive.buffer);
+export function getLocalBackupStatus(): DumpBackupStatus {
+  const files = listLocalBackupFiles();
   return {
-    dumpId: archive.dumpId,
-    filename: archive.filename,
-    sizeBytes: archive.buffer.byteLength,
-    driveFile
+    backupDirectory: config.backupWorkDir,
+    ready: true,
+    fileCount: files.length,
+    latestFile: files[0] ?? null,
   };
 }
 
-async function inspectDriveFile(driveClient: GoogleDriveBackupClient, driveFile: DumpDriveFile): Promise<InspectedDump> {
-  const buffer = await driveClient.downloadFile(driveFile.id);
-  return inspectDumpArchive(buffer, driveFile);
+function remoteUploadNotAttempted(error: string): DumpRemoteUploadResult {
+  return {
+    attempted: false,
+    success: false,
+    remoteFile: null,
+    error,
+  };
 }
 
-export async function previewLatestDriveDump(driveClient: GoogleDriveBackupClient): Promise<DumpDrivePreviewResult> {
-  const files = await driveClient.listDumpFiles();
+async function uploadDumpArchiveToRemote(
+  filename: string,
+  filePath: string,
+  sizeBytes: number,
+  progressCallback?: BackupProgressCallback,
+): Promise<DumpRemoteUploadResult> {
+  const readiness = getBackupSftpReadiness();
+  if (!readiness.ready) {
+    return remoteUploadNotAttempted(readiness.blockingIssues.join(" | "));
+  }
+
+  try {
+    emitBackupProgress(progressCallback, {
+      operation: "full_backup",
+      phase: "sftp_upload",
+      current: 0,
+      total: sizeBytes,
+      detail: filename,
+    });
+    const stream = createProgressReadStream(filePath, sizeBytes, (current) => {
+      emitBackupProgress(progressCallback, {
+        operation: "full_backup",
+        phase: "sftp_upload",
+        current,
+        total: sizeBytes,
+        detail: filename,
+      });
+    });
+    const uploadedFile = await uploadBackupSftpFile(
+      filename,
+      stream,
+      sizeBytes,
+    );
+    emitBackupProgress(progressCallback, {
+      operation: "full_backup",
+      phase: "sftp_upload",
+      current: sizeBytes,
+      total: sizeBytes,
+      detail: filename,
+    });
+    return {
+      attempted: true,
+      success: true,
+      remoteFile: mapRemoteBackupFile(
+        uploadedFile,
+        await remoteImportHistoryByFileId(),
+      ),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      attempted: true,
+      success: false,
+      remoteFile: null,
+      error: error instanceof Error ? error.message : "SFTP upload failed",
+    };
+  }
+}
+
+export async function saveDumpToLocalBackup(
+  options: DumpProgressOptions = {},
+): Promise<DumpBackupSaveResult> {
+  const snapshot = await buildDumpSnapshot({ deferFileRoots: true });
+  emitBackupProgress(options.progressCallback, {
+    operation: "full_backup",
+    phase: "db_export",
+    current: DUMP_TABLE_KEYS.length,
+    total: DUMP_TABLE_KEYS.length,
+    detail: snapshot.dumpId,
+  });
+  const workDir = ensureWorkDir();
+  const filePath = path.join(workDir, snapshot.filename);
+  const archive = await writeDumpArchiveFile(
+    snapshot,
+    filePath,
+    options.progressCallback,
+  );
+  emitBackupProgress(options.progressCallback, {
+    operation: "full_backup",
+    phase: "archive",
+    current: archive.sizeBytes,
+    total: archive.sizeBytes,
+    detail: snapshot.filename,
+  });
+  const backupFile = mapBackupFile(filePath);
+  writeLastLocalBackupManifest(snapshot.manifest);
+  emitBackupProgress(options.progressCallback, {
+    operation: "full_backup",
+    phase: "local_save",
+    current: archive.sizeBytes,
+    total: archive.sizeBytes,
+    detail: snapshot.filename,
+  });
+  const remoteUpload = await uploadDumpArchiveToRemote(
+    snapshot.filename,
+    filePath,
+    archive.sizeBytes,
+    options.progressCallback,
+  );
+  emitBackupProgress(options.progressCallback, {
+    operation: "full_backup",
+    phase: "done",
+    current: 1,
+    total: 1,
+    detail: snapshot.filename,
+  });
+  return {
+    dumpId: snapshot.dumpId,
+    filename: snapshot.filename,
+    filePath,
+    sizeBytes: archive.sizeBytes,
+    backupFile,
+    remoteUpload,
+  };
+}
+
+export async function getRemoteBackupStatus(): Promise<DumpRemoteBackupStatus> {
+  const readiness = getBackupSftpReadiness();
+  if (!readiness.ready) {
+    return {
+      remoteDirectory: readiness.remoteDirectory,
+      configured: readiness.configured,
+      protectedConfirmed: readiness.protectedConfirmed,
+      ready: false,
+      fileCount: 0,
+      latestFile: null,
+      files: [],
+      blockingIssues: readiness.blockingIssues,
+    };
+  }
+
+  try {
+    const importedByFileId = await remoteImportHistoryByFileId();
+    const files = (await listBackupSftpFiles()).map((file) =>
+      mapRemoteBackupFile(file, importedByFileId),
+    );
+    return {
+      remoteDirectory: readiness.remoteDirectory,
+      configured: readiness.configured,
+      protectedConfirmed: readiness.protectedConfirmed,
+      ready: true,
+      fileCount: files.length,
+      latestFile: files[0] ?? null,
+      files,
+      blockingIssues: [],
+    };
+  } catch (error) {
+    return {
+      remoteDirectory: readiness.remoteDirectory,
+      configured: readiness.configured,
+      protectedConfirmed: readiness.protectedConfirmed,
+      ready: false,
+      fileCount: 0,
+      latestFile: null,
+      files: [],
+      blockingIssues: [
+        error instanceof Error ? error.message : "SFTP remote status failed",
+      ],
+    };
+  }
+}
+
+async function readRemoteBackupFile(
+  fileId?: string | null,
+): Promise<{ backupFile: DumpRemoteBackupFile; buffer: Buffer }> {
+  const safeFileId = fileId ? validateBackupFileId(fileId) : null;
+  const remoteFiles = await listBackupSftpFiles();
+  const selectedFile = safeFileId
+    ? remoteFiles.find((file) => file.name === safeFileId)
+    : remoteFiles[0];
+  if (!selectedFile) {
+    throw notFound(
+      safeFileId
+        ? "Remote backup file was not found"
+        : "No remote backup dump file was found",
+    );
+  }
+
+  return {
+    backupFile: mapRemoteBackupFile(
+      selectedFile,
+      await remoteImportHistoryByFileId(),
+    ),
+    buffer: await downloadBackupSftpFile(selectedFile.name),
+  };
+}
+
+function disposeInspectedDump(preview: InspectedDump): void {
+  preview.zipFileBuffers.clear();
+}
+
+function cleanupExpiredRemotePreviewSessions(now = Date.now()): void {
+  for (const [token, session] of remotePreviewSessions.entries()) {
+    if (session.expiresAt <= now) {
+      disposeInspectedDump(session.preview);
+      remotePreviewSessions.delete(token);
+    }
+  }
+}
+
+function registerRemotePreviewSession(fileId: string, preview: InspectedDump): string {
+  cleanupExpiredRemotePreviewSessions();
+  const token = crypto.randomUUID();
+  remotePreviewSessions.set(token, {
+    fileId,
+    fileHash: preview.fileHash,
+    preview,
+    expiresAt: Date.now() + remotePreviewSessionTtlMs,
+  });
+  return token;
+}
+
+function takeRemotePreviewSession(
+  token: string,
+  fileId: string,
+  fileHash: string,
+): InspectedDump {
+  cleanupExpiredRemotePreviewSessions();
+  const session = remotePreviewSessions.get(token);
+  if (!session) {
+    throw conflict("Remote backup preview expired; preview the backup again");
+  }
+  remotePreviewSessions.delete(token);
+  if (session.fileId !== fileId || session.fileHash !== fileHash) {
+    disposeInspectedDump(session.preview);
+    throw conflict("Remote backup preview does not match the requested file");
+  }
+  return session.preview;
+}
+
+export async function previewRemoteDump(
+  params: { fileId?: string | null } = {},
+): Promise<DumpBackupPreviewResult> {
+  const { backupFile, buffer } = await readRemoteBackupFile(params.fileId);
+  const preview = await inspectDumpArchive(buffer, backupFile);
+  const previewWithWarnings: InspectedDump = backupFile.imported
+    ? {
+        ...preview,
+        warnings: [
+          "Remote backup file was already imported.",
+          ...preview.warnings,
+        ],
+      }
+    : preview;
+  if (previewWithWarnings.transferReadiness === "blocked" || backupFile.imported) {
+    disposeInspectedDump(previewWithWarnings);
+    return previewWithWarnings;
+  }
+  return {
+    ...previewWithWarnings,
+    previewToken: registerRemotePreviewSession(backupFile.id, previewWithWarnings),
+  };
+}
+
+export async function previewLatestLocalDump(): Promise<DumpBackupPreviewResult> {
+  const files = listLocalBackupFiles();
   if (files.length === 0) {
-    throw notFound("No Google Drive dump file was found");
+    throw notFound("No local backup dump file was found");
   }
 
   const warnings: string[] = [];
   for (const file of files) {
     try {
-      const preview = await inspectDriveFile(driveClient, file);
+      const { backupFile, buffer } = readLocalBackupFile(file.id);
+      const preview = await inspectDumpArchive(buffer, backupFile);
       return {
         ...preview,
-        warnings: [...warnings, ...preview.warnings]
+        warnings: [...warnings, ...preview.warnings],
       };
     } catch (error) {
-      warnings.push(`Drive file '${file.name}' was skipped: ${error instanceof Error ? error.message : "unknown error"}.`);
+      warnings.push(
+        `Backup file '${file.name}' was skipped: ${error instanceof Error ? error.message : "unknown error"}.`,
+      );
     }
   }
 
-  throw badRequest("No valid Google Drive dump file was found");
+  throw badRequest("No valid local backup dump file was found");
 }
 
-export async function applyDriveDump(
-  sqlite: Database.Database,
-  driveClient: GoogleDriveBackupClient,
+export async function applyLocalDump(
   params: { fileId: string; fileHash: string; confirmationPhrase: string },
-  options: ApplyDumpOptions = {}
-): Promise<DumpDriveApplyResult> {
+  options: ApplyDumpOptions = {},
+): Promise<DumpBackupApplyResult> {
   assertSafeDumpRuntimeTargets();
-  const files = await driveClient.listDumpFiles();
-  const driveFile = files.find((file) => file.id === params.fileId);
-  if (!driveFile) {
-    throw notFound("Google Drive dump file was not found");
-  }
-
-  const buffer = await driveClient.downloadFile(driveFile.id);
-  const preview = await inspectDumpArchive(buffer, driveFile);
+  const { backupFile, buffer } = readLocalBackupFile(params.fileId);
+  const preview = await inspectDumpArchive(buffer, backupFile);
   if (preview.fileHash !== params.fileHash) {
     throw conflict("Dump file hash changed since preview");
   }
@@ -854,67 +2308,206 @@ export async function applyDriveDump(
     throw conflict("Dump confirmation phrase does not match");
   }
   if (preview.blockingIssues.length > 0) {
-    throw badRequest(`Dump import is blocked: ${preview.blockingIssues.join(" | ")}`);
+    throw badRequest(
+      `Dump import is blocked: ${preview.blockingIssues.join(" | ")}`,
+    );
   }
 
-  const workDir = ensureWorkDir();
-  const transferDir = fs.mkdtempSync(path.join(workDir, "transfer-"));
-  const backupRoot = path.join(transferDir, "file-root-backups");
-  const targetBackupPath = path.join(transferDir, "target-before-import.zip");
-  const targetBackup = await buildDumpArchive(sqlite);
-  fs.writeFileSync(targetBackupPath, targetBackup.buffer);
+  return applyInspectedDump(preview, options);
+}
 
-  const stagedRoots = await stageFileRoots(preview.directory);
-  const backups = createFileRootBackups(backupRoot);
-  let tablesRestored = 0;
-  let fileRootsTouched = false;
-  let committed = false;
-
+async function rollbackTableSnapshot(snapshot: DumpTableRows): Promise<void> {
+  await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 0");
   try {
-    beginImportTransaction(sqlite);
-    tablesRestored = restoreTables(sqlite, preview.payload);
-    assertForeignKeys(sqlite);
-    replaceFileRoots(stagedRoots);
-    fileRootsTouched = true;
-    options.afterFileSwap?.();
-    finishImportTransaction(sqlite);
-    committed = true;
-  } catch (error) {
-    if (!committed) {
-      rollbackImportTransaction(sqlite);
+    for (const entry of [...DUMP_TABLES].reverse()) {
+      await mysqlPool.execute(`DELETE FROM \`${entry.tableName}\``);
     }
-    if (fileRootsTouched) {
-      restoreFileRootBackups(backups);
+    for (const entry of DUMP_TABLES) {
+      await insertRows(entry.tableName, snapshot[entry.key] ?? []);
     }
-    throw error;
   } finally {
-    fs.rmSync(stagedRoots.uploads, { recursive: true, force: true });
-    fs.rmSync(stagedRoots.content, { recursive: true, force: true });
-    fs.rmSync(backupRoot, { recursive: true, force: true });
+    await mysqlPool.execute("SET FOREIGN_KEY_CHECKS = 1");
+  }
+}
+
+async function applyInspectedDump(
+  preview: InspectedDump,
+  options: ApplyDumpOptions = {},
+): Promise<DumpBackupApplyResult> {
+  let transferDir: string | null = null;
+  let completed = false;
+  try {
+    const workDir = ensureWorkDir();
+    transferDir = fs.mkdtempSync(path.join(workDir, "transfer-"));
+    const targetBackupPath = "";
+    await createDatabaseSnapshot(targetBackupPath);
+
+    const stagedRoots = await stageFileRoots(
+      preview.zipFileBuffers,
+      preview.manifest,
+    );
+    emitBackupProgress(options.progressCallback, {
+      operation: "import",
+      phase: "staging",
+      current: preview.expectedFileRoots.reduce(
+        (sum, root) => sum + root.fileCount,
+        0,
+      ),
+      total: preview.expectedFileRoots.reduce(
+        (sum, root) => sum + root.fileCount,
+        0,
+      ),
+      detail: preview.backupFile.name,
+    });
+    let swaps: FileRootSwap[] = [];
+    let tablesRestored = 0;
+    let fileRootsTouched = false;
+    const dbSnapshot = await collectRawTableRows();
+
+    try {
+      const restoreResult = await restoreTables(preview.payload);
+      tablesRestored = restoreResult.restored;
+      const restoredTables = await collectDumpTableRows();
+      for (const key of restoreResult.refreshedTableKeys) {
+        refreshExpectedTableSummary(
+          preview.expectedTables,
+          key,
+          restoredTables[key],
+        );
+      }
+      emitBackupProgress(options.progressCallback, {
+        operation: "import",
+        phase: "db_restore",
+        current: tablesRestored,
+        total: DUMP_TABLE_KEYS.length,
+        detail: preview.dumpId,
+      });
+      await options.afterTablesRestore?.(preview);
+      swaps = replaceFileRoots(stagedRoots, transferDir);
+      fileRootsTouched = true;
+      emitBackupProgress(options.progressCallback, {
+        operation: "import",
+        phase: "file_swap",
+        current: 2,
+        total: 2,
+        detail: preview.dumpId,
+      });
+      options.afterFileSwap?.();
+    } catch (error) {
+      if (fileRootsTouched) {
+        restoreSwappedFileRoots(swaps);
+        await rollbackTableSnapshot(dbSnapshot);
+      }
+      throw error;
+    } finally {
+      fs.rmSync(stagedRoots.uploads, { recursive: true, force: true });
+      fs.rmSync(stagedRoots.content, { recursive: true, force: true });
+    }
+
+    const blockingIssues = [
+      ...(await verifyRestoredTables(preview.expectedTables)),
+      ...verifyRestoredFileRoots(preview.expectedFileRoots),
+    ];
+    const verificationPassed = blockingIssues.length === 0;
+    emitBackupProgress(options.progressCallback, {
+      operation: "import",
+      phase: "verify",
+      current: verificationPassed ? 1 : 0,
+      total: 1,
+      detail: preview.dumpId,
+    });
+    emitBackupProgress(options.progressCallback, {
+      operation: "import",
+      phase: "done",
+      current: verificationPassed ? 1 : 0,
+      total: 1,
+      detail: preview.dumpId,
+    });
+    completed = true;
+    return {
+      dumpId: preview.dumpId,
+      backupFile: preview.backupFile,
+      targetBackupPath,
+      verificationPassed,
+      importStatus: verificationPassed
+        ? preview.warnings.length > 0
+          ? "warning"
+          : "success"
+        : "error",
+      tablesRestored,
+      fileRootsRestored: currentFileRootSummaries(),
+      warnings: preview.warnings,
+      blockingIssues,
+    };
+  } finally {
+    if (!completed && transferDir) {
+      fs.rmSync(transferDir, { recursive: true, force: true });
+    }
+    preview.zipFileBuffers.clear();
+  }
+}
+
+export async function applyRemoteDump(
+  params: { fileId: string; fileHash: string; previewToken: string; confirmed: boolean },
+  options: DumpProgressOptions = {},
+): Promise<DumpBackupApplyResult> {
+  assertSafeDumpRuntimeTargets();
+  const safeFileId = validateBackupFileId(params.fileId);
+  if (!params.confirmed) {
+    throw badRequest("Remote dump import must be confirmed");
+  }
+  if (activeRemoteImports.has(safeFileId)) {
+    throw conflict("Remote backup file import is already running");
   }
 
-  const blockingIssues = [
-    ...verifyRestoredTables(sqlite, preview.expectedTables),
-    ...verifyRestoredFileRoots(preview.expectedFileRoots)
-  ];
-  const verificationPassed = blockingIssues.length === 0;
-  return {
-    dumpId: preview.dumpId,
-    driveFile,
-    targetBackupPath,
-    verificationPassed,
-    importStatus: verificationPassed ? (preview.warnings.length > 0 ? "warning" : "success") : "error",
-    tablesRestored,
-    fileRootsRestored: currentFileRootSummaries(),
-    warnings: preview.warnings,
-    blockingIssues
-  };
+  activeRemoteImports.add(safeFileId);
+  let preview: InspectedDump | null = null;
+  try {
+    await assertRemoteDumpWasNotImported(safeFileId);
+    preview = takeRemotePreviewSession(params.previewToken, safeFileId, params.fileHash);
+    if (preview.fileHash !== params.fileHash) {
+      throw conflict("Dump file hash changed since preview");
+    }
+    if (preview.blockingIssues.length > 0) {
+      throw badRequest(
+        `Dump import is blocked: ${preview.blockingIssues.join(" | ")}`,
+      );
+    }
+    await assertRemoteDumpWasNotImported(safeFileId);
+    return await applyInspectedDump(preview, {
+      progressCallback: options.progressCallback,
+      afterTablesRestore: async (inspectedPreview) => {
+        await recordRemoteDumpImport({
+          fileId: safeFileId,
+          fileHash: inspectedPreview.fileHash,
+          dumpId: inspectedPreview.dumpId,
+          importedAt: nowIso(),
+        });
+        refreshExpectedTableSummary(
+          inspectedPreview.expectedTables,
+          "appSettings",
+          await selectTableRows("app_settings"),
+        );
+      },
+    });
+  } finally {
+    if (preview) {
+      disposeInspectedDump(preview);
+    }
+    activeRemoteImports.delete(safeFileId);
+  }
 }
 
 export function getRegisteredDumpTableKeys(): string[] {
   return [...DUMP_TABLE_KEYS];
 }
 
-export function getRegisteredDumpTables(): Array<{ key: string; tableName: string }> {
-  return DUMP_TABLES.map((entry) => ({ key: entry.key, tableName: entry.tableName }));
+export function getRegisteredDumpTables(): Array<{
+  key: string;
+  tableName: string;
+}> {
+  return DUMP_TABLES.map((entry) => ({
+    key: entry.key,
+    tableName: entry.tableName,
+  }));
 }

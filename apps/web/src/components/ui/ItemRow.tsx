@@ -1,13 +1,17 @@
 import type { ReactNode } from "react";
+import { ActionMenu } from "./ActionMenu";
 
 interface ItemRowProps {
   accentColor?: string;
+  objectReference?: string;
   statusIndicator?: ReactNode;
   title: string;
   description?: string;
   pills?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
+  actionsIncludeObjectReference?: boolean;
+  footer?: ReactNode;
   onOpen?: () => void;
   className?: string;
   pillsClassName?: string;
@@ -18,12 +22,15 @@ interface ItemRowProps {
 /** Shared row base for domain items in list layouts. */
 export function ItemRow({
   accentColor,
+  objectReference,
   statusIndicator,
   title,
   description,
   pills,
   meta,
   actions,
+  actionsIncludeObjectReference = false,
+  footer,
   onOpen,
   className = "",
   pillsClassName = "",
@@ -36,31 +43,50 @@ export function ItemRow({
 
   return (
     <article
-      className={`grid ${columns} items-center gap-4 rounded-xl border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:border-steel-300 hover:shadow-md ${onOpen ? "cursor-pointer" : ""} ${className}`}
+      className={`group/reference-row relative grid h-full ${columns} items-center gap-4 rounded-lg border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:z-30 hover:border-steel-300 hover:shadow-panel focus-within:z-30 ${onOpen ? "cursor-pointer" : ""} ${className}`}
       style={accentColor ? { borderLeftColor: accentColor } : undefined}
       onDoubleClick={onOpen}
     >
-      {statusIndicator ? <span>{statusIndicator}</span> : null}
-      <button type="button" className="min-w-0 text-left" onClick={onOpen}>
+      {statusIndicator ? (
+        <span onClick={(event) => event.stopPropagation()}>
+          {statusIndicator}
+        </span>
+      ) : null}
+      <div className="min-w-0 text-left">
         <h3 className="truncate text-[14px] font-semibold text-ink">{title}</h3>
         {description ? (
-          <p className="truncate text-[12px] text-slate-500">{description}</p>
+          <p className="truncate text-[12px] text-steel-500">{description}</p>
         ) : null}
-      </button>
+      </div>
       {pills ? (
-        <div className={`flex shrink-0 items-center gap-2 ${pillsClassName}`}>
+        <div
+          className={`flex shrink-0 items-center gap-2 ${pillsClassName}`}
+          onClick={(event) => event.stopPropagation()}
+        >
           {pills}
         </div>
       ) : null}
       {meta ? (
-        <div className={`min-w-0 shrink-0 ${metaClassName}`}>{meta}</div>
+        <div
+          className={`min-w-0 shrink-0 ${metaClassName}`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {meta}
+        </div>
       ) : null}
-      {actions ? (
+      {objectReference || actions ? (
         <div
           className={`relative z-20 flex shrink-0 justify-end gap-1 ${actionsClassName}`}
+          onClick={(event) => event.stopPropagation()}
         >
-          {actions}
+          {objectReference && actions && !actionsIncludeObjectReference ? <ActionMenu objectReference={objectReference} items={[]} /> : null}
+          {actions ?? <ActionMenu objectReference={objectReference} items={[]} />}
         </div>
+      ) : null}
+      {footer ? (
+        <footer className="col-span-full flex min-w-0 flex-wrap gap-2 border-t border-line pt-2" onClick={(event) => event.stopPropagation()}>
+          {footer}
+        </footer>
       ) : null}
     </article>
   );

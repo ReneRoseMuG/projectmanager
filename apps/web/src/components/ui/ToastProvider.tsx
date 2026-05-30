@@ -1,4 +1,6 @@
+import { TOAST_POSITIONS, type ToastPosition } from "@taskmanager/shared-types";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useSetting } from "../../hooks/useSettings";
 import { Toast, type ToastAction, type ToastTone, type ToastViewModel } from "./Toast";
 
 interface ToastInput {
@@ -30,9 +32,26 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
+const toastPositionClasses: Record<ToastPosition, string> = {
+  "top-right": "top-6 right-6",
+  "top-left": "top-6 left-6",
+  "bottom-right": "bottom-6 right-6",
+  "bottom-left": "bottom-6 left-6"
+};
+
+function isToastPosition(value: unknown): value is ToastPosition {
+  return typeof value === "string" && (TOAST_POSITIONS as readonly string[]).includes(value);
+}
+
+function normalizeToastPosition(value: unknown): ToastPosition {
+  return isToastPosition(value) ? value : "top-right";
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastViewModel[]>([]);
   const timers = useRef<Map<number, number>>(new Map());
+  const configuredPosition = useSetting("ui.toastPosition");
+  const toastPosition = normalizeToastPosition(configuredPosition);
 
   const dismissToast = useCallback((id: number) => {
     const timer = timers.current.get(id);
@@ -89,7 +108,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed bottom-6 right-6 z-50 grid w-[min(24rem,calc(100vw-2rem))] gap-2" role="status" aria-live="polite">
+      <div className={`fixed ${toastPositionClasses[toastPosition]} z-50 grid w-[min(24rem,calc(100vw-2rem))] gap-2`} role="status" aria-live="polite">
         {toasts.map((item) => (
           <Toast key={item.id} toast={item} onDismiss={dismissToast} />
         ))}

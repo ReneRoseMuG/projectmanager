@@ -1,7 +1,11 @@
-import type { Project } from "@taskmanager/shared-types";
-import { Archive, FolderOpen } from "lucide-react";
+import type { Project, Tag } from "@taskmanager/shared-types";
+import { Archive, Bug, Flag, FolderOpen, ListTodo } from "lucide-react";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { objectReference } from "../../lib/references";
+import { catalogColor } from "../../utils/catalogs";
 import { richTextToPlainText } from "../../utils/richText";
-import { TagBadge } from "../tags/TagBadge";
+import type { ActionMenuItem } from "../ui/ActionMenu";
+import { CardFooterBar } from "../ui/CardFooterBar";
 import { PlanningItemCard } from "../ui/PlanningItemCard";
 import { StatusPill } from "../ui/StatusPill";
 
@@ -9,27 +13,57 @@ interface ProjectCardProps {
   project: Project;
   variant?: "card" | "row";
   onEdit: (project: Project) => void;
-  onDelete: (project: Project) => void;
+  onDelete?: (project: Project) => void;
+  onStatusChange?: (project: Project, status: Project["status"]) => void | Promise<unknown>;
+  onCreateMilestone?: () => void;
+  onCreateTask?: () => void;
+  onCreateTicket?: () => void;
+  allTags?: Tag[];
+  onTagsChange?: (projectId: number, tagIds: number[]) => void | Promise<void>;
 }
 
-export function ProjectCard({ project, variant = "card", onEdit, onDelete }: ProjectCardProps) {
-  const accent = project.color ?? "var(--color-steel-700)";
+export function ProjectCard({ project, variant = "card", onEdit, onDelete, onStatusChange, onCreateMilestone, onCreateTask, onCreateTicket, allTags, onTagsChange }: ProjectCardProps) {
+  const catalogs = useCatalogs();
+  const accent = catalogColor(catalogs.entries, "workStatus", project.status);
   const description = richTextToPlainText(project.description);
   const Icon = project.status === "archived" ? Archive : FolderOpen;
+  const createMenuItems: ActionMenuItem[] = [
+    ...(onCreateMilestone
+      ? [{ label: "Neuer Meilenstein", icon: <Flag size={16} />, onClick: onCreateMilestone }]
+      : []),
+    ...(onCreateTask
+      ? [{ label: "Neue Aufgabe", icon: <ListTodo size={16} />, onClick: onCreateTask }]
+      : []),
+    ...(onCreateTicket
+      ? [{ label: "Neues Ticket", icon: <Bug size={16} />, onClick: onCreateTicket }]
+      : [])
+  ];
 
   return (
     <PlanningItemCard
       title={project.name}
       description={description}
       accentColor={accent}
+      objectReference={objectReference("project", project.id)}
       icon={<Icon size={20} />}
       pills={
-        <>
-          <StatusPill kind="workStatus" value={project.status} />
-          {project.tags.map((tag) => (
-            <TagBadge key={tag.id} tag={tag} />
-          ))}
-        </>
+        <StatusPill kind="workStatus" value={project.status} onChange={onStatusChange ? (status) => onStatusChange(project, status) : undefined} />
+      }
+      footerMeta={
+        <CardFooterBar
+          tags={project.tags}
+          allTags={allTags}
+          onTagsChange={onTagsChange ? (tagIds) => onTagsChange(project.id, tagIds) : undefined}
+          leadingCounters={[
+            { icon: <Flag size={14} aria-hidden="true" />, value: project.milestoneCount, label: "Meilensteine" },
+            { icon: <ListTodo size={14} aria-hidden="true" />, value: project.totalTaskCount, label: "Aufgaben" },
+            { icon: <Bug size={14} aria-hidden="true" />, value: project.ticketCount, label: "Tickets" }
+          ]}
+          attachmentCount={project.attachmentCount}
+          noteCount={project.noteCount}
+          commentCount={project.commentCount}
+          bordered={variant !== "row"}
+        />
       }
       taskStats={{
         openTasks: project.openTaskCount,
@@ -39,7 +73,8 @@ export function ProjectCard({ project, variant = "card", onEdit, onDelete }: Pro
       variant={variant}
       onOpen={() => onEdit(project)}
       onEdit={() => onEdit(project)}
-      onDelete={() => onDelete(project)}
+      extraMenuItems={createMenuItems}
+      onDelete={onDelete ? () => onDelete(project) : undefined}
     />
   );
 }

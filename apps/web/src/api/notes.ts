@@ -13,6 +13,14 @@ export async function getMilestoneNotes(milestoneId: number): Promise<Note[]> {
   return api.get(`milestones/${milestoneId}/notes`).json<Note[]>();
 }
 
+export async function getDayPlanNotes(dayPlanId: number): Promise<Note[]> {
+  return api.get(`day-plans/${dayPlanId}/notes`).json<Note[]>();
+}
+
+export async function getWikiPageNotes(wikiPageId: number): Promise<Note[]> {
+  return api.get(`wiki/${wikiPageId}/notes`).json<Note[]>();
+}
+
 export async function createProjectNote(projectId: number, input: NoteInput): Promise<Note> {
   return api.post(`projects/${projectId}/notes`, { json: input }).json<Note>();
 }
@@ -23,6 +31,22 @@ export async function createTaskNote(taskId: number, input: NoteInput): Promise<
 
 export async function createMilestoneNote(milestoneId: number, input: NoteInput): Promise<Note> {
   return api.post(`milestones/${milestoneId}/notes`, { json: input }).json<Note>();
+}
+
+export async function createDayPlanNote(dayPlanId: number, input: NoteInput): Promise<Note> {
+  return api.post(`day-plans/${dayPlanId}/notes`, { json: input }).json<Note>();
+}
+
+export async function createWikiPageNote(wikiPageId: number, input: NoteInput): Promise<Note> {
+  return api.post(`wiki/${wikiPageId}/notes`, { json: input }).json<Note>();
+}
+
+export async function linkDayPlanNote(dayPlanId: number, noteId: number): Promise<Note> {
+  return api.post(`day-plans/${dayPlanId}/notes/${noteId}`).json<Note>();
+}
+
+export async function unlinkDayPlanNote(dayPlanId: number, noteId: number): Promise<void> {
+  await api.delete(`day-plans/${dayPlanId}/notes/${noteId}`);
 }
 
 export async function updateNote(id: number, input: NoteUpdate): Promise<Note> {

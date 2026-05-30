@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
+import { catalogFillStyle } from "../../utils/catalogs";
 
 export type BadgeTone = "crimson" | "tangerine" | "mustard" | "fern" | "teal" | "violet" | "magenta" | "steel" | "mute";
 
 interface BadgeProps {
   children: ReactNode;
   color?: string | null;
+  filled?: boolean;
   muted?: boolean;
   tone?: BadgeTone;
 }
@@ -18,22 +20,30 @@ const toneClasses: Record<BadgeTone, string> = {
   violet: "border-violet/20 bg-violet/10 text-violet",
   magenta: "border-magenta/20 bg-magenta/10 text-magenta",
   steel: "border-steel-200 bg-steel-100 text-steel-700",
-  mute: "border-line bg-shell text-slate-600"
+  mute: "border-line bg-shell text-steel-600"
 };
 
 /** Compact label for metadata, statuses and custom color tags. */
-export function Badge({ children, color, muted = false, tone }: BadgeProps) {
+export function Badge({ children, color, filled = false, muted = false, tone }: BadgeProps) {
   const style = color
-    ? {
+    ? filled
+      ? catalogFillStyle(color)
+      : {
         borderColor: color,
         color,
         backgroundColor: `${color}14`
       }
     : undefined;
-  const toneClass = tone ? toneClasses[tone] : muted ? toneClasses.mute : "border";
+  const toneClass = tone
+    ? toneClasses[tone]
+    : muted
+      ? toneClasses.mute
+      : filled
+        ? "border-steel-500 bg-steel-500 text-white"
+        : "border";
 
   return (
-    <span className={`inline-flex min-h-6 items-center rounded-full border px-2 text-xs font-semibold ${toneClass}`} style={style}>
+    <span className={`inline-flex min-h-6 items-center rounded-md border px-2 text-xs font-semibold ${toneClass}`} style={style}>
       {children}
     </span>
   );

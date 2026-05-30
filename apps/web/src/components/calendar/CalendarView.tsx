@@ -10,9 +10,10 @@ import type { DateClickArg } from "@fullcalendar/interaction";
 interface CalendarViewProps {
   events: CalendarEvent[];
   tasks: Task[];
-  onDateClick: (date: string) => void;
-  onEventClick: (event: CalendarEvent) => void;
-  onEventMove: (event: CalendarEvent, startTime: string, endTime: string) => Promise<void>;
+  onDateClick?: (date: string) => void;
+  onEventClick?: (event: CalendarEvent) => void;
+  onEventMove?: (event: CalendarEvent, startTime: string, endTime: string) => Promise<void>;
+  compact?: boolean;
 }
 
 const theme = {
@@ -39,7 +40,7 @@ function getEventAccent(event: CalendarEvent) {
   return event.color ?? (projectOwner ? projectAccent[projectOwner.id] : undefined) ?? theme.steel[700];
 }
 
-export function CalendarView({ events, tasks, onDateClick, onEventClick, onEventMove }: CalendarViewProps) {
+export function CalendarView({ events, tasks, onDateClick, onEventClick, onEventMove, compact = false }: CalendarViewProps) {
   const calendarEvents = [
     ...events.map((event) => {
       const accent = getEventAccent(event);
@@ -71,7 +72,7 @@ export function CalendarView({ events, tasks, onDateClick, onEventClick, onEvent
   ];
 
   const handleEventClick = (arg: EventClickArg) => {
-    if (arg.event.extendedProps.kind === "event") {
+    if (arg.event.extendedProps.kind === "event" && onEventClick) {
       onEventClick(arg.event.extendedProps.source as CalendarEvent);
     }
   };
@@ -91,7 +92,7 @@ export function CalendarView({ events, tasks, onDateClick, onEventClick, onEvent
     }
 
     try {
-      await onEventMove(source, startTime, endTime);
+      await onEventMove?.(source, startTime, endTime);
     } catch {
       arg.revert();
     }
@@ -104,13 +105,13 @@ export function CalendarView({ events, tasks, onDateClick, onEventClick, onEvent
         locales={[deLocale]}
         locale="de"
         initialView="dayGridMonth"
-        headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek" }}
+        headerToolbar={compact ? { left: "prev,next", center: "title", right: "" } : { left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek" }}
         buttonText={{ today: "Heute", month: "Monat", week: "Woche" }}
         events={calendarEvents}
-        editable
-        dateClick={(arg: DateClickArg) => onDateClick(arg.dateStr)}
+        editable={Boolean(onEventMove)}
+        dateClick={onDateClick ? (arg: DateClickArg) => onDateClick(arg.dateStr) : undefined}
         eventClick={handleEventClick}
-        eventDrop={handleDrop}
+        eventDrop={onEventMove ? handleDrop : undefined}
         height="auto"
       />
     </div>

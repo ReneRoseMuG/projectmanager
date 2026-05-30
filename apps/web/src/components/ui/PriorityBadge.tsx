@@ -1,7 +1,6 @@
 import type { Priority } from "@taskmanager/shared-types";
 import { useCatalogs } from "../../hooks/useCatalogs";
-import { catalogLabel } from "../../utils/catalogs";
-import { priorityBadgeTones } from "../../utils/domainLabels";
+import { catalogColor, catalogLabel } from "../../utils/catalogs";
 import { Badge } from "./Badge";
 
 interface PriorityBadgeProps {
@@ -11,5 +10,5 @@ interface PriorityBadgeProps {
 /** Compact priority display backed by editable priority catalog entries. */
 export function PriorityBadge({ value }: PriorityBadgeProps) {
   const catalogs = useCatalogs();
-  return <Badge tone={priorityBadgeTones[value] ?? "steel"}>{catalogLabel(catalogs.entries, "priority", value)}</Badge>;
+  return <Badge color={catalogColor(catalogs.entries, "priority", value)} filled>{catalogLabel(catalogs.entries, "priority", value)}</Badge>;
 }

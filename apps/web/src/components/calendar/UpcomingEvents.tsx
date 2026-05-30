@@ -7,7 +7,7 @@ import { ItemRow } from "../ui/ItemRow";
 
 interface UpcomingEventsProps {
   events: CalendarEvent[];
-  onOpen: (event: CalendarEvent) => void;
+  onOpen?: (event: CalendarEvent) => void;
 }
 
 export function UpcomingEvents({ events, onOpen }: UpcomingEventsProps) {
@@ -38,14 +38,14 @@ export function UpcomingEvents({ events, onOpen }: UpcomingEventsProps) {
                 statusIndicator={<span className="flex h-9 w-9 items-center justify-center rounded-lg bg-fern/10 text-fern"><CalendarClock size={16} /></span>}
                 title={event.title}
                 description={description}
-                meta={<span className="text-xs font-semibold text-slate-600">{formatHumanDate(event.startTime)}</span>}
-                onOpen={() => onOpen(event)}
+                meta={<span className="text-xs font-semibold text-steel-600">{formatHumanDate(event.startTime)}</span>}
+                onOpen={onOpen ? () => onOpen(event) : undefined}
               />
             );
           })}
         </div>
       ) : (
-        <p className="text-sm text-slate-600">Keine anstehenden Termine</p>
+        <p className="text-sm text-steel-600">Keine anstehenden Termine</p>
       )}
     </section>
   );

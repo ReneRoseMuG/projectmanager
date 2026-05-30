@@ -1,5 +1,6 @@
-import { eq, inArray } from "drizzle-orm";
-import type { DbClient } from "../db/client.js";
+﻿import { eq, inArray } from "drizzle-orm";
+import type { DbSession } from "../db/client.js";
+import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { milestones } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -12,28 +13,28 @@ function nowIso(): string {
 }
 
 export const milestoneRepository = {
-  findById(database: DbClient, id: number): MilestoneRecord | undefined {
-    return database.select().from(milestones).where(eq(milestones.id, id)).get();
+  async findById(database: DbSession, id: number): Promise<MilestoneRecord | undefined> {
+    return firstRow(await database.select().from(milestones).where(eq(milestones.id, id)));
   },
 
-  findAll(database: DbClient): MilestoneRecord[] {
-    return database.select().from(milestones).all();
+  async findAll(database: DbSession): Promise<MilestoneRecord[]> {
+    return database.select().from(milestones);
   },
 
-  findByProjectId(database: DbClient, projectId: number): MilestoneRecord[] {
-    return database.select().from(milestones).where(eq(milestones.projectId, projectId)).all();
+  async findByProjectId(database: DbSession, projectId: number): Promise<MilestoneRecord[]> {
+    return database.select().from(milestones).where(eq(milestones.projectId, projectId));
   },
 
-  findByProjectIds(database: DbClient, projectIds: number[]): MilestoneRecord[] {
+  async findByProjectIds(database: DbSession, projectIds: number[]): Promise<MilestoneRecord[]> {
     if (projectIds.length === 0) {
       return [];
     }
-    return database.select().from(milestones).where(inArray(milestones.projectId, projectIds)).all();
+    return database.select().from(milestones).where(inArray(milestones.projectId, projectIds));
   },
 
-  create(database: DbClient, data: MilestoneCreateData, userId?: number): MilestoneRecord {
+  async create(database: DbSession, data: MilestoneCreateData, userId?: number): Promise<MilestoneRecord> {
     const now = nowIso();
-    return database
+    const result = await database
       .insert(milestones)
       .values({
         ...data,
@@ -42,18 +43,21 @@ export const milestoneRepository = {
         updatedBy: userId ?? null,
         createdAt: now,
         updatedAt: now
-      })
-      .returning()
-      .get();
+      });
+    const created = await this.findById(database, insertId(result));
+    if (!created) {
+      throw new Error("Created milestone could not be loaded");
+    }
+    return created;
   },
 
-  update(database: DbClient, id: number, expectedVersion: number, data: MilestoneUpdateData, userId?: number): MilestoneRecord | undefined {
-    const current = this.findById(database, id);
+  async update(database: DbSession, id: number, expectedVersion: number, data: MilestoneUpdateData, userId?: number): Promise<MilestoneRecord | undefined> {
+    const current = await this.findById(database, id);
     if (!current) {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
-    return database
+    await database
       .update(milestones)
       .set({
         ...data,
@@ -61,12 +65,12 @@ export const milestoneRepository = {
         updatedBy: userId ?? null,
         updatedAt: nowIso()
       })
-      .where(eq(milestones.id, id))
-      .returning()
-      .get();
+      .where(eq(milestones.id, id));
+    return this.findById(database, id);
   },
 
-  delete(database: DbClient, id: number): number {
-    return database.delete(milestones).where(eq(milestones.id, id)).run().changes;
+  async delete(database: DbSession, id: number): Promise<number> {
+    return mutationAffectedRows(await database.delete(milestones).where(eq(milestones.id, id)));
   }
 };
+

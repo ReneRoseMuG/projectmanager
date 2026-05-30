@@ -2,11 +2,9 @@ import type { Ticket } from "@taskmanager/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import { Bug, LinkIcon } from "lucide-react";
 import { useMemo, useState } from "react";
-import { getTickets } from "../../api/tickets";
+import { getTicketLinkCandidates, type TicketOwner } from "../../api/tickets";
 import { queryKeys } from "../../queries/queryKeys";
-import { ticketTypeLabels, ticketTypeTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
-import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { Modal } from "../ui/Modal";
@@ -14,22 +12,25 @@ import { PriorityBadge } from "../ui/PriorityBadge";
 import { SearchInput } from "../ui/SearchInput";
 import { TaskListSkeleton } from "../ui/Skeleton";
 import { StatusPill } from "../ui/StatusPill";
+import { TicketTypeBadge } from "../ui/TicketTypeBadge";
 
 interface TicketLinkDialogProps {
   open: boolean;
+  owner?: TicketOwner | null;
   currentTickets: Ticket[];
   excludeIds?: number[];
   onLink: (ticket: Ticket) => Promise<void>;
   onClose: () => void;
 }
 
-export function TicketLinkDialog({ open, currentTickets, excludeIds = [], onLink, onClose }: TicketLinkDialogProps) {
+export function TicketLinkDialog({ open, owner, currentTickets, excludeIds = [], onLink, onClose }: TicketLinkDialogProps) {
   const [searchValue, setSearchValue] = useState("");
   const [linkingTicketId, setLinkingTicketId] = useState<number | null>(null);
+  const validOwner = owner && Number.isFinite(owner.id) ? owner : undefined;
   const allTicketsQuery = useQuery({
-    queryKey: queryKeys.tickets.list(),
-    queryFn: getTickets,
-    enabled: open
+    queryKey: validOwner ? queryKeys.tickets.linkCandidates(validOwner.type, validOwner.id) : queryKeys.tickets.root,
+    queryFn: () => getTicketLinkCandidates(validOwner as TicketOwner),
+    enabled: open && validOwner !== undefined
   });
   const currentTicketIds = useMemo(() => new Set([...currentTickets.map((ticket) => ticket.id), ...excludeIds]), [currentTickets, excludeIds]);
   const availableTickets = useMemo(() => {
@@ -72,10 +73,10 @@ export function TicketLinkDialog({ open, currentTickets, excludeIds = [], onLink
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="truncate text-sm font-semibold text-ink">{ticket.title}</span>
                       <StatusPill kind="workStatus" value={ticket.status} />
-                      <Badge tone={ticketTypeTones[ticket.type]}>{ticketTypeLabels[ticket.type]}</Badge>
+                      <TicketTypeBadge value={ticket.type} />
                       <PriorityBadge value={ticket.priority} />
                     </div>
-                    {description ? <p className="mt-1 line-clamp-2 text-xs text-slate-500">{description}</p> : null}
+                    {description ? <p className="mt-1 line-clamp-2 text-xs text-steel-500">{description}</p> : null}
                   </div>
                   <Button variant="secondary" icon={<LinkIcon size={17} />} loading={linkingTicketId === ticket.id} onClick={() => void linkTicket(ticket)}>
                     Verknüpfen

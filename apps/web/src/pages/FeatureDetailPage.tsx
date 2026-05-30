@@ -1,4 +1,11 @@
-import type { DraftComment, DraftTask, DraftTicket, DraftUseCase, Feature, FeatureInput } from "@taskmanager/shared-types";
+import type {
+  DraftComment,
+  DraftTask,
+  DraftTicket,
+  DraftUseCase,
+  Feature,
+  FeatureInput,
+} from "@taskmanager/shared-types";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { uploadFeatureAttachment } from "../api/attachments";
@@ -7,12 +14,17 @@ import { getProjectFeatures, setProjectFeatures } from "../api/doc-links";
 import { createOwnerTask, linkOwnerTask } from "../api/tasks";
 import { createOwnerTicket, linkOwnerTicket } from "../api/tickets";
 import { createUseCase as createUseCaseRequest } from "../api/use-cases";
-import { FeatureForm } from "../components/features/FeatureForm";
+import {
+  FeatureForm,
+  parseFeatureFormTab,
+} from "../components/features/FeatureForm";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useFeatures } from "../hooks/useFeatures";
+import { withStandaloneView } from "../utils/standalone";
 import type { DraftFile } from "../types";
 
 export function FeatureDetailPage() {
@@ -24,16 +36,20 @@ export function FeatureDetailPage() {
   const isCreateMode = params.id === undefined;
   const featureId = isCreateMode ? undefined : Number(params.id);
   const initialProjectIdParam = searchParams.get("projectId");
-  const initialProjectId = initialProjectIdParam ? Number(initialProjectIdParam) : undefined;
+  const initialProjectId = initialProjectIdParam
+    ? Number(initialProjectIdParam)
+    : undefined;
+  const initialTab = parseFeatureFormTab(searchParams.get("tab"));
   const features = useFeatures(featureId);
+  useDocumentTitle(isCreateMode ? "Feature: Neu" : features.feature ? `Feature: ${features.feature.title}` : "Feature");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
 
-  const returnTo = searchParams.get("returnTo") ?? "/features";
+  const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/features") : "/features");
   const closePage = () => navigate(returnTo);
   const openInTab =
     !isCreateMode && featureId !== undefined && Number.isFinite(featureId)
       ? () => {
-          window.open(`/features/${featureId}`, "_blank");
+          window.open(withStandaloneView(`/features/${featureId}`), "_blank");
           navigate(returnTo);
         }
       : undefined;
@@ -41,7 +57,10 @@ export function FeatureDetailPage() {
   const saveFeature = async (input: FeatureInput) => {
     try {
       if (features.feature) {
-        const updated = await features.updateFeature(features.feature.id, { ...input, expectedVersion: features.feature.version });
+        const updated = await features.updateFeature(features.feature.id, {
+          ...input,
+          expectedVersion: features.feature.version,
+        });
         await features.reload();
         showToast({ tone: "success", title: "Feature gespeichert" });
         return updated;
@@ -51,17 +70,37 @@ export function FeatureDetailPage() {
       showToast({ tone: "success", title: "Feature erstellt" });
       return created;
     } catch (featureError) {
-      showToast({ tone: "error", title: "Feature konnte nicht gespeichert werden", message: errorMessage(featureError) });
+      showToast({
+        tone: "error",
+        title: "Feature konnte nicht gespeichert werden",
+        message: errorMessage(featureError),
+      });
       throw featureError;
     }
   };
 
   const postCreateFeature = async (
     featureId: number,
-    pending: { tasks: DraftTask[]; tickets: DraftTicket[]; useCases: DraftUseCase[]; projectIds: number[]; comments: DraftComment[]; files: DraftFile[] }
+    pending: {
+      tasks: DraftTask[];
+      tickets: DraftTicket[];
+      useCases: DraftUseCase[];
+      projectIds: number[];
+      comments: DraftComment[];
+      files: DraftFile[];
+    },
   ) => {
     const owner = { type: "feature" as const, id: featureId };
     try {
+      for (const projectId of pending.projectIds) {
+        const linkedFeatures = await getProjectFeatures(projectId);
+        await setProjectFeatures(projectId, [
+          ...new Set([
+            ...linkedFeatures.map((feature) => feature.id),
+            featureId,
+          ]),
+        ]);
+      }
       for (const task of pending.tasks) {
         if (task.kind === "existing") {
           await linkOwnerTask(owner, task.task.id);
@@ -81,11 +120,6 @@ export function FeatureDetailPage() {
           await createUseCaseRequest(featureId, useCase.draft);
         }
       }
-      const projectIds = initialProjectId !== undefined && Number.isFinite(initialProjectId) ? [...new Set([...pending.projectIds, initialProjectId])] : pending.projectIds;
-      for (const projectId of projectIds) {
-        const linkedFeatures = await getProjectFeatures(projectId);
-        await setProjectFeatures(projectId, [...new Set([...linkedFeatures.map((feature) => feature.id), featureId])]);
-      }
       for (const comment of pending.comments) {
         await createEntityComment("feature", featureId, { body: comment.text });
       }
@@ -94,14 +128,20 @@ export function FeatureDetailPage() {
         if (!file) {
           continue;
         }
-        setSavingLabel(`Speichern… (Datei ${index + 1} von ${pending.files.length})`);
+        setSavingLabel(
+          `Speichern… (Datei ${index + 1} von ${pending.files.length})`,
+        );
         await uploadFeatureAttachment(featureId, file.file);
       }
       await features.reload();
       showToast({ tone: "success", title: "Feature-Zuordnungen gespeichert" });
-      navigate(`/features/${featureId}`);
     } catch (postCreateError) {
-      showToast({ tone: "error", title: "Feature wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden", message: errorMessage(postCreateError) });
+      showToast({
+        tone: "error",
+        title:
+          "Feature wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden",
+        message: errorMessage(postCreateError),
+      });
       throw postCreateError;
     } finally {
       setSavingLabel(undefined);
@@ -113,7 +153,7 @@ export function FeatureDetailPage() {
       title: "Feature löschen?",
       body: `Das Feature "${feature.title}" wird entfernt.`,
       severity: "danger",
-      confirmLabel: "Löschen"
+      confirmLabel: "Löschen",
     });
     if (!approved) {
       return false;
@@ -121,16 +161,24 @@ export function FeatureDetailPage() {
     try {
       await features.removeFeature(feature.id);
       showToast({ tone: "success", title: "Feature gelöscht" });
-      navigate("/features");
+      navigate(returnTo);
       return true;
     } catch (featureError) {
-      showToast({ tone: "error", title: "Feature konnte nicht gelöscht werden", message: errorMessage(featureError) });
+      showToast({
+        tone: "error",
+        title: "Feature konnte nicht gelöscht werden",
+        message: errorMessage(featureError),
+      });
       return false;
     }
   };
 
   if (!isCreateMode && !Number.isFinite(featureId)) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Feature nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
+        Feature nicht gefunden
+      </div>
+    );
   }
 
   if (!isCreateMode && features.loading) {
@@ -138,20 +186,25 @@ export function FeatureDetailPage() {
   }
 
   if (!isCreateMode && !features.feature) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Feature nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
+        Feature nicht gefunden
+      </div>
+    );
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
       <FeatureForm
         open
         feature={features.feature}
         variant="page"
+        initialProjectId={initialProjectId}
+        initialTab={initialTab}
         onSubmit={saveFeature}
         onDelete={deleteFeature}
         savingLabel={savingLabel}
         onPostCreate={postCreateFeature}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onOpenInTab={openInTab}
       />

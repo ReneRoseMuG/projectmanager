@@ -1,16 +1,20 @@
 import type { Attachment, AttachmentPreviewInfo } from "@taskmanager/shared-types";
-import { Download, Trash2 } from "lucide-react";
+import { Download, FolderOpen, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { assetUrl } from "../../api/client";
+import { errorMessageAsync } from "../../hooks/errors";
 import { useAttachmentPreview } from "../../hooks/useAttachmentPreview";
 import { formatHumanDate } from "../../utils/date";
 import { Button } from "../ui/Button";
 import { Spinner } from "../ui/Spinner";
+import { useToast } from "../ui/ToastProvider";
 import { describeAttachmentType } from "./attachmentTypes";
 
 interface AttachmentPreviewProps {
   attachment: Attachment;
   onDelete: (attachment: Attachment) => void;
+  onOpen: (attachment: Attachment) => Promise<void>;
+  opening?: boolean;
 }
 
 function prettyBytes(size: number): string {
@@ -62,7 +66,7 @@ function parseDelimitedLine(line: string, delimiter: "," | "\t"): string[] {
 
 function PreviewMessage({ children }: { children: string }) {
   return (
-    <div className="flex h-28 items-center justify-center rounded-md border border-dashed border-line bg-shell px-4 text-center text-sm text-slate-500">
+    <div className="flex h-28 items-center justify-center rounded-md border border-dashed border-line bg-shell px-4 text-center text-sm text-steel-500">
       <span>{children}</span>
     </div>
   );
@@ -84,7 +88,7 @@ function TextPreview({ preview }: { preview: AttachmentPreviewInfo }) {
   return (
     <div className="grid gap-2">
       <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md border border-line bg-shell p-3 font-mono text-xs leading-relaxed text-ink">{preview.text.content}</pre>
-      {preview.text.truncated ? <p className="text-xs text-slate-500">Vorschau gekürzt nach {prettyBytes(preview.text.bytesRead)}.</p> : null}
+      {preview.text.truncated ? <p className="text-xs text-steel-500">Vorschau gekürzt nach {prettyBytes(preview.text.bytesRead)}.</p> : null}
     </div>
   );
 }
@@ -105,7 +109,7 @@ function CsvPreview({ preview, delimiter }: { preview: AttachmentPreviewInfo; de
         <table className="min-w-full border-collapse text-left text-xs">
           <tbody>
             {rows.map((row, rowIndex) => (
-              <tr key={`${rowIndex}-${row.join("|")}`} className={rowIndex === 0 ? "bg-steel-100 font-semibold text-ink" : "text-slate-600"}>
+              <tr key={`${rowIndex}-${row.join("|")}`} className={rowIndex === 0 ? "bg-steel-100 font-semibold text-ink" : "text-steel-600"}>
                 {row.map((cell, cellIndex) => (
                   <td key={`${cellIndex}-${cell}`} className="max-w-48 border-b border-r border-line px-2 py-1.5 align-top">
                     <span className="line-clamp-3 break-words">{cell}</span>
@@ -116,13 +120,14 @@ function CsvPreview({ preview, delimiter }: { preview: AttachmentPreviewInfo; de
           </tbody>
         </table>
       </div>
-      {preview.text.truncated ? <p className="text-xs text-slate-500">Vorschau gekürzt nach {prettyBytes(preview.text.bytesRead)}.</p> : null}
+      {preview.text.truncated ? <p className="text-xs text-steel-500">Vorschau gekürzt nach {prettyBytes(preview.text.bytesRead)}.</p> : null}
     </div>
   );
 }
 
-export function AttachmentPreview({ attachment, onDelete }: AttachmentPreviewProps) {
+export function AttachmentPreview({ attachment, onDelete, onOpen, opening = false }: AttachmentPreviewProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const { showToast } = useToast();
   const meta = describeAttachmentType(attachment);
   const serverPreviewEnabled = needsServerPreview(meta.family);
   const { preview, loading, error } = useAttachmentPreview(attachment.id, serverPreviewEnabled);
@@ -191,10 +196,18 @@ export function AttachmentPreview({ attachment, onDelete }: AttachmentPreviewPro
     return <PreviewMessage>{preview.message ?? "Vorschau nicht verfügbar."}</PreviewMessage>;
   };
 
+  const openLocally = async () => {
+    try {
+      await onOpen(attachment);
+    } catch (openError) {
+      showToast({ tone: "error", title: "Datei konnte nicht geöffnet werden", message: await errorMessageAsync(openError) });
+    }
+  };
+
   return (
-    <article className="grid gap-3.5 rounded-xl border border-line bg-white p-3.5 shadow-sm">
+    <article className="grid gap-3.5 rounded-lg border border-line bg-white p-3.5 shadow-sm">
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5">
-        <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${meta.toneClassName}`} title={meta.label}>
+        <span className={`flex h-11 w-11 items-center justify-center rounded-lg ${meta.toneClassName}`} title={meta.label}>
           <Icon size={21} />
         </span>
         <div className="min-w-0">
@@ -202,7 +215,7 @@ export function AttachmentPreview({ attachment, onDelete }: AttachmentPreviewPro
             <h3 className="truncate text-sm font-semibold text-ink">{attachment.originalName}</h3>
             <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${meta.toneClassName}`}>{meta.badge}</span>
           </div>
-          <p className="truncate text-xs text-slate-500">
+          <p className="truncate text-xs text-steel-500">
             {prettyBytes(attachment.size)} · {formatHumanDate(attachment.createdAt)} · {attachment.mimetype}
           </p>
         </div>
@@ -210,6 +223,7 @@ export function AttachmentPreview({ attachment, onDelete }: AttachmentPreviewPro
           <a className="inline-flex h-9 w-9 items-center justify-center rounded-md text-ink transition hover:bg-line/50" href={url} target="_blank" rel="noreferrer" title="Öffnen" aria-label="Öffnen">
             <Download size={16} />
           </a>
+          <Button aria-label="Lokal öffnen" title="Lokal öffnen" className="h-10 w-10" icon={<FolderOpen size={18} />} variant="ghost" disabled={opening} onClick={() => void openLocally()} />
           <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(attachment)} />
         </div>
       </div>

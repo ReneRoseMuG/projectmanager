@@ -1,0 +1,25 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "baseUrl": "..",
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "drizzle-orm": ["apps/api/node_modules/drizzle-orm/index.d.ts"],
+      "drizzle-orm/better-sqlite3": ["apps/api/node_modules/drizzle-orm/better-sqlite3/index.d.ts"],
+      "drizzle-orm/better-sqlite3/migrator": ["apps/api/node_modules/drizzle-orm/better-sqlite3/migrator.d.ts"],
+      "drizzle-orm/*": ["apps/api/node_modules/drizzle-orm/*"]
+    },
+    "noUncheckedIndexedAccess": false,
+    "noEmit": true
+  },
+  "include": [
+    "../apps/api/src",
+    "./unit/api",
+    "./integration/api",
+    "./fixtures/api",
+    "./setup/api"
+  ],
+  "exclude": ["./.runtime", "../node_modules"]
+}

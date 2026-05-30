@@ -1,4 +1,8 @@
-import type { Task, TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
+import type {
+  Task,
+  TaskBoardItem,
+  TaskStatus,
+} from "@taskmanager/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -12,25 +16,30 @@ import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useTaskDetail } from "../hooks/useTaskDetail";
 import { useTasks } from "../hooks/useTasks";
 import { invalidateTags } from "../queries/invalidation";
+import { withStandaloneView } from "../utils/standalone";
 
 function parseTaskOwner(searchParams: URLSearchParams): TaskOwner | undefined {
   const ownerType = searchParams.get("ownerType");
   const ownerIdParam = searchParams.get("ownerId");
   const ownerId = ownerIdParam ? Number(ownerIdParam) : NaN;
-  if ((ownerType === "project" || ownerType === "milestone" || ownerType === "feature" || ownerType === "useCase") && Number.isFinite(ownerId)) {
+  if (
+    (ownerType === "project" ||
+      ownerType === "milestone" ||
+      ownerType === "feature" ||
+      ownerType === "useCase") &&
+    Number.isFinite(ownerId)
+  ) {
     return { type: ownerType, id: ownerId };
   }
   return undefined;
 }
 
 function parseTaskStatus(value: string | null): TaskStatus {
-  if (value === "in_progress" || value === "done") {
-    return value;
-  }
-  return "todo";
+  return value && value.trim().length > 0 ? value : "active";
 }
 
 export function TaskDetailPage() {
@@ -43,32 +52,56 @@ export function TaskDetailPage() {
   const taskId = isCreateMode ? null : Number(params.id);
   const owner = parseTaskOwner(searchParams);
   const taskController = useTasks(owner);
-  const detail = useTaskDetail(!isCreateMode && Number.isFinite(taskId) ? taskId : null);
+  const detail = useTaskDetail(
+    !isCreateMode && Number.isFinite(taskId) ? taskId : null,
+  );
+  useDocumentTitle(isCreateMode ? "Aufgabe: Neu" : detail.task ? `Aufgabe: ${detail.task.title}` : "Aufgabe");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
-  const returnTo = searchParams.get("returnTo") ?? (owner ? `/${owner.type === "useCase" ? "use-cases" : `${owner.type}s`}/${owner.id}` : "/projects");
+  const returnTo =
+    searchParams.get("returnTo") ??
+    (searchParams.get("standalone") === "1"
+      ? withStandaloneView("/tasks")
+      : owner
+      ? `/${owner.type === "useCase" ? "use-cases" : `${owner.type}s`}/${owner.id}`
+      : "/projects");
 
   const closePage = () => navigate(returnTo);
   const openInTab =
     !isCreateMode && taskId !== null && Number.isFinite(taskId)
       ? () => {
-          window.open(`/tasks/${taskId}`, "_blank");
+          window.open(withStandaloneView(`/tasks/${taskId}`), "_blank");
           navigate(returnTo);
         }
       : undefined;
 
   const submitTask = async (input: TaskFormInput): Promise<Task | void> => {
-    const { tagIds, pendingSubtasks, pendingTickets, pendingComments, pendingNotes, pendingFiles, ...taskInput } = input;
+    const {
+      tagIds,
+      pendingSubtasks,
+      pendingTickets,
+      pendingComments,
+      pendingNotes,
+      pendingFiles,
+      ...taskInput
+    } = input;
 
     if (!isCreateMode && detail.task) {
       try {
-        const updated = await taskController.updateTask(detail.task.id, { ...taskInput, expectedVersion: detail.task.version });
+        const updated = await taskController.updateTask(detail.task.id, {
+          ...taskInput,
+          expectedVersion: detail.task.version,
+        });
         await setTaskTags(detail.task.id, tagIds);
         await invalidateTags(queryClient);
         await detail.reload();
         showToast({ tone: "success", title: "Aufgabe gespeichert" });
         return updated ?? detail.task;
       } catch (taskError) {
-        showToast({ tone: "error", title: "Aufgabe konnte nicht gespeichert werden", message: errorMessage(taskError) });
+        showToast({
+          tone: "error",
+          title: "Aufgabe konnte nicht gespeichert werden",
+          message: errorMessage(taskError),
+        });
         throw taskError;
       }
     }
@@ -115,15 +148,22 @@ export function TaskDetailPage() {
         if (!file) {
           continue;
         }
-        setSavingLabel(`Speichern… (Datei ${index + 1} von ${pendingFiles.length})`);
+        setSavingLabel(
+          `Speichern… (Datei ${index + 1} von ${pendingFiles.length})`,
+        );
         await uploadTaskAttachment(created.id, file.file);
       }
 
       showToast({ tone: "success", title: "Aufgabe erstellt" });
-      navigate(`/tasks/${created.id}?returnTo=${encodeURIComponent(returnTo)}`);
       return created;
     } catch (taskError) {
-      showToast({ tone: "error", title: created ? "Aufgabe wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden" : "Aufgabe konnte nicht erstellt werden", message: errorMessage(taskError) });
+      showToast({
+        tone: "error",
+        title: created
+          ? "Aufgabe wurde erstellt, aber nicht alle Zuordnungen konnten gespeichert werden"
+          : "Aufgabe konnte nicht erstellt werden",
+        message: errorMessage(taskError),
+      });
       throw taskError;
     } finally {
       setSavingLabel(undefined);
@@ -131,11 +171,19 @@ export function TaskDetailPage() {
   };
 
   if (isCreateMode && !owner) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Aufgaben benötigen einen Parent-Kontext.</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
+        Aufgaben benötigen einen Parent-Kontext.
+      </div>
+    );
   }
 
   if (!isCreateMode && !Number.isFinite(taskId)) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Aufgabe nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
+        Aufgabe nicht gefunden
+      </div>
+    );
   }
 
   if (!isCreateMode && detail.loading) {
@@ -143,19 +191,23 @@ export function TaskDetailPage() {
   }
 
   if (!isCreateMode && !detail.task) {
-    return <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-slate-600">Aufgabe nicht gefunden</div>;
+    return (
+      <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-steel-600">
+        Aufgabe nicht gefunden
+      </div>
+    );
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
       <TaskForm
         open
         task={detail.task}
+        owner={owner}
         initialStatus={parseTaskStatus(searchParams.get("status"))}
         variant="page"
         savingLabel={savingLabel}
         onSubmit={submitTask}
-        closeOnSubmit={!isCreateMode}
         onClose={closePage}
         onChanged={detail.reload}
         onOpenInTab={openInTab}

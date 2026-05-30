@@ -1,7 +1,7 @@
-import type { CommentInput, CommentEntityType } from "@taskmanager/shared-types";
+import type { CommentInput, CommentEntityType, CommentUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { createEntityComment, deleteEntityComment, getEntityComments } from "../api/comments";
+import { createEntityComment, deleteEntityComment, getEntityComments, updateComment as updateCommentRequest } from "../api/comments";
 import { invalidateComments } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
@@ -50,6 +50,20 @@ export function useEntityComments(entityType: CommentEntityType, entityId?: numb
     }
   });
 
+  const updateCommentMutation = useMutation({
+    mutationFn: async ({ commentId, input }: { commentId: number; input: CommentUpdate }) => {
+      if (validEntityId === undefined) {
+        return null;
+      }
+      return updateCommentRequest(commentId, input);
+    },
+    onSuccess: async () => {
+      if (validEntityId !== undefined) {
+        await invalidateComments(queryClient, entityType, validEntityId);
+      }
+    }
+  });
+
   const createComment = useCallback(
     async (input: CommentInput) => {
       return createCommentMutation.mutateAsync(input);
@@ -64,12 +78,20 @@ export function useEntityComments(entityType: CommentEntityType, entityId?: numb
     [removeCommentMutation]
   );
 
+  const updateComment = useCallback(
+    async (commentId: number, input: CommentUpdate) => {
+      return updateCommentMutation.mutateAsync({ commentId, input });
+    },
+    [updateCommentMutation]
+  );
+
   return {
     comments: commentsQuery.data ?? [],
     loading: commentsQuery.isLoading,
     error: toQueryError(commentsQuery.error),
     reload,
     createComment,
+    updateComment,
     removeComment
   };
 }

@@ -1,16 +1,24 @@
-import type { FastifyInstance } from "fastify";
+﻿import type { FastifyInstance } from "fastify";
 import type { NoteInput, NoteUpdate } from "@taskmanager/shared-types";
+import { requireCurrentUser } from "../plugins/auth.js";
 import {
+  createDayPlanNote,
   createProjectNote,
   createMilestoneNote,
   createTaskNote,
+  createWikiPageNote,
+  deleteDayPlanNote,
   deleteNote,
   getNote,
+  linkDayPlanNote,
+  listDayPlanNotes,
   listMilestoneNotes,
   listProjectNotes,
   listTaskNotes,
+  listWikiPageNotes,
   updateNote
 } from "../services/notes.service.js";
+import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const noteBodySchema = {
@@ -29,6 +37,16 @@ const notePatchSchema = {
   properties: {
     ...noteBodySchema.properties,
     ...expectedVersionPropertySchema
+  }
+} as const;
+
+const dayPlanNoteParamSchema = {
+  type: "object",
+  required: ["id", "noteId"],
+  additionalProperties: false,
+  properties: {
+    id: { type: "integer", minimum: 1 },
+    noteId: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -51,22 +69,61 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     async (request) => listMilestoneNotes(app.db, request.params.id)
   );
 
+  app.get<{ Params: { id: number } }>(
+    "/day-plans/:id/notes",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => {
+      const currentUser = await requireCurrentUser(request);
+      return listDayPlanNotes(app.db, request.params.id, currentUser.id);
+    }
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/wiki/:id/notes",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listWikiPageNotes(app.db, request.params.id)
+  );
+
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/projects/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createProjectNote(app.db, request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(await createProjectNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/tasks/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createTaskNote(app.db, request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(await createTaskNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
   );
 
   app.post<{ Params: { id: number }; Body: NoteInput }>(
     "/milestones/:id/notes",
     { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => reply.status(201).send(createMilestoneNote(app.db, request.params.id, request.body))
+    async (request, reply) => reply.status(201).send(await createMilestoneNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
+  );
+
+  app.post<{ Params: { id: number }; Body: NoteInput }>(
+    "/day-plans/:id/notes",
+    { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
+    async (request, reply) => {
+      const currentUser = await requireCurrentUser(request);
+      return reply.status(201).send(await createDayPlanNote(app.db, request.params.id, currentUser.id, request.body, createJournalActor(request.currentUser)));
+    }
+  );
+
+  app.post<{ Params: { id: number }; Body: NoteInput }>(
+    "/wiki/:id/notes",
+    { schema: { params: idParamSchema, body: noteBodySchema, response: { 201: objectResponseSchema } } },
+    async (request, reply) => reply.status(201).send(await createWikiPageNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser)))
+  );
+
+  app.post<{ Params: { id: number; noteId: number } }>(
+    "/day-plans/:id/notes/:noteId",
+    { schema: { params: dayPlanNoteParamSchema, response: { 200: objectResponseSchema } } },
+    async (request) => {
+      const currentUser = await requireCurrentUser(request);
+      return linkDayPlanNote(app.db, request.params.id, request.params.noteId, currentUser.id, createJournalActor(request.currentUser));
+    }
   );
 
   app.get<{ Params: { id: number } }>(
@@ -78,14 +135,24 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: number }; Body: NoteUpdate }>(
     "/notes/:id",
     { schema: { params: idParamSchema, body: notePatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateNote(app.db, request.params.id, request.body)
+    async (request) => updateNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.delete<{ Params: { id: number } }>(
     "/notes/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      deleteNote(app.db, request.params.id);
+      await deleteNote(app.db, request.params.id, createJournalActor(request.currentUser));
+      return reply.status(204).send();
+    }
+  );
+
+  app.delete<{ Params: { id: number; noteId: number } }>(
+    "/day-plans/:id/notes/:noteId",
+    { schema: { params: dayPlanNoteParamSchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
+      const currentUser = await requireCurrentUser(request);
+      await deleteDayPlanNote(app.db, request.params.id, request.params.noteId, currentUser.id, createJournalActor(request.currentUser));
       return reply.status(204).send();
     }
   );

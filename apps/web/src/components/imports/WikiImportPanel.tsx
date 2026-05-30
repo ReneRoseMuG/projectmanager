@@ -23,7 +23,7 @@ const actionLabels: Record<WikiImportAction, string> = {
 const actionClasses: Record<WikiImportAction, string> = {
   created: "bg-fern/10 text-fern",
   updated: "bg-violet/10 text-violet",
-  skipped: "bg-slate-100 text-slate-600",
+  skipped: "bg-steel-100 text-steel-600",
   warning: "bg-mustard/15 text-mustard",
   error: "bg-crimson/10 text-crimson"
 };
@@ -66,7 +66,7 @@ export function WikiImportPanel({ sourcePath, report, loading, error, onSourcePa
 
           <div className="overflow-hidden rounded-lg border border-line">
             <table className="w-full border-collapse text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <thead className="bg-steel-50 text-xs uppercase text-steel-500">
                 <tr>
                   <th className="px-3 py-2 font-semibold">Status</th>
                   <th className="px-3 py-2 font-semibold">Typ</th>
@@ -76,12 +76,12 @@ export function WikiImportPanel({ sourcePath, report, loading, error, onSourcePa
               </thead>
               <tbody className="divide-y divide-line">
                 {visibleItems.map((item, index) => (
-                  <ImportRow key={`${item.type}-${item.slug ?? item.importKey ?? item.title}-${index}`} item={item} />
+                  <ImportRow key={`${item.type}-${item.importKey ?? item.title}-${index}`} item={item} />
                 ))}
               </tbody>
             </table>
           </div>
-          {report.items.length > visibleItems.length ? <div className="text-sm text-slate-600">{report.items.length - visibleItems.length} weitere Einträge</div> : null}
+          {report.items.length > visibleItems.length ? <div className="text-sm text-steel-600">{report.items.length - visibleItems.length} weitere Einträge</div> : null}
         </>
       ) : null}
     </section>
@@ -90,8 +90,8 @@ export function WikiImportPanel({ sourcePath, report, loading, error, onSourcePa
 
 function SummaryTile({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-line bg-slate-50 px-3 py-2">
-      <div className="text-xs font-medium text-slate-500">{label}</div>
+    <div className="rounded-md border border-line bg-steel-50 px-3 py-2">
+      <div className="text-xs font-medium text-steel-500">{label}</div>
       <div className="text-xl font-semibold text-ink">{value}</div>
     </div>
   );
@@ -101,14 +101,14 @@ function ImportRow({ item }: { item: WikiImportItemResult }) {
   return (
     <tr className="align-top">
       <td className="px-3 py-2">
-        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${actionClasses[item.action]}`}>{actionLabels[item.action]}</span>
+        <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${actionClasses[item.action]}`}>{actionLabels[item.action]}</span>
       </td>
-      <td className="px-3 py-2 font-mono text-xs text-slate-500">{item.type}</td>
+      <td className="px-3 py-2 font-mono text-xs text-steel-500">{item.type}</td>
       <td className="px-3 py-2">
         <div className="font-medium text-ink">{item.title}</div>
-        {item.message ? <div className="mt-1 text-xs text-slate-500">{item.message}</div> : null}
+        {item.message ? <div className="mt-1 text-xs text-steel-500">{item.message}</div> : null}
       </td>
-      <td className="max-w-[360px] truncate px-3 py-2 text-xs text-slate-500">{item.sourcePath ?? item.slug ?? item.importKey ?? ""}</td>
+      <td className="max-w-[360px] truncate px-3 py-2 text-xs text-steel-500">{item.sourcePath ?? item.importKey ?? ""}</td>
     </tr>
   );
 }

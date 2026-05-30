@@ -5,6 +5,7 @@
   "type": "module",
   "workspaces": [
     "apps/api",
+    "apps/mcp-server",
     "apps/web",
     "packages/shared-types"
   ],
@@ -12,18 +13,18 @@
     "node": "20.x || 22.x || 24.x"
   },
   "scripts": {
-    "ai:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-local-ai.ps1",
-    "ai:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-ai.ps1 -EnsureModel",
-    "dev": "npm run ai:start && concurrently \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
-    "build": "npm run build -w packages/shared-types && npm run build -w apps/api && npm run build -w apps/web",
+    "dev": "npm run build -w packages/shared-types && npm run build -w apps/mcp-server && node apps/mcp-server/dist/start-project-manager.js --dev",
+    "build": "npm run build -w packages/shared-types && npm run build -w apps/api && npm run build -w apps/mcp-server && npm run build -w apps/web",
     "db:generate": "npm run db:generate -w apps/api",
-    "db:migrate": "npm run db:migrate -w apps/api",
-    "test": "npm run test -w apps/api",
+    "db:migrate": "npm run build -w packages/shared-types && npm run db:migrate -w apps/api",
+    "test": "npm run test -w apps/api && npm run test -w apps/mcp-server",
     "lint": "npm run lint -w apps/web && npm run lint -w apps/api",
     "format": "prettier --write ."
   },
   "devDependencies": {
+    "@tiptap/extension-text-style": "^3.23.5",
     "concurrently": "^8.2.2",
+    "fastify": "^5.8.5",
     "prettier": "^3.3.3",
     "typescript": "^5.4.5"
   }

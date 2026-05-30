@@ -12,11 +12,10 @@
 // components/projects/ProjectForm.tsx             | description              | project-description
 // components/tasks/TaskForm.tsx                   | description              | task-description
 // components/tickets/TicketForm.tsx               | description              | ticket-description
-// components/ui/CommentThread.tsx                 | comment.body readOnly    | comment-thread-comment-${comment.id}-body
+// components/ui/CommentThread.tsx                 | comment.body             | comment-thread-comment-${comment.id}-body
 // components/ui/CommentThread.tsx                 | draft body               | comment-thread-body
 // components/usecases/UseCaseForm.tsx             | description              | use-case-description
 // components/usecases/UseCaseForm.tsx             | content                  | use-case-content
-// components/wiki/WikiPageDetail.tsx              | content                  | wiki-page-detail-content
 // components/wiki/WikiPageForm.tsx                | content                  | wiki-page-form-content
 
 import type { Editor } from "@tiptap/core";
@@ -26,47 +25,49 @@ import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
-import TextStyle from "@tiptap/extension-text-style";
+import { TextStyle } from "@tiptap/extension-text-style";
 import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useMutation } from "@tanstack/react-query";
 import {
   AlignCenter,
   AlignLeft,
   AlignRight,
   Bold,
   Code2,
+  Columns2,
   Heading1,
   Heading2,
   Heading3,
+  Heading4,
   Highlighter,
   ImageIcon,
   Italic,
   LinkIcon,
   List,
   ListOrdered,
+  Loader2,
+  Minus,
   PenLine,
-  Pencil,
   Quote,
   RemoveFormatting,
-  Sparkles,
   Strikethrough,
   Text,
-  Wand2,
   Underline as UnderlineIcon
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Markdown } from "tiptap-markdown";
-import { assistAiText } from "../../api/ai";
-import { hasVisibleHtmlContent } from "../../lib/html-utils";
 import { errorMessage } from "../../hooks/errors";
+import { hasVisibleHtmlContent } from "../../lib/html-utils";
 import { useToast } from "./ToastProvider";
+import { Column, ColumnBlock } from "./tiptap-column-node";
 import { TldrawNode } from "./tldraw-node";
 
 interface RichTextInlineFieldProps {
   /** Current HTML value for the controlled field. */
   value: string | null | undefined;
+  /** Declares whether the value is already HTML or raw markdown/plain text. */
+  valueFormat?: RichTextValueFormat;
   /** Called on blur with the new HTML string. Does not persist directly. */
   onChange: (html: string) => void;
   /** Plain text placeholder shown when the field is empty. */
@@ -77,20 +78,32 @@ interface RichTextInlineFieldProps {
   toolbar?: RichTextToolbarVariant;
   /** Pure read view without editor mount or edit affordances. */
   readOnly?: boolean;
+  /** Keep the active editor mounted when focus leaves the field. */
+  commitOnBlur?: boolean;
+  /** Report editor HTML while typing instead of only on blur. */
+  liveUpdate?: boolean;
   /** Additional classes for the outer container. */
   className?: string;
   /** Unique prefix for data-testid attributes at each usage site. */
   testIdPrefix?: string;
+  /** Optional image upload handler for clipboard images and toolbar file picker. */
+  onImageUpload?: (file: File) => Promise<string>;
 }
 
 interface RichTextInlineEditorProps {
   value: string;
+  valueFormat: RichTextValueFormat;
   originalValue: string;
   placeholder?: string;
   minRows?: number;
   toolbar: RichTextToolbarVariant;
   clickPosition: ClickPosition | null;
   testIdPrefix?: string;
+  onImageUpload?: (file: File) => Promise<string>;
+  commitOnBlur: boolean;
+  liveUpdate: boolean;
+  onLiveChange: (html: string) => void;
+  onFocusStart: (html: string) => void;
   onCommit: (html: string) => void;
   onCancel: () => void;
 }
@@ -104,84 +117,106 @@ interface ToolbarButtonProps {
 }
 
 type RichTextToolbarVariant = "full" | "minimal" | "none";
+type ImageUploadHandler = (file: File) => Promise<string>;
+export type RichTextValueFormat = "html" | "markdown";
 
 interface ClickPosition {
   left: number;
   top: number;
 }
 
+const IMAGE_UPLOAD_PLACEHOLDER = "[Bild wird hochgeladen...]";
+
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function RichTextInlineField({ value, onChange, placeholder, minRows, toolbar = "full", readOnly = false, className = "", testIdPrefix }: RichTextInlineFieldProps) {
-  const [isEditing, setIsEditing] = useState(false);
+export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", testIdPrefix, onImageUpload }: RichTextInlineFieldProps) {
   const [originalValue, setOriginalValue] = useState("");
-  const [clickPosition, setClickPosition] = useState<ClickPosition | null>(null);
-  const hasContent = hasVisibleHtmlContent(value);
+  const hasContent = valueFormat === "markdown" ? Boolean(value?.trim()) : hasVisibleHtmlContent(value);
   const minRowsStyle = useMemo(() => (minRows ? ({ "--rich-text-field-min-rows": minRows } as React.CSSProperties) : undefined), [minRows]);
   const minRowsClassName = minRows ? "rich-text-inline-min-rows" : "";
-
-  const handleActivate = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (readOnly) {
-      return;
-    }
-
-    setOriginalValue(value ?? "");
-    setClickPosition({ left: event.clientX, top: event.clientY });
-    setIsEditing(true);
-  };
+  const fieldChromeClassName = readOnly ? "" : "border border-line bg-shell/70 shadow-sm";
+  const fieldHoverClassName = !readOnly && "cursor-text hover:border-steel-300 hover:bg-white";
 
   const handleCommit = (html: string) => {
-    setIsEditing(false);
-    setClickPosition(null);
     onChange(html);
   };
 
   const handleCancel = () => {
-    setIsEditing(false);
-    setClickPosition(null);
     onChange(originalValue);
   };
 
+  if (!readOnly) {
+    return (
+      <div className={cn("relative group", className)} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}>
+        <RichTextInlineEditor
+          value={value ?? ""}
+          valueFormat={valueFormat}
+          originalValue={originalValue}
+          placeholder={placeholder}
+          minRows={minRows}
+          toolbar={toolbar}
+          clickPosition={null}
+          testIdPrefix={testIdPrefix}
+          onImageUpload={onImageUpload}
+          commitOnBlur={commitOnBlur}
+          liveUpdate={liveUpdate}
+          onLiveChange={onChange}
+          onFocusStart={setOriginalValue}
+          onCommit={handleCommit}
+          onCancel={handleCancel}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={cn("relative group", className)}>
-      {isEditing ? (
-        <RichTextInlineEditor value={value ?? ""} originalValue={originalValue} placeholder={placeholder} minRows={minRows} toolbar={toolbar} clickPosition={clickPosition} testIdPrefix={testIdPrefix} onCommit={handleCommit} onCancel={handleCancel} />
-      ) : hasContent ? (
+      {hasContent && valueFormat === "html" ? (
         <div
           className={cn(
             "rich-text-surface max-w-none rounded-md px-3 py-2 text-sm leading-relaxed transition-colors [&_li]:mb-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_p]:mb-1 [&_ul]:list-disc [&_ul]:pl-4",
             minRowsClassName,
-            !readOnly && "cursor-text hover:bg-shell/80"
+            fieldChromeClassName,
+            fieldHoverClassName
           )}
           data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
           style={minRowsStyle}
-          onClick={readOnly ? undefined : handleActivate}
           dangerouslySetInnerHTML={{ __html: value ?? "" }}
         />
-      ) : (
+      ) : hasContent ? (
         <div
-          className={cn("rounded-md px-3 py-2 text-sm italic text-slate-500 transition-colors", minRowsClassName, !readOnly && "cursor-text hover:bg-shell/80")}
+          className={cn(
+            "rich-text-surface max-w-none whitespace-pre-wrap rounded-md px-3 py-2 text-sm leading-relaxed transition-colors",
+            minRowsClassName,
+            fieldChromeClassName,
+            fieldHoverClassName
+          )}
           data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
           style={minRowsStyle}
-          onClick={readOnly ? undefined : handleActivate}
+        >
+          {value}
+        </div>
+      ) : (
+        <div
+          className={cn("rounded-md px-3 py-2 text-sm italic text-steel-500 transition-colors", minRowsClassName, fieldChromeClassName, fieldHoverClassName)}
+          data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
+          style={minRowsStyle}
         >
           {placeholder}
         </div>
       )}
 
-      {!readOnly && !isEditing ? (
-        <div className="pointer-events-none absolute right-1 top-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <Pencil className="h-3 w-3 text-slate-500" />
-        </div>
-      ) : null}
     </div>
   );
 }
 
-function RichTextInlineEditor({ value, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onCommit, onCancel }: RichTextInlineEditorProps) {
+function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
   const cancellingRef = useRef(false);
+  const [imageUploadCount, setImageUploadCount] = useState(0);
+  const [hasFocus, setHasFocus] = useState(false);
+  const { showToast } = useToast();
   const editorAttributes = useMemo(() => {
     const attributes: Record<string, string> = {
       class: cn("rich-text-surface max-w-none", Boolean(minRows) && "rich-text-inline-min-rows")
@@ -196,13 +231,15 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
   const extensions = useMemo(
     () => [
       StarterKit.configure({
-        heading: { levels: [1, 2, 3] }
+        heading: { levels: [1, 2, 3, 4] }
       }),
       Underline,
       Link.configure({ openOnClick: false }),
       Image,
       TldrawNode,
-      Markdown.configure({ html: true }),
+      Column,
+      ColumnBlock,
+      Markdown.configure({ html: true, transformPastedText: true }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       TextStyle,
       Color,
@@ -220,12 +257,75 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
     content: value,
     autofocus: false,
     editorProps: {
-      attributes: editorAttributes
+      attributes: editorAttributes,
+      transformPastedText(text: string): string {
+        return text.replace(/\n{3,}/g, "\n\n");
+      },
+      handlePaste(view, event): boolean {
+        const imageItem = Array.from(event.clipboardData?.items ?? []).find((item) => item.type.startsWith("image/"));
+        if (!imageItem) {
+          return false;
+        }
+
+        event.preventDefault();
+        if (!onImageUpload) {
+          showToast({ tone: "error", title: "Bild-Upload ist nicht verfügbar" });
+          return true;
+        }
+
+        const file = imageItem.getAsFile();
+        if (!file) {
+          return true;
+        }
+
+        const placeholderFrom = view.state.selection.from;
+        view.dispatch(view.state.tr.insertText(IMAGE_UPLOAD_PLACEHOLDER));
+        setImageUploadCount((count) => count + 1);
+
+        void onImageUpload(file)
+          .then((url) => {
+            const imageNode = view.state.schema.nodes.image?.create({ src: url });
+            if (!imageNode) {
+              return;
+            }
+
+            view.dispatch(view.state.tr.delete(placeholderFrom, placeholderFrom + IMAGE_UPLOAD_PLACEHOLDER.length).insert(placeholderFrom, imageNode));
+          })
+          .catch((uploadError) => {
+            view.dispatch(view.state.tr.delete(placeholderFrom, placeholderFrom + IMAGE_UPLOAD_PLACEHOLDER.length));
+            showToast({ tone: "error", title: "Bild konnte nicht hochgeladen werden", message: errorMessage(uploadError) });
+          })
+          .finally(() => setImageUploadCount((count) => Math.max(0, count - 1)));
+
+        return true;
+      }
+    },
+    onTransaction({ editor: activeEditor, transaction }) {
+      if (!transaction.getMeta("paste")) {
+        return;
+      }
+
+      const { from, to } = transaction.selection;
+      activeEditor.chain().selectAll().unsetColor().unsetMark("textStyle").setTextSelection({ from, to }).run();
+    },
+    onUpdate: ({ editor: activeEditor }: { editor: Editor }) => {
+      if (liveUpdate) {
+        onLiveChange(activeEditor.getHTML());
+      }
+    },
+    onFocus: ({ editor: activeEditor }: { editor: Editor }) => {
+      setHasFocus(true);
+      onFocusStart(activeEditor.getHTML());
     },
     onBlur: ({ editor: activeEditor }: { editor: Editor }) => {
+      setHasFocus(false);
       if (cancellingRef.current) {
         cancellingRef.current = false;
         onCancel();
+        return;
+      }
+
+      if (!commitOnBlur) {
         return;
       }
 
@@ -234,18 +334,40 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
   });
 
   useEffect(() => {
+    if (!editor || editor.isFocused || valueFormat === "markdown") {
+      return;
+    }
+
+    if (editor.getHTML() !== value) {
+      editor.commands.setContent(value, { emitUpdate: false });
+    }
+  }, [editor, value, valueFormat]);
+
+  useEffect(() => {
     if (!editor) {
       return;
     }
 
+    if (liveUpdate && valueFormat === "markdown") {
+      onLiveChange(editor.getHTML());
+    }
+  }, [editor, liveUpdate, onLiveChange, valueFormat]);
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    if (!clickPosition) {
+      return;
+    }
+
     const animationFrame = window.requestAnimationFrame(() => {
-      if (clickPosition) {
-        const position = editor.view.posAtCoords(clickPosition);
-        if (position) {
-          editor.commands.setTextSelection(position.pos);
-          editor.commands.focus();
-          return;
-        }
+      const position = editor.view.posAtCoords(clickPosition);
+      if (position) {
+        editor.commands.setTextSelection(position.pos);
+        editor.commands.focus();
+        return;
       }
 
       editor.commands.focus("end");
@@ -276,39 +398,39 @@ function RichTextInlineEditor({ value, originalValue, placeholder, minRows, tool
   }
 
   return (
-    <div className="rounded-md ring-1 ring-steel-600" data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
-      {toolbar !== "none" ? <RichTextToolbar editor={editor} variant={toolbar} /> : null}
+    <div className={cn("overflow-clip rounded-md border bg-white shadow-sm transition-colors", hasFocus ? "border-steel-600 ring-2 ring-steel-700/10" : "border-line")} data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
+      {toolbar !== "none" ? <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} /> : null}
       <EditorContent editor={editor} />
     </div>
   );
 }
 
-function RichTextToolbar({ editor, variant }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none"> }) {
+function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploading }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none">; focused: boolean; onImageUpload?: ImageUploadHandler; imageUploading: boolean }) {
   const showFullToolbar = variant === "full";
+  const [pickerUploading, setPickerUploading] = useState(false);
+  const [, setToolbarVersion] = useState(0);
   const { showToast } = useToast();
-  const aiMutation = useMutation({
-    mutationFn: (operation: "rewrite" | "formatParagraph") => assistAiText({ html: editor.getHTML(), operation }),
-    onSuccess: (result) => {
-      editor.commands.setContent(result.html);
-      editor.commands.focus("end");
-      showToast({ tone: "success", title: "Text aktualisiert" });
-    },
-    onError: (textError) => {
-      showToast({ tone: "error", title: "Text konnte nicht aktualisiert werden", message: errorMessage(textError) });
-    }
-  });
+  const hasTextSelection = !editor.state.selection.empty;
+
+  useEffect(() => {
+    const refreshToolbarState = () => setToolbarVersion((version) => version + 1);
+    editor.on("selectionUpdate", refreshToolbarState);
+    editor.on("transaction", refreshToolbarState);
+    return () => {
+      editor.off("selectionUpdate", refreshToolbarState);
+      editor.off("transaction", refreshToolbarState);
+    };
+  }, [editor]);
 
   return (
-    <div data-testid="rich-text-toolbar" className="flex flex-wrap items-center gap-1 rounded-t-md border-b border-line bg-shell p-1.5">
-      <ToolbarButton onClick={() => aiMutation.mutate("rewrite")} active={false} disabled={aiMutation.isPending} title="Umformulieren" icon={<Sparkles />} />
-      <ToolbarButton onClick={() => aiMutation.mutate("formatParagraph")} active={false} disabled={aiMutation.isPending} title="Absatz formatieren" icon={<Wand2 />} />
-      <ToolbarButton onClick={() => editor.chain().focus().unsetHighlight().run()} active={false} title="Hervorhebungen entfernen" icon={<RemoveFormatting />} />
+    <div data-testid="rich-text-toolbar" className={cn("sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-t-md border-b border-line bg-shell p-1.5 transition-opacity", focused ? "opacity-100" : "opacity-60")}>
+      <ToolbarButton onClick={() => unsetSelectionHighlight(editor)} active={false} disabled={!hasTextSelection} title="Hervorhebungen entfernen" icon={<RemoveFormatting />} />
       <Separator />
       <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Fett" icon={<Bold />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Kursiv" icon={<Italic />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Unterstrichen" icon={<UnderlineIcon />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive("strike")} title="Durchgestrichen" icon={<Strikethrough />} />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleHighlight({ color: "#fff3bf" }).run()} active={editor.isActive("highlight")} title="Hervorheben" icon={<Highlighter />} />
+      <ToolbarButton onClick={() => toggleSelectionHighlight(editor)} active={hasTextSelection && editor.isActive("highlight")} disabled={!hasTextSelection} title="Hervorheben" icon={<Highlighter />} />
       <Separator />
       <ToolbarButton onClick={() => editor.chain().focus().setParagraph().run()} active={editor.isActive("paragraph")} title="Absatz" icon={<Text />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive("bulletList")} title="Aufzählung" icon={<List />} />
@@ -320,11 +442,14 @@ function RichTextToolbar({ editor, variant }: { editor: Editor; variant: Exclude
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive("heading", { level: 1 })} title="Überschrift 1" icon={<Heading1 />} />
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive("heading", { level: 2 })} title="Überschrift 2" icon={<Heading2 />} />
           <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive("heading", { level: 3 })} title="Überschrift 3" icon={<Heading3 />} />
+          <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()} active={editor.isActive("heading", { level: 4 })} title="Überschrift 4" icon={<Heading4 />} />
           <Separator />
           <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")} title="Zitat" icon={<Quote />} />
           <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive("codeBlock")} title="Codeblock" icon={<Code2 />} />
+          <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} active={false} title="Trennlinie" icon={<Minus />} />
+          <ToolbarButton onClick={() => editor.chain().focus().insertColumnBlock().run()} active={editor.isActive("columnBlock")} title="Spalten" icon={<Columns2 />} />
           <ToolbarButton onClick={() => setLink(editor)} active={editor.isActive("link")} title="Link" icon={<LinkIcon />} />
-          <ToolbarButton onClick={() => setImage(editor)} active={false} title="Bild" icon={<ImageIcon />} />
+          <ToolbarButton onClick={() => handleImageInsert(editor, onImageUpload, setPickerUploading, showToast)} active={false} disabled={imageUploading || pickerUploading || !onImageUpload} title="Bild" icon={imageUploading || pickerUploading ? <Loader2 /> : <ImageIcon />} />
           <Separator />
           <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Links" icon={<AlignLeft />} />
           <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Mitte" icon={<AlignCenter />} />
@@ -336,6 +461,24 @@ function RichTextToolbar({ editor, variant }: { editor: Editor; variant: Exclude
       ) : null}
     </div>
   );
+}
+
+function toggleSelectionHighlight(editor: Editor) {
+  const { from, to, empty } = editor.state.selection;
+  if (empty) {
+    return;
+  }
+
+  editor.chain().focus().setTextSelection({ from, to }).toggleHighlight({ color: "#fff3bf" }).setTextSelection({ from, to }).run();
+}
+
+function unsetSelectionHighlight(editor: Editor) {
+  const { from, to, empty } = editor.state.selection;
+  if (empty) {
+    return;
+  }
+
+  editor.chain().focus().setTextSelection({ from, to }).unsetHighlight().setTextSelection({ from, to }).run();
 }
 
 function setLink(editor: Editor) {
@@ -354,14 +497,32 @@ function setLink(editor: Editor) {
   editor.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
 }
 
-function setImage(editor: Editor) {
-  const src = window.prompt("Bild-URL");
-
-  if (!src?.trim()) {
+function handleImageInsert(editor: Editor, onImageUpload: ImageUploadHandler | undefined, setUploading: (uploading: boolean) => void, showToast: ReturnType<typeof useToast>["showToast"]) {
+  if (!onImageUpload) {
+    showToast({ tone: "error", title: "Bild-Upload ist nicht verfügbar" });
     return;
   }
 
-  editor.chain().focus().setImage({ src: src.trim() }).run();
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.onchange = () => {
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setUploading(true);
+    void onImageUpload(file)
+      .then((url) => {
+        editor.chain().focus().setImage({ src: url }).run();
+      })
+      .catch((uploadError) => {
+        showToast({ tone: "error", title: "Bild konnte nicht hochgeladen werden", message: errorMessage(uploadError) });
+      })
+      .finally(() => setUploading(false));
+  };
+  input.click();
 }
 
 function ToolbarButton({ onClick, active, title, icon, disabled = false }: ToolbarButtonProps) {
@@ -373,9 +534,9 @@ function ToolbarButton({ onClick, active, title, icon, disabled = false }: Toolb
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={cn("flex h-7 w-7 items-center justify-center rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50", active ? "bg-steel-700 text-white" : "text-slate-500 hover:bg-line/50 hover:text-ink")}
+      className={cn("flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50", active ? "bg-steel-700 text-white" : "text-steel-500 hover:bg-line/50 hover:text-ink")}
     >
-      {React.cloneElement(icon, { className: "h-3.5 w-3.5" })}
+      {React.cloneElement(icon, { className: cn("h-3.5 w-3.5", icon.type === Loader2 && "animate-spin") })}
     </button>
   );
 }

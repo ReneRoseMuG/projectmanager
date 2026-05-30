@@ -1,61 +1,57 @@
-import type { Ticket } from "@taskmanager/shared-types";
-import { CalendarClock, Edit3, GitBranch, Trash2 } from "lucide-react";
+import type { Tag, Ticket } from "@taskmanager/shared-types";
+import { Edit3, GitBranch, Trash2 } from "lucide-react";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { objectReference } from "../../lib/references";
+import { catalogColor, isCatalogStatusClosed } from "../../utils/catalogs";
 import { formatHumanDate, isOverdue } from "../../utils/date";
-import { ticketTypeLabels, ticketTypeTones } from "../../utils/domainLabels";
 import { richTextToPlainText } from "../../utils/richText";
+import { ActionMenu } from "../ui/ActionMenu";
 import { Avatar } from "../ui/Avatar";
-import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
+import { CardFooterBar } from "../ui/CardFooterBar";
+import { InlineDateField } from "../ui/InlineDateField";
 import { ItemCard } from "../ui/ItemCard";
 import { ItemRow } from "../ui/ItemRow";
+import { ParentBadge } from "../ui/ParentBadge";
 import { PriorityBadge } from "../ui/PriorityBadge";
 import { StatusPill } from "../ui/StatusPill";
+import { TicketTypeBadge } from "../ui/TicketTypeBadge";
 
 interface TicketCardProps {
   ticket: Ticket;
+  allTags?: Tag[];
   compact?: boolean;
   variant?: "card" | "row";
   onOpen: (ticket: Ticket) => void;
   onDelete?: (ticket: Ticket) => void;
+  onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>;
+  onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>;
+  onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void>;
 }
 
-const priorityAccent: Record<string, string> = {
-  urgent: "var(--color-crimson)",
-  high: "var(--color-tangerine)",
-  medium: "var(--color-mustard)",
-  low: "var(--color-steel-400)"
-};
-
-const statusDot: Record<string, string> = {
-  open: "bg-steel-400",
-  in_progress: "bg-tangerine",
-  in_review: "bg-mustard",
-  resolved: "bg-fern",
-  closed: "bg-violet"
-};
-
-const tagTones = ["violet", "teal", "magenta", "fern", "steel"] as const;
-
-export function TicketCard({ ticket, compact = false, variant = "card", onOpen, onDelete }: TicketCardProps) {
+export function TicketCard({ ticket, allTags, compact = false, variant = "card", onOpen, onDelete, onStatusChange, onDueDateChange, onTagsChange }: TicketCardProps) {
+  const catalogs = useCatalogs();
   const description = richTextToPlainText(ticket.description);
+  const statusColor = catalogColor(catalogs.entries, "workStatus", ticket.status);
+  const ticketClosed = isCatalogStatusClosed(catalogs.entries, "workStatus", ticket.status);
 
   if (variant === "row") {
     return (
       <>
         <div className="md:hidden">
-          <TicketCard ticket={ticket} compact={compact} onOpen={onOpen} onDelete={onDelete} />
+          <TicketCard ticket={ticket} allTags={allTags} compact={compact} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
         </div>
-        <TicketRow ticket={ticket} description={description} onOpen={onOpen} onDelete={onDelete} />
+        <TicketRow ticket={ticket} allTags={allTags} description={description} statusColor={statusColor} ticketClosed={ticketClosed} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
       </>
     );
   }
 
   return (
     <ItemCard
-      accentColor={priorityAccent[ticket.priority] ?? "var(--color-steel-400)"}
-      header={<TicketCardHeader ticket={ticket} />}
+      accentColor={statusColor}
+      objectReference={objectReference("ticket", ticket.id)}
+      header={<TicketCardHeader ticket={ticket} onStatusChange={onStatusChange} />}
       body={<TicketCardBody description={description} />}
-      footer={<TicketCardFooter ticket={ticket} />}
+      footer={<TicketCardFooter ticket={ticket} allTags={allTags} ticketClosed={ticketClosed} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />}
       onOpen={() => onOpen(ticket)}
       onEdit={() => onOpen(ticket)}
       onDelete={onDelete ? () => onDelete(ticket) : undefined}
@@ -64,30 +60,32 @@ export function TicketCard({ ticket, compact = false, variant = "card", onOpen, 
   );
 }
 
-function TicketCardHeader({ ticket }: { ticket: Ticket }) {
+function TicketCardHeader({ ticket, onStatusChange }: { ticket: Ticket; onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown> }) {
   return (
     <div className="grid gap-2">
       <h3 className="line-clamp-2 text-sm font-semibold text-ink">{ticket.title}</h3>
       <div className="flex flex-wrap items-center gap-2">
-        <StatusPill kind="workStatus" value={ticket.status} />
-        <Badge tone={ticketTypeTones[ticket.type]}>{ticketTypeLabels[ticket.type]}</Badge>
+        <StatusPill kind="workStatus" value={ticket.status} onChange={onStatusChange ? (status) => onStatusChange(ticket, status) : undefined} />
+        <TicketTypeBadge value={ticket.type} />
+        <PriorityBadge value={ticket.priority} />
       </div>
     </div>
   );
 }
 
 function TicketCardBody({ description }: { description: string }) {
-  return description ? <p className="line-clamp-3 text-xs text-slate-600">{description}</p> : null;
+  return description ? <p className="line-clamp-3 text-xs text-steel-600">{description}</p> : null;
 }
 
-function TicketCardFooter({ ticket }: { ticket: Ticket }) {
-  const overdue = ticket.status !== "resolved" && ticket.status !== "closed" && isOverdue(ticket.dueDate);
-  const hasMeta = ticket.subTicketCount > 0 || Boolean(ticket.dueDate);
+function TicketCardFooter({ ticket, allTags, ticketClosed, onDueDateChange, onTagsChange }: { ticket: Ticket; allTags?: Tag[]; ticketClosed: boolean; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void> }) {
+  const overdue = !ticketClosed && isOverdue(ticket.dueDate);
+  const closedDate = ticketClosed ? (ticket.resolvedAt ?? ticket.updatedAt) : null;
+  const hasMeta = ticket.subTicketCount > 0 || Boolean(ticket.dueDate) || Boolean(closedDate);
 
   return (
     <div className="grid gap-3">
       {hasMeta ? (
-        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-2 text-xs text-slate-600">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-steel-600">
           {ticket.subTicketCount > 0 ? (
             <span className="inline-flex items-center gap-1">
               <GitBranch size={14} />
@@ -95,58 +93,84 @@ function TicketCardFooter({ ticket }: { ticket: Ticket }) {
             </span>
           ) : null}
           {ticket.dueDate ? (
-            <span className={`inline-flex items-center gap-1 ${overdue ? "text-crimson" : ""}`}>
-              <CalendarClock size={14} />
-              {formatHumanDate(ticket.dueDate)}
+            <span className={`inline-flex items-center gap-1 font-semibold ${overdue ? "text-crimson" : ""}`}>
+              Fällig
+              <InlineDateField value={ticket.dueDate} onChange={onDueDateChange ? (dueDate) => onDueDateChange(ticket, dueDate) : undefined} />
+            </span>
+          ) : null}
+          {closedDate ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-steel-500">
+              Geschlossen {formatHumanDate(closedDate)}
             </span>
           ) : null}
         </div>
       ) : null}
-      {ticket.tags.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {ticket.tags.map((tag, index) => (
-            <Badge key={tag.id} tone={tagTones[index % tagTones.length]}>
-              {tag.name}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
+      <TicketSupportFooter ticket={ticket} allTags={allTags} onTagsChange={onTagsChange} />
     </div>
   );
 }
 
-function TicketRow({ ticket, description, onOpen, onDelete }: { ticket: Ticket; description: string; onOpen: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void }) {
-  const overdue = ticket.status !== "resolved" && ticket.status !== "closed" && isOverdue(ticket.dueDate);
+function TicketSupportFooter({ ticket, allTags, onTagsChange, bordered = true }: { ticket: Ticket; allTags?: Tag[]; onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void>; bordered?: boolean }) {
+  return (
+    <div className="grid min-w-0 gap-2">
+      <div className="flex flex-wrap gap-2">
+        <ParentBadge parent={ticket.visibleParent} />
+      </div>
+      <CardFooterBar
+        tags={ticket.tags}
+        allTags={allTags}
+        onTagsChange={onTagsChange ? (tagIds) => onTagsChange(ticket.id, tagIds) : undefined}
+        attachmentCount={ticket.attachmentCount}
+        noteCount={ticket.noteCount}
+        commentCount={ticket.commentCount}
+        bordered={bordered}
+      />
+    </div>
+  );
+}
+
+function TicketRow({ ticket, allTags, description, statusColor, ticketClosed, onOpen, onDelete, onStatusChange, onDueDateChange, onTagsChange }: { ticket: Ticket; allTags?: Tag[]; description: string; statusColor: string; ticketClosed: boolean; onOpen: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void; onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void> }) {
+  const overdue = !ticketClosed && isOverdue(ticket.dueDate);
+  const closedDate = ticketClosed ? (ticket.resolvedAt ?? ticket.updatedAt) : null;
 
   return (
     <div className="hidden md:block">
       <ItemRow
-        accentColor={priorityAccent[ticket.priority] ?? "var(--color-steel-400)"}
-        statusIndicator={<span className={`block h-3 w-3 rounded-full ${statusDot[ticket.status] ?? "bg-steel-400"}`} aria-hidden="true" />}
+        accentColor={statusColor}
+        objectReference={objectReference("ticket", ticket.id)}
+        statusIndicator={<span className="block h-3 w-3 rounded-full" style={{ backgroundColor: statusColor }} aria-hidden="true" />}
         title={ticket.title}
         description={description}
         pills={
           <>
-            <StatusPill kind="workStatus" value={ticket.status} />
-            <Badge tone={ticketTypeTones[ticket.type]}>{ticketTypeLabels[ticket.type]}</Badge>
+            <StatusPill kind="workStatus" value={ticket.status} onChange={onStatusChange ? (status) => onStatusChange(ticket, status) : undefined} />
+            <TicketTypeBadge value={ticket.type} />
             <PriorityBadge value={ticket.priority} />
           </>
         }
         meta={
           <div className="flex items-center gap-3">
-            <span className={`inline-flex min-w-[82px] items-center gap-1 text-xs font-semibold ${overdue ? "text-crimson" : "text-slate-500"}`}>
-              <CalendarClock size={14} />
-              {ticket.dueDate ? formatHumanDate(ticket.dueDate) : "Ohne Datum"}
-            </span>
-            <Avatar name={ticket.assignee} />
+            <div className="flex min-w-[9rem] flex-wrap items-center justify-end gap-2 text-xs font-semibold text-steel-500">
+              <span className={`inline-flex items-center gap-1 ${overdue ? "text-crimson" : ""}`}>
+                Fällig
+                <InlineDateField value={ticket.dueDate} emptyLabel="Ohne Fälligkeit" onChange={onDueDateChange ? (dueDate) => onDueDateChange(ticket, dueDate) : undefined} />
+              </span>
+              {closedDate ? <span>Geschlossen {formatHumanDate(closedDate)}</span> : null}
+            </div>
+            <Avatar name={ticket.responsibleUser?.fullName ?? null} />
           </div>
         }
+        footer={<TicketSupportFooter ticket={ticket} allTags={allTags} onTagsChange={onTagsChange} bordered={false} />}
         actions={
-          <>
-            <Button aria-label="Bearbeiten" title="Bearbeiten" className="h-10 w-10" icon={<Edit3 size={18} />} variant="ghost" onClick={() => onOpen(ticket)} />
-            {onDelete ? <Button aria-label="Löschen" title="Löschen" className="h-10 w-10" icon={<Trash2 size={18} />} variant="ghost" onClick={() => onDelete(ticket)} /> : null}
-          </>
+          <ActionMenu
+            objectReference={objectReference("ticket", ticket.id)}
+            items={[
+              { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(ticket) },
+              ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(ticket), danger: true }] : [])
+            ]}
+          />
         }
+        actionsIncludeObjectReference
         onOpen={() => onOpen(ticket)}
       />
     </div>

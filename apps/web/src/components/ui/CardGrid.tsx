@@ -8,10 +8,16 @@ interface CardGridProps {
 const columnClasses: Record<NonNullable<CardGridProps["columns"]>, string> = {
   2: "md:grid-cols-2",
   3: "md:grid-cols-2 xl:grid-cols-3",
-  4: "sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
+  4: "sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4",
 };
 
 /** Responsive card grid used for statusless board layouts. */
 export function CardGrid({ children, columns = 3 }: CardGridProps) {
-  return <div className={`grid min-w-0 gap-4 ${columnClasses[columns]}`}>{children}</div>;
+  return (
+    <div
+      className={`grid h-full min-h-[30rem] w-full min-w-0 flex-1 content-start gap-4 ${columnClasses[columns]}`}
+    >
+      {children}
+    </div>
+  );
 }

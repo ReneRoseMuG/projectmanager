@@ -44,6 +44,8 @@ Statt großer Dateien vollständig zu laden, gilt immer diese Eskalationsreihenf
 3. Weitere Abschnitte nur dann laden, wenn die erste gezielte Lektüre nicht ausreicht
 4. Vollständige Lektüre großer Dokumente nur bei ausdrücklicher Architekturarbeit
 
+Bei UI-bezogenen Aktionen ist `docs/design-richtlinien-visuell.md` als verbindliche Design-Vorgabe gezielt zu berücksichtigen. Codex lädt auch hier nur die für den konkreten Auftrag relevanten Abschnitte.
+
 **Schnellcheck vor jedem Task:**
 
 | Situation | Dokument nötig? |
@@ -82,6 +84,24 @@ Neue Dateien, Routes, Services oder Strukturen werden nur angelegt, wenn der Auf
 ---
 
 ## 3. Planung
+
+### 3.0 Planungs-Skill (Pflicht)
+
+Vor jeder Planerstellung im Chat oder im Plan-Modus nutzt Codex den Repo-Skill `skills/projekt-manager-planungsleitplanken`.
+
+Der Skill ist ein Planungs-Gate und ersetzt diese Datei nicht. `agents.md` bleibt die maßgebliche Quelle; bei Widersprüchen gilt `agents.md`. Der Skill stellt sicher, dass Architekturentscheidungen, Rollen-/Permission-Regeln, Teststrategie, Branch-Hygiene, UI-Leitplanken und Abnahmekriterien bei jeder Planung geprüft werden.
+
+### 3.0.1 Testentwurfs-Skill (Pflicht bei Tests)
+
+Sobald ein Auftrag Tests plant, ergänzt, ändert, bewertet oder ausführt, nutzt Codex zusätzlich den Repo-Skill `skills/projekt-manager-test-entwurfsleitplanken`.
+
+Das gilt insbesondere bei Begriffen wie „Testsuite“, „Testabdeckung“, „echte Daten“, „Integrationstest“, „E2E“, „Abnahme“, „Testfälle“ oder „Testlauf“.
+
+Codex dokumentiert zu Beginn kurz:
+- dass der Testentwurfs-Skill angewendet wird,
+- welche Testebene betroffen ist,
+- welches beobachtbare Verhalten bewiesen werden soll,
+- welche echten Daten und welche Isolation verwendet werden.
 
 ### 3.1 Branch-Nutzung (nur bei explizitem Nutzerwunsch)
 
@@ -135,6 +155,20 @@ Der Plan muss ausreichend Kontext enthalten, damit der Nutzer die Tragweite der 
 | `test` / `Test` | Vollständigen Testlauf gemäß Abschnitt 12 seriell ausführen, inklusive Browser-/E2E-Tests; anschließend Testanzahlen und Fehlergruppierung berichten |
 | `log <kurztitel>` | Schritt-Log manuell auslösen (ergänzt automatisches Log) |
 | `save` | Alle offenen Änderungen stagen, eine sinnvolle Commit-Message wählen, alles committen und auf den aktuellen Branch pushen |
+| `savetowork` | Alle offenen Änderungen auf dem aktuellen Branch sichern, den aktuellen Branch in `work` mergen, prüfen, dass `work` alle Änderungen enthält, `work` pushen und den Arbeitsbranch nach ausdrücklicher Bestätigung löschen |
+
+#### `savetowork` Sicherheitsablauf
+
+`savetowork` ist eine Git-Operation ohne Codeänderung. Codex führt die Schritte ausschließlich seriell aus:
+
+1. Aktuellen Branch und Working Tree prüfen.
+2. Falls offene Änderungen vorhanden sind: alle Änderungen stagen, sinnvoll committen und den aktuellen Branch pushen.
+3. `work` von `origin/main` abzweigen, falls `work` noch nicht existiert; andernfalls auf `work` wechseln und `origin/work` aktualisieren.
+4. Den zuvor aktuellen Arbeitsbranch in `work` mergen.
+5. Absichern, dass die Änderungen wirklich in `work` liegen, mindestens durch `git status`, Branch-/Upstream-Prüfung und Vergleich der relevanten Commit-Spitzen.
+6. `work` pushen.
+7. Vor dem Löschen des Arbeitsbranches ausdrücklich beim Nutzer bestätigen lassen, welcher lokale und welcher Remote-Branch gelöscht werden sollen.
+8. Erst nach Bestätigung den Arbeitsbranch lokal und remote löschen.
 
 ---
 
@@ -168,16 +202,21 @@ Ein Blocker wird dokumentiert mit: was genau fehlt, welcher Schritt betroffen is
 
 Nach jeder abgeschlossenen Teilaufgabe schreibt Codex **automatisch und ohne Rückfrage** einen Log-Eintrag. Das gilt für jeden nummerierten Implementierungsschritt aus dem Großauftrag sowie für jeden eigenständigen Änderungsauftrag der Klassen 4 und 5.
 
+Jeder Log-Eintrag wird in eine **neue** Datei geschrieben. Bestehende einzelne Log-Dateien unter `logs/` dürfen nicht nachträglich ergänzt, korrigiert oder überschrieben werden. Nachträge, Korrekturen und Anschlussberichte erhalten immer eine eigene neue Log-Datei mit aktuellem Zeitstempel. Die einzige reguläre Änderung an einer bestehenden Datei im Log-Bereich ist die Aktualisierung des Index `logs/README.md`.
+
 ### 5.1 Dateiname und Ablageort
 
 ```
-logs/YYYY-MM-DD-schritt-<N>-<kurztitel-kebab-case>.md
+logs/YYYY-MM-DD-HH-mm-ss-schritt-<N>-<kurztitel-kebab-case>.md
+logs/YYYY-MM-DD-HH-mm-ss-<typ-kebab-case>-<kurztitel-kebab-case>.md
 ```
 
+`HH-mm-ss` ist die lokale Zeit im 24-Stunden-Format und wird mit Bindestrichen geschrieben, damit Dateinamen Windows-kompatibel bleiben.
+
 Beispiele:
-- `logs/2026-05-17-schritt-02-schema-migration.md`
-- `logs/2026-05-17-schritt-05-notizen-api.md`
-- `logs/2026-05-18-fix-kanban-position.md`
+- `logs/2026-05-17-09-14-33-schritt-02-schema-migration.md`
+- `logs/2026-05-17-10-02-08-schritt-05-notizen-api.md`
+- `logs/2026-05-18-16-30-12-fix-kanban-position.md`
 
 Der Ordner `logs/` liegt im Repo-Root. Er wird beim ersten Log automatisch angelegt, falls er noch nicht existiert. `logs/` ist in `.gitignore` **nicht** eingetragen — Logs sind Teil des Repos.
 
@@ -187,6 +226,7 @@ Der Ordner `logs/` liegt im Repo-Root. Er wird beim ersten Log automatisch angel
 # Log: <Kurztitel>
 
 **Datum:** DD.MM.YY  
+**Uhrzeit:** HH:mm:ss  
 **Schritt:** <N> — <Schrittbezeichnung aus Großauftrag> (oder: Fix / Feature)  
 **Status:** ✅ Abgeschlossen | ⚠️ Teilweise abgeschlossen | 🔴 Blockiert
 
@@ -210,6 +250,8 @@ Der Ordner `logs/` liegt im Repo-Root. Er wird beim ersten Log automatisch angel
 <Falls keine: „Keine." — sonst konkret auflisten.>
 ```
 
+Bei Teständerungen nennt der Schritt-Log zusätzlich, welche Testleitplanken angewendet wurden und welche Testebenen abgedeckt sind.
+
 ### 5.3 Wann gilt eine Teilaufgabe als abgeschlossen?
 
 Eine Teilaufgabe gilt als abgeschlossen, wenn:
@@ -226,10 +268,10 @@ Codex pflegt zusätzlich eine Datei `logs/README.md` als chronologische Übersic
 ```markdown
 # Log-Übersicht Projekt Manager
 
-| Datum | Schritt | Kurztitel | Status |
-|---|---|---|---|
-| 17.05.26 | 2 | Schema & Migration | ✅ |
-| 17.05.26 | 3 | Fastify-Backend Basis | ✅ |
+| Datum | Uhrzeit | Schritt | Kurztitel | Status |
+|---|---|---|---|---|
+| 17.05.26 | 09:14:33 | 2 | Schema & Migration | ✅ |
+| 17.05.26 | 10:02:08 | 3 | Fastify-Backend Basis | ✅ |
 ```
 
 Der neueste Eintrag steht **oben**. Der Index wird nach jedem neuen Log sofort aktualisiert.
@@ -269,6 +311,19 @@ Der neueste Eintrag steht **oben**. Der Index wird nach jedem neuen Log sofort a
 - Keine Business-Logik in Route-Handlern — Logik in separaten Service-Funktionen
 - Alle Endpunkte haben ein Fastify-Schema (Request-Validierung)
 
+### Authentifizierung und Rollen (verbindlich)
+
+Benutzer, Rollen und Berechtigungen sind Querschnittsinfrastruktur und müssen bei jeder neuen API-, Web- oder Domänenänderung mitgeplant werden.
+
+- Neue API-Routen sind grundsätzlich authentifizierungspflichtig. Öffentliche Ausnahmen müssen im Plan ausdrücklich benannt und begründet werden.
+- Aktuell öffentliche Ausnahmen sind nur `/health`, `/api/health` und `/api/auth/*`, sofern keine spätere Aufgabendatei etwas anderes festlegt.
+- Die API ist die verbindliche Sicherheitsgrenze. Frontend-Gating verbessert nur die Bedienbarkeit und ersetzt nie Backend-Berechtigungsprüfungen.
+- Jede neue Route erhält eine konkrete Berechtigungsentscheidung: `read` für lesende Endpunkte, `write` für erstellende oder ändernde Endpunkte, `delete` für Löschoperationen oder eine ausdrücklich benannte Admin-Berechtigung.
+- Admin-Routen verwenden domänenspezifische Admin-Rechte, zum Beispiel `users:admin` und `roles:admin`; neue Admin-Bereiche bekommen eigene klar benannte Admin-Permissions.
+- Neue fachliche Domänen oder größere Support-Objekte müssen im Permission-Katalog berücksichtigt werden, wenn sie per API gelesen, geändert oder administriert werden.
+- Services dürfen nicht davon ausgehen, dass ein Frontend eine Aktion bereits verborgen hat. Verbotene Zugriffe liefern `FORBIDDEN`, fehlende oder ungültige Sessions liefern `UNAUTHORIZED`.
+- Tests für neue geschützte Workflows müssen mindestens den erfolgreichen Zugriff mit berechtigtem User und den abgelehnten Zugriff ohne ausreichende Berechtigung abdecken. Bei Schreiboperationen wird zusätzlich ein Reader- oder Custom-Role-Negativfall geprüft.
+
 ### Drizzle ORM
 
 - Keine rohen SQL-Strings außer für unvermeidbare SQLite-spezifische Ausdrücke
@@ -296,6 +351,7 @@ Der neueste Eintrag steht **oben**. Der Index wird nach jedem neuen Log sofort a
 - Keine Business-Logik in Komponenten — Logik in Hooks oder `src/api/`
 - Keine direkte `fetch`-Nutzung in Komponenten — immer über `src/api/`-Funktionen
 - Kein `any` in Props-Definitionen
+- Neue Navigationseinträge, Aktionsbuttons und Seiten mit geschützten API-Aufrufen berücksichtigen die aktuelle Rolle und die Permissions aus `useAuth`. Versteckte UI ist nur Komfort; die zugehörige API-Berechtigung bleibt Pflicht.
 
 ### TanStack Query (verbindlich)
 
@@ -319,6 +375,15 @@ taskmanager/
 ├── agents.md                          ← diese Datei
 ├── logs/                              ← Schritt-Logs (automatisch, Abschnitt 5)
 │   └── README.md
+├── tests/                             ← zentrale Testhierarchie
+│   ├── unit/                          ← Unit-Tests nach App (`api/`, `web/`)
+│   ├── integration/                   ← Integrationstests nach App (`api/`, `web/`)
+│   ├── browser/                       ← Browser-/E2E-Tests nach App (`web/`)
+│   ├── fixtures/                      ← Test-Fixtures und Test-Helper
+│   ├── setup/                         ← Test-Setups
+│   └── .runtime/                      ← generierte Testlaufdaten (ignoriert)
+├── skills/                            ← versionierte Codex-Skills für dieses Repo
+│   └── projekt-manager-planungsleitplanken/
 ├── docs/
 │   ├── tasks/                         ← Aufgabendateien für Codex (Abschnitt 7.1)
 │   └── ...                            ← Architektur- und Implementierungsdokumentation
@@ -399,7 +464,7 @@ Alle Fastify-Endpunkte liefern Fehler in diesem Format:
 }
 ```
 
-Zulässige `error`-Werte: `NOT_FOUND`, `BAD_REQUEST`, `CONFLICT`, `INTERNAL_ERROR`.
+Zulässige `error`-Werte: `NOT_FOUND`, `BAD_REQUEST`, `CONFLICT`, `UNAUTHORIZED`, `FORBIDDEN`, `INTERNAL_ERROR`.
 
 ---
 
@@ -412,6 +477,10 @@ npm run dev        # startet api + web parallel via concurrently
 npm run dev -w apps/api   # nur Backend (Port 3001)
 npm run dev -w apps/web   # nur Frontend (Port 5173)
 ```
+
+### Dev-Server-Nutzung durch Codex
+
+Codex startet keinen Web-Dev-Server als Abschluss-Service, nur damit der Nutzer Änderungen testen kann. Für eigene Prüfungen darf Codex einen Dev-Server starten, wenn dies fachlich nötig ist; jeder dadurch gestartete Prozess muss vor der Abschlussantwort wieder beendet werden. In der Abschlussantwort wird kein laufender localhost-Server angeboten oder gemeldet, außer der Nutzer fragt ausdrücklich danach.
 
 ### Umgebungsvariablen
 
@@ -430,19 +499,31 @@ npm run dev -w apps/web   # nur Frontend (Port 5173)
 
 > ⚠️ Die Testinfrastruktur wird im Verlauf des Projekts aufgebaut. Dieser Abschnitt wächst mit. Noch nicht vorhandene Kommandos sind als Platzhalter markiert.
 
+### Testentwurfs-Gate
+
+Vor jeder Test-Erstellung, Test-Änderung oder Testabdeckungsbewertung muss Codex `skills/projekt-manager-test-entwurfsleitplanken` anwenden und kurz im Chat oder im Schritt-Log benennen.
+
+Für Testpläne und Teständerungen dokumentiert Codex mindestens:
+- Testebene: Unit, Integration oder Browser/E2E
+- zu beweisendes Verhalten: Ausgangszustand, Aktion und beobachtbares Ergebnis
+- echte Daten und Isolation: Temp-DB, In-Memory-DB, `tests/.runtime` oder Temp-Root
+- Mock-Entscheidung und relevante Negativ-, Berechtigungs- oder Konfliktfälle
+
 ### Testebenen
 
 **Unit** — isolierte Logik, keine echte DB-Verbindung, keine Dateisystem-Zugriffe außer `os.tmpdir()`.
 
 **Integration** — reale SQLite-Datei (In-Memory oder Temp-Datei), echte Fastify-App, Supertest für HTTP-Requests.
 
-**E2E** — wird später ergänzt (Playwright), sobald das Frontend stabil ist.
+**E2E** — Playwright-Browsertests unter `tests/browser/web/`.
 
 ### Bekannte Kommandos (wachsen mit dem Projekt)
 
 ```bash
 npm run test              # alle Tests (root, delegiert an workspaces)
 npm run test -w apps/api  # nur API-Tests
+npm run test -w apps/web  # nur Web-Unit-/Integrationstests
+npm run e2e -w apps/web   # Web-Browser-/E2E-Tests
 ```
 
 ### Grundregeln
@@ -450,9 +531,10 @@ npm run test -w apps/api  # nur API-Tests
 - Jeder Test muss einen beobachtbaren Effekt prüfen — keine reinen Sichtbarkeitsprüfungen
 - Leere Tests, Platzhaltertests und Tests ohne fachliche Assertion sind unzulässig. `test.skip`, `it.skip`, `describe.skip` oder leere Testkörper dürfen nur verwendet werden, wenn der Nutzer dies ausdrücklich beauftragt oder ein konkreter Blocker im Log dokumentiert wird; sie zählen nie als implementierte Tests.
 - Wenn ein Test noch nicht sicher implementierbar ist, wird kein leeres Testgerüst committed. Stattdessen wird die fehlende Testabdeckung als offener Punkt im Log dokumentiert.
+- Neue oder geänderte geschützte Workflows müssen Rollen- und Berechtigungstests enthalten. Mindestens ein positiver Fall mit passender Permission und ein negativer Fall ohne passende Permission sind Pflicht; bei UI-Flows wird zusätzlich geprüft, dass unzulässige Aktionen nicht angeboten oder mit Forbidden behandelt werden.
 - Keine Direktzugriffe auf die Produktions-SQLite-Datei in Tests
-- Alle Tests mit DB-Bezug verwenden ausschließlich In-Memory-, Temp- oder `.test-runtime`-Datenbanken; Testläufe dürfen nie `apps/api/data/` verwenden.
-- Alle Tests mit Dateisystembezug verwenden ausschließlich Temp- oder `.test-runtime`-Verzeichnisse; Testläufe dürfen nie `apps/api/uploads/`, `apps/api/content/` oder `apps/api/backups/` verwenden.
+- Alle Tests mit DB-Bezug verwenden ausschließlich In-Memory-, Temp- oder `tests/.runtime`-Datenbanken; Testläufe dürfen nie `apps/api/data/` verwenden.
+- Alle Tests mit Dateisystembezug verwenden ausschließlich Temp- oder `tests/.runtime`-Verzeichnisse; Testläufe dürfen nie `apps/api/uploads/`, `apps/api/content/` oder `apps/api/backups/` verwenden.
 - Integrationstests verwenden eine eigene Temp-DB, die vor/nach dem Test angelegt und gelöscht wird
 - Integrationstests für Update-Endpunkte versionierter Objekte verwenden die aktuelle `version` aus Create- oder GET-Antworten und senden `expectedVersion` explizit mit.
 - Neue Anwendungstabellen müssen in Test-Fixtures, `truncateAll` und Dump-Roundtrip-Tests berücksichtigt werden, sobald sie Teil des produktiven DB-Schemas sind.
@@ -613,6 +695,7 @@ Folgende Infrastruktur wird von mehreren Domänen gemeinsam genutzt:
 | **Attachments** | projects, milestones, tasks, features, tickets | `attachments` plus Owner-Join-Tabellen (`projectAttachments`, `milestoneAttachments`, `taskAttachments`, `featureAttachments`, `ticketAttachments`), DTO `owners: [...]`, `useAttachments(owner)` Hook |
 | **Comments** | tasks, features, projects, milestones, useCases, backlogItems, wikiPages, tickets | `comments` plus Owner-Join-Tabellen (`projectComments`, `milestoneComments`, `taskComments`, `featureComments`, `useCaseComments`, `backlogItemComments`, `wikiPageComments`, `ticketComments`), DTO `owners: [...]` |
 | **Calendar** | projects, milestones, tasks | `events`-Tabelle plus `projectEvents`/`milestoneEvents`/`taskEvents`-Join-Tabellen |
+| **Auth & Rollen** | alle API- und Web-Workflows | Session-Auth, Rollen, Permissions, Permission-Katalog, API-Guards und UI-Gating |
 
 **Beim Hinzufügen einer neuen Attachment-fähigen Entität:**
 1. Neue Owner-Join-Tabelle anlegen — direkte Owner-Spalten in `attachments` sind im Zielschema nicht zulässig.
@@ -644,6 +727,7 @@ Vor der Umsetzung einer neuen Entität muss im Plan ausdrücklich eingeordnet we
 - Gehört die Entität zu Projektmanagement, Dokumentation, Tickets oder ist eine neue Domäne nötig?
 - Ist sie ein fachliches Objekt, ein bearbeitbares Support-Objekt oder reine Infrastruktur/Admin-Konfiguration?
 - Ist sie versioniert, owner-fähig, suchbar, tag-, note-, comment- oder attachment-fähig?
+- Welche Rollen- und Permission-Regeln gelten für Lesen, Schreiben, Löschen und Administration?
 - Welche Parent-Child- und Owner-Beziehungen gelten im Zielzustand?
 - Welche Löschregel gilt pro Beziehung: cascade, restrict, set null oder nur Join entfernen?
 
@@ -654,13 +738,14 @@ Für neue fachliche Domänen gilt als Mindestumfang:
 3. Repository unter `apps/api/src/repositories/` für CRUD und Version-Checks.
 4. Service unter `apps/api/src/services/` für Business-Regeln und Relationen.
 5. Route unter `apps/api/src/routes/` mit Fastify-Schema und einheitlichem Fehlerformat.
-6. Update-Routen mit strikt erforderlichem `expectedVersion`.
-7. API-Integrationstests inklusive erfolgreichem Update mit aktueller Version und mindestens einem fachlichen Fehlerfall.
-8. Web-API-Funktionen unter `apps/web/src/api/`.
-9. Query-Keys, Invalidierung und Hooks gemäß TanStack-Regeln.
-10. UI-Labels und Tone-Maps in `src/utils/domainLabels.ts`.
-11. Global Search nur dann erweitern, wenn die Entität fachlich suchbar sein soll.
-12. Dump-Registry, Test-DB-Truncation und Dump-Roundtrip-Seed für jede neue Anwendungstabelle.
+6. Permission-Katalog, API-Guards und Auth-Testfälle für die neuen Routen.
+7. Update-Routen mit strikt erforderlichem `expectedVersion`.
+8. API-Integrationstests inklusive erfolgreichem Update mit aktueller Version und mindestens einem fachlichen Fehlerfall.
+9. Web-API-Funktionen unter `apps/web/src/api/`.
+10. Query-Keys, Invalidierung und Hooks gemäß TanStack-Regeln.
+11. UI-Labels und Tone-Maps in `src/utils/domainLabels.ts`.
+12. Global Search nur dann erweitern, wenn die Entität fachlich suchbar sein soll.
+13. Dump-Registry, Test-DB-Truncation und Dump-Roundtrip-Seed für jede neue Anwendungstabelle.
 
 ### Dump- und Backup-Registry
 
@@ -668,8 +753,8 @@ Jede neue Anwendungstabelle muss in `apps/api/src/services/dump.service.ts` in `
 
 Zusätzlich müssen aktualisiert werden:
 
-1. `apps/api/tests/helpers/db.ts` — `truncateAll` um die Tabelle ergänzen.
-2. `apps/api/tests/integration/dumps-drive.test.ts` — Tabellenvertrag unverändert lassen und Roundtrip-Seed um repräsentative Daten ergänzen, wenn die Tabelle fachliche Daten hält.
+1. `tests/fixtures/api/db.ts` — `truncateAll` um die Tabelle ergänzen.
+2. `tests/integration/api/dumps-local.test.ts` — Tabellenvertrag unverändert lassen und Roundtrip-Seed um repräsentative Daten ergänzen, wenn die Tabelle fachliche Daten hält.
 3. Bei strukturellen Dump-Formatänderungen bewusst entscheiden, ob `DUMP_FORMAT_VERSION` erhöht werden muss. Neue Tabellen allein erhöhen die Formatversion nicht automatisch, weil die Schema-Revision bereits geprüft wird.
 
 Der Tabellenvertrag im Dump-Test darf nicht abgeschwächt werden. Wenn er rot wird, fehlt in der Regel eine Registry-, Truncation- oder Seed-Ergänzung.
@@ -830,6 +915,57 @@ Vor dem Commit einer neuen Domain-View oder eines Formulars prüfen:
 Hauptansichten der Sidebar (`/projects`, `/tickets`, `/features`, `/wiki`, `/calendar`) erhalten einen `ExternalLink`-Icon-Button, der die Route per `window.open(path, "_blank")` in einem neuen Browser-Tab öffnet. Der Button verhindert die normale Link-Navigation mit `preventDefault()` und `stopPropagation()`.
 
 Detailformulare erhalten ein optionales Prop `onOpenInTab?: () => void`. Dieses Prop wird nur im Edit-Modus mit gültiger Entity-ID gesetzt. Create-Modi setzen das Prop nicht, damit keine URL ohne ID geöffnet werden kann. Die neue Tab-URL ist immer die saubere Entity-Route ohne `returnTo`; danach navigiert der aktuelle Tab zur bestehenden Rücksprungroute.
+
+---
+
+## 16. Journal-Architektur (verbindlich)
+
+Das Journal ist die verbindliche Anwender-Chronik für Änderungen an fachlichen Domänenobjekten und bearbeitbaren Support-Objekten. Jede spätere Erweiterung, die neue Objekte erstellt, ändert, löscht, verknüpft oder trennt, muss das Journal im Plan und in der Umsetzung ausdrücklich berücksichtigen.
+
+### 16.1 Anwendernutzen vor Technik
+
+Journal-Einträge müssen aus Sicht des Anwenders aussagekräftig sein. Generische Meldungen wie „Termin wurde geändert“ sind unzulässig. Richtig ist eine konkrete Aussage mit Objekt, Feld und Wertänderung, zum Beispiel: „Termin "Planung" hat ein neues Enddatum: 31.05.26 → 15.06.26.“
+
+Für Updates gilt:
+- geänderte Felder mit fachlichen Labels protokollieren,
+- alte und neue Werte menschenlesbar formatieren,
+- Datumswerte als `dd.MM.yy` oder `dd.MM.yy HH:mm` anzeigen,
+- Status, Prioritäten und Typen mit deutschen Labels ausgeben,
+- große Inhalte nicht vollständig speichern, sondern als sinnvolle Zusammenfassung, zum Beispiel Zeichenanzahl oder kurzer Auszug.
+
+### 16.2 Backend-Einbindung
+
+Neue journalisierte Objekte werden in `packages/shared-types/src/index.ts` in `JOURNAL_OBJECT_TYPES` ergänzt. Neue Operationen oder Kontextarten dürfen nur ergänzt werden, wenn die bestehende Semantik `create`, `update`, `delete`, `link`, `unlink` beziehungsweise `self`, `owner`, `parent`, `related` nicht ausreicht.
+
+Mutierende Services nutzen `recordJournalEntry` aus `apps/api/src/services/journal.service.ts`. Route-Handler übergeben den Akteur mit `createJournalActor(request.currentUser)`. Route-Handler enthalten keine eigene Journal-Logik.
+
+Für jedes journalisierte Objekt gilt:
+- `objectType`, `objectId` und `objectLabel` müssen das tatsächlich betroffene Objekt bezeichnen,
+- `contexts` müssen mindestens das Objekt selbst indirekt über `recordJournalEntry` und bei Unterobjekten den fachlichen Träger als `owner`, `parent` oder `related` enthalten,
+- Update-Operationen verwenden `buildJournalChanges` oder eine gleichwertige strukturierte Änderungsliste,
+- Create/Delete/Link/Unlink verwenden sprechende Summary-Builder oder fachlich gleichwertige eigene Zusammenfassungen,
+- Journal-Schreibvorgang und fachliche DB-Mutation sollen in derselben Transaktion liegen, sofern keine Dateioperation diesen Ablauf technisch verhindert.
+
+### 16.3 Frontend-Einbindung
+
+Das globale Journal bleibt über `/journal` erreichbar und wird in der Sidebar nur angezeigt, wenn `useAuth` beziehungsweise `useHasPermission("journal", "read")` Leserecht bestätigt. Neue geschützte Journal-Views dürfen nicht nur auf Frontend-Gating vertrauen; die API-Permission `journal:read` bleibt maßgeblich.
+
+Neue Detailseiten oder Detailformulare für journalisierte Objekte erhalten ein objektbezogenes Journal:
+- API-Zugriff ausschließlich über `apps/web/src/api/journal.ts`,
+- Server-State ausschließlich über `useJournalEntries` oder `useObjectJournalEntries`,
+- Query-Keys ausschließlich über `queryKeys.journal`,
+- Anzeige über `JournalPanel` oder eine bewusst begründete Erweiterung davon,
+- Journal-Tabs oder -Abschnitte nur im Edit-/Detailmodus mit gültiger Objekt-ID anzeigen.
+
+### 16.4 Tests für spätere Erweiterungen
+
+Jede neue journalisierte Domäne oder jedes neue Support-Objekt benötigt Tests auf drei Ebenen:
+- Unit-Test für Formatierung oder Summary-Builder, wenn neue Feldformatierung, Objektlabels oder Sonderwerte eingeführt werden,
+- API-Integrationstest, der mindestens Create oder Update ausführt und anschließend globales sowie objektbezogenes Journal prüft,
+- Rollen-/Berechtigungstest für `journal:read`, sofern neue Routen oder Views betroffen sind,
+- Web- oder Browser-Test, wenn eine neue Detailansicht ein Objekt-Journal anzeigt.
+
+Akzeptanzkriterium: Ein Test muss mindestens eine fachliche Aussage prüfen, nicht nur die Existenz eines Journal-Eintrags.
 
 ---
 

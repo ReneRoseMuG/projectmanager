@@ -5,7 +5,6 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { ErrorBoundary } from "./components/error/ErrorBoundary";
 import { ConfirmDialogProvider } from "./components/ui/ConfirmDialogProvider";
-import { ToastProvider } from "./components/ui/ToastProvider";
 import { queryClient } from "./queries/queryClient";
 import "./styles/theme.css";
 import "./styles.css";
@@ -14,13 +13,11 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <ToastProvider>
-          <ConfirmDialogProvider>
-            <ErrorBoundary>
-              <App />
-            </ErrorBoundary>
-          </ConfirmDialogProvider>
-        </ToastProvider>
+        <ConfirmDialogProvider>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </ConfirmDialogProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>

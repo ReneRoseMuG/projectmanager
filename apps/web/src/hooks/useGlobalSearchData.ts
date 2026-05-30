@@ -11,6 +11,14 @@ import { getRootWikiPages } from "../api/wiki";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
+export interface GlobalSearchNote extends Note {
+  projectId: number;
+}
+
+export interface GlobalSearchAttachment extends Attachment {
+  projectId: number;
+}
+
 export interface GlobalSearchData {
   projects: Project[];
   milestones: Milestone[];
@@ -18,16 +26,16 @@ export interface GlobalSearchData {
   wikiPages: WikiPage[];
   tasks: Task[];
   tickets: Ticket[];
-  notes: Note[];
-  attachments: Attachment[];
+  notes: GlobalSearchNote[];
+  attachments: GlobalSearchAttachment[];
 }
 
 async function loadGlobalSearchData(): Promise<GlobalSearchData> {
   const [projects, milestones, features, wikiPages, tasks, tickets] = await Promise.all([getProjects(), getMilestones(), getFeatures(), getRootWikiPages(), getTasks(), getTickets()]);
   const projectIds = projects.map((project) => project.id);
   const [noteLists, attachmentLists] = await Promise.all([
-    Promise.all(projectIds.map((projectId) => getProjectNotes(projectId))),
-    Promise.all(projectIds.map((projectId) => getProjectAttachments(projectId)))
+    Promise.all(projectIds.map(async (projectId) => (await getProjectNotes(projectId)).map((note) => ({ ...note, projectId })))),
+    Promise.all(projectIds.map(async (projectId) => (await getProjectAttachments(projectId)).map((attachment) => ({ ...attachment, projectId }))))
   ]);
 
   return {

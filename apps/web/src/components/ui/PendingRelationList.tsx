@@ -11,6 +11,7 @@ interface PendingExistingItem {
   title: string;
   statusLabel?: string;
   statusTone?: PillTone;
+  statusColor?: string;
 }
 
 interface PendingDraftItem {
@@ -72,7 +73,15 @@ export function PendingRelationList<TItem extends PendingExistingItem = PendingE
             <ItemRow
               key={`existing-${item.id}`}
               title={item.title}
-              pills={item.statusLabel && item.statusTone ? <Pill tone={item.statusTone}>{item.statusLabel}</Pill> : <Badge tone="steel">Bestehend</Badge>}
+              pills={
+                item.statusLabel && (item.statusColor || item.statusTone) ? (
+                  <Pill color={item.statusColor} tone={item.statusTone}>
+                    {item.statusLabel}
+                  </Pill>
+                ) : (
+                  <Badge tone="steel">Bestehend</Badge>
+                )
+              }
               actions={
                 <Button aria-label={`${item.title} entfernen`} title="Entfernen" variant="ghost" icon={<Trash2 size={16} />} onClick={() => onRemoveExisting(index)} />
               }
@@ -91,7 +100,7 @@ export function PendingRelationList<TItem extends PendingExistingItem = PendingE
         </div>
       ) : null}
 
-      <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs font-semibold text-slate-600">Diese Zuordnungen werden nach dem Speichern verknüpft.</p>
+      <p className="rounded-md border border-line bg-shell px-3 py-2 text-xs font-semibold text-steel-600">Diese Zuordnungen werden nach dem Speichern verknüpft.</p>
     </div>
   );
 }
