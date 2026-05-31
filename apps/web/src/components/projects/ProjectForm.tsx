@@ -17,6 +17,7 @@ import type {
 } from "@taskmanager/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  BookOpen,
   Flag,
   FolderKanban,
   Inbox,
@@ -906,7 +907,7 @@ export function ProjectForm({
                   title: feature.title,
                 }))}
                 draftItems={[]}
-                emptyIcon={<FolderKanban size={22} />}
+                emptyIcon={<BookOpen size={22} />}
                 emptyTitle="Keine Features vorgemerkt"
                 showCreateNew={false}
                 onLinkExisting={() => setFeatureLinkOpen(true)}

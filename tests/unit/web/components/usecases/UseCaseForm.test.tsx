@@ -25,6 +25,17 @@ import { addPendingComment, changeInput, clickTab, feature, renderWithProviders,
 import { UseCaseForm } from "../../../../../apps/web/src/components/usecases/UseCaseForm";
 
 describe("UseCaseForm", () => {
+  it("rendert den FormModal-Header mit kanonischem Use-Case-Icon in 20px", () => {
+    renderWithProviders(<UseCaseForm open useCase={useCase} features={[feature]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    const headerIcon = document.querySelector(".lucide-layers3");
+
+    expect(headerIcon).toBeInTheDocument();
+    expect(headerIcon).toHaveAttribute("width", "20");
+    expect(headerIcon).toHaveAttribute("height", "20");
+    expect(document.querySelector(".lucide-book-open[width='21']")).not.toBeInTheDocument();
+  });
+
   it("verdrahtet Body, Parent-Kontext und Sidebar-Felder ohne entfernte Felder", async () => {
     const onSubmit = vi.fn().mockResolvedValue(useCase);
     renderWithProviders(<UseCaseForm open useCase={useCase} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} />);

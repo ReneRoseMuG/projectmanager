@@ -28,7 +28,9 @@ describe("ParentContextField", () => {
       <ParentContextField
         parents={[
           { type: "project", id: 7, label: "Apollo", origin: "direct" },
-          { type: "ticket", id: 25, label: "Login Bug", origin: "direct" }
+          { type: "task", id: 11, label: "Checkliste", origin: "direct" },
+          { type: "ticket", id: 25, label: "Login Bug", origin: "direct" },
+          { type: "useCase", id: 3, label: "Anmelden", origin: "direct" }
         ]}
       />
     );
@@ -36,8 +38,16 @@ describe("ParentContextField", () => {
     expect(screen.getByTestId("parent-context-field")).toBeInTheDocument();
     expect(screen.getByText("PROJ-7")).toBeInTheDocument();
     expect(screen.getByText("Apollo")).toBeInTheDocument();
+    expect(screen.getByText("TASK-11")).toBeInTheDocument();
+    expect(screen.getByText("Checkliste")).toBeInTheDocument();
     expect(screen.getByText("TKT-25")).toBeInTheDocument();
     expect(screen.getByText("Login Bug")).toBeInTheDocument();
+    expect(screen.getByText("UC-3")).toBeInTheDocument();
+    expect(screen.getByText("Anmelden")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-list-todo")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-bug")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-layers3")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-clipboard-list")).not.toBeInTheDocument();
   });
 
   it("rendert bei leeren Kontexten nichts", () => {

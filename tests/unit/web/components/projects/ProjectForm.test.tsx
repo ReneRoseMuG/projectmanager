@@ -182,6 +182,7 @@ describe("ProjectForm", () => {
     clickTab("Features");
 
     expect(screen.getByText("Keine Features vorgemerkt")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-book-open")).toBeInTheDocument();
     expect(screen.queryByTestId("project-feature-panel")).not.toBeInTheDocument();
   });
 

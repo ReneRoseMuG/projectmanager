@@ -93,7 +93,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
     <FormModal
       open={open}
       title={item ? "Backlog-Item bearbeiten" : "Backlog-Item anlegen"}
-      icon={<Inbox size={21} />}
+      icon={<Inbox size={20} />}
       breadcrumb={["Backlog", item ? `Item #${item.id}` : "Neues Item"]}
       onSubmit={submit}
       saving={saving}

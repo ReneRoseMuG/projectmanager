@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 31.05.26 | 19:40:58 | Feature | MS-33 Design-Richtlinien | ✅ |
 | 31.05.26 | 16:36:09 | Fix | API-Testlauf ausführen | ✅ |
 | 31.05.26 | 16:19:31 | Feature | Note Details in neuem Tab | ✅ |
 | 31.05.26 | 15:56:10 | Fix | Web-Testdrift | ✅ |

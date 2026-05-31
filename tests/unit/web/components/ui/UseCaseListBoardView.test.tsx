@@ -258,6 +258,8 @@ describe("UseCaseListBoardView", () => {
     const { container } = renderUseCaseList({ useCases: [] });
 
     expect(screen.getByText("Keine Use Cases")).toBeInTheDocument();
+    expect(container.querySelector(".lucide-layers3")).toBeInTheDocument();
+    expect(container.querySelector(".lucide-book-open")).not.toBeInTheDocument();
     expect(
       container.querySelector("article.p-5"),
     ).not.toBeInTheDocument();
