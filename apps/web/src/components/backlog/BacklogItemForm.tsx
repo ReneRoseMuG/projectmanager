@@ -1,5 +1,5 @@
 import type { BacklogItem, BacklogItemInput, BacklogStatus, DraftComment, Feature } from "@taskmanager/shared-types";
-import { Inbox, Send } from "lucide-react";
+import { BookOpen, Inbox, ListChecks, ListTodo, Send, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
@@ -11,6 +11,7 @@ import { resolveCatalogEntryKey } from "../../utils/catalogs";
 import { JournalPanel } from "../journal/JournalPanel";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
+import { CatalogSelect } from "../ui/CatalogSelect";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { FormSidebar } from "../ui/FormSidebar";
@@ -20,7 +21,6 @@ import { PendingCommentList } from "../ui/PendingCommentList";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
-import { StatusToggle } from "../ui/StatusToggle";
 import { UserSelectField } from "../users/UserSelectField";
 
 interface BacklogItemFormProps {
@@ -104,8 +104,8 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
       contentLayout="flush"
     >
       <div className="flex min-h-0 w-full flex-1">
-        <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
-          <div className="mx-auto grid w-full max-w-5xl gap-4">
+        <div className="min-w-0 flex-1 overflow-auto p-2.5">
+          <div className="grid w-full gap-4">
             <ParentContextField parents={item?.parentContexts} />
             <Section title="Stammdaten">
               <FormField label="Titel" required>
@@ -141,30 +141,22 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
         </div>
 
         <FormSidebar storageKey="backlog-item-form-sidebar">
-          <div className="grid gap-4">
-            <FormField label="Status">
-              <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
-            </FormField>
-            <UserSelectField label="Verantwortlich" value={responsibleUserId} selectedUser={item?.responsibleUser ?? null} onChange={setResponsibleUserId} />
-            <Select label="Feature" value={featureId ?? ""} onChange={(event) => setFeatureId(event.target.value ? Number(event.target.value) : null)}>
-              <option value="">Ohne Feature</option>
-              {features.map((feature) => (
-                <option key={feature.id} value={feature.id}>
-                  {feature.title}
-                </option>
-              ))}
-            </Select>
-            <div className="rounded-md border border-line bg-white p-3">
-              <p className="text-sm font-semibold text-ink">{selectedFeature ? selectedFeature.title : "Ohne Feature-Bezug"}</p>
-              <p className="truncate text-xs text-steel-500">{selectedFeature ? "Feature zugeordnet" : "Feature zuordnen"}</p>
-            </div>
-            <FormField label="Sortierung">
-              <Input type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
-            </FormField>
-            <Button icon={<Send size={16} />} disabled>
-              In Task umwandeln
-            </Button>
-          </div>
+          <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
+          <UserSelectField label="Verantwortlich" icon={<Users size={14} />} variant="panel" value={responsibleUserId} selectedUser={item?.responsibleUser ?? null} onChange={setResponsibleUserId} />
+          <Select label="Feature" icon={<BookOpen size={14} />} variant="panel" value={featureId ?? ""} onChange={(event) => setFeatureId(event.target.value ? Number(event.target.value) : null)}>
+            <option value="">Ohne Feature</option>
+            {features.map((feature) => (
+              <option key={feature.id} value={feature.id}>
+                {feature.title}
+              </option>
+            ))}
+          </Select>
+          <FormField label="Sortierung" icon={<ListTodo size={14} />} variant="panel">
+            <Input type="number" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
+          </FormField>
+          <Button icon={<Send size={16} />} disabled>
+            In Task umwandeln
+          </Button>
         </FormSidebar>
       </div>
     </FormModal>

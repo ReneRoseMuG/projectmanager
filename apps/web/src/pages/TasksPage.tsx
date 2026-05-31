@@ -177,6 +177,7 @@ export function TasksPage() {
           onAdd={() => openCreate()}
           onAddStatus={openCreate}
           onOpen={openTask}
+          onOpenInTab={(task) => window.open(withStandaloneView(`/tasks/${task.id}`), "_blank")}
           onDelete={(task) => void deleteTask(task as TaskBoardItem)}
           onStatusChange={(task, status) => updateTaskStatus(task as TaskBoardItem, status)}
           onDueDateChange={(task, dueDate) => updateTaskDueDate(task as TaskBoardItem, dueDate)}

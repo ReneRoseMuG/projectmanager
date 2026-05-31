@@ -170,8 +170,10 @@ describe("EventForm", () => {
     expect(within(sidebar).getByDisplayValue("2026-06-01T11:00")).toBeInTheDocument();
     expect(within(sidebar).getByLabelText("Erinnerung")).toHaveValue("60");
     expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("");
-    expect(screen.getByLabelText("Projekt B")).toBeChecked();
-    expect(screen.getByLabelText("Aufgabe B")).toBeChecked();
+    expect(within(sidebar).queryByText("Farbe")).not.toBeInTheDocument();
+    expect(screen.queryByText("Zuordnung")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Projekt B")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Aufgabe B")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue(event.title), { target: { value: "Termin Beta" } });
     fireEvent.click(within(sidebar).getByLabelText("Ganztägig"));
@@ -179,8 +181,6 @@ describe("EventForm", () => {
     fireEvent.change(dateInputs[0], { target: { value: "2026-06-02T12:00" } });
     fireEvent.change(dateInputs[1], { target: { value: "2026-06-02T13:00" } });
     fireEvent.change(within(sidebar).getByLabelText("Erinnerung"), { target: { value: "1440" } });
-    fireEvent.click(screen.getByLabelText("Projekt A"));
-    fireEvent.click(screen.getByLabelText("Aufgabe A"));
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
@@ -190,13 +190,12 @@ describe("EventForm", () => {
           isAllDay: true,
           startTime: expect.stringMatching(/^2026-06-02T/),
           endTime: expect.stringMatching(/^2026-06-02T/),
+          color: "#123456",
           reminderMinutes: 1440,
-          owners: expect.arrayContaining([
-            { type: "project", id: 1 },
+          owners: [
             { type: "project", id: 2 },
-            { type: "task", id: 11 },
             { type: "task", id: 12 }
-          ])
+          ]
         }),
         event.id
       )
@@ -223,9 +222,9 @@ describe("EventForm", () => {
     const titleInput = document.querySelector("input[required]");
     expect(titleInput).not.toBeNull();
     fireEvent.change(titleInput as HTMLInputElement, { target: { value: "Neuer Termin" } });
-    fireEvent.click(screen.getByLabelText("Projekt A"));
-    fireEvent.click(screen.getByLabelText("Projekt B"));
-    fireEvent.click(screen.getByLabelText("Aufgabe A"));
+    expect(screen.queryByText("Zuordnung")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Projekt A")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Aufgabe A")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Erinnerung"), { target: { value: "1440" } });
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
@@ -234,11 +233,7 @@ describe("EventForm", () => {
         expect.objectContaining({
           title: "Neuer Termin",
           reminderMinutes: 1440,
-          owners: [
-            { type: "project", id: 1 },
-            { type: "project", id: 2 },
-            { type: "task", id: 11 }
-          ]
+          owners: []
         }),
         undefined
       )
@@ -247,13 +242,28 @@ describe("EventForm", () => {
     expect(onSubmit.mock.calls[0][0]).not.toHaveProperty("taskId");
   });
 
-  it("wählt vorhandene Owner beim Bearbeiten voraus", () => {
-    render(<EventForm open event={event} projects={projects} tasks={tasks} onSubmit={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />);
+  it("entfernt Verknüpfungselemente beim Bearbeiten und bewahrt vorhandene Owner", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<EventForm open event={event} projects={projects} tasks={tasks} onSubmit={onSubmit} onDelete={vi.fn()} onClose={vi.fn()} />);
 
-    expect(screen.getByLabelText("Projekt A")).not.toBeChecked();
-    expect(screen.getByLabelText("Projekt B")).toBeChecked();
-    expect(screen.getByLabelText("Aufgabe A")).not.toBeChecked();
-    expect(screen.getByLabelText("Aufgabe B")).toBeChecked();
+    expect(screen.queryByLabelText("Projekt A")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Projekt B")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Aufgabe A")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Aufgabe B")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          owners: [
+            { type: "project", id: 2 },
+            { type: "task", id: 12 }
+          ]
+        }),
+        event.id
+      )
+    );
   });
 
   it("erhaelt DayPlan-Owner beim Bearbeiten eines Tagesplan-Termins", async () => {

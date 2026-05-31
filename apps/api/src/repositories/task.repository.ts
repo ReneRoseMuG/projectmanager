@@ -48,11 +48,22 @@ export const taskRepository = {
         createdAt: now,
         updatedAt: now
       });
-    const created = await this.findById(database, insertId(result));
-    if (!created) {
-      throw new Error("Created task could not be loaded");
-    }
-    return created;
+    return {
+      id: insertId(result),
+      parentId: data.parentId ?? null,
+      title: data.title,
+      description: data.description ?? null,
+      status: data.status ?? "todo",
+      priority: data.priority ?? "medium",
+      responsibleUserId: data.responsibleUserId ?? null,
+      dueDate: data.dueDate ?? null,
+      importKey: data.importKey ?? null,
+      version: 1,
+      createdBy: userId ?? null,
+      updatedBy: userId ?? null,
+      createdAt: now,
+      updatedAt: now
+    };
   },
 
   async update(database: DbSession, id: number, expectedVersion: number, data: TaskUpdateData, userId?: number): Promise<TaskRecord | undefined> {
@@ -61,16 +72,17 @@ export const taskRepository = {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
+    const now = nowIso();
     await database
       .update(tasks)
       .set({
         ...data,
         version: current.version + 1,
         updatedBy: userId ?? null,
-        updatedAt: nowIso()
+        updatedAt: now
       })
       .where(eq(tasks.id, id));
-    return this.findById(database, id);
+    return { ...current, ...data, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
   },
 
   async delete(database: DbSession, id: number): Promise<number> {

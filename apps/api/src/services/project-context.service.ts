@@ -94,33 +94,29 @@ export async function taskProjectContext(database: DbClient, taskId: number, vis
     return context;
   }
 
-  if (task.parentId !== null) {
-    mergeProjectContext(context, await taskProjectContext(database, task.parentId, visitedTasks));
-  }
+  const [parentContext, projectRows, milestoneRows, featureRows, useCaseRows] = await Promise.all([
+    task.parentId !== null ? taskProjectContext(database, task.parentId, visitedTasks) : Promise.resolve(new Set<number>()),
+    database.select({ projectId: projectTasks.ownerId }).from(projectTasks).where(eq(projectTasks.taskId, taskId)),
+    database
+      .select({ projectId: milestones.projectId })
+      .from(milestoneTasks)
+      .innerJoin(milestones, eq(milestoneTasks.ownerId, milestones.id))
+      .where(eq(milestoneTasks.taskId, taskId)),
+    database.select({ featureId: featureTasks.ownerId }).from(featureTasks).where(eq(featureTasks.taskId, taskId)),
+    database.select({ useCaseId: useCaseTasks.ownerId }).from(useCaseTasks).where(eq(useCaseTasks.taskId, taskId))
+  ]);
 
-  const projectRows = await database.select({ projectId: projectTasks.ownerId }).from(projectTasks).where(eq(projectTasks.taskId, taskId));
+  mergeProjectContext(context, parentContext);
   for (const row of projectRows) {
     addProjectId(context, row.projectId);
   }
-
-  const milestoneRows = await database
-    .select({ projectId: milestones.projectId })
-    .from(milestoneTasks)
-    .innerJoin(milestones, eq(milestoneTasks.ownerId, milestones.id))
-    .where(eq(milestoneTasks.taskId, taskId));
   for (const row of milestoneRows) {
     addProjectId(context, row.projectId);
   }
-
-  const featureRows = await database.select({ featureId: featureTasks.ownerId }).from(featureTasks).where(eq(featureTasks.taskId, taskId));
-  for (const row of featureRows) {
-    await collectFeatureProjectIds(database, row.featureId, context);
-  }
-
-  const useCaseRows = await database.select({ useCaseId: useCaseTasks.ownerId }).from(useCaseTasks).where(eq(useCaseTasks.taskId, taskId));
-  for (const row of useCaseRows) {
-    await collectUseCaseProjectIds(database, row.useCaseId, context);
-  }
+  await Promise.all([
+    ...featureRows.map((row) => collectFeatureProjectIds(database, row.featureId, context)),
+    ...useCaseRows.map((row) => collectUseCaseProjectIds(database, row.useCaseId, context))
+  ]);
 
   return context;
 }
@@ -164,47 +160,39 @@ export async function ticketProjectContext(database: DbClient, ticketId: number,
     return context;
   }
 
-  if (ticket.parentId !== null) {
-    mergeProjectContext(context, await ticketProjectContext(database, ticket.parentId, visitedTickets));
-  }
+  const [parentContext, projectRows, milestoneRows, taskRows, featureRows, useCaseRows, relationRows] = await Promise.all([
+    ticket.parentId !== null ? ticketProjectContext(database, ticket.parentId, visitedTickets) : Promise.resolve(new Set<number>()),
+    database.select({ projectId: projectTickets.ownerId }).from(projectTickets).where(eq(projectTickets.ticketId, ticketId)),
+    database
+      .select({ projectId: milestones.projectId })
+      .from(milestoneTickets)
+      .innerJoin(milestones, eq(milestoneTickets.ownerId, milestones.id))
+      .where(eq(milestoneTickets.ticketId, ticketId)),
+    database.select({ taskId: taskTickets.ownerId }).from(taskTickets).where(eq(taskTickets.ticketId, ticketId)),
+    database.select({ featureId: featureTickets.ownerId }).from(featureTickets).where(eq(featureTickets.ticketId, ticketId)),
+    database.select({ useCaseId: useCaseTickets.ownerId }).from(useCaseTickets).where(eq(useCaseTickets.ticketId, ticketId)),
+    database
+      .select({ sourceTicketId: ticketRelations.sourceTicketId, targetTicketId: ticketRelations.targetTicketId })
+      .from(ticketRelations)
+      .where(or(eq(ticketRelations.sourceTicketId, ticketId), eq(ticketRelations.targetTicketId, ticketId)))
+  ]);
 
-  const projectRows = await database.select({ projectId: projectTickets.ownerId }).from(projectTickets).where(eq(projectTickets.ticketId, ticketId));
+  mergeProjectContext(context, parentContext);
   for (const row of projectRows) {
     addProjectId(context, row.projectId);
   }
-
-  const milestoneRows = await database
-    .select({ projectId: milestones.projectId })
-    .from(milestoneTickets)
-    .innerJoin(milestones, eq(milestoneTickets.ownerId, milestones.id))
-    .where(eq(milestoneTickets.ticketId, ticketId));
   for (const row of milestoneRows) {
     addProjectId(context, row.projectId);
   }
-
-  const taskRows = await database.select({ taskId: taskTickets.ownerId }).from(taskTickets).where(eq(taskTickets.ticketId, ticketId));
-  for (const row of taskRows) {
-    mergeProjectContext(context, await taskProjectContext(database, row.taskId));
-  }
-
-  const featureRows = await database.select({ featureId: featureTickets.ownerId }).from(featureTickets).where(eq(featureTickets.ticketId, ticketId));
-  for (const row of featureRows) {
-    await collectFeatureProjectIds(database, row.featureId, context);
-  }
-
-  const useCaseRows = await database.select({ useCaseId: useCaseTickets.ownerId }).from(useCaseTickets).where(eq(useCaseTickets.ticketId, ticketId));
-  for (const row of useCaseRows) {
-    await collectUseCaseProjectIds(database, row.useCaseId, context);
-  }
-
-  const relationRows = await database
-    .select({ sourceTicketId: ticketRelations.sourceTicketId, targetTicketId: ticketRelations.targetTicketId })
-    .from(ticketRelations)
-    .where(or(eq(ticketRelations.sourceTicketId, ticketId), eq(ticketRelations.targetTicketId, ticketId)));
-  for (const row of relationRows) {
-    const relatedTicketId = row.sourceTicketId === ticketId ? row.targetTicketId : row.sourceTicketId;
-    mergeProjectContext(context, await ticketProjectContext(database, relatedTicketId, visitedTickets));
-  }
+  await Promise.all([
+    ...taskRows.map((row) => taskProjectContext(database, row.taskId).then((ctx) => mergeProjectContext(context, ctx))),
+    ...featureRows.map((row) => collectFeatureProjectIds(database, row.featureId, context)),
+    ...useCaseRows.map((row) => collectUseCaseProjectIds(database, row.useCaseId, context)),
+    ...relationRows.map((row) => {
+      const relatedTicketId = row.sourceTicketId === ticketId ? row.targetTicketId : row.sourceTicketId;
+      return ticketProjectContext(database, relatedTicketId, visitedTickets).then((ctx) => mergeProjectContext(context, ctx));
+    })
+  ]);
 
   return context;
 }

@@ -1,90 +1,193 @@
 import type { Tag } from "@taskmanager/shared-types";
-import { Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Plus, Tag as TagIcon, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTags } from "../../hooks/useTags";
-import { Button } from "../ui/Button";
-import { FormField } from "../ui/FormField";
-import { TagBadge } from "./TagBadge";
 
 interface TagPickerProps {
   selected: Tag[];
   onChange: (tags: Tag[]) => void;
+  variant?: "default" | "panel";
 }
 
-const colors = [
-  "var(--color-steel-600)",
-  "var(--color-crimson)",
-  "var(--color-tangerine)",
-  "var(--color-mustard)",
-  "var(--color-fern)",
-  "var(--color-teal)",
-  "var(--color-violet)",
-  "var(--color-magenta)"
-];
+const DEFAULT_TAG_COLOR = "var(--color-steel-600)";
 
-export function TagPicker({ selected, onChange }: TagPickerProps) {
-  const { tags, createTag } = useTags();
-  const [name, setName] = useState("");
-  const [color, setColor] = useState(colors[0] ?? "var(--color-steel-600)");
-
-  const selectedIds = useMemo(() => new Set(selected.map((tag) => tag.id)), [selected]);
-
-  const toggle = (tag: Tag) => {
-    if (selectedIds.has(tag.id)) {
-      onChange(selected.filter((item) => item.id !== tag.id));
-      return;
-    }
-    onChange([...selected, tag]);
+function tagPillStyle(color: string) {
+  return {
+    borderColor: `color-mix(in srgb, ${color} 42%, white)`,
+    backgroundColor: `color-mix(in srgb, ${color} 14%, white)`,
+    color,
   };
+}
 
-  const addTag = async () => {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      return;
-    }
-    const tag = await createTag({ name: trimmed, color });
-    onChange([...selected, tag]);
-    setName("");
-  };
-
+function TagPill({ tag, onRemove }: { tag: Tag; onRemove: (id: number) => void }) {
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap gap-2">
-        {tags.map((tag) => (
+    <span
+      className="inline-flex min-w-0 max-w-[8rem] items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold leading-5"
+      style={tagPillStyle(tag.color)}
+      title={tag.name}
+    >
+      <span className="min-w-0 truncate">{tag.name}</span>
+      <button
+        type="button"
+        aria-label={`Tag "${tag.name}" entfernen`}
+        className="ml-0.5 shrink-0 opacity-60 transition hover:opacity-100"
+        onClick={() => onRemove(tag.id)}
+      >
+        <X size={10} />
+      </button>
+    </span>
+  );
+}
+
+export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
+  const { tags, createTag } = useTags();
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [newName, setNewName] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const selectedIds = useMemo(() => new Set(selected.map((t) => t.id)), [selected]);
+  const availableTags = useMemo(
+    () =>
+      tags.filter(
+        (t) =>
+          !selectedIds.has(t.id) &&
+          t.name.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [tags, selectedIds, search],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const removeTag = (tagId: number) => {
+    onChange(selected.filter((t) => t.id !== tagId));
+  };
+
+  const addTag = (tag: Tag) => {
+    onChange([...selected, tag]);
+    setSearch("");
+  };
+
+  const createAndAdd = async () => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const tag = await createTag({ name: trimmed, color: DEFAULT_TAG_COLOR });
+    onChange([...selected, tag]);
+    setNewName("");
+  };
+
+  const addButton = (
+    <button
+      type="button"
+      aria-label="Tag hinzufügen"
+      className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-line bg-white text-steel-500 transition hover:bg-shell hover:text-ink"
+      onClick={() => setOpen((v) => !v)}
+    >
+      <Plus size={13} />
+    </button>
+  );
+
+  const dropdown = open ? (
+    <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-md border border-line bg-white shadow-md">
+      <div className="p-2">
+        <input
+          className="h-8 w-full rounded border border-line px-2 text-sm outline-none focus:border-steel-600"
+          placeholder="Suchen…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          autoFocus
+        />
+      </div>
+      <div className="max-h-40 overflow-y-auto">
+        {availableTags.map((tag) => (
           <button
             key={tag.id}
             type="button"
-            className={`rounded transition ${selectedIds.has(tag.id) ? "ring-2 ring-ink ring-offset-2" : "opacity-80 hover:opacity-100"}`}
-            onClick={() => toggle(tag)}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-shell"
+            onClick={() => addTag(tag)}
           >
-            <TagBadge tag={tag} />
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: tag.color }}
+            />
+            {tag.name}
           </button>
         ))}
+        {availableTags.length === 0 && (
+          <div className="px-3 py-2 text-xs text-steel-500">
+            {search ? "Kein Tag gefunden" : "Alle Tags bereits ausgewählt"}
+          </div>
+        )}
       </div>
-      <div className="flex flex-wrap items-end gap-2">
-        <FormField label="Tag" className="min-w-44 flex-1">
+      <div className="border-t border-line p-2">
+        <div className="flex gap-1.5">
           <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="h-10 rounded-md border border-line px-3 outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
+            className="h-7 min-w-0 flex-1 rounded border border-line px-2 text-xs outline-none focus:border-steel-600"
+            placeholder="Neues Tag…"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void createAndAdd();
+              }
+            }}
           />
-        </FormField>
-        <div className="flex gap-1">
-          {colors.map((item) => (
-            <button
-              key={item}
-              type="button"
-              title={item}
-              aria-label={item}
-              className={`h-8 w-8 rounded border border-white shadow-panel ${item === color ? "ring-2 ring-ink ring-offset-2" : ""}`}
-              style={{ backgroundColor: item }}
-              onClick={() => setColor(item)}
-            />
+          <button
+            type="button"
+            disabled={!newName.trim()}
+            className="h-7 rounded border border-steel-300 px-2 text-xs font-medium text-steel-600 transition hover:border-steel-500 hover:text-ink disabled:opacity-50"
+            onClick={() => void createAndAdd()}
+          >
+            Neu
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  if (variant === "panel") {
+    return (
+      <div ref={containerRef} className="relative rounded-lg border border-line bg-white shadow-sm">
+        <div className="flex h-9 items-center gap-2 border-b border-line px-2.5">
+          <TagIcon size={14} className="shrink-0 text-steel-500" />
+          <span className="flex-1 text-xs font-bold uppercase tracking-wide text-steel-700">Tags</span>
+          {addButton}
+        </div>
+        <div className="flex min-h-[2.5rem] flex-wrap items-start gap-1.5 p-2.5">
+          {selected.map((tag) => (
+            <TagPill key={tag.id} tag={tag} onRemove={removeTag} />
           ))}
         </div>
-        <Button icon={<Plus size={16} />} onClick={addTag}>
-          Neu
-        </Button>
+        {dropdown}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="grid gap-1">
+      <div className="flex items-center gap-1.5">
+        <TagIcon size={12} className="shrink-0 text-steel-400" />
+        <span className="text-xs font-bold uppercase tracking-wide text-steel-700">Tags</span>
+      </div>
+      <div className="relative min-h-[2.5rem] rounded-md border border-line bg-white px-2 py-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {selected.map((tag) => (
+            <TagPill key={tag.id} tag={tag} onRemove={removeTag} />
+          ))}
+          {addButton}
+        </div>
+        {dropdown}
       </div>
     </div>
   );

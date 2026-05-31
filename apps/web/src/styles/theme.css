@@ -207,3 +207,88 @@
   border-color: color-mix(in srgb, var(--color-white) 22%, transparent);
   background: color-mix(in srgb, var(--color-steel-900) 52%, transparent);
 }
+
+.wiki-tree-nav-row {
+  position: relative;
+  border-radius: 4px;
+  transition: background 140ms ease;
+}
+
+.wiki-tree-nav-row::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition:
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.wiki-tree-nav-row:hover {
+  background: color-mix(in srgb, var(--color-white) 6%, transparent);
+}
+
+.wiki-tree-nav-row:hover::before {
+  background: color-mix(in srgb, var(--color-white) 18%, transparent);
+}
+
+.wiki-tree-nav-row-active {
+  background: color-mix(in srgb, var(--color-white) 8%, transparent);
+}
+
+.wiki-tree-nav-row-active::before {
+  background: linear-gradient(180deg, var(--color-white), var(--color-steel-300));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-white) 50%, transparent);
+}
+
+.wiki-tree-nav-link {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--color-white) 78%, transparent);
+  transition: color 140ms ease;
+}
+
+.wiki-tree-nav-row:hover .wiki-tree-nav-link,
+.wiki-tree-nav-row-active .wiki-tree-nav-link {
+  color: var(--color-white);
+}
+
+.wiki-tree-nav-row-active .wiki-tree-nav-link {
+  font-weight: 600;
+}
+
+.wiki-tree-expand-btn {
+  color: color-mix(in srgb, var(--color-white) 50%, transparent);
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.wiki-tree-expand-btn:hover {
+  background: color-mix(in srgb, var(--color-white) 10%, transparent);
+  color: var(--color-white);
+}
+
+.wiki-tree-expand-btn:disabled:hover {
+  background: transparent;
+}
+
+.wiki-tree-icon-muted {
+  color: color-mix(in srgb, var(--color-white) 40%, transparent);
+}
+
+.wiki-tree-action-btn {
+  color: color-mix(in srgb, var(--color-white) 50%, transparent);
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.wiki-tree-action-btn:hover {
+  background: color-mix(in srgb, var(--color-white) 10%, transparent);
+  color: var(--color-white);
+}

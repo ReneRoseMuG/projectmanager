@@ -7,6 +7,28 @@ import { catalogRepository, type CatalogEntryRecord, type CatalogEntryUpdateData
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
 
+const CATALOG_CACHE_TTL = 5 * 60 * 1000;
+let allEntriesCache: CatalogEntryRecord[] | null = null;
+let cacheExpiresAt = 0;
+
+function isCacheValid(): boolean {
+  return allEntriesCache !== null && Date.now() < cacheExpiresAt;
+}
+
+function invalidateCatalogCache(): void {
+  allEntriesCache = null;
+  cacheExpiresAt = 0;
+}
+
+async function getAllCachedEntries(database: DbClient): Promise<CatalogEntryRecord[]> {
+  if (isCacheValid()) {
+    return allEntriesCache!;
+  }
+  allEntriesCache = await catalogRepository.findAll(database);
+  cacheExpiresAt = Date.now() + CATALOG_CACHE_TTL;
+  return allEntriesCache;
+}
+
 const keyPattern = /^[a-z][a-z0-9_]*$/;
 const hexColorPattern = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const themeColorPattern = /^var\(--color-[a-z0-9-]+\)$/;
@@ -99,8 +121,8 @@ async function resolveSortOrder(database: DbClient, kind: CatalogKind, sortOrder
   if (sortOrder !== undefined) {
     return sortOrder;
   }
-  const entries = await catalogRepository.findByKind(database, kind);
-  const highest = entries.reduce((current, entry) => Math.max(current, entry.sortOrder), 0);
+  const all = await getAllCachedEntries(database);
+  const highest = all.filter((e) => e.kind === kind).reduce((current, entry) => Math.max(current, entry.sortOrder), 0);
   return highest + 100;
 }
 
@@ -167,52 +189,72 @@ const DEFAULT_CATALOG_ENTRIES: Array<[CatalogKind, string, string, number, boole
 
 export async function seedDefaultCatalogEntries(database: DbClient): Promise<void> {
   const now = nowIso();
-  for (const [kind, key, label, sortOrder, isClosed, color] of DEFAULT_CATALOG_ENTRIES) {
-    await database.insert(catalogEntries)
-      .ignore()
-      .values({ kind, key, label, sortOrder, isClosed, color, version: 1, createdAt: now, updatedAt: now });
+  const kindGroups = new Map<CatalogKind, Array<(typeof DEFAULT_CATALOG_ENTRIES)[number]>>();
+  for (const entry of DEFAULT_CATALOG_ENTRIES) {
+    const kind = entry[0];
+    if (!kindGroups.has(kind)) {
+      kindGroups.set(kind, []);
+    }
+    kindGroups.get(kind)!.push(entry);
+  }
+  for (const [kind, entries] of kindGroups) {
+    const existing = await catalogRepository.findByKind(database, kind);
+    if (existing.length > 0) {
+      continue;
+    }
+    for (const [entryKind, key, label, sortOrder, isClosed, color] of entries) {
+      await database.insert(catalogEntries)
+        .values({ kind: entryKind, key, label, sortOrder, isClosed, color, version: 1, createdAt: now, updatedAt: now });
+    }
   }
 }
 
 export async function listCatalogEntries(database: DbClient, kind?: string): Promise<CatalogEntry[]> {
+  const all = await getAllCachedEntries(database);
   if (kind !== undefined) {
     assertCatalogKind(kind);
-    return (await catalogRepository.findByKind(database, kind)).map(mapCatalogEntry);
+    return all.filter((e) => e.kind === kind).sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label)).map(mapCatalogEntry);
   }
-  return (await catalogRepository.findAll(database)).map(mapCatalogEntry);
+  return all.map(mapCatalogEntry);
 }
 
 export async function ensureCatalogEntryExists(database: DbClient, kind: CatalogKind, key: string): Promise<void> {
-  if (!(await catalogRepository.findByKindAndKey(database, kind, key))) {
+  const all = await getAllCachedEntries(database);
+  if (!all.find((e) => e.kind === kind && e.key === key)) {
     throw badRequest(`Catalog entry "${key}" does not exist in ${kind}`);
   }
 }
 
 export async function resolveDefaultCatalogEntryKey(database: DbClient, kind: CatalogKind, preferredKey: string): Promise<string> {
-  const preferred = await catalogRepository.findByKindAndKey(database, kind, preferredKey);
+  const all = await getAllCachedEntries(database);
+  const preferred = all.find((e) => e.kind === kind && e.key === preferredKey);
   if (preferred) {
     return preferred.key;
   }
-  const fallback = await catalogRepository.findLowestByKind(database, kind);
-  if (!fallback) {
+  const sorted = all.filter((e) => e.kind === kind).sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
+  const first = sorted[0];
+  if (!first) {
     throw badRequest(`Catalog ${kind} has no entries`);
   }
-  return fallback.key;
+  return first.key;
 }
 
 export async function isCatalogEntryClosed(database: DbClient, kind: CatalogKind, key: string): Promise<boolean> {
-  return (await catalogRepository.findByKindAndKey(database, kind, key))?.isClosed ?? false;
+  const all = await getAllCachedEntries(database);
+  return all.find((e) => e.kind === kind && e.key === key)?.isClosed ?? false;
 }
 
 export async function listClosedCatalogEntryKeys(database: DbClient, kind: CatalogKind): Promise<Set<string>> {
-  return new Set((await catalogRepository.findByKind(database, kind)).filter((entry) => entry.isClosed).map((entry) => entry.key));
+  const all = await getAllCachedEntries(database);
+  return new Set(all.filter((e) => e.kind === kind && e.isClosed).map((e) => e.key));
 }
 
 export async function createCatalogEntry(database: DbClient, kind: string, input: CatalogEntryInput): Promise<CatalogEntry> {
   assertCatalogKind(kind);
   const key = normalizeCatalogKey(input.key);
   const label = requireNonEmpty(input.label, "label");
-  if (await catalogRepository.findByKindAndKey(database, kind, key)) {
+  const existingEntries = await getAllCachedEntries(database);
+  if (existingEntries.find((e) => e.kind === kind && e.key === key)) {
     throw conflict(`Catalog entry "${key}" already exists in ${kind}`);
   }
 
@@ -225,6 +267,7 @@ export async function createCatalogEntry(database: DbClient, kind: string, input
     color: normalizeCatalogColor(input.color, kind, key)
   });
 
+  invalidateCatalogCache();
   return mapCatalogEntry(created);
 }
 
@@ -257,6 +300,7 @@ export async function updateCatalogEntry(database: DbClient, kind: string, id: n
   if (!updated) {
     throw notFound(`Catalog entry with id ${id} not found`);
   }
+  invalidateCatalogCache();
   return mapCatalogEntry(updated);
 }
 
@@ -284,4 +328,5 @@ export async function deleteCatalogEntry(database: DbClient, kind: string, id: n
     }
     await catalogRepository.delete(tx, id);
   });
+  invalidateCatalogCache();
 }

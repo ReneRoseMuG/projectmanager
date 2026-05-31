@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { UserOption } from "@taskmanager/shared-types";
 import { useMemo } from "react";
 import { useUsers } from "../../hooks/useUsers";
@@ -5,6 +6,9 @@ import { FormField } from "../ui/FormField";
 
 interface UserSelectFieldProps {
   label: string;
+  icon?: ReactNode;
+  action?: ReactNode;
+  variant?: "default" | "panel";
   value: number | null;
   onChange: (value: number | null) => void;
   selectedUser?: UserOption | null;
@@ -17,7 +21,7 @@ function userLabel(user: UserOption): string {
   return user.fullName || user.email;
 }
 
-export function UserSelectField({ label, value, onChange, selectedUser, required = false, allowEmpty = true, disabled = false }: UserSelectFieldProps) {
+export function UserSelectField({ label, icon, action, variant, value, onChange, selectedUser, required = false, allowEmpty = true, disabled = false }: UserSelectFieldProps) {
   const userList = useUsers();
   const options = useMemo(() => {
     const byId = new Map<number, UserOption>();
@@ -31,9 +35,9 @@ export function UserSelectField({ label, value, onChange, selectedUser, required
   }, [selectedUser, userList.users]);
 
   return (
-    <FormField label={label} required={required}>
+    <FormField label={label} icon={icon} action={action} variant={variant} required={required}>
       <select
-        className="h-11 w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+        className="h-10 w-full rounded-md border border-line bg-white px-3 text-sm text-ink outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 disabled:cursor-not-allowed disabled:opacity-60"
         value={value === null ? "" : String(value)}
         disabled={disabled || userList.loading}
         onChange={(event) => onChange(event.target.value ? Number(event.target.value) : null)}

@@ -1,14 +1,15 @@
 import type { Task } from "@taskmanager/shared-types";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarDays, GripVertical } from "lucide-react";
+import { GripVertical, ListTodo } from "lucide-react";
 import type { CSSProperties, KeyboardEvent } from "react";
 import { resolveTaskStatusColor } from "../../lib/task-status-color";
-import { formatHumanDate } from "../../utils/date";
+import { Avatar } from "../ui/Avatar";
+import { StatusPill } from "../ui/StatusPill";
 
 export const WEEK_TILE_HEADER_HEIGHT_PX = 48;
-export const WEEK_TILE_FOOTER_HEIGHT_PX = 60;
-export const WEEK_TILE_MIN_HEIGHT_PX = 180;
+export const WEEK_TILE_FOOTER_HEIGHT_PX = 0;
+export const WEEK_TILE_MIN_HEIGHT_PX = 136;
 
 interface WeekTaskTileProps {
   task: Task;
@@ -29,6 +30,10 @@ export function WeekTaskTile({ task, dragging = false, overlay = false, draggabl
     : {
         transform: CSS.Translate.toString(drag.transform)
       };
+  const tileStyle: CSSProperties = {
+    ...style,
+    ["--task-accent" as string]: resolveTaskStatusColor(task.status)
+  };
   const interactionAttributes = overlay || !draggable ? { role: "button", tabIndex: 0 } : drag.attributes;
 
   function activate() {
@@ -47,10 +52,10 @@ export function WeekTaskTile({ task, dragging = false, overlay = false, draggabl
     <article
       ref={overlay ? undefined : drag.setNodeRef}
       data-testid={`week-task-${task.id}`}
-      className={`group grid min-h-[180px] w-full min-w-0 overflow-hidden rounded-lg border border-line bg-white text-left shadow-sm transition hover:shadow-panel focus:outline-none focus:ring-2 focus:ring-steel-700/10 ${
+      className={`group relative grid min-h-[136px] w-full min-w-0 gap-3 overflow-hidden rounded-lg border border-line bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-steel-300 hover:shadow-panel focus:outline-none focus:ring-2 focus:ring-steel-700/10 ${
         draggable && !overlay ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
       } ${dragging ? "opacity-50" : ""} ${overlay ? "w-64 shadow-panel" : ""}`}
-      style={style}
+      style={tileStyle}
       onClick={(event) => {
         event.stopPropagation();
         activate();
@@ -59,19 +64,21 @@ export function WeekTaskTile({ task, dragging = false, overlay = false, draggabl
       {...interactionAttributes}
       {...(overlay || !draggable ? {} : drag.listeners)}
     >
-      <div className="flex min-h-12 items-start justify-between gap-2 rounded-t-lg px-3 py-2 text-xs font-semibold text-white" style={{ backgroundColor: resolveTaskStatusColor(task.status) }}>
-        <span className="inline-flex min-h-6 max-w-full items-center rounded-md border border-white/20 bg-white/10 px-2 text-xs font-semibold text-white">
-          <span className="truncate">{task.status}</span>
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-1" style={{ backgroundColor: "var(--task-accent)" }} />
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line bg-shell text-steel-700">
+            <ListTodo size={15} />
+          </span>
+          <span className="min-w-0 truncate text-xs font-semibold text-steel-500">Aufgabe</span>
         </span>
-        {draggable && !overlay ? <GripVertical size={14} className="shrink-0 text-white/80 opacity-0 transition group-hover:opacity-100" /> : null}
+        {draggable && !overlay ? <GripVertical size={14} className="shrink-0 text-steel-300 opacity-0 transition group-hover:opacity-100" /> : null}
       </div>
-      <div className="min-w-0 bg-white px-3 py-2">
-        <h3 className="line-clamp-3 break-words text-sm font-semibold text-ink">{task.title}</h3>
+      <h3 className="line-clamp-3 break-words text-sm font-semibold text-ink">{task.title}</h3>
+      <div className="mt-auto flex min-w-0 items-center justify-between gap-2">
+        <StatusPill kind="workStatus" value={task.status} />
+        {task.responsibleUser?.fullName ? <Avatar name={task.responsibleUser.fullName} size="sm" /> : null}
       </div>
-      <footer className="mt-auto flex min-h-[60px] items-center gap-2 border-t border-line bg-shell px-3 py-2 text-xs text-steel-500">
-        <CalendarDays size={13} className="shrink-0 text-steel-400" />
-        <span className="truncate">{task.dueDate ? `Fällig ${formatHumanDate(task.dueDate)}` : "Ohne Fälligkeit"}</span>
-      </footer>
     </article>
   );
 }

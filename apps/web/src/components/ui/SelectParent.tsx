@@ -18,6 +18,9 @@ export interface SelectParentItem {
 export interface SelectParentProps {
   type: "project" | "milestone" | "feature";
   label: string;
+  icon?: ReactNode;
+  action?: ReactNode;
+  variant?: "default" | "panel";
   placeholder?: string;
   items: SelectParentItem[];
   value: SelectParentItem | null;
@@ -43,6 +46,9 @@ function itemKey(item: SelectParentItem) {
 export function SelectParent({
   type,
   label,
+  icon,
+  action,
+  variant,
   placeholder,
   items,
   value,
@@ -112,7 +118,7 @@ export function SelectParent({
   };
 
   return (
-    <FormField label={label}>
+    <FormField label={label} icon={icon} action={action} variant={variant}>
       <div ref={rootRef} id={`${triggerId}-root`} className="relative grid gap-3">
         <button
           id={triggerId}

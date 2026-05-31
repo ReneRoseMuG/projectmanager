@@ -293,6 +293,7 @@ export function ProjectsPage() {
           loading={loading}
           onCreate={() => navigate(projectTarget("/projects/new"))}
           onEdit={(project) => navigate(projectTarget(`/projects/${project.id}`))}
+          onOpenInTab={(project) => window.open(withStandaloneView(`/projects/${project.id}`), "_blank")}
           onDelete={(project) => void deleteProject(project)}
           onStatusChange={updateProjectStatus}
           onTagsChange={changeProjectTags}

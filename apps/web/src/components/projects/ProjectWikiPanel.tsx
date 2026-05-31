@@ -1,13 +1,13 @@
 import type { WikiPage } from "@taskmanager/shared-types";
-import { FileText, Link2, X } from "lucide-react";
+import { FileText, Library, Link2, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useWiki, type WikiTreeNode } from "../../hooks/useWiki";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
-import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
+import { SidebarPanel } from "../ui/SidebarPanel";
 
 interface ProjectWikiPanelProps {
   wikiPageId: number | null;
@@ -88,50 +88,50 @@ export function ProjectWikiPanel({
 
   return (
     <>
-      <Section
-        title="Projekt Wiki"
-        actions={
+      <SidebarPanel
+        icon={<Library size={14} />}
+        label="Projekt Wiki"
+        action={
           <Button
             aria-label="Wiki-Seite verknüpfen"
             title="Wiki-Seite verknüpfen"
-            variant="secondary"
-            icon={<Link2 size={17} />}
-            className="h-9 w-9 bg-transparent px-0"
+            variant="ghost"
+            size="sm"
+            icon={<Link2 size={14} />}
+            className="h-6 w-6 px-0"
             disabled={!canOpenDialog}
             onClick={openDialog}
           />
         }
       >
         {wikiPageId && linkedPage ? (
-          <div className="flex items-center gap-2 rounded-lg border border-line bg-white p-2 shadow-sm">
+          <div className="flex items-center gap-2 rounded-md border border-line bg-shell p-2">
             <Link
               to={`/wiki/${linkedPage.id}`}
-              className="flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-1.5 text-sm text-ink transition hover:bg-shell focus:outline-none focus:ring-2 focus:ring-steel-700/10"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-sm text-ink transition hover:bg-steel-100 focus:outline-none focus:ring-2 focus:ring-steel-700/10"
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-steel-100 text-steel-700">
-                <FileText size={17} />
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-steel-100 text-steel-600">
+                <FileText size={14} />
               </span>
               <span className="min-w-0">
-                <span className="block truncate font-medium">
-                  {linkedPage.title}
-                </span>
-                <span className="block text-xs text-steel-500">
-                  Wiki-Seite
-                </span>
+                <span className="block truncate text-xs font-semibold">{linkedPage.title}</span>
+                <span className="block text-[11px] text-steel-500">Wiki-Seite</span>
               </span>
             </Link>
             <Button
               aria-label={`Wiki-Seite ${linkedPage.title} entfernen`}
               title="Wiki-Seite entfernen"
               variant="ghost"
-              icon={<X size={16} />}
+              size="sm"
+              icon={<X size={14} />}
+              className="h-6 w-6 shrink-0 px-0"
               loading={saving}
               disabled={saving}
               onClick={() => void removeRelation()}
             />
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-line bg-shell px-3 py-3 text-sm text-steel-500">
+          <div className="rounded-md border border-dashed border-line px-3 py-2.5 text-xs text-steel-500">
             {wiki.loading
               ? "Wiki-Seiten werden geladen"
               : pageOptions.length === 0
@@ -141,9 +141,9 @@ export function ProjectWikiPanel({
         )}
 
         {wikiPageId && !linkedPage && wiki.error ? (
-          <p className="mt-2 text-sm text-crimson">{wiki.error}</p>
+          <p className="mt-2 text-xs text-crimson">{wiki.error}</p>
         ) : null}
-      </Section>
+      </SidebarPanel>
 
       <Modal
         open={linkDialogOpen}

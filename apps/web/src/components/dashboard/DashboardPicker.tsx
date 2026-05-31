@@ -71,8 +71,7 @@ export function DashboardPicker({
           <div className="flex items-center gap-2 pb-0.5">
             <Button
               variant={selectedDashboard.isUserDefault ? "primary" : "secondary"}
-              size="sm"
-              icon={<Star size={16} fill={selectedDashboard.isUserDefault ? "currentColor" : "none"} />}
+              icon={<Star size={20} fill={selectedDashboard.isUserDefault ? "currentColor" : "none"} />}
               loading={saving}
               title={selectedDashboard.isUserDefault ? "Aktiver Standard" : "Als Standard setzen"}
               aria-label={selectedDashboard.isUserDefault ? "Aktiver Standard" : "Als Standard setzen"}
@@ -80,24 +79,21 @@ export function DashboardPicker({
             />
             <Button
               variant="secondary"
-              size="sm"
-              icon={<Pencil size={16} />}
+              icon={<Pencil size={20} />}
               title="Ansicht bearbeiten"
               aria-label="Ansicht bearbeiten"
               onClick={() => onEdit(selectedDashboard)}
             />
             <Button
               variant="secondary"
-              size="sm"
-              icon={<Plus size={16} />}
+              icon={<Plus size={20} />}
               title="Neue Ansicht"
               aria-label="Neue Ansicht"
               onClick={onCreate}
             />
             <Button
               variant="ghost"
-              size="sm"
-              icon={collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              icon={collapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
               title={collapsed ? "Details einblenden" : "Details ausblenden"}
               aria-label={collapsed ? "Details einblenden" : "Details ausblenden"}
               onClick={toggleCollapsed}

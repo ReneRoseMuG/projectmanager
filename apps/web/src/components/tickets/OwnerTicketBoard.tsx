@@ -1,6 +1,7 @@
 import type { Ticket, TicketStatus } from "@taskmanager/shared-types";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { withStandaloneView } from "../../utils/standalone";
 import type { TicketOwner } from "../../api/tickets";
 import { errorMessageAsync } from "../../hooks/errors";
 import { useCatalogs } from "../../hooks/useCatalogs";
@@ -80,6 +81,7 @@ export function OwnerTicketBoard({ owner }: OwnerTicketBoardProps) {
             onAdd={props.onAdd}
             onAddStatus={(status) => props.onAddStatus?.(status)}
             onOpen={props.onOpen}
+            onOpenInTab={(ticket) => window.open(withStandaloneView(`/tickets/${ticket.id}`), "_blank")}
             onDelete={props.onDelete}
             onStatusChange={updateTicketStatus}
             onDueDateChange={updateTicketDueDate}

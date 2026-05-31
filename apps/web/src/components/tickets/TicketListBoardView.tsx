@@ -19,6 +19,7 @@ interface TicketListBoardViewProps {
   onAdd: () => void;
   onAddStatus?: (status: Ticket["status"]) => void;
   onOpen: (ticket: Ticket) => void;
+  onOpenInTab?: (ticket: Ticket) => void;
   onDelete: (ticket: Ticket) => void;
   onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>;
   onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>;
@@ -54,6 +55,7 @@ export function TicketListBoardView({
   onAdd,
   onAddStatus,
   onOpen,
+  onOpenInTab,
   onDelete,
   onStatusChange,
   onDueDateChange,
@@ -128,7 +130,7 @@ export function TicketListBoardView({
         />
       }
       renderCard={(ticket) => (
-        <TicketCard ticket={ticket} allTags={editableTags} onOpen={onOpen} onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />
+        <TicketCard ticket={ticket} allTags={editableTags} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />
       )}
       renderRow={(ticket) => (
         <TicketCard
@@ -136,6 +138,7 @@ export function TicketListBoardView({
           allTags={editableTags}
           variant="row"
           onOpen={onOpen}
+          onOpenInTab={onOpenInTab}
           onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete}
           onStatusChange={readOnly ? undefined : onStatusChange}
           onDueDateChange={readOnly ? undefined : onDueDateChange}

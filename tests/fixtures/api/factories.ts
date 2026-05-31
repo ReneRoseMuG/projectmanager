@@ -487,6 +487,36 @@ export async function createBacklogItem(
   return res.body as TestBacklogItem;
 }
 
+export async function createNoteForMilestone(
+  app: FastifyInstance,
+  milestoneId: number,
+  overrides: Partial<{ title: string; contentJson: object }> = {}
+): Promise<TestNote> {
+  const body = {
+    title: "Testnotiz",
+    contentJson: { type: "doc", content: [] },
+    ...overrides
+  };
+
+  const res = await supertest(app.server).post(`/api/milestones/${milestoneId}/notes`).send(body).expect(201);
+  return res.body as TestNote;
+}
+
+export async function createNoteForWikiPage(
+  app: FastifyInstance,
+  wikiPageId: number,
+  overrides: Partial<{ title: string; contentJson: object }> = {}
+): Promise<TestNote> {
+  const body = {
+    title: "Testnotiz",
+    contentJson: { type: "doc", content: [] },
+    ...overrides
+  };
+
+  const res = await supertest(app.server).post(`/api/wiki/${wikiPageId}/notes`).send(body).expect(201);
+  return res.body as TestNote;
+}
+
 export async function seedProjectWithTasksAndTags(app: FastifyInstance) {
   const project = await createProject(app, { name: "Seed-Projekt" });
   const tag1 = await createTag(app, { name: "backend", color: "#3b82f6" });

@@ -42,16 +42,17 @@ export const noteRepository = {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
+    const now = nowIso();
     await database
       .update(notes)
       .set({
         ...data,
         version: current.version + 1,
         updatedBy: userId ?? null,
-        updatedAt: nowIso()
+        updatedAt: now
       })
       .where(eq(notes.id, id));
-    return this.findById(database, id);
+    return { ...current, ...data, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
   },
 
   async delete(database: DbSession, id: number): Promise<number> {

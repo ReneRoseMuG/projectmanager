@@ -41,7 +41,7 @@ export function FeatureDetailPage() {
     : undefined;
   const initialTab = parseFeatureFormTab(searchParams.get("tab"));
   const features = useFeatures(featureId);
-  useDocumentTitle(isCreateMode ? "Feature: Neu" : features.feature ? `Feature: ${features.feature.title}` : "Feature");
+  useDocumentTitle(isCreateMode ? "[Feat.] Neu" : features.feature ? `[Feat.] ${features.feature.title}` : "[Feat.]");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
 
   const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/features") : "/features");

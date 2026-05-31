@@ -119,12 +119,20 @@ async function getMilestoneCounts(database: DbClient, milestoneIds: number[]): P
     counts.set(milestoneId, emptyMilestoneCounts());
   }
 
-  const taskRows = await database
-    .select({ ownerId: milestoneTasks.ownerId, status: tasks.status })
-    .from(milestoneTasks)
-    .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
-    .where(inArray(milestoneTasks.ownerId, milestoneIds));
-  const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
+  const [taskRows, closedStatusKeys, ticketRows, featureRows, attachmentRows, noteRows, commentRows] = await Promise.all([
+    database
+      .select({ ownerId: milestoneTasks.ownerId, status: tasks.status })
+      .from(milestoneTasks)
+      .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
+      .where(inArray(milestoneTasks.ownerId, milestoneIds)),
+    listClosedCatalogEntryKeys(database, "workStatus"),
+    database.select({ ownerId: milestoneTickets.ownerId }).from(milestoneTickets).where(inArray(milestoneTickets.ownerId, milestoneIds)),
+    database.select({ milestoneId: milestoneFeatures.milestoneId }).from(milestoneFeatures).where(inArray(milestoneFeatures.milestoneId, milestoneIds)),
+    database.select({ milestoneId: milestoneAttachments.milestoneId }).from(milestoneAttachments).where(inArray(milestoneAttachments.milestoneId, milestoneIds)),
+    database.select({ milestoneId: milestoneNotes.milestoneId }).from(milestoneNotes).where(inArray(milestoneNotes.milestoneId, milestoneIds)),
+    database.select({ milestoneId: milestoneComments.milestoneId }).from(milestoneComments).where(inArray(milestoneComments.milestoneId, milestoneIds))
+  ]);
+
   for (const row of taskRows) {
     const current = counts.get(row.ownerId) ?? emptyMilestoneCounts();
     current.taskCount += 1;
@@ -136,36 +144,26 @@ async function getMilestoneCounts(database: DbClient, milestoneIds: number[]): P
     }
     counts.set(row.ownerId, current);
   }
-
-  const ticketRows = await database.select({ ownerId: milestoneTickets.ownerId }).from(milestoneTickets).where(inArray(milestoneTickets.ownerId, milestoneIds));
   for (const row of ticketRows) {
     const current = counts.get(row.ownerId) ?? emptyMilestoneCounts();
     current.ticketCount += 1;
     counts.set(row.ownerId, current);
   }
-
-  const featureRows = await database.select({ milestoneId: milestoneFeatures.milestoneId }).from(milestoneFeatures).where(inArray(milestoneFeatures.milestoneId, milestoneIds));
   for (const row of featureRows) {
     const current = counts.get(row.milestoneId) ?? emptyMilestoneCounts();
     current.featureCount += 1;
     counts.set(row.milestoneId, current);
   }
-
-  const attachmentRows = await database.select({ milestoneId: milestoneAttachments.milestoneId }).from(milestoneAttachments).where(inArray(milestoneAttachments.milestoneId, milestoneIds));
   for (const row of attachmentRows) {
     const current = counts.get(row.milestoneId) ?? emptyMilestoneCounts();
     current.attachmentCount += 1;
     counts.set(row.milestoneId, current);
   }
-
-  const noteRows = await database.select({ milestoneId: milestoneNotes.milestoneId }).from(milestoneNotes).where(inArray(milestoneNotes.milestoneId, milestoneIds));
   for (const row of noteRows) {
     const current = counts.get(row.milestoneId) ?? emptyMilestoneCounts();
     current.noteCount += 1;
     counts.set(row.milestoneId, current);
   }
-
-  const commentRows = await database.select({ milestoneId: milestoneComments.milestoneId }).from(milestoneComments).where(inArray(milestoneComments.milestoneId, milestoneIds));
   for (const row of commentRows) {
     const current = counts.get(row.milestoneId) ?? emptyMilestoneCounts();
     current.commentCount += 1;
@@ -301,8 +299,11 @@ export async function updateMilestone(database: DbClient, id: number, input: Mil
     throw notFound(`Milestone with id ${id} not found`);
   }
 
-  const counts = await getMilestoneCounts(database, [id]);
-  return mapMilestone(database, updated, counts.get(id));
+  const [counts, tags] = await Promise.all([
+    getMilestoneCounts(database, [id]),
+    getMilestoneTags(database, id)
+  ]);
+  return mapMilestone(database, updated, counts.get(id), tags);
 }
 
 export async function deleteMilestone(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {

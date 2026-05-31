@@ -13,7 +13,7 @@ import type {
   TicketType,
 } from "@taskmanager/shared-types";
 import { useQuery } from "@tanstack/react-query";
-import { Bug, GitBranch, Link2 } from "lucide-react";
+import { Activity, Bug, Flag, GitBranch, History, Link2, ListChecks, SlidersHorizontal, UserRound, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
@@ -61,8 +61,8 @@ import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { Pill } from "../ui/Pill";
+import { CatalogSelect } from "../ui/CatalogSelect";
 import { PrioritySelect } from "../ui/PrioritySelect";
-import { RadioList } from "../ui/RadioList";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
@@ -108,7 +108,6 @@ interface TicketFormProps {
   onOpenTicket?: (ticket: Ticket) => void;
 }
 
-type RadioColor = "fern" | "tangerine" | "crimson" | "violet";
 type TicketFormTab = "details" | "subTickets" | "relations" | "comments" | "notes" | "attachments" | "journal";
 
 const tabs: Array<Tab<TicketFormTab>> = [
@@ -124,7 +123,6 @@ const tabs: Array<Tab<TicketFormTab>> = [
 const resolutionOptions = (["fixed", "wont_fix", "duplicate", "cant_reproduce", "by_design"] as TicketResolution[]).map((value) => ({
   value,
   label: ticketResolutionLabels[value],
-  activeColor: "fern" as RadioColor,
 }));
 
 const relationTypes = ["blocks", "related", "duplicate"] as TicketRelationType[];
@@ -249,14 +247,6 @@ export function TicketForm({
     () => (relationCandidatesQuery.data ?? []).filter((item) => item.id !== ticketId),
     [relationCandidatesQuery.data, ticketId],
   );
-  const ticketTypeOptions = useMemo(
-    () => catalogEntriesByKind(catalogs.entries, "ticketType").map((entry) => ({ value: entry.key, label: entry.label, color: entry.color })),
-    [catalogs.entries],
-  );
-  const priorityOptions = useMemo(
-    () => catalogEntriesByKind(catalogs.entries, "priority").map((entry) => ({ value: entry.key as Priority, label: entry.label, color: entry.color })),
-    [catalogs.entries],
-  );
   const statusClosed = isCatalogStatusClosed(catalogs.entries, "workStatus", status);
   const currentTicket = loadedTicket ?? ticket;
   const showParentContexts = !owner && (currentTicket?.parentContexts?.length ?? 0) > 0;
@@ -376,8 +366,8 @@ export function TicketForm({
 
         {activeTab === "details" ? (
           <div className="flex min-h-0 w-full flex-1">
-            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
-              <div className="mx-auto grid w-full max-w-5xl gap-4">
+            <div className="min-w-0 flex-1 overflow-auto p-2.5">
+              <div className="grid w-full gap-4">
                 {showParentContexts ? <ParentContextField parents={currentTicket?.parentContexts} /> : null}
                 <Section>
                   <div className="grid gap-4">
@@ -392,46 +382,50 @@ export function TicketForm({
               </div>
             </div>
             <FormSidebar storageKey="ticket-form-sidebar">
-              <div className="grid gap-4">
-                <FormField label="Typ">
-                  <RadioList value={type} options={ticketTypeOptions} onChange={setType} />
-                </FormField>
-                <FormField label="Priorität">
-                  <RadioList value={priority} options={priorityOptions} onChange={setPriority} />
-                </FormField>
-                <FormField label="Status">
-                  <StatusToggle kind="workStatus" value={status} onChange={setStatus} />
-                </FormField>
-                {statusClosed ? (
-                  <FormField label="Lösung">
-                    <RadioList value={resolution} options={resolutionOptions} onChange={setResolution} />
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
+              <CatalogSelect label="Typ" icon={<SlidersHorizontal size={14} />} variant="panel" kind="ticketType" value={type} onChange={setType} />
+              <CatalogSelect label="Priorität" icon={<Flag size={14} />} variant="panel" kind="priority" value={priority} onChange={setPriority} />
+              {statusClosed ? (
+                <Select
+                  label="Lösung"
+                  icon={<ListChecks size={14} />}
+                  variant="panel"
+                  value={resolution}
+                  onChange={(e) => setResolution(e.target.value as TicketResolution)}
+                >
+                  {resolutionOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </Select>
+              ) : null}
+              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              <UserSelectField
+                label="Zuständig"
+                icon={<Users size={14} />}
+                variant="panel"
+                value={responsibleUserId}
+                selectedUser={currentTicket?.responsibleUser ?? null}
+                onChange={setResponsibleUserId}
+              />
+              <UserSelectField
+                label="Meldende Person"
+                icon={<UserRound size={14} />}
+                variant="panel"
+                value={reporterUserId}
+                selectedUser={currentTicket?.reporterUser ?? null}
+                onChange={setReporterUserId}
+              />
+              {type === "bug" ? (
+                <>
+                  <FormField label="Umgebung" icon={<Activity size={14} />} variant="panel">
+                    <Input value={environment} onChange={(event) => setEnvironment(event.target.value)} />
                   </FormField>
-                ) : null}
-                <DatePicker label="Fällig" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-                <UserSelectField
-                  label="Zuständig"
-                  value={responsibleUserId}
-                  selectedUser={currentTicket?.responsibleUser ?? null}
-                  onChange={setResponsibleUserId}
-                />
-                <UserSelectField
-                  label="Meldende Person"
-                  value={reporterUserId}
-                  selectedUser={currentTicket?.reporterUser ?? null}
-                  onChange={setReporterUserId}
-                />
-                {type === "bug" ? (
-                  <>
-                    <FormField label="Umgebung">
-                      <Input value={environment} onChange={(event) => setEnvironment(event.target.value)} />
-                    </FormField>
-                    <FormField label="Betroffene Version">
-                      <Input value={affectedVersion} onChange={(event) => setAffectedVersion(event.target.value)} />
-                    </FormField>
-                  </>
-                ) : null}
-                <TagPicker selected={selectedTags} onChange={setSelectedTags} />
-              </div>
+                  <FormField label="Betroffene Version" icon={<History size={14} />} variant="panel">
+                    <Input value={affectedVersion} onChange={(event) => setAffectedVersion(event.target.value)} />
+                  </FormField>
+                </>
+              ) : null}
+              <TagPicker selected={selectedTags} onChange={setSelectedTags} variant="panel" />
             </FormSidebar>
           </div>
         ) : null}
@@ -599,6 +593,7 @@ export function TicketForm({
               <>
                 <NoteList
                   notes={notes.notes}
+                  owner={{ type: "ticket", id: ticket.id }}
                   onCreate={createNote}
                   onEdit={setEditingNote}
                   onDelete={(note) => {

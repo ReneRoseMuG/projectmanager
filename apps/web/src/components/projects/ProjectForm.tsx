@@ -20,8 +20,10 @@ import {
   Flag,
   FolderKanban,
   Inbox,
+  ListChecks,
   ListTodo,
   Trash2,
+  Users,
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -87,6 +89,7 @@ import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { PrioritySelect } from "../ui/PrioritySelect";
+import { CatalogSelect } from "../ui/CatalogSelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
@@ -96,6 +99,7 @@ import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 import { UserSelectField } from "../users/UserSelectField";
 import { useHasPermission } from "../../hooks/usePermissions";
+import { withStandaloneView } from "../../utils/standalone";
 import { ProjectWikiPanel } from "./ProjectWikiPanel";
 
 interface ProjectFormProps {
@@ -788,8 +792,8 @@ export function ProjectForm({
 
         {activeTab === "details" ? (
           <div className="flex min-h-0 w-full flex-1">
-            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
-              <div className="mx-auto grid w-full max-w-5xl gap-4">
+            <div className="min-w-0 flex-1 overflow-auto p-2.5">
+              <div className="grid w-full gap-4">
                 <Section>
                   <FormField label="Projektname" required className="min-w-0">
                     <Input
@@ -812,34 +816,18 @@ export function ProjectForm({
               </div>
             </div>
             <FormSidebar storageKey="project-form-sidebar">
-              <div className="grid gap-4">
-                <FormField label="Status">
-                  <StatusToggle
-                    kind="workStatus"
-                    value={status}
-                    onChange={setStatus}
-                  />
-                </FormField>
-                <UserSelectField
-                  label="Verantwortlich"
-                  value={responsibleUserId}
-                  selectedUser={project?.responsibleUser ?? null}
-                  onChange={setResponsibleUserId}
-                />
-              </div>
-              <div className="grid gap-4">
-                <DatePicker
-                  label="Start"
-                  value={startDate}
-                  onChange={(event) => setStartDate(event.target.value)}
-                />
-                <DatePicker
-                  label="Fällig"
-                  value={dueDate}
-                  onChange={(event) => setDueDate(event.target.value)}
-                />
-              </div>
-              <TagPicker selected={selectedTags} onChange={setSelectedTags} />
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
+              <UserSelectField
+                label="Verantwortlich"
+                icon={<Users size={14} />}
+                variant="panel"
+                value={responsibleUserId}
+                selectedUser={project?.responsibleUser ?? null}
+                onChange={setResponsibleUserId}
+              />
+              <DatePicker label="Start" variant="panel" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              <TagPicker selected={selectedTags} onChange={setSelectedTags} variant="panel" />
               {project ? (
                 <ProjectWikiPanel
                   wikiPageId={projectWikiRelation.wikiPageId}
@@ -869,6 +857,7 @@ export function ProjectForm({
                     `/milestones/${milestone.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
                   )
                 }
+                onOpenInTab={(milestone) => window.open(withStandaloneView(`/milestones/${milestone.id}`), "_blank")}
                 onDelete={(milestone) => void deleteMilestone(milestone)}
                 onStatusChange={updateMilestoneStatus}
                 onDueDateChange={(milestone, dueDate) => milestones.updateMilestone(milestone.id, { dueDate, expectedVersion: milestone.version })}
@@ -1073,6 +1062,7 @@ export function ProjectForm({
               <>
                 <NoteList
                   notes={notes.notes}
+                  owner={{ type: "project", id: project.id }}
                   onCreate={createNote}
                   onEdit={setEditingNote}
                   onDelete={(note) => void notes.removeNote(note.id)}

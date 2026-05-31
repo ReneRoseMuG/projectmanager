@@ -57,7 +57,7 @@ export function TicketDetailPage() {
   const detail = useTicketDetail(
     !isCreateMode && Number.isFinite(ticketId) ? ticketId : null,
   );
-  useDocumentTitle(isCreateMode ? "Ticket: Neu" : detail.ticket ? `Ticket: ${detail.ticket.title}` : "Ticket");
+  useDocumentTitle(isCreateMode ? "[Tkt.] Neu" : detail.ticket ? `[Tkt.] ${detail.ticket.title}` : "[Tkt.]");
   const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/tickets") : "/tickets");
   const currentRoute = !isCreateMode && ticketId !== null && Number.isFinite(ticketId)
     ? `/tickets/${ticketId}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`

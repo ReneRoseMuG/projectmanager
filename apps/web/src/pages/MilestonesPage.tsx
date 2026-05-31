@@ -265,6 +265,7 @@ export function MilestonesPage() {
           onViewModeChange={setViewMode}
           onCreate={openCreate}
           onEdit={openMilestone}
+          onOpenInTab={(milestone) => window.open(withStandaloneView(`/milestones/${milestone.id}`), "_blank")}
           onDelete={(milestone) => void deleteMilestone(milestone)}
           onStatusChange={updateMilestoneStatus}
           onDueDateChange={updateMilestoneDueDate}

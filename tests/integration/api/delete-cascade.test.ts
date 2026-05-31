@@ -16,14 +16,21 @@
 
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { config } from "../../../apps/api/src/config.js";
 import {
+  attachments,
   backlogItems,
   comments,
   featureRelations,
   featureTasks,
+  featureTickets,
   features,
+  milestoneTags,
   notes,
   projectEvents,
   projectFeatures,
@@ -33,20 +40,28 @@ import {
   projectTickets,
   taskNotes,
   taskTags,
+  ticketAttachments,
   ticketNotes,
   ticketRelations,
   ticketTags,
   tickets,
   useCaseTasks,
   useCases,
+  wikiPageAttachments,
+  wikiPageNotes,
+  wikiPageRelations,
+  wikiPageTasks,
+  wikiPageTickets,
   wikiPages
 } from "../../../apps/api/src/db/schema.js";
 import {
   buildTestApp,
   createBacklogItem,
   createFeature,
+  createMilestone,
   createNoteForProject,
   createNoteForTask,
+  createNoteForWikiPage,
   createProject,
   createSubtask,
   createSubTicket,
@@ -105,6 +120,26 @@ async function setTicketTags(app: FastifyInstance, ticketId: number, tagIds: num
   await supertest(app.server).put(`/api/tickets/${ticketId}/tags`).send({ tagIds }).expect(200);
 }
 
+/** Attachment direkt in DB anlegen und mit Owner verknüpfen */
+async function insertAttachmentFor(
+  testDb: TestDb,
+  joinTable: string,
+  ownerColumn: string,
+  ownerId: number
+): Promise<number> {
+  const now = new Date().toISOString();
+  const [result] = await testDb.pool.execute(
+    "INSERT INTO attachments (original_name, filename, mimetype, size, version, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)",
+    ["test.txt", `att-${Date.now()}.txt`, "text/plain", 100, now, now]
+  );
+  const attachmentId = (result as { insertId: number }).insertId;
+  await testDb.pool.execute(
+    `INSERT INTO \`${joinTable}\` (\`${ownerColumn}\`, attachment_id) VALUES (?, ?)`,
+    [ownerId, attachmentId]
+  );
+  return attachmentId;
+}
+
 /** Features einem Projekt zuweisen */
 async function setProjectFeatures(app: FastifyInstance, projectId: number, featureIds: number[]): Promise<void> {
   await supertest(app.server).put(`/api/projects/${projectId}/features`).send({ featureIds }).expect(200);
@@ -128,11 +163,22 @@ async function setTaskUseCases(app: FastifyInstance, taskId: number, useCaseIds:
 // Test-Suite
 // ---------------------------------------------------------------------------
 
+const uploadDir = path.join(os.tmpdir(), `taskmanager-cascade-uploads-${process.pid}`);
+const previewCacheDir = path.join(os.tmpdir(), `taskmanager-cascade-previews-${process.pid}`);
+let originalUploadDir: string;
+let originalPreviewCacheDir: string;
+
 describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
 
   beforeAll(async () => {
+    originalUploadDir = config.uploadDir;
+    originalPreviewCacheDir = config.previewCacheDir;
+    config.uploadDir = uploadDir;
+    config.previewCacheDir = previewCacheDir;
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.mkdir(previewCacheDir, { recursive: true });
     testDb = await createTestDb();
     app = await buildTestApp(testDb);
   });
@@ -142,6 +188,10 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
   afterAll(async () => {
     await app?.close();
     await testDb?.close();
+    config.uploadDir = originalUploadDir;
+    config.previewCacheDir = originalPreviewCacheDir;
+    await fs.rm(uploadDir, { recursive: true, force: true });
+    await fs.rm(previewCacheDir, { recursive: true, force: true });
   });
 
   // =========================================================================
@@ -610,6 +660,28 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining).toHaveLength(1);
       expect(remaining[0].featureId).toBeNull();
     });
+
+    it("löscht Attachment-Datensatz wenn Feature alleiniger Owner ist", async () => {
+      const feature = await createFeature(app);
+      const attachmentId = await insertAttachmentFor(testDb, "feature_attachments", "feature_id", feature.id);
+
+      await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
+
+      const remaining = (await testDb.db.select().from(attachments).where(eq(attachments.id, attachmentId)));
+      expect(remaining).toHaveLength(0);
+    });
+
+    it("entfernt feature_tickets-Einträge (Ticket bleibt erhalten)", async () => {
+      const feature = await createFeature(app);
+      const ticket = await createTicket(app, { type: "feature", id: feature.id });
+
+      await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
+
+      const remainingLinks = (await testDb.db.select().from(featureTickets).where(eq(featureTickets.ownerId, feature.id)));
+      expect(remainingLinks).toHaveLength(0);
+
+      await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
+    });
   });
 
   // =========================================================================
@@ -760,6 +832,27 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       const remaining = (await testDb.db.select().from(ticketTags).where(eq(ticketTags.ticketId, ticket.id)));
       expect(remaining).toHaveLength(0);
     });
+
+    it("löscht Attachment-Datensatz wenn Ticket alleiniger Owner ist", async () => {
+      const ticket = await createTicket(app, null);
+      const attachmentId = await insertAttachmentFor(testDb, "ticket_attachments", "ticket_id", ticket.id);
+
+      await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
+
+      const remaining = (await testDb.db.select().from(attachments).where(eq(attachments.id, attachmentId)));
+      expect(remaining).toHaveLength(0);
+    });
+
+    it("bereinigt ticket_attachments-Join-Einträge vollständig", async () => {
+      const ticket = await createTicket(app, null);
+      await insertAttachmentFor(testDb, "ticket_attachments", "ticket_id", ticket.id);
+      await insertAttachmentFor(testDb, "ticket_attachments", "ticket_id", ticket.id);
+
+      await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
+
+      const remaining = (await testDb.db.select().from(ticketAttachments).where(eq(ticketAttachments.ticketId, ticket.id)));
+      expect(remaining).toHaveLength(0);
+    });
   });
 
   // =========================================================================
@@ -808,6 +901,89 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       await supertest(app.server).delete(`/api/wiki/${parent.id}`).expect(409);
     });
+
+    it("löscht den notes-Datensatz der WikiPage (nicht nur den Join-Eintrag)", async () => {
+      const page = await createWikiPage(app);
+      const note = await createNoteForWikiPage(app, page.id);
+
+      await supertest(app.server).delete(`/api/wiki/${page.id}`).expect(204);
+
+      const remaining = (await testDb.db.select().from(notes).where(eq(notes.id, note.id)));
+      expect(remaining).toHaveLength(0);
+    });
+
+    it("bereinigt wiki_page_notes-Join-Einträge vollständig", async () => {
+      const page = await createWikiPage(app);
+      await createNoteForWikiPage(app, page.id);
+      await createNoteForWikiPage(app, page.id);
+
+      await supertest(app.server).delete(`/api/wiki/${page.id}`).expect(204);
+
+      const remaining = (await testDb.db.select().from(wikiPageNotes).where(eq(wikiPageNotes.wikiPageId, page.id)));
+      expect(remaining).toHaveLength(0);
+    });
+
+    it("entfernt wiki_page_tasks-Einträge (Task bleibt erhalten)", async () => {
+      const page = await createWikiPage(app);
+      const project = await createProject(app);
+      const task = await createTask(app, project.id);
+      await supertest(app.server).post(`/api/wiki/${page.id}/tasks`).send({ taskId: task.id }).expect(201);
+
+      await supertest(app.server).delete(`/api/wiki/${page.id}`).expect(204);
+
+      const remainingLinks = (await testDb.db.select().from(wikiPageTasks).where(eq(wikiPageTasks.ownerId, page.id)));
+      expect(remainingLinks).toHaveLength(0);
+
+      await supertest(app.server).get(`/api/tasks/${task.id}`).expect(200);
+    });
+
+    it("entfernt wiki_page_tickets-Einträge (Ticket bleibt erhalten)", async () => {
+      const page = await createWikiPage(app);
+      const ticket = await createTicket(app, null);
+      await supertest(app.server).post(`/api/wiki/${page.id}/tickets`).send({ ticketId: ticket.id }).expect(201);
+
+      await supertest(app.server).delete(`/api/wiki/${page.id}`).expect(204);
+
+      const remainingLinks = (await testDb.db.select().from(wikiPageTickets).where(eq(wikiPageTickets.ownerId, page.id)));
+      expect(remainingLinks).toHaveLength(0);
+
+      await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
+    });
+
+    it("entfernt wiki_page_relations wenn source-Seite gelöscht wird", async () => {
+      const pageA = await createWikiPage(app);
+      const pageB = await createWikiPage(app);
+      await supertest(app.server).post(`/api/wiki/${pageA.id}/relations`).send({ targetWikiPageId: pageB.id }).expect(201);
+
+      await supertest(app.server).delete(`/api/wiki/${pageA.id}`).expect(204);
+
+      const remaining = (await testDb.db.select().from(wikiPageRelations).where(eq(wikiPageRelations.sourceWikiPageId, pageA.id)));
+      expect(remaining).toHaveLength(0);
+    });
+
+    it("entfernt wiki_page_relations wenn target-Seite gelöscht wird", async () => {
+      const pageA = await createWikiPage(app);
+      const pageB = await createWikiPage(app);
+      await supertest(app.server).post(`/api/wiki/${pageA.id}/relations`).send({ targetWikiPageId: pageB.id }).expect(201);
+
+      await supertest(app.server).delete(`/api/wiki/${pageB.id}`).expect(204);
+
+      const remaining = (await testDb.db.select().from(wikiPageRelations).where(eq(wikiPageRelations.sourceWikiPageId, pageA.id)));
+      expect(remaining).toHaveLength(0);
+    });
+
+    it("entfernt wiki_page_attachments-Join – Attachment-Datensatz selbst bleibt erhalten", async () => {
+      const page = await createWikiPage(app);
+      const attachmentId = await insertAttachmentFor(testDb, "wiki_page_attachments", "wiki_page_id", page.id);
+
+      await supertest(app.server).delete(`/api/wiki/${page.id}`).expect(204);
+
+      const remainingJoin = (await testDb.db.select().from(wikiPageAttachments).where(eq(wikiPageAttachments.wikiPageId, page.id)));
+      expect(remainingJoin).toHaveLength(0);
+
+      const remainingRecord = (await testDb.db.select().from(attachments).where(eq(attachments.id, attachmentId)));
+      expect(remainingRecord).toHaveLength(1);
+    });
   });
 
   // =========================================================================
@@ -854,6 +1030,20 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining).toHaveLength(0);
 
       await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
+    });
+
+    it("entfernt milestone_tags-Einträge (Meilenstein bleibt erhalten)", async () => {
+      const project = await createProject(app);
+      const milestone = await createMilestone(app, project.id);
+      const tag = await createTag(app);
+      await supertest(app.server).put(`/api/milestones/${milestone.id}/tags`).send({ tagIds: [tag.id] }).expect(200);
+
+      await supertest(app.server).delete(`/api/tags/${tag.id}`).expect(204);
+
+      const remaining = (await testDb.db.select().from(milestoneTags).where(eq(milestoneTags.tagId, tag.id)));
+      expect(remaining).toHaveLength(0);
+
+      await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(200);
     });
   });
 

@@ -186,49 +186,6 @@ textarea {
   padding: 0.5rem 0.75rem;
 }
 
-/* ─── Drittanbieter: FullCalendar ──────────────────────────────────────── */
-.fc {
-  --fc-border-color: theme("colors.line");
-  --fc-today-bg-color: rgba(46, 89, 132, 0.05);
-  --fc-button-bg-color: theme("colors.steel.700");
-  --fc-button-border-color: theme("colors.steel.700");
-  --fc-button-hover-bg-color: theme("colors.steel.800");
-  --fc-button-hover-border-color: theme("colors.steel.800");
-}
-
-.fc-event {
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  padding: 2px 6px;
-}
-
-.fc-daygrid-day-number {
-  color: theme("colors.steel.700");
-  font-weight: 700;
-}
-
-.fc-toolbar-title {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0;
-}
-
-.fc-button {
-  border-radius: 8px !important;
-  font-weight: 600 !important;
-}
-
-.fc-button-primary {
-  background: theme("colors.steel.700") !important;
-  border-color: theme("colors.steel.700") !important;
-}
-
-.fc .task-due-event {
-  border: 1px dashed theme("colors.steel.400") !important;
-  color: theme("colors.ink") !important;
-}
-
 /* ─── Drittanbieter: Toast und Skeleton Animationen ────────────────────── */
 @keyframes toast-enter {
   from {

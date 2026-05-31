@@ -218,8 +218,20 @@ export async function invalidateComments(queryClient: QueryClient, entityType: C
   await invalidateMany(queryClient, [queryKeys.comments.entity(entityType, entityId), ...commentOwnerKeys(entityType, entityId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
+export async function invalidateAllComments(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: queryKeys.comments.root });
+}
+
 export async function invalidateNotes(queryClient: QueryClient, ownerType: NoteOwnerType, ownerId: number): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.notes.owner(ownerType, ownerId), ...noteOwnerKeys(ownerType, ownerId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
+}
+
+export async function invalidateAllNotes(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: queryKeys.notes.root });
+}
+
+export async function invalidateAllAttachments(queryClient: QueryClient): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: queryKeys.attachments.root });
 }
 
 export async function invalidateAttachments(queryClient: QueryClient, ownerType: QueryOwnerType, ownerId: number): Promise<void> {

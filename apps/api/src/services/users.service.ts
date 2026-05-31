@@ -8,6 +8,31 @@ import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import { hasAnotherActiveAdmin, mapRole } from "./roles.service.js";
 
 const passwordSaltRounds = 12;
+
+// TTL-Cache für User-Lookups (10 Minuten) — wird bei jedem mapTask/mapMilestone/mapProject aufgerufen
+const USER_CACHE_TTL = 10 * 60 * 1000;
+const userOptionCache = new Map<number, { value: UserOption; expiresAt: number }>();
+
+function getCachedUserOption(id: number): UserOption | undefined {
+  const entry = userOptionCache.get(id);
+  if (entry && Date.now() < entry.expiresAt) {
+    return entry.value;
+  }
+  userOptionCache.delete(id);
+  return undefined;
+}
+
+function setCachedUserOption(id: number, value: UserOption): void {
+  userOptionCache.set(id, { value, expiresAt: Date.now() + USER_CACHE_TTL });
+}
+
+export function invalidateUserOptionCache(id?: number): void {
+  if (id !== undefined) {
+    userOptionCache.delete(id);
+  } else {
+    userOptionCache.clear();
+  }
+}
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$|^admin@local$/;
 
 function normalizeEmail(value: string | undefined): string {
@@ -84,8 +109,16 @@ export async function getUserOption(database: DbClient, id: number | null | unde
   if (id === null || id === undefined) {
     return null;
   }
+  const cached = getCachedUserOption(id);
+  if (cached) {
+    return cached;
+  }
   const user = await userRepository.findById(database, id);
-  return user ? mapUserOption(user) : null;
+  const option = user ? mapUserOption(user) : null;
+  if (option) {
+    setCachedUserOption(id, option);
+  }
+  return option;
 }
 
 export async function normalizeAssignableUserId(database: DbClient, value: number | null | undefined, field: string): Promise<number | null> {
@@ -124,6 +157,7 @@ export async function createAdminUser(database: DbClient, input: AdminUserInput)
     address: cleanNullable(input.address) ?? null,
     phone: cleanNullable(input.phone) ?? null,
     email,
+    // cache needn't be primed for new user — no refs yet
     passwordHash,
     roleId: role.id,
     isActive: input.isActive ?? true
@@ -186,6 +220,7 @@ export async function updateAdminUser(database: DbClient, id: number, input: Adm
   if (!updated) {
     throw notFound(`User with id ${id} not found`);
   }
+  invalidateUserOptionCache(id);
   return mapAdminUser(database, updated);
 }
 
@@ -199,4 +234,5 @@ export async function deleteAdminUser(database: DbClient, id: number, actorUserI
   }
   await assertLastAdminCanChange(database, current, { isActive: false });
   await userRepository.delete(database, id);
+  invalidateUserOptionCache(id);
 }

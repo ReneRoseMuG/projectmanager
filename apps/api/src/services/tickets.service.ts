@@ -567,13 +567,13 @@ export async function listTicketLinkCandidates(database: DbClient, owner: Ticket
   }
 
   const ownerContext = await ticketOwnerProjectContext(database, owner);
-  const candidates: Ticket[] = [];
-  for (const ticket of allTickets) {
-    if (!linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status) && projectContextsAreCompatible(ownerContext, await ticketProjectContext(database, ticket.id))) {
-      candidates.push(ticket);
-    }
-  }
-  return candidates;
+
+  const candidatePairs = await Promise.all(
+    allTickets
+      .filter((ticket) => !linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status))
+      .map(async (ticket) => ({ ticket, context: await ticketProjectContext(database, ticket.id) }))
+  );
+  return candidatePairs.filter(({ context }) => projectContextsAreCompatible(ownerContext, context)).map(({ ticket }) => ticket);
 }
 
 export async function listOwnerTickets(database: DbClient, owner: TicketOwner): Promise<Ticket[]> {
@@ -1019,13 +1019,12 @@ export async function listTicketRelationCandidates(database: DbClient, ticketId:
   }
 
   const allTickets = await listTickets(database);
-  const candidates: Ticket[] = [];
-  for (const ticket of allTickets) {
-    if (ticket.id !== ticketId && !relatedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status) && projectContextsAreCompatible(sourceContext, await ticketProjectContext(database, ticket.id))) {
-      candidates.push(ticket);
-    }
-  }
-  return candidates;
+  const candidatePairs = await Promise.all(
+    allTickets
+      .filter((ticket) => ticket.id !== ticketId && !relatedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status))
+      .map(async (ticket) => ({ ticket, context: await ticketProjectContext(database, ticket.id) }))
+  );
+  return candidatePairs.filter(({ context }) => projectContextsAreCompatible(sourceContext, context)).map(({ ticket }) => ticket);
 }
 
 export async function addTicketRelation(database: DbClient, ticketId: number, input: TicketRelationInput, actor?: JournalActor | null): Promise<void> {

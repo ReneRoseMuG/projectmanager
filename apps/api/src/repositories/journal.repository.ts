@@ -1,7 +1,7 @@
 ﻿import type { JournalContextRelation, JournalObjectType, JournalOperation, JsonValue } from "@taskmanager/shared-types";
 import { and, desc, eq, gte, inArray, like, lt, lte, or, sql } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
-import { firstRow, insertId } from "../db/query-utils.js";
+import { firstRow, insertId } from "../db/query-utils.js"; // firstRow used in list()
 import { journalEntries, journalEntryChanges, journalEntryContexts } from "../db/schema.js";
 
 export type JournalEntryRecord = typeof journalEntries.$inferSelect;
@@ -58,6 +58,7 @@ function stringifyJsonValue(value: JsonValue): string {
 
 export const journalRepository = {
   async create(database: DbSession, data: JournalEntryCreateData): Promise<JournalEntryRecord> {
+    const createdAt = new Date().toISOString();
     const result = await database
       .insert(journalEntries)
       .values({
@@ -68,18 +69,14 @@ export const journalRepository = {
         summary: data.summary,
         actorUserId: data.actorUserId,
         actorName: data.actorName,
-        createdAt: new Date().toISOString()
+        createdAt
       });
-    const created = firstRow(await database.select().from(journalEntries).where(eq(journalEntries.id, insertId(result))));
-    if (!created) {
-      throw new Error("Created journal entry could not be loaded");
-    }
+    const id = insertId(result);
 
-    for (const change of data.changes) {
-      await database
-        .insert(journalEntryChanges)
-        .values({
-          journalEntryId: created.id,
+    if (data.changes.length > 0) {
+      await database.insert(journalEntryChanges).values(
+        data.changes.map((change) => ({
+          journalEntryId: id,
           fieldKey: change.fieldKey,
           fieldLabel: change.fieldLabel,
           oldValueJson: stringifyJsonValue(change.oldValue),
@@ -87,23 +84,36 @@ export const journalRepository = {
           newValueJson: stringifyJsonValue(change.newValue),
           newValueLabel: change.newValueLabel,
           summary: change.summary
-        });
+        }))
+      );
     }
 
-    for (const context of data.contexts) {
+    if (data.contexts.length > 0) {
       await database
         .insert(journalEntryContexts)
         .ignore()
-        .values({
-          journalEntryId: created.id,
-          objectType: context.objectType,
-          objectId: context.objectId,
-          objectLabel: context.objectLabel,
-          relation: context.relation
-        });
+        .values(
+          data.contexts.map((context) => ({
+            journalEntryId: id,
+            objectType: context.objectType,
+            objectId: context.objectId,
+            objectLabel: context.objectLabel,
+            relation: context.relation
+          }))
+        );
     }
 
-    return created;
+    return {
+      id,
+      operation: data.operation,
+      objectType: data.objectType,
+      objectId: data.objectId,
+      objectLabel: data.objectLabel,
+      summary: data.summary,
+      actorUserId: data.actorUserId,
+      actorName: data.actorName,
+      createdAt
+    };
   },
 
   async list(database: DbSession, filters: JournalEntryFilters): Promise<JournalEntryRecord[]> {

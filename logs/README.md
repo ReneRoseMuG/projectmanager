@@ -2,6 +2,21 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 31.05.26 | 08:17:40 | Fix | Notizkarten Menü und Footer | ✅ |
+| 31.05.26 | 08:11:45 | Fix | Notizeditor Inhalt und Details | ✅ |
+| 31.05.26 | 08:05:43 | Fix | Kalenderwidget Footer-Zähler | ✅ |
+| 31.05.26 | 08:04:01 | Fix | DayPlan Kalender Create | ✅ |
+| 31.05.26 | 08:01:48 | Fix | Feiertagslabel ausschreiben | ✅ |
+| 31.05.26 | 08:00:50 | Fix | Monatskalender Feiertagskachel | ✅ |
+| 31.05.26 | 07:59:29 | Fix | Wochenkalender Create nur Plus | ✅ |
+| 31.05.26 | 07:57:57 | Fix | Wochenkalender Plus-Aktionen | ✅ |
+| 31.05.26 | 07:55:15 | Fix | Terminformular Farbwähler | ✅ |
+| 31.05.26 | 07:54:00 | Fix | Wochenkalender Spaltenkopf | ✅ |
+| 31.05.26 | 07:50:41 | Fix | MS-32 Feiertagsspalte und Karten | ✅ |
+| 31.05.26 | 07:28:44 | Feature | MS-32 offene Kalenderaufgaben | ⚠️ |
+| 31.05.26 | 07:14:08 | Fix | Feiertag-Hervorhebung | ✅ |
+| 31.05.26 | 04:58:23 | Feature | MS-32 Zentrale Kalenderkomponente | ⚠️ |
+| 31.05.26 | 02:49:12 | 1 | Persönliche Planung Dashboard | ⚠️ |
 | 29.05.26 | 10:32:01 | 2 | MySQL-Migrationsanalyse | ✅ |
 | 29.05.26 | 10:30:39 | 1 | Branching MS-26 | ✅ |
 | 29.05.26 | 10:22:45 | Fix | MS-25 Branchhinweis-Kommentar | ✅ |

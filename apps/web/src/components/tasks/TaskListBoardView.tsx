@@ -19,6 +19,7 @@ interface TaskListBoardViewProps {
   onAdd: () => void;
   onAddStatus?: (status: Task["status"]) => void;
   onOpen: (task: Task) => void;
+  onOpenInTab?: (task: Task) => void;
   onDelete: (task: Task) => void;
   onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>;
   onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>;
@@ -26,6 +27,7 @@ interface TaskListBoardViewProps {
   linkAction?: ReactNode;
   filters?: ReactNode;
   showCreateActions?: boolean;
+  canDelete?: boolean;
   readOnly?: boolean;
   loading?: boolean;
 }
@@ -48,7 +50,7 @@ function matchesSearch(task: Task, searchValue: string) {
 }
 
 /** Task-specific ListBoardView adapter with status Kanban columns. */
-export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onDelete, onStatusChange, onDueDateChange, onTagsChange, linkAction, filters, showCreateActions = true, readOnly = false, loading = false }: TaskListBoardViewProps) {
+export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange, linkAction, filters, showCreateActions = true, canDelete = true, readOnly = false, loading = false }: TaskListBoardViewProps) {
   const catalogs = useCatalogs();
   const canReadTags = useHasPermission("tags", "read");
   const canWriteTasks = useHasPermission("tasks", "write");
@@ -94,8 +96,8 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
       loading={loading}
       showGroupedEmptyState={false}
       emptyState={<EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben" body="Für diesen Kontext sind noch keine Aufgaben vorhanden." tone="fern" variant="tinted" />}
-      renderCard={(task) => <TaskCard task={task} allTags={editableTags} onOpen={onOpen} onDelete={readOnly || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
-      renderRow={(task) => <TaskCard task={task} allTags={editableTags} variant="row" onOpen={onOpen} onDelete={readOnly || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
+      renderCard={(task) => <TaskCard task={task} allTags={editableTags} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={readOnly || !canDelete || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
+      renderRow={(task) => <TaskCard task={task} allTags={editableTags} variant="row" onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={readOnly || !canDelete || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
     />
   );
 }

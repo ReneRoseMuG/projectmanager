@@ -70,11 +70,28 @@ export const ticketRepository = {
         createdAt: now,
         updatedAt: now
       });
-    const created = await this.findById(database, insertId(result));
-    if (!created) {
-      throw new Error("Created ticket could not be loaded");
-    }
-    return created;
+    return {
+      id: insertId(result),
+      parentId: data.parentId ?? null,
+      type: data.type ?? "bug",
+      title: data.title,
+      description: data.description ?? null,
+      status: data.status ?? "open",
+      priority: data.priority ?? "medium",
+      resolution: data.resolution ?? null,
+      reporterUserId: data.reporterUserId ?? null,
+      responsibleUserId: data.responsibleUserId ?? null,
+      environment: data.environment ?? null,
+      affectedVersion: data.affectedVersion ?? null,
+      dueDate: data.dueDate ?? null,
+      resolvedAt: data.resolvedAt ?? null,
+      position: data.position ?? 0,
+      version: 1,
+      createdBy: userId ?? null,
+      updatedBy: userId ?? null,
+      createdAt: now,
+      updatedAt: now
+    };
   },
 
   async update(database: DbSession, id: number, expectedVersion: number, data: TicketUpdateData, userId?: number): Promise<TicketRecord | undefined> {
@@ -83,16 +100,17 @@ export const ticketRepository = {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
+    const now = nowIso();
     await database
       .update(tickets)
       .set({
         ...data,
         version: current.version + 1,
         updatedBy: userId ?? null,
-        updatedAt: nowIso()
+        updatedAt: now
       })
       .where(eq(tickets.id, id));
-    return this.findById(database, id);
+    return { ...current, ...data, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
   },
 
   async delete(database: DbSession, id: number): Promise<number> {

@@ -322,6 +322,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
               {notes.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{notes.error}</div> : null}
               <NoteList
                 notes={notes.notes}
+                owner={{ type: "wikiPage", id: page.id }}
                 onCreate={createNote}
                 onEdit={setEditingNote}
                 onDelete={(note) => {

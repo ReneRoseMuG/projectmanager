@@ -19,7 +19,9 @@ import {
   authenticatedGoto,
   apiBaseUrl,
   createProject,
+  createTicket,
   deleteProject,
+  deleteTicket,
   formPage,
   itemCard,
   uniqueTitle,
@@ -62,6 +64,29 @@ test.describe("Realtime-Synchronisation", () => {
       await expect(form.getByRole("button", { name: /^Kommentare\s+1$/ })).toBeVisible();
     } finally {
       await deleteProject(request, project.id);
+    }
+  });
+
+  test("zeigt extern angelegte Ticket-Kommentare ohne Formular-Neuöffnung", async ({ page, request }) => {
+    const ticket = await createTicket(request, null, "E2E Realtime Ticket Kommentar");
+    const commentText = uniqueTitle("E2E Realtime Ticket Kommentar");
+
+    try {
+      await authenticatedGoto(page, `/tickets/${ticket.id}`);
+      const form = formPage(page, "Ticket bearbeiten");
+      await expect(form).toBeVisible();
+      await form.getByRole("button", { name: /^Kommentare(?:\s+\d+)?$/ }).click();
+      await expect(form.getByRole("heading", { name: "Noch keine Kommentare" })).toBeVisible();
+
+      const response = await request.post(`${apiBaseUrl}/tickets/${ticket.id}/comments`, {
+        data: { body: `<p>${commentText}</p>` }
+      });
+      expect(response.ok()).toBeTruthy();
+
+      await expect(form.getByText(commentText, { exact: true })).toBeVisible({ timeout: 8000 });
+      await expect(form.getByRole("button", { name: /^Kommentare\s+1$/ })).toBeVisible();
+    } finally {
+      await deleteTicket(request, ticket.id);
     }
   });
 

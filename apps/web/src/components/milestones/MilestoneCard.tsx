@@ -1,5 +1,5 @@
 import type { Milestone, Tag } from "@taskmanager/shared-types";
-import { Bug, Flag, ListTodo } from "lucide-react";
+import { Bug, ExternalLink, Flag, ListTodo } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { objectReference } from "../../lib/references";
 import { catalogColor } from "../../utils/catalogs";
@@ -14,6 +14,7 @@ interface MilestoneCardProps {
   milestone: Milestone;
   variant?: "card" | "row";
   onEdit: (milestone: Milestone) => void;
+  onOpenInTab?: (milestone: Milestone) => void;
   onDelete?: (milestone: Milestone) => void;
   onStatusChange?: (milestone: Milestone, status: Milestone["status"]) => void | Promise<unknown>;
   onDueDateChange?: (milestone: Milestone, dueDate: string | null) => void | Promise<unknown>;
@@ -23,11 +24,14 @@ interface MilestoneCardProps {
   onTagsChange?: (milestoneId: number, tagIds: number[]) => void | Promise<void>;
 }
 
-export function MilestoneCard({ milestone, variant = "card", onEdit, onDelete, onStatusChange, onDueDateChange, onCreateTask, onCreateTicket, allTags, onTagsChange }: MilestoneCardProps) {
+export function MilestoneCard({ milestone, variant = "card", onEdit, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onCreateTask, onCreateTicket, allTags, onTagsChange }: MilestoneCardProps) {
   const catalogs = useCatalogs();
   const accent = catalogColor(catalogs.entries, "workStatus", milestone.status);
   const description = richTextToPlainText(milestone.description);
   const createMenuItems: ActionMenuItem[] = [
+    ...(onOpenInTab
+      ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(milestone) }]
+      : []),
     ...(onCreateTask
       ? [{ label: "Neue Aufgabe", icon: <ListTodo size={16} />, onClick: onCreateTask }]
       : []),

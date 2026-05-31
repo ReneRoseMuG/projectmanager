@@ -1,4 +1,4 @@
-export type ObjectReferenceType = "project" | "milestone" | "task" | "ticket" | "feature" | "useCase";
+export type ObjectReferenceType = "project" | "milestone" | "task" | "ticket" | "feature" | "useCase" | "note";
 
 const referencePrefixes: Record<ObjectReferenceType, string> = {
   project: "PROJ",
@@ -7,6 +7,7 @@ const referencePrefixes: Record<ObjectReferenceType, string> = {
   ticket: "TKT",
   feature: "FEAT",
   useCase: "UC",
+  note: "NOTE",
 };
 
 export function objectReference(type: ObjectReferenceType, id: number): string {

@@ -116,21 +116,22 @@ async function getProjectCounts(database: DbClient, projectIds: number[]): Promi
     counts.set(projectId, emptyProjectCounts());
   }
 
-  const milestoneRows = await database.select({ projectId: milestones.projectId }).from(milestones).where(inArray(milestones.projectId, projectIds));
+  const [milestoneRows, taskRows, closedStatusKeys, ticketRows, attachmentRows, noteRows, commentRows] = await Promise.all([
+    database.select({ projectId: milestones.projectId }).from(milestones).where(inArray(milestones.projectId, projectIds)),
+    database.select({ projectId: projectTasks.ownerId, status: tasks.status }).from(projectTasks).innerJoin(tasks, eq(projectTasks.taskId, tasks.id)).where(inArray(projectTasks.ownerId, projectIds)),
+    listClosedCatalogEntryKeys(database, "workStatus"),
+    database.select({ projectId: projectTickets.ownerId }).from(projectTickets).where(inArray(projectTickets.ownerId, projectIds)),
+    database.select({ projectId: projectAttachments.projectId }).from(projectAttachments).where(inArray(projectAttachments.projectId, projectIds)),
+    database.select({ projectId: projectNotes.projectId }).from(projectNotes).where(inArray(projectNotes.projectId, projectIds)),
+    database.select({ projectId: projectComments.projectId }).from(projectComments).where(inArray(projectComments.projectId, projectIds))
+  ]);
+
   for (const row of milestoneRows) {
     const current = counts.get(row.projectId) ?? emptyProjectCounts();
     current.milestoneCount += 1;
     counts.set(row.projectId, current);
   }
-
-  const rows = await database
-    .select({ projectId: projectTasks.ownerId, status: tasks.status })
-    .from(projectTasks)
-    .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
-    .where(inArray(projectTasks.ownerId, projectIds));
-  const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
-
-  for (const row of rows) {
+  for (const row of taskRows) {
     const current = counts.get(row.projectId) ?? emptyProjectCounts();
     current.totalTaskCount += 1;
     if (closedStatusKeys.has(row.status)) {
@@ -140,29 +141,21 @@ async function getProjectCounts(database: DbClient, projectIds: number[]): Promi
     }
     counts.set(row.projectId, current);
   }
-
-  const ticketRows = await database.select({ projectId: projectTickets.ownerId }).from(projectTickets).where(inArray(projectTickets.ownerId, projectIds));
   for (const row of ticketRows) {
     const current = counts.get(row.projectId) ?? emptyProjectCounts();
     current.ticketCount += 1;
     counts.set(row.projectId, current);
   }
-
-  const attachmentRows = await database.select({ projectId: projectAttachments.projectId }).from(projectAttachments).where(inArray(projectAttachments.projectId, projectIds));
   for (const row of attachmentRows) {
     const current = counts.get(row.projectId) ?? emptyProjectCounts();
     current.attachmentCount += 1;
     counts.set(row.projectId, current);
   }
-
-  const noteRows = await database.select({ projectId: projectNotes.projectId }).from(projectNotes).where(inArray(projectNotes.projectId, projectIds));
   for (const row of noteRows) {
     const current = counts.get(row.projectId) ?? emptyProjectCounts();
     current.noteCount += 1;
     counts.set(row.projectId, current);
   }
-
-  const commentRows = await database.select({ projectId: projectComments.projectId }).from(projectComments).where(inArray(projectComments.projectId, projectIds));
   for (const row of commentRows) {
     const current = counts.get(row.projectId) ?? emptyProjectCounts();
     current.commentCount += 1;
@@ -280,8 +273,11 @@ export async function updateProject(database: DbClient, id: number, input: Proje
     throw notFound(`Project with id ${id} not found`);
   }
 
-  const counts = await getProjectCounts(database, [id]);
-  return mapProject(database, updated, counts.get(id));
+  const [counts, tags] = await Promise.all([
+    getProjectCounts(database, [id]),
+    getProjectTags(database, id)
+  ]);
+  return mapProject(database, updated, counts.get(id), tags);
 }
 
 export async function deleteProject(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {

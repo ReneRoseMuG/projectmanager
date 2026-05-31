@@ -15,6 +15,9 @@
 import { QueryClient, type QueryKey } from "@tanstack/react-query";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  invalidateAllAttachments,
+  invalidateAllComments,
+  invalidateAllNotes,
   invalidateAttachments,
   invalidateBacklogScope,
   invalidateComments,
@@ -369,6 +372,40 @@ describe("Query invalidation integration", () => {
       "settingsResolved",
       "globalSearch"
     ]);
+  });
+
+  it("invalidiert alle Kommentare, Notizen und Anhänge per Root-Key für SSE-Realtime-Sync", async () => {
+    queryClient = createQueryClient();
+    seedKnownQueries(queryClient);
+
+    await invalidateAllComments(queryClient);
+
+    expect(queryClient.getQueryState(knownQueries.projectComments)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.taskComments)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.projectNotes)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(knownQueries.projectAttachments)?.isInvalidated).toBe(false);
+
+    queryClient.clear();
+    seedKnownQueries(queryClient);
+
+    await invalidateAllNotes(queryClient);
+
+    expect(queryClient.getQueryState(knownQueries.projectNotes)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.taskNotes)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.wikiNotes)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.projectComments)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(knownQueries.projectAttachments)?.isInvalidated).toBe(false);
+
+    queryClient.clear();
+    seedKnownQueries(queryClient);
+
+    await invalidateAllAttachments(queryClient);
+
+    expect(queryClient.getQueryState(knownQueries.projectAttachments)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.taskAttachments)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.attachmentPreview)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.projectComments)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(knownQueries.projectNotes)?.isInvalidated).toBe(false);
   });
 
   it("invalidiert Journal-Queries nach fachlichen Mutationen", async () => {

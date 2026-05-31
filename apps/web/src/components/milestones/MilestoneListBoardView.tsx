@@ -18,6 +18,7 @@ interface MilestoneListBoardViewProps {
   onViewModeChange?: (viewMode: ViewMode) => void;
   onCreate: () => void;
   onEdit: (milestone: Milestone) => void;
+  onOpenInTab?: (milestone: Milestone) => void;
   onDelete: (milestone: Milestone) => void;
   onStatusChange?: (milestone: Milestone, status: Milestone["status"]) => void | Promise<unknown>;
   onDueDateChange?: (milestone: Milestone, dueDate: string | null) => void | Promise<unknown>;
@@ -45,7 +46,7 @@ function matchesSearch(milestone: Milestone, searchValue: string) {
   return milestone.name.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
-export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onDelete, onStatusChange, onDueDateChange, onTagsChange, onCreateTask, onCreateTicket, filters, readOnly = false }: MilestoneListBoardViewProps) {
+export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange, onCreateTask, onCreateTicket, filters, readOnly = false }: MilestoneListBoardViewProps) {
   const catalogs = useCatalogs();
   const canReadTags = useHasPermission("tags", "read");
   const canWriteMilestones = useHasPermission("milestones", "write");
@@ -108,6 +109,7 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
         <MilestoneCard
           milestone={milestone}
           onEdit={onEdit}
+          onOpenInTab={onOpenInTab}
           onDelete={readOnly ? undefined : onDelete}
           onStatusChange={readOnly ? undefined : onStatusChange}
           onDueDateChange={readOnly ? undefined : onDueDateChange}
@@ -122,6 +124,7 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
           milestone={milestone}
           variant="row"
           onEdit={onEdit}
+          onOpenInTab={onOpenInTab}
           onDelete={readOnly ? undefined : onDelete}
           onStatusChange={readOnly ? undefined : onStatusChange}
           onDueDateChange={readOnly ? undefined : onDueDateChange}

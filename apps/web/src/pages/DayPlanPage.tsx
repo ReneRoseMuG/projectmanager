@@ -1,39 +1,36 @@
-import type { Note, Priority, TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
+import type { Note, TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { Activity, CheckCircle2, LayoutDashboard, Link2Off, ListPlus, MessageSquare, Plus, StickyNote } from "lucide-react";
-import type { FormEvent } from "react";
+import { Activity, CalendarDays, LayoutDashboard, ListPlus, MessageSquare, StickyNote } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { CommentThread } from "../components/ui/CommentThread";
-import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
-import { FormField } from "../components/ui/FormField";
-import { Input } from "../components/ui/Input";
 import { PageHero } from "../components/ui/PageHero";
-import { PriorityBadge } from "../components/ui/PriorityBadge";
-import { PrioritySelect } from "../components/ui/PrioritySelect";
 import { Spinner } from "../components/ui/Spinner";
-import { StatusPill } from "../components/ui/StatusPill";
 import { TabBar, type Tab } from "../components/ui/TabBar";
 import { useToast } from "../components/ui/ToastProvider";
 import { DashboardView } from "../components/dashboard/DashboardView";
 import { JournalPanel } from "../components/journal/JournalPanel";
 import { NoteEditor } from "../components/notes/NoteEditor";
 import { NoteList } from "../components/notes/NoteList";
+import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
+import { TaskListBoardView } from "../components/tasks/TaskListBoardView";
 import { errorMessage } from "../hooks/errors";
 import { useCatalogs } from "../hooks/useCatalogs";
 import { useDayPlan } from "../hooks/useDayPlan";
 import { useEntityComments } from "../hooks/useEntityComments";
-import { useGlobalTasks } from "../hooks/useTasks";
 import { useNotes } from "../hooks/useNotes";
 import { useHasPermission } from "../hooks/usePermissions";
-import { isCatalogStatusClosed, resolveCatalogEntryKey } from "../utils/catalogs";
-import { formatHumanDate } from "../utils/date";
+import { useViewMode } from "../hooks/useViewMode";
+import { resolveCatalogEntryKey } from "../utils/catalogs";
+import { withStandaloneView } from "../utils/standalone";
 
-type DayPlanTab = "overview" | "tasks" | "notes" | "comments" | "journal";
+type DayPlanTab = "overview" | "calendar" | "tasks" | "notes" | "comments" | "journal";
 
 const tabs: Array<Tab<DayPlanTab>> = [
   { value: "overview", label: "Übersicht", icon: <LayoutDashboard size={16} /> },
+  { value: "calendar", label: "Kalender", icon: <CalendarDays size={16} /> },
   { value: "tasks", label: "Aufgaben", icon: <ListPlus size={16} /> },
   { value: "notes", label: "Notizen", icon: <StickyNote size={16} /> },
   { value: "comments", label: "Kommentare", icon: <MessageSquare size={16} /> },
@@ -48,62 +45,11 @@ function todayLabel(): string {
   return format(new Date(), "EEEE, dd.MM.yy", { locale: de });
 }
 
-function taskNextStatus(task: TaskBoardItem, entries: ReturnType<typeof useCatalogs>["entries"]): TaskStatus {
-  if (isCatalogStatusClosed(entries, "workStatus", task.status)) {
-    return (resolveCatalogEntryKey(entries, "workStatus", "active", "active") ?? "active") as TaskStatus;
-  }
-  return (resolveCatalogEntryKey(entries, "workStatus", "completed", "completed") ?? "completed") as TaskStatus;
-}
-
-function TaskItem({
-  task,
-  canUpdate,
-  canUnlink,
-  onToggle,
-  onUnlink,
-}: {
-  task: TaskBoardItem;
-  canUpdate: boolean;
-  canUnlink: boolean;
-  onToggle: (task: TaskBoardItem) => Promise<void>;
-  onUnlink: (taskId: number) => Promise<void>;
-}) {
-  const catalogs = useCatalogs();
-  const closed = isCatalogStatusClosed(catalogs.entries, "workStatus", task.status);
-
-  return (
-    <article className="rounded-md border border-line bg-white p-3 shadow-sm">
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className={`break-words text-sm font-semibold ${closed ? "text-steel-500 line-through" : "text-ink"}`}>{task.title}</h2>
-          {task.description ? <p className="mt-1 line-clamp-2 text-sm text-steel-600">{task.description}</p> : null}
-        </div>
-        {canUnlink ? (
-          <Button size="sm" variant="ghost" icon={<Link2Off size={15} />} title="Aus Persönlicher Planung lösen" aria-label="Aufgabe aus Persönlicher Planung lösen" onClick={() => void onUnlink(task.id)} />
-        ) : null}
-      </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <StatusPill kind="workStatus" value={task.status} />
-        <PriorityBadge value={task.priority} />
-        {task.dueDate ? <span className="text-xs font-semibold text-steel-500">Fällig {formatHumanDate(task.dueDate)}</span> : null}
-      </div>
-      {canUpdate ? (
-        <div className="mt-3">
-          <Button size="sm" variant={closed ? "secondary" : "primary"} icon={<CheckCircle2 size={15} />} onClick={() => void onToggle(task)}>
-            {closed ? "Wieder öffnen" : "Erledigt"}
-          </Button>
-        </div>
-      ) : null}
-    </article>
-  );
-}
-
 function DayPlanTasks({
   dayPlanDate,
   tasks,
   loading,
   createTask,
-  linkTask,
   unlinkTask,
   updateTask,
 }: {
@@ -111,134 +57,92 @@ function DayPlanTasks({
   tasks: TaskBoardItem[];
   loading: boolean;
   createTask: ReturnType<typeof useDayPlan>["createTask"];
-  linkTask: ReturnType<typeof useDayPlan>["linkTask"];
   unlinkTask: ReturnType<typeof useDayPlan>["unlinkTask"];
   updateTask: ReturnType<typeof useDayPlan>["updateTask"];
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const catalogs = useCatalogs();
-  const globalTasks = useGlobalTasks();
   const { showToast } = useToast();
+  const { viewMode, setViewMode } = useViewMode();
   const canWritePlan = useHasPermission("dayPlans", "write");
   const canDeletePlan = useHasPermission("dayPlans", "delete");
   const canWriteTasks = useHasPermission("tasks", "write");
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskPriority, setTaskPriority] = useState<Priority>("medium");
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
-  const linkedTaskIds = useMemo(() => new Set(tasks.map((task) => task.id)), [tasks]);
-  const candidates = useMemo(
-    () =>
-      globalTasks.tasks.filter(
-        (task) => task.parentId === null && !linkedTaskIds.has(task.id) && !isCatalogStatusClosed(catalogs.entries, "workStatus", task.status),
-      ),
-    [catalogs.entries, globalTasks.tasks, linkedTaskIds],
-  );
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [initialStatus, setInitialStatus] = useState<TaskStatus>((resolveCatalogEntryKey(catalogs.entries, "workStatus", "active", "active") ?? "active") as TaskStatus);
+  const returnTo = `${location.pathname}${location.search}`;
 
-  async function submitTask(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const title = taskTitle.trim();
-    if (!title) {
-      return;
-    }
+  function openTaskForm(status?: TaskStatus) {
+    setInitialStatus((resolveCatalogEntryKey(catalogs.entries, "workStatus", status ?? "active", "active") ?? "active") as TaskStatus);
+    setTaskFormOpen(true);
+  }
+
+  async function submitTask(input: TaskFormInput) {
     try {
       await createTask({
-        title,
-        description: null,
-        status: (resolveCatalogEntryKey(catalogs.entries, "workStatus", "active", "active") ?? "active") as TaskStatus,
-        priority: taskPriority,
-        dueDate: dayPlanDate,
+        title: input.title,
+        description: input.description,
+        status: input.status,
+        priority: input.priority,
+        responsibleUserId: input.responsibleUserId,
+        dueDate: input.dueDate ?? dayPlanDate,
       });
-      setTaskTitle("");
       showToast({ tone: "success", title: "Aufgabe angelegt" });
     } catch (taskError) {
       showToast({ tone: "error", title: "Aufgabe konnte nicht angelegt werden", message: errorMessage(taskError) });
+      throw taskError;
     }
   }
 
-  async function submitLink(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (selectedTaskId === null) {
-      return;
-    }
+  async function updateTaskStatus(task: TaskBoardItem, status: TaskStatus) {
     try {
-      await linkTask(selectedTaskId);
-      setSelectedTaskId(null);
-      showToast({ tone: "success", title: "Aufgabe verknüpft" });
+      await updateTask(task.id, { status, expectedVersion: task.version });
+      showToast({ tone: "success", title: "Aufgabe aktualisiert" });
     } catch (taskError) {
-      showToast({ tone: "error", title: "Aufgabe konnte nicht verknüpft werden", message: errorMessage(taskError) });
+      showToast({ tone: "error", title: "Aufgabe konnte nicht aktualisiert werden", message: errorMessage(taskError) });
+      throw taskError;
+    }
+  }
+
+  async function updateTaskDueDate(task: TaskBoardItem, dueDate: string | null) {
+    try {
+      await updateTask(task.id, { dueDate, expectedVersion: task.version });
+      showToast({ tone: "success", title: "Aufgabendatum aktualisiert" });
+    } catch (taskError) {
+      showToast({ tone: "error", title: "Aufgabendatum konnte nicht aktualisiert werden", message: errorMessage(taskError) });
+      throw taskError;
+    }
+  }
+
+  async function unlink(task: TaskBoardItem) {
+    try {
+      await unlinkTask(task.id);
+      showToast({ tone: "success", title: "Aufgabe gelöst" });
+    } catch (taskError) {
+      showToast({ tone: "error", title: "Aufgabe konnte nicht gelöst werden", message: errorMessage(taskError) });
+      throw taskError;
     }
   }
 
   return (
-    <div className="grid gap-4">
-      {canWritePlan ? (
-        <section className="grid gap-4 rounded-md border border-line bg-white p-4 shadow-sm lg:grid-cols-2">
-          <form className="grid gap-3" onSubmit={(event) => void submitTask(event)}>
-            <FormField label="Neue Aufgabe" required>
-              <Input value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} placeholder="Aufgabe für die persönliche Planung" />
-            </FormField>
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-              <FormField label="Priorität">
-                <PrioritySelect value={taskPriority} onChange={setTaskPriority} />
-              </FormField>
-              <Button type="submit" variant="primary" icon={<Plus size={16} />} disabled={!taskTitle.trim()}>
-                Hinzufügen
-              </Button>
-            </div>
-          </form>
-          <form className="grid gap-3" onSubmit={(event) => void submitLink(event)}>
-            <FormField label="Bestehende Aufgabe">
-              <select
-                className="h-11 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
-                value={selectedTaskId ?? ""}
-                onChange={(event) => setSelectedTaskId(event.target.value ? Number(event.target.value) : null)}
-              >
-                <option value="">Aufgabe auswählen</option>
-                {candidates.map((task) => (
-                  <option key={task.id} value={task.id}>
-                    {task.title}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-            <div className="flex justify-end">
-              <Button type="submit" variant="secondary" icon={<ListPlus size={16} />} disabled={selectedTaskId === null || globalTasks.loading}>
-                Verknüpfen
-              </Button>
-            </div>
-          </form>
-        </section>
-      ) : null}
-
-      <section className="grid gap-3">
-        {tasks.map((task) => (
-          <TaskItem
-            key={task.id}
-            task={task}
-            canUpdate={canWriteTasks}
-            canUnlink={canDeletePlan}
-            onToggle={async (target) => {
-              try {
-                await updateTask(target.id, { status: taskNextStatus(target, catalogs.entries), expectedVersion: target.version });
-                showToast({ tone: "success", title: "Aufgabe aktualisiert" });
-              } catch (taskError) {
-                showToast({ tone: "error", title: "Aufgabe konnte nicht aktualisiert werden", message: errorMessage(taskError) });
-              }
-            }}
-            onUnlink={async (taskId) => {
-              try {
-                await unlinkTask(taskId);
-                showToast({ tone: "success", title: "Aufgabe gelöst" });
-              } catch (taskError) {
-                showToast({ tone: "error", title: "Aufgabe konnte nicht gelöst werden", message: errorMessage(taskError) });
-              }
-            }}
-          />
-        ))}
-        {!loading && tasks.length === 0 ? (
-          <EmptyState icon={<ListPlus size={22} />} title="Keine Aufgaben" body="Aufgaben für die persönliche Planung erscheinen hier." variant="tinted" />
-        ) : null}
-      </section>
-    </div>
+    <>
+      <TaskListBoardView
+        tasks={tasks}
+        loading={loading}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onAdd={() => openTaskForm()}
+        onAddStatus={(status) => openTaskForm(status)}
+        onOpen={(task) => navigate(`/tasks/${task.id}?returnTo=${encodeURIComponent(returnTo)}`)}
+        onOpenInTab={(task) => window.open(withStandaloneView(`/tasks/${task.id}`), "_blank")}
+        onDelete={(task) => unlink(task as TaskBoardItem)}
+        onStatusChange={canWriteTasks ? (task, status) => updateTaskStatus(task as TaskBoardItem, status) : undefined}
+        onDueDateChange={canWriteTasks ? (task, dueDate) => updateTaskDueDate(task as TaskBoardItem, dueDate) : undefined}
+        showCreateActions={canWritePlan && canWriteTasks}
+        canDelete={canDeletePlan}
+      />
+      <TaskForm open={taskFormOpen} initialStatus={initialStatus} onSubmit={submitTask} onClose={() => setTaskFormOpen(false)} />
+    </>
   );
 }
 
@@ -266,6 +170,7 @@ function DayPlanNotes({ dayPlanId }: { dayPlanId: number }) {
       {notes.error ? <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{notes.error}</div> : null}
       <NoteList
         notes={notes.notes}
+        owner={{ type: "dayPlan", id: dayPlanId }}
         canCreate={canWriteNotes}
         canDelete={canDeleteNotes}
         onCreate={createNote}
@@ -306,7 +211,7 @@ function DayPlanComments({ dayPlanId }: { dayPlanId: number }) {
 export function DayPlanPage() {
   const date = todayKey();
   const dayPlanController = useDayPlan(date);
-  const { dayPlan, loading, error, createTask, linkTask, updateTask, unlinkTask } = dayPlanController;
+  const { dayPlan, loading, error, createTask, updateTask, unlinkTask } = dayPlanController;
   const [activeTab, setActiveTab] = useState<DayPlanTab>("overview");
 
   const tabItems = useMemo(
@@ -333,14 +238,14 @@ export function DayPlanPage() {
           </div>
         ) : dayPlan ? (
           <div className="grid gap-4">
-            {activeTab === "overview" ? <DashboardView context="dayPlan" owner={{ type: "dayPlan", id: dayPlan.id }} hideInlineHeader /> : null}
+            {activeTab === "overview" ? <DashboardView context="dayPlan" owner={{ type: "dayPlan", id: dayPlan.id }} dayPlanDate={date} hideInlineHeader /> : null}
+            {activeTab === "calendar" ? <DashboardView context="dayPlanCalendar" owner={{ type: "dayPlan", id: dayPlan.id }} dayPlanDate={date} hideInlineHeader /> : null}
             {activeTab === "tasks" ? (
               <DayPlanTasks
                 dayPlanDate={date}
                 tasks={dayPlan.tasks}
                 loading={loading}
                 createTask={createTask}
-                linkTask={linkTask}
                 unlinkTask={unlinkTask}
                 updateTask={updateTask}
               />

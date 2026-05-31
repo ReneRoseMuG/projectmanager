@@ -18,6 +18,7 @@ interface DashboardViewProps {
   subtitle?: string;
   showHeader?: boolean;
   hideInlineHeader?: boolean;
+  dayPlanDate?: string;
 }
 
 interface DashboardShortcutProps {
@@ -38,7 +39,7 @@ function DashboardLoading() {
   );
 }
 
-export function DashboardView({ context, owner, title = dashboardContextLabels[context], subtitle, showHeader = false, hideInlineHeader = false }: DashboardViewProps) {
+export function DashboardView({ context, owner, title = dashboardContextLabels[context], subtitle, showHeader = false, hideInlineHeader = false, dayPlanDate }: DashboardViewProps) {
   const dashboards = useDashboards(context);
   const canWrite = useHasPermission("dashboards", "write");
   const canAdmin = useHasPermission("dashboards", "admin");
@@ -101,7 +102,7 @@ export function DashboardView({ context, owner, title = dashboardContextLabels[c
         onEdit={openBuilder}
         onSetDefault={(dashboard) => dashboards.setDefault(dashboard.id, "USER", dashboards.userDefaultVersion).then(() => undefined)}
       />
-      <DashboardGrid dashboard={selectedDashboard} owner={owner} />
+      <DashboardGrid dashboard={selectedDashboard} owner={owner} dayPlanDate={dayPlanDate} />
     </>
   ) : (
     <>

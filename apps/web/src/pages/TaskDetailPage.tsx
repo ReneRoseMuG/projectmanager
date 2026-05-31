@@ -55,7 +55,7 @@ export function TaskDetailPage() {
   const detail = useTaskDetail(
     !isCreateMode && Number.isFinite(taskId) ? taskId : null,
   );
-  useDocumentTitle(isCreateMode ? "Aufgabe: Neu" : detail.task ? `Aufgabe: ${detail.task.title}` : "Aufgabe");
+  useDocumentTitle(isCreateMode ? "[Auf.] Neu" : detail.task ? `[Auf.] ${detail.task.title}` : "[Auf.]");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
   const returnTo =
     searchParams.get("returnTo") ??

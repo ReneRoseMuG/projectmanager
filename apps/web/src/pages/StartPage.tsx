@@ -17,7 +17,7 @@ export function StartPage() {
         title="Startseite"
         subtitle="Dein persönliches Dashboard"
       />
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-auto px-4 pt-4 md:px-5 md:pt-5">
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-auto p-4">
         <HomeDashboard hideInlineHeader />
       </div>
     </div>

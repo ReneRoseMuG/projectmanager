@@ -148,6 +148,7 @@ export function FeaturesPage() {
             features={filteredFeatures}
             onCreate={() => navigate(featureTarget("/features/new"))}
             onOpen={(feature) => navigate(featureTarget(`/features/${feature.id}`))}
+            onOpenInTab={(feature) => window.open(withStandaloneView(`/features/${feature.id}`), "_blank")}
             onStatusChange={updateFeatureStatus}
             toolbarFilters={
               <FilterChips

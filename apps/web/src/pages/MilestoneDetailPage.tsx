@@ -45,7 +45,7 @@ export function MilestoneDetailPage() {
     updateMilestone,
     removeMilestone,
   } = useMilestones(milestoneId);
-  useDocumentTitle(isCreateMode ? "Meilenstein: Neu" : milestone ? `Meilenstein: ${milestone.name}` : "Meilenstein");
+  useDocumentTitle(isCreateMode ? "[Mei.] Neu" : milestone ? `[Mei.] ${milestone.name}` : "[Mei.]");
 
   const returnTo =
     searchParams.get("returnTo") ??

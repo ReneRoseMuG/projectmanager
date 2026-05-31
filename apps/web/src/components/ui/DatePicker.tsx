@@ -6,11 +6,13 @@ import { FormField } from "./FormField";
 interface DatePickerProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
   mode?: "date" | "datetime-local";
+  variant?: "default" | "panel";
 }
 
 export function DatePicker({
   label,
   mode = "date",
+  variant,
   className = "",
   onClick,
   ...props
@@ -29,6 +31,27 @@ export function DatePicker({
       // Some browsers only allow showPicker during trusted pointer events.
     }
   };
+
+  if (variant === "panel") {
+    return (
+      <FormField
+        label={label}
+        icon={<CalendarClock size={14} />}
+        variant="panel"
+      >
+        <input
+          ref={inputRef}
+          type={mode}
+          className={`h-10 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 ${className}`}
+          onClick={(event) => {
+            onClick?.(event);
+            openNativePicker();
+          }}
+          {...props}
+        />
+      </FormField>
+    );
+  }
 
   return (
     <FormField label={label}>

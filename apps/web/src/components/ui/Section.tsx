@@ -22,7 +22,7 @@ export function Section({
 }: SectionProps) {
   const sectionClass = fill
     ? `flex h-full min-h-0 flex-1 flex-col ${className}`
-    : `rounded-lg border border-line bg-white p-4 shadow-panel ${className}`;
+    : `rounded-lg border border-line bg-white p-2.5 shadow-panel ${className}`;
 
   return (
     <section className={sectionClass}>

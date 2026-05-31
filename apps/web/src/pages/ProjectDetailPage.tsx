@@ -39,7 +39,7 @@ export function ProjectDetailPage() {
   const projectId = isCreateMode ? undefined : Number(params.id);
   const { project, loading, createProject, updateProject, removeProject } =
     useProjects(projectId);
-  useDocumentTitle(isCreateMode ? "Projekt: Neu" : project ? `Projekt: ${project.name}` : "Projekt");
+  useDocumentTitle(isCreateMode ? "[Pro.] Neu" : project ? `[Pro.] ${project.name}` : "[Pro.]");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
   const initialTab = parseProjectFormTab(searchParams.get("tab"));
 

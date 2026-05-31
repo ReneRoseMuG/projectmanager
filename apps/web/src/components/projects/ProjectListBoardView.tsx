@@ -12,6 +12,7 @@ interface ProjectListBoardViewProps {
   loading?: boolean;
   onCreate: () => void;
   onEdit: (project: Project) => void;
+  onOpenInTab?: (project: Project) => void;
   onDelete: (project: Project) => void;
   onStatusChange?: (project: Project, status: Project["status"]) => void | Promise<unknown>;
   onTagsChange?: (projectId: number, tagIds: number[]) => void | Promise<void>;
@@ -39,6 +40,7 @@ export function ProjectListBoardView({
   loading = false,
   onCreate,
   onEdit,
+  onOpenInTab,
   onDelete,
   onStatusChange,
   onTagsChange,
@@ -97,6 +99,7 @@ export function ProjectListBoardView({
         <ProjectCard
           project={project}
           onEdit={onEdit}
+          onOpenInTab={onOpenInTab}
           onDelete={readOnly ? undefined : onDelete}
           onStatusChange={readOnly ? undefined : onStatusChange}
           allTags={editableTags}
@@ -111,6 +114,7 @@ export function ProjectListBoardView({
           project={project}
           variant="row"
           onEdit={onEdit}
+          onOpenInTab={onOpenInTab}
           onDelete={readOnly ? undefined : onDelete}
           onStatusChange={readOnly ? undefined : onStatusChange}
           allTags={editableTags}
