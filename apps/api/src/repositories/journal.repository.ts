@@ -1,7 +1,7 @@
 ﻿import type { JournalContextRelation, JournalObjectType, JournalOperation, JsonValue } from "@taskmanager/shared-types";
 import { and, desc, eq, gte, inArray, like, lt, lte, or, sql } from "drizzle-orm";
-import type { DbClient, DbSession } from "../db/client.js";
-import { firstRow, insertId } from "../db/query-utils.js"; // firstRow used in list()
+import type { DbSession } from "../db/client.js";
+import { insertId } from "../db/query-utils.js";
 import { journalEntries, journalEntryChanges, journalEntryContexts } from "../db/schema.js";
 
 export type JournalEntryRecord = typeof journalEntries.$inferSelect;

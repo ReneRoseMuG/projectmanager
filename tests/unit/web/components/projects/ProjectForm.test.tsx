@@ -45,7 +45,8 @@ describe("ProjectForm", () => {
     expect(screen.getByRole("button", { name: "Stammdaten schließen" })).toBeInTheDocument();
 
     const detailsBody = screen.getByDisplayValue(project.name).closest("section")?.parentElement;
-    expect(detailsBody).toHaveClass("w-full", "max-w-5xl");
+    expect(detailsBody).toHaveClass("w-full");
+    expect(detailsBody).not.toHaveClass("max-w-5xl");
 
     clickTab("Aufgaben");
 
@@ -60,16 +61,17 @@ describe("ProjectForm", () => {
     renderWithProviders(<ProjectForm open project={datedProject} onSubmit={onSubmit} onClose={vi.fn()} />);
 
     const sidebar = screen.getByTestId("form-sidebar");
+    const sidebarSelects = within(sidebar).getAllByRole("combobox");
     expect(screen.getByDisplayValue(project.name)).toBeInTheDocument();
     expect(screen.getByTestId("project-description-view")).toHaveValue(project.description);
-    expect(within(sidebar).getByRole("button", { name: "Aktiv" })).toHaveAttribute("data-active", "true");
+    expect(sidebarSelects[0]).toHaveValue("active");
     expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
     expect(within(sidebar).getByDisplayValue("2026-05-01")).toBeInTheDocument();
     expect(within(sidebar).getByDisplayValue("2026-05-31")).toBeInTheDocument();
     expect(within(sidebar).getByRole("button", { name: "Tags 0" })).toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue(project.name), { target: { value: "Projekt Beta" } });
-    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(sidebarSelects[0], { target: { value: "done" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
     const dateInputs = within(sidebar).getAllByDisplayValue(/2026-05-/) as HTMLInputElement[];
     fireEvent.change(dateInputs[0], { target: { value: "2026-06-01" } });

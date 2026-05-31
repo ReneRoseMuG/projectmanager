@@ -27,8 +27,8 @@ function matchesSearch(note: Note, searchValue: string) {
   return note.title.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
-function noteOwnerPath(owner: NoteOwner, noteId: number): string {
-  const query = `tab=notes&noteId=${noteId}`;
+function noteOwnerReturnPath(owner: NoteOwner): string {
+  const query = "tab=notes";
 
   if (owner.type === "project") {
     return `/projects/${owner.id}?${query}`;
@@ -49,6 +49,11 @@ function noteOwnerPath(owner: NoteOwner, noteId: number): string {
   return `/day-plan?${query}`;
 }
 
+function noteDetailPath(owner: NoteOwner, noteId: number): string {
+  const params = new URLSearchParams({ returnTo: noteOwnerReturnPath(owner) });
+  return `/notes/${noteId}?${params.toString()}`;
+}
+
 export function NoteList({ notes, onCreate, onEdit, onDelete, owner, canCreate = true, canDelete = true }: NoteListProps) {
   const [mode, setMode] = useState<ListBoardMode>("board");
   const [searchValue, setSearchValue] = useState("");
@@ -58,7 +63,7 @@ export function NoteList({ notes, onCreate, onEdit, onDelete, owner, canCreate =
   );
   const openInTab = owner
     ? (note: Note) => {
-        window.open(withStandaloneView(noteOwnerPath(owner, note.id)), "_blank");
+        window.open(withStandaloneView(noteDetailPath(owner, note.id)), "_blank");
       }
     : undefined;
 

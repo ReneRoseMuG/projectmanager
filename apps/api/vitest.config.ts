@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const runtimeRoot = path.join(repoRoot, "tests", ".runtime", "vitest");
 
 // Load .env.test from repo root if present (takes precedence over process.env)
 const testEnv = loadDotenv({ path: path.join(repoRoot, ".env.test"), processEnv: {} }).parsed ?? {};
@@ -30,7 +31,12 @@ export default defineConfig({
       ADMIN_EMAIL: "admin@local",
       ADMIN_FIRST_NAME: "Test",
       ADMIN_LAST_NAME: "Admin",
-      ADMIN_INITIAL_PASSWORD: "password123"
+      ADMIN_INITIAL_PASSWORD: "password123",
+      ATTACHMENT_BASE_PATH: path.join(runtimeRoot, "uploads"),
+      UPLOAD_DIR: path.join(runtimeRoot, "uploads"),
+      PREVIEW_CACHE_DIR: path.join(runtimeRoot, "previews"),
+      CONTENT_DIR: path.join(runtimeRoot, "content"),
+      BACKUP_WORK_DIR: path.join(runtimeRoot, "backups")
     }
   }
 });

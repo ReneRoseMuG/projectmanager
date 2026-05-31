@@ -1,7 +1,29 @@
-import type { Dashboard, DashboardContext, DashboardDefaultScope, DashboardInput, DashboardWidgetId, DashboardWidgetLayout } from "@taskmanager/shared-types";
-import { DASHBOARD_ALLOWED_WIDGETS, DEFAULT_DASHBOARD_LAYOUTS } from "@taskmanager/shared-types";
-import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import type {
+  Dashboard,
+  DashboardContext,
+  DashboardDefaultScope,
+  DashboardInput,
+  DashboardWidgetId,
+  DashboardWidgetLayout,
+} from "@taskmanager/shared-types";
+import {
+  DASHBOARD_ALLOWED_WIDGETS,
+  DEFAULT_DASHBOARD_LAYOUTS,
+} from "@taskmanager/shared-types";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Plus, Save, Star, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -13,7 +35,10 @@ import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
 import { Select } from "../ui/Select";
 import { useToast } from "../ui/ToastProvider";
-import { dashboardContextLabels, dashboardWidgetRegistry } from "./widgetRegistry";
+import {
+  dashboardContextLabels,
+  dashboardWidgetRegistry,
+} from "./widgetRegistry";
 
 interface DashboardBuilderProps {
   open: boolean;
@@ -26,19 +51,47 @@ interface DashboardBuilderProps {
   onClose: () => void;
   onSaved: (dashboardId: number) => void;
   onCreate: (input: DashboardInput) => Promise<Dashboard>;
-  onUpdate: (id: number, input: DashboardInput & { expectedVersion: number }) => Promise<Dashboard>;
+  onUpdate: (
+    id: number,
+    input: DashboardInput & { expectedVersion: number },
+  ) => Promise<Dashboard>;
   onDelete: (id: number) => Promise<void>;
-  onSetDefault: (id: number, scopeType: DashboardDefaultScope, expectedVersion: number) => Promise<unknown>;
+  onSetDefault: (
+    id: number,
+    scopeType: DashboardDefaultScope,
+    expectedVersion: number,
+  ) => Promise<unknown>;
 }
 
 function defaultWidgets(context: DashboardContext): DashboardWidgetLayout[] {
   return DEFAULT_DASHBOARD_LAYOUTS[context].map((widget) => ({
     ...widget,
-    params: "params" in widget && widget.params ? { ...widget.params } : undefined,
+    params:
+      "params" in widget && widget.params ? { ...widget.params } : undefined,
   }));
 }
 
-function normalizeGrid(widgets: DashboardWidgetLayout[]): DashboardWidgetLayout[] {
+function widgetSupportsDataParams(widgetId: DashboardWidgetId): boolean {
+  return widgetId !== "calendar";
+}
+
+function sanitizeWidgetParams(
+  widget: DashboardWidgetLayout,
+): DashboardWidgetLayout {
+  if (widgetSupportsDataParams(widget.widgetId)) {
+    return widget;
+  }
+  return {
+    widgetId: widget.widgetId,
+    row: widget.row,
+    col: widget.col,
+    colSpan: widget.colSpan,
+  };
+}
+
+function normalizeGrid(
+  widgets: DashboardWidgetLayout[],
+): DashboardWidgetLayout[] {
   let row = 0;
   let col: 0 | 1 = 0;
   return widgets.map((widget) => {
@@ -80,6 +133,7 @@ function SortableWidgetRow({
   const meta = dashboardWidgetRegistry[widget.widgetId];
   const Icon = meta.icon;
   const transform = CSS.Transform.toString(sortable.transform);
+  const supportsDataParams = widgetSupportsDataParams(widget.widgetId);
 
   return (
     <div
@@ -103,28 +157,58 @@ function SortableWidgetRow({
           <Icon size={16} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-ink">{meta.label}</p>
+          <p className="truncate text-sm font-semibold text-ink">
+            {meta.label}
+          </p>
         </div>
-        <Button icon={<Trash2 size={16} />} variant="ghost" aria-label={`${meta.label} entfernen`} title={`${meta.label} entfernen`} onClick={onRemove} />
+        <Button
+          icon={<Trash2 size={16} />}
+          variant="ghost"
+          aria-label={`${meta.label} entfernen`}
+          title={`${meta.label} entfernen`}
+          onClick={onRemove}
+        />
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        <Select label="Breite" value={widget.colSpan} onChange={(event) => onColSpanChange(Number(event.target.value) === 2 ? 2 : 1)}>
+      <div
+        className={`grid gap-3 ${supportsDataParams ? "md:grid-cols-3" : "md:grid-cols-1"}`}
+      >
+        <Select
+          label="Breite"
+          value={widget.colSpan}
+          onChange={(event) =>
+            onColSpanChange(Number(event.target.value) === 2 ? 2 : 1)
+          }
+        >
           <option value={1}>Halbe Breite</option>
           <option value={2}>Volle Breite</option>
         </Select>
-        <FormField label="Limit">
-          <Input
-            type="number"
-            min={1}
-            max={50}
-            value={widget.params?.limit ?? 10}
-            onChange={(event) => onLimitChange(Number(event.target.value))}
-          />
-        </FormField>
-        <Select label="Sortierung" value={widget.params?.sort ?? "updatedAt"} onChange={(event) => onSortChange(event.target.value === "createdAt" ? "createdAt" : "updatedAt")}>
-          <option value="updatedAt">Zuletzt geändert</option>
-          <option value="createdAt">Zuletzt erstellt</option>
-        </Select>
+        {supportsDataParams ? (
+          <>
+            <FormField label="Limit">
+              <Input
+                type="number"
+                min={1}
+                max={50}
+                value={widget.params?.limit ?? 10}
+                onChange={(event) => onLimitChange(Number(event.target.value))}
+              />
+            </FormField>
+            <Select
+              label="Sortierung"
+              value={widget.params?.sort ?? "updatedAt"}
+              onChange={(event) =>
+                onSortChange(
+                  event.target.value === "createdAt"
+                    ? "createdAt"
+                    : "updatedAt",
+                )
+              }
+            >
+              <option value="updatedAt">Zuletzt geändert</option>
+              <option value="createdAt">Zuletzt erstellt</option>
+            </Select>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -150,10 +234,17 @@ export function DashboardBuilder({
   const [widgets, setWidgets] = useState<DashboardWidgetLayout[]>([]);
   const { showToast } = useToast();
   const { confirm } = useConfirm();
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  const canUpdateSelected = Boolean(dashboard && (!dashboard.isSystem || canAdmin));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
+  const canUpdateSelected = Boolean(
+    dashboard && (!dashboard.isSystem || canAdmin),
+  );
   const availableWidgets = useMemo(
-    () => DASHBOARD_ALLOWED_WIDGETS[context].filter((widgetId) => !widgets.some((widget) => widget.widgetId === widgetId)),
+    () =>
+      DASHBOARD_ALLOWED_WIDGETS[context].filter(
+        (widgetId) => !widgets.some((widget) => widget.widgetId === widgetId),
+      ),
     [context, widgets],
   );
 
@@ -162,9 +253,20 @@ export function DashboardBuilder({
       return;
     }
     if (dashboard) {
-      setName(dashboard.isSystem && !canAdmin ? `${dashboard.name} Kopie` : dashboard.name);
+      setName(
+        dashboard.isSystem && !canAdmin
+          ? `${dashboard.name} Kopie`
+          : dashboard.name,
+      );
       setIsSystem(canAdmin ? dashboard.isSystem : false);
-      setWidgets(normalizeGrid(dashboard.widgets.map((widget) => ({ ...widget, params: widget.params ? { ...widget.params } : undefined }))));
+      setWidgets(
+        normalizeGrid(
+          dashboard.widgets.map((widget) => ({
+            ...widget,
+            params: widget.params ? { ...widget.params } : undefined,
+          })),
+        ),
+      );
       return;
     }
     setName(`Mein ${dashboardContextLabels[context]}`);
@@ -173,12 +275,30 @@ export function DashboardBuilder({
   }, [canAdmin, context, dashboard, open]);
 
   const addWidget = (widgetId: DashboardWidgetId) => {
-    const colSpan: 1 | 2 = context === "task" && widgetId === "taskStatusReport" ? 2 : 1;
-    setWidgets((current) => normalizeGrid([...current, { widgetId, row: 0, col: 0, colSpan, params: { limit: 10, sort: "updatedAt" } }]));
+    const colSpan: 1 | 2 =
+      context === "task" && widgetId === "taskStatusReport" ? 2 : 1;
+    const params = widgetSupportsDataParams(widgetId)
+      ? { limit: 10, sort: "updatedAt" as const }
+      : undefined;
+    setWidgets((current) =>
+      normalizeGrid([
+        ...current,
+        { widgetId, row: 0, col: 0, colSpan, params },
+      ]),
+    );
   };
 
-  const updateWidget = (widgetId: DashboardWidgetId, updater: (widget: DashboardWidgetLayout) => DashboardWidgetLayout) => {
-    setWidgets((current) => normalizeGrid(current.map((widget) => (widget.widgetId === widgetId ? updater(widget) : widget))));
+  const updateWidget = (
+    widgetId: DashboardWidgetId,
+    updater: (widget: DashboardWidgetLayout) => DashboardWidgetLayout,
+  ) => {
+    setWidgets((current) =>
+      normalizeGrid(
+        current.map((widget) =>
+          widget.widgetId === widgetId ? updater(widget) : widget,
+        ),
+      ),
+    );
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -187,8 +307,12 @@ export function DashboardBuilder({
       return;
     }
     setWidgets((current) => {
-      const oldIndex = current.findIndex((widget) => widget.widgetId === active.id);
-      const newIndex = current.findIndex((widget) => widget.widgetId === over.id);
+      const oldIndex = current.findIndex(
+        (widget) => widget.widgetId === active.id,
+      );
+      const newIndex = current.findIndex(
+        (widget) => widget.widgetId === over.id,
+      );
       if (oldIndex < 0 || newIndex < 0) {
         return current;
       }
@@ -197,7 +321,7 @@ export function DashboardBuilder({
   };
 
   const submit = async () => {
-    const normalized = normalizeGrid(widgets);
+    const normalized = normalizeGrid(widgets).map(sanitizeWidgetParams);
     const input = {
       name: name.trim(),
       context,
@@ -205,13 +329,23 @@ export function DashboardBuilder({
       widgets: normalized,
     };
     try {
-      const saved = canUpdateSelected && dashboard ? await onUpdate(dashboard.id, { ...input, expectedVersion: dashboard.version }) : await onCreate(input);
+      const saved =
+        canUpdateSelected && dashboard
+          ? await onUpdate(dashboard.id, {
+              ...input,
+              expectedVersion: dashboard.version,
+            })
+          : await onCreate(input);
       setWidgets(saved.widgets);
       onSaved(saved.id);
       showToast({ tone: "success", title: "Dashboard gespeichert" });
       onClose();
     } catch (builderError) {
-      showToast({ tone: "error", title: "Dashboard konnte nicht gespeichert werden", message: errorMessage(builderError) });
+      showToast({
+        tone: "error",
+        title: "Dashboard konnte nicht gespeichert werden",
+        message: errorMessage(builderError),
+      });
     }
   };
 
@@ -233,7 +367,11 @@ export function DashboardBuilder({
       showToast({ tone: "success", title: "Dashboard gelöscht" });
       onClose();
     } catch (deleteError) {
-      showToast({ tone: "error", title: "Dashboard konnte nicht gelöscht werden", message: errorMessage(deleteError) });
+      showToast({
+        tone: "error",
+        title: "Dashboard konnte nicht gelöscht werden",
+        message: errorMessage(deleteError),
+      });
     }
   };
 
@@ -242,10 +380,24 @@ export function DashboardBuilder({
       return;
     }
     try {
-      await onSetDefault(dashboard.id, scopeType, scopeType === "GLOBAL" ? globalDefaultVersion : userDefaultVersion);
-      showToast({ tone: "success", title: scopeType === "GLOBAL" ? "Globaler Standard gesetzt" : "Persönlicher Standard gesetzt" });
+      await onSetDefault(
+        dashboard.id,
+        scopeType,
+        scopeType === "GLOBAL" ? globalDefaultVersion : userDefaultVersion,
+      );
+      showToast({
+        tone: "success",
+        title:
+          scopeType === "GLOBAL"
+            ? "Globaler Standard gesetzt"
+            : "Persönlicher Standard gesetzt",
+      });
     } catch (defaultError) {
-      showToast({ tone: "error", title: "Standard konnte nicht gesetzt werden", message: errorMessage(defaultError) });
+      showToast({
+        tone: "error",
+        title: "Standard konnte nicht gesetzt werden",
+        message: errorMessage(defaultError),
+      });
     }
   };
 
@@ -254,11 +406,19 @@ export function DashboardBuilder({
       <div className="grid gap-5">
         <div className="grid gap-4 md:grid-cols-[1fr_auto]">
           <FormField label="Name" required>
-            <Input value={name} onChange={(event) => setName(event.target.value)} required />
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+            />
           </FormField>
           {canAdmin ? (
             <label className="mt-7 flex h-11 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-medium text-ink">
-              <input type="checkbox" checked={isSystem} onChange={(event) => setIsSystem(event.target.checked)} />
+              <input
+                type="checkbox"
+                checked={isSystem}
+                onChange={(event) => setIsSystem(event.target.checked)}
+              />
               System-Dashboard
             </label>
           ) : null}
@@ -271,24 +431,64 @@ export function DashboardBuilder({
               {availableWidgets.map((widgetId) => {
                 const meta = dashboardWidgetRegistry[widgetId];
                 return (
-                  <Button key={widgetId} size="sm" icon={<Plus size={15} />} onClick={() => addWidget(widgetId)}>
+                  <Button
+                    key={widgetId}
+                    size="sm"
+                    icon={<Plus size={15} />}
+                    onClick={() => addWidget(widgetId)}
+                  >
                     {meta.label}
                   </Button>
                 );
               })}
             </div>
           </div>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={widgets.map((widget) => widget.widgetId)} strategy={verticalListSortingStrategy}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={widgets.map((widget) => widget.widgetId)}
+              strategy={verticalListSortingStrategy}
+            >
               <div className="grid gap-3" data-testid="dashboard-builder-list">
                 {widgets.map((widget) => (
                   <SortableWidgetRow
                     key={widget.widgetId}
                     widget={widget}
-                    onRemove={() => setWidgets((current) => normalizeGrid(current.filter((item) => item.widgetId !== widget.widgetId)))}
-                    onColSpanChange={(colSpan) => updateWidget(widget.widgetId, (item) => ({ ...item, colSpan }))}
-                    onLimitChange={(limit) => updateWidget(widget.widgetId, (item) => ({ ...item, params: { ...item.params, limit: Number.isFinite(limit) ? Math.min(50, Math.max(1, limit)) : 10 } }))}
-                    onSortChange={(sort) => updateWidget(widget.widgetId, (item) => ({ ...item, params: { ...item.params, sort } }))}
+                    onRemove={() =>
+                      setWidgets((current) =>
+                        normalizeGrid(
+                          current.filter(
+                            (item) => item.widgetId !== widget.widgetId,
+                          ),
+                        ),
+                      )
+                    }
+                    onColSpanChange={(colSpan) =>
+                      updateWidget(widget.widgetId, (item) => ({
+                        ...item,
+                        colSpan,
+                      }))
+                    }
+                    onLimitChange={(limit) =>
+                      updateWidget(widget.widgetId, (item) => ({
+                        ...item,
+                        params: {
+                          ...item.params,
+                          limit: Number.isFinite(limit)
+                            ? Math.min(50, Math.max(1, limit))
+                            : 10,
+                        },
+                      }))
+                    }
+                    onSortChange={(sort) =>
+                      updateWidget(widget.widgetId, (item) => ({
+                        ...item,
+                        params: { ...item.params, sort },
+                      }))
+                    }
                   />
                 ))}
               </div>
@@ -299,25 +499,44 @@ export function DashboardBuilder({
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
           <div className="flex flex-wrap gap-2">
             {dashboard ? (
-              <Button icon={<Star size={16} />} onClick={() => void setDefault("USER")}>
+              <Button
+                icon={<Star size={16} />}
+                onClick={() => void setDefault("USER")}
+              >
                 Als mein Standard
               </Button>
             ) : null}
             {dashboard && canAdmin && dashboard.isSystem ? (
-              <Button icon={<Star size={16} />} onClick={() => void setDefault("GLOBAL")}>
+              <Button
+                icon={<Star size={16} />}
+                onClick={() => void setDefault("GLOBAL")}
+              >
                 Als globaler Standard
               </Button>
             ) : null}
             {dashboard && canUpdateSelected ? (
-              <Button className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={16} />} variant="ghost" onClick={() => void deleteSelected()}>
+              <Button
+                className="text-crimson hover:bg-crimson/10"
+                icon={<Trash2 size={16} />}
+                variant="ghost"
+                onClick={() => void deleteSelected()}
+              >
                 Löschen
               </Button>
             ) : null}
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             <Button onClick={onClose}>Abbrechen</Button>
-            <Button variant="primary" icon={<Save size={16} />} loading={saving} disabled={!name.trim() || widgets.length === 0} onClick={() => void submit()}>
-              {canUpdateSelected ? "Speichern" : "Als eigenes Dashboard speichern"}
+            <Button
+              variant="primary"
+              icon={<Save size={16} />}
+              loading={saving}
+              disabled={!name.trim() || widgets.length === 0}
+              onClick={() => void submit()}
+            >
+              {canUpdateSelected
+                ? "Speichern"
+                : "Als eigenes Dashboard speichern"}
             </Button>
           </div>
         </footer>

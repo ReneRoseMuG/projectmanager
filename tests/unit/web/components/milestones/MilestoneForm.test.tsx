@@ -279,17 +279,18 @@ describe("MilestoneForm", () => {
     renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project, otherProject]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
 
     const sidebar = screen.getByTestId("form-sidebar");
+    const sidebarSelects = within(sidebar).getAllByRole("combobox");
     expect(screen.getByDisplayValue(milestone.name)).toBeInTheDocument();
     expect(screen.getByTestId("milestone-description-view")).toHaveValue(milestone.description);
     expect(within(sidebar).getByRole("combobox", { name: "Projekt" })).toHaveValue(String(project.id));
-    expect(within(sidebar).getByRole("button", { name: "Aktiv" })).toHaveAttribute("data-active", "true");
+    expect(sidebarSelects[1]).toHaveValue("active");
     expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
     expect(within(sidebar).getByDisplayValue("2026-06-01")).toBeInTheDocument();
     expect(within(sidebar).getByDisplayValue("2026-06-30")).toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue(milestone.name), { target: { value: "Meilenstein Beta" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Projekt" }), { target: { value: String(otherProject.id) } });
-    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(sidebarSelects[1], { target: { value: "done" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
     const dateInputs = within(sidebar).getAllByDisplayValue(/2026-06-/) as HTMLInputElement[];
     fireEvent.change(dateInputs[0], { target: { value: "2026-07-01" } });

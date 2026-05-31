@@ -17,8 +17,17 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import type { Dashboard } from "@taskmanager/shared-types";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type {
+  Dashboard,
+  DashboardWidgetLayout,
+} from "@taskmanager/shared-types";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ConfirmDialogProvider } from "../../../../../apps/web/src/components/ui/ConfirmDialogProvider";
@@ -29,7 +38,7 @@ function renderWithProviders(ui: ReactElement) {
   return render(
     <ToastProvider>
       <ConfirmDialogProvider>{ui}</ConfirmDialogProvider>
-    </ToastProvider>
+    </ToastProvider>,
   );
 }
 
@@ -41,13 +50,21 @@ function dashboard(overrides: Partial<Dashboard> = {}): Dashboard {
     isSystem: false,
     templateKey: null,
     ownerId: 1,
-    widgets: [{ widgetId: "taskStatusReport", col: 0, row: 0, colSpan: 1, params: { limit: 10, sort: "updatedAt" } }],
+    widgets: [
+      {
+        widgetId: "taskStatusReport",
+        col: 0,
+        row: 0,
+        colSpan: 1,
+        params: { limit: 10, sort: "updatedAt" },
+      },
+    ],
     version: 3,
     createdAt: "2026-05-22T10:00:00.000Z",
     updatedAt: "2026-05-22T10:00:00.000Z",
     isGlobalDefault: false,
     isUserDefault: false,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -71,12 +88,18 @@ describe("DashboardBuilder", () => {
         onUpdate={onUpdate}
         onDelete={vi.fn()}
         onSetDefault={vi.fn()}
-      />
+      />,
     );
 
-    fireEvent.change(screen.getByDisplayValue("Meine Übersicht"), { target: { value: "Meine Lage" } });
-    fireEvent.click(screen.getByRole("button", { name: "Tickets nach Status" }));
-    fireEvent.change(screen.getAllByRole("combobox")[2], { target: { value: "2" } });
+    fireEvent.change(screen.getByDisplayValue("Meine Übersicht"), {
+      target: { value: "Meine Lage" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Tickets nach Status" }),
+    );
+    fireEvent.change(screen.getAllByRole("combobox")[2], {
+      target: { value: "2" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() => expect(onUpdate).toHaveBeenCalled());
@@ -88,22 +111,39 @@ describe("DashboardBuilder", () => {
         isSystem: false,
         expectedVersion: 3,
         widgets: expect.arrayContaining([
-          expect.objectContaining({ widgetId: "taskStatusReport", row: 0, col: 0 }),
-          expect.objectContaining({ widgetId: "ticketStatusReport", row: 1, col: 0, colSpan: 2 })
-        ])
-      })
+          expect.objectContaining({
+            widgetId: "taskStatusReport",
+            row: 0,
+            col: 0,
+          }),
+          expect.objectContaining({
+            widgetId: "ticketStatusReport",
+            row: 1,
+            col: 0,
+            colSpan: 2,
+          }),
+        ]),
+      }),
     );
     expect(onSaved).toHaveBeenCalledWith(7);
   });
 
   it("legt für System-Dashboards ohne Adminrecht eine persönliche Kopie an", async () => {
-    const onCreate = vi.fn().mockResolvedValue(dashboard({ id: 9, isSystem: false, name: "Standard Kopie" }));
+    const onCreate = vi
+      .fn()
+      .mockResolvedValue(
+        dashboard({ id: 9, isSystem: false, name: "Standard Kopie" }),
+      );
 
     renderWithProviders(
       <DashboardBuilder
         open
         context="project"
-        dashboard={dashboard({ isSystem: true, ownerId: null, name: "Standard" })}
+        dashboard={dashboard({
+          isSystem: true,
+          ownerId: null,
+          name: "Standard",
+        })}
         canAdmin={false}
         saving={false}
         userDefaultVersion={0}
@@ -114,17 +154,25 @@ describe("DashboardBuilder", () => {
         onUpdate={vi.fn()}
         onDelete={vi.fn()}
         onSetDefault={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByDisplayValue("Standard Kopie")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Als eigenes Dashboard speichern" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Als eigenes Dashboard speichern" }),
+    );
 
     await waitFor(() => expect(onCreate).toHaveBeenCalled());
-    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ name: "Standard Kopie", isSystem: false }));
+    expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Standard Kopie", isSystem: false }),
+    );
   });
 
-  it("initialisiert Kalender-Dashboards mit Kalender, nächsten Terminen und überfälligen Aufgaben", () => {
+  it("initialisiert Kalender-Dashboards ohne Limit-Parameter für das Kalender-Widget", async () => {
+    const onCreate = vi
+      .fn()
+      .mockResolvedValue(dashboard({ context: "calendar", widgets: [] }));
+
     renderWithProviders(
       <DashboardBuilder
         open
@@ -136,16 +184,48 @@ describe("DashboardBuilder", () => {
         globalDefaultVersion={1}
         onClose={vi.fn()}
         onSaved={vi.fn()}
-        onCreate={vi.fn()}
+        onCreate={onCreate}
         onUpdate={vi.fn()}
         onDelete={vi.fn()}
         onSetDefault={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByDisplayValue("Mein Kalender")).toBeInTheDocument();
-    expect(screen.getByTestId("dashboard-builder-widget-calendar")).toHaveTextContent("Kalender");
-    expect(screen.getByTestId("dashboard-builder-widget-upcomingEvents")).toHaveTextContent("Nächste Termine");
-    expect(screen.getByTestId("dashboard-builder-widget-overdueTasks")).toHaveTextContent("Überfällige Aufgaben");
+    expect(
+      screen.getByTestId("dashboard-builder-widget-calendar"),
+    ).toHaveTextContent("Kalender");
+    expect(
+      screen.getByTestId("dashboard-builder-widget-upcomingEvents"),
+    ).toHaveTextContent("Nächste Termine");
+    expect(
+      screen.getByTestId("dashboard-builder-widget-overdueTasks"),
+    ).toHaveTextContent("Überfällige Aufgaben");
+    expect(
+      within(
+        screen.getByTestId("dashboard-builder-widget-calendar"),
+      ).queryByLabelText("Limit"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(
+        screen.getByTestId("dashboard-builder-widget-calendar"),
+      ).queryByLabelText("Sortierung"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(
+        screen.getByTestId("dashboard-builder-widget-upcomingEvents"),
+      ).getByLabelText("Limit"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Als eigenes Dashboard speichern" }),
+    );
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalled());
+    const savedWidgets = onCreate.mock.calls[0][0]
+      .widgets as DashboardWidgetLayout[];
+    expect(
+      savedWidgets.find((widget) => widget.widgetId === "calendar"),
+    ).toEqual(expect.not.objectContaining({ params: expect.anything() }));
   });
 });

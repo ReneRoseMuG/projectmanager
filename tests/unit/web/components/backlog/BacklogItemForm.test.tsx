@@ -128,16 +128,17 @@ describe("BacklogItemForm", () => {
     render(<BacklogItemForm open item={backlogItem} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
 
     const sidebar = screen.getByTestId("form-sidebar");
+    const sidebarSelects = within(sidebar).getAllByRole("combobox");
     expect(screen.getByTestId("parent-context-field")).toHaveTextContent("PROJ-10");
     expect(screen.getByDisplayValue(backlogItem.title)).toBeInTheDocument();
     expect(screen.getByTestId("backlog-item-description-view")).toHaveValue(backlogItem.description);
-    expect(within(sidebar).getByRole("button", { name: "Offen" })).toHaveAttribute("data-active", "true");
+    expect(sidebarSelects[0]).toHaveValue("open");
     expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
     expect(within(sidebar).getByRole("combobox", { name: "Feature" })).toHaveValue("");
     expect(within(sidebar).getByLabelText("Sortierung")).toHaveValue(0);
 
     fireEvent.change(screen.getByDisplayValue(backlogItem.title), { target: { value: "Backlog Beta" } });
-    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(sidebarSelects[0], { target: { value: "done" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Feature" }), { target: { value: String(feature.id) } });
     fireEvent.change(within(sidebar).getByLabelText("Sortierung"), { target: { value: "12" } });

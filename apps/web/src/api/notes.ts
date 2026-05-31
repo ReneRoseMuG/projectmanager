@@ -1,6 +1,10 @@
 import type { Note, NoteInput, NoteUpdate } from "@taskmanager/shared-types";
 import { api } from "./client";
 
+export async function getNote(id: number): Promise<Note> {
+  return api.get(`notes/${id}`).json<Note>();
+}
+
 export async function getProjectNotes(projectId: number): Promise<Note[]> {
   return api.get(`projects/${projectId}/notes`).json<Note[]>();
 }

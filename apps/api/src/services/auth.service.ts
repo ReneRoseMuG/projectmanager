@@ -1,6 +1,6 @@
 import type { CurrentUser, LoginRequest, SetPasswordRequest } from "@taskmanager/shared-types";
 import bcrypt from "bcryptjs";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { AppConfig } from "../config.js";
 import { config } from "../config.js";
 import type { DbClient } from "../db/client.js";

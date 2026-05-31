@@ -54,7 +54,7 @@ export function WikiPage() {
     setFormOpen(true);
   };
 
-  const submitForm = async (input: WikiPageInput, relatedPageIds: number[]) => {
+  const submitForm = async (input: WikiPageInput) => {
     try {
       const created = await wiki.createWikiPage(input);
       showToast({ tone: "success", title: "Wiki-Seite erstellt" });

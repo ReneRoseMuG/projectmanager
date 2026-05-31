@@ -1,7 +1,7 @@
 import type { BacklogItem, BacklogItemInput, BacklogStatus, DraftComment, Feature } from "@taskmanager/shared-types";
 import { BookOpen, Inbox, ListChecks, ListTodo, Send, Users } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
 import { useAuth } from "../../hooks/useAuth";
 import { useCatalogs } from "../../hooks/useCatalogs";
@@ -48,7 +48,6 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
   const [sortOrder, setSortOrder] = useState(0);
   const [saving, setSaving] = useState(false);
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
-  const selectedFeature = useMemo(() => features.find((feature) => feature.id === featureId) ?? null, [featureId, features]);
 
   useEffect(() => {
     if (!open) {

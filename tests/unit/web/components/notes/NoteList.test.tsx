@@ -29,7 +29,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import type { Note } from "@taskmanager/shared-types";
-import { fireEvent, screen } from "@testing-library/dom";
+import { fireEvent, screen, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NoteCard } from "../../../../../apps/web/src/components/notes/NoteCard";
@@ -58,6 +58,7 @@ const notes: Note[] = [
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 function articleFor(title: string) {
@@ -108,6 +109,34 @@ describe("NoteList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Neue Notiz" }));
 
     expect(onCreate).toHaveBeenCalledTimes(1);
+  });
+  it("oeffnet Notizen aus dem Board als eigene Detailseite im neuen Tab", () => {
+    vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(<NoteList notes={notes} owner={{ type: "project", id: 10 }} onCreate={vi.fn().mockResolvedValue(undefined)} onEdit={vi.fn()} onDelete={vi.fn()} />);
+
+    fireEvent.click(within(articleFor("Entscheidung Alpha")).getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /In Tab/ }));
+
+    expect(window.open).toHaveBeenCalledWith(
+      "/notes/1?returnTo=%2Fprojects%2F10%3Ftab%3Dnotes&standalone=1",
+      "_blank"
+    );
+  });
+
+  it("oeffnet Notizen aus dem Listenmodus als eigene Detailseite im neuen Tab", () => {
+    vi.spyOn(window, "open").mockImplementation(() => null);
+
+    render(<NoteList notes={notes} owner={{ type: "ticket", id: 5 }} onCreate={vi.fn().mockResolvedValue(undefined)} onEdit={vi.fn()} onDelete={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Liste" }));
+    fireEvent.click(within(articleFor("Konzept Beta")).getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /In Tab/ }));
+
+    expect(window.open).toHaveBeenCalledWith(
+      "/notes/2?returnTo=%2Ftickets%2F5%3Ftab%3Dnotes&standalone=1",
+      "_blank"
+    );
   });
 });
 

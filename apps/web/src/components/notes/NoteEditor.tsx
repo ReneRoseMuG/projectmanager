@@ -16,9 +16,11 @@ interface NoteEditorProps {
   open: boolean;
   onSave: (id: number, input: NoteUpdate) => Promise<unknown>;
   onClose: () => void;
+  variant?: "modal" | "page";
+  onOpenInTab?: () => void;
 }
 
-export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
+export function NoteEditor({ note, open, onSave, onClose, variant = "modal", onOpenInTab }: NoteEditorProps) {
   const { confirm } = useConfirm();
   const [title, setTitle] = useState("Ohne Titel");
   const [content, setContent] = useState("");
@@ -100,6 +102,8 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
       saving={saving}
       submitLabel="Speichern"
       cancelLabel="Schließen"
+      variant={variant}
+      onOpenInTab={onOpenInTab}
       footerStart={
         note ? (
           <div className="flex flex-wrap items-center gap-2">

@@ -33,12 +33,13 @@ describe("TicketForm", () => {
     renderWithProviders(<TicketForm open ticket={ticket} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
 
     const sidebar = screen.getByTestId("form-sidebar");
+    const sidebarSelects = within(sidebar).getAllByRole("combobox");
     expect(screen.getByTestId("parent-context-field")).toHaveTextContent("PROJ-30");
     expect(screen.getByDisplayValue(ticket.title)).toBeInTheDocument();
     expect(screen.getByTestId("ticket-description-view")).toHaveValue(ticket.description);
-    expect(within(sidebar).getByRole("button", { name: "Bug" })).toBeInTheDocument();
-    expect(within(sidebar).getByRole("button", { name: "Mittel" })).toBeInTheDocument();
-    expect(within(sidebar).getAllByRole("button", { name: "Offen" }).some((button) => button.getAttribute("data-active") === "true")).toBe(true);
+    expect(sidebarSelects[0]).toHaveValue("open");
+    expect(sidebarSelects[1]).toHaveValue("bug");
+    expect(sidebarSelects[2]).toHaveValue("medium");
     expect(within(sidebar).getByRole("combobox", { name: "Zuständig" })).toHaveValue("1");
     expect(within(sidebar).getByRole("combobox", { name: "Meldende Person" })).toHaveValue("1");
 

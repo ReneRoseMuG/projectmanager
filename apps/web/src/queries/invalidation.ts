@@ -226,6 +226,10 @@ export async function invalidateNotes(queryClient: QueryClient, ownerType: NoteO
   await invalidateMany(queryClient, [queryKeys.notes.owner(ownerType, ownerId), ...noteOwnerKeys(ownerType, ownerId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }
 
+export async function invalidateNoteDetail(queryClient: QueryClient, noteId: number): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.notes.root, queryKeys.notes.detail(noteId), queryKeys.dashboards.root, queryKeys.globalSearch.root]);
+}
+
 export async function invalidateAllNotes(queryClient: QueryClient): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: queryKeys.notes.root });
 }

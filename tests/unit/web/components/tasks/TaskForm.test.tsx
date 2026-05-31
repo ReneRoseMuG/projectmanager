@@ -30,21 +30,21 @@ describe("TaskForm", () => {
     renderWithProviders(<TaskForm open task={task} onSubmit={onSubmit} onClose={vi.fn()} />);
 
     const sidebar = screen.getByTestId("form-sidebar");
+    const sidebarSelects = within(sidebar).getAllByRole("combobox");
     expect(screen.getByTestId("parent-context-field")).toHaveTextContent("PROJ-30");
     expect(screen.getByDisplayValue(task.title)).toBeInTheDocument();
     expect(screen.getByTestId("task-description-view")).toHaveValue(task.description);
-    expect(within(sidebar).getAllByRole("button", { name: "Offen" }).some((button) => button.getAttribute("data-active") === "true")).toBe(true);
-    const sidebarSelects = within(sidebar).getAllByRole("combobox");
-    expect(sidebarSelects[0]).toHaveValue("medium");
-    expect(sidebarSelects[1]).toHaveValue("1");
+    expect(sidebarSelects[0]).toHaveValue("todo");
+    expect(sidebarSelects[1]).toHaveValue("medium");
+    expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
     expect(within(sidebar).getByRole("button", { name: "Tags 0" })).toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue(task.title), { target: { value: "Aufgabe Beta" } });
-    fireEvent.click(within(sidebar).getByRole("button", { name: "In Arbeit" }));
+    fireEvent.change(sidebarSelects[0], { target: { value: "in_progress" } });
     const dueDate = sidebar.querySelector('input[type="date"]');
     expect(dueDate).not.toBeNull();
     fireEvent.change(dueDate as HTMLInputElement, { target: { value: "2026-06-20" } });
-    fireEvent.change(sidebarSelects[1], { target: { value: "" } });
+    fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
     fireEvent.click(within(sidebar).getByRole("button", { name: "Tags 0" }));
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 

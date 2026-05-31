@@ -48,7 +48,13 @@ function toCandidate(
 }
 
 function toDialogItems(items: StatusCascadeCandidate[]) {
-  return items.map(({ statusSortOrder: _statusSortOrder, ...item }) => item);
+  return items.map((item) => ({
+    id: item.id,
+    title: item.title,
+    status: item.status,
+    statusLabel: item.statusLabel,
+    version: item.version,
+  }));
 }
 
 function emptySelection(): StatusCascadeSelection {

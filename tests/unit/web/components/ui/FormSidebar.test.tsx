@@ -5,12 +5,11 @@
  * FormSidebar
  *
  * Abgedeckte Regeln:
- * - Die Stammdaten-Sidebar rendert Inhalt, Collapse-Zustand und gespeicherte Breite.
+ * - Die Stammdaten-Sidebar rendert Inhalt und Collapse-Zustand mit fester Breite.
  * - Mobile Viewports starten kollabiert.
- * - Drag-Resize bleibt innerhalb der erlaubten Breiten.
  *
  * Fehlerfälle:
- * - Ungültige Breiten dürfen die Sidebar nicht außerhalb der Grenzen vergrößern.
+ * - Der Collapse-Zustand darf Inhalte nicht dauerhaft verlieren.
  *
  * Ziel:
  * Die gemeinsame Sidebar gegen Layout- und Persistenzregressionen absichern.
@@ -30,8 +29,8 @@ function mockMatchMedia(matches: boolean) {
       removeEventListener: vi.fn(),
       addListener: vi.fn(),
       removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
-    }))
+      dispatchEvent: vi.fn(),
+    })),
   });
 }
 
@@ -46,16 +45,16 @@ afterEach(() => {
 });
 
 describe("FormSidebar", () => {
-  it("rendert Inhalt mit gespeicherter Breite", () => {
+  it("rendert Inhalt mit fester Breite", () => {
     window.localStorage.setItem("project-sidebar-width", "180");
 
     render(
       <FormSidebar storageKey="project-sidebar">
         <div>Metadaten</div>
-      </FormSidebar>
+      </FormSidebar>,
     );
 
-    expect(screen.getByTestId("form-sidebar")).toHaveStyle({ width: "180px" });
+    expect(screen.getByTestId("form-sidebar")).toHaveStyle({ width: "260px" });
     expect(screen.getByText("Metadaten")).toBeInTheDocument();
   });
 
@@ -65,7 +64,7 @@ describe("FormSidebar", () => {
     render(
       <FormSidebar storageKey="task-sidebar">
         <div>Metadaten</div>
-      </FormSidebar>
+      </FormSidebar>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Stammdaten schließen" }));
@@ -81,40 +80,10 @@ describe("FormSidebar", () => {
     render(
       <FormSidebar storageKey="mobile-sidebar">
         <div>Metadaten</div>
-      </FormSidebar>
+      </FormSidebar>,
     );
 
     expect(screen.getByTestId("form-sidebar")).toHaveStyle({ width: "32px" });
     expect(screen.getByText("Stammdaten")).toBeInTheDocument();
-  });
-
-  it("begrenzt Drag-Resize auf die maximale Breite", () => {
-    render(
-      <FormSidebar storageKey="resize-sidebar">
-        <div>Metadaten</div>
-      </FormSidebar>
-    );
-
-    fireEvent.mouseDown(screen.getByRole("button", { name: "Sidebar-Breite ändern" }), { clientX: 300 });
-    fireEvent.mouseMove(window, { clientX: 100 });
-    fireEvent.mouseUp(window);
-
-    expect(screen.getByTestId("form-sidebar")).toHaveStyle({ width: "340px" });
-  });
-
-  it("begrenzt Drag-Resize auf die minimale Breite", () => {
-    window.localStorage.setItem("resize-min-sidebar-width", "220");
-
-    render(
-      <FormSidebar storageKey="resize-min-sidebar">
-        <div>Metadaten</div>
-      </FormSidebar>
-    );
-
-    fireEvent.mouseDown(screen.getByRole("button", { name: "Sidebar-Breite ändern" }), { clientX: 200 });
-    fireEvent.mouseMove(window, { clientX: 500 });
-    fireEvent.mouseUp(window);
-
-    expect(screen.getByTestId("form-sidebar")).toHaveStyle({ width: "160px" });
   });
 });

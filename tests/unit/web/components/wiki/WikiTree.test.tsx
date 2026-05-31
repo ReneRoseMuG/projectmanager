@@ -88,8 +88,9 @@ describe("WikiTree", () => {
   it("markiert aktive und inaktive Nodes im Sidebar-Stil", () => {
     renderTree();
 
-    expect(screen.getByRole("link", { name: "Unterseite" })).toHaveClass("bg-white/10", "text-white");
-    expect(screen.getByRole("link", { name: "Rootseite" })).toHaveClass("text-white/75", "hover:bg-white/10");
+    expect(screen.getByRole("link", { name: "Unterseite" }).closest(".wiki-tree-nav-row")).toHaveClass("wiki-tree-nav-row-active");
+    expect(screen.getByRole("link", { name: "Rootseite" }).closest(".wiki-tree-nav-row")).not.toHaveClass("wiki-tree-nav-row-active");
+    expect(screen.getByRole("link", { name: "Rootseite" })).toHaveClass("wiki-tree-nav-link");
   });
 
   it("behält Root- und Unterseiten-Erstellung bei", () => {

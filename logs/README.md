@@ -2,6 +2,12 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 31.05.26 | 16:36:09 | Fix | API-Testlauf ausführen | ✅ |
+| 31.05.26 | 16:19:31 | Feature | Note Details in neuem Tab | ✅ |
+| 31.05.26 | 15:56:10 | Fix | Web-Testdrift | ✅ |
+| 31.05.26 | 15:45:57 | Fix | Lint Restfehler | ✅ |
+| 31.05.26 | 15:33:31 | Fix | Lint Cleanup | ✅ |
+| 31.05.26 | 12:45:46 | Fix | Dashboard Kalender Limit | ✅ |
 | 31.05.26 | 08:17:40 | Fix | Notizkarten Menü und Footer | ✅ |
 | 31.05.26 | 08:11:45 | Fix | Notizeditor Inhalt und Details | ✅ |
 | 31.05.26 | 08:05:43 | Fix | Kalenderwidget Footer-Zähler | ✅ |

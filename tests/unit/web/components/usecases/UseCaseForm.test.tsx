@@ -30,6 +30,7 @@ describe("UseCaseForm", () => {
     renderWithProviders(<UseCaseForm open useCase={useCase} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} />);
 
     const sidebar = screen.getByTestId("form-sidebar");
+    const sidebarSelects = within(sidebar).getAllByRole("combobox");
     expect(screen.queryByTestId("parent-context-field")).not.toBeInTheDocument();
     expect(screen.getByDisplayValue(useCase.title)).toBeInTheDocument();
     expect(screen.getByTestId("use-case-content-view")).toHaveValue(useCase.content);
@@ -37,13 +38,13 @@ describe("UseCaseForm", () => {
     expect(screen.queryByLabelText("Sortierung")).not.toBeInTheDocument();
     expect(within(sidebar).getByRole("combobox", { name: "Feature" })).toHaveValue(String(feature.id));
     expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
-    expect(within(sidebar).getByRole("button", { name: "Aktiv" })).toHaveAttribute("data-active", "true");
+    expect(sidebarSelects[2]).toHaveValue("active");
     expect(within(sidebar).queryByText(/Tags/i)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue(useCase.title), { target: { value: "Use Case Beta" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Feature" }), { target: { value: "" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
-    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(sidebarSelects[2], { target: { value: "done" } });
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>

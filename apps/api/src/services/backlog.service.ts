@@ -141,10 +141,6 @@ async function getUseCaseJournalObject(database: DbClient, useCaseId: number): P
   return makeJournalObject("useCase", useCase.id, useCase.title);
 }
 
-async function optionalObjectLabel(getObject: () => Promise<JournalObjectRef>, id: number | null): Promise<string | null> {
-  return id === null ? null : (await getObject()).label;
-}
-
 function backlogJournalObject(record: BacklogItemRecord): JournalObjectRef {
   return makeJournalObject("backlogItem", record.id, record.title);
 }

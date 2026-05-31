@@ -64,7 +64,6 @@ import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
-import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 import { UserSelectField } from "../users/UserSelectField";
