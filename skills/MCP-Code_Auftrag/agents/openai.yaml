@@ -1,0 +1,7 @@
+interface:
+  display_name: "MCP-Code Auftrag"
+  short_description: "Arbeitsaufträge aus dem Projekt-Manager-MCP ausführen"
+  default_prompt: "Use $MCP-Code_Auftrag to process a Projekt Manager MCP work order from a parent reference, load recursive context, ask for direct execution or planning, then optionally log back to the parent."
+
+policy:
+  allow_implicit_invocation: true
