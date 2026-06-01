@@ -12,7 +12,7 @@ import type {
   TicketStatus,
   TicketType,
 } from "@taskmanager/shared-types";
-import { ClipboardList, Flag, ListChecks, Users } from "lucide-react";
+import { Bug, Flag, ListChecks, ListTodo, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DraftFile } from "../../types";
@@ -381,7 +381,7 @@ export function TaskForm({
         open={open}
         title={task ? "Aufgabe bearbeiten" : "Aufgabe anlegen"}
         objectReference={task ? objectReference("task", task.id) : undefined}
-        icon={<ClipboardList size={20} />}
+        icon={<ListTodo size={20} />}
         breadcrumb={["Aufgaben", task ? task.title : "Neu"]}
         submitLabel={
           saving
@@ -529,7 +529,7 @@ export function TaskForm({
                   title: subtask.title,
                   badge: "Wird erstellt",
                 }))}
-                emptyIcon={<ListChecks size={22} />}
+                emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Subtasks vorgemerkt"
                 showLinkExisting={false}
                 onCreateNew={() => setSubtaskDraftOpen(true)}
@@ -575,7 +575,7 @@ export function TaskForm({
                     ? [{ title: item.draft.title, badge: "Wird erstellt" }]
                     : [],
                 )}
-                emptyIcon={<ClipboardList size={22} />}
+                emptyIcon={<Bug size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
                 showLinkExisting={ticketCandidateOwner !== null}
                 onLinkExisting={() => setTicketLinkOpen(true)}
@@ -877,7 +877,7 @@ function SubtaskDraftDialog({
     <FormModal
       open={open}
       title="Subtask vormerken"
-      icon={<ListChecks size={20} />}
+      icon={<ListTodo size={20} />}
       breadcrumb={["Aufgaben", "Subtask"]}
       submitLabel="Vormerken"
       onSubmit={submit}
@@ -969,7 +969,7 @@ function TicketDraftDialog({
     <FormModal
       open={open}
       title="Ticket vormerken"
-      icon={<ClipboardList size={20} />}
+      icon={<Bug size={20} />}
       breadcrumb={["Aufgaben", "Ticket"]}
       submitLabel="Vormerken"
       onSubmit={submit}

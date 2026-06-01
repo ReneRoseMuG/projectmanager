@@ -254,7 +254,7 @@ function CollapsedNavigationRow({
         `relative flex h-10 w-10 items-center justify-center rounded-md transition focus:outline-none focus:ring-2 focus:ring-white/20 ${isActive ? "bg-white/10 text-white" : "text-white/75 hover:bg-white/5 hover:text-white"}`
       }
     >
-      <Icon size={17} />
+      <Icon size={16} />
       {allowStandalone ? (
         <button
           type="button"

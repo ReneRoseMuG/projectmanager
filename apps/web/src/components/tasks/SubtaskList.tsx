@@ -1,5 +1,5 @@
 import type { Task, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
-import { Check, ListChecks, Plus, Trash2 } from "lucide-react";
+import { Check, ListTodo, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { catalogEntriesByKind, isCatalogStatusClosed } from "../../utils/catalogs";
@@ -53,7 +53,7 @@ export function SubtaskList({ subtasks, onCreate, onUpdate, onDelete }: SubtaskL
       </section>
 
       <section className="grid gap-2 rounded-lg border border-line bg-white p-4 shadow-card">
-        {subtasks.length === 0 ? <EmptyState icon={<ListChecks size={20} />} title="Noch keine Tasks" body="Zerlege die Aufgabe in kleinere Schritte." tone="fern" variant="default" className="p-6" /> : null}
+        {subtasks.length === 0 ? <EmptyState icon={<ListTodo size={20} />} title="Noch keine Tasks" body="Zerlege die Aufgabe in kleinere Schritte." tone="fern" variant="default" className="p-6" /> : null}
         {subtasks.map((subtask) => {
           const done = isCatalogStatusClosed(catalogs.entries, "workStatus", subtask.status);
           return (

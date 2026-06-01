@@ -123,6 +123,17 @@ afterEach(() => {
 });
 
 describe("BacklogItemForm", () => {
+  it("rendert das FormModal-Header-Icon mit 20px", () => {
+    const { container } = render(<BacklogItemForm open item={backlogItem} features={[]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    const headerIcon = container.querySelector(".lucide-inbox");
+
+    expect(headerIcon).toBeInTheDocument();
+    expect(headerIcon).toHaveAttribute("width", "20");
+    expect(headerIcon).toHaveAttribute("height", "20");
+    expect(container.querySelector(".lucide-inbox[width='21']")).not.toBeInTheDocument();
+  });
+
   it("verdrahtet Body, Parent-Kontext und Sidebar-Felder mit Submit-Payload", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(<BacklogItemForm open item={backlogItem} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);

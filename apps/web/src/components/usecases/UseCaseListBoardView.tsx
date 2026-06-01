@@ -1,5 +1,5 @@
 import type { UseCase } from "@taskmanager/shared-types";
-import { BookOpen } from "lucide-react";
+import { Layers3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
 import { EmptyState } from "../ui/EmptyState";
@@ -54,7 +54,7 @@ export function UseCaseListBoardView({ useCases, viewMode, onViewModeChange, onC
       onItemStatusChange={onStatusChange ? (useCase, status) => onStatusChange(useCase, status as UseCase["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
-      emptyState={<EmptyState icon={<BookOpen size={22} />} title="Keine Use Cases" body="Lege Use Cases an, um fachliche Abläufe zu beschreiben." tone="violet" variant="tinted" />}
+      emptyState={<EmptyState icon={<Layers3 size={22} />} title="Keine Use Cases" body="Lege Use Cases an, um fachliche Abläufe zu beschreiben." tone="violet" variant="tinted" />}
       renderCard={(useCase) => <UseCaseCard useCase={useCase} onOpen={onOpen} onStatusChange={onStatusChange} />}
       renderRow={(useCase) => <UseCaseCard useCase={useCase} variant="row" onOpen={onOpen} onStatusChange={onStatusChange} />}
     />

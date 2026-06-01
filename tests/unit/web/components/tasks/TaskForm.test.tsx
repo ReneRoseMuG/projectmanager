@@ -25,6 +25,28 @@ import { addPendingComment, changeInput, clickTab, getFileInput, renderWithProvi
 import { TaskForm } from "../../../../../apps/web/src/components/tasks/TaskForm";
 
 describe("TaskForm", () => {
+  it("verwendet kanonische Aufgaben- und Ticket-Icons in Header und Pending-States", () => {
+    renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    const headerIcon = document.querySelector(".lucide-list-todo");
+    expect(headerIcon).toBeInTheDocument();
+    expect(headerIcon).toHaveAttribute("width", "20");
+    expect(headerIcon).toHaveAttribute("height", "20");
+
+    clickTab("Subtasks");
+    expect(screen.getByText("Keine Subtasks vorgemerkt")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-list-todo")).toBeInTheDocument();
+
+    clickTab("Tickets");
+    expect(screen.getByText("Keine Tickets vorgemerkt")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-bug")).toBeInTheDocument();
+    expect(document.querySelector(".lucide-clipboard-list")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
+    const ticketDraftIcon = document.querySelector(".lucide-bug[width='20']");
+    expect(ticketDraftIcon).toBeInTheDocument();
+  });
+
   it("verdrahtet Body, Parent-Kontext und Sidebar-Felder mit Submit-Payload", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     renderWithProviders(<TaskForm open task={task} onSubmit={onSubmit} onClose={vi.fn()} />);

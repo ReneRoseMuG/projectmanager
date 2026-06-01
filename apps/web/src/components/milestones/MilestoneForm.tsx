@@ -10,10 +10,13 @@ import type {
   Tag,
 } from "@taskmanager/shared-types";
 import {
+  BookOpen,
+  Bug,
   Flag,
   FolderKanban,
   Link2,
   ListChecks,
+  ListTodo,
   Trash2,
   Users,
 } from "lucide-react";
@@ -446,7 +449,7 @@ export function MilestoneForm({
         open={open}
         title={milestone ? "Meilenstein bearbeiten" : "Meilenstein anlegen"}
         objectReference={milestone ? objectReference("milestone", milestone.id) : undefined}
-        icon={<Flag size={21} />}
+        icon={<Flag size={20} />}
         breadcrumb={[
           "Meilensteine",
           milestone ? milestone.name : "Neuer Meilenstein",
@@ -580,7 +583,7 @@ export function MilestoneForm({
                       title="Feature verknüpfen"
                       variant="secondary"
                       icon={<Link2 size={17} />}
-                      className="h-9 w-9 bg-transparent px-0"
+                      className="bg-transparent"
                       disabled={availableFeatures.length === 0}
                       onClick={() => setFeatureLinkOpen(true)}
                     />
@@ -590,7 +593,7 @@ export function MilestoneForm({
               )
             ) : (
               <EmptyState
-                icon={<FolderKanban size={22} />}
+                icon={<BookOpen size={22} />}
                 title="Features sind nach dem Speichern verfügbar."
                 tone="violet"
                 variant="tinted"
@@ -605,7 +608,7 @@ export function MilestoneForm({
               <OwnerTaskBoard owner={{ type: "milestone", id: milestone.id }} />
             ) : (
               <EmptyState
-                icon={<Flag size={22} />}
+                icon={<ListTodo size={22} />}
                 title="Aufgaben sind nach dem Speichern verfügbar."
                 tone="teal"
                 variant="tinted"
@@ -622,7 +625,7 @@ export function MilestoneForm({
               />
             ) : (
               <EmptyState
-                icon={<Flag size={22} />}
+                icon={<Bug size={22} />}
                 title="Tickets sind nach dem Speichern verfügbar."
                 tone="teal"
                 variant="tinted"
@@ -784,7 +787,7 @@ function FeatureLinkDialog({
           </Select>
         ) : (
           <EmptyState
-            icon={<FolderKanban size={22} />}
+            icon={<BookOpen size={22} />}
             title="Keine Features verfügbar"
             tone="violet"
             variant="tinted"

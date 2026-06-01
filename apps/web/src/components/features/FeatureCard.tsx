@@ -1,5 +1,5 @@
 import type { Feature } from "@taskmanager/shared-types";
-import { ArrowRight, Edit3, ExternalLink, FileText, Trash2 } from "lucide-react";
+import { ArrowRight, Edit3, ExternalLink, Layers3, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { objectReference } from "../../lib/references";
 import { catalogColor } from "../../utils/catalogs";
@@ -87,7 +87,7 @@ function FeatureCardFooter({ feature }: { feature: Feature }) {
   return (
     <div className="group flex items-center justify-between gap-3">
       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-steel-700">
-        <FileText size={14} />
+        <Layers3 size={14} />
         {feature.useCaseCount} Use Cases
       </span>
       <span className="flex h-9 w-9 items-center justify-center rounded-md bg-steel-100 text-steel-700 transition group-hover:bg-steel-700 group-hover:text-white" aria-hidden="true">

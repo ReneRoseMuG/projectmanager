@@ -1,4 +1,4 @@
-import { BookOpen, Bug, CircleHelp, ClipboardList, FileText, Flag, FolderKanban, ListTodo, Paperclip, Search, Sparkles, StickyNote, X } from "lucide-react";
+import { BookOpen, Bug, CircleHelp, FileText, Flag, FolderKanban, ListTodo, Paperclip, Search, Sparkles, StickyNote, X } from "lucide-react";
 import type { Ticket } from "@taskmanager/shared-types";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -38,7 +38,7 @@ function ticketIcon(ticket: Ticket) {
   if (ticket.type === "question") {
     return <CircleHelp size={17} />;
   }
-  return <ClipboardList size={17} />;
+  return <Bug size={17} />;
 }
 
 export function GlobalSearch({ open, initialQuery = "", onClose }: GlobalSearchProps) {

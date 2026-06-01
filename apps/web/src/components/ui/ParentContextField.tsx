@@ -1,5 +1,5 @@
 import type { VisibleParentContext, VisibleParentType } from "@taskmanager/shared-types";
-import { BookOpen, Bug, ClipboardList, FileText, Flag, FolderKanban, Layers3, type LucideIcon } from "lucide-react";
+import { BookOpen, Bug, FileText, Flag, FolderKanban, Layers3, ListTodo, type LucideIcon } from "lucide-react";
 
 interface ParentContextFieldProps {
   parents?: VisibleParentContext[] | null;
@@ -28,7 +28,7 @@ const parentReferencePrefixes: Record<VisibleParentType, string> = {
 const parentIcons = {
   project: FolderKanban,
   milestone: Flag,
-  task: ClipboardList,
+  task: ListTodo,
   ticket: Bug,
   feature: BookOpen,
   useCase: Layers3,

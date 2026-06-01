@@ -11,7 +11,7 @@ import type {
   UseCase,
   UseCaseInput,
 } from "@taskmanager/shared-types";
-import { BookOpen, Bug, ListChecks, ListTodo, Trash2, Users } from "lucide-react";
+import { BookOpen, Bug, Layers3, ListChecks, ListTodo, Trash2, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -349,7 +349,7 @@ export function UseCaseForm({
         open={open}
         title={useCase ? "Use Case bearbeiten" : "Use Case anlegen"}
         objectReference={useCase ? objectReference("useCase", useCase.id) : undefined}
-        icon={<BookOpen size={21} />}
+        icon={<Layers3 size={20} />}
         breadcrumb={["Use Cases", useCase ? useCase.title : "Neu"]}
         onSubmit={submit}
         saving={saving}

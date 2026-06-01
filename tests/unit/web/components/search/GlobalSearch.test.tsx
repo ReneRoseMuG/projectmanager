@@ -132,4 +132,45 @@ describe("GlobalSearch", () => {
 
     expect(navigateMock).toHaveBeenCalledWith("/tasks/2");
   });
+
+  it("verwendet Bug als Fallback-Icon fÃ¼r unbekannte Ticket-Typen", () => {
+    const { container } = renderSearch({
+      ...emptyData,
+      tickets: [
+        {
+          id: 9,
+          parentId: null,
+          type: "custom" as GlobalSearchData["tickets"][number]["type"],
+          title: "Unbekannter Ticket-Typ",
+          description: null,
+          status: "open",
+          priority: "medium",
+          resolution: null,
+          reporterUserId: null,
+          reporterUser: null,
+          responsibleUserId: null,
+          responsibleUser: null,
+          environment: null,
+          affectedVersion: null,
+          dueDate: null,
+          resolvedAt: null,
+          position: 0,
+          version: 1,
+          createdAt: "2026-05-31T00:00:00.000Z",
+          updatedAt: "2026-05-31T00:00:00.000Z",
+          tags: [],
+          subTicketCount: 0,
+          attachmentCount: 0,
+          noteCount: 0,
+          commentCount: 0
+        }
+      ]
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("Global suchen"), { target: { value: "Unbekannter" } });
+
+    const result = screen.getByRole("button", { name: /Unbekannter Ticket-Typ/ });
+    expect(result.querySelector(".lucide-bug")).toBeInTheDocument();
+    expect(container.querySelector(".lucide-clipboard-list")).not.toBeInTheDocument();
+  });
 });

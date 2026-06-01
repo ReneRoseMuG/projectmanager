@@ -316,7 +316,10 @@ describe("Sidebar", () => {
       screen.queryByPlaceholderText("Alles durchsuchen"),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Features")).not.toBeInTheDocument();
-    expect(screen.getByTitle("Features")).toBeInTheDocument();
+    const featureLink = screen.getByTitle("Features");
+    expect(featureLink).toBeInTheDocument();
+    expect(featureLink.querySelector("svg")).toHaveAttribute("width", "16");
+    expect(featureLink.querySelector("svg")).toHaveAttribute("height", "16");
 
     const standaloneButton = screen.getByTitle("Features in neuem Tab öffnen");
 
