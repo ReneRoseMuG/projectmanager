@@ -36,22 +36,22 @@ export function useFeatures(featureId?: number) {
 
   const createFeatureMutation = useMutation({
     mutationFn: createFeatureRequest,
-    onSuccess: async (created) => {
-      await invalidateFeatureScope(queryClient, created.id);
+    onSuccess: (created) => {
+      void invalidateFeatureScope(queryClient, created.id);
     }
   });
 
   const updateFeatureMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: FeatureUpdate }) => updateFeatureRequest(id, input),
-    onSuccess: async (updated) => {
-      await invalidateFeatureScope(queryClient, updated.id);
+    onSuccess: (updated) => {
+      void invalidateFeatureScope(queryClient, updated.id);
     }
   });
 
   const removeFeatureMutation = useMutation({
     mutationFn: deleteFeatureRequest,
-    onSuccess: async (_result, id) => {
-      await invalidateFeatureScope(queryClient, id);
+    onSuccess: (_result, id) => {
+      void invalidateFeatureScope(queryClient, id);
     }
   });
 

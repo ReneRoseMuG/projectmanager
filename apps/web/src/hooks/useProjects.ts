@@ -43,21 +43,21 @@ export function useProjects(projectId?: number) {
       }
       return created;
     },
-    onSuccess: async (created) => {
-      await invalidateProjectScope(queryClient, created.id);
+    onSuccess: (created) => {
+      void invalidateProjectScope(queryClient, created.id);
     }
   });
 
   const updateProjectMutation = useMutation({
     mutationFn: async ({ id, input, tagIds }: { id: number; input: ProjectUpdate; tagIds?: number[] }) => {
-      const updated = await updateProjectRequest(id, input);
-      if (tagIds) {
-        await setProjectTags(id, tagIds);
-      }
+      const [updated] = await Promise.all([
+        updateProjectRequest(id, input),
+        tagIds !== undefined ? setProjectTags(id, tagIds) : Promise.resolve(undefined),
+      ]);
       return updated;
     },
-    onSuccess: async (updated) => {
-      await invalidateProjectScope(queryClient, updated.id);
+    onSuccess: (updated) => {
+      void invalidateProjectScope(queryClient, updated.id);
     }
   });
 
@@ -65,15 +65,15 @@ export function useProjects(projectId?: number) {
     mutationFn: async ({ id, tagIds }: { id: number; tagIds: number[] }) => {
       return setProjectTags(id, tagIds);
     },
-    onSuccess: async (_tags, variables) => {
-      await invalidateProjectScope(queryClient, variables.id);
+    onSuccess: (_tags, variables) => {
+      void invalidateProjectScope(queryClient, variables.id);
     }
   });
 
   const removeProjectMutation = useMutation({
     mutationFn: deleteProjectRequest,
-    onSuccess: async () => {
-      await invalidateProjects(queryClient);
+    onSuccess: () => {
+      void invalidateProjects(queryClient);
     }
   });
 

@@ -85,9 +85,9 @@ export function useAttachments(owner: AttachmentOwner | null) {
       }
       return uploadFeatureAttachment(ownerId as number, file);
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       if (hasOwner) {
-        await invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);
+        void invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);
       }
     }
   });
@@ -100,9 +100,9 @@ export function useAttachments(owner: AttachmentOwner | null) {
       }
       await deleteAttachmentRequest(id);
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       if (hasOwner) {
-        await invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);
+        void invalidateAttachments(queryClient, ownerType as AttachmentOwner["type"], ownerId as number);
       }
     }
   });

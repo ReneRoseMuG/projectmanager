@@ -29,8 +29,8 @@ export function useNoteDetail(noteId: number | null) {
       }
       return updateNoteRequest(validNoteId, input);
     },
-    onSuccess: async (updated) => {
-      await invalidateNoteDetail(queryClient, updated?.id ?? validNoteId ?? 0);
+    onSuccess: (updated) => {
+      void invalidateNoteDetail(queryClient, updated?.id ?? validNoteId ?? 0);
     }
   });
 

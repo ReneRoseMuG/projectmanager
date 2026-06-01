@@ -2,6 +2,9 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 01.06.26 | 06:23:09 | Feature | MS-34 Browser-Test-Speedup | ⚠️ |
+| 01.06.26 | 06:14:17 | Fix | Alten Referenz-Skill entfernen | ✅ |
+| 01.06.26 | 06:13:22 | Fix | MCP-Code Auftrag Skill | ✅ |
 | 31.05.26 | 19:40:58 | Feature | MS-33 Design-Richtlinien | ✅ |
 | 31.05.26 | 16:36:09 | Fix | API-Testlauf ausführen | ✅ |
 | 31.05.26 | 16:19:31 | Feature | Note Details in neuem Tab | ✅ |

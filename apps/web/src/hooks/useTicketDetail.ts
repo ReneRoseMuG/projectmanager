@@ -42,8 +42,8 @@ export function useTicketDetail(ticketId: number | null) {
       }
       return updateTicketRequest(validTicketId, input);
     },
-    onSuccess: async (updated) => {
-      await invalidateTicketScope(queryClient, undefined, updated?.id ?? validTicketId);
+    onSuccess: (updated) => {
+      void invalidateTicketScope(queryClient, undefined, updated?.id ?? validTicketId);
     }
   });
 
@@ -57,9 +57,9 @@ export function useTicketDetail(ticketId: number | null) {
         tags.map((tag) => tag.id)
       );
     },
-    onSuccess: async () => {
-      await invalidateTicketScope(queryClient, undefined, validTicketId);
-      await invalidateTags(queryClient);
+    onSuccess: () => {
+      void invalidateTicketScope(queryClient, undefined, validTicketId);
+      void invalidateTags(queryClient);
     }
   });
 
@@ -70,25 +70,25 @@ export function useTicketDetail(ticketId: number | null) {
       }
       return createSubTicketRequest(validTicketId, input);
     },
-    onSuccess: async (created) => {
-      await invalidateTicketScope(queryClient, undefined, created?.id);
-      await invalidateTicketScope(queryClient, undefined, validTicketId);
+    onSuccess: (created) => {
+      void invalidateTicketScope(queryClient, undefined, created?.id);
+      void invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
   const updateSubTicketMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TicketUpdate }) => updateTicketRequest(id, input),
-    onSuccess: async (updated) => {
-      await invalidateTicketScope(queryClient, undefined, updated.id);
-      await invalidateTicketScope(queryClient, undefined, validTicketId);
+    onSuccess: (updated) => {
+      void invalidateTicketScope(queryClient, undefined, updated.id);
+      void invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
   const removeSubTicketMutation = useMutation({
     mutationFn: deleteTicket,
-    onSuccess: async (_result, id) => {
-      await invalidateTicketScope(queryClient, undefined, id);
-      await invalidateTicketScope(queryClient, undefined, validTicketId);
+    onSuccess: (_result, id) => {
+      void invalidateTicketScope(queryClient, undefined, id);
+      void invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
@@ -99,8 +99,8 @@ export function useTicketDetail(ticketId: number | null) {
       }
       await addTicketRelationRequest(validTicketId, input);
     },
-    onSuccess: async () => {
-      await invalidateTicketScope(queryClient, undefined, validTicketId);
+    onSuccess: () => {
+      void invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
@@ -111,8 +111,8 @@ export function useTicketDetail(ticketId: number | null) {
       }
       await removeTicketRelationRequest(validTicketId, input);
     },
-    onSuccess: async () => {
-      await invalidateTicketScope(queryClient, undefined, validTicketId);
+    onSuccess: () => {
+      void invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
@@ -123,11 +123,11 @@ export function useTicketDetail(ticketId: number | null) {
       }
       return createEntityCommentRequest("ticket", validTicketId, input);
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       if (validTicketId !== undefined) {
-        await invalidateComments(queryClient, "ticket", validTicketId);
+        void invalidateComments(queryClient, "ticket", validTicketId);
       }
-      await invalidateTicketScope(queryClient, undefined, validTicketId);
+      void invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
@@ -138,21 +138,21 @@ export function useTicketDetail(ticketId: number | null) {
       }
       return deleteEntityCommentRequest("ticket", validTicketId, commentId);
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       if (validTicketId !== undefined) {
-        await invalidateComments(queryClient, "ticket", validTicketId);
+        void invalidateComments(queryClient, "ticket", validTicketId);
       }
-      await invalidateTicketScope(queryClient, undefined, validTicketId);
+      void invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 
   const updateCommentMutation = useMutation({
     mutationFn: ({ commentId, input }: { commentId: number; input: CommentUpdate }) => updateCommentRequest(commentId, input),
-    onSuccess: async () => {
+    onSuccess: () => {
       if (validTicketId !== undefined) {
-        await invalidateComments(queryClient, "ticket", validTicketId);
+        void invalidateComments(queryClient, "ticket", validTicketId);
       }
-      await invalidateTicketScope(queryClient, undefined, validTicketId);
+      void invalidateTicketScope(queryClient, undefined, validTicketId);
     }
   });
 

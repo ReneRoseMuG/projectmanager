@@ -66,13 +66,33 @@ export function MilestoneDetailPage() {
   const submitMilestone = async (input: MilestoneInput, tagIds: number[]) => {
     try {
       if (milestone) {
+        const m = milestone;
+        const fieldsChanged =
+          input.name !== m.name ||
+          (input.description ?? "") !== (m.description ?? "") ||
+          (input.status ?? m.status) !== m.status ||
+          (input.color ?? null) !== m.color ||
+          (input.startDate ?? null) !== m.startDate ||
+          (input.dueDate ?? null) !== m.dueDate ||
+          (input.responsibleUserId ?? null) !== m.responsibleUserId;
+
+        const currentTagIds = m.tags.map((t) => t.id).sort((a, b) => a - b);
+        const nextTagIds = [...tagIds].sort((a, b) => a - b);
+        const tagsChanged =
+          nextTagIds.length !== currentTagIds.length ||
+          nextTagIds.some((id, i) => id !== currentTagIds[i]);
+
+        if (!fieldsChanged && !tagsChanged) {
+          return m;
+        }
+
         const updated = await updateMilestone(
-          milestone.id,
-          { ...input, expectedVersion: milestone.version },
-          tagIds,
+          m.id,
+          { ...input, expectedVersion: m.version },
+          tagsChanged ? tagIds : undefined,
         );
         showToast({ tone: "success", title: "Meilenstein gespeichert" });
-        await statusCascade.startMilestoneCascade(milestone, updated);
+        await statusCascade.startMilestoneCascade(m, updated);
         return updated;
       }
 

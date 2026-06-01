@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const testEnv = loadDotenv({ path: path.join(repoRoot, ".env.test"), processEnv: {} }).parsed ?? {};
+const dbName = process.env.DB_NAME ?? "taskmanager_e2e";
 
 function dbConfig() {
   return {
@@ -15,9 +16,16 @@ function dbConfig() {
   };
 }
 
+function quoteIdentifier(value: string) {
+  if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+    throw new Error(`Invalid E2E database name: ${value}`);
+  }
+  return `\`${value}\``;
+}
+
 export default async function globalTeardown() {
   const conn = await mysql.createConnection(dbConfig());
-  await conn.execute("DROP DATABASE IF EXISTS `taskmanager_e2e`");
+  await conn.execute(`DROP DATABASE IF EXISTS ${quoteIdentifier(dbName)}`);
   await conn.end();
-  console.log("[e2e] taskmanager_e2e dropped");
+  console.log(`[e2e] ${dbName} dropped`);
 }

@@ -1,17 +1,16 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import {
   apiBaseUrl,
   authenticatedGoto,
   createEvent,
-  createMilestone,
   createProject,
   createTask,
-  createTicket,
   deleteEvent,
   deleteProject,
   ensureApiAuth,
   todayIsoDate,
 } from "./domain-test-utils";
+import { test } from "./fixtures";
 
 /**
  * Test Scope:
@@ -99,51 +98,37 @@ test.describe("Dashboards", () => {
     }
   });
 
-  test("zeigt Meilenstein-Dashboard mit gefilterten Tasks und Tickets", async ({ page, request }) => {
-    const project = await createProject(request, "E2E Meilenstein Dashboard Projekt");
-    const milestone = await createMilestone(request, project.id, "E2E Dashboard Meilenstein");
-    const task = await createTask(request, { type: "milestone", id: milestone.id }, "E2E MS Task", { status: "todo" });
-    const ticket = await createTicket(request, { type: "milestone", id: milestone.id }, "E2E MS Ticket", { status: "open" });
+  test("zeigt Meilenstein-Dashboard mit gefilterten Tasks und Tickets", async ({ page, milestoneWithTaskAndTicket }) => {
+    const { milestone, task, ticket } = milestoneWithTaskAndTicket;
 
-    try {
-      await authenticatedGoto(page, `/milestones/${milestone.id}`);
+    await authenticatedGoto(page, `/milestones/${milestone.id}`);
 
-      await expect(page.getByRole("button", { name: "Übersicht" })).toBeVisible();
-      await page.getByRole("button", { name: "Übersicht" }).click();
+    await expect(page.getByRole("button", { name: "Übersicht" })).toBeVisible();
+    await page.getByRole("button", { name: "Übersicht" }).click();
 
-      // taskJournal und ticketJournal sollen Task/Ticket des Meilensteins zeigen
-      await expect(page.getByTestId("dashboard-widget-taskJournal")).toContainText(task.title);
-      await expect(page.getByTestId("dashboard-widget-ticketJournal")).toContainText(ticket.title);
+    // taskJournal und ticketJournal sollen Task/Ticket des Meilensteins zeigen
+    await expect(page.getByTestId("dashboard-widget-taskJournal")).toContainText(task.title);
+    await expect(page.getByTestId("dashboard-widget-ticketJournal")).toContainText(ticket.title);
 
-      // taskStatusReport und ticketStatusReport müssen angezeigt werden
-      await expect(page.getByTestId("dashboard-widget-taskStatusReport")).toBeVisible();
-      await expect(page.getByTestId("dashboard-widget-ticketStatusReport")).toBeVisible();
-    } finally {
-      await deleteProject(request, project.id);
-    }
+    // taskStatusReport und ticketStatusReport müssen angezeigt werden
+    await expect(page.getByTestId("dashboard-widget-taskStatusReport")).toBeVisible();
+    await expect(page.getByTestId("dashboard-widget-ticketStatusReport")).toBeVisible();
   });
 
-  test("zeigt Projekt-Dashboard mit echten Meilenstein-, Aufgaben- und Ticketdaten", async ({ page, request }) => {
-    const project = await createProject(request, "E2E Dashboard Project");
-    const milestone = await createMilestone(request, project.id, "E2E Dashboard Milestone");
-    const task = await createTask(request, { type: "project", id: project.id }, "E2E Dashboard Task", { status: "todo" });
-    const ticket = await createTicket(request, { type: "project", id: project.id }, "E2E Dashboard Ticket", { status: "open" });
+  test("zeigt Projekt-Dashboard mit echten Meilenstein-, Aufgaben- und Ticketdaten", async ({ page, projectWithDashboardItems }) => {
+    const { project, milestone, task, ticket } = projectWithDashboardItems;
 
-    try {
-      await authenticatedGoto(page, `/projects/${project.id}`);
+    await authenticatedGoto(page, `/projects/${project.id}`);
 
-      await expect(page.getByRole("button", { name: "Übersicht" })).toBeVisible();
-      await page.getByRole("button", { name: "Übersicht" }).click();
-      await expect(page.getByRole("button", { name: "Neue Ansicht" })).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Projektübersicht" })).toHaveCount(0);
-      await expect(page.getByTestId("dashboard-widget-milestoneProgress")).toContainText(milestone.name);
-      await expect(page.getByTestId("dashboard-widget-taskJournal")).toContainText(task.title);
-      await expect(page.getByTestId("dashboard-widget-ticketJournal")).toContainText(ticket.title);
-      await expect(page.getByTestId("dashboard-widget-taskStatusReport")).toContainText("Offen");
-      await expect(page.getByTestId("dashboard-widget-ticketStatusReport")).toContainText("Offen");
-    } finally {
-      await deleteProject(request, project.id);
-    }
+    await expect(page.getByRole("button", { name: "Übersicht" })).toBeVisible();
+    await page.getByRole("button", { name: "Übersicht" }).click();
+    await expect(page.getByRole("button", { name: "Neue Ansicht" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Projektübersicht" })).toHaveCount(0);
+    await expect(page.getByTestId("dashboard-widget-milestoneProgress")).toContainText(milestone.name);
+    await expect(page.getByTestId("dashboard-widget-taskJournal")).toContainText(task.title);
+    await expect(page.getByTestId("dashboard-widget-ticketJournal")).toContainText(ticket.title);
+    await expect(page.getByTestId("dashboard-widget-taskStatusReport")).toContainText("Offen");
+    await expect(page.getByTestId("dashboard-widget-ticketStatusReport")).toContainText("Offen");
   });
 
   test("speichert ein per Drag sortiertes persönliches Dashboard", async ({ page, request }) => {

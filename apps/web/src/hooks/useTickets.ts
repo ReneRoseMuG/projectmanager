@@ -59,8 +59,8 @@ export function useTickets(owner?: TicketOwner | null) {
     mutationFn: async (input: TicketInput) => {
       return validOwner !== undefined ? createOwnerTicketRequest(validOwner, input) : createTicketRequest(input);
     },
-    onSuccess: async (created) => {
-      await invalidateTicketScope(queryClient, validOwner, created?.id);
+    onSuccess: (created) => {
+      void invalidateTicketScope(queryClient, validOwner, created?.id);
     }
   });
 
@@ -71,8 +71,8 @@ export function useTickets(owner?: TicketOwner | null) {
       }
       return linkOwnerTicketRequest(validOwner, ticketId);
     },
-    onSuccess: async (linked) => {
-      await invalidateTicketScope(queryClient, validOwner, linked?.id);
+    onSuccess: (linked) => {
+      void invalidateTicketScope(queryClient, validOwner, linked?.id);
     }
   });
 
@@ -83,36 +83,36 @@ export function useTickets(owner?: TicketOwner | null) {
       }
       await unlinkOwnerTicketRequest(validOwner, ticketId);
     },
-    onSuccess: async (_result, ticketId) => {
-      await invalidateTicketScope(queryClient, validOwner, ticketId);
+    onSuccess: (_result, ticketId) => {
+      void invalidateTicketScope(queryClient, validOwner, ticketId);
     }
   });
 
   const updateTicketMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TicketUpdate }) => updateTicketRequest(id, input),
-    onSuccess: async (updated) => {
-      await invalidateTicketScope(queryClient, validOwner, updated.id);
+    onSuccess: (updated) => {
+      void invalidateTicketScope(queryClient, validOwner, updated.id);
     }
   });
 
   const updateTicketTagsMutation = useMutation({
     mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTicketTags(id, tagIds),
-    onSuccess: async (_tags, { id }) => {
-      await invalidateTicketScope(queryClient, validOwner, id);
+    onSuccess: (_tags, { id }) => {
+      void invalidateTicketScope(queryClient, validOwner, id);
     }
   });
 
   const updateTicketPositionMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TicketPositionInput }) => updateTicketPositionRequest(id, input),
-    onSuccess: async (updated) => {
-      await invalidateTicketScope(queryClient, validOwner, updated.id);
+    onSuccess: (updated) => {
+      void invalidateTicketScope(queryClient, validOwner, updated.id);
     }
   });
 
   const removeTicketMutation = useMutation({
     mutationFn: deleteTicketRequest,
-    onSuccess: async (_result, id) => {
-      await invalidateTicketScope(queryClient, validOwner, id);
+    onSuccess: (_result, id) => {
+      void invalidateTicketScope(queryClient, validOwner, id);
     }
   });
 

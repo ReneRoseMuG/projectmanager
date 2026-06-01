@@ -96,7 +96,6 @@ export async function expectToast(page: Page, text: string) {
 }
 
 const authenticatedApiRequests = new WeakSet<APIRequestContext>();
-const authenticatedPages = new WeakSet<Page>();
 
 export async function ensureApiAuth(request: APIRequestContext) {
   if (authenticatedApiRequests.has(request)) {
@@ -110,14 +109,6 @@ export async function ensureApiAuth(request: APIRequestContext) {
 }
 
 export async function authenticatedGoto(page: Page, path: string) {
-  if (!authenticatedPages.has(page)) {
-    await page.goto("/login");
-    await page.getByRole("button", { name: "Als Rene anmelden" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Startseite", exact: true }),
-    ).toBeVisible();
-    authenticatedPages.add(page);
-  }
   await page.goto(path);
 }
 
