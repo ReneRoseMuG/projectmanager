@@ -1,5 +1,6 @@
 import type { Note } from "@taskmanager/shared-types";
-import { StickyNote } from "lucide-react";
+import { ExternalLink, StickyNote } from "lucide-react";
+import { objectReference } from "../../lib/references";
 import { formatHumanDate } from "../../utils/date";
 import { ItemCard } from "../ui/ItemCard";
 import { noteContentToPreviewText } from "./noteContent";
@@ -7,6 +8,7 @@ import { noteContentToPreviewText } from "./noteContent";
 interface NoteCardProps {
   note: Note;
   onEdit: (note: Note) => void;
+  onOpenInTab?: (note: Note) => void;
   onDelete?: (note: Note) => void;
 }
 
@@ -24,16 +26,17 @@ function NoteHeader({ note }: { note: Note }) {
   );
 }
 
-export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
+export function NoteCard({ note, onEdit, onOpenInTab, onDelete }: NoteCardProps) {
   const preview = noteContentToPreviewText(note.contentJson);
 
   return (
     <ItemCard
+      objectReference={objectReference("note", note.id)}
       header={<NoteHeader note={note} />}
       body={preview ? <p className="line-clamp-4 text-sm text-steel-600">{preview}</p> : <p className="text-sm italic text-steel-500">Kein Inhalt</p>}
-      footer={<span className="text-xs font-semibold text-steel-500">Notiz #{note.id}</span>}
       onOpen={() => onEdit(note)}
       onEdit={() => onEdit(note)}
+      extraMenuItems={onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(note) }] : []}
       onDelete={onDelete ? () => onDelete(note) : undefined}
       className="min-h-56"
     />

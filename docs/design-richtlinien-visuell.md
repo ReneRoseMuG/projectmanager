@@ -172,6 +172,17 @@ Zwei Größen: `md` (h-10), `sm` (h-8).
 Radius: `rounded-md`.  
 Schrift: `text-sm font-medium`.
 
+**Icon-Größen:**
+
+| Button-Modus | Icon `size` | Begründung |
+|---|---|---|
+| Icon-Only (`icon` ohne `children`) | `size={18}` | Füllt den Bereich gut aus, wirkt klar und lesbar |
+| Text + Icon (`icon` mit `children`) | `size={16}` | Neben Text ist kleines Icon passend |
+
+Diese Regel gilt unabhängig von der Button-Größe (`sm` oder `md`). Icon-Only-Buttons erhalten automatisch die passende Breite (`w-10` / `w-8`).
+
+**Größenwahl:** `md` ist der Standard. `sm` nur in dichten Toolbars, wo explizit Platz gespart werden muss. Icon-Buttons neben Eingabefeldern (`h-11`) verwenden immer `md`, damit Höhen visuell harmonieren.
+
 **Verboten:** Button-Klassen mit Ad-hoc-`className`-Overrides für Farben umgehen. Stattdessen einen neuen Variant definieren.
 
 ### 8.2 Input / Select

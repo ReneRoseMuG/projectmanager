@@ -2,6 +2,31 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 01.06.26 | 06:23:09 | Feature | MS-34 Browser-Test-Speedup | ⚠️ |
+| 01.06.26 | 06:14:17 | Fix | Alten Referenz-Skill entfernen | ✅ |
+| 01.06.26 | 06:13:22 | Fix | MCP-Code Auftrag Skill | ✅ |
+| 31.05.26 | 19:40:58 | Feature | MS-33 Design-Richtlinien | ✅ |
+| 31.05.26 | 16:36:09 | Fix | API-Testlauf ausführen | ✅ |
+| 31.05.26 | 16:19:31 | Feature | Note Details in neuem Tab | ✅ |
+| 31.05.26 | 15:56:10 | Fix | Web-Testdrift | ✅ |
+| 31.05.26 | 15:45:57 | Fix | Lint Restfehler | ✅ |
+| 31.05.26 | 15:33:31 | Fix | Lint Cleanup | ✅ |
+| 31.05.26 | 12:45:46 | Fix | Dashboard Kalender Limit | ✅ |
+| 31.05.26 | 08:17:40 | Fix | Notizkarten Menü und Footer | ✅ |
+| 31.05.26 | 08:11:45 | Fix | Notizeditor Inhalt und Details | ✅ |
+| 31.05.26 | 08:05:43 | Fix | Kalenderwidget Footer-Zähler | ✅ |
+| 31.05.26 | 08:04:01 | Fix | DayPlan Kalender Create | ✅ |
+| 31.05.26 | 08:01:48 | Fix | Feiertagslabel ausschreiben | ✅ |
+| 31.05.26 | 08:00:50 | Fix | Monatskalender Feiertagskachel | ✅ |
+| 31.05.26 | 07:59:29 | Fix | Wochenkalender Create nur Plus | ✅ |
+| 31.05.26 | 07:57:57 | Fix | Wochenkalender Plus-Aktionen | ✅ |
+| 31.05.26 | 07:55:15 | Fix | Terminformular Farbwähler | ✅ |
+| 31.05.26 | 07:54:00 | Fix | Wochenkalender Spaltenkopf | ✅ |
+| 31.05.26 | 07:50:41 | Fix | MS-32 Feiertagsspalte und Karten | ✅ |
+| 31.05.26 | 07:28:44 | Feature | MS-32 offene Kalenderaufgaben | ⚠️ |
+| 31.05.26 | 07:14:08 | Fix | Feiertag-Hervorhebung | ✅ |
+| 31.05.26 | 04:58:23 | Feature | MS-32 Zentrale Kalenderkomponente | ⚠️ |
+| 31.05.26 | 02:49:12 | 1 | Persönliche Planung Dashboard | ⚠️ |
 | 29.05.26 | 10:32:01 | 2 | MySQL-Migrationsanalyse | ✅ |
 | 29.05.26 | 10:30:39 | 1 | Branching MS-26 | ✅ |
 | 29.05.26 | 10:22:45 | Fix | MS-25 Branchhinweis-Kommentar | ✅ |

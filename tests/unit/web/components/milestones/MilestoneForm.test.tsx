@@ -264,6 +264,36 @@ afterEach(() => {
 });
 
 describe("MilestoneForm", () => {
+  it("rendert Header-Icon und Feature-Link-Button in den Standardgrößen", () => {
+    const { container } = renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    const headerIcon = container.querySelector(".lucide-flag");
+    expect(headerIcon).toBeInTheDocument();
+    expect(headerIcon).toHaveAttribute("width", "20");
+    expect(headerIcon).toHaveAttribute("height", "20");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Features/ }));
+    const linkButton = screen.getByRole("button", { name: "Feature verknüpfen" });
+    expect(linkButton).toHaveClass("h-10", "w-10");
+    expect(linkButton).not.toHaveClass("h-9", "w-9", "px-0");
+  });
+
+  it("zeigt Create-Empty-States mit den kanonischen Domain-Icons", () => {
+    const { container } = renderWithProviders(<MilestoneForm open projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Features/ }));
+    expect(screen.getByText("Features sind nach dem Speichern verfügbar.")).toBeInTheDocument();
+    expect(container.querySelector(".lucide-book-open")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Aufgaben/ }));
+    expect(screen.getByText("Aufgaben sind nach dem Speichern verfügbar.")).toBeInTheDocument();
+    expect(container.querySelector(".lucide-list-todo")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Tickets/ }));
+    expect(screen.getByText("Tickets sind nach dem Speichern verfügbar.")).toBeInTheDocument();
+    expect(container.querySelector(".lucide-bug")).toBeInTheDocument();
+  });
+
   it("zeigt den Details-Tab ohne Counter", () => {
     renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
@@ -279,17 +309,18 @@ describe("MilestoneForm", () => {
     renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project, otherProject]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
 
     const sidebar = screen.getByTestId("form-sidebar");
+    const sidebarSelects = within(sidebar).getAllByRole("combobox");
     expect(screen.getByDisplayValue(milestone.name)).toBeInTheDocument();
     expect(screen.getByTestId("milestone-description-view")).toHaveValue(milestone.description);
     expect(within(sidebar).getByRole("combobox", { name: "Projekt" })).toHaveValue(String(project.id));
-    expect(within(sidebar).getByRole("button", { name: "Aktiv" })).toHaveAttribute("data-active", "true");
+    expect(sidebarSelects[1]).toHaveValue("active");
     expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
     expect(within(sidebar).getByDisplayValue("2026-06-01")).toBeInTheDocument();
     expect(within(sidebar).getByDisplayValue("2026-06-30")).toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue(milestone.name), { target: { value: "Meilenstein Beta" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Projekt" }), { target: { value: String(otherProject.id) } });
-    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(sidebarSelects[1], { target: { value: "done" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
     const dateInputs = within(sidebar).getAllByDisplayValue(/2026-06-/) as HTMLInputElement[];
     fireEvent.change(dateInputs[0], { target: { value: "2026-07-01" } });

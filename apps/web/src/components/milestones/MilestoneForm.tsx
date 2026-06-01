@@ -10,10 +10,15 @@ import type {
   Tag,
 } from "@taskmanager/shared-types";
 import {
+  BookOpen,
+  Bug,
   Flag,
   FolderKanban,
   Link2,
+  ListChecks,
+  ListTodo,
   Trash2,
+  Users,
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -57,11 +62,11 @@ import { Modal } from "../ui/Modal";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
+import { CatalogSelect } from "../ui/CatalogSelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
-import { StatusToggle } from "../ui/StatusToggle";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 import { UserSelectField } from "../users/UserSelectField";
@@ -444,7 +449,7 @@ export function MilestoneForm({
         open={open}
         title={milestone ? "Meilenstein bearbeiten" : "Meilenstein anlegen"}
         objectReference={milestone ? objectReference("milestone", milestone.id) : undefined}
-        icon={<Flag size={21} />}
+        icon={<Flag size={20} />}
         breadcrumb={[
           "Meilensteine",
           milestone ? milestone.name : "Neuer Meilenstein",
@@ -488,8 +493,8 @@ export function MilestoneForm({
 
         {activeTab === "details" ? (
           <div className="flex min-h-0 w-full flex-1">
-            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
-              <div className="mx-auto grid w-full max-w-5xl gap-4">
+            <div className="min-w-0 flex-1 overflow-auto p-2.5">
+              <div className="grid w-full gap-4">
                 <Section>
                   <FormField label="Name" required className="min-w-0">
                     <Input
@@ -514,6 +519,8 @@ export function MilestoneForm({
             <FormSidebar storageKey="milestone-form-sidebar">
               <Select
                 label="Projekt"
+                icon={<FolderKanban size={14} />}
+                variant="panel"
                 required
                 value={projectId}
                 disabled={lockProjectSelection}
@@ -532,36 +539,18 @@ export function MilestoneForm({
                   </option>
                 ))}
               </Select>
-              <div className="grid gap-4">
-                <FormField label="Status">
-                  <StatusToggle
-                    kind="workStatus"
-                    value={status}
-                    onChange={setStatus}
-                  />
-                </FormField>
-                <UserSelectField
-                  label="Verantwortlich"
-                  value={responsibleUserId}
-                  selectedUser={milestone?.responsibleUser ?? null}
-                  onChange={setResponsibleUserId}
-                />
-              </div>
-              <div className="grid gap-4">
-                <DatePicker
-                  label="Start"
-                  value={startDate}
-                  onChange={(inputEvent) =>
-                    setStartDate(inputEvent.target.value)
-                  }
-                />
-                <DatePicker
-                  label="Fällig"
-                  value={dueDate}
-                  onChange={(inputEvent) => setDueDate(inputEvent.target.value)}
-                />
-              </div>
-              <TagPicker selected={selectedTags} onChange={setSelectedTags} />
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
+              <UserSelectField
+                label="Verantwortlich"
+                icon={<Users size={14} />}
+                variant="panel"
+                value={responsibleUserId}
+                selectedUser={milestone?.responsibleUser ?? null}
+                onChange={setResponsibleUserId}
+              />
+              <DatePicker label="Start" variant="panel" value={startDate} onChange={(inputEvent) => setStartDate(inputEvent.target.value)} />
+              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(inputEvent) => setDueDate(inputEvent.target.value)} />
+              <TagPicker selected={selectedTags} onChange={setSelectedTags} variant="panel" />
             </FormSidebar>
           </div>
         ) : null}
@@ -594,7 +583,7 @@ export function MilestoneForm({
                       title="Feature verknüpfen"
                       variant="secondary"
                       icon={<Link2 size={17} />}
-                      className="h-9 w-9 bg-transparent px-0"
+                      className="bg-transparent"
                       disabled={availableFeatures.length === 0}
                       onClick={() => setFeatureLinkOpen(true)}
                     />
@@ -604,7 +593,7 @@ export function MilestoneForm({
               )
             ) : (
               <EmptyState
-                icon={<FolderKanban size={22} />}
+                icon={<BookOpen size={22} />}
                 title="Features sind nach dem Speichern verfügbar."
                 tone="violet"
                 variant="tinted"
@@ -619,7 +608,7 @@ export function MilestoneForm({
               <OwnerTaskBoard owner={{ type: "milestone", id: milestone.id }} />
             ) : (
               <EmptyState
-                icon={<Flag size={22} />}
+                icon={<ListTodo size={22} />}
                 title="Aufgaben sind nach dem Speichern verfügbar."
                 tone="teal"
                 variant="tinted"
@@ -636,7 +625,7 @@ export function MilestoneForm({
               />
             ) : (
               <EmptyState
-                icon={<Flag size={22} />}
+                icon={<Bug size={22} />}
                 title="Tickets sind nach dem Speichern verfügbar."
                 tone="teal"
                 variant="tinted"
@@ -672,6 +661,7 @@ export function MilestoneForm({
               <>
                 <NoteList
                   notes={notes.notes}
+                  owner={{ type: "milestone", id: milestone.id }}
                   onCreate={createNote}
                   onEdit={setEditingNote}
                   onDelete={(note) => void notes.removeNote(note.id)}
@@ -797,7 +787,7 @@ function FeatureLinkDialog({
           </Select>
         ) : (
           <EmptyState
-            icon={<FolderKanban size={22} />}
+            icon={<BookOpen size={22} />}
             title="Keine Features verfügbar"
             tone="violet"
             variant="tinted"

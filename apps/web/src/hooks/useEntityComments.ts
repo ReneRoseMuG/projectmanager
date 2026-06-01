@@ -29,9 +29,9 @@ export function useEntityComments(entityType: CommentEntityType, entityId?: numb
       }
       return createEntityComment(entityType, validEntityId, input);
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       if (validEntityId !== undefined) {
-        await invalidateComments(queryClient, entityType, validEntityId);
+        void invalidateComments(queryClient, entityType, validEntityId);
       }
     }
   });
@@ -43,9 +43,9 @@ export function useEntityComments(entityType: CommentEntityType, entityId?: numb
       }
       return deleteEntityComment(entityType, validEntityId, commentId);
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       if (validEntityId !== undefined) {
-        await invalidateComments(queryClient, entityType, validEntityId);
+        void invalidateComments(queryClient, entityType, validEntityId);
       }
     }
   });
@@ -57,9 +57,9 @@ export function useEntityComments(entityType: CommentEntityType, entityId?: numb
       }
       return updateCommentRequest(commentId, input);
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       if (validEntityId !== undefined) {
-        await invalidateComments(queryClient, entityType, validEntityId);
+        void invalidateComments(queryClient, entityType, validEntityId);
       }
     }
   });

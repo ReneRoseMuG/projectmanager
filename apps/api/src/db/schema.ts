@@ -29,7 +29,7 @@ export const TICKET_RESOLUTIONS = ["fixed", "wont_fix", "duplicate", "cant_repro
 export const TICKET_RELATION_TYPES = ["blocks", "related", "duplicate"] as const;
 export const CATALOG_KINDS = ["workStatus", "featureStatus", "priority", "ticketType"] as const;
 export const SETTING_SCOPE_TYPES = ["GLOBAL", "ROLE", "USER"] as const;
-export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar", "dayPlan"] as const;
+export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar", "dayPlan", "dayPlanCalendar"] as const;
 export const DASHBOARD_DEFAULT_SCOPE_TYPES = ["GLOBAL", "USER"] as const;
 export const NOTIFICATION_CHANNELS = ["email", "push"] as const;
 export const JOURNAL_OBJECT_TYPES = [
@@ -308,7 +308,11 @@ export const tasks = mysqlTable(
     updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestampText("created_at"),
     updatedAt: timestampText("updated_at")
-  }
+  },
+  (table) => ({
+    statusUpdatedAtIdx: index("tasks_status_updated_at_idx").on(table.status, table.updatedAt),
+    parentStatusIdx: index("tasks_parent_status_idx").on(table.parentId, table.status)
+  })
 );
 
 export const dayPlans = mysqlTable(
@@ -792,38 +796,50 @@ export const dayPlanEvents = mysqlTable(
   })
 );
 
-export const features = mysqlTable("features", {
-  id: int("id").autoincrement().primaryKey(),
-  title: shortText("title").notNull(),
-  status: shortText("status").notNull().default("draft"),
-  description: longtext("description"),
-  content: longtext("content"),
-  sortOrder: int("sort_order").notNull().default(0),
-  responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
-  version: int("version").notNull().default(1),
-  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: timestampText("created_at"),
-  updatedAt: timestampText("updated_at")
-});
+export const features = mysqlTable(
+  "features",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    title: shortText("title").notNull(),
+    status: shortText("status").notNull().default("draft"),
+    description: longtext("description"),
+    content: longtext("content"),
+    sortOrder: int("sort_order").notNull().default(0),
+    responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  },
+  (table) => ({
+    sortOrderStatusIdx: index("features_sort_order_status_idx").on(table.sortOrder, table.status)
+  })
+);
 
-export const useCases = mysqlTable("use_cases", {
-  id: int("id").autoincrement().primaryKey(),
-  featureId: int("feature_id")
-    .notNull()
-    .references(() => features.id, { onDelete: "cascade" }),
-  title: shortText("title").notNull(),
-  status: shortText("status").notNull().default("draft"),
-  description: longtext("description"),
-  content: longtext("content"),
-  sortOrder: int("sort_order").notNull().default(0),
-  responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
-  version: int("version").notNull().default(1),
-  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: timestampText("created_at"),
-  updatedAt: timestampText("updated_at")
-});
+export const useCases = mysqlTable(
+  "use_cases",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    featureId: int("feature_id")
+      .notNull()
+      .references(() => features.id, { onDelete: "cascade" }),
+    title: shortText("title").notNull(),
+    status: shortText("status").notNull().default("draft"),
+    description: longtext("description"),
+    content: longtext("content"),
+    sortOrder: int("sort_order").notNull().default(0),
+    responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  },
+  (table) => ({
+    featureSortOrderIdx: index("use_cases_feature_sort_order_idx").on(table.featureId, table.sortOrder)
+  })
+);
 
 export const featureRelations = mysqlTable(
   "feature_relations",
@@ -916,7 +932,8 @@ export const backlogItems = mysqlTable(
     updatedAt: timestampText("updated_at")
   },
   (table) => ({
-    projectImportKeyUnique: uniqueIndex("backlog_items_project_import_key_unique").on(table.projectId, table.importKey)
+    projectImportKeyUnique: uniqueIndex("backlog_items_project_import_key_unique").on(table.projectId, table.importKey),
+    projectStatusIdx: index("backlog_items_project_status_idx").on(table.projectId, table.status)
   })
 );
 

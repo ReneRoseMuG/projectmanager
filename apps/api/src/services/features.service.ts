@@ -145,12 +145,13 @@ async function getFeatureSupportCounts(database: DbClient, featureIds: number[])
     return nextCounts;
   };
 
-  const attachmentRows = await database.select({ featureId: featureAttachments.featureId }).from(featureAttachments).where(inArray(featureAttachments.featureId, featureIds));
+  const [attachmentRows, commentRows] = await Promise.all([
+    database.select({ featureId: featureAttachments.featureId }).from(featureAttachments).where(inArray(featureAttachments.featureId, featureIds)),
+    database.select({ featureId: featureComments.featureId }).from(featureComments).where(inArray(featureComments.featureId, featureIds))
+  ]);
   for (const row of attachmentRows) {
     ensureCounts(row.featureId).attachmentCount += 1;
   }
-
-  const commentRows = await database.select({ featureId: featureComments.featureId }).from(featureComments).where(inArray(featureComments.featureId, featureIds));
   for (const row of commentRows) {
     ensureCounts(row.featureId).commentCount += 1;
   }

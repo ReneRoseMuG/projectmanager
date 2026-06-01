@@ -291,27 +291,17 @@ async function getTaskSupportCounts(database: DbClient, taskIds: number[]): Prom
 
 async function collectTaskSubtreeIds(database: DbClient, taskId: number): Promise<number[]> {
   await getTaskRecord(database, taskId);
-  const rows = await taskRepository.findAll(database);
-  const childrenByParent = new Map<number, number[]>();
-
-  for (const row of rows) {
-    if (row.parentId !== null) {
-      childrenByParent.set(row.parentId, [...(childrenByParent.get(row.parentId) ?? []), row.id]);
-    }
-  }
 
   const ids: number[] = [];
-  const queue = [taskId];
+  const queue: number[] = [taskId];
   while (queue.length > 0) {
-    const currentId = queue.shift();
-    if (currentId === undefined) {
-      continue;
-    }
-
+    const currentId = queue.shift()!;
     ids.push(currentId);
-    queue.push(...(childrenByParent.get(currentId) ?? []));
+    const children = await taskRepository.findChildren(database, currentId);
+    for (const child of children) {
+      queue.push(child.id);
+    }
   }
-
   return ids;
 }
 
@@ -544,13 +534,12 @@ export async function listTaskLinkCandidates(database: DbClient, owner: TaskOwne
 
   const ownerContext = await taskOwnerProjectContext(database, owner);
 
-  const candidates: Task[] = [];
-  for (const task of allTasks) {
-    if (!linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status) && projectContextsAreCompatible(ownerContext, await taskProjectContext(database, task.id))) {
-      candidates.push(task);
-    }
-  }
-  return candidates;
+  const candidatePairs = await Promise.all(
+    allTasks
+      .filter((task) => !linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status))
+      .map(async (task) => ({ task, context: await taskProjectContext(database, task.id) }))
+  );
+  return candidatePairs.filter(({ context }) => projectContextsAreCompatible(ownerContext, context)).map(({ task }) => task);
 }
 
 export async function listSubtasks(database: DbClient, taskId: number): Promise<Task[]> {

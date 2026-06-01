@@ -62,21 +62,21 @@ export function useMilestones(milestoneId?: number | null, projectId?: number | 
       }
       return created;
     },
-    onSuccess: async (created) => {
-      await invalidateMilestoneScope(queryClient, created.id, created.projectId);
+    onSuccess: (created) => {
+      void invalidateMilestoneScope(queryClient, created.id, created.projectId);
     }
   });
 
   const updateMilestoneMutation = useMutation({
     mutationFn: async ({ id, input, tagIds }: { id: number; input: MilestoneUpdate; tagIds?: number[] }) => {
-      const updated = await updateMilestoneRequest(id, input);
-      if (tagIds) {
-        await setMilestoneTags(id, tagIds);
-      }
+      const [updated] = await Promise.all([
+        updateMilestoneRequest(id, input),
+        tagIds !== undefined ? setMilestoneTags(id, tagIds) : Promise.resolve(undefined),
+      ]);
       return updated;
     },
-    onSuccess: async (updated) => {
-      await invalidateMilestoneScope(queryClient, updated.id, updated.projectId);
+    onSuccess: (updated) => {
+      void invalidateMilestoneScope(queryClient, updated.id, updated.projectId);
     }
   });
 
@@ -84,15 +84,15 @@ export function useMilestones(milestoneId?: number | null, projectId?: number | 
     mutationFn: async ({ id, tagIds }: { id: number; tagIds: number[] }) => {
       return setMilestoneTags(id, tagIds);
     },
-    onSuccess: async (_tags, variables) => {
-      await invalidateMilestoneScope(queryClient, variables.id);
+    onSuccess: (_tags, variables) => {
+      void invalidateMilestoneScope(queryClient, variables.id);
     }
   });
 
   const removeMilestoneMutation = useMutation({
     mutationFn: deleteMilestoneRequest,
-    onSuccess: async () => {
-      await invalidateMilestones(queryClient);
+    onSuccess: () => {
+      void invalidateMilestones(queryClient);
     }
   });
 

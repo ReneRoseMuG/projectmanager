@@ -1,14 +1,16 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import {
   apiBaseUrl,
   authenticatedGoto,
-  createMilestone,
+  createEvent,
   createProject,
   createTask,
-  createTicket,
+  deleteEvent,
   deleteProject,
   ensureApiAuth,
+  todayIsoDate,
 } from "./domain-test-utils";
+import { test } from "./fixtures";
 
 /**
  * Test Scope:
@@ -42,27 +44,91 @@ async function dragBuilderWidget(page: Page, source: Locator, target: Locator) {
 }
 
 test.describe("Dashboards", () => {
-  test("zeigt Projekt-Dashboard mit echten Meilenstein-, Aufgaben- und Ticketdaten", async ({ page, request }) => {
-    const project = await createProject(request, "E2E Dashboard Project");
-    const milestone = await createMilestone(request, project.id, "E2E Dashboard Milestone");
-    const task = await createTask(request, { type: "project", id: project.id }, "E2E Dashboard Task", { status: "todo" });
-    const ticket = await createTicket(request, { type: "project", id: project.id }, "E2E Dashboard Ticket", { status: "open" });
+  test("zeigt upcomingEvents-Widget mit einem bevorstehenden Termin auf der Startseite", async ({ page, request }) => {
+    // Zukünftigen Termin anlegen
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateStr = tomorrow.toISOString().slice(0, 10);
+    const event = await createEvent(request, "E2E Nächster Termin", {
+      startTime: `${dateStr}T09:00:00`,
+      endTime: `${dateStr}T10:00:00`,
+    });
 
     try {
-      await authenticatedGoto(page, `/projects/${project.id}`);
+      await authenticatedGoto(page, "/");
 
-      await expect(page.getByRole("button", { name: "Übersicht" })).toBeVisible();
-      await page.getByRole("button", { name: "Übersicht" }).click();
-      await expect(page.getByRole("button", { name: "Neue Ansicht" })).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Projektübersicht" })).toHaveCount(0);
-      await expect(page.getByTestId("dashboard-widget-milestoneProgress")).toContainText(milestone.name);
-      await expect(page.getByTestId("dashboard-widget-taskJournal")).toContainText(task.title);
-      await expect(page.getByTestId("dashboard-widget-ticketJournal")).toContainText(ticket.title);
-      await expect(page.getByTestId("dashboard-widget-taskStatusReport")).toContainText("Offen");
-      await expect(page.getByTestId("dashboard-widget-ticketStatusReport")).toContainText("Offen");
+      // upcomingEvents-Widget muss den Termin enthalten
+      const widget = page.getByTestId("dashboard-widget-upcomingEvents");
+      await expect(widget).toBeVisible();
+      await expect(widget).toContainText(event.title);
+    } finally {
+      await deleteEvent(request, event.id);
+    }
+  });
+
+  test("zeigt DayPlan-Dashboard mit noteList und overdueTasks", async ({ page, request }) => {
+    // Überfälligen Task anlegen und heute in den DayPlan hängen
+    await ensureApiAuth(request);
+    const project = await createProject(request, "E2E DayPlan Projekt");
+    const task = await createTask(
+      request,
+      { type: "project", id: project.id },
+      "E2E DayPlan Überfällig",
+      { dueDate: "2026-01-01", status: "todo" }
+    );
+    const today = todayIsoDate();
+    // Task in den heutigen DayPlan einbinden
+    const dayPlanRes = await request.get(`${apiBaseUrl}/day-plans/${today}`);
+    expect(dayPlanRes.ok()).toBeTruthy();
+    const dayPlan = await dayPlanRes.json() as { id: number };
+    await request.post(`${apiBaseUrl}/day-plans/${today}/tasks/${task.id}`);
+
+    try {
+      await authenticatedGoto(page, "/day-plan");
+
+      // noteList-Widget muss sichtbar sein
+      await expect(page.getByTestId("dashboard-widget-noteList")).toBeVisible();
+
+      // overdueTasks-Widget muss den überfälligen Task anzeigen
+      const overdueWidget = page.getByTestId("dashboard-widget-overdueTasks");
+      await expect(overdueWidget).toBeVisible();
+      await expect(overdueWidget).toContainText(task.title);
     } finally {
       await deleteProject(request, project.id);
     }
+  });
+
+  test("zeigt Meilenstein-Dashboard mit gefilterten Tasks und Tickets", async ({ page, milestoneWithTaskAndTicket }) => {
+    const { milestone, task, ticket } = milestoneWithTaskAndTicket;
+
+    await authenticatedGoto(page, `/milestones/${milestone.id}`);
+
+    await expect(page.getByRole("button", { name: "Übersicht" })).toBeVisible();
+    await page.getByRole("button", { name: "Übersicht" }).click();
+
+    // taskJournal und ticketJournal sollen Task/Ticket des Meilensteins zeigen
+    await expect(page.getByTestId("dashboard-widget-taskJournal")).toContainText(task.title);
+    await expect(page.getByTestId("dashboard-widget-ticketJournal")).toContainText(ticket.title);
+
+    // taskStatusReport und ticketStatusReport müssen angezeigt werden
+    await expect(page.getByTestId("dashboard-widget-taskStatusReport")).toBeVisible();
+    await expect(page.getByTestId("dashboard-widget-ticketStatusReport")).toBeVisible();
+  });
+
+  test("zeigt Projekt-Dashboard mit echten Meilenstein-, Aufgaben- und Ticketdaten", async ({ page, projectWithDashboardItems }) => {
+    const { project, milestone, task, ticket } = projectWithDashboardItems;
+
+    await authenticatedGoto(page, `/projects/${project.id}`);
+
+    await expect(page.getByRole("button", { name: "Übersicht" })).toBeVisible();
+    await page.getByRole("button", { name: "Übersicht" }).click();
+    await expect(page.getByRole("button", { name: "Neue Ansicht" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Projektübersicht" })).toHaveCount(0);
+    await expect(page.getByTestId("dashboard-widget-milestoneProgress")).toContainText(milestone.name);
+    await expect(page.getByTestId("dashboard-widget-taskJournal")).toContainText(task.title);
+    await expect(page.getByTestId("dashboard-widget-ticketJournal")).toContainText(ticket.title);
+    await expect(page.getByTestId("dashboard-widget-taskStatusReport")).toContainText("Offen");
+    await expect(page.getByTestId("dashboard-widget-ticketStatusReport")).toContainText("Offen");
   });
 
   test("speichert ein per Drag sortiertes persönliches Dashboard", async ({ page, request }) => {

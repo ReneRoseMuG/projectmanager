@@ -55,7 +55,7 @@ export function TaskDetailPage() {
   const detail = useTaskDetail(
     !isCreateMode && Number.isFinite(taskId) ? taskId : null,
   );
-  useDocumentTitle(isCreateMode ? "Aufgabe: Neu" : detail.task ? `Aufgabe: ${detail.task.title}` : "Aufgabe");
+  useDocumentTitle(isCreateMode ? "[Auf.] Neu" : detail.task ? `[Auf.] ${detail.task.title}` : "[Auf.]");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
   const returnTo =
     searchParams.get("returnTo") ??
@@ -86,16 +86,38 @@ export function TaskDetailPage() {
     } = input;
 
     if (!isCreateMode && detail.task) {
+      const t = detail.task;
+
+      const fieldsChanged =
+        taskInput.title !== t.title ||
+        (taskInput.description ?? "") !== (t.description ?? "") ||
+        taskInput.status !== t.status ||
+        taskInput.priority !== t.priority ||
+        taskInput.responsibleUserId !== t.responsibleUserId ||
+        taskInput.dueDate !== t.dueDate;
+
+      const currentTagIds = (t.tags ?? []).map((tag) => tag.id).sort((a, b) => a - b);
+      const nextTagIds = [...tagIds].sort((a, b) => a - b);
+      const tagsChanged =
+        nextTagIds.length !== currentTagIds.length ||
+        nextTagIds.some((id, index) => id !== currentTagIds[index]);
+
+      if (!fieldsChanged && !tagsChanged) {
+        return t;
+      }
+
       try {
-        const updated = await taskController.updateTask(detail.task.id, {
-          ...taskInput,
-          expectedVersion: detail.task.version,
-        });
-        await setTaskTags(detail.task.id, tagIds);
-        await invalidateTags(queryClient);
-        await detail.reload();
+        const [updatedTask] = await Promise.all([
+          fieldsChanged
+            ? taskController.updateTask(t.id, { ...taskInput, expectedVersion: t.version })
+            : Promise.resolve(undefined),
+          tagsChanged ? setTaskTags(t.id, tagIds) : Promise.resolve(undefined),
+        ]);
+        if (tagsChanged) {
+          void invalidateTags(queryClient);
+        }
         showToast({ tone: "success", title: "Aufgabe gespeichert" });
-        return updated ?? detail.task;
+        return (updatedTask as Task | undefined) ?? t;
       } catch (taskError) {
         showToast({
           tone: "error",

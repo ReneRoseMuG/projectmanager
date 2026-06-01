@@ -27,7 +27,8 @@ const systemDashboardTemplates: Array<{ templateKey: string; name: string; conte
   { templateKey: "system.task.default", name: "Standard: Aufgabenübersicht", context: "task", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.task] },
   { templateKey: "system.home.default", name: "Standard: Startseite", context: "home", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.home] },
   { templateKey: "system.calendar.default", name: "Standard: Kalender", context: "calendar", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.calendar] },
-  { templateKey: "system.dayPlan.default", name: "Standard: Persönliche Planung", context: "dayPlan", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.dayPlan] }
+  { templateKey: "system.dayPlan.default", name: "Standard: Persönliche Planung", context: "dayPlan", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.dayPlan] },
+  { templateKey: "system.dayPlanCalendar.default", name: "Standard: Persönliche Planung Kalender", context: "dayPlanCalendar", widgets: [...DEFAULT_DASHBOARD_LAYOUTS.dayPlanCalendar] }
 ];
 
 function isDashboardContext(value: string): value is DashboardContext {

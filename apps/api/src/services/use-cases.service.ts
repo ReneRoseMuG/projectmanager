@@ -98,7 +98,7 @@ async function mapUseCase(database: DbClient, record: UseCaseRecord, content?: s
   };
 }
 
-async function useCaseParentContexts(database: DbClient, featureId: number): Promise<VisibleParentContext[]> {
+async function buildUseCaseParentContexts(database: DbClient, featureId: number): Promise<VisibleParentContext[]> {
   const feature = firstRow(await database.select({ id: features.id, label: features.title }).from(features).where(eq(features.id, featureId)));
   return feature ? [{ type: "feature", id: feature.id, label: feature.label, origin: "direct" }] : [];
 }
@@ -196,7 +196,7 @@ export async function listUseCases(database: DbClient, featureId: number): Promi
 export async function getUseCase(database: DbClient, id: number): Promise<UseCaseDto> {
   const useCase = await getUseCaseRecord(database, id);
   const supportCounts = (await getUseCaseSupportCounts(database, [id])).get(id) ?? emptyUseCaseSupportCounts;
-  return mapUseCase(database, useCase, await readUseCaseContent(database, useCase), supportCounts, await useCaseParentContexts(database, useCase.featureId));
+  return mapUseCase(database, useCase, await readUseCaseContent(database, useCase), supportCounts, await buildUseCaseParentContexts(database, useCase.featureId));
 }
 
 export async function createUseCase(database: DbClient, featureId: number, input: UseCaseInput, actor?: JournalActor | null): Promise<UseCaseDto> {

@@ -53,25 +53,25 @@ export function useUseCases(featureId?: number) {
       }
       return createUseCaseRequest(validFeatureId, input);
     },
-    onSuccess: async (created) => {
+    onSuccess: (created) => {
       setSelectedUseCase(created);
-      await invalidateUseCaseScope(queryClient, created.featureId, created.id);
+      void invalidateUseCaseScope(queryClient, created.featureId, created.id);
     }
   });
 
   const updateUseCaseMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: UseCaseUpdate }) => updateUseCaseRequest(id, input),
-    onSuccess: async (updated) => {
+    onSuccess: (updated) => {
       setSelectedUseCase(updated);
-      await invalidateUseCaseScope(queryClient, updated.featureId, updated.id);
+      void invalidateUseCaseScope(queryClient, updated.featureId, updated.id);
     }
   });
 
   const removeUseCaseMutation = useMutation({
     mutationFn: deleteUseCaseRequest,
-    onSuccess: async (_result, id) => {
+    onSuccess: (_result, id) => {
       setSelectedUseCase((current) => (current?.id === id ? null : current));
-      await invalidateUseCaseScope(queryClient, validFeatureId, id);
+      void invalidateUseCaseScope(queryClient, validFeatureId, id);
     }
   });
 

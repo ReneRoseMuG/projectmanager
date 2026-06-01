@@ -1,14 +1,16 @@
 import type { CalendarEvent } from "@taskmanager/shared-types";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock3, GripVertical } from "lucide-react";
+import { CalendarClock, CalendarDays, ClipboardList, Flag, FolderKanban, GripVertical, ListTodo } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Avatar } from "../ui/Avatar";
+import { StatusPill } from "../ui/StatusPill";
 
 export interface EventContext {
   label: string;
   accentColor: string;
   ownerType: string;
+  status: string | null;
   responsibleName: string | null;
 }
 
@@ -34,16 +36,16 @@ export function WeekEventTile({ event, context, timeLabel, dragging = false, ove
       };
   const tileStyle: CSSProperties = {
     ...style,
-    borderLeft: `4px solid ${context.accentColor}`,
-    backgroundColor: `color-mix(in srgb, ${context.accentColor} 10%, var(--color-white))`
+    ["--event-accent" as string]: context.accentColor
   };
+  const Icon = eventContextIcon(context.ownerType);
 
   return (
     <button
       ref={overlay ? undefined : draggable.setNodeRef}
       type="button"
       data-testid={`week-event-${event.id}`}
-      className={`group grid w-full min-w-0 gap-1 rounded-md border border-line p-2 text-left shadow-sm transition hover:border-steel-300 hover:shadow-panel focus:outline-none focus:ring-2 focus:ring-steel-700/10 ${
+      className={`group relative grid w-full min-w-0 gap-3 overflow-hidden rounded-lg border border-line bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-steel-300 hover:shadow-panel focus:outline-none focus:ring-2 focus:ring-steel-700/10 ${
         dragging ? "opacity-50" : ""
       } ${overlay ? "w-64 shadow-panel" : ""}`}
       style={tileStyle}
@@ -54,20 +56,43 @@ export function WeekEventTile({ event, context, timeLabel, dragging = false, ove
       {...(overlay ? {} : draggable.attributes)}
       {...(overlay ? {} : draggable.listeners)}
     >
-      <span className="flex min-w-0 items-center gap-2">
-        <span className="min-w-0 truncate text-xs font-semibold text-steel-500">{context.label}</span>
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-1" style={{ backgroundColor: "var(--event-accent)" }} />
+      <span className="flex min-w-0 items-start justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line bg-shell text-steel-700">
+            <Icon size={15} />
+          </span>
+          <span className="grid min-w-0 gap-0.5">
+            <span className="min-w-0 truncate text-xs font-semibold text-steel-500">{context.label}</span>
+            <span className="truncate text-xs font-medium text-steel-500">{timeLabel}</span>
+          </span>
+        </span>
         <GripVertical size={13} className="ml-auto shrink-0 text-steel-300 opacity-0 transition group-hover:opacity-100" />
       </span>
       <span className="line-clamp-2 break-words text-sm font-semibold text-ink">{event.title}</span>
-      <span className="flex min-w-0 items-center gap-1 text-xs font-medium text-steel-500">
-        <Clock3 size={12} className="shrink-0" />
-        <span className="truncate">{timeLabel}</span>
+      <span className="flex min-w-0 items-center justify-between gap-2">
+        {context.status ? <StatusPill kind="workStatus" value={context.status} /> : <span className="inline-flex min-h-6 items-center rounded-md border border-line bg-shell px-2 text-xs font-semibold text-steel-600">Ohne Kontext</span>}
+        {context.responsibleName ? <Avatar name={context.responsibleName} size="sm" /> : null}
       </span>
-      {context.responsibleName ? (
-        <span className="mt-1 flex justify-end">
-          <Avatar name={context.responsibleName} size="sm" />
-        </span>
-      ) : null}
     </button>
   );
+}
+
+function eventContextIcon(ownerType: string) {
+  if (ownerType === "project") {
+    return FolderKanban;
+  }
+  if (ownerType === "milestone") {
+    return Flag;
+  }
+  if (ownerType === "task") {
+    return ListTodo;
+  }
+  if (ownerType === "dayPlan") {
+    return CalendarDays;
+  }
+  if (ownerType === "none") {
+    return CalendarClock;
+  }
+  return ClipboardList;
 }

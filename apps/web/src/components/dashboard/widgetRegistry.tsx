@@ -145,6 +145,7 @@ export const dashboardContextLabels: Record<DashboardContext, string> = {
   home: "Startseite",
   calendar: "Kalender",
   dayPlan: "Persönliche Planung",
+  dayPlanCalendar: "Persönliche Planung Kalender",
 };
 
 export function dashboardWidgetLabel(widgetId: DashboardWidgetId): string {

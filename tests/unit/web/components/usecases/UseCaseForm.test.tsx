@@ -25,11 +25,23 @@ import { addPendingComment, changeInput, clickTab, feature, renderWithProviders,
 import { UseCaseForm } from "../../../../../apps/web/src/components/usecases/UseCaseForm";
 
 describe("UseCaseForm", () => {
+  it("rendert den FormModal-Header mit kanonischem Use-Case-Icon in 20px", () => {
+    renderWithProviders(<UseCaseForm open useCase={useCase} features={[feature]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    const headerIcon = document.querySelector(".lucide-layers3");
+
+    expect(headerIcon).toBeInTheDocument();
+    expect(headerIcon).toHaveAttribute("width", "20");
+    expect(headerIcon).toHaveAttribute("height", "20");
+    expect(document.querySelector(".lucide-book-open[width='21']")).not.toBeInTheDocument();
+  });
+
   it("verdrahtet Body, Parent-Kontext und Sidebar-Felder ohne entfernte Felder", async () => {
     const onSubmit = vi.fn().mockResolvedValue(useCase);
     renderWithProviders(<UseCaseForm open useCase={useCase} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} />);
 
     const sidebar = screen.getByTestId("form-sidebar");
+    const sidebarSelects = within(sidebar).getAllByRole("combobox");
     expect(screen.queryByTestId("parent-context-field")).not.toBeInTheDocument();
     expect(screen.getByDisplayValue(useCase.title)).toBeInTheDocument();
     expect(screen.getByTestId("use-case-content-view")).toHaveValue(useCase.content);
@@ -37,13 +49,13 @@ describe("UseCaseForm", () => {
     expect(screen.queryByLabelText("Sortierung")).not.toBeInTheDocument();
     expect(within(sidebar).getByRole("combobox", { name: "Feature" })).toHaveValue(String(feature.id));
     expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
-    expect(within(sidebar).getByRole("button", { name: "Aktiv" })).toHaveAttribute("data-active", "true");
+    expect(sidebarSelects[2]).toHaveValue("active");
     expect(within(sidebar).queryByText(/Tags/i)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue(useCase.title), { target: { value: "Use Case Beta" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Feature" }), { target: { value: "" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
-    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(sidebarSelects[2], { target: { value: "done" } });
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>

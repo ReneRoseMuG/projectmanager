@@ -159,7 +159,7 @@ export function getSettingDefinition(key: string): SettingDefinition | undefined
 
 export const settingDefinitions = Object.values(settingsRegistry) as SettingDefinition[];
 
-export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar", "dayPlan"] as const;
+export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar", "dayPlan", "dayPlanCalendar"] as const;
 export const DASHBOARD_OWNER_TYPES = ["project", "milestone", "task", "dayPlan"] as const;
 export const DASHBOARD_WIDGET_IDS = [
   "taskStatusReport",
@@ -287,7 +287,8 @@ export const DASHBOARD_ALLOWED_WIDGETS = {
   task: ["taskStatusReport", "taskJournal", "commentJournal", "attachmentJournal"],
   home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
   calendar: ["calendar", "upcomingEvents", "overdueTasks", "taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
-  dayPlan: ["taskList", "taskBoard", "upcomingEvents", "overdueTasks", "commentJournal", "noteList", "globalJournal"]
+  dayPlan: ["taskList", "taskBoard", "calendar", "upcomingEvents", "overdueTasks", "commentJournal", "noteList", "globalJournal"],
+  dayPlanCalendar: ["calendar", "upcomingEvents"]
 } as const satisfies Record<DashboardContext, readonly DashboardWidgetId[]>;
 
 export const DEFAULT_DASHBOARD_LAYOUTS = {
@@ -341,6 +342,10 @@ export const DEFAULT_DASHBOARD_LAYOUTS = {
     { widgetId: "noteList", col: 0, row: 1, colSpan: 1, params: { limit: 10 } },
     { widgetId: "commentJournal", col: 1, row: 1, colSpan: 1, params: { limit: 10 } },
     { widgetId: "globalJournal", col: 0, row: 2, colSpan: 2, params: { limit: 15 } }
+  ],
+  dayPlanCalendar: [
+    { widgetId: "calendar", col: 0, row: 0, colSpan: 2 },
+    { widgetId: "upcomingEvents", col: 0, row: 1, colSpan: 1 }
   ]
 } as const satisfies Record<DashboardContext, readonly DashboardWidgetLayout[]>;
 

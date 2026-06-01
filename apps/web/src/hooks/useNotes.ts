@@ -86,27 +86,27 @@ export function useNotes(owner: NoteOwner | null) {
       }
       return createTaskNote(ownerId as number, input);
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       if (hasOwner) {
-        await invalidateNotes(queryClient, ownerType as NoteOwner["type"], ownerId as number);
+        void invalidateNotes(queryClient, ownerType as NoteOwner["type"], ownerId as number);
       }
     }
   });
 
   const updateNoteMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: NoteUpdate }) => updateNoteRequest(id, input),
-    onSuccess: async () => {
+    onSuccess: () => {
       if (hasOwner) {
-        await invalidateNotes(queryClient, ownerType as NoteOwner["type"], ownerId as number);
+        void invalidateNotes(queryClient, ownerType as NoteOwner["type"], ownerId as number);
       }
     }
   });
 
   const removeNoteMutation = useMutation({
     mutationFn: (id: number) => (ownerType === "dayPlan" && ownerId !== undefined ? unlinkDayPlanNote(ownerId, id) : deleteNoteRequest(id)),
-    onSuccess: async () => {
+    onSuccess: () => {
       if (hasOwner) {
-        await invalidateNotes(queryClient, ownerType as NoteOwner["type"], ownerId as number);
+        void invalidateNotes(queryClient, ownerType as NoteOwner["type"], ownerId as number);
       }
     }
   });

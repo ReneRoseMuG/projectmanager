@@ -57,7 +57,7 @@ export function TicketDetailPage() {
   const detail = useTicketDetail(
     !isCreateMode && Number.isFinite(ticketId) ? ticketId : null,
   );
-  useDocumentTitle(isCreateMode ? "Ticket: Neu" : detail.ticket ? `Ticket: ${detail.ticket.title}` : "Ticket");
+  useDocumentTitle(isCreateMode ? "[Tkt.] Neu" : detail.ticket ? `[Tkt.] ${detail.ticket.title}` : "[Tkt.]");
   const returnTo = searchParams.get("returnTo") ?? (searchParams.get("standalone") === "1" ? withStandaloneView("/tickets") : "/tickets");
   const currentRoute = !isCreateMode && ticketId !== null && Number.isFinite(ticketId)
     ? `/tickets/${ticketId}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
@@ -137,7 +137,7 @@ export function TicketDetailPage() {
     if (!ticket) {
       return;
     }
-    const tagIds = input.tagIds;
+    const { tagIds } = input;
     const ticketInput = {
       title: input.title,
       type: input.type,
@@ -151,14 +151,37 @@ export function TicketDetailPage() {
       affectedVersion: input.affectedVersion,
       dueDate: input.dueDate,
     };
+
+    const fieldsChanged =
+      ticketInput.title !== ticket.title ||
+      ticketInput.type !== ticket.type ||
+      (ticketInput.description ?? "") !== (ticket.description ?? "") ||
+      ticketInput.status !== ticket.status ||
+      ticketInput.priority !== ticket.priority ||
+      (ticketInput.resolution ?? null) !== (ticket.resolution ?? null) ||
+      ticketInput.reporterUserId !== ticket.reporterUserId ||
+      ticketInput.responsibleUserId !== ticket.responsibleUserId ||
+      (ticketInput.environment ?? null) !== (ticket.environment ?? null) ||
+      (ticketInput.affectedVersion ?? null) !== (ticket.affectedVersion ?? null) ||
+      ticketInput.dueDate !== ticket.dueDate;
+
+    const currentTagIds = ticket.tags.map((t) => t.id).sort((a, b) => a - b);
+    const nextTagIds = [...tagIds].sort((a, b) => a - b);
+    const tagsChanged =
+      nextTagIds.length !== currentTagIds.length ||
+      nextTagIds.some((id, i) => id !== currentTagIds[i]);
+
+    if (!fieldsChanged && !tagsChanged) {
+      return;
+    }
+
     try {
-      await detail.updateTicket({
-        ...ticketInput,
-        expectedVersion: ticket.version,
-      });
-      await setTicketTags(ticket.id, tagIds);
-      await detail.reload();
-      await tickets.reload();
+      await Promise.all([
+        fieldsChanged
+          ? detail.updateTicket({ ...ticketInput, expectedVersion: ticket.version })
+          : Promise.resolve(undefined),
+        tagsChanged ? setTicketTags(ticket.id, tagIds) : Promise.resolve(undefined),
+      ]);
       showToast({ tone: "success", title: "Ticket gespeichert" });
     } catch (ticketError) {
       showToast({

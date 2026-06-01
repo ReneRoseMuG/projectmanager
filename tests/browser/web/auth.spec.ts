@@ -1,14 +1,22 @@
 import { expect, test } from "@playwright/test";
 import { apiBaseUrl, authenticatedGoto, ensureApiAuth, uniqueTitle } from "./domain-test-utils";
 
-test("Direktaufruf ohne Session landet beim Login und kehrt nach Login zur Route zurück", async ({ page }) => {
-  await page.goto("/projects");
-  await expect(page.getByRole("button", { name: "Als Rene anmelden" })).toBeVisible();
+test.describe.configure({ mode: "serial" });
 
-  await page.getByRole("button", { name: "Als Rene anmelden" }).click();
+test("Direktaufruf ohne Session landet beim Login und kehrt nach Login zur Route zurück", async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL });
+  const page = await context.newPage();
+  try {
+    await page.goto("/projects");
+    await expect(page.getByRole("button", { name: "Als Rene anmelden" })).toBeVisible();
 
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: "Startseite", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Als Rene anmelden" }).click();
+
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { name: "Startseite", exact: true })).toBeVisible();
+  } finally {
+    await context.close();
+  }
 });
 
 test("Admin legt Benutzer in der UI an; Nicht-Admin sieht keine Administration", async ({ page, request }) => {

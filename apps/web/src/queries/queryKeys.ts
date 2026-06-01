@@ -80,6 +80,7 @@ export const queryKeys = {
   },
   notes: {
     root: ["notes"] as const,
+    detail: (noteId: number) => [...queryKeys.notes.root, "detail", noteId] as const,
     owner: (ownerType: NoteOwnerType, ownerId: number) => [...queryKeys.notes.root, ownerType, ownerId] as const
   },
   attachments: {

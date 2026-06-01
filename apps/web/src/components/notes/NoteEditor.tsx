@@ -1,5 +1,5 @@
 import type { Note, NoteUpdate } from "@taskmanager/shared-types";
-import { Download, StickyNote, Trash2 } from "lucide-react";
+import { StickyNote, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
@@ -9,32 +9,18 @@ import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
-import {
-  escapeHtml,
-  htmlToNoteContent,
-  noteContentToEditorContent,
-  noteContentToExportHtml,
-  type NoteContentFormat,
-} from "./noteContent";
+import { htmlToNoteContent, noteContentToEditorContent, type NoteContentFormat } from "./noteContent";
 
 interface NoteEditorProps {
   note: Note | null;
   open: boolean;
   onSave: (id: number, input: NoteUpdate) => Promise<unknown>;
   onClose: () => void;
+  variant?: "modal" | "page";
+  onOpenInTab?: () => void;
 }
 
-function exportNote(note: Note, title: string, content: string, contentFormat: NoteContentFormat) {
-  const blob = new Blob([`<h1>${escapeHtml(title)}</h1>\n${noteContentToExportHtml(content, contentFormat)}\n`], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `note-${note.id}.html`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
+export function NoteEditor({ note, open, onSave, onClose, variant = "modal", onOpenInTab }: NoteEditorProps) {
   const { confirm } = useConfirm();
   const [title, setTitle] = useState("Ohne Titel");
   const [content, setContent] = useState("");
@@ -116,12 +102,11 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
       saving={saving}
       submitLabel="Speichern"
       cancelLabel="Schließen"
+      variant={variant}
+      onOpenInTab={onOpenInTab}
       footerStart={
         note ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="ghost" icon={<Download size={16} />} onClick={() => exportNote(note, title, content, contentFormat)}>
-              Export HTML
-            </Button>
             <Button variant="ghost" className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={16} />} disabled>
               Löschen
             </Button>
@@ -132,29 +117,22 @@ export function NoteEditor({ note, open, onSave, onClose }: NoteEditorProps) {
       {note ? (
         <>
           <Section>
-            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_16rem]">
-              <FormField label="Titel">
-                <input
-                  className="h-11 rounded-md border border-line bg-white px-3 text-lg font-semibold outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
-                  value={title}
-                  required
-                  onChange={(event) => {
-                    setTitle(event.target.value);
-                    setDirty(true);
-                  }}
-                />
-              </FormField>
-              <FormField label="Verknüpft mit">
-                <select className="h-11 rounded-md border border-line bg-white px-3 text-sm text-steel-600 outline-none" disabled>
-                  <option>Aktueller Kontext</option>
-                </select>
-              </FormField>
-            </div>
-            <div className="mt-4 rounded-lg border border-dashed border-line bg-shell/60 p-3 text-sm text-steel-600">Tags für Notizen werden über die Kontextlisten gepflegt.</div>
+            <FormField label="Titel">
+              <input
+                className="h-11 rounded-md border border-line bg-white px-3 text-lg font-semibold outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
+                value={title}
+                required
+                onChange={(event) => {
+                  setTitle(event.target.value);
+                  setDirty(true);
+                }}
+              />
+            </FormField>
           </Section>
 
           <Section>
             <RichTextInlineField
+              key={`${note.id}-${contentFormat}`}
               value={content}
               valueFormat={contentFormat}
               testIdPrefix="note-editor-content"

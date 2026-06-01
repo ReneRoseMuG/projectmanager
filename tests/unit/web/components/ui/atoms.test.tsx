@@ -163,7 +163,7 @@ describe("DatePicker / Select", () => {
       </Select>,
     );
 
-    expect(container.querySelector("select")).toHaveClass("h-11", "w-full");
+    expect(container.querySelector("select")).toHaveClass("h-10", "w-full");
   });
 });
 

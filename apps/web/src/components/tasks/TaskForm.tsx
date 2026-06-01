@@ -12,7 +12,7 @@ import type {
   TicketStatus,
   TicketType,
 } from "@taskmanager/shared-types";
-import { ClipboardList, ListChecks } from "lucide-react";
+import { Bug, Flag, ListChecks, ListTodo, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DraftFile } from "../../types";
@@ -57,6 +57,7 @@ import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { Pill } from "../ui/Pill";
+import { CatalogSelect } from "../ui/CatalogSelect";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
@@ -380,7 +381,7 @@ export function TaskForm({
         open={open}
         title={task ? "Aufgabe bearbeiten" : "Aufgabe anlegen"}
         objectReference={task ? objectReference("task", task.id) : undefined}
-        icon={<ClipboardList size={20} />}
+        icon={<ListTodo size={20} />}
         breadcrumb={["Aufgaben", task ? task.title : "Neu"]}
         submitLabel={
           saving
@@ -423,8 +424,8 @@ export function TaskForm({
 
         {activeTab === "details" ? (
           <div className="flex min-h-0 w-full flex-1">
-            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
-              <div className="mx-auto grid w-full max-w-5xl gap-4">
+            <div className="min-w-0 flex-1 overflow-auto p-2.5">
+              <div className="grid w-full gap-4">
                 {showParentContexts ? <ParentContextField parents={currentTask?.parentContexts} /> : null}
                 <Section>
                   <div className="grid gap-4">
@@ -451,30 +452,18 @@ export function TaskForm({
               </div>
             </div>
             <FormSidebar storageKey="task-form-sidebar">
-              <div className="grid gap-4">
-                <FormField label="Status">
-                  <StatusToggle
-                    kind="workStatus"
-                    value={status}
-                    onChange={setStatus}
-                  />
-                </FormField>
-                <FormField label="Priorität">
-                  <PrioritySelect value={priority} onChange={setPriority} />
-                </FormField>
-                <DatePicker
-                  label="Fällig"
-                  value={dueDate}
-                  onChange={(event) => setDueDate(event.target.value)}
-                />
-                <UserSelectField
-                  label="Verantwortlich"
-                  value={responsibleUserId}
-                  selectedUser={currentTask?.responsibleUser ?? null}
-                  onChange={setResponsibleUserId}
-                />
-                <TagPicker selected={selectedTags} onChange={setSelectedTags} />
-              </div>
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
+              <CatalogSelect label="Priorität" icon={<Flag size={14} />} variant="panel" kind="priority" value={priority} onChange={setPriority} />
+              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              <UserSelectField
+                label="Verantwortlich"
+                icon={<Users size={14} />}
+                variant="panel"
+                value={responsibleUserId}
+                selectedUser={currentTask?.responsibleUser ?? null}
+                onChange={setResponsibleUserId}
+              />
+              <TagPicker selected={selectedTags} onChange={setSelectedTags} variant="panel" />
             </FormSidebar>
           </div>
         ) : null}
@@ -540,7 +529,7 @@ export function TaskForm({
                   title: subtask.title,
                   badge: "Wird erstellt",
                 }))}
-                emptyIcon={<ListChecks size={22} />}
+                emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Subtasks vorgemerkt"
                 showLinkExisting={false}
                 onCreateNew={() => setSubtaskDraftOpen(true)}
@@ -586,7 +575,7 @@ export function TaskForm({
                     ? [{ title: item.draft.title, badge: "Wird erstellt" }]
                     : [],
                 )}
-                emptyIcon={<ClipboardList size={22} />}
+                emptyIcon={<Bug size={22} />}
                 emptyTitle="Keine Tickets vorgemerkt"
                 showLinkExisting={ticketCandidateOwner !== null}
                 onLinkExisting={() => setTicketLinkOpen(true)}
@@ -684,6 +673,7 @@ export function TaskForm({
               <>
                 <NoteList
                   notes={notes.notes}
+                  owner={{ type: "task", id: task.id }}
                   onCreate={createNote}
                   onEdit={setEditingNote}
                   onDelete={(note) => {
@@ -887,7 +877,7 @@ function SubtaskDraftDialog({
     <FormModal
       open={open}
       title="Subtask vormerken"
-      icon={<ListChecks size={20} />}
+      icon={<ListTodo size={20} />}
       breadcrumb={["Aufgaben", "Subtask"]}
       submitLabel="Vormerken"
       onSubmit={submit}
@@ -979,7 +969,7 @@ function TicketDraftDialog({
     <FormModal
       open={open}
       title="Ticket vormerken"
-      icon={<ClipboardList size={20} />}
+      icon={<Bug size={20} />}
       breadcrumb={["Aufgaben", "Ticket"]}
       submitLabel="Vormerken"
       onSubmit={submit}

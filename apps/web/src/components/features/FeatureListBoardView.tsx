@@ -9,6 +9,7 @@ interface FeatureListBoardViewProps {
   features: Feature[];
   onCreate: () => void;
   onOpen: (feature: Feature) => void;
+  onOpenInTab?: (feature: Feature) => void;
   onDelete: (feature: Feature) => void;
   onStatusChange?: (feature: Feature, status: Feature["status"]) => void | Promise<unknown>;
   toolbarFilters?: React.ReactNode;
@@ -29,6 +30,7 @@ export function FeatureListBoardView({
   features,
   onCreate,
   onOpen,
+  onOpenInTab,
   onDelete,
   onStatusChange,
   toolbarFilters,
@@ -68,10 +70,10 @@ export function FeatureListBoardView({
         />
       }
       renderCard={(feature) => (
-        <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} />
+        <FeatureCard feature={feature} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={onDelete} onStatusChange={onStatusChange} />
       )}
       renderRow={(feature) => (
-        <FeatureCard feature={feature} variant="row" onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} />
+        <FeatureCard feature={feature} variant="row" onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={onDelete} onStatusChange={onStatusChange} />
       )}
     />
   );

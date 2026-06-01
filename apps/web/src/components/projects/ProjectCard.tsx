@@ -1,5 +1,5 @@
 import type { Project, Tag } from "@taskmanager/shared-types";
-import { Archive, Bug, Flag, FolderOpen, ListTodo } from "lucide-react";
+import { Archive, Bug, ExternalLink, Flag, FolderOpen, ListTodo } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { objectReference } from "../../lib/references";
 import { catalogColor } from "../../utils/catalogs";
@@ -13,6 +13,7 @@ interface ProjectCardProps {
   project: Project;
   variant?: "card" | "row";
   onEdit: (project: Project) => void;
+  onOpenInTab?: (project: Project) => void;
   onDelete?: (project: Project) => void;
   onStatusChange?: (project: Project, status: Project["status"]) => void | Promise<unknown>;
   onCreateMilestone?: () => void;
@@ -22,12 +23,15 @@ interface ProjectCardProps {
   onTagsChange?: (projectId: number, tagIds: number[]) => void | Promise<void>;
 }
 
-export function ProjectCard({ project, variant = "card", onEdit, onDelete, onStatusChange, onCreateMilestone, onCreateTask, onCreateTicket, allTags, onTagsChange }: ProjectCardProps) {
+export function ProjectCard({ project, variant = "card", onEdit, onOpenInTab, onDelete, onStatusChange, onCreateMilestone, onCreateTask, onCreateTicket, allTags, onTagsChange }: ProjectCardProps) {
   const catalogs = useCatalogs();
   const accent = catalogColor(catalogs.entries, "workStatus", project.status);
   const description = richTextToPlainText(project.description);
   const Icon = project.status === "archived" ? Archive : FolderOpen;
   const createMenuItems: ActionMenuItem[] = [
+    ...(onOpenInTab
+      ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(project) }]
+      : []),
     ...(onCreateMilestone
       ? [{ label: "Neuer Meilenstein", icon: <Flag size={16} />, onClick: onCreateMilestone }]
       : []),

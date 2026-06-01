@@ -38,11 +38,18 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { format, parseISO } from "date-fns";
 import { describe, expect, it, vi } from "vitest";
 import { MonthCalendar } from "../../../../../apps/web/src/components/calendar/MonthCalendar";
+import { CalendarWidgetView } from "../../../../../apps/web/src/components/calendar/CalendarWidgetView";
 import { eventsByDay, moveEventToDate, resolveEventContext, WeekCalendar } from "../../../../../apps/web/src/components/calendar/WeekCalendar";
 import { WeekEventTile } from "../../../../../apps/web/src/components/calendar/WeekEventTile";
 import { WeekTaskTile } from "../../../../../apps/web/src/components/calendar/WeekTaskTile";
 import { getGermanHolidaysForDate } from "../../../../../apps/web/src/lib/german-holidays";
 import { resolveTaskStatusColor } from "../../../../../apps/web/src/lib/task-status-color";
+
+vi.mock("../../../../../apps/web/src/components/ui/StatusPill", () => ({
+  StatusPill({ value }: { value: string }) {
+    return <span>{value}</span>;
+  }
+}));
 
 function event(overrides: Partial<CalendarEvent>): CalendarEvent {
   return {
@@ -137,14 +144,14 @@ describe("WeekCalendar helpers", () => {
     expect(format(parseISO(moved.endTime), "yyyy-MM-dd HH:mm")).toBe("2026-06-03 11:45");
   });
 
-  it("priorisiert Event-Farbe vor Kontextfarbe und erkennt DayPlan-Owner defensiv", () => {
+  it("priorisiert Statusfarben vor Event-Farben und erkennt DayPlan-Owner defensiv", () => {
     const projectContext = resolveEventContext(
       event({ owners: [{ type: "project", id: 2 }], color: "var(--color-magenta)" }),
       [project({ id: 2, name: "Projekt Beta", color: "var(--color-teal)" })]
     );
     const dayPlanContext = resolveEventContext(event({ owners: [{ type: "day_plan" as "dayPlan", id: 5 }], color: "#6366f1" }));
 
-    expect(projectContext).toMatchObject({ label: "Projekt Beta", accentColor: "var(--color-magenta)", ownerType: "project" });
+    expect(projectContext).toMatchObject({ label: "Projekt Beta", accentColor: "var(--color-teal)", ownerType: "project", status: "active" });
     expect(dayPlanContext).toMatchObject({ label: "Persönliche Planung", accentColor: "var(--color-teal)", ownerType: "dayPlan" });
   });
 
@@ -159,8 +166,9 @@ describe("WeekCalendar helpers", () => {
 
     expect(taskContext).toMatchObject({
       label: "Design prüfen",
-      accentColor: "var(--color-tangerine)",
+      accentColor: "var(--color-steel-400)",
       ownerType: "task",
+      status: "todo",
       responsibleName: "Ada Lovelace"
     });
     expect(milestoneContext).toMatchObject({
@@ -171,7 +179,7 @@ describe("WeekCalendar helpers", () => {
     });
   });
 
-  it("rendert Wochenkacheln mit Akzentrand, Tint und Assignee-Avatar", () => {
+  it("rendert Terminkarten mit Board-Card-Akzent, Domain-Icon, Status und Assignee-Avatar", () => {
     render(
       <WeekEventTile
         event={event({ id: 12, title: "Review" })}
@@ -179,6 +187,7 @@ describe("WeekCalendar helpers", () => {
           label: "Design prüfen",
           accentColor: "var(--color-tangerine)",
           ownerType: "task",
+          status: "in_review",
           responsibleName: "Ada Lovelace"
         }}
         timeLabel="09:00 - 10:00"
@@ -187,27 +196,66 @@ describe("WeekCalendar helpers", () => {
     );
 
     const tile = screen.getByTestId("week-event-12");
-    expect(tile.getAttribute("style")).toContain("border-left: 4px solid var(--color-tangerine)");
-    expect(tile.getAttribute("style")).toContain("background-color: color-mix(in srgb, var(--color-tangerine) 10%, var(--color-white))");
+    expect(tile.getAttribute("style")).toContain("--event-accent: var(--color-tangerine)");
+    expect(tile).toHaveTextContent("in_review");
+    expect(tile).toHaveTextContent("09:00 - 10:00");
     expect(screen.getByText("AL")).toBeInTheDocument();
   });
 
   it("löst Task-Statusfarben und nationale Feiertage auf", () => {
     expect(resolveTaskStatusColor("in_progress")).toBe("var(--color-teal)");
+    expect(resolveTaskStatusColor("active")).toBe("var(--color-teal)");
     expect(resolveTaskStatusColor("completed")).toBe("var(--color-fern)");
     expect(resolveTaskStatusColor("unknown")).toBe("var(--color-steel-400)");
     expect(getGermanHolidaysForDate("2026-05-01")).toContain("Maifeiertag");
   });
 
-  it("rendert Task-Wochenkacheln mit Header, Body, Footer und Klickaktion", () => {
+  it("hebt Feiertags-Spalten rot und den heutigen Spaltenkopf dunkel hervor", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-31T10:00:00"));
+
+    try {
+      render(<WeekCalendar events={[]} tasks={[]} initialDate="2026-05-25" />);
+
+      expect(screen.getByTestId("week-day-2026-05-25")).toHaveClass("calendar-holiday-column");
+      expect(screen.getByTestId("week-day-2026-05-25")).toHaveStyle({ backgroundColor: "color-mix(in srgb, var(--color-crimson) 14%, var(--color-white))" });
+      expect(within(screen.getByTestId("week-day-2026-05-25")).getByText("Mo 25. Mai")).toBeInTheDocument();
+      expect(within(screen.getByTestId("week-day-2026-05-25")).getByText("Pfingstmontag")).toBeInTheDocument();
+      expect(screen.getByTestId("week-day-2026-05-25").querySelector("header")).not.toHaveClass("border-crimson");
+      expect(screen.getByTestId("week-day-2026-05-31").querySelector("header")).toHaveClass("bg-steel-700");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("startet Create nur über den Plus-Button und nicht über die Tagesspalte", () => {
+    const onDateClick = vi.fn();
+    render(<WeekCalendar events={[]} tasks={[]} initialDate="2026-05-25" onDateClick={onDateClick} />);
+
+    fireEvent.click(screen.getByTestId("week-day-2026-05-25"));
+    expect(onDateClick).not.toHaveBeenCalled();
+
+    fireEvent.click(within(screen.getByTestId("week-day-2026-05-25")).getByRole("button", { name: "Termin anlegen" }));
+    expect(onDateClick).toHaveBeenCalledWith("2026-05-25");
+  });
+
+  it("hebt Feiertage im Monatskalender sichtbar rot hervor", () => {
+    render(<MonthCalendar tasks={[]} initialDate="2026-05-01" />);
+    expect(screen.getByTestId("month-day-2026-05-01")).toHaveClass("calendar-holiday-cell", "border-line");
+    expect(screen.getByTestId("month-day-2026-05-01")).toHaveStyle({ backgroundColor: "color-mix(in srgb, var(--color-crimson) 14%, var(--color-white))" });
+    expect(within(screen.getByTestId("month-day-2026-05-01")).getByText("Maifeiertag")).toBeInTheDocument();
+  });
+
+  it("rendert Task-Wochenkacheln im Board-Card-Stil ohne Datumsfooter", () => {
     const onClick = vi.fn();
     render(<WeekTaskTile task={task({ id: 21, title: "Kalender portieren", status: "in_review", dueDate: "2026-05-27" })} overlay onClick={onClick} />);
 
     const tile = screen.getByTestId("week-task-21");
+    expect(tile.getAttribute("style")).toContain("--task-accent: var(--color-tangerine)");
+    expect(tile).toHaveTextContent("Aufgabe");
     expect(tile).toHaveTextContent("in_review");
     expect(tile).toHaveTextContent("Kalender portieren");
-    expect(tile).toHaveTextContent("Fällig 27.05.26");
-    expect(within(tile).getByText("in_review").closest("div")?.getAttribute("style")).toContain("background-color: var(--color-tangerine)");
+    expect(tile).not.toHaveTextContent("Fällig 27.05.26");
 
     fireEvent.click(tile);
     expect(onClick).toHaveBeenCalledWith(expect.objectContaining({ id: 21 }));
@@ -253,5 +301,73 @@ describe("WeekCalendar helpers", () => {
 
     fireEvent.click(within(day).getByTestId("month-task-31"));
     expect(onTaskClick).toHaveBeenCalledWith(expect.objectContaining({ id: 31 }));
+  });
+
+  it("rendert Termine im Monatskalender nach Startdatum", () => {
+    const onEventClick = vi.fn();
+    render(
+      <MonthCalendar
+        events={[event({ id: 41, title: "Monatstermin", startTime: "2026-05-12T08:00:00", endTime: "2026-05-12T09:00:00" })]}
+        tasks={[]}
+        initialDate="2026-05-15"
+        onEventClick={onEventClick}
+      />
+    );
+
+    fireEvent.click(within(screen.getByTestId("month-day-2026-05-12")).getByTestId("month-event-41"));
+
+    expect(onEventClick).toHaveBeenCalledWith(expect.objectContaining({ id: 41 }));
+  });
+
+  it("nutzt eine zentrale Kalenderkomponente für Woche und Monat ohne Datenverlust", () => {
+    render(
+      <CalendarWidgetView
+        events={[event({ id: 51, title: "Zentraler Termin", startTime: "2026-05-27T08:00:00", endTime: "2026-05-27T09:00:00" })]}
+        tasks={[task({ id: 52, title: "Zentrale Aufgabe", status: "todo", dueDate: "2026-05-27" })]}
+        initialDate="2026-05-27"
+        initialView="week"
+        mode="interactive"
+        onDateClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId("calendar-widget-view")).toHaveTextContent("Zentraler Termin");
+    expect(screen.getAllByRole("button", { name: "Termin anlegen" }).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Monat" }));
+
+    expect(screen.getByTestId("calendar-widget-view")).toHaveTextContent("Zentraler Termin");
+    expect(screen.getByTestId("calendar-widget-view")).toHaveTextContent("Zentrale Aufgabe");
+  });
+
+  it("blendet Create-Aktionen in der zentralen Read-only-Variante aus", () => {
+    render(
+      <CalendarWidgetView
+        events={[event({ id: 61, title: "Nur Lesen", startTime: "2026-05-27T08:00:00", endTime: "2026-05-27T09:00:00" })]}
+        tasks={[]}
+        initialDate="2026-05-27"
+        initialView="week"
+        mode="readonly"
+        onDateClick={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: "Termin anlegen" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("calendar-widget-view")).toHaveTextContent("Nur Lesen");
+  });
+
+  it("rendert keine Kalender-Footer-Zähler unter dem Widget", () => {
+    render(
+      <CalendarWidgetView
+        events={[]}
+        tasks={[]}
+        initialDate="2026-05-27"
+        initialView="week"
+        mode="readonly"
+      />
+    );
+
+    expect(screen.queryByText("0 Termine")).not.toBeInTheDocument();
+    expect(screen.queryByText("0 fällige Aufgaben")).not.toBeInTheDocument();
   });
 });

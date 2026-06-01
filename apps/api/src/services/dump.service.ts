@@ -32,7 +32,7 @@ export function setMysqlPoolForTests(pool: typeof _productionPool | null): void 
 }
 
 const mysqlPool = new Proxy(_productionPool, {
-  get(target, prop, _receiver) {
+  get(target, prop) {
     const pool = _poolOverride ?? target;
     const value = Reflect.get(pool as object, prop, pool);
     return typeof value === "function" ? (value as (...args: unknown[]) => unknown).bind(pool) : value;
@@ -261,13 +261,6 @@ interface RemotePreviewSession {
 }
 
 const remotePreviewSessions = new Map<string, RemotePreviewSession>();
-
-function quoteIdentifier(value: string): string {
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) {
-    throw badRequest(`Unsafe SQL identifier: ${value}`);
-  }
-  return `"${value}"`;
-}
 
 function sha256Buffer(value: Buffer): string {
   return crypto.createHash("sha256").update(value).digest("hex");
@@ -986,9 +979,7 @@ async function writeDumpArchiveFile(
   };
 }
 
-async function createDatabaseSnapshot(
-  _targetPath: string,
-): Promise<void> {
+async function createDatabaseSnapshot(): Promise<void> {
   // MySQL: no file snapshot needed, the JSON dump is the backup
 }
 
@@ -2340,7 +2331,7 @@ async function applyInspectedDump(
     const workDir = ensureWorkDir();
     transferDir = fs.mkdtempSync(path.join(workDir, "transfer-"));
     const targetBackupPath = "";
-    await createDatabaseSnapshot(targetBackupPath);
+    await createDatabaseSnapshot();
 
     const stagedRoots = await stageFileRoots(
       preview.zipFileBuffers,

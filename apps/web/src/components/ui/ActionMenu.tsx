@@ -80,9 +80,9 @@ export function ActionMenu({ items, ariaLabel = "Aktionen", objectReference }: A
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         title={ariaLabel}
-        icon={<Settings2 size={22} strokeWidth={2.4} />}
+        icon={<Settings2 size={20} strokeWidth={2} />}
         variant="ghost"
-        className="-mr-1 h-9 w-[36px] border border-line bg-white px-0 text-ink shadow-sm hover:border-steel-300 hover:bg-steel-50"
+        className="-mr-1 h-10 w-10 border border-line bg-white px-0 text-ink shadow-sm hover:border-steel-300 hover:bg-steel-50"
         onClick={(event) => {
           event.stopPropagation();
           setOpen((current) => !current);

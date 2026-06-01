@@ -1,6 +1,7 @@
 import type { TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { withStandaloneView } from "../../utils/standalone";
 import type { TaskOwner } from "../../api/tasks";
 import { errorMessage } from "../../hooks/errors";
 import { useCatalogs } from "../../hooks/useCatalogs";
@@ -80,6 +81,7 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
             onAdd={props.onAdd}
             onAddStatus={(status) => props.onAddStatus?.(status)}
             onOpen={(task) => props.onOpen(task as TaskBoardItem)}
+            onOpenInTab={(task) => window.open(withStandaloneView(`/tasks/${task.id}`), "_blank")}
             onDelete={(task) => props.onDelete(task as TaskBoardItem)}
             onStatusChange={(task, status) => updateTaskStatus(task as TaskBoardItem, status)}
             onDueDateChange={(task, dueDate) => updateTaskDueDate(task as TaskBoardItem, dueDate)}

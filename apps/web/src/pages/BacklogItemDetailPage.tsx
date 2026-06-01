@@ -32,7 +32,7 @@ export function BacklogItemDetailPage() {
       : undefined);
   const backlog = useBacklog(projectId);
   const features = useFeatures();
-  useDocumentTitle(isCreateMode ? "Backlog-Item: Neu" : item ? `Backlog-Item: ${item.title}` : "Backlog-Item");
+  useDocumentTitle(isCreateMode ? "[Bl.] Neu" : item ? `[Bl.] ${item.title}` : "[Bl.]");
   const returnTo =
     searchParams.get("returnTo") ??
     (searchParams.get("standalone") === "1"

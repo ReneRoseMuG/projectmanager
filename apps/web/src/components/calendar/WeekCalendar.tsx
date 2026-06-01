@@ -3,10 +3,11 @@ import { DndContext, DragOverlay, PointerSensor, useDroppable, useSensor, useSen
 import { addDays, addMilliseconds, differenceInMilliseconds, endOfISOWeek, format, getISOWeek, isBefore, isSameDay, parseISO, set, startOfDay, startOfISOWeek } from "date-fns";
 import { de } from "date-fns/locale";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { sortCalendarTasks } from "../../lib/task-calendar";
+import { resolveTaskStatusColor } from "../../lib/task-status-color";
 import { Button } from "../ui/Button";
-import { CalendarHolidayBadge } from "./CalendarHolidayBadge";
+import { CalendarHolidayBadge, getCalendarHolidayNames } from "./CalendarHolidayBadge";
 import { WeekEventTile, type EventContext } from "./WeekEventTile";
 import { WeekTaskTile } from "./WeekTaskTile";
 
@@ -16,6 +17,9 @@ interface WeekCalendarProps {
   projects?: Project[];
   milestones?: Milestone[];
   initialDate?: string;
+  visibleDate?: Date;
+  onVisibleDateChange?: (date: Date) => void;
+  hideHeader?: boolean;
   onDateClick?: (date: string) => void;
   onEventClick?: (event: CalendarEvent) => void;
   onEventMove?: (event: CalendarEvent, startTime: string, endTime: string) => Promise<void>;
@@ -97,8 +101,9 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
     const project = projects.find((candidate) => candidate.id === projectOwner.id);
     return {
       label: project?.name ?? `Projekt #${projectOwner.id}`,
-      accentColor: contextualAccent(event.color, project?.color ?? fallbackAccent),
+      accentColor: project?.status ? resolveTaskStatusColor(project.status) : contextualAccent(event.color, project?.color ?? fallbackAccent),
       ownerType: "project",
+      status: project?.status ?? null,
       responsibleName: project?.responsibleUser?.fullName ?? null
     };
   }
@@ -108,8 +113,9 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
     const project = milestone ? projects.find((candidate) => candidate.id === milestone.projectId) : undefined;
     return {
       label: milestone?.name ?? `Meilenstein #${milestoneOwner.id}`,
-      accentColor: contextualAccent(event.color, milestone?.color ?? project?.color ?? milestoneAccent),
+      accentColor: milestone?.status ? resolveTaskStatusColor(milestone.status) : contextualAccent(event.color, milestone?.color ?? project?.color ?? milestoneAccent),
       ownerType: "milestone",
+      status: milestone?.status ?? null,
       responsibleName: milestone?.responsibleUser?.fullName ?? null
     };
   }
@@ -118,8 +124,9 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
     const task = tasks.find((candidate) => candidate.id === taskOwner.id);
     return {
       label: task?.title ?? `Aufgabe #${taskOwner.id}`,
-      accentColor: contextualAccent(event.color, taskAccent),
+      accentColor: task?.status ? resolveTaskStatusColor(task.status) : contextualAccent(event.color, taskAccent),
       ownerType: "task",
+      status: task?.status ?? null,
       responsibleName: task?.responsibleUser?.fullName ?? null
     };
   }
@@ -129,14 +136,16 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
       label: "Persönliche Planung",
       accentColor: contextualAccent(event.color, dayPlanAccent),
       ownerType: "dayPlan",
+      status: null,
       responsibleName: event.responsibleUser?.fullName ?? null
     };
   }
 
   return {
     label: "Ohne Kontext",
-    accentColor: event.color ?? fallbackAccent,
+    accentColor: fallbackAccent,
     ownerType: "none",
+    status: null,
     responsibleName: event.responsibleUser?.fullName ?? null
   };
 }
@@ -197,26 +206,34 @@ function WeekDayColumn({
   const droppable = useDroppable({ id: date });
   const dateValue = parseISO(date);
   const today = isSameDay(dateValue, new Date());
+  const holidayNames = getCalendarHolidayNames(date);
+  const dateLabel = `${format(dateValue, "EEEEEE", { locale: de })} ${format(dateValue, "dd. MMM", { locale: de })}`;
+  const columnStyle: CSSProperties | undefined =
+    holidayNames.length > 0
+      ? {
+          backgroundColor: "color-mix(in srgb, var(--color-crimson) 14%, var(--color-white))"
+        }
+      : undefined;
+  const createActionClassName = today && holidayNames.length === 0 ? "h-9 w-9 shrink-0 text-white hover:bg-white/10" : "h-9 w-9 shrink-0 text-ink hover:bg-steel-100";
 
   return (
     <section
       ref={droppable.setNodeRef}
       data-testid={`week-day-${date}`}
-      className={`grid min-h-[520px] min-w-0 content-start gap-3 border-line bg-white p-3 transition ${droppable.isOver ? "bg-teal/10" : ""}`}
-      onClick={() => onDateClick?.(date)}
+      className={`grid min-h-[520px] min-w-0 content-start border-line transition ${holidayNames.length > 0 ? "calendar-holiday-column" : today ? "bg-steel-100" : "bg-white"} ${droppable.isOver ? "!bg-teal/10" : ""}`}
+      style={columnStyle}
     >
-      <header className="flex min-w-0 items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-steel-400">{format(dateValue, "EEEE", { locale: de })}</p>
-          <h2 className={`text-lg font-bold ${today ? "text-teal" : "text-ink"}`}>{format(dateValue, "dd.MM.")}</h2>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <CalendarHolidayBadge dateKey={date} />
+      <header className={`grid min-h-16 min-w-0 gap-1 border-b px-3 py-2 ${holidayNames.length > 0 ? "border-line bg-crimson/25" : today ? "border-steel-700 bg-steel-700 text-white" : "border-line bg-shell"}`}>
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className={`truncate whitespace-nowrap text-base font-bold ${today && holidayNames.length === 0 ? "text-white" : "text-ink"}`}>{dateLabel}</h2>
+          </div>
           {onDateClick ? (
             <Button
-              size="sm"
+              size="md"
               variant="ghost"
-              icon={<Plus size={15} />}
+              className={createActionClassName}
+              icon={<Plus size={20} strokeWidth={2.4} />}
               title="Termin anlegen"
               aria-label="Termin anlegen"
               onClick={(event) => {
@@ -226,9 +243,12 @@ function WeekDayColumn({
             />
           ) : null}
         </div>
+        <div className="min-h-6 min-w-0">
+          <CalendarHolidayBadge dateKey={date} />
+        </div>
       </header>
 
-      <div className="grid gap-2">
+      <div className="grid gap-2 p-3">
         {events.map((event) => (
           <WeekEventTile
             key={event.id}
@@ -253,12 +273,28 @@ function WeekDayColumn({
   );
 }
 
-export function WeekCalendar({ events, tasks, projects = [], milestones = [], initialDate, onDateClick, onEventClick, onEventMove, onTaskClick, onTaskMove }: WeekCalendarProps) {
-  const [visibleDate, setVisibleDate] = useState(() => parseISO(initialDate ?? toDateKey(new Date())));
+export function WeekCalendar({
+  events,
+  tasks,
+  projects = [],
+  milestones = [],
+  initialDate,
+  visibleDate,
+  onVisibleDateChange,
+  hideHeader = false,
+  onDateClick,
+  onEventClick,
+  onEventMove,
+  onTaskClick,
+  onTaskMove
+}: WeekCalendarProps) {
+  const [localVisibleDate, setLocalVisibleDate] = useState(() => parseISO(initialDate ?? toDateKey(new Date())));
   const [activeEvent, setActiveEvent] = useState<CalendarEvent | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
-  const weekStart = startOfISOWeek(visibleDate);
-  const weekEnd = endOfISOWeek(visibleDate);
+  const currentVisibleDate = visibleDate ?? localVisibleDate;
+  const setCurrentVisibleDate = onVisibleDateChange ?? setLocalVisibleDate;
+  const weekStart = startOfISOWeek(currentVisibleDate);
+  const weekEnd = endOfISOWeek(currentVisibleDate);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, index) => toDateKey(addDays(weekStart, index))), [weekStart]);
   const dayEvents = useMemo(() => eventsByDay(events, weekStart), [events, weekStart]);
   const dayTasks = useMemo(() => tasksByDueDate(tasks, weekStart), [tasks, weekStart]);
@@ -293,7 +329,8 @@ export function WeekCalendar({ events, tasks, projects = [], milestones = [], in
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-line bg-white shadow-sm">
+    <section className={hideHeader ? "overflow-hidden bg-white" : "overflow-hidden rounded-lg border border-line bg-white shadow-sm"}>
+      {hideHeader ? null : (
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-4 py-3">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-wide text-steel-400">KW {getISOWeek(weekStart)}</p>
@@ -302,17 +339,18 @@ export function WeekCalendar({ events, tasks, projects = [], milestones = [], in
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" icon={<ChevronLeft size={15} />} onClick={() => setVisibleDate((current) => addDays(current, -7))}>
+          <Button size="sm" variant="secondary" icon={<ChevronLeft size={15} />} onClick={() => setCurrentVisibleDate(addDays(currentVisibleDate, -7))}>
             Zurück
           </Button>
-          <Button size="sm" variant="secondary" icon={<CalendarDays size={15} />} onClick={() => setVisibleDate(new Date())}>
+          <Button size="sm" variant="secondary" icon={<CalendarDays size={15} />} onClick={() => setCurrentVisibleDate(new Date())}>
             Heute
           </Button>
-          <Button size="sm" variant="secondary" icon={<ChevronRight size={15} />} onClick={() => setVisibleDate((current) => addDays(current, 7))}>
+          <Button size="sm" variant="secondary" icon={<ChevronRight size={15} />} onClick={() => setCurrentVisibleDate(addDays(currentVisibleDate, 7))}>
             Weiter
           </Button>
         </div>
       </header>
+      )}
 
       <DndContext
         sensors={sensors}

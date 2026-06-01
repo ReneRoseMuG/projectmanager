@@ -45,7 +45,7 @@ export function UseCaseDetailPage() {
   const useCases = useUseCases(validFeatureId);
   const [useCase, setUseCase] = useState<UseCase | null>(null);
   const [loading, setLoading] = useState(false);
-  useDocumentTitle(isCreateMode ? "Use Case: Neu" : useCase ? `Use Case: ${useCase.title}` : "Use Case");
+  useDocumentTitle(isCreateMode ? "[UC] Neu" : useCase ? `[UC] ${useCase.title}` : "[UC]");
   const returnTo =
     searchParams.get("returnTo") ??
     (searchParams.get("standalone") === "1"

@@ -1,6 +1,7 @@
 import type { CalendarEvent, DayPlan, DayPlanStatus, DayPlanUpdate, EventInput, EventOwner, TaskBoardItem, TaskInput } from "@taskmanager/shared-types";
 import type { DbClient } from "../db/client.js";
-import { DAY_PLAN_STATUSES, tasks } from "../db/schema.js";
+import { DAY_PLAN_STATUSES } from "../db/schema.js";
+import type { tasks } from "../db/schema.js";
 import { dayPlanRepository, type DayPlanEventRow, type DayPlanRecord, type DayPlanTaskRow } from "../repositories/day-plan.repository.js";
 import { taskRepository } from "../repositories/task.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";

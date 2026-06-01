@@ -10,10 +10,16 @@ export const mysqlPool = mysql.createPool({
   password: config.db.password,
   ssl: config.db.ssl ? { rejectUnauthorized: true } : undefined,
   waitForConnections: true,
-  connectionLimit: 10
+  connectionLimit: 10,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
+  connectTimeout: 10000,
+  maxIdle: 5,
+  idleTimeout: 60000,
+  queueLimit: 50
 });
 
-export const db = drizzle({ client: mysqlPool });
+export const db = drizzle({ client: mysqlPool, logger: process.env.NODE_ENV === "development" });
 
 export type DbClient = Omit<typeof db, "$client">;
 type DbTransaction = Parameters<Parameters<DbClient["transaction"]>[0]>[0];

@@ -39,7 +39,7 @@ export function ProjectDetailPage() {
   const projectId = isCreateMode ? undefined : Number(params.id);
   const { project, loading, createProject, updateProject, removeProject } =
     useProjects(projectId);
-  useDocumentTitle(isCreateMode ? "Projekt: Neu" : project ? `Projekt: ${project.name}` : "Projekt");
+  useDocumentTitle(isCreateMode ? "[Pro.] Neu" : project ? `[Pro.] ${project.name}` : "[Pro.]");
   const [savingLabel, setSavingLabel] = useState<string | undefined>();
   const initialTab = parseProjectFormTab(searchParams.get("tab"));
 
@@ -56,13 +56,33 @@ export function ProjectDetailPage() {
   const submitProject = async (input: ProjectInput, tagIds: number[]) => {
     try {
       if (project) {
+        const p = project;
+        const fieldsChanged =
+          input.name !== p.name ||
+          (input.description ?? "") !== (p.description ?? "") ||
+          (input.status ?? p.status) !== p.status ||
+          (input.color ?? null) !== p.color ||
+          (input.startDate ?? null) !== p.startDate ||
+          (input.dueDate ?? null) !== p.dueDate ||
+          (input.responsibleUserId ?? null) !== p.responsibleUserId;
+
+        const currentTagIds = p.tags.map((t) => t.id).sort((a, b) => a - b);
+        const nextTagIds = [...tagIds].sort((a, b) => a - b);
+        const tagsChanged =
+          nextTagIds.length !== currentTagIds.length ||
+          nextTagIds.some((id, i) => id !== currentTagIds[i]);
+
+        if (!fieldsChanged && !tagsChanged) {
+          return p;
+        }
+
         const updated = await updateProject(
-          project.id,
-          { ...input, expectedVersion: project.version },
-          tagIds,
+          p.id,
+          { ...input, expectedVersion: p.version },
+          tagsChanged ? tagIds : undefined,
         );
         showToast({ tone: "success", title: "Projekt gespeichert" });
-        await statusCascade.startProjectCascade(project, updated);
+        await statusCascade.startProjectCascade(p, updated);
         return updated;
       }
 

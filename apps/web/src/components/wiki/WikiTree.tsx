@@ -41,12 +41,12 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate }: WikiNodeProps
   return (
     <div className="grid gap-1">
       <div
-        className="flex items-center gap-1"
+        className={`wiki-tree-nav-row flex items-center gap-1${activeId === node.id ? " wiki-tree-nav-row-active" : ""}`}
         style={{ paddingLeft: `${level * 14}px` }}
       >
         <button
           type="button"
-          className="flex h-8 w-8 items-center justify-center rounded-md text-white/50 hover:bg-white/10 hover:text-white disabled:hover:bg-transparent"
+          className="wiki-tree-expand-btn flex h-8 w-8 items-center justify-center rounded-md"
           onClick={() => setExpanded((current) => !current)}
           disabled={!hasChildren}
           aria-label={expanded ? "Einklappen" : "Ausklappen"}
@@ -59,15 +59,11 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate }: WikiNodeProps
               <ChevronRight size={16} />
             )
           ) : (
-            <FileText size={15} className="text-white/40" />
+            <FileText size={15} className="wiki-tree-icon-muted" />
           )}
         </button>
         <Link
-          className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-sm ${
-            activeId === node.id
-              ? "bg-white/10 text-white"
-              : "text-white/75 hover:bg-white/10 hover:text-white"
-          }`}
+          className="wiki-tree-nav-link min-w-0 flex-1 truncate rounded-md px-2 py-1.5"
           to={pagePath}
           onClick={openPage}
         >
@@ -78,7 +74,7 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate }: WikiNodeProps
           title="Unterseite anlegen"
           icon={<Plus size={15} />}
           variant="ghost"
-          className="text-white/50 hover:bg-white/10 hover:text-white"
+          className="wiki-tree-action-btn"
           onClick={() => onCreate(node)}
         />
       </div>

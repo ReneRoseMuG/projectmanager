@@ -1,5 +1,5 @@
 import type { Feature } from "@taskmanager/shared-types";
-import { ArrowRight, Edit3, FileText, Trash2 } from "lucide-react";
+import { ArrowRight, Edit3, ExternalLink, Layers3, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { objectReference } from "../../lib/references";
 import { catalogColor } from "../../utils/catalogs";
@@ -14,12 +14,13 @@ interface FeatureCardProps {
   feature: Feature;
   variant?: "card" | "row";
   onOpen: (feature: Feature) => void;
+  onOpenInTab?: (feature: Feature) => void;
   onDelete: (feature: Feature) => void;
   onStatusChange?: (feature: Feature, status: Feature["status"]) => void | Promise<unknown>;
 }
 
 /** Feature card based on the shared ItemCard surface. */
-export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onStatusChange }: FeatureCardProps) {
+export function FeatureCard({ feature, variant = "card", onOpen, onOpenInTab, onDelete, onStatusChange }: FeatureCardProps) {
   const catalogs = useCatalogs();
   const open = () => onOpen(feature);
   const description = richTextToPlainText(feature.description);
@@ -29,7 +30,7 @@ export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onSta
     return (
       <>
         <div className="md:hidden">
-          <FeatureCard feature={feature} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} />
+          <FeatureCard feature={feature} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={onDelete} onStatusChange={onStatusChange} />
         </div>
         <div className="hidden md:block">
           <ItemRow
@@ -40,7 +41,11 @@ export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onSta
             pills={<StatusPill kind="featureStatus" value={feature.status} onChange={onStatusChange ? (status) => onStatusChange(feature, status) : undefined} />}
             meta={<span className="text-xs font-semibold text-steel-500">{feature.useCaseCount} Use Cases</span>}
             footer={<CardFooterBar tags={[]} attachmentCount={feature.attachmentCount} noteCount={feature.noteCount} commentCount={feature.commentCount} bordered={false} />}
-            actions={<ActionMenu objectReference={objectReference("feature", feature.id)} items={[{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: open }, { label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(feature), danger: true }]} />}
+            actions={<ActionMenu objectReference={objectReference("feature", feature.id)} items={[
+              { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: open },
+              ...(onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(feature) }] : []),
+              { label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(feature), danger: true }
+            ]} />}
             actionsIncludeObjectReference
             onOpen={open}
           />
@@ -55,6 +60,7 @@ export function FeatureCard({ feature, variant = "card", onOpen, onDelete, onSta
       objectReference={objectReference("feature", feature.id)}
       onOpen={open}
       onEdit={open}
+      extraMenuItems={onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(feature) }] : []}
       onDelete={() => onDelete(feature)}
       header={<FeatureCardHeader feature={feature} onStatusChange={onStatusChange} />}
       body={description ? <p className="line-clamp-3 text-sm text-steel-600">{description}</p> : null}
@@ -81,7 +87,7 @@ function FeatureCardFooter({ feature }: { feature: Feature }) {
   return (
     <div className="group flex items-center justify-between gap-3">
       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-steel-700">
-        <FileText size={14} />
+        <Layers3 size={14} />
         {feature.useCaseCount} Use Cases
       </span>
       <span className="flex h-9 w-9 items-center justify-center rounded-md bg-steel-100 text-steel-700 transition group-hover:bg-steel-700 group-hover:text-white" aria-hidden="true">

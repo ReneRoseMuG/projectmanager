@@ -15,17 +15,24 @@
 import { QueryClient, type QueryKey } from "@tanstack/react-query";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  invalidateAllAttachments,
+  invalidateAllComments,
+  invalidateAllNotes,
   invalidateAttachments,
   invalidateBacklogScope,
   invalidateComments,
+  invalidateDashboards,
   invalidateEvents,
   invalidateFeatureScope,
+  invalidateMilestones,
+  invalidateNoteDetail,
   invalidateNotes,
   invalidateProjectScope,
   invalidateProjects,
   invalidateSettings,
   invalidateTags,
   invalidateTaskScope,
+  invalidateTicketScope,
   invalidateUseCaseScope,
   invalidateWiki,
   invalidateWikiImportData
@@ -36,6 +43,7 @@ const projectId = 11;
 const taskId = 22;
 const featureId = 33;
 const useCaseId = 44;
+const noteId = 55;
 const attachmentId = 66;
 const wikiPageId = 77;
 
@@ -58,6 +66,7 @@ const knownQueries = {
   useCaseTasks: queryKeys.useCases.tasks(useCaseId),
   projectComments: queryKeys.comments.entity("project", projectId),
   taskComments: queryKeys.comments.entity("task", taskId),
+  noteDetail: queryKeys.notes.detail(noteId),
   projectNotes: queryKeys.notes.owner("project", projectId),
   taskNotes: queryKeys.notes.owner("task", taskId),
   wikiNotes: queryKeys.notes.owner("wikiPage", wikiPageId),
@@ -119,6 +128,7 @@ describe("Query invalidation integration", () => {
     expect(queryKeys.projects.tasks(projectId)).toEqual(["projects", "detail", projectId, "tasks"]);
     expect(queryKeys.tasks.features(taskId)).toEqual(["tasks", "detail", taskId, "features"]);
     expect(queryKeys.features.projects(featureId)).toEqual(["features", "detail", featureId, "projects"]);
+    expect(queryKeys.notes.detail(noteId)).toEqual(["notes", "detail", noteId]);
     expect(queryKeys.settings.resolved()).toEqual(["settings", "resolved"]);
     expect(queryKeys.dumps.remoteStatus()).toEqual(["dumps", "remoteStatus"]);
     expect(queryKeys.globalSearch.data()).toEqual(["globalSearch", "data"]);
@@ -245,6 +255,13 @@ describe("Query invalidation integration", () => {
     queryClient.clear();
     seedKnownQueries(queryClient);
 
+    await invalidateNoteDetail(queryClient, noteId);
+
+    expectInvalidated(queryClient, ["noteDetail", "projectNotes", "taskNotes", "wikiNotes", "globalSearch"]);
+
+    queryClient.clear();
+    seedKnownQueries(queryClient);
+
     await invalidateAttachments(queryClient, "project", projectId);
 
     expectInvalidated(queryClient, ["projectsList", "projectDetail", "projectTasks", "projectBacklog", "projectFeatures", "projectAttachments", "globalSearch"]);
@@ -353,6 +370,7 @@ describe("Query invalidation integration", () => {
       "useCaseTasks",
       "projectComments",
       "taskComments",
+      "noteDetail",
       "projectNotes",
       "taskNotes",
       "wikiNotes",
@@ -371,6 +389,41 @@ describe("Query invalidation integration", () => {
     ]);
   });
 
+  it("invalidiert alle Kommentare, Notizen und Anhänge per Root-Key für SSE-Realtime-Sync", async () => {
+    queryClient = createQueryClient();
+    seedKnownQueries(queryClient);
+
+    await invalidateAllComments(queryClient);
+
+    expect(queryClient.getQueryState(knownQueries.projectComments)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.taskComments)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.projectNotes)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(knownQueries.projectAttachments)?.isInvalidated).toBe(false);
+
+    queryClient.clear();
+    seedKnownQueries(queryClient);
+
+    await invalidateAllNotes(queryClient);
+
+    expect(queryClient.getQueryState(knownQueries.noteDetail)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.projectNotes)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.taskNotes)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.wikiNotes)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.projectComments)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(knownQueries.projectAttachments)?.isInvalidated).toBe(false);
+
+    queryClient.clear();
+    seedKnownQueries(queryClient);
+
+    await invalidateAllAttachments(queryClient);
+
+    expect(queryClient.getQueryState(knownQueries.projectAttachments)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.taskAttachments)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.attachmentPreview)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(knownQueries.projectComments)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(knownQueries.projectNotes)?.isInvalidated).toBe(false);
+  });
+
   it("invalidiert Journal-Queries nach fachlichen Mutationen", async () => {
     queryClient = createQueryClient();
     const journalKey = queryKeys.journal.list({ limit: 100 });
@@ -379,5 +432,106 @@ describe("Query invalidation integration", () => {
     await invalidateProjectScope(queryClient, projectId);
 
     expect(queryClient.getQueryState(journalKey)?.isInvalidated).toBe(true);
+  });
+
+  // =========================================================================
+  // Schritt 7: Dashboard-widgetData-Cache-Invalidierung
+  // =========================================================================
+
+  it("Schritt 7 – widgetData-Queries werden bei allen scope-Invalidierungen als stale markiert", async () => {
+    // Widget-Keys für drei verschiedene Kontexte/Owner
+    const projectWidgetKey = queryKeys.dashboards.widgetData("taskStatusReport", "project:11", {});
+    const milestoneWidgetKey = queryKeys.dashboards.widgetData("ticketJournal", "milestone:5", { limit: 10 });
+    const globalWidgetKey = queryKeys.dashboards.widgetData("commentJournal", "global", {});
+    const taskWidgetKey = queryKeys.dashboards.widgetData("taskStatusReport", "task:22", {});
+    const dashboardListProject = queryKeys.dashboards.list("project");
+    const dashboardListGlobal = queryKeys.dashboards.list("global");
+
+    function seedWidgetData(qc: QueryClient) {
+      qc.setQueryData(projectWidgetKey, { total: 3, statusCounts: {} });
+      qc.setQueryData(milestoneWidgetKey, []);
+      qc.setQueryData(globalWidgetKey, []);
+      qc.setQueryData(taskWidgetKey, { total: 0, statusCounts: {} });
+      qc.setQueryData(dashboardListProject, { dashboards: [], globalDefaultDashboardId: null, globalDefaultVersion: 0, userDefaultDashboardId: null, userDefaultVersion: 0 });
+      qc.setQueryData(dashboardListGlobal, { dashboards: [], globalDefaultDashboardId: null, globalDefaultVersion: 0, userDefaultDashboardId: null, userDefaultVersion: 0 });
+    }
+
+    function expectAllWidgetDataStale(qc: QueryClient) {
+      expect(qc.getQueryState(projectWidgetKey)?.isInvalidated).toBe(true);
+      expect(qc.getQueryState(milestoneWidgetKey)?.isInvalidated).toBe(true);
+      expect(qc.getQueryState(globalWidgetKey)?.isInvalidated).toBe(true);
+      expect(qc.getQueryState(taskWidgetKey)?.isInvalidated).toBe(true);
+      expect(qc.getQueryState(dashboardListProject)?.isInvalidated).toBe(true);
+      expect(qc.getQueryState(dashboardListGlobal)?.isInvalidated).toBe(true);
+    }
+
+    // invalidateProjectScope → alle Dashboard-widgetData stale
+    queryClient = createQueryClient();
+    seedWidgetData(queryClient);
+    await invalidateProjectScope(queryClient, projectId);
+    expectAllWidgetDataStale(queryClient);
+
+    // invalidateTaskScope → alle Dashboard-widgetData stale
+    queryClient.clear();
+    queryClient = createQueryClient();
+    seedWidgetData(queryClient);
+    await invalidateTaskScope(queryClient, taskId);
+    expectAllWidgetDataStale(queryClient);
+
+    // invalidateMilestones → alle Dashboard-widgetData stale
+    queryClient.clear();
+    queryClient = createQueryClient();
+    seedWidgetData(queryClient);
+    await invalidateMilestones(queryClient);
+    expectAllWidgetDataStale(queryClient);
+
+    // invalidateTicketScope → alle Dashboard-widgetData stale
+    queryClient.clear();
+    queryClient = createQueryClient();
+    seedWidgetData(queryClient);
+    await invalidateTicketScope(queryClient);
+    expectAllWidgetDataStale(queryClient);
+
+    // invalidateComments → alle Dashboard-widgetData stale
+    queryClient.clear();
+    queryClient = createQueryClient();
+    seedWidgetData(queryClient);
+    await invalidateComments(queryClient, "project", projectId);
+    expectAllWidgetDataStale(queryClient);
+
+    // invalidateNotes → alle Dashboard-widgetData stale
+    queryClient.clear();
+    queryClient = createQueryClient();
+    seedWidgetData(queryClient);
+    await invalidateNotes(queryClient, "project", projectId);
+    expectAllWidgetDataStale(queryClient);
+
+    // invalidateAttachments → alle Dashboard-widgetData stale
+    queryClient.clear();
+    queryClient = createQueryClient();
+    seedWidgetData(queryClient);
+    await invalidateAttachments(queryClient, "project", projectId);
+    expectAllWidgetDataStale(queryClient);
+
+    // invalidateDashboards direkt → alle Dashboard-widgetData stale
+    queryClient.clear();
+    queryClient = createQueryClient();
+    seedWidgetData(queryClient);
+    await invalidateDashboards(queryClient);
+    expectAllWidgetDataStale(queryClient);
+  });
+
+  it("Schritt 7 – nicht Dashboard-relevante Invalidierungen lassen widgetData-Cache unberührt", async () => {
+    queryClient = createQueryClient();
+    const widgetKey = queryKeys.dashboards.widgetData("taskStatusReport", "project:11", {});
+    queryClient.setQueryData(widgetKey, { total: 1, statusCounts: {} });
+
+    // Wiki-Invalidierung berührt Dashboard-widgetData NICHT
+    await invalidateWiki(queryClient);
+    expect(queryClient.getQueryState(widgetKey)?.isInvalidated).toBe(false);
+
+    // Settings-Invalidierung berührt Dashboard-widgetData NICHT
+    await invalidateSettings(queryClient);
+    expect(queryClient.getQueryState(widgetKey)?.isInvalidated).toBe(false);
   });
 });

@@ -154,6 +154,7 @@ export function TicketsPage() {
           onAdd={() => navigate(ticketCreateTarget())}
           onAddStatus={(status) => navigate(ticketCreateTarget(status))}
           onOpen={(ticket) => navigate(ticketOpenTarget(ticket))}
+          onOpenInTab={(ticket) => window.open(withStandaloneView(`/tickets/${ticket.id}`), "_blank")}
           onDelete={deleteTicket}
           onStatusChange={updateTicketStatus}
           onDueDateChange={updateTicketDueDate}

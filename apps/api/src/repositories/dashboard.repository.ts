@@ -121,6 +121,7 @@ export const dashboardRepository = {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
+    const now = nowIso();
     await database
       .update(dashboards)
       .set({
@@ -130,19 +131,15 @@ export const dashboardRepository = {
         ownerId: data.ownerId ?? null,
         version: current.version + 1,
         updatedBy: userId ?? null,
-        updatedAt: nowIso()
+        updatedAt: now
       })
       .where(eq(dashboards.id, id));
-    const updated = await this.findById(database, id);
-    if (!updated) {
-      throw new Error("Updated dashboard could not be loaded");
-    }
     await database.delete(dashboardWidgets).where(eq(dashboardWidgets.dashboardId, id));
     const values = widgetValues(id, widgets);
     if (values.length > 0) {
       await database.insert(dashboardWidgets).values(values);
     }
-    return updated;
+    return { ...current, name: data.name, context: data.context, isSystem: data.isSystem, ownerId: data.ownerId ?? null, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
   },
 
   async delete(database: DbSession, id: number): Promise<number> {

@@ -6,8 +6,12 @@ import { publishBackupProgress } from "./useBackupProgress";
 import {
   invalidateAdminRoles,
   invalidateAdminUsers,
+  invalidateAllAttachments,
+  invalidateAllComments,
+  invalidateAllNotes,
   invalidateCatalogs,
   invalidateDashboards,
+  invalidateDayPlan,
   invalidateEvents,
   invalidateFeatureScope,
   invalidateMilestones,
@@ -66,10 +70,19 @@ async function invalidateRealtimeScope(queryClient: ReturnType<typeof useQueryCl
     case "adminRoles":
       await invalidateAdminRoles(queryClient);
       return;
-    case "backlog":
     case "comments":
+      await invalidateAllComments(queryClient);
+      return;
     case "notes":
+      await invalidateAllNotes(queryClient);
+      return;
     case "attachments":
+      await invalidateAllAttachments(queryClient);
+      return;
+    case "dayPlans":
+      await invalidateDayPlan(queryClient);
+      return;
+    case "backlog":
     case "dumps":
     case "all":
       await invalidateWikiImportData(queryClient);

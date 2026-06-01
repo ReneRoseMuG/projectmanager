@@ -22,10 +22,13 @@ import os from "node:os";
 import path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { config } from "../../../apps/api/src/config.js";
 import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 const uploadDir = path.join(os.tmpdir(), `taskmanager-dashboard-widgets-${process.pid}`);
 const previewCacheDir = path.join(os.tmpdir(), `taskmanager-dashboard-widget-previews-${process.pid}`);
+let originalUploadDir: string;
+let originalPreviewCacheDir: string;
 
 async function loginAdmin(app: FastifyInstance) {
   const agent = supertest.agent(app.server);
@@ -36,14 +39,14 @@ async function loginAdmin(app: FastifyInstance) {
 describe("Dashboard widget data API", () => {
   let testDb: TestDb;
   let app: FastifyInstance;
-  let previousUploadDir: string | undefined;
-  let previousPreviewCacheDir: string | undefined;
 
   beforeAll(async () => {
-    previousUploadDir = process.env.UPLOAD_DIR;
-    previousPreviewCacheDir = process.env.PREVIEW_CACHE_DIR;
-    process.env.UPLOAD_DIR = uploadDir;
-    process.env.PREVIEW_CACHE_DIR = previewCacheDir;
+    originalUploadDir = config.uploadDir;
+    originalPreviewCacheDir = config.previewCacheDir;
+    config.uploadDir = uploadDir;
+    config.previewCacheDir = previewCacheDir;
+    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.mkdir(previewCacheDir, { recursive: true });
     testDb = await createTestDb();
     app = await buildTestApp(testDb, { enableAuth: true, enableMultipart: true });
   });
@@ -53,22 +56,12 @@ describe("Dashboard widget data API", () => {
   });
 
   afterAll(async () => {
-    if (app) {
-      await app?.close();
-    }
+    await app?.close();
     await testDb?.close();
+    config.uploadDir = originalUploadDir;
+    config.previewCacheDir = originalPreviewCacheDir;
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
-    if (previousUploadDir === undefined) {
-      delete process.env.UPLOAD_DIR;
-    } else {
-      process.env.UPLOAD_DIR = previousUploadDir;
-    }
-    if (previousPreviewCacheDir === undefined) {
-      delete process.env.PREVIEW_CACHE_DIR;
-    } else {
-      process.env.PREVIEW_CACHE_DIR = previousPreviewCacheDir;
-    }
   });
 
   it("zählt Aufgaben und Tickets nach Status und filtert überfällige Aufgaben nach Projekt", async () => {
@@ -237,5 +230,259 @@ describe("Dashboard widget data API", () => {
 
     const ownAttachments = await reader.get("/api/attachments/recent?mine=true&limit=10").expect(200);
     expect(ownAttachments.body).toEqual([]);
+  });
+
+  // =========================================================================
+  // Schritt 1: Meilenstein-Kontext
+  // =========================================================================
+
+  it("Schritt 1 – filtert Widget-Daten korrekt auf Meilenstein-Owner", async () => {
+    const admin = await loginAdmin(app);
+    const project = await admin.post("/api/projects").send({ name: "MS-Widget Projekt" }).expect(201);
+    const ms = await admin.post(`/api/projects/${project.body.id}/milestones`).send({ name: "Meilenstein A", status: "active" }).expect(201);
+    const otherMs = await admin.post(`/api/projects/${project.body.id}/milestones`).send({ name: "Meilenstein B", status: "active" }).expect(201);
+
+    const closedStatus = await admin
+      .post("/api/catalogs/workStatus")
+      .send({ key: "ms_closed_x", label: "MS Geschlossen", sortOrder: 1350, isClosed: true, color: "var(--color-steel-500)" })
+      .expect(201);
+
+    // Tasks für Meilenstein A: 1 offen, 1 abgeschlossen
+    const taskA = await admin.post(`/api/milestones/${ms.body.id}/tasks`).send({ title: "MS-A Task offen", status: "todo", priority: "medium" }).expect(201);
+    await admin.post(`/api/milestones/${ms.body.id}/tasks`).send({ title: "MS-A Task erledigt", status: closedStatus.body.key, priority: "low" }).expect(201);
+
+    // Task für anderen Meilenstein – darf nicht erscheinen
+    await admin.post(`/api/milestones/${otherMs.body.id}/tasks`).send({ title: "MS-B Task", status: "todo", priority: "medium" }).expect(201);
+
+    // Ticket für Meilenstein A
+    await admin.post(`/api/milestones/${ms.body.id}/tickets`).send({ title: "MS-A Ticket", type: "bug", status: "open", priority: "medium" }).expect(201);
+
+    // Kommentar direkt am Meilenstein A
+    await admin.post(`/api/milestones/${ms.body.id}/comments`).send({ body: "Direkter Meilenstein-Kommentar" }).expect(201);
+    // Kommentar am Task des Meilensteins A
+    await admin.post(`/api/tasks/${taskA.body.id}/comments`).send({ body: "Task-Kommentar im Meilenstein" }).expect(201);
+
+    // Attachment für Meilenstein A
+    await admin
+      .post(`/api/milestones/${ms.body.id}/attachments`)
+      .attach("file", Buffer.from("MS-Anhang"), { filename: "ms-anhang.txt", contentType: "text/plain" })
+      .expect(201);
+
+    // taskStatusReport für Meilenstein A: beide Tasks zählen, closed ist dabei
+    const taskStats = await admin.get(`/api/tasks/stats?ownerType=milestone&ownerId=${ms.body.id}`).expect(200);
+    expect(taskStats.body.total).toBe(2);
+    expect(taskStats.body.statusCounts).toMatchObject({ todo: 1, [closedStatus.body.key]: 1 });
+
+    // ticketStatusReport für Meilenstein A
+    const ticketStats = await admin.get(`/api/tickets/stats?ownerType=milestone&ownerId=${ms.body.id}`).expect(200);
+    expect(ticketStats.body.total).toBe(1);
+    expect(ticketStats.body.statusCounts).toMatchObject({ open: 1 });
+
+    // taskJournal – geschlossene Tasks werden ausgeblendet, fremde Meilensteine isoliert
+    const recentTasks = await admin.get(`/api/tasks/recent?ownerType=milestone&ownerId=${ms.body.id}`).expect(200);
+    const taskTitles = recentTasks.body.map((t: { title: string }) => t.title);
+    expect(taskTitles).toContain("MS-A Task offen");
+    expect(taskTitles).not.toContain("MS-A Task erledigt");
+    expect(taskTitles).not.toContain("MS-B Task");
+
+    // ticketJournal für Meilenstein A
+    const recentTickets = await admin.get(`/api/tickets/recent?ownerType=milestone&ownerId=${ms.body.id}`).expect(200);
+    expect(recentTickets.body.map((t: { title: string }) => t.title)).toContain("MS-A Ticket");
+
+    // commentJournal für Meilenstein A: direkter Kommentar und Task-Kommentar
+    const recentComments = await admin.get(`/api/comments/recent?ownerType=milestone&ownerId=${ms.body.id}`).expect(200);
+    const commentBodies = recentComments.body.map((c: { body: string }) => c.body);
+    expect(commentBodies).toContain("Direkter Meilenstein-Kommentar");
+    expect(commentBodies).toContain("Task-Kommentar im Meilenstein");
+
+    // attachmentJournal für Meilenstein A
+    const recentAttachments = await admin.get(`/api/attachments/recent?ownerType=milestone&ownerId=${ms.body.id}`).expect(200);
+    expect(recentAttachments.body.map((a: { filename: string }) => a.filename)).toContain("ms-anhang.txt");
+
+    // Meilenstein B bleibt isoliert
+    const otherTaskStats = await admin.get(`/api/tasks/stats?ownerType=milestone&ownerId=${otherMs.body.id}`).expect(200);
+    expect(otherTaskStats.body.total).toBe(1);
+    expect(otherTaskStats.body.statusCounts).not.toHaveProperty("ms_closed_x");
+  });
+
+  // =========================================================================
+  // Schritt 2: Task-Kontext (Subtask-Zählung und Kommentare)
+  // =========================================================================
+
+  it("Schritt 2 – filtert Widget-Daten korrekt auf Task-Owner (Subtasks und Kommentare)", async () => {
+    const admin = await loginAdmin(app);
+    const project = await admin.post("/api/projects").send({ name: "Task-Widget Projekt" }).expect(201);
+    const parentTask = await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Eltern-Task", status: "in_progress", priority: "high" }).expect(201);
+    const otherTask = await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Anderer Task", status: "todo", priority: "medium" }).expect(201);
+
+    // Subtasks des Eltern-Tasks
+    await admin.post(`/api/tasks/${parentTask.body.id}/subtasks`).send({ title: "Subtask offen", status: "todo" }).expect(201);
+    await admin.post(`/api/tasks/${parentTask.body.id}/subtasks`).send({ title: "Subtask in Arbeit", status: "in_progress" }).expect(201);
+
+    // Kommentar am Eltern-Task
+    await admin.post(`/api/tasks/${parentTask.body.id}/comments`).send({ body: "Eltern-Kommentar" }).expect(201);
+    // Kommentar am anderen Task – darf nicht erscheinen
+    await admin.post(`/api/tasks/${otherTask.body.id}/comments`).send({ body: "Fremder Kommentar" }).expect(201);
+
+    // taskStatusReport für Task-Kontext: zählt Subtasks
+    const taskStats = await admin.get(`/api/tasks/stats?ownerType=task&ownerId=${parentTask.body.id}`).expect(200);
+    expect(taskStats.body.total).toBe(2);
+    expect(taskStats.body.statusCounts).toMatchObject({ todo: 1, in_progress: 1 });
+
+    // taskStats für Task ohne Subtasks → total 0
+    const emptyStats = await admin.get(`/api/tasks/stats?ownerType=task&ownerId=${otherTask.body.id}`).expect(200);
+    expect(emptyStats.body.total).toBe(0);
+
+    // commentJournal für Task-Kontext: nur eigene Kommentare
+    const recentComments = await admin.get(`/api/comments/recent?ownerType=task&ownerId=${parentTask.body.id}`).expect(200);
+    const commentBodies = recentComments.body.map((c: { body: string }) => c.body);
+    expect(commentBodies).toContain("Eltern-Kommentar");
+    expect(commentBodies).not.toContain("Fremder Kommentar");
+  });
+
+  // =========================================================================
+  // Schritt 3: Widget-Parameter (limit und sort)
+  // =========================================================================
+
+  it("Schritt 3 – respektiert limit- und sort-Parameter für taskJournal, ticketJournal und overdueTasks", async () => {
+    const admin = await loginAdmin(app);
+    const project = await admin.post("/api/projects").send({ name: "Param-Widget Projekt" }).expect(201);
+
+    // 3 offene Tasks sequenziell anlegen (minimaler Abstand für stabile Sortierung)
+    for (let i = 1; i <= 3; i++) {
+      await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: `Task ${i}`, status: "todo", priority: "medium" }).expect(201);
+      await new Promise<void>((r) => setTimeout(r, 10));
+    }
+
+    // 3 Tickets anlegen
+    for (let i = 1; i <= 3; i++) {
+      await admin.post(`/api/projects/${project.body.id}/tickets`).send({ title: `Ticket ${i}`, type: "bug", status: "open", priority: "medium" }).expect(201);
+    }
+
+    // limit=1 gibt genau 1 Aufgabe zurück
+    const tasks1 = await admin.get(`/api/tasks/recent?ownerType=project&ownerId=${project.body.id}&limit=1`).expect(200);
+    expect(tasks1.body).toHaveLength(1);
+
+    // limit=2 gibt genau 2 Tickets zurück
+    const tickets2 = await admin.get(`/api/tickets/recent?ownerType=project&ownerId=${project.body.id}&limit=2`).expect(200);
+    expect(tickets2.body).toHaveLength(2);
+
+    // sort=createdAt: zuletzt angelegter Task steht zuerst (Task 3)
+    const byCreatedAt = await admin.get(`/api/tasks/recent?ownerType=project&ownerId=${project.body.id}&sort=createdAt`).expect(200);
+    expect(byCreatedAt.body).toHaveLength(3);
+    expect((byCreatedAt.body[0] as { title: string }).title).toBe("Task 3");
+
+    // sort=updatedAt: ohne Updates gleiche Reihenfolge wie createdAt
+    const byUpdatedAt = await admin.get(`/api/tasks/recent?ownerType=project&ownerId=${project.body.id}&sort=updatedAt`).expect(200);
+    expect(byUpdatedAt.body).toHaveLength(3);
+    expect((byUpdatedAt.body[0] as { title: string }).title).toBe("Task 3");
+
+    // overdueTasks: limit begrenzt Ergebnisse
+    const project2 = await admin.post("/api/projects").send({ name: "Overdue-Limit Projekt" }).expect(201);
+    for (let i = 1; i <= 4; i++) {
+      await admin.post(`/api/projects/${project2.body.id}/tasks`).send({ title: `Überfällig ${i}`, status: "todo", priority: "medium", dueDate: "2026-01-01" }).expect(201);
+    }
+    const overdueLimit2 = await admin.get(`/api/tasks/overdue?ownerType=project&ownerId=${project2.body.id}&limit=2`).expect(200);
+    expect(overdueLimit2.body).toHaveLength(2);
+  });
+
+  // =========================================================================
+  // Schritt 4: Widget-Counter nach Datenänderung
+  // =========================================================================
+
+  it("Schritt 4 – Widget-Daten spiegeln Statuswechsel und Abschluss sofort wider", async () => {
+    const admin = await loginAdmin(app);
+    const project = await admin.post("/api/projects").send({ name: "Mutation-Widget Projekt" }).expect(201);
+    const task = await admin
+      .post(`/api/projects/${project.body.id}/tasks`)
+      .send({ title: "Mutations-Task", status: "todo", priority: "high", dueDate: "2026-01-01" })
+      .expect(201);
+
+    // Ausgangszustand: todo in taskStatusReport, erscheint in overdueTasks und taskJournal
+    const statsBefore = await admin.get(`/api/tasks/stats?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    expect(statsBefore.body).toMatchObject({ total: 1, statusCounts: { todo: 1 } });
+
+    const overdueBefore = await admin.get(`/api/tasks/overdue?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    expect(overdueBefore.body.map((t: { title: string }) => t.title)).toContain("Mutations-Task");
+
+    const recentBefore = await admin.get(`/api/tasks/recent?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    expect(recentBefore.body.map((t: { title: string }) => t.title)).toContain("Mutations-Task");
+
+    // Task auf "done" (geschlossener Systemstatus) setzen
+    await admin.patch(`/api/tasks/${task.body.id}`).send({ status: "done", expectedVersion: task.body.version }).expect(200);
+
+    // taskStatusReport: zeigt jetzt "done"
+    const statsAfter = await admin.get(`/api/tasks/stats?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    expect(statsAfter.body.statusCounts).toHaveProperty("done", 1);
+    expect(statsAfter.body.statusCounts).not.toHaveProperty("todo");
+
+    // overdueTasks: abgeschlossener Task verschwindet
+    const overdueAfter = await admin.get(`/api/tasks/overdue?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    expect(overdueAfter.body.map((t: { title: string }) => t.title)).not.toContain("Mutations-Task");
+
+    // taskJournal: geschlossener Task wird gefiltert
+    const recentAfter = await admin.get(`/api/tasks/recent?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    expect(recentAfter.body.map((t: { title: string }) => t.title)).not.toContain("Mutations-Task");
+
+    // Ticket-Mutation: Ticket anlegen → Stats steigen, schließen → aus recent herausgefiltert
+    const closedTicketStatus = await admin
+      .post("/api/catalogs/workStatus")
+      .send({ key: "ticket_closed_m", label: "Ticket Geschlossen", sortOrder: 1450, isClosed: true, color: "var(--color-steel-500)" })
+      .expect(201);
+    const ticket = await admin.post(`/api/projects/${project.body.id}/tickets`).send({ title: "Mutations-Ticket", type: "bug", status: "open", priority: "medium" }).expect(201);
+
+    const ticketStatsBefore = await admin.get(`/api/tickets/stats?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    expect(ticketStatsBefore.body.statusCounts).toMatchObject({ open: 1 });
+
+    await admin.patch(`/api/tickets/${ticket.body.id}`).send({ status: closedTicketStatus.body.key, expectedVersion: ticket.body.version }).expect(200);
+
+    const ticketRecentAfter = await admin.get(`/api/tickets/recent?ownerType=project&ownerId=${project.body.id}`).expect(200);
+    expect(ticketRecentAfter.body.map((t: { title: string }) => t.title)).not.toContain("Mutations-Ticket");
+  });
+
+  // =========================================================================
+  // Schritt 5: DayPlan-Kontext (noteList, overdueTasks, commentJournal)
+  // =========================================================================
+
+  it("Schritt 5 – liefert noteList, overdueTasks und commentJournal für DayPlan-Owner", async () => {
+    const admin = await loginAdmin(app);
+    const date = "2026-08-15";
+
+    // DayPlan für dieses Datum holen/anlegen (ID-basiert)
+    const dayPlanRes = await admin.get(`/api/day-plans/${date}`).expect(200);
+    const dayPlanId = (dayPlanRes.body as { id: number }).id;
+
+    // noteList: Note direkt am DayPlan anlegen
+    await admin.post(`/api/day-plans/${dayPlanId}/notes`).send({ title: "Tagesplan-Notiz", contentJson: { type: "doc", content: [] } }).expect(201);
+
+    // overdueTasks: überfälligen Task und Zukunfts-Task in DayPlan einbinden
+    const project = await admin.post("/api/projects").send({ name: "DayPlan-Projekt" }).expect(201);
+    const overdueTask = await admin
+      .post(`/api/projects/${project.body.id}/tasks`)
+      .send({ title: "DayPlan-Überfälliger-Task", status: "todo", priority: "high", dueDate: "2026-01-01" })
+      .expect(201);
+    const futureTask = await admin
+      .post(`/api/projects/${project.body.id}/tasks`)
+      .send({ title: "DayPlan-Zukunfts-Task", status: "todo", priority: "medium", dueDate: "2030-12-31" })
+      .expect(201);
+    await admin.post(`/api/day-plans/${date}/tasks/${overdueTask.body.id}`).expect(200);
+    await admin.post(`/api/day-plans/${date}/tasks/${futureTask.body.id}`).expect(200);
+
+    // commentJournal: Kommentar direkt am DayPlan anlegen
+    await admin.post(`/api/day-plans/${dayPlanId}/comments`).send({ body: "Tagesplan-Kommentar" }).expect(201);
+
+    // noteList: GET /api/day-plans/:id/notes
+    const notes = await admin.get(`/api/day-plans/${dayPlanId}/notes`).expect(200);
+    expect(notes.body.map((n: { title: string }) => n.title)).toContain("Tagesplan-Notiz");
+
+    // overdueTasks für DayPlan-Owner: nur überfällige, nicht Zukunfts-Task
+    const overdueTasks = await admin.get(`/api/tasks/overdue?ownerType=dayPlan&ownerId=${dayPlanId}`).expect(200);
+    const overdueTitles = overdueTasks.body.map((t: { title: string }) => t.title);
+    expect(overdueTitles).toContain("DayPlan-Überfälliger-Task");
+    expect(overdueTitles).not.toContain("DayPlan-Zukunfts-Task");
+
+    // commentJournal für DayPlan-Owner
+    const recentComments = await admin.get(`/api/comments/recent?ownerType=dayPlan&ownerId=${dayPlanId}`).expect(200);
+    expect(recentComments.body.map((c: { body: string }) => c.body)).toContain("Tagesplan-Kommentar");
   });
 });

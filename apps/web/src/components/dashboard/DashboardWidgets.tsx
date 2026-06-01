@@ -2,6 +2,7 @@ import type {
   DashboardOwner,
   DashboardContext,
   DashboardWidgetLayout,
+  EventInput,
   JournalEntry,
   JournalListResponse,
   Milestone,
@@ -14,33 +15,41 @@ import type {
   Ticket,
   TicketStats,
 } from "@taskmanager/shared-types";
-import { AlertTriangle, ExternalLink, Inbox, StickyNote } from "lucide-react";
+import { AlertTriangle, ExternalLink, Inbox, Plus, StickyNote } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCalendarTasks } from "../../hooks/useCalendarTasks";
+import { useDayPlan } from "../../hooks/useDayPlan";
 import { useEvents } from "../../hooks/useEvents";
+import { useEntityComments } from "../../hooks/useEntityComments";
 import { useDashboardWidgetData } from "../../hooks/useDashboards";
 import { useHasPermission } from "../../hooks/usePermissions";
+import { useNotes } from "../../hooks/useNotes";
+import { errorMessage } from "../../hooks/errors";
 import { catalogColor, catalogLabel } from "../../utils/catalogs";
+import { withStandaloneView } from "../../utils/standalone";
 import { formatHumanDate } from "../../utils/date";
+import { EventForm } from "../calendar/EventForm";
 import { CalendarSkeleton } from "../calendar/CalendarSkeleton";
 import { useOptionalCalendarDashboard } from "../calendar/CalendarDashboardProvider";
-import { CalendarView } from "../calendar/CalendarView";
-import { MonthCalendar } from "../calendar/MonthCalendar";
+import { CalendarWidgetView } from "../calendar/CalendarWidgetView";
 import { UpcomingEvents } from "../calendar/UpcomingEvents";
-import { WeekCalendar } from "../calendar/WeekCalendar";
 import { MilestoneListBoardView } from "../milestones/MilestoneListBoardView";
 import { ProjectListBoardView } from "../projects/ProjectListBoardView";
+import { TaskForm, type TaskFormInput } from "../tasks/TaskForm";
 import { TaskListBoardView } from "../tasks/TaskListBoardView";
 import { TicketListBoardView } from "../tickets/TicketListBoardView";
+import { Button } from "../ui/Button";
+import { CommentBodyModal } from "../ui/CommentBodyModal";
 import { EmptyState } from "../ui/EmptyState";
 import { PriorityBadge } from "../ui/PriorityBadge";
 import { ProgressBar } from "../ui/ProgressBar";
-import { SegmentedControl } from "../ui/SegmentedControl";
 import { Skeleton } from "../ui/Skeleton";
 import { StatusPill } from "../ui/StatusPill";
 import { TicketTypeBadge } from "../ui/TicketTypeBadge";
 import { useCatalogs } from "../../hooks/useCatalogs";
+import { useToast } from "../ui/ToastProvider";
+import { NoteEditor } from "../notes/NoteEditor";
 import { noteContentToPreviewText } from "../notes/noteContent";
 import { dashboardWidgetRegistry } from "./widgetRegistry";
 
@@ -48,6 +57,7 @@ interface DashboardWidgetCardProps {
   widget: DashboardWidgetLayout;
   owner?: DashboardOwner;
   context?: DashboardContext;
+  dayPlanDate?: string;
 }
 
 function dashboardPath(type: string, id: number): string {
@@ -88,9 +98,11 @@ function dashboardDetailPath(type: string, id: number, returnTo: string): string
 
 function WidgetShell({
   widget,
+  action,
   children,
 }: {
   widget: DashboardWidgetLayout;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   const meta = dashboardWidgetRegistry[widget.widgetId];
@@ -107,6 +119,7 @@ function WidgetShell({
             <h3 className="truncate text-sm font-semibold text-ink">{meta.label}</h3>
           </div>
         </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
       </header>
       <div className="min-h-0 flex-1">
         {children}
@@ -134,6 +147,159 @@ function WidgetError({ message }: { message: string }) {
       tone="tangerine"
       variant="tinted"
     />
+  );
+}
+
+function isDayPlanEvent(event: { owners: Array<{ type: string; id: number }> }, owner?: DashboardOwner): boolean {
+  return owner?.type === "dayPlan" && event.owners.some((eventOwner) => eventOwner.type === "dayPlan" && eventOwner.id === owner.id);
+}
+
+function DayPlanWidgetAction({
+  widget,
+  owner,
+  context,
+  dayPlanDate,
+}: {
+  widget: DashboardWidgetLayout;
+  owner?: DashboardOwner;
+  context?: DashboardContext;
+  dayPlanDate?: string;
+}) {
+  const { showToast } = useToast();
+  const canWriteDayPlans = useHasPermission("dayPlans", "write");
+  const canWriteTasks = useHasPermission("tasks", "write");
+  const canWriteNotes = useHasPermission("notes", "write");
+  const canWriteComments = useHasPermission("comments", "write");
+  const canWriteEvents = useHasPermission("events", "write");
+  const dayPlan = useDayPlan(dayPlanDate ?? "", owner?.type === "dayPlan" && Boolean(dayPlanDate));
+  const notes = useNotes(owner?.type === "dayPlan" ? owner : null);
+  const comments = useEntityComments("dayPlan", owner?.type === "dayPlan" ? owner.id : null);
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [commentModalOpen, setCommentModalOpen] = useState(false);
+  const [eventFormOpen, setEventFormOpen] = useState(false);
+
+  if (context !== "dayPlan" || owner?.type !== "dayPlan") {
+    return null;
+  }
+
+  const createTask = widget.widgetId === "taskList" || widget.widgetId === "taskBoard";
+  const createNote = widget.widgetId === "noteList";
+  const createComment = widget.widgetId === "commentJournal";
+  const createEvent = widget.widgetId === "upcomingEvents";
+  const canCreate =
+    (createTask && Boolean(dayPlanDate) && canWriteDayPlans && canWriteTasks) ||
+    (createNote && canWriteNotes) ||
+    (createComment && canWriteComments) ||
+    (createEvent && Boolean(dayPlanDate) && canWriteDayPlans && canWriteEvents);
+
+  if (!canCreate) {
+    return null;
+  }
+
+  const openCreate = () => {
+    if (createTask) {
+      setTaskFormOpen(true);
+      return;
+    }
+    if (createNote) {
+      void notes
+        .createNote({ title: "Neue Notiz", contentJson: {} })
+        .then((note) => {
+          if (note) {
+            setEditingNote(note);
+          }
+          showToast({ tone: "success", title: "Notiz angelegt" });
+        })
+        .catch((noteError: unknown) => showToast({ tone: "error", title: "Notiz konnte nicht angelegt werden", message: errorMessage(noteError) }));
+      return;
+    }
+    if (createComment) {
+      setCommentModalOpen(true);
+      return;
+    }
+    if (createEvent) {
+      setEventFormOpen(true);
+    }
+  };
+
+  const submitTask = async (input: TaskFormInput) => {
+    try {
+      await dayPlan.createTask({
+        title: input.title,
+        description: input.description,
+        status: input.status,
+        priority: input.priority,
+        responsibleUserId: input.responsibleUserId,
+        dueDate: input.dueDate,
+      });
+      showToast({ tone: "success", title: "Aufgabe angelegt" });
+    } catch (taskError) {
+      showToast({ tone: "error", title: "Aufgabe konnte nicht angelegt werden", message: errorMessage(taskError) });
+      throw taskError;
+    }
+  };
+
+  const submitComment = async (body: string) => {
+    try {
+      await comments.createComment({ body });
+      showToast({ tone: "success", title: "Kommentar angelegt" });
+    } catch (commentError) {
+      showToast({ tone: "error", title: "Kommentar konnte nicht angelegt werden", message: errorMessage(commentError) });
+      throw commentError;
+    }
+  };
+
+  const submitEvent = async (input: EventInput) => {
+    try {
+      await dayPlan.createEvent(input);
+      showToast({ tone: "success", title: "Termin erstellt" });
+    } catch (eventError) {
+      showToast({ tone: "error", title: "Termin konnte nicht gespeichert werden", message: errorMessage(eventError) });
+      throw eventError;
+    }
+  };
+
+  return (
+    <>
+      <Button variant="ghost" icon={<Plus size={18} />} title="Neu anlegen" aria-label={`${dashboardWidgetRegistry[widget.widgetId].label}: neu anlegen`} onClick={openCreate} />
+      <TaskForm open={taskFormOpen} onSubmit={submitTask} onClose={() => setTaskFormOpen(false)} />
+      <NoteEditor
+        note={editingNote}
+        open={editingNote !== null}
+        onClose={() => setEditingNote(null)}
+        onSave={async (id, input) => {
+          const updated = await notes.updateNote(id, input);
+          if (updated) {
+            setEditingNote(updated);
+          }
+        }}
+      />
+      <CommentBodyModal
+        open={commentModalOpen}
+        title="Kommentar anlegen"
+        breadcrumb={["Kommentare", "Anlegen"]}
+        initialBody=""
+        placeholder="Kommentar schreiben"
+        submitLabel="Anlegen"
+        testIdPrefix="day-plan-widget-comment-create"
+        onSave={submitComment}
+        onClose={() => setCommentModalOpen(false)}
+      />
+      <EventForm
+        open={eventFormOpen}
+        event={null}
+        initialDate={dayPlanDate}
+        initialOwners={[{ type: "dayPlan", id: owner.id }]}
+        projects={[]}
+        milestones={[]}
+        tasks={[]}
+        onSubmit={submitEvent}
+        onDelete={async () => undefined}
+        canDelete={false}
+        onClose={() => setEventFormOpen(false)}
+      />
+    </>
   );
 }
 
@@ -331,28 +497,76 @@ function MilestoneRows({ milestones }: { milestones: Milestone[] | undefined }) 
   );
 }
 
-function CalendarWidget() {
+function CalendarWidget({ owner, context, dayPlanDate }: { owner?: DashboardOwner; context?: DashboardContext; dayPlanDate?: string }) {
   const canReadEvents = useHasPermission("events", "read");
+  const canWriteEvents = useHasPermission("events", "write");
+  const canDeleteEvents = useHasPermission("events", "delete");
   const canReadTasks = useHasPermission("tasks", "read");
+  const canWriteDayPlans = useHasPermission("dayPlans", "write");
   const events = useEvents(undefined, canReadEvents);
-  const calendarTasks = useCalendarTasks(canReadTasks);
+  const isDayPlanCalendar = owner?.type === "dayPlan" && (context === "dayPlan" || context === "dayPlanCalendar");
+  const dayPlan = useDayPlan(dayPlanDate ?? "", isDayPlanCalendar && Boolean(dayPlanDate));
+  const calendarTasks = useCalendarTasks(canReadTasks && !isDayPlanCalendar);
+  const { showToast } = useToast();
+  const [formOpen, setFormOpen] = useState(false);
+  const [formDate, setFormDate] = useState<string | null>(null);
 
   if (events.loading || calendarTasks.loading) {
     return <CalendarSkeleton />;
   }
 
+  const interactive = canWriteEvents && (!isDayPlanCalendar || (Boolean(dayPlanDate) && canWriteDayPlans));
+  const handleDateClick = interactive
+    ? (date: string) => {
+        setFormDate(date);
+        setFormOpen(true);
+      }
+    : undefined;
+
+  const handleSubmit = async (input: EventInput) => {
+    try {
+      if (isDayPlanCalendar) {
+        await dayPlan.createEvent(input);
+      } else {
+        await events.createEvent(input);
+      }
+      showToast({ tone: "success", title: "Termin erstellt" });
+    } catch (err) {
+      showToast({ tone: "error", title: "Termin konnte nicht gespeichert werden", message: errorMessage(err) });
+      throw err;
+    }
+  };
+
   return (
-    <CalendarView
-      events={canReadEvents ? events.events : []}
-      tasks={canReadTasks ? calendarTasks.tasks : []}
-      compact
-    />
+    <>
+      <CalendarWidgetView
+        events={canReadEvents ? (isDayPlanCalendar ? events.events.filter((event) => isDayPlanEvent(event, owner)) : events.events) : []}
+        tasks={canReadTasks && !isDayPlanCalendar ? calendarTasks.tasks : []}
+        compact
+        mode={interactive ? "interactive" : "readonly"}
+        onDateClick={handleDateClick}
+      />
+      {interactive ? (
+        <EventForm
+          open={formOpen}
+          event={null}
+          initialDate={formDate}
+          initialOwners={isDayPlanCalendar && owner?.type === "dayPlan" ? [{ type: "dayPlan", id: owner.id }] : undefined}
+          projects={[]}
+          milestones={[]}
+          tasks={[]}
+          onSubmit={handleSubmit}
+          onDelete={async () => undefined}
+          canDelete={canDeleteEvents}
+          onClose={() => setFormOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
 function InteractiveCalendarWidget() {
   const calendar = useOptionalCalendarDashboard();
-  const [viewMode, setViewMode] = useState<"week" | "month">("week");
 
   if (!calendar) {
     return <WidgetError message="Kalenderdaten sind nicht verfügbar." />;
@@ -367,37 +581,18 @@ function InteractiveCalendarWidget() {
   }
 
   return (
-    <div className="grid gap-3">
-      <div className="flex justify-end">
-        <SegmentedControl
-          value={viewMode}
-          options={[
-            { value: "week", label: "Woche" },
-            { value: "month", label: "Monat" }
-          ]}
-          onChange={setViewMode}
-        />
-      </div>
-      {viewMode === "week" ? (
-        <WeekCalendar
-          events={calendar.events}
-          tasks={calendar.tasks}
-          projects={calendar.projects}
-          milestones={calendar.milestones}
-          onDateClick={calendar.canWriteEvents ? calendar.openCreate : undefined}
-          onEventClick={calendar.canWriteEvents ? calendar.openEvent : undefined}
-          onEventMove={calendar.canWriteEvents ? calendar.moveEvent : undefined}
-          onTaskClick={calendar.canWriteTasks ? calendar.openTask : undefined}
-          onTaskMove={calendar.canWriteTasks ? calendar.moveTask : undefined}
-        />
-      ) : (
-        <MonthCalendar
-          tasks={calendar.tasks}
-          onTaskClick={calendar.canWriteTasks ? calendar.openTask : undefined}
-          onTaskMove={calendar.canWriteTasks ? calendar.moveTask : undefined}
-        />
-      )}
-    </div>
+    <CalendarWidgetView
+      events={calendar.events}
+      tasks={calendar.tasks}
+      projects={calendar.projects}
+      milestones={calendar.milestones}
+      mode="interactive"
+      onDateClick={calendar.canWriteEvents ? calendar.openCreate : undefined}
+      onEventClick={calendar.canWriteEvents ? calendar.openEvent : undefined}
+      onEventMove={calendar.canWriteEvents ? calendar.moveEvent : undefined}
+      onTaskClick={calendar.canWriteTasks ? calendar.openTask : undefined}
+      onTaskMove={calendar.canWriteTasks ? calendar.moveTask : undefined}
+    />
   );
 }
 
@@ -409,7 +604,7 @@ function UpcomingEventsWidget({ owner }: { owner?: DashboardOwner }) {
     return <WidgetLoading />;
   }
 
-  const visibleEvents = owner?.type === "dayPlan" ? events.events.filter((event) => event.owners.some((eventOwner) => eventOwner.type === "dayPlan" && eventOwner.id === owner.id)) : events.events;
+  const visibleEvents = owner?.type === "dayPlan" ? events.events.filter((event) => isDayPlanEvent(event, owner)) : events.events;
 
   return <UpcomingEvents events={canReadEvents ? visibleEvents : []} />;
 }
@@ -473,6 +668,7 @@ function MilestoneBoardWidget({
       viewMode={mode}
       onCreate={() => undefined}
       onEdit={onOpen}
+      onOpenInTab={(milestone) => window.open(withStandaloneView(`/milestones/${milestone.id}`), "_blank")}
       onDelete={() => undefined}
       readOnly
     />
@@ -494,18 +690,20 @@ function ProjectBoardWidget({
       viewMode={mode}
       onCreate={() => undefined}
       onEdit={onOpen}
+      onOpenInTab={(project) => window.open(withStandaloneView(`/projects/${project.id}`), "_blank")}
       onDelete={() => undefined}
       readOnly
     />
   );
 }
 
-export function DashboardWidgetCard({ widget, owner, context }: DashboardWidgetCardProps) {
+export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: DashboardWidgetCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
   const usesOwnData = widget.widgetId === "calendar" || widget.widgetId === "upcomingEvents";
   const query = useDashboardWidgetData(widget, owner, !usesOwnData);
+  const dayPlanAction = context === "dayPlan" && owner?.type === "dayPlan" ? <DayPlanWidgetAction widget={widget} owner={owner} context={context} dayPlanDate={dayPlanDate} /> : undefined;
   const navigateToDetail = (type: "task" | "ticket" | "milestone" | "project", id: number) => {
     navigate(dashboardDetailPath(type, id, returnTo));
   };
@@ -520,15 +718,15 @@ export function DashboardWidgetCard({ widget, owner, context }: DashboardWidgetC
     }
 
     return (
-      <WidgetShell widget={widget}>
-        <CalendarWidget />
+      <WidgetShell widget={widget} action={dayPlanAction}>
+        <CalendarWidget owner={owner} context={context} dayPlanDate={dayPlanDate} />
       </WidgetShell>
     );
   }
 
   if (widget.widgetId === "upcomingEvents") {
     return (
-      <WidgetShell widget={widget}>
+      <WidgetShell widget={widget} action={dayPlanAction}>
         <UpcomingEventsWidget owner={owner} />
       </WidgetShell>
     );
@@ -536,7 +734,7 @@ export function DashboardWidgetCard({ widget, owner, context }: DashboardWidgetC
 
   if (query.loading) {
     return (
-      <WidgetShell widget={widget}>
+      <WidgetShell widget={widget} action={dayPlanAction}>
         <WidgetLoading />
       </WidgetShell>
     );
@@ -544,14 +742,14 @@ export function DashboardWidgetCard({ widget, owner, context }: DashboardWidgetC
 
   if (query.error) {
     return (
-      <WidgetShell widget={widget}>
+      <WidgetShell widget={widget} action={dayPlanAction}>
         <WidgetError message={query.error} />
       </WidgetShell>
     );
   }
 
   return (
-    <WidgetShell widget={widget}>
+    <WidgetShell widget={widget} action={dayPlanAction}>
       {widget.widgetId === "taskStatusReport" ? <StatusReport stats={query.data as TaskStats | undefined} kind="workStatus" /> : null}
       {widget.widgetId === "ticketStatusReport" ? <StatusReport stats={query.data as TicketStats | undefined} kind="workStatus" /> : null}
       {widget.widgetId === "taskJournal" ? <TaskRows tasks={query.data as Task[] | undefined} emptyTitle="Keine Aufgaben vorhanden" /> : null}

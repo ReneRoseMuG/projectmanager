@@ -29,8 +29,8 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import type { DashboardWidgetId, DashboardWidgetLayout, Milestone, Note, Project, RecentComment, Task, Ticket } from "@taskmanager/shared-types";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { CalendarEvent, DashboardContext, DashboardOwner, DashboardWidgetId, DashboardWidgetLayout, Milestone, Note, Project, RecentComment, Task, Ticket } from "@taskmanager/shared-types";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardWidgetCard } from "../../../../../apps/web/src/components/dashboard/DashboardWidgets";
@@ -38,6 +38,9 @@ import { dashboardWidgetRegistry } from "../../../../../apps/web/src/components/
 import { buildMilestone, buildProject, buildTask, buildTicket } from "../../../../fixtures/web/components/ui/factories";
 
 const widgetData = vi.hoisted(() => new Map<string, unknown>());
+const calendarEvents = vi.hoisted(() => ({ value: [] as CalendarEvent[] }));
+const permissions = vi.hoisted(() => new Map<string, boolean>());
+const createNoteMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../../../apps/web/src/hooks/useDashboards", () => ({
   useDashboardWidgetData(widget: { widgetId: string }) {
@@ -48,6 +51,30 @@ vi.mock("../../../../../apps/web/src/hooks/useDashboards", () => ({
       reload: async () => undefined,
     };
   },
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useDayPlan", () => ({
+  useDayPlan: () => ({
+    createTask: vi.fn(),
+    createEvent: vi.fn(),
+  }),
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useNotes", () => ({
+  useNotes: () => ({
+    createNote: createNoteMock,
+    updateNote: vi.fn(),
+  }),
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useEntityComments", () => ({
+  useEntityComments: () => ({
+    createComment: vi.fn(),
+  }),
+}));
+
+vi.mock("../../../../../apps/web/src/components/ui/ToastProvider", () => ({
+  useToast: () => ({ showToast: vi.fn() }),
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
@@ -68,7 +95,7 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
-  useHasPermission: () => true,
+  useHasPermission: (resource: string, action: string) => permissions.get(`${resource}:${action}`) ?? true,
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/useTags", () => ({
@@ -94,30 +121,51 @@ vi.mock("../../../../../apps/web/src/components/calendar/CalendarDashboardProvid
     loading: false,
     error: null,
     canWriteEvents: true,
+    canWriteTasks: true,
     openCreate: vi.fn(),
     openEvent: vi.fn(),
+    openTask: vi.fn(),
     moveEvent: vi.fn(),
+    moveTask: vi.fn(),
   }),
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/useEvents", () => ({
-  useEvents: () => ({ events: [], loading: false }),
+  useEvents: () => ({ events: calendarEvents.value, loading: false }),
 }));
 
 vi.mock("../../../../../apps/web/src/components/calendar/CalendarSkeleton", () => ({
   CalendarSkeleton: () => <div data-testid="calendar-skeleton" />,
 }));
 
-vi.mock("../../../../../apps/web/src/components/calendar/CalendarView", () => ({
-  CalendarView: () => <div data-testid="calendar-view" />,
-}));
-
-vi.mock("../../../../../apps/web/src/components/calendar/WeekCalendar", () => ({
-  WeekCalendar: () => <div data-testid="week-calendar" />,
+vi.mock("../../../../../apps/web/src/components/calendar/CalendarWidgetView", () => ({
+  CalendarWidgetView: ({ events, mode, compact }: { events: CalendarEvent[]; mode: string; compact?: boolean }) => (
+    <div data-testid="calendar-widget-view" data-mode={mode} data-compact={compact ? "true" : "false"}>
+      {events.map((event) => (
+        <span key={event.id}>{event.title}</span>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock("../../../../../apps/web/src/components/calendar/UpcomingEvents", () => ({
   UpcomingEvents: () => <div data-testid="upcoming-events" />,
+}));
+
+vi.mock("../../../../../apps/web/src/components/tasks/TaskForm", () => ({
+  TaskForm: ({ open }: { open: boolean }) => (open ? <div role="dialog" data-testid="task-form" /> : null),
+}));
+
+vi.mock("../../../../../apps/web/src/components/calendar/EventForm", () => ({
+  EventForm: ({ open }: { open: boolean }) => (open ? <div role="dialog" data-testid="event-form" /> : null),
+}));
+
+vi.mock("../../../../../apps/web/src/components/notes/NoteEditor", () => ({
+  NoteEditor: ({ open }: { open: boolean }) => (open ? <div role="dialog" data-testid="note-editor" /> : null),
+}));
+
+vi.mock("../../../../../apps/web/src/components/ui/CommentBodyModal", () => ({
+  CommentBodyModal: ({ open }: { open: boolean }) => (open ? <div role="dialog" data-testid="comment-modal" /> : null),
 }));
 
 interface NavigationCase {
@@ -191,7 +239,13 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}|${returnTo}`}</div>;
 }
 
-function renderWithRouter(widgetId: DashboardWidgetId, data: unknown, context?: "calendar"): void {
+interface RenderOptions {
+  context?: DashboardContext;
+  owner?: DashboardOwner;
+  dayPlanDate?: string;
+}
+
+function renderWithRouter(widgetId: DashboardWidgetId, data: unknown, options: RenderOptions = {}): void {
   const widget: DashboardWidgetLayout = {
     widgetId,
     col: 0,
@@ -201,13 +255,33 @@ function renderWithRouter(widgetId: DashboardWidgetId, data: unknown, context?: 
   };
 
   widgetData.set(widgetId, data);
+  const owner = options.owner ?? { type: "project", id: 99 };
 
   render(
     <MemoryRouter initialEntries={["/projects/99?tab=overview"]}>
-      <DashboardWidgetCard widget={widget} owner={{ type: "project", id: 99 }} context={context} />
+      <DashboardWidgetCard widget={widget} owner={owner} context={options.context} dayPlanDate={options.dayPlanDate} />
       <LocationProbe />
     </MemoryRouter>,
   );
+}
+
+function buildCalendarEvent(id: number, title: string, owners: CalendarEvent["owners"]): CalendarEvent {
+  return {
+    id,
+    title,
+    owners,
+    description: null,
+    startTime: "2026-05-31T08:00:00.000Z",
+    endTime: "2026-05-31T09:00:00.000Z",
+    isAllDay: false,
+    color: null,
+    reminderMinutes: 0,
+    responsibleUserId: null,
+    responsibleUser: null,
+    version: 1,
+    createdAt: "2026-05-30T08:00:00.000Z",
+    updatedAt: "2026-05-30T08:00:00.000Z",
+  };
 }
 
 function findItemArticle(label: string): HTMLElement {
@@ -225,6 +299,9 @@ function findItemArticle(label: string): HTMLElement {
 afterEach(() => {
   cleanup();
   widgetData.clear();
+  calendarEvents.value = [];
+  permissions.clear();
+  createNoteMock.mockReset();
 });
 
 describe("DashboardWidgetCard", () => {
@@ -241,11 +318,31 @@ describe("DashboardWidgetCard", () => {
     expect(dashboardWidgetRegistry.milestoneListView.label).toBe("Meilensteinliste");
   });
 
-  it("rendert das Kalender-Widget im Kalender-Kontext als interaktive Wochenansicht", () => {
-    renderWithRouter("calendar", undefined, "calendar");
+  it("rendert das Kalender-Widget im Kalender-Kontext über die zentrale Kalenderkomponente", () => {
+    renderWithRouter("calendar", undefined, { context: "calendar" });
 
-    expect(screen.getByTestId("week-calendar")).toBeInTheDocument();
-    expect(screen.queryByTestId("calendar-view")).not.toBeInTheDocument();
+    expect(screen.getByTestId("calendar-widget-view")).toHaveAttribute("data-mode", "interactive");
+    expect(screen.getByTestId("calendar-widget-view")).toHaveAttribute("data-compact", "false");
+  });
+
+  it("filtert das Kalender-Widget im DayPlan-Kalender strikt auf Termine des DayPlan-Kontexts", () => {
+    calendarEvents.value = [
+      buildCalendarEvent(1, "Persönlicher Termin", [{ type: "dayPlan", id: 7 }]),
+      buildCalendarEvent(2, "Globaler Termin", [{ type: "project", id: 99 }]),
+      buildCalendarEvent(3, "Anderer Tagesplan", [{ type: "dayPlan", id: 8 }]),
+    ];
+
+    renderWithRouter("calendar", undefined, {
+      context: "dayPlanCalendar",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    expect(screen.getByTestId("calendar-widget-view")).toHaveAttribute("data-mode", "interactive");
+    expect(screen.getByTestId("calendar-widget-view")).toHaveAttribute("data-compact", "true");
+    expect(screen.getByTestId("calendar-widget-view")).toHaveTextContent("Persönlicher Termin");
+    expect(screen.getByTestId("calendar-widget-view")).not.toHaveTextContent("Globaler Termin");
+    expect(screen.getByTestId("calendar-widget-view")).not.toHaveTextContent("Anderer Tagesplan");
   });
 
   it("rendert noteList als read-only Notizvorschau", () => {
@@ -306,5 +403,85 @@ describe("DashboardWidgetCard", () => {
     expect(screen.getByText("Wiki Seite").closest("a")).toHaveAttribute("href", "/wiki/51");
     expect(screen.getByText("Backlog Eintrag").closest("a")).toHaveAttribute("href", "/backlog/61");
     expect(screen.getByText("Persönliche Planung 2026-05-27").closest("a")).toHaveAttribute("href", "/day-plan");
+  });
+
+  it("öffnet im DayPlan-Kontext den Aufgaben-Create-Dialog aus dem Widget-Header", () => {
+    renderWithRouter("taskList", [], {
+      context: "dayPlan",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Aufgabenliste: neu anlegen" }));
+
+    expect(screen.getByTestId("task-form")).toBeInTheDocument();
+  });
+
+  it("öffnet im DayPlan-Kontext den Kommentar-Create-Dialog aus dem Widget-Header", () => {
+    renderWithRouter("commentJournal", [], {
+      context: "dayPlan",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Kommentare: neu anlegen" }));
+
+    expect(screen.getByTestId("comment-modal")).toBeInTheDocument();
+  });
+
+  it("öffnet im DayPlan-Kontext den Termin-Create-Dialog aus dem Widget-Header", () => {
+    renderWithRouter("upcomingEvents", undefined, {
+      context: "dayPlan",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Nächste Termine: neu anlegen" }));
+
+    expect(screen.getByTestId("event-form")).toBeInTheDocument();
+  });
+
+  it("legt im DayPlan-Kontext eine Notiz an und öffnet den Editor", async () => {
+    createNoteMock.mockResolvedValue({
+      id: 9,
+      title: "Neue Notiz",
+      contentJson: {},
+      version: 1,
+      createdAt: "2026-05-31T08:00:00.000Z",
+      updatedAt: "2026-05-31T08:00:00.000Z",
+    });
+
+    renderWithRouter("noteList", [], {
+      context: "dayPlan",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Notizen: neu anlegen" }));
+
+    await waitFor(() => expect(screen.getByTestId("note-editor")).toBeInTheDocument());
+    expect(createNoteMock).toHaveBeenCalledWith({ title: "Neue Notiz", contentJson: {} });
+  });
+
+  it("blendet Widget-Create-Aktionen außerhalb des DayPlan-Kontexts und ohne Berechtigung aus", () => {
+    renderWithRouter("upcomingEvents", undefined, {
+      context: "project",
+      owner: { type: "project", id: 99 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    expect(screen.queryByRole("button", { name: "Nächste Termine: neu anlegen" })).not.toBeInTheDocument();
+
+    cleanup();
+    widgetData.clear();
+    permissions.set("events:write", false);
+
+    renderWithRouter("upcomingEvents", undefined, {
+      context: "dayPlan",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    expect(screen.queryByRole("button", { name: "Nächste Termine: neu anlegen" })).not.toBeInTheDocument();
   });
 });

@@ -43,7 +43,7 @@ describe("ActionMenu", () => {
 
     const trigger = screen.getByRole("button", { name: "Aktionen" });
 
-    expect(trigger).toHaveClass("h-9", "w-[36px]", "border-line", "bg-white", "text-ink", "shadow-sm");
+    expect(trigger).toHaveClass("h-10", "w-10", "border-line", "bg-white", "text-ink", "shadow-sm");
     expect(trigger).not.toHaveClass("border-transparent", "bg-transparent", "shadow-none");
   });
 

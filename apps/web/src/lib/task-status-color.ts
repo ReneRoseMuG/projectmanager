@@ -7,8 +7,10 @@ export function resolveTaskStatusColor(status: string): string {
       return "var(--color-steel-400)";
     case "open":
       return "var(--color-steel-500)";
+    case "active":
     case "in_progress":
       return "var(--color-teal)";
+    case "pending":
     case "in_review":
       return "var(--color-tangerine)";
     case "done":

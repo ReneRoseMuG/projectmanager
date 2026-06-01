@@ -33,11 +33,20 @@ export const featureRepository = {
         createdAt: now,
         updatedAt: now
       });
-    const created = await this.findById(database, insertId(result));
-    if (!created) {
-      throw new Error("Created feature could not be loaded");
-    }
-    return created;
+    return {
+      id: insertId(result),
+      title: data.title,
+      status: data.status ?? "draft",
+      description: data.description ?? null,
+      content: data.content ?? null,
+      sortOrder: data.sortOrder ?? 0,
+      responsibleUserId: data.responsibleUserId ?? null,
+      version: 1,
+      createdBy: userId ?? null,
+      updatedBy: userId ?? null,
+      createdAt: now,
+      updatedAt: now
+    };
   },
 
   async update(database: DbSession, id: number, expectedVersion: number, data: FeatureUpdateData, userId?: number): Promise<FeatureRecord | undefined> {
@@ -46,16 +55,17 @@ export const featureRepository = {
       return undefined;
     }
     assertVersion(current.version, expectedVersion);
+    const now = nowIso();
     await database
       .update(features)
       .set({
         ...data,
         version: current.version + 1,
         updatedBy: userId ?? null,
-        updatedAt: nowIso()
+        updatedAt: now
       })
       .where(eq(features.id, id));
-    return this.findById(database, id);
+    return { ...current, ...data, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
   },
 
   async delete(database: DbSession, id: number): Promise<number> {

@@ -1,5 +1,5 @@
 import type { Tag, Ticket } from "@taskmanager/shared-types";
-import { Edit3, GitBranch, Trash2 } from "lucide-react";
+import { Edit3, ExternalLink, GitBranch, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { objectReference } from "../../lib/references";
 import { catalogColor, isCatalogStatusClosed } from "../../utils/catalogs";
@@ -22,13 +22,14 @@ interface TicketCardProps {
   compact?: boolean;
   variant?: "card" | "row";
   onOpen: (ticket: Ticket) => void;
+  onOpenInTab?: (ticket: Ticket) => void;
   onDelete?: (ticket: Ticket) => void;
   onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>;
   onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>;
   onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void>;
 }
 
-export function TicketCard({ ticket, allTags, compact = false, variant = "card", onOpen, onDelete, onStatusChange, onDueDateChange, onTagsChange }: TicketCardProps) {
+export function TicketCard({ ticket, allTags, compact = false, variant = "card", onOpen, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange }: TicketCardProps) {
   const catalogs = useCatalogs();
   const description = richTextToPlainText(ticket.description);
   const statusColor = catalogColor(catalogs.entries, "workStatus", ticket.status);
@@ -38,9 +39,9 @@ export function TicketCard({ ticket, allTags, compact = false, variant = "card",
     return (
       <>
         <div className="md:hidden">
-          <TicketCard ticket={ticket} allTags={allTags} compact={compact} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
+          <TicketCard ticket={ticket} allTags={allTags} compact={compact} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
         </div>
-        <TicketRow ticket={ticket} allTags={allTags} description={description} statusColor={statusColor} ticketClosed={ticketClosed} onOpen={onOpen} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
+        <TicketRow ticket={ticket} allTags={allTags} description={description} statusColor={statusColor} ticketClosed={ticketClosed} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
       </>
     );
   }
@@ -54,6 +55,7 @@ export function TicketCard({ ticket, allTags, compact = false, variant = "card",
       footer={<TicketCardFooter ticket={ticket} allTags={allTags} ticketClosed={ticketClosed} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />}
       onOpen={() => onOpen(ticket)}
       onEdit={() => onOpen(ticket)}
+      extraMenuItems={onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(ticket) }] : []}
       onDelete={onDelete ? () => onDelete(ticket) : undefined}
       className={compact ? "p-4" : ""}
     />
@@ -129,7 +131,7 @@ function TicketSupportFooter({ ticket, allTags, onTagsChange, bordered = true }:
   );
 }
 
-function TicketRow({ ticket, allTags, description, statusColor, ticketClosed, onOpen, onDelete, onStatusChange, onDueDateChange, onTagsChange }: { ticket: Ticket; allTags?: Tag[]; description: string; statusColor: string; ticketClosed: boolean; onOpen: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void; onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void> }) {
+function TicketRow({ ticket, allTags, description, statusColor, ticketClosed, onOpen, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange }: { ticket: Ticket; allTags?: Tag[]; description: string; statusColor: string; ticketClosed: boolean; onOpen: (ticket: Ticket) => void; onOpenInTab?: (ticket: Ticket) => void; onDelete?: (ticket: Ticket) => void; onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void> }) {
   const overdue = !ticketClosed && isOverdue(ticket.dueDate);
   const closedDate = ticketClosed ? (ticket.resolvedAt ?? ticket.updatedAt) : null;
 
@@ -166,6 +168,7 @@ function TicketRow({ ticket, allTags, description, statusColor, ticketClosed, on
             objectReference={objectReference("ticket", ticket.id)}
             items={[
               { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(ticket) },
+              ...(onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(ticket) }] : []),
               ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(ticket), danger: true }] : [])
             ]}
           />

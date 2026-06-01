@@ -48,7 +48,13 @@ function toCandidate(
 }
 
 function toDialogItems(items: StatusCascadeCandidate[]) {
-  return items.map(({ statusSortOrder: _statusSortOrder, ...item }) => item);
+  return items.map((item) => ({
+    id: item.id,
+    title: item.title,
+    status: item.status,
+    statusLabel: item.statusLabel,
+    version: item.version,
+  }));
 }
 
 function emptySelection(): StatusCascadeSelection {
@@ -95,30 +101,28 @@ export function useStatusCascadeWorkflow() {
         return;
       }
       setApplying(true);
-      let successCount = 0;
-      let failureCount = 0;
       const selected = selection ?? emptySelection();
 
+      const updatePromises: Promise<void>[] = [];
       for (const step of dialogState.steps) {
         const selectedIds = new Set(selected[step.type]);
         for (const item of step.items) {
           if (!selectedIds.has(item.id)) {
             continue;
           }
-          try {
-            if (step.type === "milestone") {
-              await milestoneActions.updateMilestone(item.id, { status: dialogState.targetStatus, expectedVersion: item.version });
-            } else if (step.type === "task") {
-              await taskActions.updateTask(item.id, { status: dialogState.targetStatus as TaskStatus, expectedVersion: item.version });
-            } else {
-              await ticketActions.updateTicket(item.id, { status: dialogState.targetStatus as TicketStatus, expectedVersion: item.version });
-            }
-            successCount += 1;
-          } catch {
-            failureCount += 1;
+          if (step.type === "milestone") {
+            updatePromises.push(milestoneActions.updateMilestone(item.id, { status: dialogState.targetStatus, expectedVersion: item.version }).then(() => undefined));
+          } else if (step.type === "task") {
+            updatePromises.push(taskActions.updateTask(item.id, { status: dialogState.targetStatus as TaskStatus, expectedVersion: item.version }).then(() => undefined));
+          } else {
+            updatePromises.push(ticketActions.updateTicket(item.id, { status: dialogState.targetStatus as TicketStatus, expectedVersion: item.version }).then(() => undefined));
           }
         }
       }
+
+      const results = await Promise.allSettled(updatePromises);
+      const successCount = results.filter((r) => r.status === "fulfilled").length;
+      const failureCount = results.filter((r) => r.status === "rejected").length;
 
       if (failureCount > 0 && successCount > 0) {
         showToast({

@@ -4,7 +4,8 @@
  * Abgedeckte Regeln:
  * - Dashboard-Listen erzeugen System-Standarddashboards je Kontext.
  * - Der Kalender-Kontext erzeugt ein anpassbares Standarddashboard mit interaktivem Kalender-Widget.
- * - Der Kontext für persönliche Planung erlaubt noteList und lehnt attachmentJournal ab.
+ * - Der Kontext für persönliche Planung erlaubt noteList und calendar und lehnt attachmentJournal ab.
+ * - Der Kalender-Subkontext der persönlichen Planung erzeugt ein eigenes Dashboard mit Kalenderwidget.
  * - Leser dürfen Dashboards lesen, aber nicht erstellen.
  * - Editoren dürfen eigene Dashboards speichern und persönliche Standards setzen.
  * - Nur Admins dürfen System-Dashboards und globale Standards verwalten.
@@ -204,12 +205,55 @@ describe("Dashboard API", () => {
         context: "dayPlan",
         widgets: [
           { widgetId: "taskList", col: 0, row: 0, colSpan: 1 },
-          { widgetId: "noteList", col: 1, row: 0, colSpan: 1 }
+          { widgetId: "calendar", col: 1, row: 0, colSpan: 1 },
+          { widgetId: "noteList", col: 0, row: 1, colSpan: 1 }
         ]
       })
       .expect(201);
 
     expect(created.body).toMatchObject({ name: "Meine Planung", context: "dayPlan", isSystem: false, version: 1 });
+  });
+
+  it("erzeugt das Kalender-Dashboard für persönliche Planung und validiert den Widget-Katalog", async () => {
+    await supertest(app.server).get("/api/dashboards?context=dayPlanCalendar").expect(401);
+    const reader = await createUser(app, "reader", "dashboard.dayplan.calendar.reader@example.test");
+
+    const list = await reader.get("/api/dashboards?context=dayPlanCalendar").expect(200);
+
+    expect(list.body.globalDefaultDashboardId).toEqual(expect.any(Number));
+    expect(list.body.dashboards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Standard: Persönliche Planung Kalender",
+          context: "dayPlanCalendar",
+          isSystem: true,
+          widgets: expect.arrayContaining([
+            expect.objectContaining({ widgetId: "calendar", colSpan: 2 }),
+            expect.objectContaining({ widgetId: "upcomingEvents" })
+          ])
+        })
+      ])
+    );
+
+    const editor = await createUser(app, "editor", "dashboard.dayplan.calendar.editor@example.test");
+    await editor
+      .post("/api/dashboards")
+      .send({ name: "Falscher Planungskalender", context: "dayPlanCalendar", widgets: [{ widgetId: "noteList", col: 0, row: 0, colSpan: 1 }] })
+      .expect(400);
+
+    const created = await editor
+      .post("/api/dashboards")
+      .send({
+        name: "Mein Planungskalender",
+        context: "dayPlanCalendar",
+        widgets: [
+          { widgetId: "calendar", col: 0, row: 0, colSpan: 2 },
+          { widgetId: "upcomingEvents", col: 0, row: 1, colSpan: 1 }
+        ]
+      })
+      .expect(201);
+
+    expect(created.body).toMatchObject({ name: "Mein Planungskalender", context: "dayPlanCalendar", isSystem: false, version: 1 });
   });
 
   it("verwaltet persönliche Editor-Dashboards versioniert und setzt USER-Defaults", async () => {

@@ -17,6 +17,7 @@ import { JournalPage } from "./pages/JournalPage";
 import { MilestoneDetailPage } from "./pages/MilestoneDetailPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { MilestonesPage } from "./pages/MilestonesPage";
+import { NoteDetailPage } from "./pages/NoteDetailPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SetupPasswordPage } from "./pages/SetupPasswordPage";
@@ -46,7 +47,7 @@ function hasAdminAccess(user: ReturnType<typeof useAuth>["user"]): boolean {
 function isFullBleedRoute(pathname: string): boolean {
   return (
     pathname === "/" ||
-    /^\/(?:projects|milestones|tasks|tickets|features|use-cases|backlog)(?:\/|$)/.test(pathname) ||
+    /^\/(?:projects|milestones|tasks|tickets|features|use-cases|backlog|notes)(?:\/|$)/.test(pathname) ||
     /^\/(?:wiki|calendar|day-plan|journal)(?:\/|$)/.test(pathname) ||
     /^\/settings\/preferences\/?$/.test(pathname) ||
     /^\/admin(?:\/|$)/.test(pathname)
@@ -120,6 +121,7 @@ export default function App() {
       <Route path="/use-cases/:id" element={<UseCaseDetailPage />} />
       <Route path="/backlog/new" element={<BacklogItemDetailPage />} />
       <Route path="/backlog/:id" element={<BacklogItemDetailPage />} />
+      <Route path="/notes/:id" element={<NoteDetailPage />} />
       <Route path="/wiki" element={<WikiPage />} />
       <Route path="/wiki/:id" element={<WikiPage />} />
       <Route path="/calendar" element={<CalendarPage />} />

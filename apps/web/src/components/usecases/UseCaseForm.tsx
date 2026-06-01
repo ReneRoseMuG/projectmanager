@@ -11,7 +11,7 @@ import type {
   UseCase,
   UseCaseInput,
 } from "@taskmanager/shared-types";
-import { BookOpen, Bug, ListTodo, Trash2 } from "lucide-react";
+import { BookOpen, Bug, Layers3, ListChecks, ListTodo, Trash2, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -46,6 +46,7 @@ import { Modal } from "../ui/Modal";
 import { ParentContextField } from "../ui/ParentContextField";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingRelationList } from "../ui/PendingRelationList";
+import { CatalogSelect } from "../ui/CatalogSelect";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
@@ -348,7 +349,7 @@ export function UseCaseForm({
         open={open}
         title={useCase ? "Use Case bearbeiten" : "Use Case anlegen"}
         objectReference={useCase ? objectReference("useCase", useCase.id) : undefined}
-        icon={<BookOpen size={21} />}
+        icon={<Layers3 size={20} />}
         breadcrumb={["Use Cases", useCase ? useCase.title : "Neu"]}
         onSubmit={submit}
         saving={saving}
@@ -379,8 +380,8 @@ export function UseCaseForm({
       >
         {activeTab === "details" ? (
           <div className="flex min-h-0 w-full flex-1">
-            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
-              <div className="mx-auto grid w-full max-w-5xl gap-4">
+            <div className="min-w-0 flex-1 overflow-auto p-2.5">
+              <div className="grid w-full gap-4">
                 {showParentContexts ? <ParentContextField parents={useCase?.parentContexts} /> : null}
                 <Section>
                   <FormField label="Titel" required className="min-w-0">
@@ -413,39 +414,33 @@ export function UseCaseForm({
             </div>
 
             <FormSidebar storageKey="use-case-form-sidebar">
-              <div className="grid gap-4">
-                <Select
-                  label="Feature"
-                  value={selectedFeatureId}
-                  onChange={(event) =>
-                    setSelectedFeatureId(
-                      event.target.value ? Number(event.target.value) : "",
-                    )
-                  }
-                >
-                  <option value="">Ohne Feature</option>
-                  {features.map((feature) => (
-                    <option key={feature.id} value={feature.id}>
-                      {feature.title}
-                    </option>
-                  ))}
-                </Select>
-                <UserSelectField
-                  label="Verantwortlich"
-                  value={responsibleUserId}
-                  selectedUser={useCase?.responsibleUser ?? null}
-                  onChange={setResponsibleUserId}
-                />
-              </div>
-              <div className="grid gap-4">
-                <FormField label="Status">
-                  <StatusToggle
-                    kind="featureStatus"
-                    value={status}
-                    onChange={setStatus}
-                  />
-                </FormField>
-              </div>
+              <Select
+                label="Feature"
+                icon={<BookOpen size={14} />}
+                variant="panel"
+                value={selectedFeatureId}
+                onChange={(event) =>
+                  setSelectedFeatureId(
+                    event.target.value ? Number(event.target.value) : "",
+                  )
+                }
+              >
+                <option value="">Ohne Feature</option>
+                {features.map((feature) => (
+                  <option key={feature.id} value={feature.id}>
+                    {feature.title}
+                  </option>
+                ))}
+              </Select>
+              <UserSelectField
+                label="Verantwortlich"
+                icon={<Users size={14} />}
+                variant="panel"
+                value={responsibleUserId}
+                selectedUser={useCase?.responsibleUser ?? null}
+                onChange={setResponsibleUserId}
+              />
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="featureStatus" value={status} onChange={setStatus} />
             </FormSidebar>
           </div>
         ) : null}

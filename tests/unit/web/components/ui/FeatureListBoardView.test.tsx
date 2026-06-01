@@ -133,6 +133,10 @@ describe("FeatureListBoardView", () => {
     );
 
     expectItemCardClasses(container.querySelectorAll("article.p-5"));
+    const useCaseCounter = screen.getAllByText(/Use Cases/)[0].closest("span");
+    expect(useCaseCounter).not.toBeNull();
+    expect((useCaseCounter as HTMLElement).querySelector(".lucide-layers3")).toBeInTheDocument();
+    expect((useCaseCounter as HTMLElement).querySelector(".lucide-file-text")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(
       features.length,
     );

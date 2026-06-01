@@ -32,18 +32,19 @@ describe("FeatureForm", () => {
     renderWithProviders(<FeatureForm open feature={feature} onSubmit={onSubmit} onClose={vi.fn()} />);
 
     const sidebar = screen.getByTestId("form-sidebar");
+    const sidebarSelects = within(sidebar).getAllByRole("combobox");
     expect(screen.getByTestId("parent-context-field")).toHaveTextContent("PROJ-30");
     expect(screen.getByDisplayValue(feature.title)).toBeInTheDocument();
     expect(screen.getByTestId("feature-form-content-view")).toHaveValue(feature.content);
     expect(screen.queryByTestId("feature-form-description-view")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Sortierung")).not.toBeInTheDocument();
-    expect(within(sidebar).getByRole("button", { name: "Aktiv" })).toHaveAttribute("data-active", "true");
+    expect(sidebarSelects[0]).toHaveValue("active");
     expect(within(sidebar).getByRole("combobox", { name: "Verantwortlich" })).toHaveValue("1");
     expect(within(sidebar).getAllByText("Projekt Alpha").length).toBeGreaterThan(0);
     expect(within(sidebar).queryByText(/Tags/i)).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue(feature.title), { target: { value: "Feature Beta" } });
-    fireEvent.click(within(sidebar).getByRole("button", { name: "Erledigt" }));
+    fireEvent.change(sidebarSelects[0], { target: { value: "done" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 

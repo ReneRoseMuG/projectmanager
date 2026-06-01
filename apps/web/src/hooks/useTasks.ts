@@ -74,22 +74,22 @@ export function useGlobalTasks(enabled = true) {
 
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TaskUpdate }) => updateTaskRequest(id, input),
-    onSuccess: async (updated) => {
-      await invalidateTaskScope(queryClient, updated.id);
+    onSuccess: (updated) => {
+      void invalidateTaskScope(queryClient, updated.id);
     }
   });
 
   const updateTaskTagsMutation = useMutation({
     mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTaskTags(id, tagIds),
-    onSuccess: async (_tags, { id }) => {
-      await invalidateTaskScope(queryClient, id);
+    onSuccess: (_tags, { id }) => {
+      void invalidateTaskScope(queryClient, id);
     }
   });
 
   const removeTaskMutation = useMutation({
     mutationFn: deleteTaskRequest,
-    onSuccess: async (_result, id) => {
-      await invalidateTaskScope(queryClient, id);
+    onSuccess: (_result, id) => {
+      void invalidateTaskScope(queryClient, id);
     }
   });
 
@@ -127,8 +127,8 @@ export function useTasks(owner?: TaskOwner | null) {
       }
       return createOwnerTaskRequest(validOwner, input);
     },
-    onSuccess: async (created) => {
-      await invalidateOwner(queryClient, validOwner, created?.id);
+    onSuccess: (created) => {
+      void invalidateOwner(queryClient, validOwner, created?.id);
     }
   });
 
@@ -139,8 +139,8 @@ export function useTasks(owner?: TaskOwner | null) {
       }
       return linkOwnerTaskRequest(validOwner, taskId);
     },
-    onSuccess: async (linked) => {
-      await invalidateOwner(queryClient, validOwner, linked?.id);
+    onSuccess: (linked) => {
+      void invalidateOwner(queryClient, validOwner, linked?.id);
     }
   });
 
@@ -151,22 +151,22 @@ export function useTasks(owner?: TaskOwner | null) {
       }
       await unlinkOwnerTaskRequest(validOwner, taskId);
     },
-    onSuccess: async (_result, taskId) => {
-      await invalidateOwner(queryClient, validOwner, taskId);
+    onSuccess: (_result, taskId) => {
+      void invalidateOwner(queryClient, validOwner, taskId);
     }
   });
 
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TaskUpdate }) => updateTaskRequest(id, input),
-    onSuccess: async (updated) => {
-      await invalidateOwner(queryClient, validOwner, updated.id);
+    onSuccess: (updated) => {
+      void invalidateOwner(queryClient, validOwner, updated.id);
     }
   });
 
   const updateTaskTagsMutation = useMutation({
     mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTaskTags(id, tagIds),
-    onSuccess: async (_tags, { id }) => {
-      await invalidateOwner(queryClient, validOwner, id);
+    onSuccess: (_tags, { id }) => {
+      void invalidateOwner(queryClient, validOwner, id);
     }
   });
 
@@ -197,8 +197,8 @@ export function useTasks(owner?: TaskOwner | null) {
         queryClient.setQueryData(queryKey, context.previousTasks);
       }
     },
-    onSuccess: async (updated) => {
-      await invalidateOwner(queryClient, validOwner, updated.id);
+    onSuccess: (updated) => {
+      void invalidateOwner(queryClient, validOwner, updated.id);
     }
   });
 
@@ -209,15 +209,15 @@ export function useTasks(owner?: TaskOwner | null) {
       }
       return updateOwnerTaskBoardRequest(validOwner, id, input);
     },
-    onSuccess: async (updated) => {
-      await invalidateOwner(queryClient, validOwner, updated.id);
+    onSuccess: (updated) => {
+      void invalidateOwner(queryClient, validOwner, updated.id);
     }
   });
 
   const removeTaskMutation = useMutation({
     mutationFn: deleteTaskRequest,
-    onSuccess: async (_result, id) => {
-      await invalidateOwner(queryClient, validOwner, id);
+    onSuccess: (_result, id) => {
+      void invalidateOwner(queryClient, validOwner, id);
     }
   });
 

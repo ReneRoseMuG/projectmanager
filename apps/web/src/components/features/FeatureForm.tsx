@@ -16,8 +16,11 @@ import {
   BookOpen,
   Bug,
   FileText,
+  FolderKanban,
+  ListChecks,
   ListTodo,
   Trash2,
+  Users,
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -65,6 +68,7 @@ import { ParentContextField } from "../ui/ParentContextField";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingRelationList } from "../ui/PendingRelationList";
+import { CatalogSelect } from "../ui/CatalogSelect";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
@@ -543,8 +547,8 @@ export function FeatureForm({
       >
         {activeTab === "details" ? (
           <div className="flex min-h-0 w-full flex-1">
-            <div className="min-w-0 flex-1 overflow-auto p-4 md:p-5">
-              <div className="mx-auto grid w-full max-w-5xl gap-4">
+            <div className="min-w-0 flex-1 overflow-auto p-2.5">
+              <div className="grid w-full gap-4">
                 {showParentContexts ? <ParentContextField parents={feature?.parentContexts} /> : null}
                 <Section>
                   <FormField label="Titel" required className="min-w-0">
@@ -568,24 +572,20 @@ export function FeatureForm({
               </div>
             </div>
             <FormSidebar storageKey="feature-form-sidebar">
-              <div className="grid gap-4">
-                <FormField label="Status">
-                  <StatusToggle
-                    kind="featureStatus"
-                    value={status}
-                    onChange={setStatus}
-                  />
-                </FormField>
-                <UserSelectField
-                  label="Verantwortlich"
-                  value={responsibleUserId}
-                  selectedUser={feature?.responsibleUser ?? null}
-                  onChange={setResponsibleUserId}
-                />
-              </div>
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="featureStatus" value={status} onChange={setStatus} />
+              <UserSelectField
+                label="Verantwortlich"
+                icon={<Users size={14} />}
+                variant="panel"
+                value={responsibleUserId}
+                selectedUser={feature?.responsibleUser ?? null}
+                onChange={setResponsibleUserId}
+              />
               <SelectParent
                 type="project"
                 label="Projekt"
+                icon={<FolderKanban size={14} />}
+                variant="panel"
                 placeholder="Projekt wählen ..."
                 items={projectParentItems}
                 value={selectedParentItem}
