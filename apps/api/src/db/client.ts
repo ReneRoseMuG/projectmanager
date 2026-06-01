@@ -1,5 +1,7 @@
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { config } from "../config.js";
 
 export const mysqlPool = mysql.createPool({
@@ -8,7 +10,10 @@ export const mysqlPool = mysql.createPool({
   database: config.db.name,
   user: config.db.user,
   password: config.db.password,
-  ssl: config.db.ssl ? { rejectUnauthorized: true } : undefined,
+  ssl: config.db.ssl ? {
+    rejectUnauthorized: true,
+    ca: readFileSync(join(process.cwd(), "../../docs/Zertifikate/ca.pem"), "utf8"),
+  } : undefined,
   waitForConnections: true,
   connectionLimit: 10,
   enableKeepAlive: true,
