@@ -2,11 +2,14 @@ import type { DraftNote } from "@taskmanager/shared-types";
 import { Plus, StickyNote, Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
+import { uploadContentImage } from "../../api/content-images";
+import { htmlToNoteContent, noteContentToPreviewText } from "../notes/noteContent";
 import { Button } from "./Button";
 import { EmptyState } from "./EmptyState";
 import { FormField } from "./FormField";
 import { Input } from "./Input";
 import { Modal } from "./Modal";
+import { RichTextInlineField } from "./rich-text-inline-field";
 
 interface PendingNoteListProps {
   notes: DraftNote[];
@@ -17,11 +20,13 @@ interface PendingNoteListProps {
 export function PendingNoteList({ notes, onAdd, onRemove }: PendingNoteListProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
   const trimmedTitle = title.trim();
 
   const closeDialog = () => {
     setDialogOpen(false);
     setTitle("");
+    setContent("");
   };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -30,7 +35,7 @@ export function PendingNoteList({ notes, onAdd, onRemove }: PendingNoteListProps
     if (!trimmedTitle) {
       return;
     }
-    onAdd({ title: trimmedTitle, contentJson: {} });
+    onAdd({ title: trimmedTitle, contentJson: htmlToNoteContent(content) });
     closeDialog();
   };
 
@@ -49,7 +54,10 @@ export function PendingNoteList({ notes, onAdd, onRemove }: PendingNoteListProps
           <div className="grid gap-2">
             {notes.map((note, index) => (
               <div key={`${note.title}-${index}`} className="flex items-center justify-between gap-3 rounded-md border border-line bg-white p-3 shadow-sm">
-                <span className="min-w-0 truncate text-sm font-semibold text-ink">{note.title}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-ink">{note.title}</span>
+                  {noteContentToPreviewText(note.contentJson) ? <span className="mt-1 line-clamp-1 block text-xs text-steel-500">{noteContentToPreviewText(note.contentJson)}</span> : null}
+                </span>
                 <Button aria-label={`${note.title} entfernen`} title="Entfernen" variant="ghost" icon={<Trash2 size={16} />} onClick={() => onRemove(index)} />
               </div>
             ))}
@@ -63,6 +71,16 @@ export function PendingNoteList({ notes, onAdd, onRemove }: PendingNoteListProps
         <form className="grid gap-4" onSubmit={submit}>
           <FormField label="Titel" required>
             <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus required />
+          </FormField>
+          <FormField label="Inhalt">
+            <RichTextInlineField
+              value={content}
+              placeholder="Notizinhalt"
+              minRows={8}
+              testIdPrefix="pending-note-content"
+              onChange={setContent}
+              onImageUpload={uploadContentImage}
+            />
           </FormField>
           <footer className="flex justify-end gap-2">
             <Button onClick={closeDialog}>Abbrechen</Button>

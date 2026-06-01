@@ -1,8 +1,10 @@
-import type { DraftComment, DraftNote, Milestone, MilestoneInput } from "@taskmanager/shared-types";
+import type { DraftComment, DraftNote, DraftTask, DraftTicket, Milestone, MilestoneInput } from "@taskmanager/shared-types";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { uploadMilestoneAttachment } from "../api/attachments";
 import { createEntityComment } from "../api/comments";
 import { createMilestoneNote } from "../api/notes";
+import { createOwnerTask, linkOwnerTask } from "../api/tasks";
+import { createOwnerTicket, linkOwnerTicket } from "../api/tickets";
 import {
   MilestoneForm,
   parseMilestoneFormTab,
@@ -112,12 +114,32 @@ export function MilestoneDetailPage() {
   const postCreateMilestone = async (
     milestoneId: number,
     pending: {
+      tasks: DraftTask[];
+      tickets: DraftTicket[];
       comments: DraftComment[];
       notes: DraftNote[];
       files: DraftFile[];
     },
   ) => {
     try {
+      const taskOwner = { type: "milestone" as const, id: milestoneId };
+      for (const task of pending.tasks) {
+        if (task.kind === "existing") {
+          await linkOwnerTask(taskOwner, task.task.id);
+        } else {
+          await createOwnerTask(taskOwner, task.draft);
+        }
+      }
+
+      const ticketOwner = { type: "milestone" as const, id: milestoneId };
+      for (const ticket of pending.tickets) {
+        if (ticket.kind === "existing") {
+          await linkOwnerTicket(ticketOwner, ticket.ticket.id);
+        } else {
+          await createOwnerTicket(ticketOwner, ticket.draft);
+        }
+      }
+
       for (const comment of pending.comments) {
         await createEntityComment("milestone", milestoneId, { body: comment.text });
       }

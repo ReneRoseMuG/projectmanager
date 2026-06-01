@@ -275,7 +275,7 @@ describe("ProjectForm", () => {
     addPendingComment("Projekt-Kommentar");
     clickTab("Notizen");
     fireEvent.click(screen.getByRole("button", { name: "Neue Notiz" }));
-    fireEvent.change(screen.getAllByRole("textbox").at(-1) as HTMLElement, { target: { value: "Projekt-Notiz" } });
+    fireEvent.change(screen.getByLabelText(/Titel/), { target: { value: "Projekt-Notiz" } });
     fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
     clickTab("Dateien");
     fireEvent.change(getFileInput(container), { target: { files: [file] } });
@@ -289,7 +289,7 @@ describe("ProjectForm", () => {
         tasks: [{ kind: "new", draft: { title: "Projekt-Aufgabe Pending", status: "active", priority: "medium" } }],
         tickets: [{ kind: "new", draft: { title: "Projekt-Ticket Pending", type: "bug", status: "open", priority: "medium" } }],
         comments: [{ text: "Projekt-Kommentar" }],
-        notes: [{ title: "Projekt-Notiz", contentJson: {} }],
+        notes: [{ title: "Projekt-Notiz", contentJson: { html: "" } }],
         files: [{ file, previewUrl: undefined }]
       })
     );

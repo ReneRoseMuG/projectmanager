@@ -84,6 +84,8 @@ interface RichTextInlineFieldProps {
   liveUpdate?: boolean;
   /** Additional classes for the outer container. */
   className?: string;
+  /** Stretch the editor to fill a flex/grid parent. */
+  fill?: boolean;
   /** Unique prefix for data-testid attributes at each usage site. */
   testIdPrefix?: string;
   /** Optional image upload handler for clipboard images and toolbar file picker. */
@@ -100,6 +102,7 @@ interface RichTextInlineEditorProps {
   clickPosition: ClickPosition | null;
   testIdPrefix?: string;
   onImageUpload?: (file: File) => Promise<string>;
+  fill: boolean;
   commitOnBlur: boolean;
   liveUpdate: boolean;
   onLiveChange: (html: string) => void;
@@ -131,7 +134,7 @@ function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", testIdPrefix, onImageUpload }: RichTextInlineFieldProps) {
+export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload }: RichTextInlineFieldProps) {
   const [originalValue, setOriginalValue] = useState("");
   const hasContent = valueFormat === "markdown" ? Boolean(value?.trim()) : hasVisibleHtmlContent(value);
   const minRowsStyle = useMemo(() => (minRows ? ({ "--rich-text-field-min-rows": minRows } as React.CSSProperties) : undefined), [minRows]);
@@ -149,7 +152,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
 
   if (!readOnly) {
     return (
-      <div className={cn("relative group", className)} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}>
+      <div className={cn("relative group", fill && "flex min-h-0 flex-1 flex-col", className)} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}>
         <RichTextInlineEditor
           value={value ?? ""}
           valueFormat={valueFormat}
@@ -160,6 +163,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
           clickPosition={null}
           testIdPrefix={testIdPrefix}
           onImageUpload={onImageUpload}
+          fill={fill}
           commitOnBlur={commitOnBlur}
           liveUpdate={liveUpdate}
           onLiveChange={onChange}
@@ -212,14 +216,14 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
   );
 }
 
-function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
+function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
   const cancellingRef = useRef(false);
   const [imageUploadCount, setImageUploadCount] = useState(0);
   const [hasFocus, setHasFocus] = useState(false);
   const { showToast } = useToast();
   const editorAttributes = useMemo(() => {
     const attributes: Record<string, string> = {
-      class: cn("rich-text-surface max-w-none", Boolean(minRows) && "rich-text-inline-min-rows")
+      class: cn("rich-text-surface max-w-none", Boolean(minRows) && "rich-text-inline-min-rows", fill && "min-h-full flex-1")
     };
 
     if (minRows) {
@@ -334,7 +338,7 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
   });
 
   useEffect(() => {
-    if (!editor || editor.isFocused || valueFormat === "markdown") {
+    if (!editor || editor.isFocused) {
       return;
     }
 
@@ -398,9 +402,9 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
   }
 
   return (
-    <div className={cn("overflow-clip rounded-md border bg-white shadow-sm transition-colors", hasFocus ? "border-steel-600 ring-2 ring-steel-700/10" : "border-line")} data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
+    <div className={cn(fill ? "flex min-h-0 flex-1 flex-col overflow-visible" : "overflow-clip", "rounded-md border bg-white shadow-sm transition-colors", hasFocus ? "border-steel-600 ring-2 ring-steel-700/10" : "border-line")} data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
       {toolbar !== "none" ? <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} /> : null}
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} className={fill ? "flex min-h-0 flex-1 flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1" : undefined} />
     </div>
   );
 }

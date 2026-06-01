@@ -17,6 +17,12 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PendingNoteList } from "../../../../../apps/web/src/components/ui/PendingNoteList";
 
+vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
+  RichTextInlineField({ value, onChange, placeholder, testIdPrefix }: { value: string | null | undefined; onChange: (value: string) => void; placeholder?: string; testIdPrefix?: string }) {
+    return <textarea aria-label={placeholder ?? "Rich Text"} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined} value={value ?? ""} onChange={(event) => onChange(event.currentTarget.value)} />;
+  }
+}));
+
 afterEach(() => {
   cleanup();
 });
@@ -45,18 +51,20 @@ describe("PendingNoteList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Neue Notiz" }));
 
     expect(screen.getByRole("heading", { name: "Neue Notiz" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Notizinhalt" })).toBeInTheDocument();
   });
 
-  it("ruft onAdd nach Titel-Eingabe mit der korrekten DraftNote auf", () => {
+  it("ruft onAdd nach Titel- und Inhalts-Eingabe mit der korrekten DraftNote auf", () => {
     const onAdd = vi.fn();
     render(<PendingNoteList notes={[]} onAdd={onAdd} onRemove={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Neue Notiz" }));
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: " Neue Notiz " } });
+    fireEvent.change(screen.getByLabelText(/Titel/), { target: { value: " Neue Notiz " } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Notizinhalt" }), { target: { value: "<p>Notizinhalt</p>" } });
     fireEvent.click(within(document.body).getByRole("button", { name: "Hinzufügen" }));
 
-    expect(onAdd).toHaveBeenCalledWith({ title: "Neue Notiz", contentJson: {} });
+    expect(onAdd).toHaveBeenCalledWith({ title: "Neue Notiz", contentJson: { html: "<p>Notizinhalt</p>" } });
   });
 
   it("deaktiviert Bestätigen bei leerem Titel", () => {

@@ -31,8 +31,17 @@ export async function getTasks(): Promise<Task[]> {
   return api.get("tasks").json<Task[]>();
 }
 
-export async function getTaskLinkCandidates(owner: TaskOwner): Promise<Task[]> {
-  return api.get("tasks/link-candidates", { searchParams: { ownerType: owner.type, ownerId: owner.id } }).json<Task[]>();
+export async function getTaskLinkCandidates(owner: TaskOwner | null, contextOwner?: TaskOwner | null): Promise<Task[]> {
+  const searchParams: Record<string, string | number> = {};
+  if (owner) {
+    searchParams.ownerType = owner.type;
+    searchParams.ownerId = owner.id;
+  }
+  if (contextOwner) {
+    searchParams.contextOwnerType = contextOwner.type;
+    searchParams.contextOwnerId = contextOwner.id;
+  }
+  return api.get("tasks/link-candidates", { searchParams }).json<Task[]>();
 }
 
 export async function createOwnerTask(owner: TaskOwner, input: TaskInput): Promise<TaskBoardItem> {

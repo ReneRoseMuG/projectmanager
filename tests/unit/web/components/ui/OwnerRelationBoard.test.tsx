@@ -227,17 +227,18 @@ describe("PendingCommentList", () => {
 });
 
 describe("PendingNoteList", () => {
-  it("merkt Notizen mit leerem Content-Objekt vor und entfernt sie", () => {
+  it("merkt Notizen mit HTML-Content-Objekt vor und entfernt sie", () => {
     const onAdd = vi.fn();
     const onRemove = vi.fn();
     render(<PendingNoteList notes={[{ title: "Konzept", contentJson: {} }]} onAdd={onAdd} onRemove={onRemove} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Neue Notiz" }));
-    fireEvent.change(screen.getAllByRole("textbox").at(-1) as HTMLElement, { target: { value: "  Neue Notiz  " } });
+    fireEvent.change(screen.getByLabelText(/Titel/), { target: { value: "  Neue Notiz  " } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Notizinhalt" }), { target: { value: "<p>Inhalt</p>" } });
     fireEvent.click(screen.getByRole("button", { name: /Hinzuf/i }));
     fireEvent.click(screen.getByRole("button", { name: "Konzept entfernen" }));
 
-    expect(onAdd).toHaveBeenCalledWith({ title: "Neue Notiz", contentJson: {} });
+    expect(onAdd).toHaveBeenCalledWith({ title: "Neue Notiz", contentJson: { html: "<p>Inhalt</p>" } });
     expect(onRemove).toHaveBeenCalledWith(0);
   });
 

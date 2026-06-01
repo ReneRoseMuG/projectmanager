@@ -240,6 +240,22 @@ describe("Tickets API", () => {
     await supertest(app.server).post(`/api/milestones/${milestone.id}/tickets/${closedTicket.id}`).expect(400);
   });
 
+  it("GET /api/tickets/link-candidates unterstützt Create-Kontext ohne Owner-Ausschluss", async () => {
+    const project = await createProject(app, { name: "Ticket-Kontext-Projekt" });
+    const foreignProject = await createProject(app, { name: "Fremdes Ticket-Projekt" });
+    const milestone = await createMilestone(app, project.id, { name: "Ticket-Kontext-Meilenstein" });
+    const projectTicket = await createTicket(app, { type: "project", id: project.id }, { title: "Bereits am Projekt" });
+    const closedProjectTicket = await createTicket(app, { type: "project", id: project.id }, { title: "Geschlossenes Ticket", status: "resolved" });
+    const foreignTicket = await createTicket(app, { type: "project", id: foreignProject.id }, { title: "Fremdes Ticket" });
+
+    const res = await supertest(app.server).get(`/api/tickets/link-candidates?contextOwnerType=milestone&contextOwnerId=${milestone.id}`).expect(200);
+    const ids = (res.body as TestTicket[]).map((ticket) => ticket.id);
+
+    expect(ids).toContain(projectTicket.id);
+    expect(ids).not.toContain(closedProjectTicket.id);
+    expect(ids).not.toContain(foreignTicket.id);
+  });
+
   it("GET /api/projects/:id/tickets liefert direkte und Meilenstein-Tickets kumulativ", async () => {
     const project = await createProject(app, { name: "Ticket-Projekt" });
     const milestone = await createMilestone(app, project.id, { name: "Ticket-Meilenstein" });

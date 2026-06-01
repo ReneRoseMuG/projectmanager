@@ -108,7 +108,7 @@ describe("Link-Dialog-Kandidaten", () => {
     renderWithQuery(<TaskLinkDialog open owner={{ type: "project", id: 7 }} currentTasks={[]} onLink={onLink} onClose={vi.fn()} />);
 
     expect(await screen.findByText(task.title)).toBeInTheDocument();
-    expect(apiMocks.getTaskLinkCandidates).toHaveBeenCalledWith({ type: "project", id: 7 });
+    expect(apiMocks.getTaskLinkCandidates).toHaveBeenCalledWith({ type: "project", id: 7 }, undefined);
 
     fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
 
@@ -122,7 +122,7 @@ describe("Link-Dialog-Kandidaten", () => {
     renderWithQuery(<TicketLinkDialog open owner={{ type: "feature", id: 8 }} currentTickets={[]} onLink={onLink} onClose={vi.fn()} />);
 
     expect(await screen.findByText(ticket.title)).toBeInTheDocument();
-    expect(apiMocks.getTicketLinkCandidates).toHaveBeenCalledWith({ type: "feature", id: 8 });
+    expect(apiMocks.getTicketLinkCandidates).toHaveBeenCalledWith({ type: "feature", id: 8 }, undefined);
 
     fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
 

@@ -295,6 +295,22 @@ describe("Tasks API", () => {
     await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks/${closedTask.id}`).expect(400);
   });
 
+  it("GET /api/tasks/link-candidates unterstützt Create-Kontext ohne Owner-Ausschluss", async () => {
+    const project = await createProject(app, { name: "Kontext-Projekt" });
+    const foreignProject = await createProject(app, { name: "Fremdes Projekt" });
+    const milestone = await createMilestone(app, project.id, { name: "Kontext-Meilenstein" });
+    const projectTask = await createTask(app, project.id, { title: "Bereits am Projekt" });
+    const closedProjectTask = await createTask(app, project.id, { title: "Geschlossene Aufgabe", status: "done" });
+    const foreignTask = await createTask(app, foreignProject.id, { title: "Fremde Aufgabe" });
+
+    const res = await supertest(app.server).get(`/api/tasks/link-candidates?contextOwnerType=milestone&contextOwnerId=${milestone.id}`).expect(200);
+    const ids = res.body.map((item: { id: number }) => item.id);
+
+    expect(ids).toContain(projectTask.id);
+    expect(ids).not.toContain(closedProjectTask.id);
+    expect(ids).not.toContain(foreignTask.id);
+  });
+
   it("DELETE /api/projects/:id/tasks/:taskId entfernt nur die Zuordnung", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);

@@ -77,11 +77,12 @@ const taskLinkBodySchema = {
 
 const taskLinkCandidatesQuerySchema = {
   type: "object",
-  required: ["ownerType", "ownerId"],
   additionalProperties: false,
   properties: {
     ownerType: { type: "string", enum: ["project", "milestone", "feature", "useCase", "wikiPage"] },
-    ownerId: { type: "integer", minimum: 1 }
+    ownerId: { type: "integer", minimum: 1 },
+    contextOwnerType: { type: "string", enum: ["project", "milestone", "feature", "useCase", "wikiPage"] },
+    contextOwnerId: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -161,10 +162,14 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  app.get<{ Querystring: { ownerType: TaskOwner["type"]; ownerId: number } }>(
+  app.get<{ Querystring: { ownerType?: TaskOwner["type"]; ownerId?: number; contextOwnerType?: TaskOwner["type"]; contextOwnerId?: number } }>(
     "/tasks/link-candidates",
     { schema: { querystring: taskLinkCandidatesQuerySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => listTaskLinkCandidates(app.db, { type: request.query.ownerType, id: request.query.ownerId })
+    async (request) => {
+      const owner = request.query.ownerType && request.query.ownerId ? { type: request.query.ownerType, id: request.query.ownerId } : null;
+      const contextOwner = request.query.contextOwnerType && request.query.contextOwnerId ? { type: request.query.contextOwnerType, id: request.query.contextOwnerId } : null;
+      return listTaskLinkCandidates(app.db, owner, contextOwner);
+    }
   );
 
   app.get<{ Params: { id: number } }>(

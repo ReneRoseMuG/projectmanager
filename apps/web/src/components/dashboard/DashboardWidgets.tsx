@@ -29,6 +29,7 @@ import { errorMessage } from "../../hooks/errors";
 import { catalogColor, catalogLabel } from "../../utils/catalogs";
 import { withStandaloneView } from "../../utils/standalone";
 import { formatHumanDate } from "../../utils/date";
+import { richTextToPlainText } from "../../utils/richText";
 import { EventForm } from "../calendar/EventForm";
 import { CalendarSkeleton } from "../calendar/CalendarSkeleton";
 import { useOptionalCalendarDashboard } from "../calendar/CalendarDashboardProvider";
@@ -416,7 +417,7 @@ function CommentRows({ comments }: { comments: RecentComment[] | undefined }) {
             <span className="truncate text-sm font-semibold text-ink">{comment.entityLabel}</span>
             <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(comment.updatedAt)}</span>
           </div>
-          <p className="line-clamp-2 text-xs text-steel-600">{comment.body}</p>
+          <p className="line-clamp-2 text-xs text-steel-600">{richTextToPlainText(comment.body)}</p>
           <p className="text-xs text-steel-400">{comment.authorName}</p>
         </Link>
       ))}

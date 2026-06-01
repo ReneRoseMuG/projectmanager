@@ -5,7 +5,7 @@
  *
  * Create-Modus:
  *  1. Alle Relation-Tabs sichtbar (Aufgaben, Tickets, Kommentare, ...).
- *  2. PendingRelationList in Relation-Tabs sichtbar (kein Board, kein API-Aufruf).
+ *  2. PendingRelationList für Subtasks und List-/Board-Ansicht für Tickets im Create-Modus sichtbar.
  *  3. PendingCommentList im Kommentare-Tab sichtbar.
  *  4. PendingFileList im Dateien-Tab sichtbar (sofern Tab vorhanden).
  *  5. Verknüpfen → kein API-Aufruf vor Submit.
@@ -38,11 +38,11 @@ describe("TaskForm", () => {
     expect(document.querySelector(".lucide-list-todo")).toBeInTheDocument();
 
     clickTab("Tickets");
-    expect(screen.getByText("Keine Tickets vorgemerkt")).toBeInTheDocument();
+    expect(screen.getByText("Keine Tickets")).toBeInTheDocument();
     expect(document.querySelector(".lucide-bug")).toBeInTheDocument();
     expect(document.querySelector(".lucide-clipboard-list")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Neues Ticket" }));
     const ticketDraftIcon = document.querySelector(".lucide-bug[width='20']");
     expect(ticketDraftIcon).toBeInTheDocument();
   });
@@ -129,12 +129,13 @@ describe("TaskForm", () => {
     expect(screen.queryByRole("button", { name: "Verknüpfen" })).not.toBeInTheDocument();
   });
 
-  it("zeigt im Tickets-Tab PendingRelationList statt OwnerTicketBoard", () => {
+  it("zeigt im Tickets-Tab die lokale List-/Board-Ansicht statt OwnerTicketBoard", () => {
     renderWithProviders(<TaskForm open onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     clickTab("Tickets");
 
-    expect(screen.getByText("Keine Tickets vorgemerkt")).toBeInTheDocument();
+    expect(screen.getByText("Keine Tickets")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Neues Ticket" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Verknüpfen" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("owner-ticket-board")).not.toBeInTheDocument();
   });
@@ -217,7 +218,7 @@ describe("TaskForm", () => {
     addPendingComment("Task-Kommentar");
     clickTab("Notizen");
     fireEvent.click(screen.getByRole("button", { name: "Neue Notiz" }));
-    fireEvent.change(screen.getAllByRole("textbox").at(-1) as HTMLElement, { target: { value: "Task-Notiz" } });
+    fireEvent.change(screen.getByLabelText(/Titel/), { target: { value: "Task-Notiz" } });
     fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
     clickTab("Dateien");
     fireEvent.change(getFileInput(container), { target: { files: [file] } });
@@ -231,7 +232,7 @@ describe("TaskForm", () => {
           pendingSubtasks: [{ title: "Subtask im Create", status: "active", priority: "medium" }],
           pendingTickets: [{ kind: "existing", ticket }],
           pendingComments: [{ text: "Task-Kommentar" }],
-          pendingNotes: [{ title: "Task-Notiz", contentJson: {} }],
+          pendingNotes: [{ title: "Task-Notiz", contentJson: { html: "" } }],
           pendingFiles: [{ file, previewUrl: undefined }]
         })
       )

@@ -39,8 +39,17 @@ export async function getTickets(): Promise<Ticket[]> {
   return api.get("tickets").json<Ticket[]>();
 }
 
-export async function getTicketLinkCandidates(owner: TicketOwner): Promise<Ticket[]> {
-  return api.get("tickets/link-candidates", { searchParams: { ownerType: owner.type, ownerId: owner.id } }).json<Ticket[]>();
+export async function getTicketLinkCandidates(owner: TicketOwner | null, contextOwner?: TicketOwner | null): Promise<Ticket[]> {
+  const searchParams: Record<string, string | number> = {};
+  if (owner) {
+    searchParams.ownerType = owner.type;
+    searchParams.ownerId = owner.id;
+  }
+  if (contextOwner) {
+    searchParams.contextOwnerType = contextOwner.type;
+    searchParams.contextOwnerId = contextOwner.id;
+  }
+  return api.get("tickets/link-candidates", { searchParams }).json<Ticket[]>();
 }
 
 export async function getOwnerTickets(owner: TicketOwner): Promise<Ticket[]> {

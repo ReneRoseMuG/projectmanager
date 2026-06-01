@@ -192,6 +192,7 @@ export function WikiPage() {
               {wiki.page ? (
                 <WikiPageForm
                   inline
+                  inlineChrome={standalone ? "standalone" : "embedded"}
                   open={true}
                   page={wiki.page}
                   parent={inlineParent}

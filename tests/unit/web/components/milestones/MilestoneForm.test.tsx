@@ -14,6 +14,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import type { Milestone, Project } from "@taskmanager/shared-types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -251,11 +252,32 @@ const milestone: Milestone = {
 };
 
 function renderWithProviders(ui: ReactElement) {
-  return render(
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false }
+    }
+  });
+  const result = render(
     <MemoryRouter>
-      <ToastProvider>{ui}</ToastProvider>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>{ui}</ToastProvider>
+      </QueryClientProvider>
     </MemoryRouter>
   );
+
+  return {
+    ...result,
+    rerender(nextUi: ReactElement) {
+      result.rerender(
+        <MemoryRouter>
+          <QueryClientProvider client={queryClient}>
+            <ToastProvider>{nextUi}</ToastProvider>
+          </QueryClientProvider>
+        </MemoryRouter>
+      );
+    }
+  };
 }
 
 afterEach(() => {
@@ -278,7 +300,7 @@ describe("MilestoneForm", () => {
     expect(linkButton).not.toHaveClass("h-9", "w-9", "px-0");
   });
 
-  it("zeigt Create-Empty-States mit den kanonischen Domain-Icons", () => {
+  it("zeigt Create-Relationen mit den kanonischen Domain-Icons", () => {
     const { container } = renderWithProviders(<MilestoneForm open projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Features/ }));
@@ -286,11 +308,15 @@ describe("MilestoneForm", () => {
     expect(container.querySelector(".lucide-book-open")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Aufgaben/ }));
-    expect(screen.getByText("Aufgaben sind nach dem Speichern verfügbar.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Neue Aufgabe" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verknüpfen" })).toBeInTheDocument();
+    expect(screen.queryByTestId("owner-task-board")).not.toBeInTheDocument();
     expect(container.querySelector(".lucide-list-todo")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Tickets/ }));
-    expect(screen.getByText("Tickets sind nach dem Speichern verfügbar.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Neues Ticket" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verknüpfen" })).toBeInTheDocument();
+    expect(screen.queryByTestId("owner-ticket-board")).not.toBeInTheDocument();
     expect(container.querySelector(".lucide-bug")).toBeInTheDocument();
   });
 
@@ -366,13 +392,7 @@ describe("MilestoneForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Aufgaben/ }));
     expect(screen.getByTestId("owner-task-board")).toBeInTheDocument();
 
-    rerender(
-      <MemoryRouter>
-        <ToastProvider>
-          <MilestoneForm open milestone={{ ...milestone, name: "Meilenstein Refetch" }} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />
-        </ToastProvider>
-      </MemoryRouter>,
-    );
+    rerender(<MilestoneForm open milestone={{ ...milestone, name: "Meilenstein Refetch" }} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
     expect(screen.getByTestId("owner-task-board")).toBeInTheDocument();
   });

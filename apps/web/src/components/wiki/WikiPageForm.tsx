@@ -39,6 +39,7 @@ interface WikiPageFormProps {
   onClose: () => void;
   onOpenInTab?: () => void;
   inline?: boolean;
+  inlineChrome?: "embedded" | "standalone";
   onDelete?: (page: WikiPage) => void;
   onDirtyChange?: (dirty: boolean) => void;
 }
@@ -57,7 +58,7 @@ const tabs: Array<Tab<WikiPageFormTab>> = [
   { value: "journal", label: "Journal" }
 ];
 
-export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onPostCreate, onClose, onOpenInTab, inline = false, onDelete, onDirtyChange }: WikiPageFormProps) {
+export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onPostCreate, onClose, onOpenInTab, inline = false, inlineChrome = "standalone", onDelete, onDirtyChange }: WikiPageFormProps) {
   const { confirm } = useConfirm();
   const { showToast } = useToast();
   const pageId = page?.id ?? null;
@@ -178,9 +179,12 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
     return null;
   }
 
+  const showInlineHeader = inline && inlineChrome === "standalone";
+  const embeddedActionPage = inline && inlineChrome === "embedded" ? page : null;
+
   const form = (
       <form className={inline ? "flex h-full min-h-0 flex-col bg-shell" : "flex max-h-[calc(100vh-64px)] flex-col bg-shell"} onSubmit={submit}>
-        {inline ? (
+        {showInlineHeader ? (
           <PageHero
             variant="detail"
             breadcrumb={["Wiki", parentPageTitle ?? "Root"]}
@@ -196,7 +200,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
               </>
             }
           />
-        ) : (
+        ) : !inline ? (
         <header className="border-b border-steel-700 bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
           <div className="flex items-start justify-between gap-4">
             <div className="grid gap-2">
@@ -222,12 +226,12 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
             </div>
           </div>
         </header>
-        )}
+        ) : null}
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
 
-        <div className="grid flex-1 gap-4 overflow-auto p-4 md:p-5">
+        <div className="flex-1 overflow-auto">
           {activeTab === "details" ? (
-            <>
+            <div className="grid min-h-full grid-rows-[auto_auto_minmax(0,1fr)] gap-4 p-4 md:p-5">
               <Section>
                 <div className="grid gap-4 md:grid-cols-2">
                   <FormField label="Titel">
@@ -274,23 +278,25 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                 />
               </Section>
 
-              <Section>
+              <Section fill className="min-h-0">
                 <RichTextInlineField
                   value={content}
                   placeholder="Wiki-Inhalt"
                   testIdPrefix="wiki-page-form-content"
                   onImageUpload={uploadContentImage}
                   className="min-h-[400px]"
+                  fill
                   onChange={(value) => {
                     setContent(value);
                     setDirty(true);
                   }}
                 />
               </Section>
-            </>
+            </div>
           ) : null}
 
           {activeTab === "comments" ? (
+            <div className="p-4 md:p-5">
             <Section title="Kommentare">
               {page ? (
                 <>
@@ -315,9 +321,11 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                 />
               )}
             </Section>
+            </div>
           ) : null}
 
           {activeTab === "notes" && page ? (
+            <div className="flex min-h-full p-4 md:p-5">
             <Section fill>
               {notes.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{notes.error}</div> : null}
               <NoteList
@@ -343,9 +351,11 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
               />
               <NoteEditor note={editingNote} open={Boolean(editingNote)} onSave={notes.updateNote} onClose={() => setEditingNote(null)} />
             </Section>
+            </div>
           ) : null}
 
           {activeTab === "attachments" && page ? (
+            <div className="p-4 md:p-5">
             <Section title="Dateien">
               {attachments.error ? <div className="mb-3 rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{attachments.error}</div> : null}
               <div className="grid gap-4">
@@ -372,16 +382,27 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                 />
               </div>
             </Section>
+            </div>
           ) : null}
 
           {activeTab === "journal" && page ? (
+            <div className="flex min-h-full p-4 md:p-5">
             <Section title="Journal" fill>
               <JournalPanel objectType="wikiPage" objectId={page.id} />
             </Section>
+            </div>
           ) : null}
         </div>
 
-        <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-line bg-white px-5 py-4">
+        <footer className={`flex flex-wrap items-center gap-3 border-t border-line bg-white px-5 py-4 ${embeddedActionPage ? "justify-between" : "justify-end"}`}>
+          {embeddedActionPage ? (
+            <div className="flex items-center gap-2">
+              <CopyReferenceButton reference={String(embeddedActionPage.id)} />
+              {onDelete ? (
+                <Button aria-label="Seite löschen" title="Seite löschen" variant="danger" icon={<Trash2 size={16} />} className="h-8 w-8 px-0" onClick={() => onDelete(embeddedActionPage)} />
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex items-center gap-2">
             <Button onClick={() => void requestClose()}>Verwerfen</Button>
             <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>

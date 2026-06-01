@@ -12,10 +12,10 @@ import type {
   TicketStatus,
   TicketType,
 } from "@taskmanager/shared-types";
-import { Bug, Flag, ListChecks, ListTodo, Users } from "lucide-react";
+import { Bug, Flag, Link2, ListChecks, ListTodo, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DraftFile } from "../../types";
+import type { DraftFile, ViewMode } from "../../types";
 import { uploadContentImage } from "../../api/content-images";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useTickets } from "../../hooks/useTickets";
@@ -44,6 +44,8 @@ import type { TaskOwner } from "../../api/tasks";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import type { TicketOwner } from "../../api/tickets";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
+import { TicketListBoardView } from "../tickets/TicketListBoardView";
+import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { DatePicker } from "../ui/DatePicker";
@@ -70,6 +72,7 @@ import { useToast } from "../ui/ToastProvider";
 import { UserSelectField } from "../users/UserSelectField";
 import { SubtaskList } from "./SubtaskList";
 import { useHasPermission } from "../../hooks/usePermissions";
+import { draftTicketItem } from "../../utils/draftRelations";
 
 interface TaskFormProps {
   open: boolean;
@@ -164,7 +167,7 @@ export function TaskForm({
   const detail = useTaskDetail(open && taskId ? taskId : null);
   const ticketOwner =
     taskId && open ? { type: "task" as const, id: taskId } : null;
-  const ticketCandidateOwner: TicketOwner | null =
+  const ticketContextOwner: TicketOwner | null =
     ticketOwner ?? (owner && Number.isFinite(owner.id) ? owner : null);
   const tickets = useTickets(ticketOwner);
   const catalogs = useCatalogs();
@@ -193,6 +196,7 @@ export function TaskForm({
   const [subtaskDraftOpen, setSubtaskDraftOpen] = useState(false);
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
+  const [pendingTicketViewMode, setPendingTicketViewMode] = useState<ViewMode>("kanban");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const prevOpenRef = useRef(false);
 
@@ -206,6 +210,7 @@ export function TaskForm({
       setSubtaskDraftOpen(false);
       setTicketLinkOpen(false);
       setTicketDraftOpen(false);
+      setPendingTicketViewMode("kanban");
       setEditingNote(null);
       prevOpenRef.current = false;
       return;
@@ -374,6 +379,13 @@ export function TaskForm({
   const loadedTask = detail.task;
   const currentTask = detail.task ?? task;
   const showParentContexts = !owner && (currentTask?.parentContexts?.length ?? 0) > 0;
+  const pendingTicketItems = pendingTickets.map(draftTicketItem);
+
+  const removePendingTicket = (ticketId: number) => {
+    setPendingTickets((items) =>
+      items.filter((item, index) => draftTicketItem(item, index).id !== ticketId),
+    );
+  };
 
   return (
     <>
@@ -549,46 +561,26 @@ export function TaskForm({
             {ticketOwner ? (
               <OwnerTicketBoard owner={ticketOwner} />
             ) : (
-              <PendingRelationList
-                existingItems={pendingTickets.flatMap((item) =>
-                  item.kind === "existing"
-                    ? [
-                        {
-                          id: item.ticket.id,
-                          title: item.ticket.title,
-                          statusLabel: catalogLabel(
-                            catalogs.entries,
-                            "workStatus",
-                            item.ticket.status,
-                          ),
-                          statusColor: catalogColor(
-                            catalogs.entries,
-                            "workStatus",
-                            item.ticket.status,
-                          ),
-                        },
-                      ]
-                    : [],
-                )}
-                draftItems={pendingTickets.flatMap((item) =>
-                  item.kind === "new"
-                    ? [{ title: item.draft.title, badge: "Wird erstellt" }]
-                    : [],
-                )}
-                emptyIcon={<Bug size={22} />}
-                emptyTitle="Keine Tickets vorgemerkt"
-                showLinkExisting={ticketCandidateOwner !== null}
-                onLinkExisting={() => setTicketLinkOpen(true)}
-                onCreateNew={() => setTicketDraftOpen(true)}
-                onRemoveExisting={(index) =>
-                  setPendingTickets((items) =>
-                    removeDraftByKindIndex(items, "existing", index),
-                  )
-                }
-                onRemoveDraft={(index) =>
-                  setPendingTickets((items) =>
-                    removeDraftByKindIndex(items, "new", index),
-                  )
+              <TicketListBoardView
+                tickets={pendingTicketItems}
+                loading={false}
+                viewMode={pendingTicketViewMode}
+                onViewModeChange={setPendingTicketViewMode}
+                onAdd={() => setTicketDraftOpen(true)}
+                onAddStatus={() => setTicketDraftOpen(true)}
+                onOpen={() => undefined}
+                onDelete={(ticket) => removePendingTicket(ticket.id)}
+                linkAction={
+                  ticketContextOwner ? (
+                    <Button
+                      aria-label="Verknüpfen"
+                      title="Verknüpfen"
+                      variant="secondary"
+                      icon={<Link2 size={17} />}
+                      className="h-9 w-9 bg-transparent px-0"
+                      onClick={() => setTicketLinkOpen(true)}
+                    />
+                  ) : undefined
                 }
               />
             )}
@@ -790,7 +782,8 @@ export function TaskForm({
 
       <TicketLinkDialog
         open={ticketLinkOpen}
-        owner={ticketCandidateOwner}
+        owner={ticketOwner}
+        contextOwner={ticketOwner ? undefined : ticketContextOwner}
         currentTickets={pendingTickets.flatMap((item) =>
           item.kind === "existing" ? [item.ticket] : [],
         )}
@@ -803,7 +796,7 @@ export function TaskForm({
         }}
         onClose={() => setTicketLinkOpen(false)}
       />
-      <SubtaskDraftDialog
+      <TaskDraftDialog
         open={subtaskDraftOpen}
         onCreate={(subtask) =>
           setPendingSubtasks((items) => [...items, subtask])
@@ -839,14 +832,18 @@ function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(
   });
 }
 
-function SubtaskDraftDialog({
+export function TaskDraftDialog({
   open,
   onCreate,
   onClose,
+  title: dialogTitle = "Subtask vormerken",
+  breadcrumb = ["Aufgaben", "Subtask"],
 }: {
   open: boolean;
   onCreate: (subtask: DraftSubtask) => void;
   onClose: () => void;
+  title?: string;
+  breadcrumb?: string[];
 }) {
   const [title, setTitle] = useState("");
   const catalogs = useCatalogs();
@@ -876,9 +873,9 @@ function SubtaskDraftDialog({
   return (
     <FormModal
       open={open}
-      title="Subtask vormerken"
+      title={dialogTitle}
       icon={<ListTodo size={20} />}
-      breadcrumb={["Aufgaben", "Subtask"]}
+      breadcrumb={breadcrumb}
       submitLabel="Vormerken"
       onSubmit={submit}
       onClose={onClose}
@@ -911,14 +908,18 @@ function SubtaskDraftDialog({
   );
 }
 
-function TicketDraftDialog({
+export function TicketDraftDialog({
   open,
   onCreate,
   onClose,
+  title: dialogTitle = "Ticket vormerken",
+  breadcrumb = ["Aufgaben", "Ticket"],
 }: {
   open: boolean;
   onCreate: (ticket: Extract<DraftTicket, { kind: "new" }>["draft"]) => void;
   onClose: () => void;
+  title?: string;
+  breadcrumb?: string[];
 }) {
   const [title, setTitle] = useState("");
   const catalogs = useCatalogs();
@@ -968,9 +969,9 @@ function TicketDraftDialog({
   return (
     <FormModal
       open={open}
-      title="Ticket vormerken"
+      title={dialogTitle}
       icon={<Bug size={20} />}
-      breadcrumb={["Aufgaben", "Ticket"]}
+      breadcrumb={breadcrumb}
       submitLabel="Vormerken"
       onSubmit={submit}
       onClose={onClose}

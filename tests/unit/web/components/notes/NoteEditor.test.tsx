@@ -31,7 +31,7 @@
 import "@testing-library/jest-dom/vitest";
 import type { Note } from "@taskmanager/shared-types";
 import { fireEvent, screen, waitFor } from "@testing-library/dom";
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import type { FormEvent, ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NoteEditor } from "../../../../../apps/web/src/components/notes/NoteEditor";
@@ -73,6 +73,7 @@ function renderWithProviders(ui: ReactElement) {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
@@ -137,5 +138,46 @@ describe("NoteEditor", () => {
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     expect(onParentSubmit).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("verwendet nach Autosave die zurückgelieferte Version beim manuellen Speichern", async () => {
+    vi.useFakeTimers();
+    const onSave = vi
+      .fn()
+      .mockResolvedValueOnce({ ...note, version: 6, contentJson: { html: "<p>Autosave</p>" } })
+      .mockResolvedValueOnce({ ...note, version: 7, contentJson: { html: "<p>Manuell</p>" } });
+    const onClose = vi.fn();
+    renderWithProviders(<NoteEditor open note={note} onSave={onSave} onClose={onClose} />);
+
+    fireEvent.change(screen.getByTestId("note-editor-content-view"), { target: { value: "<p>Autosave</p>" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(onSave).toHaveBeenNthCalledWith(
+      1,
+      note.id,
+      expect.objectContaining({
+        contentJson: { html: "<p>Autosave</p>" },
+        expectedVersion: 5
+      })
+    );
+
+    fireEvent.change(screen.getByTestId("note-editor-content-view"), { target: { value: "<p>Manuell</p>" } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      await Promise.resolve();
+    });
+
+    expect(onSave).toHaveBeenNthCalledWith(
+      2,
+      note.id,
+      expect.objectContaining({
+        contentJson: { html: "<p>Manuell</p>" },
+        expectedVersion: 6
+      })
+    );
+    expect(onClose).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });

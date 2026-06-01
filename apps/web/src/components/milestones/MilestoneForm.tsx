@@ -1,6 +1,8 @@
 import type {
   DraftComment,
   DraftNote,
+  DraftTask,
+  DraftTicket,
   Feature,
   Milestone,
   MilestoneInput,
@@ -11,12 +13,10 @@ import type {
 } from "@taskmanager/shared-types";
 import {
   BookOpen,
-  Bug,
   Flag,
   FolderKanban,
   Link2,
   ListChecks,
-  ListTodo,
   Trash2,
   Users,
 } from "lucide-react";
@@ -49,7 +49,12 @@ import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { TagPicker } from "../tags/TagPicker";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
+import { TaskDraftDialog, TicketDraftDialog } from "../tasks/TaskForm";
+import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
+import { TaskListBoardView } from "../tasks/TaskListBoardView";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
+import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
+import { TicketListBoardView } from "../tickets/TicketListBoardView";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
 import { DatePicker } from "../ui/DatePicker";
@@ -71,6 +76,7 @@ import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 import { UserSelectField } from "../users/UserSelectField";
 import { useHasPermission } from "../../hooks/usePermissions";
+import { draftTaskItem, draftTicketItem } from "../../utils/draftRelations";
 
 interface MilestoneFormProps {
   open: boolean;
@@ -92,6 +98,8 @@ interface MilestoneFormProps {
   onPostCreate?: (
     milestoneId: number,
     pending: {
+      tasks: DraftTask[];
+      tickets: DraftTicket[];
       comments: DraftComment[];
       notes: DraftNote[];
       files: DraftFile[];
@@ -194,9 +202,17 @@ export function MilestoneForm({
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
+  const [pendingTickets, setPendingTickets] = useState<DraftTicket[]>([]);
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
   const [pendingNotes, setPendingNotes] = useState<DraftNote[]>([]);
   const [pendingFiles, setPendingFiles] = useState<DraftFile[]>([]);
+  const [taskLinkOpen, setTaskLinkOpen] = useState(false);
+  const [taskDraftOpen, setTaskDraftOpen] = useState(false);
+  const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
+  const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
+  const [pendingTaskViewMode, setPendingTaskViewMode] = useState<ViewMode>("kanban");
+  const [pendingTicketViewMode, setPendingTicketViewMode] = useState<ViewMode>("kanban");
   const prevOpenRef = useRef(false);
   const returnTo = `${location.pathname}${location.search}`;
   const projectOptions = projects.map((project) => ({
@@ -223,6 +239,12 @@ export function MilestoneForm({
   useEffect(() => {
     if (!open) {
       setFeatureLinkOpen(false);
+      setTaskLinkOpen(false);
+      setTaskDraftOpen(false);
+      setTicketLinkOpen(false);
+      setTicketDraftOpen(false);
+      setPendingTaskViewMode("kanban");
+      setPendingTicketViewMode("kanban");
       prevOpenRef.current = false;
       return;
     }
@@ -230,6 +252,12 @@ export function MilestoneForm({
     if (!prevOpenRef.current) {
       setActiveTab(initialTab ?? "details");
       setFeatureLinkOpen(false);
+      setTaskLinkOpen(false);
+      setTaskDraftOpen(false);
+      setTicketLinkOpen(false);
+      setTicketDraftOpen(false);
+      setPendingTasks([]);
+      setPendingTickets([]);
       setPendingComments([]);
       setPendingNotes([]);
       setPendingFiles([]);
@@ -290,6 +318,8 @@ export function MilestoneForm({
       );
       if (!milestone && created && onPostCreate) {
         await onPostCreate(created.id, {
+          tasks: pendingTasks,
+          tickets: pendingTickets,
           comments: pendingComments,
           notes: pendingNotes,
           files: pendingFiles,
@@ -416,7 +446,7 @@ export function MilestoneForm({
         ...tab,
         count: milestone
           ? countOpenStatusItems(tasks.tasks, catalogs.entries, "workStatus")
-          : 0,
+          : countOpenStatusItems(pendingTasks.map((item) => (item.kind === "existing" ? item.task : item.draft)), catalogs.entries, "workStatus"),
       };
     }
     if (tab.value === "tickets") {
@@ -428,7 +458,7 @@ export function MilestoneForm({
               catalogs.entries,
               "workStatus",
             )
-          : 0,
+          : countOpenStatusItems(pendingTickets.map((item) => (item.kind === "existing" ? item.ticket : item.draft)), catalogs.entries, "workStatus"),
       };
     }
     if (tab.value === "comments") {
@@ -442,6 +472,21 @@ export function MilestoneForm({
     }
     return { ...tab, count: 0 };
   });
+  const pendingTaskItems = pendingTasks.map(draftTaskItem);
+  const pendingTicketItems = pendingTickets.map(draftTicketItem);
+  const selectedProjectContext = typeof projectId === "number" ? { type: "project" as const, id: projectId } : null;
+
+  const removePendingTask = (taskId: number) => {
+    setPendingTasks((items) =>
+      items.filter((item, index) => draftTaskItem(item, index).id !== taskId),
+    );
+  };
+
+  const removePendingTicket = (ticketId: number) => {
+    setPendingTickets((items) =>
+      items.filter((item, index) => draftTicketItem(item, index).id !== ticketId),
+    );
+  };
 
   return (
     <>
@@ -607,11 +652,27 @@ export function MilestoneForm({
             {milestone ? (
               <OwnerTaskBoard owner={{ type: "milestone", id: milestone.id }} />
             ) : (
-              <EmptyState
-                icon={<ListTodo size={22} />}
-                title="Aufgaben sind nach dem Speichern verfügbar."
-                tone="teal"
-                variant="tinted"
+              <TaskListBoardView
+                tasks={pendingTaskItems}
+                loading={false}
+                viewMode={pendingTaskViewMode}
+                onViewModeChange={setPendingTaskViewMode}
+                onAdd={() => setTaskDraftOpen(true)}
+                onAddStatus={() => setTaskDraftOpen(true)}
+                onOpen={() => undefined}
+                onDelete={(task) => removePendingTask(task.id)}
+                linkAction={
+                  selectedProjectContext ? (
+                    <Button
+                      aria-label="Verknüpfen"
+                      title="Verknüpfen"
+                      variant="secondary"
+                      icon={<Link2 size={17} />}
+                      className="h-9 w-9 bg-transparent px-0"
+                      onClick={() => setTaskLinkOpen(true)}
+                    />
+                  ) : undefined
+                }
               />
             )}
           </Section>
@@ -624,11 +685,27 @@ export function MilestoneForm({
                 owner={{ type: "milestone", id: milestone.id }}
               />
             ) : (
-              <EmptyState
-                icon={<Bug size={22} />}
-                title="Tickets sind nach dem Speichern verfügbar."
-                tone="teal"
-                variant="tinted"
+              <TicketListBoardView
+                tickets={pendingTicketItems}
+                loading={false}
+                viewMode={pendingTicketViewMode}
+                onViewModeChange={setPendingTicketViewMode}
+                onAdd={() => setTicketDraftOpen(true)}
+                onAddStatus={() => setTicketDraftOpen(true)}
+                onOpen={() => undefined}
+                onDelete={(ticket) => removePendingTicket(ticket.id)}
+                linkAction={
+                  selectedProjectContext ? (
+                    <Button
+                      aria-label="Verknüpfen"
+                      title="Verknüpfen"
+                      variant="secondary"
+                      icon={<Link2 size={17} />}
+                      className="h-9 w-9 bg-transparent px-0"
+                      onClick={() => setTicketLinkOpen(true)}
+                    />
+                  ) : undefined
+                }
               />
             )}
           </Section>
@@ -727,6 +804,42 @@ export function MilestoneForm({
         features={availableFeatures}
         onLink={linkFeature}
         onClose={() => setFeatureLinkOpen(false)}
+      />
+      <TaskLinkDialog
+        open={taskLinkOpen}
+        owner={null}
+        contextOwner={selectedProjectContext}
+        currentTasks={pendingTasks.flatMap((item) => (item.kind === "existing" ? [item.task] : []))}
+        onLink={async (task) => {
+          setPendingTasks((items) => [...items, { kind: "existing", task }]);
+          setTaskLinkOpen(false);
+        }}
+        onClose={() => setTaskLinkOpen(false)}
+      />
+      <TicketLinkDialog
+        open={ticketLinkOpen}
+        owner={null}
+        contextOwner={selectedProjectContext}
+        currentTickets={pendingTickets.flatMap((item) => (item.kind === "existing" ? [item.ticket] : []))}
+        onLink={async (ticket) => {
+          setPendingTickets((items) => [...items, { kind: "existing", ticket }]);
+          setTicketLinkOpen(false);
+        }}
+        onClose={() => setTicketLinkOpen(false)}
+      />
+      <TaskDraftDialog
+        open={taskDraftOpen}
+        title="Aufgabe vormerken"
+        breadcrumb={["Meilensteine", "Aufgabe"]}
+        onCreate={(task) => setPendingTasks((items) => [...items, { kind: "new", draft: task }])}
+        onClose={() => setTaskDraftOpen(false)}
+      />
+      <TicketDraftDialog
+        open={ticketDraftOpen}
+        title="Ticket vormerken"
+        breadcrumb={["Meilensteine", "Ticket"]}
+        onCreate={(ticket) => setPendingTickets((items) => [...items, { kind: "new", draft: ticket }])}
+        onClose={() => setTicketDraftOpen(false)}
       />
     </>
   );

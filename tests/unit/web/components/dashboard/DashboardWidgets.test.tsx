@@ -405,6 +405,26 @@ describe("DashboardWidgetCard", () => {
     expect(screen.getByText("Persönliche Planung 2026-05-27").closest("a")).toHaveAttribute("href", "/day-plan");
   });
 
+  it("rendert Kommentarvorschauen ohne rohe HTML-Tags", () => {
+    const comments: RecentComment[] = [
+      {
+        id: 4,
+        body: "<p><strong>HTML</strong> Kommentar</p>",
+        createdAt: "2026-05-27T06:00:00.000Z",
+        updatedAt: "2026-05-27T06:05:00.000Z",
+        authorName: "Admin",
+        entityType: "task",
+        entityId: 81,
+        entityLabel: "Aufgabe"
+      }
+    ];
+
+    renderWithRouter("commentJournal", comments);
+
+    expect(screen.getByText("HTML Kommentar")).toBeInTheDocument();
+    expect(screen.queryByText(/<p>|<\/p>|<strong>/)).not.toBeInTheDocument();
+  });
+
   it("öffnet im DayPlan-Kontext den Aufgaben-Create-Dialog aus dem Widget-Header", () => {
     renderWithRouter("taskList", [], {
       context: "dayPlan",

@@ -134,7 +134,7 @@ describe("TicketForm", () => {
     addPendingComment("Ticket-Kommentar");
     clickTab("Notizen");
     fireEvent.click(screen.getByRole("button", { name: "Neue Notiz" }));
-    changeLastInput("Ticket-Notiz");
+    fireEvent.change(screen.getByLabelText(/Titel/), { target: { value: "Ticket-Notiz" } });
     fireEvent.click(screen.getByRole("button", { name: /Hinzuf/ }));
     clickTab("Dateien");
     fireEvent.change(getFileInput(container), { target: { files: [file] } });
@@ -147,7 +147,7 @@ describe("TicketForm", () => {
           pendingSubTickets: [{ title: "Sub-Ticket Pending", type: "bug", status: "open", priority: "medium" }],
           pendingRelations: [{ ticket, relationType: "related" }],
           pendingComments: [{ text: "Ticket-Kommentar" }],
-          pendingNotes: [{ title: "Ticket-Notiz", contentJson: {} }],
+          pendingNotes: [{ title: "Ticket-Notiz", contentJson: { html: "" } }],
           pendingFiles: [{ file, previewUrl: undefined }]
         })
       )

@@ -17,20 +17,22 @@ import { TicketTypeBadge } from "../ui/TicketTypeBadge";
 interface TicketLinkDialogProps {
   open: boolean;
   owner?: TicketOwner | null;
+  contextOwner?: TicketOwner | null;
   currentTickets: Ticket[];
   excludeIds?: number[];
   onLink: (ticket: Ticket) => Promise<void>;
   onClose: () => void;
 }
 
-export function TicketLinkDialog({ open, owner, currentTickets, excludeIds = [], onLink, onClose }: TicketLinkDialogProps) {
+export function TicketLinkDialog({ open, owner, contextOwner, currentTickets, excludeIds = [], onLink, onClose }: TicketLinkDialogProps) {
   const [searchValue, setSearchValue] = useState("");
   const [linkingTicketId, setLinkingTicketId] = useState<number | null>(null);
   const validOwner = owner && Number.isFinite(owner.id) ? owner : undefined;
+  const validContextOwner = contextOwner && Number.isFinite(contextOwner.id) ? contextOwner : undefined;
   const allTicketsQuery = useQuery({
-    queryKey: validOwner ? queryKeys.tickets.linkCandidates(validOwner.type, validOwner.id) : queryKeys.tickets.root,
-    queryFn: () => getTicketLinkCandidates(validOwner as TicketOwner),
-    enabled: open && validOwner !== undefined
+    queryKey: validOwner ? queryKeys.tickets.linkCandidates(validOwner.type, validOwner.id) : [...queryKeys.tickets.root, "link-context", validContextOwner?.type, validContextOwner?.id],
+    queryFn: () => getTicketLinkCandidates(validOwner ?? null, validContextOwner),
+    enabled: open && (validOwner !== undefined || validContextOwner !== undefined)
   });
   const currentTicketIds = useMemo(() => new Set([...currentTickets.map((ticket) => ticket.id), ...excludeIds]), [currentTickets, excludeIds]);
   const availableTickets = useMemo(() => {

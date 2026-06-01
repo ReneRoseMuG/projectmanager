@@ -140,11 +140,12 @@ const ticketLinkBodySchema = {
 
 const ticketLinkCandidatesQuerySchema = {
   type: "object",
-  required: ["ownerType", "ownerId"],
   additionalProperties: false,
   properties: {
     ownerType: { type: "string", enum: ["project", "milestone", "task", "feature", "useCase", "wikiPage"] },
-    ownerId: { type: "integer", minimum: 1 }
+    ownerId: { type: "integer", minimum: 1 },
+    contextOwnerType: { type: "string", enum: ["project", "milestone", "task", "feature", "useCase", "wikiPage"] },
+    contextOwnerId: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -300,10 +301,14 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     );
   }
 
-  app.get<{ Querystring: { ownerType: TicketOwner["type"]; ownerId: number } }>(
+  app.get<{ Querystring: { ownerType?: TicketOwner["type"]; ownerId?: number; contextOwnerType?: TicketOwner["type"]; contextOwnerId?: number } }>(
     "/tickets/link-candidates",
     { schema: { querystring: ticketLinkCandidatesQuerySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => listTicketLinkCandidates(app.db, { type: request.query.ownerType, id: request.query.ownerId })
+    async (request) => {
+      const owner = request.query.ownerType && request.query.ownerId ? { type: request.query.ownerType, id: request.query.ownerId } : null;
+      const contextOwner = request.query.contextOwnerType && request.query.contextOwnerId ? { type: request.query.contextOwnerType, id: request.query.contextOwnerId } : null;
+      return listTicketLinkCandidates(app.db, owner, contextOwner);
+    }
   );
 
   app.get<{ Params: { id: number } }>(

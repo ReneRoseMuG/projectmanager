@@ -120,11 +120,13 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiTree", () => ({
 vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
   WikiPageForm({
     inline,
+    inlineChrome,
     open,
     page,
     onDirtyChange,
   }: {
     inline?: boolean;
+    inlineChrome?: "embedded" | "standalone";
     open: boolean;
     page?: typeof wikiFixtures.wikiAlpha | null;
     onDirtyChange?: (dirty: boolean) => void;
@@ -135,7 +137,7 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
 
     if (inline) {
       return (
-        <form data-testid="wiki-inline-form">
+        <form data-testid="wiki-inline-form" data-inline-chrome={inlineChrome}>
           <h2>{page?.title}</h2>
           <button type="button" onClick={() => onDirtyChange?.(true)}>
             Inline Dirty
@@ -203,6 +205,7 @@ describe("WikiPage Inline-Redesign", () => {
     renderPage();
 
     expect(screen.getByTestId("wiki-inline-form")).toBeInTheDocument();
+    expect(screen.getByTestId("wiki-inline-form")).toHaveAttribute("data-inline-chrome", "embedded");
     expect(screen.getByRole("heading", { name: "Wiki Alpha" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Metadaten" })).not.toBeInTheDocument();
   });

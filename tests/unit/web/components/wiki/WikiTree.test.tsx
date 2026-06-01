@@ -104,6 +104,16 @@ describe("WikiTree", () => {
     expect(onCreate).toHaveBeenCalledWith(rootPage);
   });
 
+  it("öffnet Wiki-Seiten aus dem Baum in einer Standalone-Tab-Ansicht", () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderTree();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rootseite in neuem Tab öffnen" }));
+
+    expect(openSpy).toHaveBeenCalledWith("/wiki/1?standalone=1", "_blank");
+    openSpy.mockRestore();
+  });
+
   it("klappt Kindseiten weiterhin ein und aus", () => {
     renderTree();
 

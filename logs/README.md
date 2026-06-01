@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 01.06.26 | 16:35:34 | Test | MS-41 Abschlusslauf | ⚠️ |
+| 01.06.26 | 16:35:33 | 1 | MS-41 Refactoring Kommentare, Notizen und Create-Relationen | ✅ |
 | 01.06.26 | 06:23:09 | Feature | MS-34 Browser-Test-Speedup | ⚠️ |
 | 01.06.26 | 06:14:17 | Fix | Alten Referenz-Skill entfernen | ✅ |
 | 01.06.26 | 06:13:22 | Fix | MCP-Code Auftrag Skill | ✅ |

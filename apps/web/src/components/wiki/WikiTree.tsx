@@ -1,8 +1,9 @@
-import { ChevronDown, ChevronRight, FileText, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, FileText, Plus } from "lucide-react";
 import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { WikiTreeNode } from "../../hooks/useWiki";
+import { withStandaloneView } from "../../utils/standalone";
 import { Button } from "../ui/Button";
 
 interface WikiTreeProps {
@@ -38,6 +39,10 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate }: WikiNodeProps
     });
   };
 
+  const openPageInTab = () => {
+    window.open(withStandaloneView(pagePath), "_blank");
+  };
+
   return (
     <div className="grid gap-1">
       <div
@@ -69,6 +74,14 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate }: WikiNodeProps
         >
           {node.title}
         </Link>
+        <Button
+          aria-label={`${node.title} in neuem Tab öffnen`}
+          title="In neuem Tab öffnen"
+          icon={<ExternalLink size={15} />}
+          variant="ghost"
+          className="wiki-tree-action-btn"
+          onClick={openPageInTab}
+        />
         <Button
           aria-label="Unterseite anlegen"
           title="Unterseite anlegen"

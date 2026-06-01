@@ -50,17 +50,20 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
     placeholder,
     testIdPrefix,
     className,
+    fill,
   }: {
     value: string | null | undefined;
     onChange: (value: string) => void;
     placeholder?: string;
     testIdPrefix?: string;
     className?: string;
+    fill?: boolean;
   }) {
     return (
       <textarea
         aria-label={placeholder ?? "Rich Text"}
         className={className}
+        data-fill={fill ? "true" : undefined}
         data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
         value={value ?? ""}
         onChange={(event) => onChange(event.currentTarget.value)}
@@ -209,12 +212,19 @@ describe("WikiPageForm", () => {
     expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
   });
 
-  it("rendert den Inline-Modus ohne Modal und mit PageHero", () => {
-    const { container } = renderWithProviders(<WikiPageForm inline open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+  it("rendert den eingebetteten Inline-Modus ohne redundanten PageHero", () => {
+    const { container } = renderWithProviders(<WikiPageForm inline inlineChrome="embedded" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
-    expect(container.querySelector('[data-testid="page-hero"][data-variant="detail"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-testid="page-hero"][data-variant="detail"]')).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Schließen" })).not.toBeInTheDocument();
     expect(screen.getByTestId("wiki-page-form-content-view")).toHaveClass("min-h-[400px]");
+    expect(screen.getByTestId("wiki-page-form-content-view")).toHaveAttribute("data-fill", "true");
+  });
+
+  it("rendert den Standalone-Inline-Modus weiterhin mit PageHero", () => {
+    const { container } = renderWithProviders(<WikiPageForm inline inlineChrome="standalone" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(container.querySelector('[data-testid="page-hero"][data-variant="detail"]')).toBeInTheDocument();
   });
 
   it("zeigt den Journal-Tab im Inline-Modus nur mit Berechtigung", () => {

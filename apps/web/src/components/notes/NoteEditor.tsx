@@ -25,6 +25,8 @@ export function NoteEditor({ note, open, onSave, onClose, variant = "modal", onO
   const [title, setTitle] = useState("Ohne Titel");
   const [content, setContent] = useState("");
   const [contentFormat, setContentFormat] = useState<NoteContentFormat>("html");
+  const [localVersion, setLocalVersion] = useState<number | null>(null);
+  const [lastSavedContentJson, setLastSavedContentJson] = useState<Note["contentJson"] | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -36,6 +38,8 @@ export function NoteEditor({ note, open, onSave, onClose, variant = "modal", onO
     setTitle(note.title);
     setContent(nextContent.value);
     setContentFormat(nextContent.format);
+    setLocalVersion(note.version);
+    setLastSavedContentJson(note.contentJson);
     setDirty(false);
   }, [note, open]);
 
@@ -57,11 +61,17 @@ export function NoteEditor({ note, open, onSave, onClose, variant = "modal", onO
     }
     setSaving(true);
     try {
-      await onSave(note.id, {
+      const updated = await onSave(note.id, {
         title,
-        contentJson: contentFormat === "html" ? htmlToNoteContent(content) : note.contentJson,
-        expectedVersion: note.version
+        contentJson: contentFormat === "html" ? htmlToNoteContent(content) : (lastSavedContentJson ?? note.contentJson),
+        expectedVersion: localVersion ?? note.version
       });
+      if (updated && typeof updated === "object" && "version" in updated && typeof updated.version === "number") {
+        setLocalVersion(updated.version);
+        if ("contentJson" in updated && updated.contentJson && typeof updated.contentJson === "object" && !Array.isArray(updated.contentJson)) {
+          setLastSavedContentJson(updated.contentJson as Note["contentJson"]);
+        }
+      }
       setDirty(false);
     } finally {
       setSaving(false);

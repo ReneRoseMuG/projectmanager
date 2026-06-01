@@ -521,18 +521,31 @@ export async function listTasks(database: DbClient): Promise<Task[]> {
   return Promise.all(rows.map((task) => mapTask(database, task, Promise.resolve(tagsByTask.get(task.id) ?? []), Promise.resolve(subtaskCounts.get(task.id) ?? 0), undefined, Promise.resolve(supportCountsMap.get(task.id) ?? emptySupportCounts))));
 }
 
-export async function listTaskLinkCandidates(database: DbClient, owner: TaskOwner): Promise<Task[]> {
-  await ensureOwnerExists(database, owner);
-  const ownerTaskRows = await selectVisibleOwnerTaskRows(database, owner);
+export async function listTaskLinkCandidates(database: DbClient, owner: TaskOwner | null, contextOwner?: TaskOwner | null): Promise<Task[]> {
+  if (!owner && !contextOwner) {
+    throw badRequest("Task link candidates require an owner or context owner");
+  }
+  if (owner) {
+    await ensureOwnerExists(database, owner);
+  }
+  if (contextOwner) {
+    await ensureOwnerExists(database, contextOwner);
+  }
+  const ownerTaskRows = owner ? await selectVisibleOwnerTaskRows(database, owner) : [];
   const linkedTaskIds = new Set(ownerTaskRows.map((task) => task.id));
   const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
   const allTasks = await listTasks(database);
 
-  if (owner.type === "wikiPage") {
+  const compatibilityOwner = contextOwner ?? owner;
+  if (!compatibilityOwner) {
+    return [];
+  }
+
+  if (compatibilityOwner.type === "wikiPage") {
     return allTasks.filter((task) => !linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status));
   }
 
-  const ownerContext = await taskOwnerProjectContext(database, owner);
+  const ownerContext = await taskOwnerProjectContext(database, compatibilityOwner);
 
   const candidatePairs = await Promise.all(
     allTasks

@@ -555,18 +555,31 @@ export async function listTickets(database: DbClient): Promise<Ticket[]> {
   return Promise.all(rows.map((ticket) => mapTicket(database, ticket, Promise.resolve(tagsByTicket.get(ticket.id) ?? []), Promise.resolve(subTicketCounts.get(ticket.id) ?? 0), ticket.position, undefined, Promise.resolve(supportCountsMap.get(ticket.id) ?? emptySupportCounts))));
 }
 
-export async function listTicketLinkCandidates(database: DbClient, owner: TicketOwner): Promise<Ticket[]> {
-  await ensureOwnerExists(database, owner);
-  const ownerTicketRows = await selectVisibleOwnerTicketRows(database, owner);
+export async function listTicketLinkCandidates(database: DbClient, owner: TicketOwner | null, contextOwner?: TicketOwner | null): Promise<Ticket[]> {
+  if (!owner && !contextOwner) {
+    throw badRequest("Ticket link candidates require an owner or context owner");
+  }
+  if (owner) {
+    await ensureOwnerExists(database, owner);
+  }
+  if (contextOwner) {
+    await ensureOwnerExists(database, contextOwner);
+  }
+  const ownerTicketRows = owner ? await selectVisibleOwnerTicketRows(database, owner) : [];
   const linkedTicketIds = new Set(ownerTicketRows.map((ticket) => ticket.id));
   const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
   const allTickets = await listTickets(database);
 
-  if (owner.type === "wikiPage") {
+  const compatibilityOwner = contextOwner ?? owner;
+  if (!compatibilityOwner) {
+    return [];
+  }
+
+  if (compatibilityOwner.type === "wikiPage") {
     return allTickets.filter((ticket) => !linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status));
   }
 
-  const ownerContext = await ticketOwnerProjectContext(database, owner);
+  const ownerContext = await ticketOwnerProjectContext(database, compatibilityOwner);
 
   const candidatePairs = await Promise.all(
     allTickets

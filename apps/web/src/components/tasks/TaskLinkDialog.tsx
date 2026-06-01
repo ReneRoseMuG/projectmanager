@@ -16,20 +16,22 @@ import { StatusPill } from "../ui/StatusPill";
 interface TaskLinkDialogProps {
   open: boolean;
   owner?: TaskOwner | null;
+  contextOwner?: TaskOwner | null;
   currentTasks: Task[];
   excludeIds?: number[];
   onLink: (task: Task) => Promise<void>;
   onClose: () => void;
 }
 
-export function TaskLinkDialog({ open, owner, currentTasks, excludeIds = [], onLink, onClose }: TaskLinkDialogProps) {
+export function TaskLinkDialog({ open, owner, contextOwner, currentTasks, excludeIds = [], onLink, onClose }: TaskLinkDialogProps) {
   const [searchValue, setSearchValue] = useState("");
   const [linkingTaskId, setLinkingTaskId] = useState<number | null>(null);
   const validOwner = owner && Number.isFinite(owner.id) ? owner : undefined;
+  const validContextOwner = contextOwner && Number.isFinite(contextOwner.id) ? contextOwner : undefined;
   const allTasksQuery = useQuery({
-    queryKey: validOwner ? queryKeys.tasks.linkCandidates(validOwner.type, validOwner.id) : queryKeys.tasks.root,
-    queryFn: () => getTaskLinkCandidates(validOwner as TaskOwner),
-    enabled: open && validOwner !== undefined
+    queryKey: validOwner ? queryKeys.tasks.linkCandidates(validOwner.type, validOwner.id) : [...queryKeys.tasks.root, "link-context", validContextOwner?.type, validContextOwner?.id],
+    queryFn: () => getTaskLinkCandidates(validOwner ?? null, validContextOwner),
+    enabled: open && (validOwner !== undefined || validContextOwner !== undefined)
   });
   const currentTaskIds = useMemo(() => new Set([...currentTasks.map((task) => task.id), ...excludeIds]), [currentTasks, excludeIds]);
   const availableTasks = useMemo(() => {
