@@ -62,7 +62,7 @@ function resourceForPath(path: string): AuthResource {
     ["/tags", "tags"],
     ["/journal", "journal"],
     ["/dashboards", "dashboards"],
-    ["/dumps", "dumps"],
+    ["/attachment-sync", "settings"],
     ["/settings", "settings"],
     ["/imports", "wiki"],
     ["/doc-links", "wiki"],

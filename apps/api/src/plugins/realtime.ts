@@ -73,9 +73,6 @@ function scopeForPath(path: string): RealtimeInvalidationScope {
   if (apiPath.startsWith("/settings")) {
     return "settings";
   }
-  if (apiPath.startsWith("/dumps")) {
-    return "dumps";
-  }
   return "all";
 }
 
