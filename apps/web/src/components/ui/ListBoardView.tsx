@@ -20,7 +20,7 @@ import type {
   StatusCatalogKind,
 } from "@taskmanager/shared-types";
 import { Plus } from "lucide-react";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import type { ViewMode } from "../../types";
 import { catalogEntriesByKind, catalogFillStyle, catalogSoftStyle } from "../../utils/catalogs";
@@ -64,6 +64,7 @@ interface ListBoardViewProps<T> {
   onItemStatusChange?: (item: T, newStatus: string) => void | Promise<unknown>;
   renderCard: (item: T) => ReactNode;
   renderRow: (item: T) => ReactNode;
+  renderClosedRow?: (item: T) => ReactNode;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   toolbarFilters?: ReactNode;
@@ -71,6 +72,7 @@ interface ListBoardViewProps<T> {
   emptyState?: ReactNode;
   showGroupedEmptyState?: boolean;
   loading?: boolean;
+  boardId?: string;
 }
 
 function toViewMode(mode: ListBoardMode): ViewMode {
@@ -526,6 +528,108 @@ function DraggableItemWrapper({
   );
 }
 
+const CLOSED_SIDEBAR_WIDTH = 270;
+const CLOSED_SIDEBAR_STRIP_WIDTH = 12;
+
+function readStoredBoolean(key: string, fallback: boolean): boolean {
+  try {
+    const stored = window.localStorage.getItem(key);
+    if (stored === "true") return true;
+    if (stored === "false") return false;
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function ClosedBoardSidebar<T>({
+  groups,
+  renderItem,
+  storageKey,
+}: {
+  groups: StatusGroup<T>[];
+  renderItem: (item: T) => ReactNode;
+  storageKey: string;
+}) {
+  const [collapsed, setCollapsed] = useState(() =>
+    readStoredBoolean(`${storageKey}-closed-sidebar`, false),
+  );
+  const [sidebarWidth] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem("ui.kanban-sidebar-width");
+      if (!stored) return CLOSED_SIDEBAR_WIDTH;
+      const parsed = parseInt(stored, 10);
+      return Number.isFinite(parsed) && parsed >= 150 && parsed <= 600 ? parsed : CLOSED_SIDEBAR_WIDTH;
+    } catch {
+      return CLOSED_SIDEBAR_WIDTH;
+    }
+  });
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(`${storageKey}-closed-sidebar`, String(collapsed));
+      } catch {
+        // localStorage may be unavailable in privacy mode.
+      }
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [collapsed, storageKey]);
+
+  const allItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
+
+  return (
+    <aside
+      className="flex shrink-0 self-stretch flex-row border-l border-steel-200 bg-steel-50/80 transition-[width] duration-150"
+      style={{ width: collapsed ? CLOSED_SIDEBAR_STRIP_WIDTH : sidebarWidth }}
+    >
+      <button
+        type="button"
+        aria-label={collapsed ? "Geschlossene Items anzeigen" : "Geschlossene Items ausblenden"}
+        title={collapsed ? "Geschlossene Items anzeigen" : "Geschlossene Items ausblenden"}
+        className="flex w-3 shrink-0 cursor-col-resize flex-col items-center justify-center gap-[3px] bg-steel-100 transition-colors hover:bg-steel-200 focus:outline-none"
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        {collapsed ? (
+          <span
+            className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-steel-400"
+            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+          >
+            Geschlossen · {allItems.length}
+          </span>
+        ) : (
+          <>
+            <span className="h-[3px] w-[3px] rounded-full bg-steel-300" />
+            <span className="h-[3px] w-[3px] rounded-full bg-steel-300" />
+            <span className="h-[3px] w-[3px] rounded-full bg-steel-300" />
+          </>
+        )}
+      </button>
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-hidden transition-opacity duration-150"
+        style={{
+          opacity: collapsed ? 0 : 1,
+          pointerEvents: collapsed ? "none" : "auto",
+        }}
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-steel-200 bg-steel-100/60 px-3 py-2">
+          <h3 className="text-xs font-semibold text-steel-600">Geschlossen</h3>
+          <span className="rounded bg-steel-200 px-1.5 py-0.5 text-[10px] font-semibold text-steel-600">
+            {allItems.length}
+          </span>
+        </div>
+        <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-1.5">
+          {allItems.map((item, index) => (
+            <div key={index} className="min-w-0">
+              {renderItem(item)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 /** Shared list/board surface with search, filters, view toggle and add button. */
 export function ListBoardView<T>(props: ListBoardViewProps<T>) {
   if (props.statusCatalogKind && props.statusColumns === undefined) {
@@ -568,6 +672,7 @@ function ListBoardViewContent<T>({
   onItemStatusChange,
   renderCard,
   renderRow,
+  renderClosedRow,
   searchValue = "",
   onSearchChange,
   toolbarFilters,
@@ -575,6 +680,7 @@ function ListBoardViewContent<T>({
   emptyState,
   showGroupedEmptyState = true,
   loading = false,
+  boardId = "board",
 }: ListBoardViewProps<T>) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [activeItem, setActiveItem] = useState<T | null>(null);
@@ -669,20 +775,23 @@ function ListBoardViewContent<T>({
     layout: ListBoardMode,
     groups: StatusGroup<T>[],
   ) => {
+    const closedGroups = layout === "board" ? groups.filter((g) => g.column.isClosed) : [];
+    const visibleGroups = layout === "board" ? groups.filter((g) => !g.column.isClosed) : groups;
+
     const rootClass =
       layout === "board"
-        ? "flex w-full min-w-0 flex-nowrap items-start gap-4 overflow-x-auto pb-2"
+        ? "flex flex-1 min-w-0 flex-nowrap items-start gap-4 overflow-x-auto pb-2"
         : "grid h-full min-h-[30rem] w-full flex-1 content-start gap-4";
     const itemClass =
       layout === "board" ? "min-w-0 max-w-full" : "";
-    const groupedContent = (
+    const columnsContent = (
       <div
         className={rootClass}
         style={layout === "board" ? { minHeight: "max(30rem, 100%)" } : undefined}
         data-dnd-enabled={dndEnabled ? "true" : undefined}
         data-list-board-layout={layout}
       >
-        {groups.map((group) => {
+        {visibleGroups.map((group) => {
           const knownColumn = isKnownStatusGroup(orderedStatusColumns, group);
           const collapsed = group.items.length === 0 && knownColumn;
           const Section =
@@ -743,6 +852,17 @@ function ListBoardViewContent<T>({
         })}
       </div>
     );
+
+    const groupedContent = layout === "board" && closedGroups.length > 0 ? (
+      <div className="flex w-full min-w-0" style={{ minHeight: "max(30rem, 100%)" }}>
+        {columnsContent}
+        <ClosedBoardSidebar
+          groups={closedGroups}
+          renderItem={renderClosedRow ?? renderRow}
+          storageKey={boardId}
+        />
+      </div>
+    ) : columnsContent;
 
     if (!dndEnabled) {
       return groupedContent;
@@ -825,22 +945,24 @@ function ListBoardViewContent<T>({
     >
       {showToolbar ? (
       <div className="grid w-full gap-3">
-        <div className={`grid w-full grid-cols-1 items-center gap-3 ${toolbarFilters ? "md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]" : "md:grid-cols-[minmax(0,1fr)_auto]"}`}>
+        <div className={`grid w-full grid-cols-1 items-center gap-3 ${toolbarFilters && (items.length > 0 || loading) ? "md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]" : "md:grid-cols-[minmax(0,1fr)_auto]"}`}>
           <div className="flex min-w-0 justify-start">
             {onSearchChange ? (
               <SearchInput value={searchValue} onChange={onSearchChange} />
             ) : null}
           </div>
-          {toolbarFilters ? (
+          {toolbarFilters && (items.length > 0 || loading) ? (
             <div className="flex min-w-0 flex-wrap items-center justify-center gap-2">
               {toolbarFilters}
             </div>
           ) : null}
           <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 md:justify-end">
-            <ViewToggle
-              value={toViewMode(mode)}
-              onChange={(value) => onModeChange(toListBoardMode(value))}
-            />
+            {items.length > 0 || loading ? (
+              <ViewToggle
+                value={toViewMode(mode)}
+                onChange={(value) => onModeChange(toListBoardMode(value))}
+              />
+            ) : null}
             {showToolbarAdd ? (
               <Button
                 aria-label={addLabel}

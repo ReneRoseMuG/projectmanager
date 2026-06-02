@@ -8,7 +8,9 @@ import { useTags } from "../../hooks/useTags";
 import { catalogEntriesByKind } from "../../utils/catalogs";
 import { EmptyState } from "../ui/EmptyState";
 import { FilterChips } from "../ui/FilterChips";
+import { ClosedItemRow } from "../ui/ClosedItemRow";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
+import { objectReference } from "../../lib/references";
 import { MilestoneCard } from "./MilestoneCard";
 
 interface MilestoneListBoardViewProps {
@@ -132,6 +134,14 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
           onTagsChange={handleTagsChange}
           onCreateTask={!readOnly && onCreateTask ? () => onCreateTask(milestone) : undefined}
           onCreateTicket={!readOnly && onCreateTicket ? () => onCreateTicket(milestone) : undefined}
+        />
+      )}
+      renderClosedRow={(milestone) => (
+        <ClosedItemRow
+          title={milestone.name}
+          objectReference={objectReference("milestone", milestone.id)}
+          accentColor={statusColumns.find((c) => c.value === milestone.status)?.color}
+          onOpenInTab={onOpenInTab ? () => onOpenInTab(milestone) : undefined}
         />
       )}
     />

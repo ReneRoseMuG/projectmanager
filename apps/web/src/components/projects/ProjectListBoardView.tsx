@@ -1,8 +1,12 @@
 import type { Project } from "@taskmanager/shared-types";
 import { FolderKanban } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
+import { useCatalogs } from "../../hooks/useCatalogs";
 import { useHasPermission } from "../../hooks/usePermissions";
 import { useTags } from "../../hooks/useTags";
+import { objectReference } from "../../lib/references";
+import { catalogEntriesByKind } from "../../utils/catalogs";
+import { ClosedItemRow } from "../ui/ClosedItemRow";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { ProjectCard } from "./ProjectCard";
@@ -52,6 +56,11 @@ export function ProjectListBoardView({
   readOnly = false,
   viewMode,
 }: ProjectListBoardViewProps) {
+  const catalogs = useCatalogs();
+  const statusColumns = useMemo(
+    () => catalogEntriesByKind(catalogs.entries, "workStatus"),
+    [catalogs.entries],
+  );
   const canReadTags = useHasPermission("tags", "read");
   const canWriteProjects = useHasPermission("projects", "write");
   const [mode, setMode] = useState<ListBoardMode>("board");
@@ -122,6 +131,14 @@ export function ProjectListBoardView({
           onCreateMilestone={!readOnly && onCreateMilestone ? () => onCreateMilestone(project) : undefined}
           onCreateTask={!readOnly && onCreateTask ? () => onCreateTask(project) : undefined}
           onCreateTicket={!readOnly && onCreateTicket ? () => onCreateTicket(project) : undefined}
+        />
+      )}
+      renderClosedRow={(project) => (
+        <ClosedItemRow
+          title={project.name}
+          objectReference={objectReference("project", project.id)}
+          accentColor={statusColumns.find((c) => c.key === project.status)?.color}
+          onOpenInTab={onOpenInTab ? () => onOpenInTab(project) : undefined}
         />
       )}
     />

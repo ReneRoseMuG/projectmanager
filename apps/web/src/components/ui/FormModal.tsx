@@ -126,7 +126,7 @@ export function FormModal({
           contentLayout === "flush"
             ? "flex min-h-0 w-full flex-1 overflow-hidden"
             : isPage
-              ? "flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto px-4 pt-4 md:px-5 md:pt-5"
+              ? "flex min-h-0 w-full flex-1 flex-col gap-4 overflow-auto px-4 py-4 md:px-5 md:py-5"
               : "grid min-h-0 flex-1 content-start gap-4 overflow-auto p-4 md:p-5"
         } ${contentClassName}`}
       >

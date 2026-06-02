@@ -64,6 +64,7 @@ import { Pill } from "../ui/Pill";
 import { CatalogSelect } from "../ui/CatalogSelect";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
+import { DetailBoardShell } from "../ui/DetailBoardShell";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
@@ -540,7 +541,7 @@ export function TicketForm({
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section>
+          <DetailBoardShell>
             {ticket && loadedTicket ? (
               <CommentThread
                 comments={loadedTicket.comments}
@@ -584,11 +585,11 @@ export function TicketForm({
                 onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))}
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "notes" ? (
-          <Section fill={Boolean(ticket)}>
+          <DetailBoardShell>
             {ticket ? (
               <>
                 <NoteList
@@ -621,7 +622,7 @@ export function TicketForm({
                 onRemove={(index) => setPendingNotes((items) => items.filter((_, itemIndex) => itemIndex !== index))}
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "attachments" ? (

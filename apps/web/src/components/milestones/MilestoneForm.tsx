@@ -3,7 +3,6 @@ import type {
   DraftNote,
   DraftTask,
   DraftTicket,
-  Feature,
   Milestone,
   MilestoneInput,
   Note,
@@ -12,7 +11,6 @@ import type {
   Tag,
 } from "@taskmanager/shared-types";
 import {
-  BookOpen,
   Flag,
   FolderKanban,
   Link2,
@@ -29,8 +27,6 @@ import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useAuth } from "../../hooks/useAuth";
 import { useEntityComments } from "../../hooks/useEntityComments";
-import { useFeatures } from "../../hooks/useFeatures";
-import { useMilestoneFeatureLinks } from "../../hooks/useDocLinks";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { useNotes } from "../../hooks/useNotes";
 import { useTasks } from "../../hooks/useTasks";
@@ -43,12 +39,12 @@ import {
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { MilestoneDashboard } from "../dashboard/DashboardView";
-import { ProjectFeaturePanel } from "../features/ProjectFeaturePanel";
 import { JournalPanel } from "../journal/JournalPanel";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { TagPicker } from "../tags/TagPicker";
 import { OwnerTaskBoard } from "../tasks/OwnerTaskBoard";
+import { DetailBoardShell } from "../ui/DetailBoardShell";
 import { TaskDraftDialog, TicketDraftDialog } from "../tasks/TaskForm";
 import { TaskLinkDialog } from "../tasks/TaskLinkDialog";
 import { TaskListBoardView } from "../tasks/TaskListBoardView";
@@ -58,12 +54,10 @@ import { TicketListBoardView } from "../tickets/TicketListBoardView";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
 import { DatePicker } from "../ui/DatePicker";
-import { EmptyState } from "../ui/EmptyState";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
 import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
-import { Modal } from "../ui/Modal";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
@@ -120,7 +114,6 @@ function workStatusValue(
 export type MilestoneFormTab =
   | "overview"
   | "details"
-  | "features"
   | "tasks"
   | "tickets"
   | "comments"
@@ -133,7 +126,6 @@ const tabs: Array<Tab<MilestoneFormTab>> = [
   { value: "details", label: "Details" },
   { value: "tasks", label: "Aufgaben" },
   { value: "tickets", label: "Tickets" },
-  { value: "features", label: "Features" },
   { value: "comments", label: "Kommentare" },
   { value: "notes", label: "Notizen" },
   { value: "attachments", label: "Dateien" },
@@ -169,8 +161,6 @@ export function MilestoneForm({
   const { showToast } = useToast();
   const auth = useAuth();
   const milestoneId = milestone?.id;
-  const allFeatures = useFeatures();
-  const featureLinks = useMilestoneFeatureLinks(milestoneId);
   const taskOwner = milestoneId
     ? { type: "milestone" as const, id: milestoneId }
     : undefined;
@@ -197,8 +187,6 @@ export function MilestoneForm({
   const [dueDate, setDueDate] = useState("");
   const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
-  const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("list");
-  const [featureLinkOpen, setFeatureLinkOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -219,13 +207,6 @@ export function MilestoneForm({
     value: project.id,
     label: project.name,
   }));
-  const linkedFeatureIds = new Set(
-    featureLinks.features.map((feature) => feature.id),
-  );
-  const availableFeatures = allFeatures.features.filter(
-    (feature) => !linkedFeatureIds.has(feature.id),
-  );
-
   const handleTabChange = (nextTab: MilestoneFormTab) => {
     setActiveTab(nextTab);
     if (variant !== "page") {
@@ -238,7 +219,6 @@ export function MilestoneForm({
 
   useEffect(() => {
     if (!open) {
-      setFeatureLinkOpen(false);
       setTaskLinkOpen(false);
       setTaskDraftOpen(false);
       setTicketLinkOpen(false);
@@ -251,7 +231,6 @@ export function MilestoneForm({
 
     if (!prevOpenRef.current) {
       setActiveTab(initialTab ?? "details");
-      setFeatureLinkOpen(false);
       setTaskLinkOpen(false);
       setTaskDraftOpen(false);
       setTicketLinkOpen(false);
@@ -384,62 +363,12 @@ export function MilestoneForm({
     }
   };
 
-  const linkFeature = async (targetFeature: Feature) => {
-    if (!milestoneId) {
-      return false;
-    }
-    try {
-      await featureLinks.setFeaturesForMilestone([
-        ...featureLinks.features.map((feature) => feature.id),
-        targetFeature.id,
-      ]);
-      showToast({ tone: "success", title: "Feature verknüpft" });
-      return true;
-    } catch (featureError) {
-      showToast({
-        tone: "error",
-        title: "Feature konnte nicht verknüpft werden",
-        message: errorMessage(featureError),
-      });
-      return false;
-    }
-  };
-
-  const unlinkFeature = async (feature: Feature) => {
-    try {
-      await featureLinks.setFeaturesForMilestone(
-        featureLinks.features
-          .filter((item) => item.id !== feature.id)
-          .map((item) => item.id),
-      );
-      showToast({ tone: "success", title: "Feature-Zuordnung entfernt" });
-    } catch (featureError) {
-      showToast({
-        tone: "error",
-        title: "Feature-Zuordnung konnte nicht entfernt werden",
-        message: errorMessage(featureError),
-      });
-    }
-  };
-
   const visibleTabs = milestone
     ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
     : tabs.filter((tab) => tab.value !== "overview" && tab.value !== "journal");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
       return tab;
-    }
-    if (tab.value === "features") {
-      return {
-        ...tab,
-        count: milestone
-          ? countOpenStatusItems(
-              featureLinks.features,
-              catalogs.entries,
-              "featureStatus",
-            )
-          : 0,
-      };
     }
     if (tab.value === "tasks") {
       return {
@@ -600,55 +529,8 @@ export function MilestoneForm({
           </div>
         ) : null}
 
-        {activeTab === "features" ? (
-          <Section fill={Boolean(milestone)}>
-            {milestone ? (
-              featureLinks.loading || allFeatures.loading ? (
-                <TaskListSkeleton />
-              ) : (
-                <ProjectFeaturePanel
-                  features={featureLinks.features}
-                  viewMode={featureViewMode}
-                  onViewModeChange={setFeatureViewMode}
-                  onCreate={() =>
-                    navigate(
-                      `/features/new?returnTo=${encodeURIComponent(returnTo)}`,
-                    )
-                  }
-                  onOpen={(feature) =>
-                    navigate(
-                      `/features/${feature.id}?returnTo=${encodeURIComponent(returnTo)}`,
-                    )
-                  }
-                  onRemove={(feature) => void unlinkFeature(feature)}
-                  removeLabel="Zuordnung entfernen"
-                  secondaryAction={
-                    <Button
-                      aria-label="Feature verknüpfen"
-                      title="Feature verknüpfen"
-                      variant="secondary"
-                      icon={<Link2 size={17} />}
-                      className="bg-transparent"
-                      disabled={availableFeatures.length === 0}
-                      onClick={() => setFeatureLinkOpen(true)}
-                    />
-                  }
-                  emptyBody="Für diesen Meilenstein sind noch keine Features verknüpft."
-                />
-              )
-            ) : (
-              <EmptyState
-                icon={<BookOpen size={22} />}
-                title="Features sind nach dem Speichern verfügbar."
-                tone="violet"
-                variant="tinted"
-              />
-            )}
-          </Section>
-        ) : null}
-
         {activeTab === "tasks" ? (
-          <Section fill={Boolean(milestone)}>
+          <DetailBoardShell>
             {milestone ? (
               <OwnerTaskBoard owner={{ type: "milestone", id: milestone.id }} />
             ) : (
@@ -675,11 +557,11 @@ export function MilestoneForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section fill={Boolean(milestone)}>
+          <DetailBoardShell>
             {milestone ? (
               <OwnerTicketBoard
                 owner={{ type: "milestone", id: milestone.id }}
@@ -708,11 +590,11 @@ export function MilestoneForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section>
+          <DetailBoardShell>
             {milestone ? (
               <CommentThread
                 comments={comments.comments}
@@ -729,11 +611,11 @@ export function MilestoneForm({
                 onRemove={(index) => setPendingComments((items) => items.filter((_, itemIndex) => itemIndex !== index))}
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "notes" ? (
-          <Section fill={Boolean(milestone)}>
+          <DetailBoardShell>
             {milestone ? (
               <>
                 <NoteList
@@ -757,7 +639,7 @@ export function MilestoneForm({
                 onRemove={(index) => setPendingNotes((items) => items.filter((_, itemIndex) => itemIndex !== index))}
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "attachments" ? (
@@ -799,12 +681,6 @@ export function MilestoneForm({
         ) : null}
       </FormModal>
 
-      <FeatureLinkDialog
-        open={featureLinkOpen}
-        features={availableFeatures}
-        onLink={linkFeature}
-        onClose={() => setFeatureLinkOpen(false)}
-      />
       <TaskLinkDialog
         open={taskLinkOpen}
         owner={null}
@@ -845,74 +721,3 @@ export function MilestoneForm({
   );
 }
 
-function FeatureLinkDialog({
-  open,
-  features,
-  onLink,
-  onClose,
-}: {
-  open: boolean;
-  features: Feature[];
-  onLink: (feature: Feature) => Promise<boolean>;
-  onClose: () => void;
-}) {
-  const [selectedFeatureId, setSelectedFeatureId] = useState<number | "">("");
-  const firstFeatureId = features[0]?.id ?? "";
-
-  useEffect(() => {
-    if (open) {
-      setSelectedFeatureId(firstFeatureId);
-    }
-  }, [firstFeatureId, open]);
-
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.stopPropagation();
-    event.preventDefault();
-    const feature = features.find((item) => item.id === selectedFeatureId);
-    if (!feature) {
-      return;
-    }
-
-    const linked = await onLink(feature);
-    if (linked) {
-      onClose();
-    }
-  };
-
-  return (
-    <Modal open={open} title="Feature verknüpfen" size="md" onClose={onClose}>
-      <form className="grid gap-4" onSubmit={(event) => void submit(event)}>
-        {features.length > 0 ? (
-          <Select
-            label="Feature"
-            value={selectedFeatureId}
-            onChange={(inputEvent) =>
-              setSelectedFeatureId(
-                inputEvent.target.value ? Number(inputEvent.target.value) : "",
-              )
-            }
-          >
-            {features.map((feature) => (
-              <option key={feature.id} value={feature.id}>
-                {feature.title}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <EmptyState
-            icon={<BookOpen size={22} />}
-            title="Keine Features verfügbar"
-            tone="violet"
-            variant="tinted"
-          />
-        )}
-        <footer className="flex justify-end gap-2">
-          <Button onClick={onClose}>Abbrechen</Button>
-          <Button type="submit" variant="primary" disabled={!selectedFeatureId}>
-            Verknüpfen
-          </Button>
-        </footer>
-      </form>
-    </Modal>
-  );
-}

@@ -71,6 +71,7 @@ import { PendingRelationList } from "../ui/PendingRelationList";
 import { CatalogSelect } from "../ui/CatalogSelect";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
+import { DetailBoardShell } from "../ui/DetailBoardShell";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
 import { SelectParent, type SelectParentItem } from "../ui/SelectParent";
@@ -599,7 +600,7 @@ export function FeatureForm({
         ) : null}
 
         {activeTab === "useCases" ? (
-          <Section fill={Boolean(feature)}>
+          <DetailBoardShell>
             {feature ? (
               useCases.loading ? (
                 <TaskListSkeleton />
@@ -641,11 +642,11 @@ export function FeatureForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section fill={Boolean(feature)}>
+          <DetailBoardShell>
             {feature ? (
               <OwnerTaskBoard owner={{ type: "feature", id: feature.id }} />
             ) : (
@@ -692,11 +693,11 @@ export function FeatureForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section fill={Boolean(feature)}>
+          <DetailBoardShell>
             {feature ? (
               <OwnerTicketBoard owner={{ type: "feature", id: feature.id }} />
             ) : (
@@ -743,11 +744,11 @@ export function FeatureForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section>
+          <DetailBoardShell>
             {feature ? (
               <CommentThread
                 comments={comments.comments}
@@ -776,7 +777,7 @@ export function FeatureForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "attachments" ? (

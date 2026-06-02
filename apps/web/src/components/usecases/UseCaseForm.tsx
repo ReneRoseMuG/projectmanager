@@ -49,6 +49,7 @@ import { PendingRelationList } from "../ui/PendingRelationList";
 import { CatalogSelect } from "../ui/CatalogSelect";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
+import { DetailBoardShell } from "../ui/DetailBoardShell";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
 import { StatusPill } from "../ui/StatusPill";
@@ -446,7 +447,7 @@ export function UseCaseForm({
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section fill={Boolean(taskOwner)}>
+          <DetailBoardShell>
             {taskOwner ? (
               <OwnerTaskBoard owner={taskOwner} />
             ) : (
@@ -493,11 +494,11 @@ export function UseCaseForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section fill={Boolean(ticketOwner)}>
+          <DetailBoardShell>
             {ticketOwner ? (
               <OwnerTicketBoard owner={ticketOwner} />
             ) : (
@@ -544,11 +545,11 @@ export function UseCaseForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section>
+          <DetailBoardShell>
             {useCase ? (
               <>
                 {comments.error ? (
@@ -584,7 +585,7 @@ export function UseCaseForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "journal" && useCase ? (

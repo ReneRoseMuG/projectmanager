@@ -2,6 +2,10 @@ import type { UseCase } from "@taskmanager/shared-types";
 import { Layers3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ViewMode } from "../../types";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { objectReference } from "../../lib/references";
+import { catalogEntriesByKind } from "../../utils/catalogs";
+import { ClosedItemRow } from "../ui/ClosedItemRow";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { UseCaseCard } from "./UseCaseCard";
@@ -38,6 +42,11 @@ function matchesSearch(useCase: UseCase, searchValue: string) {
 
 /** Use-case adapter for the generic ListBoardView without status grouping. */
 export function UseCaseListBoardView({ useCases, viewMode, onViewModeChange, onCreate, onOpen, onStatusChange }: UseCaseListBoardViewProps) {
+  const catalogs = useCatalogs();
+  const statusColumns = useMemo(
+    () => catalogEntriesByKind(catalogs.entries, "featureStatus"),
+    [catalogs.entries],
+  );
   const [searchValue, setSearchValue] = useState("");
   const visibleUseCases = useMemo(() => sortUseCases(useCases).filter((useCase) => matchesSearch(useCase, searchValue)), [searchValue, useCases]);
 
@@ -57,6 +66,13 @@ export function UseCaseListBoardView({ useCases, viewMode, onViewModeChange, onC
       emptyState={<EmptyState icon={<Layers3 size={22} />} title="Keine Use Cases" body="Lege Use Cases an, um fachliche Abläufe zu beschreiben." tone="violet" variant="tinted" />}
       renderCard={(useCase) => <UseCaseCard useCase={useCase} onOpen={onOpen} onStatusChange={onStatusChange} />}
       renderRow={(useCase) => <UseCaseCard useCase={useCase} variant="row" onOpen={onOpen} onStatusChange={onStatusChange} />}
+      renderClosedRow={(useCase) => (
+        <ClosedItemRow
+          title={useCase.title}
+          objectReference={objectReference("useCase", useCase.id)}
+          accentColor={statusColumns.find((c) => c.key === useCase.status)?.color}
+        />
+      )}
     />
   );
 }

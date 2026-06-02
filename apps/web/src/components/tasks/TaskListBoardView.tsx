@@ -9,7 +9,9 @@ import { useTags } from "../../hooks/useTags";
 import { catalogEntriesByKind } from "../../utils/catalogs";
 import { EmptyState } from "../ui/EmptyState";
 import { FilterChips } from "../ui/FilterChips";
+import { ClosedItemRow } from "../ui/ClosedItemRow";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
+import { objectReference } from "../../lib/references";
 import { TaskCard } from "./TaskCard";
 
 interface TaskListBoardViewProps {
@@ -94,10 +96,17 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
       toolbarFilters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={tasks.length} />}
       filters={readOnly ? undefined : filters}
       loading={loading}
-      showGroupedEmptyState={false}
-      emptyState={<EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben" body="Für diesen Kontext sind noch keine Aufgaben vorhanden." tone="fern" variant="tinted" />}
+      emptyState={<EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben" body="Für diesen Kontext sind noch keine Aufgaben vorhanden." tone="fern" variant="default" />}
       renderCard={(task) => <TaskCard task={task} allTags={editableTags} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={readOnly || !canDelete || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
       renderRow={(task) => <TaskCard task={task} allTags={editableTags} variant="row" onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={readOnly || !canDelete || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
+      renderClosedRow={(task) => (
+        <ClosedItemRow
+          title={task.title}
+          objectReference={objectReference("task", task.id)}
+          accentColor={statusColumns.find((c) => c.value === task.status)?.color}
+          onOpenInTab={onOpenInTab ? () => onOpenInTab(task) : undefined}
+        />
+      )}
     />
   );
 }

@@ -1,6 +1,10 @@
 import type { Feature } from "@taskmanager/shared-types";
 import { BookOpen } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useCatalogs } from "../../hooks/useCatalogs";
+import { objectReference } from "../../lib/references";
+import { catalogEntriesByKind } from "../../utils/catalogs";
+import { ClosedItemRow } from "../ui/ClosedItemRow";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { FeatureCard } from "./FeatureCard";
@@ -37,6 +41,11 @@ export function FeatureListBoardView({
   filters,
   showToolbarAdd = true,
 }: FeatureListBoardViewProps) {
+  const catalogs = useCatalogs();
+  const statusColumns = useMemo(
+    () => catalogEntriesByKind(catalogs.entries, "featureStatus"),
+    [catalogs.entries],
+  );
   const [mode, setMode] = useState<ListBoardMode>("board");
   const [searchValue, setSearchValue] = useState("");
   const visibleFeatures = useMemo(
@@ -74,6 +83,14 @@ export function FeatureListBoardView({
       )}
       renderRow={(feature) => (
         <FeatureCard feature={feature} variant="row" onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={onDelete} onStatusChange={onStatusChange} />
+      )}
+      renderClosedRow={(feature) => (
+        <ClosedItemRow
+          title={feature.title}
+          objectReference={objectReference("feature", feature.id)}
+          accentColor={statusColumns.find((c) => c.key === feature.status)?.color}
+          onOpenInTab={onOpenInTab ? () => onOpenInTab(feature) : undefined}
+        />
       )}
     />
   );

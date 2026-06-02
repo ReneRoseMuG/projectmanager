@@ -9,7 +9,9 @@ import { useTags } from "../../hooks/useTags";
 import { catalogEntriesByKind } from "../../utils/catalogs";
 import { EmptyState } from "../ui/EmptyState";
 import { FilterChips } from "../ui/FilterChips";
+import { ClosedItemRow } from "../ui/ClosedItemRow";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
+import { objectReference } from "../../lib/references";
 import { TicketCard } from "./TicketCard";
 
 interface TicketListBoardViewProps {
@@ -126,7 +128,7 @@ export function TicketListBoardView({
           title="Keine Tickets"
           body="Für diesen Kontext sind noch keine Tickets vorhanden."
           tone="violet"
-          variant="tinted"
+          variant="default"
         />
       }
       renderCard={(ticket) => (
@@ -143,6 +145,14 @@ export function TicketListBoardView({
           onStatusChange={readOnly ? undefined : onStatusChange}
           onDueDateChange={readOnly ? undefined : onDueDateChange}
           onTagsChange={handleTagsChange}
+        />
+      )}
+      renderClosedRow={(ticket) => (
+        <ClosedItemRow
+          title={ticket.title}
+          objectReference={objectReference("ticket", ticket.id)}
+          accentColor={statusColumns.find((c) => c.value === ticket.status)?.color}
+          onOpenInTab={onOpenInTab ? () => onOpenInTab(ticket) : undefined}
         />
       )}
     />

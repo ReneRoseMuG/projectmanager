@@ -92,6 +92,7 @@ import { PendingRelationList } from "../ui/PendingRelationList";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { CatalogSelect } from "../ui/CatalogSelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
+import { DetailBoardShell } from "../ui/DetailBoardShell";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
 import { TaskListSkeleton } from "../ui/Skeleton";
@@ -841,7 +842,7 @@ export function ProjectForm({
         ) : null}
 
         {activeTab === "milestones" ? (
-          <Section fill={Boolean(project)}>
+          <DetailBoardShell>
             {project ? (
               <MilestoneListBoardView
                 milestones={milestones.milestones}
@@ -874,11 +875,11 @@ export function ProjectForm({
                 variant="tinted"
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "features" ? (
-          <Section fill={Boolean(project)}>
+          <DetailBoardShell>
             {project ? (
               featureLinks.loading ? (
                 <TaskListSkeleton />
@@ -919,11 +920,11 @@ export function ProjectForm({
                 onRemoveDraft={() => undefined}
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "tasks" ? (
-          <Section fill={Boolean(project)}>
+          <DetailBoardShell>
             {project ? (
               <OwnerTaskBoard owner={{ type: "project", id: project.id }} />
             ) : (
@@ -970,11 +971,11 @@ export function ProjectForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "tickets" ? (
-          <Section fill={Boolean(project)}>
+          <DetailBoardShell>
             {project ? (
               <OwnerTicketBoard owner={{ type: "project", id: project.id }} />
             ) : (
@@ -1021,11 +1022,11 @@ export function ProjectForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "comments" ? (
-          <Section>
+          <DetailBoardShell>
             {project ? (
               <CommentThread
                 comments={comments.comments}
@@ -1054,11 +1055,11 @@ export function ProjectForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "notes" ? (
-          <Section fill={Boolean(project)}>
+          <DetailBoardShell>
             {project ? (
               <>
                 <NoteList
@@ -1086,7 +1087,7 @@ export function ProjectForm({
                 }
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "attachments" ? (
@@ -1120,7 +1121,7 @@ export function ProjectForm({
         ) : null}
 
         {activeTab === "backlog" ? (
-          <Section fill={Boolean(project)}>
+          <DetailBoardShell>
             {project ? (
               backlog.loading || allFeatures.loading ? (
                 <TaskListSkeleton />
@@ -1152,7 +1153,7 @@ export function ProjectForm({
                 variant="tinted"
               />
             )}
-          </Section>
+          </DetailBoardShell>
         ) : null}
 
         {activeTab === "journal" && project ? (

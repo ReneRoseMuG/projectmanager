@@ -2,12 +2,10 @@
 import {
   authenticatedGoto,
   apiBaseUrl,
-  createFeature,
   createMilestone,
   createProject,
   createTask,
   createTicket,
-  deleteFeature,
   deleteProject,
   deleteTask,
   deleteTicket,
@@ -114,11 +112,8 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
   test("Meilensteinformular zeigt Details und aktualisierte Subview-Mengen", async ({ page, request }) => {
     const project = await createProject(request, "E2E Milestone Detail Project");
     const milestone = await createMilestone(request, project.id, "E2E Milestone Detail");
-    const feature = await createFeature(request, "E2E Milestone Feature");
     const task = await createTask(request, { type: "milestone", id: milestone.id }, "E2E Milestone Task");
     const ticket = await createTicket(request, { type: "milestone", id: milestone.id }, "E2E Milestone Ticket");
-    const featureResponse = await request.put(`${apiBaseUrl}/milestones/${milestone.id}/features`, { data: { featureIds: [feature.id] } });
-    expect(featureResponse.ok()).toBeTruthy();
     const noteResponse = await request.post(`${apiBaseUrl}/milestones/${milestone.id}/notes`, { data: { title: "E2E Milestone Note", contentJson: { type: "doc" } } });
     expect(noteResponse.ok()).toBeTruthy();
     const commentResponse = await request.post(`${apiBaseUrl}/milestones/${milestone.id}/comments`, { data: { body: "E2E Milestone Comment" } });
@@ -141,7 +136,6 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       await expect(milestoneForm.locator("select[required]")).toHaveValue(String(project.id));
       await expectRichText(milestoneForm, "E2E Meilensteinbeschreibung vollständig");
 
-      await expect(milestoneForm.getByRole("button", { name: /Features\s+1/ })).toBeVisible();
       await expect(milestoneForm.getByRole("button", { name: /Aufgaben\s+1/ })).toBeVisible();
       await expect(milestoneForm.getByRole("button", { name: /Tickets\s+1/ })).toBeVisible();
       await expect(milestoneForm.getByRole("button", { name: /Kommentare\s+1/ })).toBeVisible();
@@ -149,8 +143,6 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       await expect(milestoneForm.getByRole("button", { name: /Dateien\s+1/ })).toBeVisible();
       await expect(milestoneForm.getByRole("button", { name: /Events/ })).toHaveCount(0);
 
-      await milestoneForm.getByRole("button", { name: /Features/ }).click();
-      await expect(itemCard(milestoneForm, feature.title)).toBeVisible();
       await milestoneForm.getByRole("button", { name: /Aufgaben/ }).click();
       await expect(itemCard(milestoneForm, task.title)).toBeVisible();
       await milestoneForm.getByRole("button", { name: /Tickets/ }).click();
@@ -174,7 +166,6 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
       await deleteProject(request, project.id);
       await deleteTask(request, task.id);
       await deleteTicket(request, ticket.id);
-      await deleteFeature(request, feature.id);
     }
   });
 });

@@ -135,8 +135,6 @@ $batPath = "$Target\Projekt Manager.bat"
 $batContent = @'
 @echo off
 setlocal
-
-:: In das Verzeichnis dieses Startscripts wechseln
 cd /d "%~dp0"
 
 echo.
@@ -147,44 +145,55 @@ echo.
 echo  API  -^>  http://localhost:3001
 echo  Web  -^>  http://localhost:5173
 echo.
+echo  Fenster schliessen beendet alle Dienste.
+echo  -----------------------------------------
+echo.
 
-:: API-Server in eigenem Konsolenfenster starten
-:: Das Arbeitsverzeichnis /D sorgt dafuer, dass dotenv die .env-Datei findet
-start "Projekt Manager - API" /D "%~dp0apps\api" cmd /k node dist\index.js
+:: Beide Dienste im Hintergrund dieses Fensters starten (/B = kein neues Fenster)
+:: /D setzt das Arbeitsverzeichnis, damit dotenv die .env-Datei findet
+start /B /D "%~dp0apps\api" node dist\index.js
+start /B /D "%~dp0" npx --yes serve@14 apps\web\dist -l 5173 -s
 
-:: Frontend als statischen Server bereitstellen (serve via npx, einmaliger Download beim ersten Start)
-start "Projekt Manager - Web" /D "%~dp0" cmd /k npx --yes serve@14 apps\web\dist -l 5173 -s
-
-:: Kurz warten bis die Server bereit sind, dann Browser oeffnen
+:: Warten bis Server bereit, dann Browser oeffnen
 timeout /t 5 /nobreak > nul
 start "" "http://localhost:5173"
 
-echo  Beide Dienste wurden gestartet.
-echo  Dieses Fenster kann geschlossen werden.
-pause
+:: Fenster offen halten – Ausgabe beider Dienste erscheint hier
+pause > nul
 '@
 
 Set-Content -Path $batPath -Value $batContent -Encoding ASCII
 
+$shell = New-Object -ComObject WScript.Shell
+
 # Desktop-Verknuepfung anlegen / aktualisieren
 $desktopPath = [Environment]::GetFolderPath('Desktop')
 $shortcutPath = "$desktopPath\Projekt Manager.lnk"
-
-$shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath  = $batPath
+$shortcut.TargetPath      = $batPath
 $shortcut.WorkingDirectory = $Target
-$shortcut.WindowStyle = 1   # 1 = Normal
-$shortcut.Description = "Projekt Manager starten"
+$shortcut.WindowStyle     = 1
+$shortcut.Description     = "Projekt Manager starten"
 $shortcut.Save()
-
 Write-Host "  Desktop-Verknuepfung : $shortcutPath" -ForegroundColor Gray
+
+# Autostart-Verknuepfung anlegen / aktualisieren
+$startupDir  = [Environment]::GetFolderPath('Startup')
+$startupPath = "$startupDir\Projekt Manager.lnk"
+$shortcut2 = $shell.CreateShortcut($startupPath)
+$shortcut2.TargetPath      = $batPath
+$shortcut2.WorkingDirectory = $Target
+$shortcut2.WindowStyle     = 1
+$shortcut2.Description     = "Projekt Manager starten"
+$shortcut2.Save()
+Write-Host "  Autostart-Verknuepfung: $startupPath" -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "================================" -ForegroundColor Green
 Write-Host "   Deployment abgeschlossen!    " -ForegroundColor Green
 Write-Host "================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Startscript          : $batPath"
-Write-Host "  Desktop-Verknuepfung : $shortcutPath"
+Write-Host "  Startscript            : $batPath"
+Write-Host "  Desktop-Verknuepfung  : $shortcutPath"
+Write-Host "  Autostart-Verknuepfung: $startupPath"
 Write-Host ""

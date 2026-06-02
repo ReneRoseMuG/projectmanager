@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface FormSidebarProps {
   children: ReactNode;
@@ -9,7 +8,7 @@ interface FormSidebarProps {
 }
 
 const FIXED_WIDTH = 260;
-const COLLAPSED_WIDTH = 32;
+const COLLAPSED_WIDTH = 12;
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -52,46 +51,43 @@ export function FormSidebar({
   return (
     <aside
       className={cn(
-        "flex min-h-0 shrink-0 flex-col border-l border-line bg-steel-100 transition-[width] duration-150",
+        "flex min-h-0 shrink-0 flex-row border-l border-line bg-steel-100 transition-[width] duration-150",
         className,
       )}
       style={{ width: collapsed ? COLLAPSED_WIDTH : FIXED_WIDTH }}
       data-testid="form-sidebar"
     >
-      {collapsed ? (
-        <button
-          type="button"
-          aria-label="Stammdaten öffnen"
-          title="Stammdaten öffnen"
-          className="flex h-8 w-full items-center justify-center text-steel-400 transition hover:bg-steel-100 hover:text-ink focus:outline-none"
-          onClick={() => setCollapsed(false)}
-        >
-          <ChevronLeft size={16} />
-        </button>
-      ) : (
-        <div className="flex items-center border-b border-line px-2 py-1.5">
-          <button
-            type="button"
-            aria-label="Stammdaten schließen"
-            title="Stammdaten schließen"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-steel-400 transition hover:bg-steel-100 hover:text-ink focus:outline-none"
-            onClick={() => setCollapsed(true)}
+      <button
+        type="button"
+        aria-label={collapsed ? "Stammdaten öffnen" : "Stammdaten schließen"}
+        title={collapsed ? "Stammdaten öffnen" : "Stammdaten schließen"}
+        className="flex w-3 shrink-0 cursor-col-resize flex-col items-center justify-center gap-[3px] transition-colors hover:bg-steel-200 focus:outline-none"
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        {collapsed ? (
+          <span
+            className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-steel-500"
+            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
           >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-      )}
-      {collapsed ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
-          <span className="-rotate-90 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-steel-500">
             Stammdaten
           </span>
-        </div>
-      ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <div className="grid gap-2.5">{children}</div>
-        </div>
-      )}
+        ) : (
+          <>
+            <span className="h-[3px] w-[3px] rounded-full bg-steel-400" />
+            <span className="h-[3px] w-[3px] rounded-full bg-steel-400" />
+            <span className="h-[3px] w-[3px] rounded-full bg-steel-400" />
+          </>
+        )}
+      </button>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto p-3 transition-opacity duration-150"
+        style={{
+          opacity: collapsed ? 0 : 1,
+          pointerEvents: collapsed ? "none" : "auto",
+        }}
+      >
+        <div className="grid gap-2.5">{children}</div>
+      </div>
     </aside>
   );
 }

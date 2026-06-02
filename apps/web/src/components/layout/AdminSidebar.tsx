@@ -1,4 +1,4 @@
-import { DatabaseBackup, ListChecks, ShieldCheck, Tag, Users } from "lucide-react";
+import { DatabaseBackup, ListChecks, Monitor, ShieldCheck, Tag, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const adminItems = [
@@ -7,6 +7,7 @@ const adminItems = [
   { to: "/admin/backup", label: "Sicherung", icon: DatabaseBackup },
   { to: "/admin/users", label: "Benutzer", icon: Users },
   { to: "/admin/roles", label: "Rollen", icon: ShieldCheck },
+  { to: "/admin/ui", label: "User Interface", icon: Monitor },
 ];
 
 function adminLinkClass(isActive: boolean): string {
@@ -19,7 +20,7 @@ function adminLinkClass(isActive: boolean): string {
 export function AdminSidebar() {
   return (
     <aside className="w-28 shrink-0 bg-gradient-to-b from-steel-800 to-steel-900 px-3 py-5">
-      <p className="mb-4 text-center text-xs font-bold uppercase tracking-wide text-white/45">
+      <p className="mb-4 text-center text-xs font-bold uppercase tracking-wide text-white">
         Admin
       </p>
       <nav aria-label="Admin-Bereich" className="grid gap-3">
