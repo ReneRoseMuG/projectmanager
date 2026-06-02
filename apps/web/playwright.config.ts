@@ -51,7 +51,6 @@ export default defineConfig({
         UPLOAD_DIR: path.join(e2eRuntimeRoot, "uploads"),
         PREVIEW_CACHE_DIR: path.join(e2eRuntimeRoot, "previews"),
         CONTENT_DIR: path.join(e2eRuntimeRoot, "content"),
-        BACKUP_WORK_DIR: path.join(e2eRuntimeRoot, "backups"),
         PORT: String(apiPort),
         CORS_ORIGIN: webBaseUrl,
         ADMIN_EMAIL: "admin@local",

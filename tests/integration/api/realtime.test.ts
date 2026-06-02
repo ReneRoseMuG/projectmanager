@@ -57,36 +57,6 @@ async function readSseHandshake(baseUrl: string, cookie: string): Promise<{ chun
   });
 }
 
-async function readPublishedBackupProgress(baseUrl: string, cookie: string, publish: () => void): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const request = http.get(`${baseUrl}/api/realtime/stream`, { headers: { Cookie: cookie } }, (response) => {
-      let published = false;
-      let eventBuffer = "";
-      response.setEncoding("utf8");
-      response.on("data", (chunk: string) => {
-        if (!published && chunk.includes(": connected")) {
-          published = true;
-          publish();
-          return;
-        }
-        eventBuffer += chunk;
-        if (eventBuffer.includes("event: backup_progress") && eventBuffer.includes("\n\n")) {
-          request.destroy();
-          resolve(eventBuffer);
-        }
-      });
-    });
-    request.setTimeout(3000, () => {
-      request.destroy();
-      reject(new Error("Timed out waiting for backup progress SSE event"));
-    });
-    request.on("error", (error: NodeJS.ErrnoException) => {
-      if (error.code !== "ECONNRESET") {
-        reject(error);
-      }
-    });
-  });
-}
 
 describe("Realtime API", () => {
   let testDb: TestDb;
@@ -133,26 +103,6 @@ describe("Realtime API", () => {
 
     expect(handshake.contentType).toContain("text/event-stream");
     expect(handshake.chunk).toContain(": connected");
-  });
-
-  it("sendet Backup-Fortschritt als eigenes SSE-Event", async () => {
-    const login = await supertest(app.server).post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
-    const baseUrl = await app.listen({ host: "127.0.0.1", port: 0 });
-
-    const chunk = await readPublishedBackupProgress(baseUrl, firstCookie(login), () => {
-      app.realtimeBus.publish({
-        type: "backup_progress",
-        operation: "full_backup",
-        phase: "archive",
-        current: 1,
-        total: 3,
-        detail: "uploads/example.txt"
-      });
-    });
-
-    expect(chunk).toContain("event: backup_progress");
-    expect(chunk).toContain("\"operation\":\"full_backup\"");
-    expect(chunk).toContain("\"phase\":\"archive\"");
   });
 
   it("publiziert Events für erfolgreiche Mutationen und keine Events für Fehler", async () => {

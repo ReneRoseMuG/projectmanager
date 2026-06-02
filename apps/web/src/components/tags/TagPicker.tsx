@@ -1,6 +1,7 @@
 import type { Tag } from "@taskmanager/shared-types";
-import { Plus, Tag as TagIcon, X } from "lucide-react";
+import { Minus, Plus, Tag as TagIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ColorPicker } from "../ui/ColorPicker";
 import { useTags } from "../../hooks/useTags";
 
 interface TagPickerProps {
@@ -33,7 +34,7 @@ function TagPill({ tag, onRemove }: { tag: Tag; onRemove: (id: number) => void }
         className="ml-0.5 shrink-0 opacity-60 transition hover:opacity-100"
         onClick={() => onRemove(tag.id)}
       >
-        <X size={10} />
+        <Minus size={10} />
       </button>
     </span>
   );
@@ -42,8 +43,11 @@ function TagPill({ tag, onRemove }: { tag: Tag; onRemove: (id: number) => void }
 export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
   const { tags, createTag } = useTags();
   const [open, setOpen] = useState(false);
+  const [dropUp, setDropUp] = useState(false);
   const [search, setSearch] = useState("");
   const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState(DEFAULT_TAG_COLOR);
+  const [showNewColorPicker, setShowNewColorPicker] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedIds = useMemo(() => new Set(selected.map((t) => t.id)), [selected]);
@@ -81,9 +85,21 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
   const createAndAdd = async () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    const tag = await createTag({ name: trimmed, color: DEFAULT_TAG_COLOR });
+    const tag = await createTag({ name: trimmed, color: newColor });
     onChange([...selected, tag]);
     setNewName("");
+    setNewColor(DEFAULT_TAG_COLOR);
+    setShowNewColorPicker(false);
+  };
+
+  const openPicker = () => {
+    if (!open) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        setDropUp(window.innerHeight - rect.bottom < 300);
+      }
+    }
+    setOpen((v) => !v);
   };
 
   const addButton = (
@@ -91,14 +107,16 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
       type="button"
       aria-label="Tag hinzufügen"
       className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-line bg-white text-steel-500 transition hover:bg-shell hover:text-ink"
-      onClick={() => setOpen((v) => !v)}
+      onClick={openPicker}
     >
       <Plus size={13} />
     </button>
   );
 
+  const dropdownPositionClass = dropUp ? "bottom-full mb-1" : "top-full mt-1";
+
   const dropdown = open ? (
-    <div className="absolute right-0 top-full z-50 mt-1 w-52 rounded-md border border-line bg-white shadow-md">
+    <div className={`absolute right-0 ${dropdownPositionClass} z-50 w-64 rounded-md border border-line bg-white shadow-md`}>
       <div className="p-2">
         <input
           className="h-8 w-full rounded border border-line px-2 text-sm outline-none focus:border-steel-600"
@@ -130,9 +148,16 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
         )}
       </div>
       <div className="border-t border-line p-2">
-        <div className="flex gap-1.5">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-1.5">
+          <button
+            type="button"
+            className="h-7 w-7 shrink-0 rounded-full border-2 border-white shadow-sm transition hover:ring-2 hover:ring-steel-300"
+            style={{ backgroundColor: newColor }}
+            aria-label="Farbe wählen"
+            onClick={() => setShowNewColorPicker((v) => !v)}
+          />
           <input
-            className="h-7 min-w-0 flex-1 rounded border border-line px-2 text-xs outline-none focus:border-steel-600"
+            className="h-7 min-w-0 rounded border border-line px-2 text-xs outline-none focus:border-steel-600"
             placeholder="Neues Tag…"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
@@ -152,6 +177,11 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
             Neu
           </button>
         </div>
+        {showNewColorPicker ? (
+          <div className="mt-2">
+            <ColorPicker value={newColor} onChange={setNewColor} />
+          </div>
+        ) : null}
       </div>
     </div>
   ) : null;

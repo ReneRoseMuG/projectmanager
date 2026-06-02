@@ -295,6 +295,25 @@ describe("Tasks API", () => {
     await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks/${closedTask.id}`).expect(400);
   });
 
+  it("GET /api/tasks/link-candidates liefert Projektaufgaben für bestehende Meilensteine", async () => {
+    const project = await createProject(app, { name: "Bestehender Meilenstein Projekt" });
+    const foreignProject = await createProject(app, { name: "Fremdes Projekt" });
+    const milestone = await createMilestone(app, project.id, { name: "Bestehender Meilenstein" });
+    const projectTask = await createTask(app, project.id, { title: "Verknüpfbare Projektaufgabe", status: "todo" });
+    const linkedMilestoneTask = await createTask(app, project.id, { title: "Schon am Meilenstein", status: "todo" });
+    const closedProjectTask = await createTask(app, project.id, { title: "Geschlossene Projektaufgabe", status: "done" });
+    const foreignTask = await createTask(app, foreignProject.id, { title: "Fremde Projektaufgabe", status: "todo" });
+    await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks/${linkedMilestoneTask.id}`).expect(200);
+
+    const res = await supertest(app.server).get(`/api/tasks/link-candidates?ownerType=milestone&ownerId=${milestone.id}`).expect(200);
+    const ids = res.body.map((item: { id: number }) => item.id);
+
+    expect(ids).toContain(projectTask.id);
+    expect(ids).not.toContain(linkedMilestoneTask.id);
+    expect(ids).not.toContain(closedProjectTask.id);
+    expect(ids).not.toContain(foreignTask.id);
+  });
+
   it("GET /api/tasks/link-candidates unterstützt Create-Kontext ohne Owner-Ausschluss", async () => {
     const project = await createProject(app, { name: "Kontext-Projekt" });
     const foreignProject = await createProject(app, { name: "Fremdes Projekt" });
@@ -304,6 +323,21 @@ describe("Tasks API", () => {
     const foreignTask = await createTask(app, foreignProject.id, { title: "Fremde Aufgabe" });
 
     const res = await supertest(app.server).get(`/api/tasks/link-candidates?contextOwnerType=milestone&contextOwnerId=${milestone.id}`).expect(200);
+    const ids = res.body.map((item: { id: number }) => item.id);
+
+    expect(ids).toContain(projectTask.id);
+    expect(ids).not.toContain(closedProjectTask.id);
+    expect(ids).not.toContain(foreignTask.id);
+  });
+
+  it("GET /api/tasks/link-candidates unterstützt Projekt-Create-Kontext für neue Meilensteine", async () => {
+    const project = await createProject(app, { name: "Neuer Meilenstein Projekt" });
+    const foreignProject = await createProject(app, { name: "Fremdes Meilenstein Projekt" });
+    const projectTask = await createTask(app, project.id, { title: "Offene Projektaufgabe", status: "todo" });
+    const closedProjectTask = await createTask(app, project.id, { title: "Geschlossene Projektaufgabe", status: "done" });
+    const foreignTask = await createTask(app, foreignProject.id, { title: "Fremde Projektaufgabe", status: "todo" });
+
+    const res = await supertest(app.server).get(`/api/tasks/link-candidates?contextOwnerType=project&contextOwnerId=${project.id}`).expect(200);
     const ids = res.body.map((item: { id: number }) => item.id);
 
     expect(ids).toContain(projectTask.id);

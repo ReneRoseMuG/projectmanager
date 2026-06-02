@@ -369,7 +369,6 @@ export function TicketForm({
           <div className="flex min-h-0 w-full flex-1">
             <div className="min-w-0 flex-1 overflow-auto p-2.5">
               <div className="grid w-full gap-4">
-                {showParentContexts ? <ParentContextField parents={currentTicket?.parentContexts} /> : null}
                 <Section>
                   <div className="grid gap-4">
                     <FormField label="Titel" required>
@@ -383,6 +382,7 @@ export function TicketForm({
               </div>
             </div>
             <FormSidebar storageKey="ticket-form-sidebar">
+              {showParentContexts ? <ParentContextField parents={currentTicket?.parentContexts} /> : null}
               <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
               <CatalogSelect label="Typ" icon={<SlidersHorizontal size={14} />} variant="panel" kind="ticketType" value={type} onChange={setType} />
               <CatalogSelect label="Priorität" icon={<Flag size={14} />} variant="panel" kind="priority" value={priority} onChange={setPriority} />

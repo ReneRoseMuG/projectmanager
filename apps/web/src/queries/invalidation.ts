@@ -306,7 +306,7 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.tickets.root,
     queryKeys.dashboards.root,
     queryKeys.settings.root,
-    queryKeys.dumps.root,
+    queryKeys.attachmentSync.root,
     queryKeys.pushNotifications.root,
     queryKeys.journal.root,
     queryKeys.auth.root,
@@ -317,6 +317,6 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
   ]);
 }
 
-export async function invalidateDumps(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.dumps.root]);
+export async function invalidateAttachmentSync(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.attachmentSync.root]);
 }

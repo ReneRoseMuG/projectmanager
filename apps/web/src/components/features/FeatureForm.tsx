@@ -550,7 +550,6 @@ export function FeatureForm({
           <div className="flex min-h-0 w-full flex-1">
             <div className="min-w-0 flex-1 overflow-auto p-2.5">
               <div className="grid w-full gap-4">
-                {showParentContexts ? <ParentContextField parents={feature?.parentContexts} /> : null}
                 <Section>
                   <FormField label="Titel" required className="min-w-0">
                     <Input
@@ -573,6 +572,7 @@ export function FeatureForm({
               </div>
             </div>
             <FormSidebar storageKey="feature-form-sidebar">
+              {showParentContexts ? <ParentContextField parents={feature?.parentContexts} /> : null}
               <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="featureStatus" value={status} onChange={setStatus} />
               <UserSelectField
                 label="Verantwortlich"

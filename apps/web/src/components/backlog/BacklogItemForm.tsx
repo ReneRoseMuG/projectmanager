@@ -105,7 +105,6 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
       <div className="flex min-h-0 w-full flex-1">
         <div className="min-w-0 flex-1 overflow-auto p-2.5">
           <div className="grid w-full gap-4">
-            <ParentContextField parents={item?.parentContexts} />
             <Section title="Stammdaten">
               <FormField label="Titel" required>
                 <Input value={title} onChange={(event) => setTitle(event.target.value)} required />
@@ -140,6 +139,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onPostCreate, 
         </div>
 
         <FormSidebar storageKey="backlog-item-form-sidebar">
+          <ParentContextField parents={item?.parentContexts} />
           <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
           <UserSelectField label="Verantwortlich" icon={<Users size={14} />} variant="panel" value={responsibleUserId} selectedUser={item?.responsibleUser ?? null} onChange={setResponsibleUserId} />
           <Select label="Feature" icon={<BookOpen size={14} />} variant="panel" value={featureId ?? ""} onChange={(event) => setFeatureId(event.target.value ? Number(event.target.value) : null)}>

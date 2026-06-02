@@ -1,5 +1,5 @@
 import type { Tag } from "@taskmanager/shared-types";
-import { FileText, MessageCircle, Paperclip, Plus, Tag as TagIcon } from "lucide-react";
+import { FileText, MessageCircle, Minus, Paperclip, Plus, Tag as TagIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type TagLabelMode = "full" | "short";
@@ -17,6 +17,7 @@ interface CardFooterBarProps {
 
 interface TagPillProps {
   tag: Tag;
+  onRemove?: (tagId: number) => void;
 }
 
 export interface CardFooterCounter {
@@ -54,7 +55,7 @@ function tagStyle(color: string) {
   };
 }
 
-function TagPill({ tag }: TagPillProps) {
+function TagPill({ tag, onRemove }: TagPillProps) {
   const labelRef = useRef<HTMLSpanElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const [abbreviated, setAbbreviated] = useState(false);
@@ -78,7 +79,7 @@ function TagPill({ tag }: TagPillProps) {
 
   return (
     <span
-      className="relative inline-flex min-w-0 max-w-[6.5rem] items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold leading-5"
+      className="relative inline-flex min-w-0 max-w-[6.5rem] items-center gap-0.5 rounded-md border px-2 py-0.5 text-[11px] font-semibold leading-5"
       style={tagStyle(tag.color)}
       title={tag.name}
     >
@@ -88,6 +89,16 @@ function TagPill({ tag }: TagPillProps) {
       <span ref={measureRef} className="pointer-events-none absolute -left-[9999px] top-0 whitespace-nowrap text-[11px] font-semibold">
         {tag.name}
       </span>
+      {onRemove ? (
+        <button
+          type="button"
+          aria-label={`Tag "${tag.name}" entfernen`}
+          className="ml-0.5 shrink-0 opacity-60 transition hover:opacity-100"
+          onClick={(e) => { e.stopPropagation(); onRemove(tag.id); }}
+        >
+          <Minus size={10} />
+        </button>
+      ) : null}
     </span>
   );
 }
@@ -188,7 +199,11 @@ export function CardFooterBar({
   const tagList = (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
       {visibleTags.map((tag) => (
-        <TagPill key={tag.id} tag={tag} />
+        <TagPill
+          key={tag.id}
+          tag={tag}
+          onRemove={canEditTags ? (tagId) => void toggleTag(tagId) : undefined}
+        />
       ))}
       {canEditTags ? (
         <button

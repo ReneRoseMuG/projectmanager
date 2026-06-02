@@ -521,6 +521,59 @@ export async function listTasks(database: DbClient): Promise<Task[]> {
   return Promise.all(rows.map((task) => mapTask(database, task, Promise.resolve(tagsByTask.get(task.id) ?? []), Promise.resolve(subtaskCounts.get(task.id) ?? 0), undefined, Promise.resolve(supportCountsMap.get(task.id) ?? emptySupportCounts))));
 }
 
+async function listNeutralTasks(database: DbClient): Promise<Task[]> {
+  const rows = await database
+    .select(taskSelect)
+    .from(tasks)
+    .leftJoin(projectTasks, eq(projectTasks.taskId, tasks.id))
+    .leftJoin(milestoneTasks, eq(milestoneTasks.taskId, tasks.id))
+    .leftJoin(featureTasks, eq(featureTasks.taskId, tasks.id))
+    .leftJoin(useCaseTasks, eq(useCaseTasks.taskId, tasks.id))
+    .leftJoin(wikiPageTasks, eq(wikiPageTasks.taskId, tasks.id))
+    .where(and(
+      isNull(tasks.parentId),
+      isNull(projectTasks.taskId),
+      isNull(milestoneTasks.taskId),
+      isNull(featureTasks.taskId),
+      isNull(useCaseTasks.taskId),
+      isNull(wikiPageTasks.taskId)
+    ));
+  const ids = rows.map((task) => task.id);
+  const [tagsByTask, subtaskCounts, supportCountsMap] = await Promise.all([
+    getTaskTagsMap(database, ids),
+    getSubtaskCounts(database, ids),
+    getTaskSupportCounts(database, ids)
+  ]);
+
+  return Promise.all(rows.map((task) => mapTask(database, task, Promise.resolve(tagsByTask.get(task.id) ?? []), Promise.resolve(subtaskCounts.get(task.id) ?? 0), undefined, Promise.resolve(supportCountsMap.get(task.id) ?? emptySupportCounts))));
+}
+
+async function listMilestoneTaskLinkCandidates(
+  database: DbClient,
+  milestoneOwner: { type: "milestone"; id: number },
+  linkedTaskIds: Set<number>,
+  closedStatusKeys: Set<string>
+): Promise<Task[]> {
+  const ownerContext = await taskOwnerProjectContext(database, milestoneOwner);
+  const projectId = [...ownerContext][0];
+  if (ownerContext.size !== 1 || projectId === undefined) {
+    return [];
+  }
+
+  const [projectTasks, neutralTasks] = await Promise.all([
+    listOwnerTasks(database, { type: "project", id: projectId }),
+    listNeutralTasks(database)
+  ]);
+  const seenTaskIds = new Set<number>();
+  return [...projectTasks, ...neutralTasks].filter((task) => {
+    if (seenTaskIds.has(task.id) || linkedTaskIds.has(task.id) || closedStatusKeys.has(task.status)) {
+      return false;
+    }
+    seenTaskIds.add(task.id);
+    return true;
+  });
+}
+
 export async function listTaskLinkCandidates(database: DbClient, owner: TaskOwner | null, contextOwner?: TaskOwner | null): Promise<Task[]> {
   if (!owner && !contextOwner) {
     throw badRequest("Task link candidates require an owner or context owner");
@@ -534,6 +587,16 @@ export async function listTaskLinkCandidates(database: DbClient, owner: TaskOwne
   const ownerTaskRows = owner ? await selectVisibleOwnerTaskRows(database, owner) : [];
   const linkedTaskIds = new Set(ownerTaskRows.map((task) => task.id));
   const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
+
+  if (!owner && contextOwner?.type === "project") {
+    const projectTasks = await listOwnerTasks(database, contextOwner);
+    return projectTasks.filter((task) => !closedStatusKeys.has(task.status));
+  }
+
+  if (owner?.type === "milestone" && !contextOwner) {
+    return listMilestoneTaskLinkCandidates(database, { type: "milestone", id: owner.id }, linkedTaskIds, closedStatusKeys);
+  }
+
   const allTasks = await listTasks(database);
 
   const compatibilityOwner = contextOwner ?? owner;

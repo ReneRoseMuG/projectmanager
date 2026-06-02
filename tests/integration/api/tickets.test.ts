@@ -256,6 +256,21 @@ describe("Tickets API", () => {
     expect(ids).not.toContain(foreignTicket.id);
   });
 
+  it("GET /api/tickets/link-candidates unterstützt Projekt-Create-Kontext für neue Meilensteine", async () => {
+    const project = await createProject(app, { name: "Neuer Ticket-Meilenstein" });
+    const foreignProject = await createProject(app, { name: "Fremdes Ticket-Meilenstein-Projekt" });
+    const projectTicket = await createTicket(app, { type: "project", id: project.id }, { title: "Offenes Projektticket", status: "open" });
+    const closedProjectTicket = await createTicket(app, { type: "project", id: project.id }, { title: "Geschlossenes Projektticket", status: "resolved" });
+    const foreignTicket = await createTicket(app, { type: "project", id: foreignProject.id }, { title: "Fremdes Projektticket", status: "open" });
+
+    const res = await supertest(app.server).get(`/api/tickets/link-candidates?contextOwnerType=project&contextOwnerId=${project.id}`).expect(200);
+    const ids = (res.body as TestTicket[]).map((ticket) => ticket.id);
+
+    expect(ids).toContain(projectTicket.id);
+    expect(ids).not.toContain(closedProjectTicket.id);
+    expect(ids).not.toContain(foreignTicket.id);
+  });
+
   it("GET /api/projects/:id/tickets liefert direkte und Meilenstein-Tickets kumulativ", async () => {
     const project = await createProject(app, { name: "Ticket-Projekt" });
     const milestone = await createMilestone(app, project.id, { name: "Ticket-Meilenstein" });

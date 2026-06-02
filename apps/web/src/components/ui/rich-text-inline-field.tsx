@@ -21,7 +21,6 @@
 import type { Editor } from "@tiptap/core";
 import Color from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
-import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import TextAlign from "@tiptap/extension-text-align";
@@ -61,6 +60,7 @@ import { errorMessage } from "../../hooks/errors";
 import { hasVisibleHtmlContent } from "../../lib/html-utils";
 import { useToast } from "./ToastProvider";
 import { Column, ColumnBlock } from "./tiptap-column-node";
+import { ResizableImage } from "./tiptap-image-node";
 import { TldrawNode } from "./tldraw-node";
 
 interface RichTextInlineFieldProps {
@@ -239,7 +239,7 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
       }),
       Underline,
       Link.configure({ openOnClick: false }),
-      Image,
+      ResizableImage,
       TldrawNode,
       Column,
       ColumnBlock,

@@ -56,7 +56,6 @@ describe("Projekt Manager API integration", () => {
     process.env.UPLOAD_DIR = path.join(tempDir, "uploads");
     process.env.PREVIEW_CACHE_DIR = path.join(tempDir, "previews");
     process.env.CONTENT_DIR = path.join(tempDir, "content");
-    process.env.BACKUP_WORK_DIR = path.join(tempDir, "backups");
     process.env.PORT = "0";
     process.env.ADMIN_EMAIL = "admin@local";
     process.env.ADMIN_FIRST_NAME = "Integration";

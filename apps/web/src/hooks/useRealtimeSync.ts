@@ -1,8 +1,7 @@
-import type { BackupProgressEvent, RealtimeInvalidationEvent, RealtimeInvalidationScope } from "@taskmanager/shared-types";
+import type { RealtimeInvalidationEvent, RealtimeInvalidationScope } from "@taskmanager/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { apiBaseUrl, getClientTabId } from "../api/client";
-import { publishBackupProgress } from "./useBackupProgress";
 import {
   invalidateAdminRoles,
   invalidateAdminUsers,
@@ -83,7 +82,6 @@ async function invalidateRealtimeScope(queryClient: ReturnType<typeof useQueryCl
       await invalidateDayPlan(queryClient);
       return;
     case "backlog":
-    case "dumps":
     case "all":
       await invalidateWikiImportData(queryClient);
       return;
@@ -97,24 +95,6 @@ function parseRealtimeEvent(data: string): RealtimeInvalidationEvent | null {
     const parsed = JSON.parse(data) as Partial<RealtimeInvalidationEvent>;
     if (parsed.type === "invalidate" && typeof parsed.scope === "string") {
       return parsed as RealtimeInvalidationEvent;
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function parseBackupProgressEvent(data: string): BackupProgressEvent | null {
-  try {
-    const parsed = JSON.parse(data) as Partial<BackupProgressEvent>;
-    if (
-      parsed.type === "backup_progress" &&
-      (parsed.operation === "full_backup" || parsed.operation === "import") &&
-      typeof parsed.phase === "string" &&
-      typeof parsed.current === "number" &&
-      typeof parsed.total === "number"
-    ) {
-      return parsed as BackupProgressEvent;
     }
   } catch {
     return null;
@@ -147,18 +127,9 @@ export function useRealtimeSync(enabled: boolean): void {
     };
 
     eventSource.addEventListener("invalidate", handleInvalidate as EventListener);
-    const handleBackupProgress = (message: MessageEvent<string>) => {
-      const event = parseBackupProgressEvent(message.data);
-      if (event) {
-        publishBackupProgress(event);
-      }
-    };
-
-    eventSource.addEventListener("backup_progress", handleBackupProgress as EventListener);
 
     return () => {
       eventSource.removeEventListener("invalidate", handleInvalidate as EventListener);
-      eventSource.removeEventListener("backup_progress", handleBackupProgress as EventListener);
       eventSource.close();
     };
   }, [enabled, queryClient]);

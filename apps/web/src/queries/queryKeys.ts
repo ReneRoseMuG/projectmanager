@@ -130,10 +130,9 @@ export const queryKeys = {
     root: ["calendarTasks"] as const,
     list: () => [...queryKeys.calendarTasks.root, "list"] as const
   },
-  dumps: {
-    root: ["dumps"] as const,
-    localStatus: () => [...queryKeys.dumps.root, "localStatus"] as const,
-    remoteStatus: () => [...queryKeys.dumps.root, "remoteStatus"] as const
+  attachmentSync: {
+    root: ["attachmentSync"] as const,
+    status: () => [...queryKeys.attachmentSync.root, "status"] as const
   },
   tickets: {
     root: ["tickets"] as const,

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import path from "node:path";
-import { apiRoot, repoRoot } from "./runtime-safety.js";
+import { apiRoot } from "./runtime-safety.js";
 
 export interface AppConfig {
   db: {
@@ -21,14 +21,12 @@ export interface AppConfig {
   previewConversionTimeoutMs: number;
   libreOfficePath: string;
   contentDir: string;
-  backupWorkDir: string;
-  backupSftpEnabled: boolean;
-  backupSftpHost: string;
-  backupSftpPort: number;
-  backupSftpUser: string;
-  backupSftpPassword: string;
-  backupSftpRemoteDir: string;
-  backupSftpProtectedConfirmed: boolean;
+  sftpHost: string;
+  sftpPort: number;
+  sftpUser: string;
+  sftpPassword: string;
+  attachmentSyncEnabled: boolean;
+  attachmentSyncRemoteDir: string;
   notificationsEnabled: boolean;
   notificationCron: string;
   smtpEnabled: boolean;
@@ -53,20 +51,6 @@ export interface AppConfig {
 
 function resolveFromApiRoot(value: string): string {
   return path.isAbsolute(value) ? value : path.resolve(apiRoot, value);
-}
-
-function resolveFromRepoRoot(value: string): string {
-  return path.isAbsolute(value) ? value : path.resolve(repoRoot, value);
-}
-
-export function resolveBackupWorkDir(value: string | undefined): string {
-  const configuredValue = value?.trim() ? value.trim() : "./backups";
-  const resolvedPath = resolveFromRepoRoot(configuredValue);
-  const legacyApiBackupDir = path.resolve(apiRoot, "backups");
-  if (path.resolve(resolvedPath).toLowerCase() === legacyApiBackupDir.toLowerCase()) {
-    return path.resolve(repoRoot, "backups");
-  }
-  return resolvedPath;
 }
 
 function numberFromEnv(value: string | undefined, fallback: number): number {
@@ -101,14 +85,12 @@ export const config: AppConfig = {
   previewConversionTimeoutMs: numberFromEnv(process.env.PREVIEW_CONVERSION_TIMEOUT_MS, 15000),
   libreOfficePath: process.env.LIBREOFFICE_PATH ?? "soffice",
   contentDir: resolveFromApiRoot(process.env.CONTENT_DIR ?? "./content"),
-  backupWorkDir: resolveBackupWorkDir(process.env.BACKUP_WORK_DIR),
-  backupSftpEnabled: booleanFromEnv(process.env.BACKUP_SFTP_ENABLED),
-  backupSftpHost: process.env.BACKUP_SFTP_HOST?.trim() ?? "",
-  backupSftpPort: numberFromEnv(process.env.BACKUP_SFTP_PORT, 22),
-  backupSftpUser: process.env.BACKUP_SFTP_USER?.trim() ?? "",
-  backupSftpPassword: process.env.BACKUP_SFTP_PASSWORD ?? "",
-  backupSftpRemoteDir: process.env.BACKUP_SFTP_REMOTE_DIR?.trim() ?? "",
-  backupSftpProtectedConfirmed: booleanFromEnv(process.env.BACKUP_SFTP_PROTECTED_CONFIRMED),
+  sftpHost: process.env.SFTP_HOST?.trim() ?? "",
+  sftpPort: numberFromEnv(process.env.SFTP_PORT, 22),
+  sftpUser: process.env.SFTP_USER?.trim() ?? "",
+  sftpPassword: process.env.SFTP_PASSWORD ?? "",
+  attachmentSyncEnabled: booleanFromEnv(process.env.ATTACHMENT_SYNC_ENABLED),
+  attachmentSyncRemoteDir: process.env.ATTACHMENT_SYNC_REMOTE_DIR?.trim() ?? "",
   notificationsEnabled: booleanFromEnv(process.env.NOTIFICATIONS_ENABLED),
   notificationCron: process.env.NOTIFICATION_CRON?.trim() || "* * * * *",
   smtpEnabled: booleanFromEnv(process.env.SMTP_ENABLED),

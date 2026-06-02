@@ -2,6 +2,13 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 02.06.26 | 15:55:14 | Feature | MS-46 TipTap Image Extensions | ✅ |
+| 02.06.26 | 10:37:17 | Fix | TASK-203 Projektzuordnung | ✅ |
+| 02.06.26 | 10:28:05 | Fix | MS-43 Dirty-Guard Auftrag | ✅ |
+| 02.06.26 | 10:16:00 | Fix | Meilenstein Aufgaben Link-Kandidaten | ⚠️ |
+| 02.06.26 | 10:04:30 | Fix | Parent Context Sidebar | ✅ |
+| 02.06.26 | 09:51:19 | Fix | Meilenstein Create Verknüpfungen | ✅ |
+| 02.06.26 | 09:24:17 | Fix | Deploy Shared Types Runtime | ✅ |
 | 02.06.26 | 09:16:59 | Feature | Deploy LocalAppData Runtime | ✅ |
 | 01.06.26 | 16:35:34 | Test | MS-41 Abschlusslauf | ⚠️ |
 | 01.06.26 | 16:35:33 | 1 | MS-41 Refactoring Kommentare, Notizen und Create-Relationen | ✅ |

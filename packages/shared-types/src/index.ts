@@ -355,7 +355,7 @@ export interface ApiErrorPayload {
   statusCode: number;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "dumps", "settings", "realtime", "users", "roles"] as const;
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "settings", "realtime", "users", "roles"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";
@@ -416,7 +416,6 @@ export const REALTIME_INVALIDATION_SCOPES = [
   "dayPlans",
   "dashboards",
   "settings",
-  "dumps",
   "adminUsers",
   "adminRoles"
 ] as const;
@@ -430,18 +429,7 @@ export interface RealtimeInvalidationEvent {
   occurredAt: string;
 }
 
-export type BackupProgressOperation = "full_backup" | "import";
-
-export interface BackupProgressEvent {
-  type: "backup_progress";
-  operation: BackupProgressOperation;
-  phase: string;
-  current: number;
-  total: number;
-  detail?: string;
-}
-
-export type RealtimeEvent = RealtimeInvalidationEvent | BackupProgressEvent;
+export type RealtimeEvent = RealtimeInvalidationEvent;
 
 export interface AdminUser {
   id: number;
@@ -594,11 +582,19 @@ export interface JournalListResponse {
   nextCursor: number | null;
 }
 
+export interface TagUsageCounts {
+  projects: number;
+  milestones: number;
+  tasks: number;
+  tickets: number;
+}
+
 export interface Tag {
   id: number;
   name: string;
   color: string;
   version: number;
+  usageCounts?: TagUsageCounts;
 }
 
 export interface Project {
@@ -1171,117 +1167,29 @@ export interface WikiImportReport {
   items: WikiImportItemResult[];
 }
 
-export type DumpReadiness = "ready" | "warning" | "blocked";
-export type DumpImportStatus = "success" | "warning" | "error";
-
-export interface DumpBackupFile {
-  id: string;
-  name: string;
-  path: string;
-  createdTime: string;
-  modifiedTime: string | null;
-  sizeBytes: number;
-}
-
-export interface DumpTableSummary {
-  key: string;
-  rowCount: number;
-  sha256: string;
-}
-
-export interface DumpFileRootSummary {
-  key: "uploads" | "content";
-  fileCount: number;
-  totalBytes: number;
-  sha256: string;
-  partial?: boolean;
-}
-
-export interface DumpBackupStatus {
-  backupDirectory: string;
-  ready: boolean;
-  fileCount: number;
-  latestFile: DumpBackupFile | null;
-}
-
-export interface DumpRemoteBackupFile extends DumpBackupFile {
-  imported: boolean;
-  importedAt: string | null;
-}
-
-export interface DumpRemoteBackupStatus {
-  remoteDirectory: string;
-  configured: boolean;
-  protectedConfirmed: boolean;
-  ready: boolean;
-  fileCount: number;
-  latestFile: DumpRemoteBackupFile | null;
-  files: DumpRemoteBackupFile[];
-  blockingIssues: string[];
-}
-
-export interface DumpRemoteUploadResult {
-  attempted: boolean;
-  success: boolean;
-  remoteFile: DumpRemoteBackupFile | null;
-  error: string | null;
-}
-
 export interface ContentImageUploadResponse {
   url: string;
 }
 
-export interface DumpBackupSaveResult {
-  dumpId: string;
-  filename: string;
-  filePath: string;
-  sizeBytes: number;
-  backupFile: DumpBackupFile;
-  remoteUpload: DumpRemoteUploadResult | null;
-}
-
-export interface DumpBackupPreviewResult {
-  previewToken?: string;
-  fileHash: string;
-  dumpId: string;
-  backupFile: DumpBackupFile;
-  targetDatabasePath: string;
-  transferReadiness: DumpReadiness;
+export interface AttachmentSyncReadiness {
+  configured: boolean;
+  ready: boolean;
+  remoteDir: string;
   blockingIssues: string[];
-  warnings: string[];
-  confirmationPhrase: string;
-  manifestPresent: boolean;
-  schemaRevision: string | null;
-  expectedTables: DumpTableSummary[];
-  expectedFileRoots: DumpFileRootSummary[];
 }
 
-export interface DumpBackupApplyRequest {
-  fileId: string;
-  fileHash: string;
-  confirmationPhrase: string;
+export interface AttachmentSyncStats {
+  pulled: number;
+  pushed: number;
+  deleted: number;
+  errors: string[];
+  durationMs: number;
+  syncedAt: string;
 }
 
-export interface DumpRemoteBackupPreviewRequest {
-  fileId?: string | null;
-}
-
-export interface DumpRemoteBackupApplyRequest {
-  fileId: string;
-  fileHash: string;
-  previewToken: string;
-  confirmed: boolean;
-}
-
-export interface DumpBackupApplyResult {
-  dumpId: string;
-  backupFile: DumpBackupFile;
-  targetBackupPath: string;
-  verificationPassed: boolean;
-  importStatus: DumpImportStatus;
-  tablesRestored: number;
-  fileRootsRestored: DumpFileRootSummary[];
-  warnings: string[];
-  blockingIssues: string[];
+export interface AttachmentSyncStatus {
+  readiness: AttachmentSyncReadiness;
+  inProgress: boolean;
+  lastSync: AttachmentSyncStats | null;
 }
 

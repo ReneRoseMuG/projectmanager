@@ -438,7 +438,6 @@ export function TaskForm({
           <div className="flex min-h-0 w-full flex-1">
             <div className="min-w-0 flex-1 overflow-auto p-2.5">
               <div className="grid w-full gap-4">
-                {showParentContexts ? <ParentContextField parents={currentTask?.parentContexts} /> : null}
                 <Section>
                   <div className="grid gap-4">
                     <FormField label="Titel" required>
@@ -464,6 +463,7 @@ export function TaskForm({
               </div>
             </div>
             <FormSidebar storageKey="task-form-sidebar">
+              {showParentContexts ? <ParentContextField parents={currentTask?.parentContexts} /> : null}
               <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
               <CatalogSelect label="Priorität" icon={<Flag size={14} />} variant="panel" kind="priority" value={priority} onChange={setPriority} />
               <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />

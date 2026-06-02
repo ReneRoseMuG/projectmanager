@@ -35,8 +35,7 @@ export default defineConfig({
       ATTACHMENT_BASE_PATH: path.join(runtimeRoot, "uploads"),
       UPLOAD_DIR: path.join(runtimeRoot, "uploads"),
       PREVIEW_CACHE_DIR: path.join(runtimeRoot, "previews"),
-      CONTENT_DIR: path.join(runtimeRoot, "content"),
-      BACKUP_WORK_DIR: path.join(runtimeRoot, "backups")
+      CONTENT_DIR: path.join(runtimeRoot, "content")
     }
   }
 });

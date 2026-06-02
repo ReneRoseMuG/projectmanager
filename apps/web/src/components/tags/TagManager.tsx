@@ -5,20 +5,11 @@ import { deleteTag, updateTag } from "../../api/tags";
 import { errorMessage } from "../../hooks/errors";
 import { useTags } from "../../hooks/useTags";
 import { Button } from "../ui/Button";
+import { ColorPicker } from "../ui/ColorPicker";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { Section } from "../ui/Section";
 import { useToast } from "../ui/ToastProvider";
 
-const palette = [
-  "var(--color-steel-700)",
-  "var(--color-crimson)",
-  "var(--color-tangerine)",
-  "var(--color-mustard)",
-  "var(--color-fern)",
-  "var(--color-teal)",
-  "var(--color-violet)",
-  "var(--color-magenta)"
-];
 const defaultTagColor = "var(--color-steel-700)";
 
 type SortMode = "usage" | "name" | "newest";
@@ -60,6 +51,12 @@ function TagRow({ tag, onReload }: { tag: Tag; onReload: () => Promise<void> }) 
     }
   };
 
+  const counts = tag.usageCounts;
+  const totalUsage = counts ? counts.projects + counts.milestones + counts.tasks + counts.tickets : 0;
+  const usageLabel = counts
+    ? `${counts.projects} Projekte · ${counts.milestones} Meilensteine · ${counts.tasks} Aufgaben · ${counts.tickets} Tickets`
+    : "–";
+
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_minmax(9rem,1fr)_7rem_auto] items-center gap-3 border-t border-line py-3 text-sm">
       <span className="h-6 w-6 rounded-full border border-white shadow-sm" style={{ backgroundColor: editing ? color : tag.color }} />
@@ -68,8 +65,12 @@ function TagRow({ tag, onReload }: { tag: Tag; onReload: () => Promise<void> }) 
       ) : (
         <span className="min-w-0 truncate font-semibold text-ink">{tag.name}</span>
       )}
-      <span className="text-steel-500">0 · Projekte 0 · Tasks 0 · Notizen 0</span>
-      <span className="rounded-md border border-line bg-shell px-2 py-1 text-center text-xs font-semibold text-steel-500">verwaist</span>
+      <span className="text-steel-500">{usageLabel}</span>
+      {totalUsage === 0 ? (
+        <span className="rounded-md border border-line bg-shell px-2 py-1 text-center text-xs font-semibold text-steel-500">verwaist</span>
+      ) : (
+        <span className="rounded-md border border-fern/30 bg-fern/10 px-2 py-1 text-center text-xs font-semibold text-fern">aktiv</span>
+      )}
       <div className="flex justify-end gap-1">
         {editing ? (
           <>
@@ -85,10 +86,8 @@ function TagRow({ tag, onReload }: { tag: Tag; onReload: () => Promise<void> }) 
         )}
       </div>
       {editing ? (
-        <div className="col-span-5 flex flex-wrap gap-2 pl-9">
-          {palette.map((swatch) => (
-            <button key={swatch} type="button" className={`h-7 w-7 rounded-full border-2 ${color === swatch ? "border-steel-900" : "border-white"}`} style={{ backgroundColor: swatch }} onClick={() => setColor(swatch)} aria-label={`Farbe ${swatch}`} />
-          ))}
+        <div className="col-span-5 pl-9">
+          <ColorPicker value={color} onChange={setColor} />
         </div>
       ) : null}
     </div>
@@ -139,10 +138,8 @@ export function TagManager() {
                 Anlegen
               </Button>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {palette.map((swatch) => (
-                <button key={swatch} type="button" className={`h-8 w-8 rounded-full border-2 ${color === swatch ? "border-steel-900" : "border-white"}`} style={{ backgroundColor: swatch }} onClick={() => setColor(swatch)} aria-label={`Farbe ${swatch}`} />
-              ))}
+            <div className="mt-3">
+              <ColorPicker value={color} onChange={setColor} />
             </div>
           </Section>
 

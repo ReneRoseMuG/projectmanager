@@ -383,7 +383,6 @@ export function UseCaseForm({
           <div className="flex min-h-0 w-full flex-1">
             <div className="min-w-0 flex-1 overflow-auto p-2.5">
               <div className="grid w-full gap-4">
-                {showParentContexts ? <ParentContextField parents={useCase?.parentContexts} /> : null}
                 <Section>
                   <FormField label="Titel" required className="min-w-0">
                     <Input
@@ -415,6 +414,7 @@ export function UseCaseForm({
             </div>
 
             <FormSidebar storageKey="use-case-form-sidebar">
+              {showParentContexts ? <ParentContextField parents={useCase?.parentContexts} /> : null}
               <Select
                 label="Feature"
                 icon={<BookOpen size={14} />}

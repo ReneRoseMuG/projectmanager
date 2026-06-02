@@ -5,7 +5,6 @@ import {
   assertSafeTestDirectoryPath,
   assertSafeTestRuntimeTargets,
   isTestRuntime,
-  repoRoot,
   testRuntimeRoot
 } from "../../../apps/api/src/runtime-safety.js";
 
@@ -17,7 +16,7 @@ import {
  * - Temp-Verzeichnisse und tests/.runtime sind als isolierte Testziele erlaubt.
  *
  * Fehlerfälle:
- * - uploads/, previews/, content/ und backups/ werden im Testmodus blockiert.
+ * - uploads/, previews/, content/ werden im Testmodus blockiert.
  *
  * Ziel:
  * Dateisystemtests technisch gegen produktive Laufzeitpfade absichern.
@@ -54,7 +53,6 @@ describe("runtime safety guard", () => {
     expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "uploads"), "UPLOAD_DIR")).toThrow(/application filesystem/);
     expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "previews"), "PREVIEW_CACHE_DIR")).toThrow(/application filesystem/);
     expect(() => assertSafeTestDirectoryPath(path.join(apiRoot, "content"), "CONTENT_DIR")).toThrow(/application filesystem/);
-    expect(() => assertSafeTestDirectoryPath(path.join(repoRoot, "backups"), "BACKUP_WORK_DIR")).toThrow(/application filesystem/);
   });
 
   it("prüft komplette Runtime-Ziele gemeinsam", () => {
@@ -65,7 +63,6 @@ describe("runtime safety guard", () => {
         uploadDir: path.join(testRuntimeRoot, "e2e", "uploads"),
         previewCacheDir: path.join(testRuntimeRoot, "e2e", "previews"),
         contentDir: path.join(testRuntimeRoot, "e2e", "content"),
-        backupWorkDir: path.join(testRuntimeRoot, "e2e", "backups")
       })
     ).not.toThrow();
   });

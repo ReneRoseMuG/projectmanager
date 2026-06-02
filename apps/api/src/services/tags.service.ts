@@ -1,5 +1,5 @@
 import type { JsonValue, Tag } from "@taskmanager/shared-types";
-import { inArray, eq } from "drizzle-orm";
+import { inArray, eq, sql } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { firstRow } from "../db/query-utils.js";
 import { milestoneTags, milestones, projectTags, projects, tags, taskTags, tasks, ticketTags, tickets } from "../db/schema.js";
@@ -131,7 +131,31 @@ function buildTagAssignmentSummary(owner: JournalObjectRef, changes: JournalChan
 }
 
 export async function listTags(database: DbClient): Promise<Tag[]> {
-  return (await tagRepository.findAll(database)).map(mapTag);
+  const rows = await database
+    .select({
+      id: tags.id,
+      name: tags.name,
+      color: tags.color,
+      version: tags.version,
+      projectCount: sql<number>`(SELECT COUNT(*) FROM ${projectTags} WHERE ${projectTags.tagId} = ${tags.id})`,
+      milestoneCount: sql<number>`(SELECT COUNT(*) FROM ${milestoneTags} WHERE ${milestoneTags.tagId} = ${tags.id})`,
+      taskCount: sql<number>`(SELECT COUNT(*) FROM ${taskTags} WHERE ${taskTags.tagId} = ${tags.id})`,
+      ticketCount: sql<number>`(SELECT COUNT(*) FROM ${ticketTags} WHERE ${ticketTags.tagId} = ${tags.id})`
+    })
+    .from(tags);
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    version: row.version,
+    usageCounts: {
+      projects: Number(row.projectCount),
+      milestones: Number(row.milestoneCount),
+      tasks: Number(row.taskCount),
+      tickets: Number(row.ticketCount)
+    }
+  }));
 }
 
 export async function getProjectTags(database: DbClient, projectId: number): Promise<Tag[]> {

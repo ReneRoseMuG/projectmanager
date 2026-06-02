@@ -186,6 +186,36 @@ textarea {
   padding: 0.5rem 0.75rem;
 }
 
+/* ─── TipTap Bilder ───────────────────────────────────────────────────────── */
+.tiptap-img {
+  max-width: 100%;
+  border-radius: 0.25rem;
+}
+
+.tiptap-img-float-left {
+  float: left;
+  margin: 0 1rem 0.5rem 0;
+}
+
+.tiptap-img-float-right {
+  float: right;
+  margin: 0 0 0.5rem 1rem;
+}
+
+.tiptap-img-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Clearfix: verhindert, dass floatende Bilder aus dem Container herausragen */
+.rich-text-surface::after,
+.ProseMirror::after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
 /* ─── Drittanbieter: Toast und Skeleton Animationen ────────────────────── */
 @keyframes toast-enter {
   from {

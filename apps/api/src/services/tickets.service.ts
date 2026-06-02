@@ -568,6 +568,12 @@ export async function listTicketLinkCandidates(database: DbClient, owner: Ticket
   const ownerTicketRows = owner ? await selectVisibleOwnerTicketRows(database, owner) : [];
   const linkedTicketIds = new Set(ownerTicketRows.map((ticket) => ticket.id));
   const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
+
+  if (!owner && contextOwner?.type === "project") {
+    const projectTickets = await listOwnerTickets(database, contextOwner);
+    return projectTickets.filter((ticket) => !closedStatusKeys.has(ticket.status));
+  }
+
   const allTickets = await listTickets(database);
 
   const compatibilityOwner = contextOwner ?? owner;

@@ -6,7 +6,6 @@ export interface RuntimeTargets {
   uploadDir: string;
   previewCacheDir: string;
   contentDir: string;
-  backupWorkDir: string;
 }
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -20,7 +19,6 @@ const protectedRuntimePaths = {
   uploadDir: path.resolve(apiRoot, "uploads"),
   previewCacheDir: path.resolve(apiRoot, "previews"),
   contentDir: path.resolve(apiRoot, "content"),
-  backupWorkDir: path.resolve(repoRoot, "backups")
 };
 
 function isSameOrInside(targetPath: string, rootPath: string): boolean {
@@ -38,14 +36,17 @@ export function isTestRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.NODE_ENV === "test" || env.VITEST === "true" || env.TASKMANAGER_TEST_MODE === "1";
 }
 
-export function assertSafeTestDirectoryPath(directoryPath: string, context: "UPLOAD_DIR" | "PREVIEW_CACHE_DIR" | "CONTENT_DIR" | "BACKUP_WORK_DIR"): void {
+export function assertSafeTestDirectoryPath(directoryPath: string, context: "UPLOAD_DIR" | "PREVIEW_CACHE_DIR" | "CONTENT_DIR"): void {
   if (!isTestRuntime()) {
     return;
   }
 
   const resolvedPath = path.resolve(directoryPath);
   const protectedPath =
-    protectedRuntimePaths[context === "UPLOAD_DIR" ? "uploadDir" : context === "PREVIEW_CACHE_DIR" ? "previewCacheDir" : context === "CONTENT_DIR" ? "contentDir" : "backupWorkDir"];
+    context === "UPLOAD_DIR" ? protectedRuntimePaths.uploadDir :
+    context === "PREVIEW_CACHE_DIR" ? protectedRuntimePaths.previewCacheDir :
+    protectedRuntimePaths.contentDir;
+
   if (isSameOrInside(resolvedPath, protectedPath)) {
     throw new Error(`${context} must not point to the application filesystem while tests are running: ${resolvedPath}`);
   }
@@ -58,5 +59,4 @@ export function assertSafeTestRuntimeTargets(targets: RuntimeTargets): void {
   assertSafeTestDirectoryPath(targets.uploadDir, "UPLOAD_DIR");
   assertSafeTestDirectoryPath(targets.previewCacheDir, "PREVIEW_CACHE_DIR");
   assertSafeTestDirectoryPath(targets.contentDir, "CONTENT_DIR");
-  assertSafeTestDirectoryPath(targets.backupWorkDir, "BACKUP_WORK_DIR");
 }
