@@ -20,3 +20,4 @@ coverage/
 .vite/
 apps/web/test-results/
 apps/web/playwright-report/
+scripts/deploy.ps1

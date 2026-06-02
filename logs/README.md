@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 02.06.26 | 09:16:59 | Feature | Deploy LocalAppData Runtime | ✅ |
 | 01.06.26 | 16:35:34 | Test | MS-41 Abschlusslauf | ⚠️ |
 | 01.06.26 | 16:35:33 | 1 | MS-41 Refactoring Kommentare, Notizen und Create-Relationen | ✅ |
 | 01.06.26 | 06:23:09 | Feature | MS-34 Browser-Test-Speedup | ⚠️ |
