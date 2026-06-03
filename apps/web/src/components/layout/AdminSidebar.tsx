@@ -4,7 +4,7 @@ import { NavLink } from "react-router-dom";
 const adminItems = [
   { to: "/admin/catalogs", label: "Kataloge", icon: ListChecks },
   { to: "/admin/tags", label: "Tags", icon: Tag },
-  { to: "/admin/sync", label: "Synchronisation", icon: ArrowDownUp },
+  { to: "/admin/sync", label: "Sync", icon: ArrowDownUp },
   { to: "/admin/users", label: "Benutzer", icon: Users },
   { to: "/admin/roles", label: "Rollen", icon: ShieldCheck },
   { to: "/admin/ui", label: "User Interface", icon: Monitor },
@@ -19,7 +19,7 @@ function adminLinkClass(isActive: boolean): string {
 /** Inner navigation for admin sections. */
 export function AdminSidebar() {
   return (
-    <aside className="w-28 shrink-0 bg-gradient-to-b from-steel-800 to-steel-900 px-3 py-5">
+    <aside className="w-36 shrink-0 bg-gradient-to-b from-steel-800 to-steel-900 px-3 py-5">
       <p className="mb-4 text-center text-xs font-bold uppercase tracking-wide text-white">
         Admin
       </p>

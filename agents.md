@@ -1,6 +1,6 @@
-# agents.md – Projekt Manager
+﻿# agents.md – Projekt Manager
 
-Codex ist ein **ausführendes Werkzeug**. Er trifft keine eigenständigen Architektur-, Produkt- oder Scope-Entscheidungen. Bei Unklarheiten, Widersprüchen oder nicht eindeutig umsetzbaren Anforderungen bricht Codex die Umsetzung kontrolliert ab und dokumentiert den Blocker.
+Der Agent ist ein **ausführendes Werkzeug**. Er trifft keine eigenständigen Architektur-, Produkt- oder Scope-Entscheidungen. Bei Unklarheiten, Widersprüchen oder nicht eindeutig umsetzbaren Anforderungen bricht der Agent die Umsetzung kontrolliert ab und dokumentiert den Blocker.
 
 Diese Datei `agents.md` ist die maßgebliche Arbeitsanweisung im Repository. Verweise auf `AGENTS.md` sind als Verweis auf diese Datei zu verstehen.
 
@@ -8,7 +8,7 @@ Diese Datei `agents.md` ist die maßgebliche Arbeitsanweisung im Repository. Ver
 
 ## 0. Auftragsklassifikation (Pflicht vor jedem weiteren Schritt)
 
-Vor jeder weiteren Aktion klassifiziert Codex den Auftrag in genau eine der folgenden Klassen:
+Vor jeder weiteren Aktion klassifiziert der Agent den Auftrag in genau eine der folgenden Klassen:
 
 1. **Reine Frage oder Leseauftrag**
 2. **Reiner Analyse-, Audit- oder Test-Report**
@@ -28,7 +28,7 @@ Von dieser Klassifikation hängen Branch-Nutzung, Dokumentenlektüre, Analyseumf
 | 4. Kleiner lokaler Fix | Nur bei explizitem Wunsch | Minimal und gezielt | Start klein und dateinah | Kleiner Plan |
 | 5. Mehrschichtige Änderung oder neues Feature | Nur bei explizitem Wunsch | Gestuft und gezielt | Breiter, aber begründet | Voller Plan |
 
-Codex dokumentiert zu Beginn kurz:
+Der Agent dokumentiert zu Beginn kurz:
 - welche Klasse gewählt wurde,
 - warum diese Klasse passt,
 - welche Startschritte daraus folgen.
@@ -44,7 +44,7 @@ Statt großer Dateien vollständig zu laden, gilt immer diese Eskalationsreihenf
 3. Weitere Abschnitte nur dann laden, wenn die erste gezielte Lektüre nicht ausreicht
 4. Vollständige Lektüre großer Dokumente nur bei ausdrücklicher Architekturarbeit
 
-Bei UI-bezogenen Aktionen ist `docs/design-richtlinien-visuell.md` als verbindliche Design-Vorgabe gezielt zu berücksichtigen. Codex lädt auch hier nur die für den konkreten Auftrag relevanten Abschnitte.
+Bei UI-bezogenen Aktionen ist `docs/design-leitfaden.md` als verbindliche Design-Vorgabe gezielt zu berücksichtigen. Der Agent lädt auch hier nur die für den konkreten Auftrag relevanten Abschnitte.
 
 **Schnellcheck vor jedem Task:**
 
@@ -57,13 +57,13 @@ Bei UI-bezogenen Aktionen ist `docs/design-richtlinien-visuell.md` als verbindli
 | Neues Feature über mehrere Schichten | `agents.md` + relevante `docs/`-Abschnitte gezielt |
 | Unklare Zuordnung | Gezielt erweitern — nicht raten |
 
-Codex dokumentiert kurz, welche Abschnitte gelesen wurden und warum diese Auswahl genügt.
+Der Agent dokumentiert kurz, welche Abschnitte gelesen wurden und warum diese Auswahl genügt.
 
 ---
 
 ## 2. Analyse vor der Umsetzung (Pflicht, aber klein starten)
 
-Bevor Änderungen vorgenommen werden, startet Codex die Analyse **immer klein und auftragsnah**.
+Bevor Änderungen vorgenommen werden, startet der Agent die Analyse **immer klein und auftragsnah**.
 
 Zuerst werden nur untersucht:
 - direkt betroffene Dateien,
@@ -87,17 +87,17 @@ Neue Dateien, Routes, Services oder Strukturen werden nur angelegt, wenn der Auf
 
 ### 3.0 Planungs-Skill (Pflicht)
 
-Vor jeder Planerstellung im Chat oder im Plan-Modus nutzt Codex den Repo-Skill `skills/projekt-manager-planungsleitplanken`.
+Vor jeder Planerstellung im Chat oder im Plan-Modus nutzt der Agent den Repo-Skill `skills/projekt-manager-planungsleitplanken`.
 
 Der Skill ist ein Planungs-Gate und ersetzt diese Datei nicht. `agents.md` bleibt die maßgebliche Quelle; bei Widersprüchen gilt `agents.md`. Der Skill stellt sicher, dass Architekturentscheidungen, Rollen-/Permission-Regeln, Teststrategie, Branch-Hygiene, UI-Leitplanken und Abnahmekriterien bei jeder Planung geprüft werden.
 
 ### 3.0.1 Testentwurfs-Skill (Pflicht bei Tests)
 
-Sobald ein Auftrag Tests plant, ergänzt, ändert, bewertet oder ausführt, nutzt Codex zusätzlich den Repo-Skill `skills/projekt-manager-test-entwurfsleitplanken`.
+Sobald ein Auftrag Tests plant, ergänzt, ändert, bewertet oder ausführt, nutzt der Agent zusätzlich den Repo-Skill `skills/projekt-manager-test-entwurfsleitplanken`.
 
 Das gilt insbesondere bei Begriffen wie „Testsuite“, „Testabdeckung“, „echte Daten“, „Integrationstest“, „E2E“, „Abnahme“, „Testfälle“ oder „Testlauf“.
 
-Codex dokumentiert zu Beginn kurz:
+Der Agent dokumentiert zu Beginn kurz:
 - dass der Testentwurfs-Skill angewendet wird,
 - welche Testebene betroffen ist,
 - welches beobachtbare Verhalten bewiesen werden soll,
@@ -105,9 +105,9 @@ Codex dokumentiert zu Beginn kurz:
 
 ### 3.1 Branch-Nutzung (nur bei explizitem Nutzerwunsch)
 
-Codex fragt nicht aktiv nach einem Branch. Ein Branch wird nur angelegt, wenn der Nutzer dies ausdrücklich verlangt oder das Kurzkommando `branch <name>` verwendet.
+Der Agent fragt nicht aktiv nach einem Branch. Ein Branch wird nur angelegt, wenn der Nutzer dies ausdrücklich verlangt oder das Kurzkommando `branch <name>` verwendet.
 
-Delegiert der Nutzer die Namenswahl an Codex, wählt Codex selbst einen kurzen, auftragsbezogenen Namen. Git-Aktionen werden ausschließlich **seriell** ausgeführt.
+Delegiert der Nutzer die Namenswahl an den Agenten, wählt der Agent selbst einen kurzen, auftragsbezogenen Namen. Git-Aktionen werden ausschließlich **seriell** ausgeführt.
 
 ### 3.2 Planformat
 
@@ -143,7 +143,7 @@ Der Plan muss ausreichend Kontext enthalten, damit der Nutzer die Tragweite der 
 - welche Bereiche bewusst unverändert bleiben sollen,
 - wie hoch das Schadenspotential ist.
 
-Änderungen sind nur zulässig, wenn sie im Auftrag oder im bestätigten Plan stehen. Weitet sich der Eingriff während der Analyse aus, muss Codex die Ausweitung vorab benennen.
+Änderungen sind nur zulässig, wenn sie im Auftrag oder im bestätigten Plan stehen. Weitet sich der Eingriff während der Analyse aus, muss der Agent die Ausweitung vorab benennen.
 
 ### 3.4 Kurzkommandos
 
@@ -159,7 +159,7 @@ Der Plan muss ausreichend Kontext enthalten, damit der Nutzer die Tragweite der 
 
 #### `savetowork` Sicherheitsablauf
 
-`savetowork` ist eine Git-Operation ohne Codeänderung. Codex führt die Schritte ausschließlich seriell aus:
+`savetowork` ist eine Git-Operation ohne Codeänderung. Der Agent führt die Schritte ausschließlich seriell aus:
 
 1. Aktuellen Branch und Working Tree prüfen.
 2. Falls offene Änderungen vorhanden sind: alle Änderungen stagen, sinnvoll committen und den aktuellen Branch pushen.
@@ -180,15 +180,19 @@ Alle Kommandos — Git, Tests, Builds, Migrationen — werden ausschließlich **
 
 ### 4.2 Keine spekulativen Änderungen
 
-Codex ändert nur, was im Auftrag oder im bestätigten Plan steht. Keine Refactorings, Umbenennungen, Strukturänderungen oder Verbesserungen „nebenbei", ohne dass der Auftrag dies verlangt.
+Der Agent ändert nur, was im Auftrag oder im bestätigten Plan steht. Keine Refactorings, Umbenennungen, Strukturänderungen oder Verbesserungen „nebenbei", ohne dass der Auftrag dies verlangt.
 
 ### 4.3 Keine Regressions-Fixes während Tests
 
-Schlägt ein Test fehl, dokumentiert Codex den Fehler. Eigenständige Fixes während eines laufenden Testlaufs sind unzulässig. Fixes erfolgen erst nach einem separaten Folgeauftrag.
+Schlägt ein Test fehl, dokumentiert der Agent den Fehler. Eigenständige Fixes während eines laufenden Testlaufs sind unzulässig. Fixes erfolgen erst nach einem separaten Folgeauftrag.
 
-### 4.4 Blocker-Verhalten — Weitermachen ist Pflicht
+### 4.4 Test-Nachführung bei Codeänderungen (Pflicht, unabhängig von Auftragsklasse)
 
-Ein Blocker in einer Teilaufgabe unterbricht den Auftrag **nicht**. Codex dokumentiert den Blocker im Schritt-Log und setzt die Umsetzung mit dem nächsten Schritt fort.
+Bei jeder Codeänderung wird vor dem Commit geprüft, welche bestehenden Tests die geänderten Stellen abdecken. Veraltete Tests — durch geänderte Labels, Props oder API-Signaturen — werden als Teil der Änderung aktualisiert. Assertions bleiben gleich spezifisch oder werden spezifischer. Abschwächen ist keine Option.
+
+### 4.5 Blocker-Verhalten — Weitermachen ist Pflicht
+
+Ein Blocker in einer Teilaufgabe unterbricht den Auftrag **nicht**. Der Agent dokumentiert den Blocker im Schritt-Log und setzt die Umsetzung mit dem nächsten Schritt fort.
 
 **Abbruch des gesamten Auftrags ist nur zulässig, wenn es faktisch unmöglich ist weiterzuarbeiten** — zum Beispiel wenn eine Datei fehlt, die für alle folgenden Schritte zwingend benötigt wird, oder wenn ein Kompilierfehler jeden weiteren Schritt blockiert.
 
@@ -200,7 +204,7 @@ Ein Blocker wird dokumentiert mit: was genau fehlt, welcher Schritt betroffen is
 
 ## 5. Schritt-Log (Pflicht nach jeder Teilaufgabe)
 
-Nach jeder abgeschlossenen Teilaufgabe schreibt Codex **automatisch und ohne Rückfrage** einen Log-Eintrag. Das gilt für jeden nummerierten Implementierungsschritt aus dem Großauftrag sowie für jeden eigenständigen Änderungsauftrag der Klassen 4 und 5.
+Nach jeder abgeschlossenen Teilaufgabe schreibt der Agent **automatisch und ohne Rückfrage** einen Log-Eintrag. Das gilt für jeden nummerierten Implementierungsschritt aus dem Großauftrag sowie für jeden eigenständigen Änderungsauftrag der Klassen 4 und 5.
 
 Jeder Log-Eintrag wird in eine **neue** Datei geschrieben. Bestehende einzelne Log-Dateien unter `logs/` dürfen nicht nachträglich ergänzt, korrigiert oder überschrieben werden. Nachträge, Korrekturen und Anschlussberichte erhalten immer eine eigene neue Log-Datei mit aktuellem Zeitstempel. Die einzige reguläre Änderung an einer bestehenden Datei im Log-Bereich ist die Aktualisierung des Index `logs/README.md`.
 
@@ -263,7 +267,7 @@ Kann eine Teilaufgabe nur teilweise umgesetzt werden, wird der Log mit Status `�
 
 ### 5.4 Log-Index pflegen
 
-Codex pflegt zusätzlich eine Datei `logs/README.md` als chronologische Übersicht:
+Der Agent pflegt zusätzlich eine Datei `logs/README.md` als chronologische Übersicht:
 
 ```markdown
 # Log-Übersicht Projekt Manager
@@ -382,10 +386,10 @@ taskmanager/
 │   ├── fixtures/                      ← Test-Fixtures und Test-Helper
 │   ├── setup/                         ← Test-Setups
 │   └── .runtime/                      ← generierte Testlaufdaten (ignoriert)
-├── skills/                            ← versionierte Codex-Skills für dieses Repo
+├── skills/                            ← versionierte Skills für dieses Repo
 │   └── projekt-manager-planungsleitplanken/
 ├── docs/
-│   ├── tasks/                         ← Aufgabendateien für Codex (Abschnitt 7.1)
+│   ├── tasks/                         ← Aufgabendateien (Abschnitt 7.1)
 │   └── ...                            ← Architektur- und Implementierungsdokumentation
 ├── codex-auftrag-ticket-system.md     ← Großauftrag (Legacy-Ablage, neue Aufträge → docs/tasks/)
 ├── apps/
@@ -407,13 +411,9 @@ taskmanager/
     └── shared-types/                  ← gemeinsame TypeScript-Interfaces
 ```
 
-Aktuelle Großaufträge:
-- `codex-auftrag-ticket-system.md` — Ticket- & Bug-Tracking-System (Domäne 3, ab 17.05.26)
-- `docs/tasks/codex-auftrag-browser-tabs.md` — Views und Detailseiten in Browser-Tabs öffnen (ab 20.05.26)
-
 ### 7.1 Aufgabendateien (verbindlich)
 
-Alle Codex-Aufgabendateien werden unter `docs/tasks/` abgelegt. Dateiname: `codex-auftrag-<thema-kebab-case>.md`.
+Alle Aufgabendateien werden unter `docs/tasks/` abgelegt. Dateiname: `codex-auftrag-<thema-kebab-case>.md`.
 
 Die Vorlage liegt unter `docs/task-template.md`. Neue Aufgabendateien folgen dem Format des Skill `mugplan-codex-auftrag` (Abschnitte: Ziel, Kontext, Aufgabe, Regeln & Einschränkungen, Randfälle & Fehlerpfade, Seiteneffekte, Testhinweise, Abnahmekriterien, Implementierungsreihenfolge).
 
@@ -448,7 +448,7 @@ Jede Aufgabendatei enthält einen Abschnitt **Testhinweise** mit:
 4. Prüfen, ob DB-Schema zum Code passt
 5. Erst jetzt Tests oder weitere Implementierung
 
-Eine Schemaänderung gilt erst als abgeschlossen, wenn die Migration erfolgreich gelaufen ist. Schlägt die Migration fehl, darf Codex den Schritt nicht als abgeschlossen melden.
+Eine Schemaänderung gilt erst als abgeschlossen, wenn die Migration erfolgreich gelaufen ist. Schlägt die Migration fehl, darf der Agent den Schritt nicht als abgeschlossen melden.
 
 ---
 
@@ -478,9 +478,9 @@ npm run dev -w apps/api   # nur Backend (Port 3001)
 npm run dev -w apps/web   # nur Frontend (Port 5173)
 ```
 
-### Dev-Server-Nutzung durch Codex
+### Dev-Server-Nutzung durch den Agenten
 
-Codex startet keinen Web-Dev-Server als Abschluss-Service, nur damit der Nutzer Änderungen testen kann. Für eigene Prüfungen darf Codex einen Dev-Server starten, wenn dies fachlich nötig ist; jeder dadurch gestartete Prozess muss vor der Abschlussantwort wieder beendet werden. In der Abschlussantwort wird kein laufender localhost-Server angeboten oder gemeldet, außer der Nutzer fragt ausdrücklich danach.
+Der Agent startet keinen Web-Dev-Server als Abschluss-Service, nur damit der Nutzer Änderungen testen kann. Für eigene Prüfungen darf der Agent einen Dev-Server starten, wenn dies fachlich nötig ist; jeder dadurch gestartete Prozess muss vor der Abschlussantwort wieder beendet werden. In der Abschlussantwort wird kein laufender localhost-Server angeboten oder gemeldet, außer der Nutzer fragt ausdrücklich danach.
 
 ### Umgebungsvariablen
 
@@ -501,9 +501,9 @@ Codex startet keinen Web-Dev-Server als Abschluss-Service, nur damit der Nutzer 
 
 ### Testentwurfs-Gate
 
-Vor jeder Test-Erstellung, Test-Änderung oder Testabdeckungsbewertung muss Codex `skills/projekt-manager-test-entwurfsleitplanken` anwenden und kurz im Chat oder im Schritt-Log benennen.
+Vor jeder Test-Erstellung, Test-Änderung oder Testabdeckungsbewertung muss der Agent `skills/projekt-manager-test-entwurfsleitplanken` anwenden und kurz im Chat oder im Schritt-Log benennen.
 
-Für Testpläne und Teständerungen dokumentiert Codex mindestens:
+Für Testpläne und Teständerungen dokumentiert der Agent mindestens:
 - Testebene: Unit, Integration oder Browser/E2E
 - zu beweisendes Verhalten: Ausgangszustand, Aktion und beobachtbares Ergebnis
 - echte Daten und Isolation: Temp-DB, In-Memory-DB, `tests/.runtime` oder Temp-Root
@@ -538,7 +538,7 @@ npm run e2e -w apps/web   # Web-Browser-/E2E-Tests
 - Integrationstests verwenden eine eigene Temp-DB, die vor/nach dem Test angelegt und gelöscht wird
 - Integrationstests für Update-Endpunkte versionierter Objekte verwenden die aktuelle `version` aus Create- oder GET-Antworten und senden `expectedVersion` explizit mit.
 - Neue Anwendungstabellen müssen in Test-Fixtures, `truncateAll` und Dump-Roundtrip-Tests berücksichtigt werden, sobald sie Teil des produktiven DB-Schemas sind.
-- Schlägt ein Test fehl, dokumentiert Codex den Fehler und nimmt keine eigenständigen Fixes vor
+- Schlägt ein Test fehl, dokumentiert der Agent den Fehler und nimmt keine eigenständigen Fixes vor
 
 ### Test-Dokumentation in Testdateien
 
@@ -573,7 +573,7 @@ Jede neue Testdatei enthält einen Pflicht-Kommentar:
 
 Alle Testkommandos werden seriell ausgeführt. Ein fehlgeschlagenes Kommando unterbricht den Gesamtlauf nicht; alle weiteren Testkommandos werden trotzdem ausgeführt.
 
-Nach dem Testlauf berichtet Codex:
+Nach dem Testlauf berichtet der Agent:
 - welche Kommandos ausgeführt wurden,
 - pro Kommando: Status, Anzahl grün, rot, übersprungen und blockiert,
 - gesamt: Anzahl ausgeführt, grün, rot, übersprungen und blockiert,
@@ -601,7 +601,7 @@ Diese Gruppe wird nach Schweregrad absteigend berichtet:
 - `npm run build`
 - _(weitere Prüfungen werden ergänzt)_
 
-Nach Ausführung muss Codex explizit berichten: welche Kommandos ausgeführt wurden, welches Ergebnis jedes hatte und welche noch nicht verfügbar sind.
+Nach Ausführung muss der Agent explizit berichten: welche Kommandos ausgeführt wurden, welches Ergebnis jedes hatte und welche noch nicht verfügbar sind.
 
 ---
 
@@ -619,7 +619,7 @@ Nach Fertigstellung eines Auftrags richtet sich der Abschluss nach der gewählte
 
 ### 13.1 Schritt-Log schreiben (automatisch, keine Rückfrage)
 
-Codex schreibt den Log-Eintrag gemäß Abschnitt 5 **immer** — ohne Rückfrage, ohne Nutzerbestätigung. Das ist kein optionaler Schritt.
+Der Agent schreibt den Log-Eintrag gemäß Abschnitt 5 **immer** — ohne Rückfrage, ohne Nutzerbestätigung. Das ist kein optionaler Schritt.
 
 ### 13.2 Testlauf
 
@@ -638,12 +638,12 @@ Codex schreibt den Log-Eintrag gemäß Abschnitt 5 **immer** — ohne Rückfrage
 
 ### 13.4 Abschlussprüfung (immer, ohne Rückfrage)
 
-Codex prüft das Ergebnis gegen:
+Der Agent prüft das Ergebnis gegen:
 - den Aufgabentext inkl. Ziel und Akzeptanzkriterien,
 - die Implementierungsvorgaben aus dem Großauftrag,
 - die gewählte Auftragsklasse.
 
-Codex nennt konkret, welche Stellen geprüft wurden und ob es bekannte Abweichungen gibt. Bei Abweichungen werden konkrete Korrekturen vorgeschlagen.
+Der Agent nennt konkret, welche Stellen geprüft wurden und ob es bekannte Abweichungen gibt. Bei Abweichungen werden konkrete Korrekturen vorgeschlagen.
 
 Eine Aufgabe gilt als abgeschlossen, wenn das fachliche Ziel umgesetzt und der Schritt-Log geschrieben ist. Kann eine Aufgabe nur teilweise umgesetzt werden, gilt sie als abgeschlossen, sofern der Blocker im Log sauber dokumentiert ist.
 
@@ -978,3 +978,4 @@ Wenn nach der Formulierung eines Plans weitere Informationen, Korrekturen oder E
 - Der aktualisierte Plan muss alle Schritte enthalten — auch die unveränderten.
 
 **Begründung:** Ein vollständiger Plan stellt sicher, dass der Arbeitsauftrag in sich geschlossen und ohne Rückgriff auf frühere Nachrichten ausführbar ist.
+

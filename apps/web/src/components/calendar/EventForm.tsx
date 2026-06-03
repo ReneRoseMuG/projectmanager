@@ -67,6 +67,32 @@ export function EventForm({ open, event, initialDate, initialOwners, onSubmit, o
     setResponsibleUserId(event ? event.responsibleUserId : (auth.user?.id ?? null));
   }, [auth.user?.id, event, initialDate, initialOwners, open]);
 
+  const handleStartChange = (value: string) => {
+    if (!value) {
+      setStartTime(value);
+      return;
+    }
+    let durationMs = 60 * 60 * 1000;
+    if (startTime && endTime) {
+      const diff = new Date(endTime).getTime() - new Date(startTime).getTime();
+      if (diff > 0) durationMs = diff;
+    }
+    setStartTime(value);
+    setEndTime(new Date(new Date(value).getTime() + durationMs).toISOString().slice(0, 16));
+  };
+
+  const handleEndChange = (value: string) => {
+    if (!value || !startTime) {
+      setEndTime(value);
+      return;
+    }
+    if (value <= startTime) {
+      setEndTime(new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString().slice(0, 16));
+    } else {
+      setEndTime(value);
+    }
+  };
+
   const submit = async (submitEvent: FormEvent<HTMLFormElement>) => {
     submitEvent.preventDefault();
     setSaving(true);
@@ -125,8 +151,8 @@ export function EventForm({ open, event, initialDate, initialOwners, onSubmit, o
         </div>
 
         <FormSidebar storageKey="event-form-sidebar">
-          <DatePicker label="Start" mode="datetime-local" variant="panel" value={startTime} onChange={(inputEvent) => setStartTime(inputEvent.target.value)} />
-          <DatePicker label="Ende" mode="datetime-local" variant="panel" value={endTime} onChange={(inputEvent) => setEndTime(inputEvent.target.value)} />
+          <DatePicker label="Start" mode="datetime-local" variant="panel" value={startTime} onChange={(inputEvent) => handleStartChange(inputEvent.target.value)} />
+          <DatePicker label="Ende" mode="datetime-local" variant="panel" value={endTime} onChange={(inputEvent) => handleEndChange(inputEvent.target.value)} />
           <FormField label="Erinnerung" icon={<Bell size={14} />} variant="panel">
             <select
               className="h-10 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"

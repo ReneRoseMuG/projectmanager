@@ -146,7 +146,7 @@ export function CommentThread({
   const editingComment = modalState?.mode === "edit" ? modalState.comment : null;
 
   return (
-    <div className="min-h-0">
+    <>
       <ListBoardView
         items={comments}
         mode={mode}
@@ -159,8 +159,8 @@ export function CommentThread({
             icon={<MessageSquare size={22} />}
             title="Noch keine Kommentare"
             body={`Kommentare und Rückfragen zu diesem ${entityLabel} erscheinen hier.`}
-            tone="neutral"
-            variant="default"
+            tone="violet"
+            variant="tinted"
           />
         }
         renderCard={(comment) => (
@@ -193,6 +193,6 @@ export function CommentThread({
         onSave={saveComment}
         onClose={closeModal}
       />
-    </div>
+    </>
   );
 }

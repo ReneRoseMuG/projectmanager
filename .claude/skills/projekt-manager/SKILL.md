@@ -16,8 +16,11 @@ Alle Tools des `projekt-manager` MCP Servers stehen zur Verfügung:
 **Projekte & Meilensteine**
 - `list_projects` — alle Projekte auflisten
 - `get_project` — ein Projekt per ID abrufen
+- `update_project` — Projekt aktualisieren
 - `list_milestones` — Meilensteine (optional gefiltert nach Projekt)
 - `get_milestone` — einen Meilenstein per ID abrufen
+- `create_milestone` — neuen Meilenstein anlegen
+- `update_milestone` — Meilenstein aktualisieren
 
 **Aufgaben & Tickets**
 - `list_tasks_for_parent` — Aufgaben eines Projekts/Meilensteins auflisten
@@ -25,8 +28,10 @@ Alle Tools des `projekt-manager` MCP Servers stehen zur Verfügung:
 - `get_task` — eine Aufgabe per ID abrufen
 - `get_ticket` — ein Ticket per ID abrufen
 - `add_task_to_parent` — neue Aufgabe anlegen
+- `update_task` — Aufgabe aktualisieren (Status, Felder)
 - `assign_editorial_task` — Aufgabe zuweisen
 - `add_ticket_to_parent` — neues Ticket anlegen
+- `update_ticket` — Ticket aktualisieren (Status, Felder)
 
 **Features & Use Cases**
 - `list_features` — Features auflisten

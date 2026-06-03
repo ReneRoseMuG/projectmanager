@@ -486,6 +486,123 @@ export async function cleanupTicketsByTitle(
   }
 }
 
+export interface DayPlanFixture {
+  id: number;
+  date: string;
+}
+
+export interface NoteFixture {
+  id: number;
+  title: string;
+  version: number;
+}
+
+export interface CommentFixture {
+  id: number;
+  body: string;
+  version: number;
+}
+
+export async function getDayPlan(
+  request: APIRequestContext,
+  date: string,
+): Promise<DayPlanFixture> {
+  await ensureApiAuth(request);
+  const response = await request.get(`${apiBaseUrl}/day-plans/${date}`);
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<DayPlanFixture>;
+}
+
+export async function createDayPlanEvent(
+  request: APIRequestContext,
+  date: string,
+  titlePrefix: string,
+  input: Partial<{ startTime: string; endTime: string }> = {},
+): Promise<EventFixture> {
+  await ensureApiAuth(request);
+  const title = uniqueTitle(titlePrefix);
+  const day = input.startTime?.slice(0, 10) ?? date;
+  const response = await request.post(`${apiBaseUrl}/day-plans/${date}/events`, {
+    data: {
+      title,
+      startTime: input.startTime ?? `${day}T10:00:00`,
+      endTime: input.endTime ?? `${day}T11:00:00`,
+      isAllDay: false,
+      color: "#4682B4",
+      owners: [],
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<EventFixture>;
+}
+
+export async function createDayPlanTask(
+  request: APIRequestContext,
+  date: string,
+  titlePrefix: string,
+  input: Partial<{ status: string; priority: string }> = {},
+): Promise<TaskFixture> {
+  await ensureApiAuth(request);
+  const title = uniqueTitle(titlePrefix);
+  const response = await request.post(`${apiBaseUrl}/day-plans/${date}/tasks`, {
+    data: {
+      title,
+      description: "<p>E2E DayPlan Aufgabe</p>",
+      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.priority !== undefined ? { priority: input.priority } : {}),
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<TaskFixture>;
+}
+
+export async function createDayPlanNote(
+  request: APIRequestContext,
+  dayPlanId: number,
+  titlePrefix: string,
+): Promise<NoteFixture> {
+  await ensureApiAuth(request);
+  const title = uniqueTitle(titlePrefix);
+  const response = await request.post(`${apiBaseUrl}/day-plans/${dayPlanId}/notes`, {
+    data: { title, contentJson: {} },
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<NoteFixture>;
+}
+
+export async function createDayPlanComment(
+  request: APIRequestContext,
+  dayPlanId: number,
+  body: string,
+): Promise<CommentFixture> {
+  await ensureApiAuth(request);
+  const response = await request.post(`${apiBaseUrl}/day-plans/${dayPlanId}/comments`, {
+    data: { body },
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<CommentFixture>;
+}
+
+export async function deleteNote(
+  request: APIRequestContext,
+  noteId: number | null | undefined,
+): Promise<void> {
+  await ensureApiAuth(request);
+  if (noteId) {
+    await request.delete(`${apiBaseUrl}/notes/${noteId}`);
+  }
+}
+
+export async function deleteComment(
+  request: APIRequestContext,
+  commentId: number | null | undefined,
+): Promise<void> {
+  await ensureApiAuth(request);
+  if (commentId) {
+    await request.delete(`${apiBaseUrl}/comments/${commentId}`);
+  }
+}
+
 export function formPage(page: Page, heading: string | RegExp) {
   return page
     .locator("form")

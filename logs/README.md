@@ -1,552 +1,553 @@
-# Log-Übersicht Projekt Manager
+﻿# Log-Ãœbersicht Projekt Manager
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
-| 02.06.26 | 15:55:14 | Feature | MS-46 TipTap Image Extensions | ✅ |
-| 02.06.26 | 10:37:17 | Fix | TASK-203 Projektzuordnung | ✅ |
-| 02.06.26 | 10:28:05 | Fix | MS-43 Dirty-Guard Auftrag | ✅ |
-| 02.06.26 | 10:16:00 | Fix | Meilenstein Aufgaben Link-Kandidaten | ⚠️ |
-| 02.06.26 | 10:04:30 | Fix | Parent Context Sidebar | ✅ |
-| 02.06.26 | 09:51:19 | Fix | Meilenstein Create Verknüpfungen | ✅ |
-| 02.06.26 | 09:24:17 | Fix | Deploy Shared Types Runtime | ✅ |
-| 02.06.26 | 09:16:59 | Feature | Deploy LocalAppData Runtime | ✅ |
-| 01.06.26 | 16:35:34 | Test | MS-41 Abschlusslauf | ⚠️ |
-| 01.06.26 | 16:35:33 | 1 | MS-41 Refactoring Kommentare, Notizen und Create-Relationen | ✅ |
-| 01.06.26 | 06:23:09 | Feature | MS-34 Browser-Test-Speedup | ⚠️ |
-| 01.06.26 | 06:14:17 | Fix | Alten Referenz-Skill entfernen | ✅ |
-| 01.06.26 | 06:13:22 | Fix | MCP-Code Auftrag Skill | ✅ |
-| 31.05.26 | 19:40:58 | Feature | MS-33 Design-Richtlinien | ✅ |
-| 31.05.26 | 16:36:09 | Fix | API-Testlauf ausführen | ✅ |
-| 31.05.26 | 16:19:31 | Feature | Note Details in neuem Tab | ✅ |
-| 31.05.26 | 15:56:10 | Fix | Web-Testdrift | ✅ |
-| 31.05.26 | 15:45:57 | Fix | Lint Restfehler | ✅ |
-| 31.05.26 | 15:33:31 | Fix | Lint Cleanup | ✅ |
-| 31.05.26 | 12:45:46 | Fix | Dashboard Kalender Limit | ✅ |
-| 31.05.26 | 08:17:40 | Fix | Notizkarten Menü und Footer | ✅ |
-| 31.05.26 | 08:11:45 | Fix | Notizeditor Inhalt und Details | ✅ |
-| 31.05.26 | 08:05:43 | Fix | Kalenderwidget Footer-Zähler | ✅ |
-| 31.05.26 | 08:04:01 | Fix | DayPlan Kalender Create | ✅ |
-| 31.05.26 | 08:01:48 | Fix | Feiertagslabel ausschreiben | ✅ |
-| 31.05.26 | 08:00:50 | Fix | Monatskalender Feiertagskachel | ✅ |
-| 31.05.26 | 07:59:29 | Fix | Wochenkalender Create nur Plus | ✅ |
-| 31.05.26 | 07:57:57 | Fix | Wochenkalender Plus-Aktionen | ✅ |
-| 31.05.26 | 07:55:15 | Fix | Terminformular Farbwähler | ✅ |
-| 31.05.26 | 07:54:00 | Fix | Wochenkalender Spaltenkopf | ✅ |
-| 31.05.26 | 07:50:41 | Fix | MS-32 Feiertagsspalte und Karten | ✅ |
-| 31.05.26 | 07:28:44 | Feature | MS-32 offene Kalenderaufgaben | ⚠️ |
-| 31.05.26 | 07:14:08 | Fix | Feiertag-Hervorhebung | ✅ |
-| 31.05.26 | 04:58:23 | Feature | MS-32 Zentrale Kalenderkomponente | ⚠️ |
-| 31.05.26 | 02:49:12 | 1 | Persönliche Planung Dashboard | ⚠️ |
-| 29.05.26 | 10:32:01 | 2 | MySQL-Migrationsanalyse | ✅ |
-| 29.05.26 | 10:30:39 | 1 | Branching MS-26 | ✅ |
-| 29.05.26 | 10:22:45 | Fix | MS-25 Branchhinweis-Kommentar | ✅ |
-| 29.05.26 | 10:21:06 | 5 | Testabdeckung und Verifikation | ⚠️ |
-| 29.05.26 | 10:16:54 | 4 | WikiPageDetail Entfernen | ✅ |
-| 29.05.26 | 10:16:36 | 3 | WikiPageForm Inline Modus | ✅ |
-| 29.05.26 | 10:07:30 | 2 | WikiPage Two Pane Layout | ✅ |
-| 29.05.26 | 10:05:39 | 1 | WikiTree Dark Sidebar | ✅ |
-| 29.05.26 | 09:52:58 | Nachtrag | MS-24 Formular-Testabdeckung | ⚠️ |
-| 29.05.26 | 09:17:55 | 4 | Formulare und Tests | ✅ |
-| 29.05.26 | 09:17:54 | 3 | Rich-Text-Editor | ✅ |
-| 29.05.26 | 09:17:53 | 2 | Sidebar und Parent-Kontext | ✅ |
-| 29.05.26 | 09:17:52 | 1 | Save und Branch | ✅ |
-| 29.05.26 | 08:36:24 | Feature | MCP Bulk Tools | ✅ |
-| 29.05.26 | 05:35:18 | Fix | Migrationen und Dev-Start | ✅ |
-| 28.05.26 | 17:59:08 | Log | Manueller Status TKT-33 | ✅ |
-| 28.05.26 | 17:58:56 | Nachtrag | TKT-32 Kommentar Realtime | ⚠️ |
-| 28.05.26 | 17:58:49 | Nachtrag | Wiki Support Tabs Log | ✅ |
-| 28.05.26 | 17:58:03 | 4 | Tests teilweise blockiert | ⚠️ |
-| 28.05.26 | 17:49:16 | Fix / Feature | Wiki Support Tabs | ⚠️ |
-| 28.05.26 | 17:44:08 | 3 | UI-Feinpunkte | ✅ |
-| 28.05.26 | 17:40:41 | 2 | Web Userbezüge Kalender Daten | ✅ |
-| 28.05.26 | 17:28:51 | 1 | User-Bezüge Schema API MCP | ✅ |
-| 28.05.26 | 17:14:43 | Fix | TKT-32 Kommentar Realtime | ⚠️ |
-| 28.05.26 | 17:12:54 | Nachtrag | Wiki Verwandte Seiten Lint | ⚠️ |
-| 28.05.26 | 17:11:31 | Fix | Wiki Verwandte Seiten Suche | ✅ |
-| 28.05.26 | 16:39:13 | Fix | Wiki Detail Kopfbereich | ✅ |
-| 28.05.26 | 16:26:02 | Fix | ParentBadge WikiPage | ✅ |
-| 28.05.26 | 14:59:23 | 4 | Tests und Abnahme | ⚠️ |
-| 28.05.26 | 14:47:31 | 3 | Wiki-Web-UI | ✅ |
-| 28.05.26 | 14:47:08 | 2 | Wiki-API-Verknüpfungen | ✅ |
-| 28.05.26 | 14:45:31 | 1 | Datenmodell und Migration | ⚠️ |
-| 28.05.26 | 10:24:50 | 2 | Editor-Bilder als Content Images | ✅ |
-| 28.05.26 | 10:24:50 | 1 | Backup-Import entdoppeln | ⚠️ |
-| 28.05.26 | 09:57:29 | Fix | Log-Richtlinien Zeitstempel | ✅ |
-| 28.05.26 | - | Fix | Dev-Start Shared Types | ✅ |
-| 28.05.26 | - | Fix | Start-Abhängigkeiten und Dev-Check | ⚠️ |
-| 28.05.26 | - | Fix | Migrationskonsolidierung | ✅ |
-| 28.05.26 | - | 5 | MS-23 Prüfung | ⚠️ |
-| 28.05.26 | - | 4 | MS-23 Tests | ⚠️ |
-| 28.05.26 | - | 3 | MS-23 DayPlan UI | ✅ |
-| 28.05.26 | - | 2 | MS-23 Dashboard-State | ✅ |
-| 28.05.26 | - | 1 | MS-23 Schema und API | ⚠️ |
-| 28.05.26 | - | Fix | Kommentar-Modal Schließen | ✅ |
-| 28.05.26 | - | Fix | TKT-20 Statusfilter Verknüpfungen | ✅ |
-| 28.05.26 | - | Feature | TASK-110 Kommentar Modal List Board | ⚠️ |
-| 28.05.26 | - | Fix | Ticket Markdown HTML Editor | ⚠️ |
-| 28.05.26 | - | Feature | Kalender MuGPlan Port | ⚠️ |
-| 28.05.26 | - | Fix | Kalender-Breite | ✅ |
-| 28.05.26 | - | Fix | Startnavigation und Tagesplan-Breite | ✅ |
-| 28.05.26 | - | Feature | Rene Ein-Klick-Login | ⚠️ |
-| 27.05.26 | - | Fix | Content Backfill | ⚠️ |
-| 27.05.26 | - | 2 | Backup straffen | ✅ |
-| 27.05.26 | - | 1 | HTML-Content in der DB | ✅ |
-| 27.05.26 | - | Fix | Backup Altbackup User Remap | ✅ |
-| 27.05.26 | - | Feature | Backup User Vollrestore | ⚠️ |
-| 27.05.26 | - | Fix | Migrationen nachholen | ⚠️ |
-| 27.05.26 | - | Fix | Backup-Import-Fehlermeldung | ✅ |
-| 27.05.26 | - | Fix | Web-Testdrift | ✅ |
-| 27.05.26 | - | 1 | Kalender-Dashboard und WeekEventTile-Design | ⚠️ |
-| 27.05.26 | - | Fix | Migrationen ausführen | ⚠️ |
-| 27.05.26 | - | 3 | MS-20 Tests und Abnahme | ⚠️ |
-| 27.05.26 | - | 2 | MS-20 Tagesplan und Wochenkalender UI | ✅ |
-| 27.05.26 | - | 1 | MS-20 Day-Plans Backend | ✅ |
-| 27.05.26 | - | Fix / Feature | Footer-Counter Erweiterung | ✅ |
-| 27.05.26 | - | Fix | Dashboard Widget Kontexte | ✅ |
-| 27.05.26 | - | 4 | MS-14 Tests und Abnahme | ⚠️ |
-| 27.05.26 | - | Fix | Startseite Button Anpassen | ✅ |
-| 27.05.26 | - | 3 | MS-14 Frontend Integration | ✅ |
-| 27.05.26 | - | 2 | MS-14 Backend Versand und API | ✅ |
-| 27.05.26 | - | 1 | MS-14 Datenmodell und Config | ✅ |
-| 27.05.26 | - | Fix | Kommentar Markdown HTML | ✅ |
-| 27.05.26 | - | Fix | Vollbackup Beschleunigung | ✅ |
-| 27.05.26 | - | Fix | Backup Varianten Container | ✅ |
-| 26.05.26 | - | Fix | Backup UI Ordnung | ✅ |
-| 26.05.26 | - | 4 | TASK-95 Tests und Abnahme | ⚠️ |
-| 26.05.26 | - | 3 | TASK-95 Backup Progress UI | ✅ |
-| 26.05.26 | - | 2 | TASK-95 Realtime Progress Events | ✅ |
-| 26.05.26 | - | 1 | TASK-95 SFTP Streaming Progress | ✅ |
-| 26.05.26 | - | Feature | Status-Kaskadierdialog | ✅ |
-| 26.05.26 | - | Fix | Kommentar-Dialog Speichern | ✅ |
-| 26.05.26 | - | Fix | Kommentar-Editor Modal | ✅ |
-| 26.05.26 | - | Feature | Editierbare Kommentare | ✅ |
-| 26.05.26 | - | Fix | Standard-Admin Rene Rose | ✅ |
-| 26.05.26 | - | Feature | Notizen Board List Modal Editor | ⚠️ |
-| 26.05.26 | - | Fix | Claude Config UTF-8 BOM | ✅ |
-| 26.05.26 | - | Fix | Claude Store MCP Konfig | ✅ |
-| 26.05.26 | - | Fix | Claude Desktop MCP Büro | ✅ |
-| 26.05.26 | - | Feature | MCP ChatGPT lokale Vorbereitung | ⚠️ |
-| 26.05.26 | - | Fix | Start-Abhängigkeiten | ✅ |
-| 26.05.26 | - | Fix | CardFooterBar Untere Kartenkante | ✅ |
-| 26.05.26 | - | Fix | Standard-Admin Passwort DB | ✅ |
-| 26.05.26 | - | Fix | Standard-Admin zurückgesetzt | ✅ |
-| 26.05.26 | - | 65 | CardFooterBar Status-Footer | ⚠️ |
-| 26.05.26 | - | 64 | ItemCard Höhenangleichung | ✅ |
-| 26.05.26 | - | Analyse | MCP-ChatGPT stabiler Zugang | ⚠️ |
-| 26.05.26 | - | Feature | TASK-63 Toast-Position Admin-Einstellungen | ⚠️ |
-| 26.05.26 | - | Feature | TASK-62 SelectParent Parent-Projekt | ⚠️ |
-| 26.05.26 | - | Fix | MCP Feature Feldhinweise | ✅ |
-| 26.05.26 | - | Fix | Projekt Feature Zuordnung UI | ✅ |
-| 26.05.26 | - | Fix | Sidebar globale Suche Placeholder | ✅ |
-| 26.05.26 | - | Fix | Features Projektfilter Position | ✅ |
-| 26.05.26 | - | Fix | Features Projektfilter | ✅ |
-| 25.05.26 | - | Fix | Admin Nav Kontrast | ✅ |
-| 25.05.26 | - | Fix | Admin Nav Icons | ✅ |
-| 25.05.26 | - | Fix | Admin Sidebar Hero Meta | ✅ |
-| 25.05.26 | - | Feature | Admin Sidebar Detail Layout | ✅ |
-| 25.05.26 | - | Fix | MCP-Keys angleichen | ✅ |
-| 25.05.26 | - | Feature | Project Wiki UI | ⚠️ |
-| 25.05.26 | - | Fix | ProjectDetails Feature-Link-Button | ✅ |
-| 25.05.26 | - | Fix | MCP-Lokalkonfiguration | ⚠️ |
-| 25.05.26 | - | Feature | TASK-61 Wiki-Projektbezug | ✅ |
-| 25.05.26 | - | Fix / Feature | Korrektur Dashboard Meilensteinliste | ✅ |
-| 25.05.26 | - | Fix / Feature | Dashboard Widget Detailnavigation | ✅ |
-| 25.05.26 | - | Fix | Dashboard Widget Zeilenhöhe | ✅ |
-| 25.05.26 | - | Fix | Detail-Tabs Events und Import | ✅ |
-| 25.05.26 | - | Fix / Feature | Tab-Headlines und Editor | ✅ |
-| 25.05.26 | - | Fix | Meilenstein Übersicht Tabs | ✅ |
-| 25.05.26 | - | Fix | Dashboard Editor Dropdown Ausblenden | ✅ |
-| 25.05.26 | - | Fix | Dashboard Editor Button Größe | ✅ |
-| 24.05.26 | - | 7 | Dashboard Editor Toggle | ✅ |
-| 24.05.26 | - | 6 | Projekt Dashboard Kindobjekte | ✅ |
-| 24.05.26 | - | 5 | Dashboard Route Entfernen | ✅ |
-| 24.05.26 | - | 4 | Startseite Reines Dashboard | ✅ |
-| 24.05.26 | - | 3 | Read-only Board/List Widgets | ✅ |
-| 24.05.26 | - | 2 | Kalender Dashboard Widgets | ✅ |
-| 24.05.26 | - | 1 | Dashboard Widget Registry | ✅ |
-| 24.05.26 | - | 53 | Startseite Sektion-Titel | ⚠️ |
-| 24.05.26 | - | 52 | Sidebar Edge Style | ⚠️ |
-| 24.05.26 | - | Fix | MCP Dev Start | ✅ |
-| 24.05.26 | - | Feature | MS-12 Backup und Sync | ✅ |
-| 24.05.26 | - | Feature | TASK-49 App-Startseite | ⚠️ |
-| 24.05.26 | - | Feature | Referenz-Kontext MCP Skill | ⚠️ |
-| 24.05.26 | - | Fix | Projekt-Features-DnD | ✅ |
-| 24.05.26 | - | Fix | Sidebar Hero Abstände | ✅ |
-| 24.05.26 | - | Feature | PageHero Sidebar Alignment | ✅ |
-| 24.05.26 | - | Fix | MCP Büro Anleitung | ✅ |
-| 24.05.26 | - | 2 | MCP Autostart Startpfade | ✅ |
-| 24.05.26 | - | 1 | ChatGPT MCP HTTP Auth | ✅ |
-| 24.05.26 | - | Fix / Feature | Meilenstein-Karten-Kindobjekte | ✅ |
-| 24.05.26 | - | Analyse | Create-Kindobjekte und DnD | ✅ |
-| 24.05.26 | - | Fix | StatusPill Fallback | ✅ |
-| 24.05.26 | - | Fix | Web-Unit-Test-Erwartungen | ✅ |
-| 24.05.26 | - | 4 | Create-Kindobjekte Abnahme | ⚠️ |
-| 24.05.26 | - | 3 | Create-Kindobjekte Browsertests | ⚠️ |
-| 24.05.26 | - | 2 | Kindobjekte Integrationstests | ✅ |
-| 24.05.26 | - | 1 | Create-Kindobjekte UI | ⚠️ |
-| 24.05.26 | - | Fix / Feature | MS-13 Navigation | ✅ |
-| 24.05.26 | - | Fix | Sidebar Header Buttons | ✅ |
-| 24.05.26 | - | Fix | Sidebar Header Suche | ✅ |
-| 24.05.26 | - | Feature | MCP Attachment Tool | ✅ |
-| 24.05.26 | - | Fix | Board-Spaltenbreite | ✅ |
-| 24.05.26 | - | Feature | Projekt-Meilenstein Create-Aktionen | ⚠️ |
-| 24.05.26 | - | Fix | Project Feature Status-Akzentfarben | ✅ |
-| 24.05.26 | - | Fix | Project Features Tab Position | ✅ |
-| 24.05.26 | - | Fix | ActionMenu Stacking und Breite | ✅ |
-| 24.05.26 | - | Feature | List/Board Item Menü Create-Aktionen | ⚠️ |
-| 24.05.26 | - | Fix | Sidebar rechter Abstand | ✅ |
-| 24.05.26 | - | Fix | Collapsed Plus Button Position | ✅ |
-| 24.05.26 | - | Feature | Kollabierte Status-Spalten | ⚠️ |
-| 24.05.26 | - | Fix | Sidebar-Navigation Breite | ✅ |
-| 24.05.26 | - | Fix | Sidebar-Navigation Buttonhöhe und Breite | ✅ |
-| 24.05.26 | - | Fix | Sidebar-Navigation als begrenzte Flächen | ✅ |
-| 23.05.26 | - | Feature | Sidebar Collapse | ⚠️ |
-| 23.05.26 | - | Feature | Copy Reference im Menü | ✅ |
-| 23.05.26 | - | Fix | Copy Link Hero Icon | ✅ |
-| 23.05.26 | - | Feature | MCP Link Tools Feature Use Case | ✅ |
-| 23.05.26 | - | Feature | MCP Link Tools | ✅ |
-| 23.05.26 | - | Test | MCP und Referenz Abnahme | ⚠️ |
-| 23.05.26 | - | Feature | Objekt-Referenzen UI | ✅ |
-| 23.05.26 | - | Feature | MCP Update Create Resolve Tools | ✅ |
-| 23.05.26 | - | Fix | Codex MCP Registrierung | ⚠️ |
-| 23.05.26 | - | Fix | Katalog-Geschlossen-Status | ✅ |
-| 23.05.26 | - | Fix | Einheitliche Badge-Darstellung | ✅ |
-| 23.05.26 | - | Fix | ListBoard-Toolbar und Aktionsicon | ✅ |
-| 23.05.26 | - | Fix | Board-Icon-Nachjustierung | ✅ |
-| 23.05.26 | - | Fix | Circle-Plus-Icongröße | ✅ |
-| 23.05.26 | - | Fix | Board-Controls-Kontrast | ✅ |
-| 23.05.26 | - | Fix | Status-Spalten-Plus | ✅ |
-| 23.05.26 | - | Fix | Status-Pill-Textfarbe | ✅ |
-| 23.05.26 | - | Fix | Env Examples | ✅ |
-| 23.05.26 | - | Fix | API-Key Env | ✅ |
-| 23.05.26 | - | Fix | Attachment Open E2E Wait | ✅ |
-| 23.05.26 | - | Fix | Testentwurfs-Skill Pflicht | ✅ |
-| 23.05.26 | - | Fix / Feature | MCP Tests und Tool-Doku | ⚠️ |
-| 23.05.26 | - | Fix | MCP HTTP Hardening | ✅ |
-| 23.05.26 | - | Feature | MCP Server | ✅ |
-| 23.05.26 | - | 4 | Realtime Tests und Abnahme | ✅ |
-| 23.05.26 | - | 3 | Realtime-Frontend-Sync | ✅ |
-| 23.05.26 | - | 2 | Realtime-API-Infrastruktur | ✅ |
-| 23.05.26 | - | 1 | KI-Feature entfernen | ✅ |
-| 23.05.26 | - | Feature | API Key Authentifizierung | ✅ |
-| 23.05.26 | - | Feature | Codex Code Discipline Skill | ⚠️ |
-| 23.05.26 | - | Feature | TipTap-Editor-Verbesserungen | ✅ |
-| 23.05.26 | - | Fix | Planungsleitplanken Designrichtlinien | ✅ |
-| 23.05.26 | - | Fix | Design-Richtlinien-Pfad | ✅ |
-| 22.05.26 | - | Fix | API-Integration-Hook-Timeout | ✅ |
-| 22.05.26 | - | Fix | Auth-Form-Labels | ✅ |
-| 22.05.26 | - | Fix | Testseitige Design-Erwartungen | ⚠️ |
-| 22.05.26 | - | 3 | text-muted und blockierte Muster | ✅ |
-| 22.05.26 | - | 2 | Design-Vereinheitlichung ohne text-muted | ⚠️ |
-| 22.05.26 | - | 1 | text-muted Analyse | ✅ |
-| 22.05.26 | - | Fix | Shell Navigation Suche | ✅ |
-| 22.05.26 | - | Fix | Owner Task E2E Selector | ✅ |
-| 22.05.26 | - | Fix | Dashboard E2E Testfixes | ⚠️ |
-| 22.05.26 | - | 3 | Dashboard Tests und Verifikation | ⚠️ |
-| 22.05.26 | - | 2 | Dashboard Frontend | ✅ |
-| 22.05.26 | - | 1 | Dashboard Backend | ✅ |
-| 22.05.26 | - | Fix | Meilenstein-Statusfilter | ✅ |
-| 22.05.26 | - | Fix | Board-Toolbar Statusfilter | ✅ |
-| 22.05.26 | - | Fix | API-Test-Erwartungen | ✅ |
-| 22.05.26 | - | Feature | Navigation und Standalone-Tabs | ⚠️ |
-| 22.05.26 | - | Fix | DnD Status Views | ✅ |
-| 22.05.26 | - | Fix | Action Menu Sichtbarkeit | ✅ |
-| 22.05.26 | - | Fix | Board-Spaltenhöhe | ✅ |
-| 22.05.26 | - | Feature | Task DnD Board und Liste | ⚠️ |
-| 22.05.26 | - | Fix | Doppelklick Items | ✅ |
-| 22.05.26 | - | 6 | List-/Board-Testabdeckung | ✅ |
-| 22.05.26 | - | 5 | Inline Status und Datum | ✅ |
-| 22.05.26 | - | 4 | Status-Cards und Tag-Footer | ✅ |
-| 22.05.26 | - | 3 | Kumulative Projektlisten | ✅ |
-| 22.05.26 | - | 2 | List-/Board-Adapter | ⚠️ |
-| 22.05.26 | - | 1 | List-/Board-Toolbar | ⚠️ |
-| 22.05.26 | - | Fix | Globale Suche | ✅ |
-| 22.05.26 | - | Fix | Testfixes Projektgrenzen Relationen | ⚠️ |
-| 22.05.26 | - | Feature | Projektgrenzen Relationen | ⚠️ |
-| 22.05.26 | - | Fix | Katalog Farbfeld Anzeige | ✅ |
-| 22.05.26 | - | Feature | Slug und Projekt-Kürzel entfernt | ✅ |
-| 22.05.26 | - | Fix | Katalog Colorpicker | ✅ |
-| 22.05.26 | - | Feature | Ticket-User-Auswahl | ✅ |
-| 22.05.26 | - | Fix | Ticket-Priorität UI | ✅ |
-| 22.05.26 | - | Fix | Remote Backup Timeout | ✅ |
-| 22.05.26 | - | Fix | SFTP Env-Konfiguration | ✅ |
-| 21.05.26 | - | Feature | Ticket-Typen als farbige Katalogeinträge | ⚠️ |
-| 21.05.26 | - | Fix | SFTP Backup Timeout | ✅ |
-| 21.05.26 | - | Feature | Ticket-Detailformular Tabs | ✅ |
-| 21.05.26 | - | Fix | API Drizzle Startscript | ✅ |
-| 21.05.26 | - | Feature | SFTP Backups | ⚠️ |
-| 21.05.26 | - | Fix | Dump Standardadmin | ✅ |
-| 21.05.26 | - | Feature | Attachments lokal öffnen | ✅ |
-| 21.05.26 | - | Fix | Board/List Header Hintergrund | ✅ |
-| 21.05.26 | - | Fix | UI-Regressionen | ✅ |
-| 21.05.26 | - | Fix | Calendar E2E Datum | ✅ |
-| 21.05.26 | - | 7 | Formular-Höhen | ⚠️ |
-| 21.05.26 | - | 6 | StatusPill Farben | ⚠️ |
-| 21.05.26 | - | 5 | Tabbar Breadcrumb | ⚠️ |
-| 21.05.26 | - | 4 | Kommentar-Platzhalter | ⚠️ |
-| 21.05.26 | - | 3 | Klick-Verhalten | ⚠️ |
-| 21.05.26 | - | 2 | Header-Konsistenz | ⚠️ |
-| 21.05.26 | - | 1 | Design Quick Wins | ⚠️ |
-| 21.05.26 | - | Fix | Journal-Test-Fixtures | ✅ |
-| 21.05.26 | - | Feature | Journal-Komponente | ⚠️ |
-| 21.05.26 | - | 4 | Tests UI-Board-Overhaul | ✅ |
-| 21.05.26 | - | 3 | Slug- & Icon-Bereinigung | ✅ |
-| 21.05.26 | - | 2 | Board-Toolbar & Statusspalten | ✅ |
-| 21.05.26 | - | 1 | ActionMenu & Kartenaktionen | ✅ |
-| 21.05.26 | - | Feature | KI RichText Beschreibungsfeld | ✅ |
-| 21.05.26 | - | Feature | Test-Entwurfsleitplanken-Skill | ⚠️ |
-| 21.05.26 | - | Fix | Rote Tests TLDraw und Migration | ✅ |
-| 21.05.26 | - | 1 | Settings-System | ⚠️ |
-| 21.05.26 | - | Fix | Details-Tab-Body-Breite | ✅ |
-| 21.05.26 | - | Fix | Tab-Board-Außenrand und Header | ✅ |
-| 21.05.26 | - | Fix | Detailseiten-Formulare Breite | ✅ |
-| 21.05.26 | - | Fix | Auth Bypass Admin | ✅ |
-| 21.05.26 | - | 4 | Dev-Tooling Audit Cluster | ✅ |
-| 21.05.26 | - | 3 | tldraw TipTap Audit Cluster | ✅ |
-| 21.05.26 | - | 2 | Drizzle Audit Cluster | ✅ |
-| 21.05.26 | - | 1 | Fastify Audit Cluster | ✅ |
-| 21.05.26 | - | Feature | Root-Testhierarchie | ⚠️ |
-| 21.05.26 | - | Fix | npm audit dev start | ✅ |
-| 20.05.26 | - | Fix | Formular Save-Close Create | ✅ |
-| 20.05.26 | - | Fix | Backup Pfad Root | ✅ |
-| 20.05.26 | - | Feature | Lokale Backups | ✅ |
-| 20.05.26 | - | Fix | Formular-Board-Tabs füllen | ⚠️ |
-| 20.05.26 | - | Fix | Katalogsichere Create-Flows | ✅ |
-| 20.05.26 | - | Fix | Admin Account Reset | ✅ |
-| 20.05.26 | - | Feature | Sticky Formular-Shells | ✅ |
-| 20.05.26 | - | Fix | Formularfelder | ✅ |
-| 20.05.26 | - | 1 | Planungsleitplanken-Skill | ✅ |
-| 20.05.26 | - | Fix | Auth-Rollen-Architektur | ✅ |
-| 20.05.26 | - | Fix | Savetowork-Kommando | ✅ |
-| 20.05.26 | - | 5 | Auth-Tests und Verifikation | ✅ |
-| 20.05.26 | - | 4 | Auth-Frontend | ✅ |
-| 20.05.26 | - | 3 | Auth-API | ✅ |
-| 20.05.26 | - | 2 | Auth-Schema und Seed | ✅ |
-| 20.05.26 | - | 1 | Auth-Vorbereitung | ✅ |
-| 20.05.26 | - | Fix | Create Detailroute | ✅ |
-| 20.05.26 | - | Fix | Rote Tests Testhelper | ⚠️ |
-| 20.05.26 | - | Fix | Audit Coverage entfernt | ⚠️ |
-| 20.05.26 | - | 1 | Browser-Tabs | ⚠️ |
-| 20.05.26 | - | Fix | Büroumgebung KI Runtime | ✅ |
-| 20.05.26 | - | Feature | Status-Board-Gruppierung | ✅ |
-| 20.05.26 | - | Feature | Status- und Prioritätskataloge | ✅ |
-| 20.05.26 | - | Fix | TaskForm-Umbenennung | ✅ |
-| 20.05.26 | - | Fix | Planungskarten Aufgaben-Progress | ✅ |
-| 20.05.26 | - | Fix | Meilenstein View-State | ✅ |
-| 20.05.26 | - | Fix | Feature List Items | ✅ |
-| 20.05.26 | - | Fix | Formular Speichern schließt | ✅ |
-| 20.05.26 | - | Fix | Projekt-Tabs Leerfläche | ✅ |
-| 20.05.26 | - | Fix | Lokale KI Runtime Paket | ✅ |
-| 20.05.26 | - | Feature | TLDraw-Zeichenblock | ✅ |
-| 20.05.26 | - | Feature | Lokaler KI-Agent | ✅ |
-| 20.05.26 | - | Fix | E2E RichText Verifikation | ✅ |
-| 20.05.26 | - | Fix | Agents Milestone Gate | ⚠️ |
-| 20.05.26 | - | Fix | RichText-Auswahl-Toolbar | ✅ |
-| 20.05.26 | - | Fix | Formular-Hero-Unterzeilen | ✅ |
-| 19.05.26 | - | Fix | Startscript und Dev-Watch | ✅ |
-| 19.05.26 | - | Fix | Google Drive OAuth Client Env | ⚠️ |
-| 19.05.26 | - | Fix | RichText Beschreibungsfelder | ✅ |
-| 19.05.26 | - | Fix | Startdatei Ein Terminal | ✅ |
-| 19.05.26 | - | Feature | RichTextInlineField | ✅ |
-| 19.05.26 | - | Fix | Milestone-Web-Tests | ✅ |
-| 19.05.26 | - | Feature | Meilensteine als Projekt-Subdomäne | ⚠️ |
-| 19.05.26 | - | Fix / Feature | Demo-Daten-Seed entfernt | ✅ |
-| 19.05.26 | - | 12 | Events Owner-Junction-Modell | ✅ |
-| 19.05.26 | - | Fix | Events Owner-Junction Folgeauftrag | ✅ |
-| 19.05.26 | - | 9 | Legacy-Spalten Cleanup | ✅ |
-| 19.05.26 | - | Fix | Agents Architekturleitplanken | ✅ |
-| 19.05.26 | - | Fix | Dump-Registry Neue Tabellen | ✅ |
-| 19.05.26 | - | Fix | Test-Fixtures Expected Version | ✅ |
-| 19.05.26 | - | 10 | Test- und Abnahme-Gate | ⚠️ |
-| 19.05.26 | - | 9 | Cleanup und Drop Legacy-Spalten | 🔴 |
-| 19.05.26 | - | 8 | Support- und Infrastruktur-Services | ⚠️ |
-| 19.05.26 | - | 7 | Dokumentation- und Backlog-Services | ⚠️ |
-| 19.05.26 | - | 6 | Project-, Task- und Ticket-Services | ⚠️ |
-| 19.05.26 | - | 5 | Repository Foundation und API-Kontrakte | ✅ |
-| 19.05.26 | - | 4 | Attachment-Junction-Modell | ⚠️ |
-| 19.05.26 | - | 3 | Comment-Junction-Modell | ⚠️ |
-| 19.05.26 | - | 2 | Schema Users, Version und Audit-Felder | ⚠️ |
-| 19.05.26 | - | 1 | Bestandsaufnahme Architektur-Delta | ✅ |
-| 19.05.26 | - | Fix | Aufgabendateien Architektur-Refactoring | ✅ |
-| 18.05.26 | - | Feature | Detailseiten und Formularnavigation | ✅ |
-| 18.05.26 | - | Fix | App-Name Projekt Manager | ✅ |
-| 18.05.26 | - | Fix | Responsive-Density-Auftrag | ✅ |
-| 18.05.26 | - | Fix | Projekt-Doppelklick Formular | ✅ |
-| 18.05.26 | - | Fix | Startdatei CRLF | ✅ |
-| 18.05.26 | - | Fix | Runtime-Datenbanken | ✅ |
-| 18.05.26 | - | Fix | Startdatei Pfaderkennung | ✅ |
-| 18.05.26 | - | Fix | Dev-Start ohne tsx | ✅ |
-| 18.05.26 | - | Fix | Browsertests | ✅ |
-| 18.05.26 | - | 5 | Verifikation und Upload-Fortschritt | ✅ |
-| 18.05.26 | - | 3/4 | E2E-Form-Specs | 🔴 |
-| 18.05.26 | - | 2 | Form-Unit-Tests | ⚠️ |
-| 18.05.26 | - | 1 | Pending-Komponenten-Tests | ✅ |
-| 18.05.26 | - | 0 | Playwright-Startblocker | 🔴 |
-| 18.05.26 | - | Fix | Test-Kommando | ✅ |
-| 18.05.26 | - | 7 | Tests und Verifikation | ⚠️ |
-| 18.05.26 | - | 6 | ProjectForm | ✅ |
-| 18.05.26 | - | 5 | FeatureForm | ✅ |
-| 18.05.26 | - | 4 | TaskModal | ✅ |
-| 18.05.26 | - | 3 | UseCase-Formular | ✅ |
-| 18.05.26 | - | 2 | Owner-Board-Migration | ✅ |
-| 18.05.26 | - | 1 | Foundation Owner-Relation-Board | ✅ |
-| 18.05.26 | - | Feature | Owner-Aufgabenbeziehungen Tests | ⚠️ |
-| 18.05.26 | - | Feature | Owner-Join-Tabellen für Tickets | ✅ |
-| 18.05.26 | - | Feature | Owner-Join-Tabellen für Aufgaben | ✅ |
-| 18.05.26 | - | Feature | Feature-Projekt-Zuordnung Board View | ⚠️ |
-| 18.05.26 | - | Fix | Projekt-Tabs Toolbar | ✅ |
-| 18.05.26 | - | Fix | Task-Liste Statuskreis | ✅ |
-| 18.05.26 | - | Fix | Use-Case Formular Status und Text | ✅ |
-| 18.05.26 | - | Fix | Sticky Form Footer und Use Case Detail | ✅ |
-| 18.05.26 | - | Fix | Feature-Hero und Tab-Meta | ✅ |
-| 18.05.26 | - | Fix | Feature-Kurzbeschreibung Markdown | ✅ |
-| 18.05.26 | - | Fix | Editor-Toolbar Icons | ✅ |
-| 18.05.26 | - | Fix | Formular schließen und Iconbuttons | ✅ |
-| 18.05.26 | - | Fix | Beschreibungseditoren und Tabs | ✅ |
-| 18.05.26 | - | Fix | Task-Detail Bereinigung | ✅ |
-| 18.05.26 | - | Fix | Feature-Öffnung, Rich-Text und Projektheader | ✅ |
-| 18.05.26 | - | Fix | Fake-Benutzer und Projektboard | ✅ |
-| 18.05.26 | - | Fix | Karten Rich-Text Preview | ✅ |
-| 18.05.26 | - | Fix | Projektformular Feature-Vorauswahl | ✅ |
-| 18.05.26 | - | Fix | App-Datenbank leeren | ✅ |
-| 17.05.26 | - | Fix | Delete-Cascade-Tests | ✅ |
-| 17.05.26 | - | Fix | Delete-Cascade-Cleanup | ✅ |
-| 17.05.26 | - | Fix | Wiki-Import Feature-Content | ✅ |
-| 17.05.26 | - | 11 | Ticket-Tests | ✅ |
-| 17.05.26 | - | 10 | Ticket-Seed-Daten | ✅ |
-| 17.05.26 | - | 9 | Ticket-Globale-Suche | ✅ |
-| 17.05.26 | - | 8 | Ticket-Seiten & Navigation | ✅ |
-| 17.05.26 | - | 7 | Ticket-Komponenten | ✅ |
-| 17.05.26 | - | 6 | Ticket-Frontend-API & Hooks | ✅ |
-| 17.05.26 | - | 5 | Ticket-Shared-Infrastruktur | ✅ |
-| 17.05.26 | - | 4 | Ticket-Routes | ✅ |
-| 17.05.26 | - | 3 | Ticket-Service | ✅ |
-| 17.05.26 | - | 2 | Ticket-Shared-Types | ✅ |
-| 17.05.26 | - | 1 | Ticket-Schema & Migration | ✅ |
-| 17.05.26 | - | Feature | Query-Sync-Testabdeckung | ✅ |
-| 17.05.26 | - | Fix | Test-only Fehlerbehebung | ✅ |
-| 17.05.26 | - | Feature | Drive-Konfiguration UI | ✅ |
-| 17.05.26 | - | Feature | Global Query Sync | ✅ |
-| 17.05.26 | - | Fix | Board Card Width | ✅ |
-| 17.05.26 | - | Fix | ListBoard Add Buttons | ✅ |
-| 17.05.26 | - | Feature | Attachment-Previews | ✅ |
-| 17.05.26 | - | Feature | Wiki-Import Relationen und Backlogs | ✅ |
-| 17.05.26 | - | Fix | Project Features Board | ✅ |
-| 17.05.26 | - | Feature | Board/ListView Testsuite | ✅ |
-| 17.05.26 | - | Feature | Admin-Testdaten | ✅ |
-| 17.05.26 | - | 0 | ListBoardView Testsuite Blocker | 🔴 |
-| 17.05.26 | - | Fix | Test Runtime Safety | ✅ |
-| 17.05.26 | - | Fix | E2E leere Tests | ✅ |
-| 17.05.26 | - | Fix | Design-Review-Befunde | ✅ |
-| 17.05.26 | - | Feature | Google-Drive-Dump | ✅ |
-| 17.05.26 | - | Fix | Restabweichungen Designauftrag | ✅ |
-| 17.05.26 | - | 15 | Cleanup | ✅ |
-| 17.05.26 | - | 14 | Comments Rollout | ✅ |
-| 17.05.26 | - | 13 | Domain Wiki & Kalender | ✅ |
-| 17.05.26 | - | 12 | Domain Use Case & Backlog | ✅ |
-| 17.05.26 | - | 11 | Domain Project | ✅ |
-| 17.05.26 | - | 10 | Domain Feature | ✅ |
-| 17.05.26 | - | 9 | Domain Task | ⚠️ |
-| 17.05.26 | - | 8 | RelationPanel | ✅ |
-| 17.05.26 | - | 7 | ListBoard | ✅ |
-| 17.05.26 | - | 6 | Comments | ✅ |
-| 17.05.26 | - | 5 | Templates | ✅ |
-| 17.05.26 | - | 4 | Section & FormField | ✅ |
-| 17.05.26 | - | 3 | Rich-Text | ✅ |
-| 17.05.26 | - | 2 | Moleküle | ✅ |
-| 17.05.26 | - | 1 | Atome | ✅ |
-| 17.05.26 | - | 0 | Token-Migration | ✅ |
-| 17.05.26 | - | Fix | Form-Footer-Hinweise | ✅ |
-| 17.05.26 | - | Fix | Create-Form Pflichtfeld-Markierungen | ✅ |
-| 17.05.26 | - | Fix | Project-Form Footer-Text | ✅ |
-| 17.05.26 | - | Fix | Project-Form Kürzel-Layout | ✅ |
-| 17.05.26 | - | Fix | Feature Rich-Text-Editor | ✅ |
-| 17.05.26 | - | Feature | Feature-Projekt-Relation UI | ✅ |
-| 17.05.26 | - | Feature | Feature-Detail Use-Case Overlay | ✅ |
-| 17.05.26 | - | Fix | Project-Detail-Hero | ✅ |
-| 17.05.26 | - | Fix | Feature-Input Container | ✅ |
-| 16.05.26 | - | Fix | Import-Tab Position | ✅ |
-| 16.05.26 | - | Feature | Wiki-Import | ✅ |
-| 16.05.26 | - | 12 | GlobalSearch, Avatar und API-Health | ✅ |
-| 16.05.26 | - | 11 | NotFound und ErrorBoundary | ✅ |
-| 16.05.26 | - | 10 | EmptyState | ✅ |
-| 16.05.26 | - | 9 | Skeleton-Family | ✅ |
-| 16.05.26 | - | 8 | ToastProvider | ✅ |
-| 16.05.26 | - | 7 | ConfirmDialog | ✅ |
-| 16.05.26 | - | 6 | TagManager | ✅ |
-| 16.05.26 | - | 5 | WikiEditor | ✅ |
-| 16.05.26 | - | 4 | NoteEditor | ✅ |
-| 16.05.26 | - | 3 | BacklogForm | ✅ |
-| 16.05.26 | - | 2 | TaskForm | ✅ |
-| 16.05.26 | - | 1 | ProjectForm | ✅ |
-| 16.05.26 | - | 7 | Modal-Footer | ✅ |
-| 16.05.26 | - | 6 | Docs, Notizen und Dateien | ✅ |
-| 16.05.26 | - | 5 | Kommentare-Tab | ✅ |
-| 16.05.26 | - | 4 | Subtasks-Tab | ✅ |
-| 16.05.26 | - | 3 | Details-Tab | ✅ |
-| 16.05.26 | - | 2 | Tab-Strip | ✅ |
-| 16.05.26 | - | 1 | Modal-Chrome | ✅ |
-| 16.05.26 | - | 0 | Forms/System-Blocker | 🔴 |
-| 16.05.26 | - | 6 | Feature- und UseCase-Form-Modals | ✅ |
-| 16.05.26 | - | 5 | MarkdownEditor-Wrapper | ✅ |
-| 16.05.26 | - | 4 | UseCase-Detail-Form | ✅ |
-| 16.05.26 | - | 3 | UseCaseList | ✅ |
-| 16.05.26 | - | 2 | Feature-Detail-Form | ✅ |
-| 16.05.26 | - | 1 | Feature-Page-Hero | ✅ |
-| 16.05.26 | - | 5 | FeaturePicker und TaskList | ✅ |
-| 16.05.26 | - | 4 | BacklogList | ✅ |
-| 16.05.26 | - | 3 | AttachmentPreview | ✅ |
-| 16.05.26 | - | 2 | AttachmentUploader | ✅ |
-| 16.05.26 | - | 1 | NoteCard | ✅ |
-| 16.05.26 | - | 7 | FeatureCard und FullCalendar | ✅ |
-| 16.05.26 | - | 6 | TaskCard, Pill und Badge | ✅ |
-| 16.05.26 | - | 5 | Kanban-Tönung | ✅ |
-| 16.05.26 | - | 4 | ProjectCard-Restyle | ✅ |
-| 16.05.26 | - | 3 | TopBar-Suchfeld | ✅ |
-| 16.05.26 | - | 2 | Sidebar-Restyle | ✅ |
-| 16.05.26 | - | 1 | Tailwind-Tokens | ✅ |
-| 16.05.26 | - | 6 | Task-Detail Vorschau | ✅ |
-| 16.05.26 | - | 5 | Health-Endpoint | ✅ |
-| 16.05.26 | - | 4 | Nächste Termine | ✅ |
-| 16.05.26 | - | 3 | Filter-Chips | ✅ |
-| 16.05.26 | - | 2 | Progress-Balken | ✅ |
-| 16.05.26 | - | 1 | Hover-Lift | ✅ |
-| 16.05.26 | - | Fix / Feature | API Red Tests | ✅ |
-| 16.05.26 | - | Fix / Feature | Node 24 SQLite Binding | ✅ |
-| 16.05.26 | - | Fix / Feature | Test Kurzkommando | ✅ |
-| 16.05.26 | - | Fix / Feature | Save Kurzkommando | ✅ |
-| 16.05.26 | - | 30 | Integrationstests Wiki/Docs | ✅ |
-| 16.05.26 | - | 29 | Integration bestehende Views | ✅ |
-| 16.05.26 | - | 28 | Frontend Backlog | ✅ |
-| 16.05.26 | - | 27 | Frontend Wiki | ✅ |
-| 16.05.26 | - | 26 | Frontend Features & Use Cases | ✅ |
-| 16.05.26 | - | 26 | Frontend Features & Use Cases Blocker | 🔴 |
-| 16.05.26 | - | 25 | Shared Types Wiki/Docs | ✅ |
-| 16.05.26 | - | 24 | Junction/Link-APIs | ✅ |
-| 16.05.26 | - | 23 | Backlog API | ✅ |
-| 16.05.26 | - | 22 | Wiki-Seiten API | ✅ |
-| 16.05.26 | - | 21 | Use Cases API | ✅ |
-| 16.05.26 | - | 20 | Features API | ✅ |
-| 16.05.26 | - | 19 | Content FileSystem Service | ✅ |
-| 16.05.26 | - | 18 | DB-Schema Wiki/Docs | ✅ |
-| 16.05.26 | - | Fix / Feature | Integrationstestsuite | 🔴 |
-| 16.05.26 | - | Fix / Feature | Offene Vollständigkeitspunkte | ✅ |
-| 16.05.26 | - | Audit | Vollständigkeitsprüfung | ✅ |
-| 16.05.26 | - | Fix | Node 20 Blocker | ✅ |
-| 16.05.26 | - | 17 | Polish | ⚠️ |
-| 16.05.26 | - | 16 | Kalender | ✅ |
-| 16.05.26 | - | 15 | Attachments UI | ✅ |
-| 16.05.26 | - | 14 | Notizen UI | ✅ |
-| 16.05.26 | - | 13 | Tags UI | ✅ |
-| 16.05.26 | - | 12 | TaskDetail Modal | ✅ |
-| 16.05.26 | - | 11 | Task Views | ✅ |
-| 16.05.26 | - | 10 | Projects Page | ✅ |
-| 16.05.26 | - | 9 | React Grundstruktur | ✅ |
-| 16.05.26 | - | 8 | Shared Types | ✅ |
-| 16.05.26 | - | 7 | Termine API | ⚠️ |
-| 16.05.26 | - | 6 | Attachments API | ⚠️ |
-| 16.05.26 | - | 5 | Notizen API | ⚠️ |
-| 16.05.26 | - | 4 | Tags API | ⚠️ |
-| 16.05.26 | - | 3 | Fastify Backend Basis | ⚠️ |
-| 16.05.26 | - | 2 | Schema & Migration | ⚠️ |
-| 16.05.26 | - | 1 | Monorepo Grundgerüst | ✅ |
+| 03.06.26 | 07:24:49 | Feature | Codex Skills Sync | ✅ |
+| 02.06.26 | 15:55:14 | Feature | MS-46 TipTap Image Extensions | âœ… |
+| 02.06.26 | 10:37:17 | Fix | TASK-203 Projektzuordnung | âœ… |
+| 02.06.26 | 10:28:05 | Fix | MS-43 Dirty-Guard Auftrag | âœ… |
+| 02.06.26 | 10:16:00 | Fix | Meilenstein Aufgaben Link-Kandidaten | âš ï¸ |
+| 02.06.26 | 10:04:30 | Fix | Parent Context Sidebar | âœ… |
+| 02.06.26 | 09:51:19 | Fix | Meilenstein Create VerknÃ¼pfungen | âœ… |
+| 02.06.26 | 09:24:17 | Fix | Deploy Shared Types Runtime | âœ… |
+| 02.06.26 | 09:16:59 | Feature | Deploy LocalAppData Runtime | âœ… |
+| 01.06.26 | 16:35:34 | Test | MS-41 Abschlusslauf | âš ï¸ |
+| 01.06.26 | 16:35:33 | 1 | MS-41 Refactoring Kommentare, Notizen und Create-Relationen | âœ… |
+| 01.06.26 | 06:23:09 | Feature | MS-34 Browser-Test-Speedup | âš ï¸ |
+| 01.06.26 | 06:14:17 | Fix | Alten Referenz-Skill entfernen | âœ… |
+| 01.06.26 | 06:13:22 | Fix | MCP-Code Auftrag Skill | âœ… |
+| 31.05.26 | 19:40:58 | Feature | MS-33 Design-Richtlinien | âœ… |
+| 31.05.26 | 16:36:09 | Fix | API-Testlauf ausfÃ¼hren | âœ… |
+| 31.05.26 | 16:19:31 | Feature | Note Details in neuem Tab | âœ… |
+| 31.05.26 | 15:56:10 | Fix | Web-Testdrift | âœ… |
+| 31.05.26 | 15:45:57 | Fix | Lint Restfehler | âœ… |
+| 31.05.26 | 15:33:31 | Fix | Lint Cleanup | âœ… |
+| 31.05.26 | 12:45:46 | Fix | Dashboard Kalender Limit | âœ… |
+| 31.05.26 | 08:17:40 | Fix | Notizkarten MenÃ¼ und Footer | âœ… |
+| 31.05.26 | 08:11:45 | Fix | Notizeditor Inhalt und Details | âœ… |
+| 31.05.26 | 08:05:43 | Fix | Kalenderwidget Footer-ZÃ¤hler | âœ… |
+| 31.05.26 | 08:04:01 | Fix | DayPlan Kalender Create | âœ… |
+| 31.05.26 | 08:01:48 | Fix | Feiertagslabel ausschreiben | âœ… |
+| 31.05.26 | 08:00:50 | Fix | Monatskalender Feiertagskachel | âœ… |
+| 31.05.26 | 07:59:29 | Fix | Wochenkalender Create nur Plus | âœ… |
+| 31.05.26 | 07:57:57 | Fix | Wochenkalender Plus-Aktionen | âœ… |
+| 31.05.26 | 07:55:15 | Fix | Terminformular FarbwÃ¤hler | âœ… |
+| 31.05.26 | 07:54:00 | Fix | Wochenkalender Spaltenkopf | âœ… |
+| 31.05.26 | 07:50:41 | Fix | MS-32 Feiertagsspalte und Karten | âœ… |
+| 31.05.26 | 07:28:44 | Feature | MS-32 offene Kalenderaufgaben | âš ï¸ |
+| 31.05.26 | 07:14:08 | Fix | Feiertag-Hervorhebung | âœ… |
+| 31.05.26 | 04:58:23 | Feature | MS-32 Zentrale Kalenderkomponente | âš ï¸ |
+| 31.05.26 | 02:49:12 | 1 | PersÃ¶nliche Planung Dashboard | âš ï¸ |
+| 29.05.26 | 10:32:01 | 2 | MySQL-Migrationsanalyse | âœ… |
+| 29.05.26 | 10:30:39 | 1 | Branching MS-26 | âœ… |
+| 29.05.26 | 10:22:45 | Fix | MS-25 Branchhinweis-Kommentar | âœ… |
+| 29.05.26 | 10:21:06 | 5 | Testabdeckung und Verifikation | âš ï¸ |
+| 29.05.26 | 10:16:54 | 4 | WikiPageDetail Entfernen | âœ… |
+| 29.05.26 | 10:16:36 | 3 | WikiPageForm Inline Modus | âœ… |
+| 29.05.26 | 10:07:30 | 2 | WikiPage Two Pane Layout | âœ… |
+| 29.05.26 | 10:05:39 | 1 | WikiTree Dark Sidebar | âœ… |
+| 29.05.26 | 09:52:58 | Nachtrag | MS-24 Formular-Testabdeckung | âš ï¸ |
+| 29.05.26 | 09:17:55 | 4 | Formulare und Tests | âœ… |
+| 29.05.26 | 09:17:54 | 3 | Rich-Text-Editor | âœ… |
+| 29.05.26 | 09:17:53 | 2 | Sidebar und Parent-Kontext | âœ… |
+| 29.05.26 | 09:17:52 | 1 | Save und Branch | âœ… |
+| 29.05.26 | 08:36:24 | Feature | MCP Bulk Tools | âœ… |
+| 29.05.26 | 05:35:18 | Fix | Migrationen und Dev-Start | âœ… |
+| 28.05.26 | 17:59:08 | Log | Manueller Status TKT-33 | âœ… |
+| 28.05.26 | 17:58:56 | Nachtrag | TKT-32 Kommentar Realtime | âš ï¸ |
+| 28.05.26 | 17:58:49 | Nachtrag | Wiki Support Tabs Log | âœ… |
+| 28.05.26 | 17:58:03 | 4 | Tests teilweise blockiert | âš ï¸ |
+| 28.05.26 | 17:49:16 | Fix / Feature | Wiki Support Tabs | âš ï¸ |
+| 28.05.26 | 17:44:08 | 3 | UI-Feinpunkte | âœ… |
+| 28.05.26 | 17:40:41 | 2 | Web UserbezÃ¼ge Kalender Daten | âœ… |
+| 28.05.26 | 17:28:51 | 1 | User-BezÃ¼ge Schema API MCP | âœ… |
+| 28.05.26 | 17:14:43 | Fix | TKT-32 Kommentar Realtime | âš ï¸ |
+| 28.05.26 | 17:12:54 | Nachtrag | Wiki Verwandte Seiten Lint | âš ï¸ |
+| 28.05.26 | 17:11:31 | Fix | Wiki Verwandte Seiten Suche | âœ… |
+| 28.05.26 | 16:39:13 | Fix | Wiki Detail Kopfbereich | âœ… |
+| 28.05.26 | 16:26:02 | Fix | ParentBadge WikiPage | âœ… |
+| 28.05.26 | 14:59:23 | 4 | Tests und Abnahme | âš ï¸ |
+| 28.05.26 | 14:47:31 | 3 | Wiki-Web-UI | âœ… |
+| 28.05.26 | 14:47:08 | 2 | Wiki-API-VerknÃ¼pfungen | âœ… |
+| 28.05.26 | 14:45:31 | 1 | Datenmodell und Migration | âš ï¸ |
+| 28.05.26 | 10:24:50 | 2 | Editor-Bilder als Content Images | âœ… |
+| 28.05.26 | 10:24:50 | 1 | Backup-Import entdoppeln | âš ï¸ |
+| 28.05.26 | 09:57:29 | Fix | Log-Richtlinien Zeitstempel | âœ… |
+| 28.05.26 | - | Fix | Dev-Start Shared Types | âœ… |
+| 28.05.26 | - | Fix | Start-AbhÃ¤ngigkeiten und Dev-Check | âš ï¸ |
+| 28.05.26 | - | Fix | Migrationskonsolidierung | âœ… |
+| 28.05.26 | - | 5 | MS-23 PrÃ¼fung | âš ï¸ |
+| 28.05.26 | - | 4 | MS-23 Tests | âš ï¸ |
+| 28.05.26 | - | 3 | MS-23 DayPlan UI | âœ… |
+| 28.05.26 | - | 2 | MS-23 Dashboard-State | âœ… |
+| 28.05.26 | - | 1 | MS-23 Schema und API | âš ï¸ |
+| 28.05.26 | - | Fix | Kommentar-Modal SchlieÃŸen | âœ… |
+| 28.05.26 | - | Fix | TKT-20 Statusfilter VerknÃ¼pfungen | âœ… |
+| 28.05.26 | - | Feature | TASK-110 Kommentar Modal List Board | âš ï¸ |
+| 28.05.26 | - | Fix | Ticket Markdown HTML Editor | âš ï¸ |
+| 28.05.26 | - | Feature | Kalender MuGPlan Port | âš ï¸ |
+| 28.05.26 | - | Fix | Kalender-Breite | âœ… |
+| 28.05.26 | - | Fix | Startnavigation und Tagesplan-Breite | âœ… |
+| 28.05.26 | - | Feature | Rene Ein-Klick-Login | âš ï¸ |
+| 27.05.26 | - | Fix | Content Backfill | âš ï¸ |
+| 27.05.26 | - | 2 | Backup straffen | âœ… |
+| 27.05.26 | - | 1 | HTML-Content in der DB | âœ… |
+| 27.05.26 | - | Fix | Backup Altbackup User Remap | âœ… |
+| 27.05.26 | - | Feature | Backup User Vollrestore | âš ï¸ |
+| 27.05.26 | - | Fix | Migrationen nachholen | âš ï¸ |
+| 27.05.26 | - | Fix | Backup-Import-Fehlermeldung | âœ… |
+| 27.05.26 | - | Fix | Web-Testdrift | âœ… |
+| 27.05.26 | - | 1 | Kalender-Dashboard und WeekEventTile-Design | âš ï¸ |
+| 27.05.26 | - | Fix | Migrationen ausfÃ¼hren | âš ï¸ |
+| 27.05.26 | - | 3 | MS-20 Tests und Abnahme | âš ï¸ |
+| 27.05.26 | - | 2 | MS-20 Tagesplan und Wochenkalender UI | âœ… |
+| 27.05.26 | - | 1 | MS-20 Day-Plans Backend | âœ… |
+| 27.05.26 | - | Fix / Feature | Footer-Counter Erweiterung | âœ… |
+| 27.05.26 | - | Fix | Dashboard Widget Kontexte | âœ… |
+| 27.05.26 | - | 4 | MS-14 Tests und Abnahme | âš ï¸ |
+| 27.05.26 | - | Fix | Startseite Button Anpassen | âœ… |
+| 27.05.26 | - | 3 | MS-14 Frontend Integration | âœ… |
+| 27.05.26 | - | 2 | MS-14 Backend Versand und API | âœ… |
+| 27.05.26 | - | 1 | MS-14 Datenmodell und Config | âœ… |
+| 27.05.26 | - | Fix | Kommentar Markdown HTML | âœ… |
+| 27.05.26 | - | Fix | Vollbackup Beschleunigung | âœ… |
+| 27.05.26 | - | Fix | Backup Varianten Container | âœ… |
+| 26.05.26 | - | Fix | Backup UI Ordnung | âœ… |
+| 26.05.26 | - | 4 | TASK-95 Tests und Abnahme | âš ï¸ |
+| 26.05.26 | - | 3 | TASK-95 Backup Progress UI | âœ… |
+| 26.05.26 | - | 2 | TASK-95 Realtime Progress Events | âœ… |
+| 26.05.26 | - | 1 | TASK-95 SFTP Streaming Progress | âœ… |
+| 26.05.26 | - | Feature | Status-Kaskadierdialog | âœ… |
+| 26.05.26 | - | Fix | Kommentar-Dialog Speichern | âœ… |
+| 26.05.26 | - | Fix | Kommentar-Editor Modal | âœ… |
+| 26.05.26 | - | Feature | Editierbare Kommentare | âœ… |
+| 26.05.26 | - | Fix | Standard-Admin Rene Rose | âœ… |
+| 26.05.26 | - | Feature | Notizen Board List Modal Editor | âš ï¸ |
+| 26.05.26 | - | Fix | Claude Config UTF-8 BOM | âœ… |
+| 26.05.26 | - | Fix | Claude Store MCP Konfig | âœ… |
+| 26.05.26 | - | Fix | Claude Desktop MCP BÃ¼ro | âœ… |
+| 26.05.26 | - | Feature | MCP ChatGPT lokale Vorbereitung | âš ï¸ |
+| 26.05.26 | - | Fix | Start-AbhÃ¤ngigkeiten | âœ… |
+| 26.05.26 | - | Fix | CardFooterBar Untere Kartenkante | âœ… |
+| 26.05.26 | - | Fix | Standard-Admin Passwort DB | âœ… |
+| 26.05.26 | - | Fix | Standard-Admin zurÃ¼ckgesetzt | âœ… |
+| 26.05.26 | - | 65 | CardFooterBar Status-Footer | âš ï¸ |
+| 26.05.26 | - | 64 | ItemCard HÃ¶henangleichung | âœ… |
+| 26.05.26 | - | Analyse | MCP-ChatGPT stabiler Zugang | âš ï¸ |
+| 26.05.26 | - | Feature | TASK-63 Toast-Position Admin-Einstellungen | âš ï¸ |
+| 26.05.26 | - | Feature | TASK-62 SelectParent Parent-Projekt | âš ï¸ |
+| 26.05.26 | - | Fix | MCP Feature Feldhinweise | âœ… |
+| 26.05.26 | - | Fix | Projekt Feature Zuordnung UI | âœ… |
+| 26.05.26 | - | Fix | Sidebar globale Suche Placeholder | âœ… |
+| 26.05.26 | - | Fix | Features Projektfilter Position | âœ… |
+| 26.05.26 | - | Fix | Features Projektfilter | âœ… |
+| 25.05.26 | - | Fix | Admin Nav Kontrast | âœ… |
+| 25.05.26 | - | Fix | Admin Nav Icons | âœ… |
+| 25.05.26 | - | Fix | Admin Sidebar Hero Meta | âœ… |
+| 25.05.26 | - | Feature | Admin Sidebar Detail Layout | âœ… |
+| 25.05.26 | - | Fix | MCP-Keys angleichen | âœ… |
+| 25.05.26 | - | Feature | Project Wiki UI | âš ï¸ |
+| 25.05.26 | - | Fix | ProjectDetails Feature-Link-Button | âœ… |
+| 25.05.26 | - | Fix | MCP-Lokalkonfiguration | âš ï¸ |
+| 25.05.26 | - | Feature | TASK-61 Wiki-Projektbezug | âœ… |
+| 25.05.26 | - | Fix / Feature | Korrektur Dashboard Meilensteinliste | âœ… |
+| 25.05.26 | - | Fix / Feature | Dashboard Widget Detailnavigation | âœ… |
+| 25.05.26 | - | Fix | Dashboard Widget ZeilenhÃ¶he | âœ… |
+| 25.05.26 | - | Fix | Detail-Tabs Events und Import | âœ… |
+| 25.05.26 | - | Fix / Feature | Tab-Headlines und Editor | âœ… |
+| 25.05.26 | - | Fix | Meilenstein Ãœbersicht Tabs | âœ… |
+| 25.05.26 | - | Fix | Dashboard Editor Dropdown Ausblenden | âœ… |
+| 25.05.26 | - | Fix | Dashboard Editor Button GrÃ¶ÃŸe | âœ… |
+| 24.05.26 | - | 7 | Dashboard Editor Toggle | âœ… |
+| 24.05.26 | - | 6 | Projekt Dashboard Kindobjekte | âœ… |
+| 24.05.26 | - | 5 | Dashboard Route Entfernen | âœ… |
+| 24.05.26 | - | 4 | Startseite Reines Dashboard | âœ… |
+| 24.05.26 | - | 3 | Read-only Board/List Widgets | âœ… |
+| 24.05.26 | - | 2 | Kalender Dashboard Widgets | âœ… |
+| 24.05.26 | - | 1 | Dashboard Widget Registry | âœ… |
+| 24.05.26 | - | 53 | Startseite Sektion-Titel | âš ï¸ |
+| 24.05.26 | - | 52 | Sidebar Edge Style | âš ï¸ |
+| 24.05.26 | - | Fix | MCP Dev Start | âœ… |
+| 24.05.26 | - | Feature | MS-12 Backup und Sync | âœ… |
+| 24.05.26 | - | Feature | TASK-49 App-Startseite | âš ï¸ |
+| 24.05.26 | - | Feature | Referenz-Kontext MCP Skill | âš ï¸ |
+| 24.05.26 | - | Fix | Projekt-Features-DnD | âœ… |
+| 24.05.26 | - | Fix | Sidebar Hero AbstÃ¤nde | âœ… |
+| 24.05.26 | - | Feature | PageHero Sidebar Alignment | âœ… |
+| 24.05.26 | - | Fix | MCP BÃ¼ro Anleitung | âœ… |
+| 24.05.26 | - | 2 | MCP Autostart Startpfade | âœ… |
+| 24.05.26 | - | 1 | ChatGPT MCP HTTP Auth | âœ… |
+| 24.05.26 | - | Fix / Feature | Meilenstein-Karten-Kindobjekte | âœ… |
+| 24.05.26 | - | Analyse | Create-Kindobjekte und DnD | âœ… |
+| 24.05.26 | - | Fix | StatusPill Fallback | âœ… |
+| 24.05.26 | - | Fix | Web-Unit-Test-Erwartungen | âœ… |
+| 24.05.26 | - | 4 | Create-Kindobjekte Abnahme | âš ï¸ |
+| 24.05.26 | - | 3 | Create-Kindobjekte Browsertests | âš ï¸ |
+| 24.05.26 | - | 2 | Kindobjekte Integrationstests | âœ… |
+| 24.05.26 | - | 1 | Create-Kindobjekte UI | âš ï¸ |
+| 24.05.26 | - | Fix / Feature | MS-13 Navigation | âœ… |
+| 24.05.26 | - | Fix | Sidebar Header Buttons | âœ… |
+| 24.05.26 | - | Fix | Sidebar Header Suche | âœ… |
+| 24.05.26 | - | Feature | MCP Attachment Tool | âœ… |
+| 24.05.26 | - | Fix | Board-Spaltenbreite | âœ… |
+| 24.05.26 | - | Feature | Projekt-Meilenstein Create-Aktionen | âš ï¸ |
+| 24.05.26 | - | Fix | Project Feature Status-Akzentfarben | âœ… |
+| 24.05.26 | - | Fix | Project Features Tab Position | âœ… |
+| 24.05.26 | - | Fix | ActionMenu Stacking und Breite | âœ… |
+| 24.05.26 | - | Feature | List/Board Item MenÃ¼ Create-Aktionen | âš ï¸ |
+| 24.05.26 | - | Fix | Sidebar rechter Abstand | âœ… |
+| 24.05.26 | - | Fix | Collapsed Plus Button Position | âœ… |
+| 24.05.26 | - | Feature | Kollabierte Status-Spalten | âš ï¸ |
+| 24.05.26 | - | Fix | Sidebar-Navigation Breite | âœ… |
+| 24.05.26 | - | Fix | Sidebar-Navigation ButtonhÃ¶he und Breite | âœ… |
+| 24.05.26 | - | Fix | Sidebar-Navigation als begrenzte FlÃ¤chen | âœ… |
+| 23.05.26 | - | Feature | Sidebar Collapse | âš ï¸ |
+| 23.05.26 | - | Feature | Copy Reference im MenÃ¼ | âœ… |
+| 23.05.26 | - | Fix | Copy Link Hero Icon | âœ… |
+| 23.05.26 | - | Feature | MCP Link Tools Feature Use Case | âœ… |
+| 23.05.26 | - | Feature | MCP Link Tools | âœ… |
+| 23.05.26 | - | Test | MCP und Referenz Abnahme | âš ï¸ |
+| 23.05.26 | - | Feature | Objekt-Referenzen UI | âœ… |
+| 23.05.26 | - | Feature | MCP Update Create Resolve Tools | âœ… |
+| 23.05.26 | - | Fix | Codex MCP Registrierung | âš ï¸ |
+| 23.05.26 | - | Fix | Katalog-Geschlossen-Status | âœ… |
+| 23.05.26 | - | Fix | Einheitliche Badge-Darstellung | âœ… |
+| 23.05.26 | - | Fix | ListBoard-Toolbar und Aktionsicon | âœ… |
+| 23.05.26 | - | Fix | Board-Icon-Nachjustierung | âœ… |
+| 23.05.26 | - | Fix | Circle-Plus-IcongrÃ¶ÃŸe | âœ… |
+| 23.05.26 | - | Fix | Board-Controls-Kontrast | âœ… |
+| 23.05.26 | - | Fix | Status-Spalten-Plus | âœ… |
+| 23.05.26 | - | Fix | Status-Pill-Textfarbe | âœ… |
+| 23.05.26 | - | Fix | Env Examples | âœ… |
+| 23.05.26 | - | Fix | API-Key Env | âœ… |
+| 23.05.26 | - | Fix | Attachment Open E2E Wait | âœ… |
+| 23.05.26 | - | Fix | Testentwurfs-Skill Pflicht | âœ… |
+| 23.05.26 | - | Fix / Feature | MCP Tests und Tool-Doku | âš ï¸ |
+| 23.05.26 | - | Fix | MCP HTTP Hardening | âœ… |
+| 23.05.26 | - | Feature | MCP Server | âœ… |
+| 23.05.26 | - | 4 | Realtime Tests und Abnahme | âœ… |
+| 23.05.26 | - | 3 | Realtime-Frontend-Sync | âœ… |
+| 23.05.26 | - | 2 | Realtime-API-Infrastruktur | âœ… |
+| 23.05.26 | - | 1 | KI-Feature entfernen | âœ… |
+| 23.05.26 | - | Feature | API Key Authentifizierung | âœ… |
+| 23.05.26 | - | Feature | Codex Code Discipline Skill | âš ï¸ |
+| 23.05.26 | - | Feature | TipTap-Editor-Verbesserungen | âœ… |
+| 23.05.26 | - | Fix | Planungsleitplanken Designrichtlinien | âœ… |
+| 23.05.26 | - | Fix | Design-Richtlinien-Pfad | âœ… |
+| 22.05.26 | - | Fix | API-Integration-Hook-Timeout | âœ… |
+| 22.05.26 | - | Fix | Auth-Form-Labels | âœ… |
+| 22.05.26 | - | Fix | Testseitige Design-Erwartungen | âš ï¸ |
+| 22.05.26 | - | 3 | text-muted und blockierte Muster | âœ… |
+| 22.05.26 | - | 2 | Design-Vereinheitlichung ohne text-muted | âš ï¸ |
+| 22.05.26 | - | 1 | text-muted Analyse | âœ… |
+| 22.05.26 | - | Fix | Shell Navigation Suche | âœ… |
+| 22.05.26 | - | Fix | Owner Task E2E Selector | âœ… |
+| 22.05.26 | - | Fix | Dashboard E2E Testfixes | âš ï¸ |
+| 22.05.26 | - | 3 | Dashboard Tests und Verifikation | âš ï¸ |
+| 22.05.26 | - | 2 | Dashboard Frontend | âœ… |
+| 22.05.26 | - | 1 | Dashboard Backend | âœ… |
+| 22.05.26 | - | Fix | Meilenstein-Statusfilter | âœ… |
+| 22.05.26 | - | Fix | Board-Toolbar Statusfilter | âœ… |
+| 22.05.26 | - | Fix | API-Test-Erwartungen | âœ… |
+| 22.05.26 | - | Feature | Navigation und Standalone-Tabs | âš ï¸ |
+| 22.05.26 | - | Fix | DnD Status Views | âœ… |
+| 22.05.26 | - | Fix | Action Menu Sichtbarkeit | âœ… |
+| 22.05.26 | - | Fix | Board-SpaltenhÃ¶he | âœ… |
+| 22.05.26 | - | Feature | Task DnD Board und Liste | âš ï¸ |
+| 22.05.26 | - | Fix | Doppelklick Items | âœ… |
+| 22.05.26 | - | 6 | List-/Board-Testabdeckung | âœ… |
+| 22.05.26 | - | 5 | Inline Status und Datum | âœ… |
+| 22.05.26 | - | 4 | Status-Cards und Tag-Footer | âœ… |
+| 22.05.26 | - | 3 | Kumulative Projektlisten | âœ… |
+| 22.05.26 | - | 2 | List-/Board-Adapter | âš ï¸ |
+| 22.05.26 | - | 1 | List-/Board-Toolbar | âš ï¸ |
+| 22.05.26 | - | Fix | Globale Suche | âœ… |
+| 22.05.26 | - | Fix | Testfixes Projektgrenzen Relationen | âš ï¸ |
+| 22.05.26 | - | Feature | Projektgrenzen Relationen | âš ï¸ |
+| 22.05.26 | - | Fix | Katalog Farbfeld Anzeige | âœ… |
+| 22.05.26 | - | Feature | Slug und Projekt-KÃ¼rzel entfernt | âœ… |
+| 22.05.26 | - | Fix | Katalog Colorpicker | âœ… |
+| 22.05.26 | - | Feature | Ticket-User-Auswahl | âœ… |
+| 22.05.26 | - | Fix | Ticket-PrioritÃ¤t UI | âœ… |
+| 22.05.26 | - | Fix | Remote Backup Timeout | âœ… |
+| 22.05.26 | - | Fix | SFTP Env-Konfiguration | âœ… |
+| 21.05.26 | - | Feature | Ticket-Typen als farbige KatalogeintrÃ¤ge | âš ï¸ |
+| 21.05.26 | - | Fix | SFTP Backup Timeout | âœ… |
+| 21.05.26 | - | Feature | Ticket-Detailformular Tabs | âœ… |
+| 21.05.26 | - | Fix | API Drizzle Startscript | âœ… |
+| 21.05.26 | - | Feature | SFTP Backups | âš ï¸ |
+| 21.05.26 | - | Fix | Dump Standardadmin | âœ… |
+| 21.05.26 | - | Feature | Attachments lokal Ã¶ffnen | âœ… |
+| 21.05.26 | - | Fix | Board/List Header Hintergrund | âœ… |
+| 21.05.26 | - | Fix | UI-Regressionen | âœ… |
+| 21.05.26 | - | Fix | Calendar E2E Datum | âœ… |
+| 21.05.26 | - | 7 | Formular-HÃ¶hen | âš ï¸ |
+| 21.05.26 | - | 6 | StatusPill Farben | âš ï¸ |
+| 21.05.26 | - | 5 | Tabbar Breadcrumb | âš ï¸ |
+| 21.05.26 | - | 4 | Kommentar-Platzhalter | âš ï¸ |
+| 21.05.26 | - | 3 | Klick-Verhalten | âš ï¸ |
+| 21.05.26 | - | 2 | Header-Konsistenz | âš ï¸ |
+| 21.05.26 | - | 1 | Design Quick Wins | âš ï¸ |
+| 21.05.26 | - | Fix | Journal-Test-Fixtures | âœ… |
+| 21.05.26 | - | Feature | Journal-Komponente | âš ï¸ |
+| 21.05.26 | - | 4 | Tests UI-Board-Overhaul | âœ… |
+| 21.05.26 | - | 3 | Slug- & Icon-Bereinigung | âœ… |
+| 21.05.26 | - | 2 | Board-Toolbar & Statusspalten | âœ… |
+| 21.05.26 | - | 1 | ActionMenu & Kartenaktionen | âœ… |
+| 21.05.26 | - | Feature | KI RichText Beschreibungsfeld | âœ… |
+| 21.05.26 | - | Feature | Test-Entwurfsleitplanken-Skill | âš ï¸ |
+| 21.05.26 | - | Fix | Rote Tests TLDraw und Migration | âœ… |
+| 21.05.26 | - | 1 | Settings-System | âš ï¸ |
+| 21.05.26 | - | Fix | Details-Tab-Body-Breite | âœ… |
+| 21.05.26 | - | Fix | Tab-Board-AuÃŸenrand und Header | âœ… |
+| 21.05.26 | - | Fix | Detailseiten-Formulare Breite | âœ… |
+| 21.05.26 | - | Fix | Auth Bypass Admin | âœ… |
+| 21.05.26 | - | 4 | Dev-Tooling Audit Cluster | âœ… |
+| 21.05.26 | - | 3 | tldraw TipTap Audit Cluster | âœ… |
+| 21.05.26 | - | 2 | Drizzle Audit Cluster | âœ… |
+| 21.05.26 | - | 1 | Fastify Audit Cluster | âœ… |
+| 21.05.26 | - | Feature | Root-Testhierarchie | âš ï¸ |
+| 21.05.26 | - | Fix | npm audit dev start | âœ… |
+| 20.05.26 | - | Fix | Formular Save-Close Create | âœ… |
+| 20.05.26 | - | Fix | Backup Pfad Root | âœ… |
+| 20.05.26 | - | Feature | Lokale Backups | âœ… |
+| 20.05.26 | - | Fix | Formular-Board-Tabs fÃ¼llen | âš ï¸ |
+| 20.05.26 | - | Fix | Katalogsichere Create-Flows | âœ… |
+| 20.05.26 | - | Fix | Admin Account Reset | âœ… |
+| 20.05.26 | - | Feature | Sticky Formular-Shells | âœ… |
+| 20.05.26 | - | Fix | Formularfelder | âœ… |
+| 20.05.26 | - | 1 | Planungsleitplanken-Skill | âœ… |
+| 20.05.26 | - | Fix | Auth-Rollen-Architektur | âœ… |
+| 20.05.26 | - | Fix | Savetowork-Kommando | âœ… |
+| 20.05.26 | - | 5 | Auth-Tests und Verifikation | âœ… |
+| 20.05.26 | - | 4 | Auth-Frontend | âœ… |
+| 20.05.26 | - | 3 | Auth-API | âœ… |
+| 20.05.26 | - | 2 | Auth-Schema und Seed | âœ… |
+| 20.05.26 | - | 1 | Auth-Vorbereitung | âœ… |
+| 20.05.26 | - | Fix | Create Detailroute | âœ… |
+| 20.05.26 | - | Fix | Rote Tests Testhelper | âš ï¸ |
+| 20.05.26 | - | Fix | Audit Coverage entfernt | âš ï¸ |
+| 20.05.26 | - | 1 | Browser-Tabs | âš ï¸ |
+| 20.05.26 | - | Fix | BÃ¼roumgebung KI Runtime | âœ… |
+| 20.05.26 | - | Feature | Status-Board-Gruppierung | âœ… |
+| 20.05.26 | - | Feature | Status- und PrioritÃ¤tskataloge | âœ… |
+| 20.05.26 | - | Fix | TaskForm-Umbenennung | âœ… |
+| 20.05.26 | - | Fix | Planungskarten Aufgaben-Progress | âœ… |
+| 20.05.26 | - | Fix | Meilenstein View-State | âœ… |
+| 20.05.26 | - | Fix | Feature List Items | âœ… |
+| 20.05.26 | - | Fix | Formular Speichern schlieÃŸt | âœ… |
+| 20.05.26 | - | Fix | Projekt-Tabs LeerflÃ¤che | âœ… |
+| 20.05.26 | - | Fix | Lokale KI Runtime Paket | âœ… |
+| 20.05.26 | - | Feature | TLDraw-Zeichenblock | âœ… |
+| 20.05.26 | - | Feature | Lokaler KI-Agent | âœ… |
+| 20.05.26 | - | Fix | E2E RichText Verifikation | âœ… |
+| 20.05.26 | - | Fix | Agents Milestone Gate | âš ï¸ |
+| 20.05.26 | - | Fix | RichText-Auswahl-Toolbar | âœ… |
+| 20.05.26 | - | Fix | Formular-Hero-Unterzeilen | âœ… |
+| 19.05.26 | - | Fix | Startscript und Dev-Watch | âœ… |
+| 19.05.26 | - | Fix | Google Drive OAuth Client Env | âš ï¸ |
+| 19.05.26 | - | Fix | RichText Beschreibungsfelder | âœ… |
+| 19.05.26 | - | Fix | Startdatei Ein Terminal | âœ… |
+| 19.05.26 | - | Feature | RichTextInlineField | âœ… |
+| 19.05.26 | - | Fix | Milestone-Web-Tests | âœ… |
+| 19.05.26 | - | Feature | Meilensteine als Projekt-SubdomÃ¤ne | âš ï¸ |
+| 19.05.26 | - | Fix / Feature | Demo-Daten-Seed entfernt | âœ… |
+| 19.05.26 | - | 12 | Events Owner-Junction-Modell | âœ… |
+| 19.05.26 | - | Fix | Events Owner-Junction Folgeauftrag | âœ… |
+| 19.05.26 | - | 9 | Legacy-Spalten Cleanup | âœ… |
+| 19.05.26 | - | Fix | Agents Architekturleitplanken | âœ… |
+| 19.05.26 | - | Fix | Dump-Registry Neue Tabellen | âœ… |
+| 19.05.26 | - | Fix | Test-Fixtures Expected Version | âœ… |
+| 19.05.26 | - | 10 | Test- und Abnahme-Gate | âš ï¸ |
+| 19.05.26 | - | 9 | Cleanup und Drop Legacy-Spalten | ðŸ”´ |
+| 19.05.26 | - | 8 | Support- und Infrastruktur-Services | âš ï¸ |
+| 19.05.26 | - | 7 | Dokumentation- und Backlog-Services | âš ï¸ |
+| 19.05.26 | - | 6 | Project-, Task- und Ticket-Services | âš ï¸ |
+| 19.05.26 | - | 5 | Repository Foundation und API-Kontrakte | âœ… |
+| 19.05.26 | - | 4 | Attachment-Junction-Modell | âš ï¸ |
+| 19.05.26 | - | 3 | Comment-Junction-Modell | âš ï¸ |
+| 19.05.26 | - | 2 | Schema Users, Version und Audit-Felder | âš ï¸ |
+| 19.05.26 | - | 1 | Bestandsaufnahme Architektur-Delta | âœ… |
+| 19.05.26 | - | Fix | Aufgabendateien Architektur-Refactoring | âœ… |
+| 18.05.26 | - | Feature | Detailseiten und Formularnavigation | âœ… |
+| 18.05.26 | - | Fix | App-Name Projekt Manager | âœ… |
+| 18.05.26 | - | Fix | Responsive-Density-Auftrag | âœ… |
+| 18.05.26 | - | Fix | Projekt-Doppelklick Formular | âœ… |
+| 18.05.26 | - | Fix | Startdatei CRLF | âœ… |
+| 18.05.26 | - | Fix | Runtime-Datenbanken | âœ… |
+| 18.05.26 | - | Fix | Startdatei Pfaderkennung | âœ… |
+| 18.05.26 | - | Fix | Dev-Start ohne tsx | âœ… |
+| 18.05.26 | - | Fix | Browsertests | âœ… |
+| 18.05.26 | - | 5 | Verifikation und Upload-Fortschritt | âœ… |
+| 18.05.26 | - | 3/4 | E2E-Form-Specs | ðŸ”´ |
+| 18.05.26 | - | 2 | Form-Unit-Tests | âš ï¸ |
+| 18.05.26 | - | 1 | Pending-Komponenten-Tests | âœ… |
+| 18.05.26 | - | 0 | Playwright-Startblocker | ðŸ”´ |
+| 18.05.26 | - | Fix | Test-Kommando | âœ… |
+| 18.05.26 | - | 7 | Tests und Verifikation | âš ï¸ |
+| 18.05.26 | - | 6 | ProjectForm | âœ… |
+| 18.05.26 | - | 5 | FeatureForm | âœ… |
+| 18.05.26 | - | 4 | TaskModal | âœ… |
+| 18.05.26 | - | 3 | UseCase-Formular | âœ… |
+| 18.05.26 | - | 2 | Owner-Board-Migration | âœ… |
+| 18.05.26 | - | 1 | Foundation Owner-Relation-Board | âœ… |
+| 18.05.26 | - | Feature | Owner-Aufgabenbeziehungen Tests | âš ï¸ |
+| 18.05.26 | - | Feature | Owner-Join-Tabellen fÃ¼r Tickets | âœ… |
+| 18.05.26 | - | Feature | Owner-Join-Tabellen fÃ¼r Aufgaben | âœ… |
+| 18.05.26 | - | Feature | Feature-Projekt-Zuordnung Board View | âš ï¸ |
+| 18.05.26 | - | Fix | Projekt-Tabs Toolbar | âœ… |
+| 18.05.26 | - | Fix | Task-Liste Statuskreis | âœ… |
+| 18.05.26 | - | Fix | Use-Case Formular Status und Text | âœ… |
+| 18.05.26 | - | Fix | Sticky Form Footer und Use Case Detail | âœ… |
+| 18.05.26 | - | Fix | Feature-Hero und Tab-Meta | âœ… |
+| 18.05.26 | - | Fix | Feature-Kurzbeschreibung Markdown | âœ… |
+| 18.05.26 | - | Fix | Editor-Toolbar Icons | âœ… |
+| 18.05.26 | - | Fix | Formular schlieÃŸen und Iconbuttons | âœ… |
+| 18.05.26 | - | Fix | Beschreibungseditoren und Tabs | âœ… |
+| 18.05.26 | - | Fix | Task-Detail Bereinigung | âœ… |
+| 18.05.26 | - | Fix | Feature-Ã–ffnung, Rich-Text und Projektheader | âœ… |
+| 18.05.26 | - | Fix | Fake-Benutzer und Projektboard | âœ… |
+| 18.05.26 | - | Fix | Karten Rich-Text Preview | âœ… |
+| 18.05.26 | - | Fix | Projektformular Feature-Vorauswahl | âœ… |
+| 18.05.26 | - | Fix | App-Datenbank leeren | âœ… |
+| 17.05.26 | - | Fix | Delete-Cascade-Tests | âœ… |
+| 17.05.26 | - | Fix | Delete-Cascade-Cleanup | âœ… |
+| 17.05.26 | - | Fix | Wiki-Import Feature-Content | âœ… |
+| 17.05.26 | - | 11 | Ticket-Tests | âœ… |
+| 17.05.26 | - | 10 | Ticket-Seed-Daten | âœ… |
+| 17.05.26 | - | 9 | Ticket-Globale-Suche | âœ… |
+| 17.05.26 | - | 8 | Ticket-Seiten & Navigation | âœ… |
+| 17.05.26 | - | 7 | Ticket-Komponenten | âœ… |
+| 17.05.26 | - | 6 | Ticket-Frontend-API & Hooks | âœ… |
+| 17.05.26 | - | 5 | Ticket-Shared-Infrastruktur | âœ… |
+| 17.05.26 | - | 4 | Ticket-Routes | âœ… |
+| 17.05.26 | - | 3 | Ticket-Service | âœ… |
+| 17.05.26 | - | 2 | Ticket-Shared-Types | âœ… |
+| 17.05.26 | - | 1 | Ticket-Schema & Migration | âœ… |
+| 17.05.26 | - | Feature | Query-Sync-Testabdeckung | âœ… |
+| 17.05.26 | - | Fix | Test-only Fehlerbehebung | âœ… |
+| 17.05.26 | - | Feature | Drive-Konfiguration UI | âœ… |
+| 17.05.26 | - | Feature | Global Query Sync | âœ… |
+| 17.05.26 | - | Fix | Board Card Width | âœ… |
+| 17.05.26 | - | Fix | ListBoard Add Buttons | âœ… |
+| 17.05.26 | - | Feature | Attachment-Previews | âœ… |
+| 17.05.26 | - | Feature | Wiki-Import Relationen und Backlogs | âœ… |
+| 17.05.26 | - | Fix | Project Features Board | âœ… |
+| 17.05.26 | - | Feature | Board/ListView Testsuite | âœ… |
+| 17.05.26 | - | Feature | Admin-Testdaten | âœ… |
+| 17.05.26 | - | 0 | ListBoardView Testsuite Blocker | ðŸ”´ |
+| 17.05.26 | - | Fix | Test Runtime Safety | âœ… |
+| 17.05.26 | - | Fix | E2E leere Tests | âœ… |
+| 17.05.26 | - | Fix | Design-Review-Befunde | âœ… |
+| 17.05.26 | - | Feature | Google-Drive-Dump | âœ… |
+| 17.05.26 | - | Fix | Restabweichungen Designauftrag | âœ… |
+| 17.05.26 | - | 15 | Cleanup | âœ… |
+| 17.05.26 | - | 14 | Comments Rollout | âœ… |
+| 17.05.26 | - | 13 | Domain Wiki & Kalender | âœ… |
+| 17.05.26 | - | 12 | Domain Use Case & Backlog | âœ… |
+| 17.05.26 | - | 11 | Domain Project | âœ… |
+| 17.05.26 | - | 10 | Domain Feature | âœ… |
+| 17.05.26 | - | 9 | Domain Task | âš ï¸ |
+| 17.05.26 | - | 8 | RelationPanel | âœ… |
+| 17.05.26 | - | 7 | ListBoard | âœ… |
+| 17.05.26 | - | 6 | Comments | âœ… |
+| 17.05.26 | - | 5 | Templates | âœ… |
+| 17.05.26 | - | 4 | Section & FormField | âœ… |
+| 17.05.26 | - | 3 | Rich-Text | âœ… |
+| 17.05.26 | - | 2 | MolekÃ¼le | âœ… |
+| 17.05.26 | - | 1 | Atome | âœ… |
+| 17.05.26 | - | 0 | Token-Migration | âœ… |
+| 17.05.26 | - | Fix | Form-Footer-Hinweise | âœ… |
+| 17.05.26 | - | Fix | Create-Form Pflichtfeld-Markierungen | âœ… |
+| 17.05.26 | - | Fix | Project-Form Footer-Text | âœ… |
+| 17.05.26 | - | Fix | Project-Form KÃ¼rzel-Layout | âœ… |
+| 17.05.26 | - | Fix | Feature Rich-Text-Editor | âœ… |
+| 17.05.26 | - | Feature | Feature-Projekt-Relation UI | âœ… |
+| 17.05.26 | - | Feature | Feature-Detail Use-Case Overlay | âœ… |
+| 17.05.26 | - | Fix | Project-Detail-Hero | âœ… |
+| 17.05.26 | - | Fix | Feature-Input Container | âœ… |
+| 16.05.26 | - | Fix | Import-Tab Position | âœ… |
+| 16.05.26 | - | Feature | Wiki-Import | âœ… |
+| 16.05.26 | - | 12 | GlobalSearch, Avatar und API-Health | âœ… |
+| 16.05.26 | - | 11 | NotFound und ErrorBoundary | âœ… |
+| 16.05.26 | - | 10 | EmptyState | âœ… |
+| 16.05.26 | - | 9 | Skeleton-Family | âœ… |
+| 16.05.26 | - | 8 | ToastProvider | âœ… |
+| 16.05.26 | - | 7 | ConfirmDialog | âœ… |
+| 16.05.26 | - | 6 | TagManager | âœ… |
+| 16.05.26 | - | 5 | WikiEditor | âœ… |
+| 16.05.26 | - | 4 | NoteEditor | âœ… |
+| 16.05.26 | - | 3 | BacklogForm | âœ… |
+| 16.05.26 | - | 2 | TaskForm | âœ… |
+| 16.05.26 | - | 1 | ProjectForm | âœ… |
+| 16.05.26 | - | 7 | Modal-Footer | âœ… |
+| 16.05.26 | - | 6 | Docs, Notizen und Dateien | âœ… |
+| 16.05.26 | - | 5 | Kommentare-Tab | âœ… |
+| 16.05.26 | - | 4 | Subtasks-Tab | âœ… |
+| 16.05.26 | - | 3 | Details-Tab | âœ… |
+| 16.05.26 | - | 2 | Tab-Strip | âœ… |
+| 16.05.26 | - | 1 | Modal-Chrome | âœ… |
+| 16.05.26 | - | 0 | Forms/System-Blocker | ðŸ”´ |
+| 16.05.26 | - | 6 | Feature- und UseCase-Form-Modals | âœ… |
+| 16.05.26 | - | 5 | MarkdownEditor-Wrapper | âœ… |
+| 16.05.26 | - | 4 | UseCase-Detail-Form | âœ… |
+| 16.05.26 | - | 3 | UseCaseList | âœ… |
+| 16.05.26 | - | 2 | Feature-Detail-Form | âœ… |
+| 16.05.26 | - | 1 | Feature-Page-Hero | âœ… |
+| 16.05.26 | - | 5 | FeaturePicker und TaskList | âœ… |
+| 16.05.26 | - | 4 | BacklogList | âœ… |
+| 16.05.26 | - | 3 | AttachmentPreview | âœ… |
+| 16.05.26 | - | 2 | AttachmentUploader | âœ… |
+| 16.05.26 | - | 1 | NoteCard | âœ… |
+| 16.05.26 | - | 7 | FeatureCard und FullCalendar | âœ… |
+| 16.05.26 | - | 6 | TaskCard, Pill und Badge | âœ… |
+| 16.05.26 | - | 5 | Kanban-TÃ¶nung | âœ… |
+| 16.05.26 | - | 4 | ProjectCard-Restyle | âœ… |
+| 16.05.26 | - | 3 | TopBar-Suchfeld | âœ… |
+| 16.05.26 | - | 2 | Sidebar-Restyle | âœ… |
+| 16.05.26 | - | 1 | Tailwind-Tokens | âœ… |
+| 16.05.26 | - | 6 | Task-Detail Vorschau | âœ… |
+| 16.05.26 | - | 5 | Health-Endpoint | âœ… |
+| 16.05.26 | - | 4 | NÃ¤chste Termine | âœ… |
+| 16.05.26 | - | 3 | Filter-Chips | âœ… |
+| 16.05.26 | - | 2 | Progress-Balken | âœ… |
+| 16.05.26 | - | 1 | Hover-Lift | âœ… |
+| 16.05.26 | - | Fix / Feature | API Red Tests | âœ… |
+| 16.05.26 | - | Fix / Feature | Node 24 SQLite Binding | âœ… |
+| 16.05.26 | - | Fix / Feature | Test Kurzkommando | âœ… |
+| 16.05.26 | - | Fix / Feature | Save Kurzkommando | âœ… |
+| 16.05.26 | - | 30 | Integrationstests Wiki/Docs | âœ… |
+| 16.05.26 | - | 29 | Integration bestehende Views | âœ… |
+| 16.05.26 | - | 28 | Frontend Backlog | âœ… |
+| 16.05.26 | - | 27 | Frontend Wiki | âœ… |
+| 16.05.26 | - | 26 | Frontend Features & Use Cases | âœ… |
+| 16.05.26 | - | 26 | Frontend Features & Use Cases Blocker | ðŸ”´ |
+| 16.05.26 | - | 25 | Shared Types Wiki/Docs | âœ… |
+| 16.05.26 | - | 24 | Junction/Link-APIs | âœ… |
+| 16.05.26 | - | 23 | Backlog API | âœ… |
+| 16.05.26 | - | 22 | Wiki-Seiten API | âœ… |
+| 16.05.26 | - | 21 | Use Cases API | âœ… |
+| 16.05.26 | - | 20 | Features API | âœ… |
+| 16.05.26 | - | 19 | Content FileSystem Service | âœ… |
+| 16.05.26 | - | 18 | DB-Schema Wiki/Docs | âœ… |
+| 16.05.26 | - | Fix / Feature | Integrationstestsuite | ðŸ”´ |
+| 16.05.26 | - | Fix / Feature | Offene VollstÃ¤ndigkeitspunkte | âœ… |
+| 16.05.26 | - | Audit | VollstÃ¤ndigkeitsprÃ¼fung | âœ… |
+| 16.05.26 | - | Fix | Node 20 Blocker | âœ… |
+| 16.05.26 | - | 17 | Polish | âš ï¸ |
+| 16.05.26 | - | 16 | Kalender | âœ… |
+| 16.05.26 | - | 15 | Attachments UI | âœ… |
+| 16.05.26 | - | 14 | Notizen UI | âœ… |
+| 16.05.26 | - | 13 | Tags UI | âœ… |
+| 16.05.26 | - | 12 | TaskDetail Modal | âœ… |
+| 16.05.26 | - | 11 | Task Views | âœ… |
+| 16.05.26 | - | 10 | Projects Page | âœ… |
+| 16.05.26 | - | 9 | React Grundstruktur | âœ… |
+| 16.05.26 | - | 8 | Shared Types | âœ… |
+| 16.05.26 | - | 7 | Termine API | âš ï¸ |
+| 16.05.26 | - | 6 | Attachments API | âš ï¸ |
+| 16.05.26 | - | 5 | Notizen API | âš ï¸ |
+| 16.05.26 | - | 4 | Tags API | âš ï¸ |
+| 16.05.26 | - | 3 | Fastify Backend Basis | âš ï¸ |
+| 16.05.26 | - | 2 | Schema & Migration | âš ï¸ |
+| 16.05.26 | - | 1 | Monorepo GrundgerÃ¼st | âœ… |

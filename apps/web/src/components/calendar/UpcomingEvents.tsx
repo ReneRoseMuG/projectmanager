@@ -12,9 +12,9 @@ interface UpcomingEventsProps {
 
 export function UpcomingEvents({ events, onOpen }: UpcomingEventsProps) {
   const upcoming = useMemo(() => {
-    const now = Date.now();
+    const todayDate = new Date().toISOString().slice(0, 10);
     return events
-      .filter((event) => new Date(event.startTime).getTime() >= now)
+      .filter((event) => event.startTime.slice(0, 10) >= todayDate)
       .sort((left, right) => new Date(left.startTime).getTime() - new Date(right.startTime).getTime())
       .slice(0, 4);
   }, [events]);

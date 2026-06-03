@@ -11,6 +11,7 @@ import { Spinner } from "../components/ui/Spinner";
 import { TabBar, type Tab } from "../components/ui/TabBar";
 import { useToast } from "../components/ui/ToastProvider";
 import { DashboardView } from "../components/dashboard/DashboardView";
+import { DayPlanCalendarWidget } from "../components/dashboard/DashboardWidgets";
 import { JournalPanel } from "../components/journal/JournalPanel";
 import { NoteEditor } from "../components/notes/NoteEditor";
 import { NoteList } from "../components/notes/NoteList";
@@ -230,34 +231,39 @@ export function DayPlanPage() {
       <PageHero variant="list" title="Persönliche Planung" subtitle={todayLabel()} />
       <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
 
-      <main className="min-h-0 flex-1 overflow-auto px-4 py-4 lg:px-5 lg:py-5">
-        {error ? <div className="mb-4 rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">{error}</div> : null}
-        {loading ? (
-          <div className="flex min-h-80 items-center justify-center">
-            <Spinner />
-          </div>
-        ) : dayPlan ? (
-          <div className="grid gap-4">
-            {activeTab === "overview" ? <DashboardView context="dayPlan" owner={{ type: "dayPlan", id: dayPlan.id }} dayPlanDate={date} hideInlineHeader /> : null}
-            {activeTab === "calendar" ? <DashboardView context="dayPlanCalendar" owner={{ type: "dayPlan", id: dayPlan.id }} dayPlanDate={date} hideInlineHeader /> : null}
-            {activeTab === "tasks" ? (
-              <DayPlanTasks
-                dayPlanDate={date}
-                tasks={dayPlan.tasks}
-                loading={loading}
-                createTask={createTask}
-                unlinkTask={unlinkTask}
-                updateTask={updateTask}
-              />
-            ) : null}
-            {activeTab === "notes" ? <DayPlanNotes dayPlanId={dayPlan.id} /> : null}
-            {activeTab === "comments" ? <DayPlanComments dayPlanId={dayPlan.id} /> : null}
-            {activeTab === "journal" ? <JournalPanel objectType="dayPlan" objectId={dayPlan.id} /> : null}
-          </div>
-        ) : (
-          <EmptyState icon={<LayoutDashboard size={22} />} title="Persönliche Planung konnte nicht geladen werden" variant="tinted" tone="tangerine" />
-        )}
-      </main>
+      {activeTab === "calendar" && dayPlan ? (
+        <div className="min-h-0 flex-1 p-4 lg:p-5">
+          <DayPlanCalendarWidget owner={{ type: "dayPlan", id: dayPlan.id }} dayPlanDate={date} />
+        </div>
+      ) : (
+        <main className="min-h-0 flex-1 overflow-auto px-4 py-4 lg:px-5 lg:py-5">
+          {error ? <div className="mb-4 rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">{error}</div> : null}
+          {loading ? (
+            <div className="flex min-h-80 items-center justify-center">
+              <Spinner />
+            </div>
+          ) : dayPlan ? (
+            <div className="grid gap-4">
+              {activeTab === "overview" ? <DashboardView context="dayPlan" owner={{ type: "dayPlan", id: dayPlan.id }} dayPlanDate={date} hideInlineHeader /> : null}
+              {activeTab === "tasks" ? (
+                <DayPlanTasks
+                  dayPlanDate={date}
+                  tasks={dayPlan.tasks}
+                  loading={loading}
+                  createTask={createTask}
+                  unlinkTask={unlinkTask}
+                  updateTask={updateTask}
+                />
+              ) : null}
+              {activeTab === "notes" ? <DayPlanNotes dayPlanId={dayPlan.id} /> : null}
+              {activeTab === "comments" ? <DayPlanComments dayPlanId={dayPlan.id} /> : null}
+              {activeTab === "journal" ? <JournalPanel objectType="dayPlan" objectId={dayPlan.id} /> : null}
+            </div>
+          ) : (
+            <EmptyState icon={<LayoutDashboard size={22} />} title="Persönliche Planung konnte nicht geladen werden" variant="tinted" tone="tangerine" />
+          )}
+        </main>
+      )}
     </div>
   );
 }

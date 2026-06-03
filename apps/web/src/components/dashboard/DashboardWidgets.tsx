@@ -1,4 +1,5 @@
 import type {
+  CalendarEvent,
   DashboardOwner,
   DashboardContext,
   DashboardWidgetLayout,
@@ -511,29 +512,55 @@ function CalendarWidget({ owner, context, dayPlanDate }: { owner?: DashboardOwne
   const { showToast } = useToast();
   const [formOpen, setFormOpen] = useState(false);
   const [formDate, setFormDate] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
   if (events.loading || calendarTasks.loading) {
     return <CalendarSkeleton />;
   }
 
   const interactive = canWriteEvents && (!isDayPlanCalendar || (Boolean(dayPlanDate) && canWriteDayPlans));
+
   const handleDateClick = interactive
     ? (date: string) => {
+        setSelectedEvent(null);
         setFormDate(date);
         setFormOpen(true);
       }
     : undefined;
 
-  const handleSubmit = async (input: EventInput) => {
+  const handleEventClick = interactive
+    ? (event: CalendarEvent) => {
+        setSelectedEvent(event);
+        setFormDate(null);
+        setFormOpen(true);
+      }
+    : undefined;
+
+  const handleSubmit = async (input: EventInput, eventId?: number) => {
     try {
-      if (isDayPlanCalendar) {
+      if (eventId !== undefined && selectedEvent) {
+        await events.updateEvent(eventId, { ...input, expectedVersion: selectedEvent.version });
+        showToast({ tone: "success", title: "Termin aktualisiert" });
+      } else if (isDayPlanCalendar) {
         await dayPlan.createEvent(input);
+        showToast({ tone: "success", title: "Termin erstellt" });
       } else {
         await events.createEvent(input);
+        showToast({ tone: "success", title: "Termin erstellt" });
       }
-      showToast({ tone: "success", title: "Termin erstellt" });
     } catch (err) {
       showToast({ tone: "error", title: "Termin konnte nicht gespeichert werden", message: errorMessage(err) });
+      throw err;
+    }
+  };
+
+  const handleDelete = async (event: CalendarEvent) => {
+    try {
+      await events.removeEvent(event.id);
+      setFormOpen(false);
+      showToast({ tone: "success", title: "Termin gelöscht" });
+    } catch (err) {
+      showToast({ tone: "error", title: "Termin konnte nicht gelöscht werden", message: errorMessage(err) });
       throw err;
     }
   };
@@ -546,20 +573,130 @@ function CalendarWidget({ owner, context, dayPlanDate }: { owner?: DashboardOwne
         compact
         mode={interactive ? "interactive" : "readonly"}
         onDateClick={handleDateClick}
+        onEventClick={interactive ? handleEventClick : undefined}
       />
       {interactive ? (
         <EventForm
           open={formOpen}
-          event={null}
+          event={selectedEvent}
           initialDate={formDate}
-          initialOwners={isDayPlanCalendar && owner?.type === "dayPlan" ? [{ type: "dayPlan", id: owner.id }] : undefined}
+          initialOwners={!selectedEvent && isDayPlanCalendar && owner?.type === "dayPlan" ? [{ type: "dayPlan", id: owner.id }] : undefined}
           projects={[]}
           milestones={[]}
           tasks={[]}
           onSubmit={handleSubmit}
-          onDelete={async () => undefined}
+          onDelete={handleDelete}
           canDelete={canDeleteEvents}
-          onClose={() => setFormOpen(false)}
+          onClose={() => {
+            setFormOpen(false);
+            setSelectedEvent(null);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function DayPlanCalendarWidget({ owner, dayPlanDate }: { owner: { type: "dayPlan"; id: number }; dayPlanDate?: string }) {
+  const canReadEvents = useHasPermission("events", "read");
+  const canWriteEvents = useHasPermission("events", "write");
+  const canDeleteEvents = useHasPermission("events", "delete");
+  const canWriteDayPlans = useHasPermission("dayPlans", "write");
+  const events = useEvents(undefined, canReadEvents);
+  const dayPlan = useDayPlan(dayPlanDate ?? "", Boolean(dayPlanDate));
+  const { showToast } = useToast();
+  const [formOpen, setFormOpen] = useState(false);
+  const [formDate, setFormDate] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+  if (events.loading) {
+    return <CalendarSkeleton />;
+  }
+
+  const interactive = canWriteEvents && Boolean(dayPlanDate) && canWriteDayPlans;
+  const dayPlanEvents = canReadEvents ? events.events.filter((event) => isDayPlanEvent(event, owner)) : [];
+
+  const handleDateClick = interactive
+    ? (date: string) => {
+        setSelectedEvent(null);
+        setFormDate(date);
+        setFormOpen(true);
+      }
+    : undefined;
+
+  const handleEventClick = interactive
+    ? (event: CalendarEvent) => {
+        setSelectedEvent(event);
+        setFormDate(null);
+        setFormOpen(true);
+      }
+    : undefined;
+
+  const handleEventMove = interactive
+    ? async (event: CalendarEvent, startTime: string, endTime: string) => {
+        try {
+          await events.updateEvent(event.id, { startTime, endTime, expectedVersion: event.version });
+          showToast({ tone: "success", title: "Termin verschoben" });
+        } catch (err) {
+          showToast({ tone: "error", title: "Termin konnte nicht verschoben werden", message: errorMessage(err) });
+          throw err;
+        }
+      }
+    : undefined;
+
+  const handleSubmit = async (input: EventInput, eventId?: number) => {
+    try {
+      if (eventId !== undefined && selectedEvent) {
+        await events.updateEvent(eventId, { ...input, expectedVersion: selectedEvent.version });
+        showToast({ tone: "success", title: "Termin aktualisiert" });
+      } else {
+        await dayPlan.createEvent(input);
+        showToast({ tone: "success", title: "Termin erstellt" });
+      }
+    } catch (err) {
+      showToast({ tone: "error", title: "Termin konnte nicht gespeichert werden", message: errorMessage(err) });
+      throw err;
+    }
+  };
+
+  const handleDelete = async (event: CalendarEvent) => {
+    try {
+      await events.removeEvent(event.id);
+      setFormOpen(false);
+      showToast({ tone: "success", title: "Termin gelöscht" });
+    } catch (err) {
+      showToast({ tone: "error", title: "Termin konnte nicht gelöscht werden", message: errorMessage(err) });
+      throw err;
+    }
+  };
+
+  return (
+    <>
+      <CalendarWidgetView
+        events={dayPlanEvents}
+        tasks={[]}
+        mode={interactive ? "interactive" : "readonly"}
+        initialView="week"
+        onDateClick={handleDateClick}
+        onEventClick={handleEventClick}
+        onEventMove={handleEventMove}
+      />
+      {interactive ? (
+        <EventForm
+          open={formOpen}
+          event={selectedEvent}
+          initialDate={formDate}
+          initialOwners={selectedEvent ? undefined : [{ type: "dayPlan", id: owner.id }]}
+          projects={[]}
+          milestones={[]}
+          tasks={[]}
+          onSubmit={handleSubmit}
+          onDelete={handleDelete}
+          canDelete={canDeleteEvents}
+          onClose={() => {
+            setFormOpen(false);
+            setSelectedEvent(null);
+          }}
         />
       ) : null}
     </>
@@ -597,7 +734,7 @@ function InteractiveCalendarWidget() {
   );
 }
 
-function UpcomingEventsWidget({ owner }: { owner?: DashboardOwner }) {
+function UpcomingEventsWidget() {
   const canReadEvents = useHasPermission("events", "read");
   const events = useEvents(undefined, canReadEvents);
 
@@ -605,9 +742,7 @@ function UpcomingEventsWidget({ owner }: { owner?: DashboardOwner }) {
     return <WidgetLoading />;
   }
 
-  const visibleEvents = owner?.type === "dayPlan" ? events.events.filter((event) => isDayPlanEvent(event, owner)) : events.events;
-
-  return <UpcomingEvents events={canReadEvents ? visibleEvents : []} />;
+  return <UpcomingEvents events={canReadEvents ? events.events : []} />;
 }
 
 function TaskBoardWidget({
@@ -718,6 +853,14 @@ export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: Das
       );
     }
 
+    if (context === "dayPlanCalendar" && owner?.type === "dayPlan") {
+      return (
+        <section className="h-full" data-testid={`dashboard-widget-${widget.widgetId}`}>
+          <DayPlanCalendarWidget owner={{ type: "dayPlan", id: owner.id }} dayPlanDate={dayPlanDate} />
+        </section>
+      );
+    }
+
     return (
       <WidgetShell widget={widget} action={dayPlanAction}>
         <CalendarWidget owner={owner} context={context} dayPlanDate={dayPlanDate} />
@@ -728,7 +871,7 @@ export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: Das
   if (widget.widgetId === "upcomingEvents") {
     return (
       <WidgetShell widget={widget} action={dayPlanAction}>
-        <UpcomingEventsWidget owner={owner} />
+        <UpcomingEventsWidget />
       </WidgetShell>
     );
   }

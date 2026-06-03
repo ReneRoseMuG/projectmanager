@@ -11,7 +11,7 @@
 ## Schritt 1: Bestandsaufnahme (vor jeder Änderung)
 
 Lies zunächst den Architektur-Leitfaden vollständig:
-`docs/architecture-leitfaden.md`
+`docs/architektur-leitfaden.md`
 
 Lese dann alle betroffenen Dateien und erstelle eine Ist/Soll-Tabelle:
 
@@ -140,7 +140,7 @@ Die Aufgabe gilt als abgeschlossen wenn **alle** der folgenden Punkte erfüllt s
 
 ## Referenz
 
-- Architektur-Leitfaden: `docs/architecture-leitfaden.md`
+- Architektur-Leitfaden: `docs/architektur-leitfaden.md`
 - Schema: `apps/api/src/db/schema.ts`
 - Repositories: `apps/api/src/repositories/`
 - Services: `apps/api/src/services/`

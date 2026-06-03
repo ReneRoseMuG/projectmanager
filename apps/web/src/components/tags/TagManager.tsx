@@ -85,11 +85,6 @@ function TagRow({ tag, onReload }: { tag: Tag; onReload: () => Promise<void> }) 
           </>
         )}
       </div>
-      {editing ? (
-        <div className="col-span-5 pl-9">
-          <ColorPicker value={color} onChange={setColor} />
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -134,9 +129,7 @@ export function TagManager() {
             <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-center">
               <span className="h-9 w-9 rounded-full border border-white shadow-sm" style={{ backgroundColor: color }} />
               <input className="h-10 rounded-md border border-line px-3 text-sm outline-none focus:border-magenta" placeholder="Tag-Name" value={name} onChange={(event) => setName(event.target.value)} />
-              <Button variant="primary" icon={<Plus size={16} />} onClick={create}>
-                Anlegen
-              </Button>
+              <Button variant="primary" icon={<Plus size={18} />} aria-label="Anlegen" title="Anlegen" className="h-10 w-10 shrink-0 px-0" onClick={create} />
             </div>
             <div className="mt-3">
               <ColorPicker value={color} onChange={setColor} />
