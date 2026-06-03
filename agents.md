@@ -896,7 +896,7 @@ export const ticketSeverityTones: Record<TicketSeverity, PillTone> = {
 - Tailwind-Utility-Klassen — ausschließlich vorhandene Design-Tokens aus der App (`bg-shell`, `border-line`, `text-ink`, `shadow-panel`, `rounded-xl`, `rounded-2xl` usw.)
 - Keine neuen Farb- oder Shadow-Klassen ohne Abstimmung
 - Kein Inline-CSS außer für `accentColor`-Streifen (RGB-Wert aus Entitätsdaten)
-- Icons aus `lucide-react` — konsistente Größen: `size={16}` für Buttons, `size={20}` für Modal-Icons, `size={17}` für Primär-Aktionen
+- Icons aus `lucide-react` — Größen verbindlich gemäß `docs/design-leitfaden.md §8.1` (Icon-Größen-Tabelle); Action-Button-Semantik (Create/Remove/Delete) gemäß `docs/design-leitfaden.md §8.20`
 
 ### 15.7 Abnahme-Checkliste für neue UI-Komponenten
 

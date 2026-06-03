@@ -172,14 +172,19 @@ Zwei Größen: `md` (h-10), `sm` (h-8).
 Radius: `rounded-md`.  
 Schrift: `text-sm font-medium`.
 
-**Icon-Größen:**
+**Icon-Größen (verbindliche Tabelle für alle Komponenten):**
 
-| Button-Modus | Icon `size` | Begründung |
-|---|---|---|
-| Icon-Only (`icon` ohne `children`) | `size={18}` | Füllt den Bereich gut aus, wirkt klar und lesbar |
-| Text + Icon (`icon` mit `children`) | `size={16}` | Neben Text ist kleines Icon passend |
+| Kontext | Icon `size` |
+|---|---|
+| Icon in Text+Icon-Button (`md` oder `sm`) | `16` |
+| Icon-Only-Button (`md`, `w-10`) | `18` |
+| Icon-Only-Button (`sm`, `w-8`) | `16` |
+| Primäre Aktions-Icons in Panel-/Section-Headers | `16` |
+| Icons in Modal/FormModal/DetailModal-Header | `20` |
+| Inline-Icons neben Text (z. B. Metazeile, TabBar) | `14` |
+| Badge/Chip Remove-`X` | `12` |
 
-Diese Regel gilt unabhängig von der Button-Größe (`sm` oder `md`). Icon-Only-Buttons erhalten automatisch die passende Breite (`w-10` / `w-8`).
+Diese Tabelle ist die einzige verbindliche Quelle für Icon-Größen. `agents.md §15.6` verweist auf diese Tabelle. Icon-Only-Buttons erhalten automatisch die passende Breite (`w-10` / `w-8`).
 
 **Größenwahl:** `md` ist der Standard. `sm` nur in dichten Toolbars, wo explizit Platz gespart werden muss. Icon-Buttons neben Eingabefeldern (`h-11`) verwenden immer `md`, damit Höhen visuell harmonieren.
 
@@ -295,6 +300,128 @@ Bleibt `rounded-full` — Kreisform ist semantisch für Benutzer-Avatare.
 
 Track und Füllung bleiben `rounded-full` — bar-typische Rundung an den Enden.
 
+### 8.20 Action-Button-Semantik: Create, Remove/Unlink, Delete
+
+Aktions-Buttons für das Anlegen, Trennen und Löschen von Objekten folgen einer festen Semantik. Abweichungen sind nicht zulässig.
+
+#### Create — Objekt anlegen
+
+Der Einstiegspunkt für das Anlegen eines Objekts verwendet immer das `Plus`-Icon aus `lucide-react`.
+
+| Kontext | Form |
+|---|---|
+| Toolbar einer ListBoardView | `Button variant="secondary" size="md"` + `Plus size={16}` + Textlabel |
+| Kompakter Panel-Header | `Button variant="ghost" size="sm"` + `Plus size={16}` + Textlabel |
+| Extrem dichte Toolbar (begründungspflichtig) | `Button variant="ghost" size="sm"` Icon-Only + `Plus size={18}` |
+
+**Verboten:** `CirclePlus`, `PlusCircle`, `PlusSquare` — ausschließlich `Plus`. Kein rohes `<button>` ohne die `Button`-Komponente.
+
+#### Remove / Unlink — Verknüpfung trennen (kein Datenverlust)
+
+Das Entfernen einer Verknüpfung verwendet immer das `X`-Icon aus `lucide-react`.
+
+| Kontext | Form |
+|---|---|
+| Relation-Panel (Zeile/Karte aus Verknüpfung entfernen) | `Button variant="ghost" size="sm"` + `X size={16}` |
+| Badge / Chip (Tag, Parent, Filter entfernen) | `X size={12}` inline im Badge — kein eigener Button-Wrapper |
+
+Kein ConfirmDialog erforderlich, da kein Datenverlust entsteht.
+
+#### Delete — Objekt endgültig löschen
+
+Das permanente Löschen eines Objekts verwendet `Trash2` und immer `useConfirm()`.
+
+| Kontext | Form |
+|---|---|
+| Alle Lösch-Aktionen (Card, Row, Detail) | `Button variant="danger"` + `Trash2 size={16}` + `useConfirm()` |
+
+**Semantische Trennung:**
+
+| Aktion | Icon | Datenverlust | ConfirmDialog |
+|---|---|---|---|
+| Objekt anlegen | `Plus` | — | Nein |
+| Verknüpfung trennen | `X` | Nein | Nein |
+| Badge/Chip entfernen | `X size={12}` inline | Nein | Nein |
+| Objekt löschen | `Trash2` | Ja | Pflicht |
+
+### 8.21 Detail-Sidebar Panels — Einstellungen, Optionen, Stammdaten
+
+Konfigurierbare Eigenschaften eines Objekts (Status, Zuständiger, Datum, Priorität, Katalog-Zuordnung usw.) sowie Stammdaten-Anzeigen (Erstellt am, Letzte Änderung) werden in Detail-Sidebars und Formularen als `Section`-Komponente mit eigenem `title`-Prop dargestellt.
+
+```tsx
+<Section title="Einstellungen">
+  <FormField label="Status"><RadioList ... /></FormField>
+  <FormField label="Zuständig"><UserSelectField ... /></FormField>
+</Section>
+
+<Section title="Stammdaten">
+  <FormField label="Erstellt am"><span>{formatDate(item.createdAt)}</span></FormField>
+  <FormField label="Letzte Änderung"><span>{formatDate(item.updatedAt)}</span></FormField>
+</Section>
+```
+
+Diese Regel gilt sowohl für `FormModal`-Formulare (Anlegen/Bearbeiten) als auch für `DetailModal`/Detail-Sidebars (Lesen/Navigieren).
+
+**Verboten:** Eigenständige `<div>`-Blöcke mit Inline-`<h3>`-Überschriften außerhalb einer `Section`, lose `<p>`-Elemente ohne `FormField`-Wrapper, eigenes Card-Markup für Konfigurationsgruppen.
+
+### 8.22 ListBoardView — Layoutregeln
+
+`ListBoardView` ist die einzige zulässige Basis für alle Listen- und Board-Ansichten (Hauptansichten und Detail-Tabs). Jede der folgenden Regeln gilt für alle Adapter über `ListBoardView<T>`.
+
+#### Platzbelegung
+
+- Die Komponente füllt immer den gesamten verfügbaren Platz: `h-full flex-1 w-full`.
+- Der einheitliche Außenabstand kommt ausschließlich vom einbettenden Container (`p-4` für Detail-Tabs, `p-5` für Hauptansichten) — nie von der Komponente selbst.
+- In Detail-Pages füllt der View den Bereich zwischen TabBar und unterem Seitenrand. Der Parent-Container ist dafür verantwortlich, diesen Bereich als scrollbaren Flex-Container anzubieten.
+
+#### Hintergrund
+
+- Die `ListBoardView` und ihr einbettender Container zusammen ergeben eine weiße Fläche: der Container setzt `bg-white rounded-lg`, die Komponente selbst hat kein eigenes `bg-*`.
+- Keine `bg-shell` oder `bg-steel-*` als Hintergrund des View-Panels.
+
+#### Toolbar — Add-Button
+
+Der primäre Add-Button in der Toolbar folgt immer §8.20 (Create-Semantik):
+
+| Kontext | Form |
+|---|---|
+| Hauptansicht | `Button variant="secondary" size="md"` + `Plus size={16}` + `addLabel` als Text |
+| Detail-Tab | `Button variant="ghost" size="sm"` + `Plus size={16}` + `addLabel` als Text |
+
+**Verboten:** Icon-Only Add-Button in der Toolbar, `className`-Overrides für Farben (z. B. `border-fern text-fern`), `Plus size={26}` oder abweichende `strokeWidth`-Werte.
+
+#### Toolbar — Link-Button
+
+Wo Objekte verknüpft (nicht neu erstellt) werden, steht neben dem Add-Button ein Link-Button:
+
+- `Button variant="ghost" size="sm"` + `Link size={16}` + Textlabel (z. B. „Verknüpfen")
+- Der Link-Button öffnet einen Auswahl-Dialog, keinen Erstellungs-Dialog.
+
+#### Toolbar — Suchleiste
+
+- Immer links in der Toolbar-Grid-Zeile.
+- Immer die `SearchInput`-Komponente — kein reguläres `Input`.
+- Position ist nicht konfigurierbar.
+
+#### Spalten und Gruppen
+
+- Spalten und Gruppen werden **ausschließlich dann angezeigt, wenn mindestens ein Item existiert**.
+- Ist die gesamte Itemliste leer (`items.length === 0`), erscheint ausschließlich der `EmptyState` — keine kollabierten Spalten-Stubs.
+- Sind Items vorhanden, dürfen leere bekannte Spalten als kollabierte Drop-Target-Streifen sichtbar bleiben (DnD-Usability). Unbekannte Spalten (Status nicht im Katalog) werden nur gezeigt, wenn sie Items enthalten.
+- `showGroupedEmptyState` bleibt immer `true`. Das Prop sollte nicht auf `false` gesetzt werden.
+
+#### EmptyState
+
+Innerhalb von `ListBoardView` gilt:
+
+| Kontext | Variante | Buttons |
+|---|---|---|
+| Detail-Tab, noch keine Items | `default` (dashed border) | Nein — Add-Button ist in der Toolbar |
+| Hauptansicht, Nutzer hat noch nie Daten angelegt | `first-run` (dunkler Gradient) | Ja, ein primärer CTA |
+| Gefilterte Ansicht ohne Treffer | `default` | Nein |
+
+Inhalt (Icon, Titel, Body-Text) ist domänenspezifisch — die Darstellungsform ist es nicht.
+
 ### 8.19 SearchInput
 
 Form: `h-10 rounded-md bg-steel-100 px-3` (kein Rahmen, kein `bg-white`).  
@@ -361,6 +488,14 @@ Jede Selektor-Komponente verwendet **ein** Aktiv-Signal konsistent.
 | Button-Farb-Override via `className` | Umgeht Variant-System | Neuen Variant definieren |
 | Inline `style={{ color }}` für strukturelles Styling | Nicht überschreibbar | Tailwind-Klassen / Token |
 | `border-2` als Aktiv-Signal | Inkonsistent mit anderen Selektoren | Gefüllter Hintergrund |
+| `CirclePlus`, `PlusCircle`, `PlusSquare` für Create-Aktionen | Inkonsistentes Create-Symbol | `Plus` |
+| `Minus` für Remove/Unlink | Abgelöst durch `X` | `X size={16}` (Button) / `X size={12}` (Badge inline) |
+| `Trash2` ohne `useConfirm()` | Datenverlust ohne Bestätigung | `useConfirm()` vorschalten |
+| `<div>` mit Inline-`<h3>` als Konfigurationsgruppe in Formularen/Sidebars | Inkonsistentes Panel-Layout | `Section`-Komponente mit `title`-Prop |
+| Icon-Größen abweichend von §8.1 Tabelle | Inkonsistente visuelle Hierarchie | Größen-Tabelle in §8.1 verwenden |
+| `showGroupedEmptyState={false}` in ListBoardView | Zeigt leere Spalten-Stubs ohne Daten | Prop weglassen (default `true`) |
+| Eigener List/Board-Container statt `ListBoardView<T>` | Drift in Layout und Verhalten | `ListBoardView<T>`-Adapter verwenden |
+| `bg-shell` oder `bg-steel-*` als Hintergrund des View-Panels | Bricht Weiß-Panel-Regel (§8.22) | `bg-white rounded-lg` im Container |
 
 ---
 
@@ -404,3 +539,9 @@ Auf `rounded-md` angleichen (wie Select).
 
 ### ❼ ViewToggle `border-2 border-ink` — Priorität: Mittel
 Durch `bg-steel-700 text-white border-steel-700` ersetzen.
+
+### ❽ `ListBoardView` Add-Button — Priorität: Hoch
+`ListBoardView.tsx` Toolbar-Add-Button verwendet `variant="ghost"` mit `className`-Override (`border-fern text-fern`) und `Plus size={26} strokeWidth={3}`. Ersetzen durch `variant="secondary"` (Hauptansicht) oder `variant="ghost" size="sm"` (Detail-Tab) + `Plus size={16}` + `addLabel` als Text — gemäß §8.20 und §8.22.
+
+### ❾ `ListBoardView` Spalten-Add-Button Icon-Größe — Priorität: Mittel
+`ListBoardView.tsx` Column-Add-Button verwendet `Plus size={30} strokeWidth={3.4}`. Ersetzen durch `Plus size={18}` (Icon-Only `md`-Button gemäß §8.1).
