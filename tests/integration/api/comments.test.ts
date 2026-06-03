@@ -7,6 +7,7 @@
 import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { config } from "../../../apps/api/src/config.js";
 import {
   buildTestApp,
   createBacklogItem,
@@ -200,5 +201,49 @@ describe("Comments API", () => {
 
   it("DELETE eines nicht vorhandenen Kommentars gibt 404 zurueck", async () => {
     await supertest(app.server).delete("/api/comments/9999").expect(404);
+  });
+
+  describe("Auth-Schutz: Reader-Negativfall", () => {
+    let authApp: FastifyInstance;
+    let originalAuthBypassAdmin: boolean;
+    let originalApiKey: string | null;
+
+    beforeAll(async () => {
+      originalAuthBypassAdmin = config.authBypassAdmin;
+      originalApiKey = config.apiKey;
+      authApp = await buildTestApp(testDb, { enableAuth: true });
+    });
+
+    beforeEach(async () => {
+      config.authBypassAdmin = false;
+      config.apiKey = null;
+      await truncateAll(testDb.pool);
+    });
+
+    afterAll(async () => {
+      config.authBypassAdmin = originalAuthBypassAdmin;
+      config.apiKey = originalApiKey;
+      await authApp?.close();
+    });
+
+    it("Reader darf keinen Kommentar anlegen (403)", async () => {
+      const admin = supertest.agent(authApp.server);
+      await admin.post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
+      const project = (await admin.post("/api/projects").send({ name: "Reader Comment Test", status: "active" }).expect(201)).body as { id: number };
+      const task = (await admin.post(`/api/projects/${project.id}/tasks`).send({ title: "Reader Task", status: "todo", priority: "medium" }).expect(201)).body as { id: number };
+      const roles = (await admin.get("/api/admin/roles").expect(200)).body as Array<{ key: string; id: number }>;
+      const readerRole = roles.find((r) => r.key === "reader")!;
+      await admin.post("/api/admin/users").send({
+        firstName: "Reader", lastName: "Comment",
+        email: "reader-comments-auth@example.test",
+        roleId: readerRole.id, password: "password123", isActive: true
+      }).expect(201);
+
+      const reader = supertest.agent(authApp.server);
+      await reader.post("/api/auth/login").send({ email: "reader-comments-auth@example.test", password: "password123" }).expect(200);
+
+      await reader.post(`/api/tasks/${task.id}/comments`).send({ body: "Nicht erlaubt" }).expect(403);
+      await reader.get(`/api/tasks/${task.id}/comments`).expect(200);
+    });
   });
 });

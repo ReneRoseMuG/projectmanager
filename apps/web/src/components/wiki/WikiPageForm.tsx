@@ -1,5 +1,5 @@
 import type { DraftComment, Note, Project, WikiPage, WikiPageInput, WikiPageRelationSummary } from "@taskmanager/shared-types";
-import { ExternalLink, Save, Trash2, X } from "lucide-react";
+import { ExternalLink, Trash2, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
@@ -17,7 +17,6 @@ import { NoteList } from "../notes/NoteList";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
-import { CopyReferenceButton } from "../ui/CopyReferenceButton";
 import { FormField } from "../ui/FormField";
 import { Modal } from "../ui/Modal";
 import { PageHero } from "../ui/PageHero";
@@ -190,14 +189,11 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
             breadcrumb={["Wiki", parentPageTitle ?? "Root"]}
             title={title || (page ? "Wiki-Seite bearbeiten" : "Wiki-Seite anlegen")}
             actions={
-              <>
-                {page ? <CopyReferenceButton reference={String(page.id)} variant="hero" /> : null}
-                {page && onDelete ? (
-                  <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Seite löschen" title="Seite löschen" onClick={() => onDelete(page)}>
-                    <Trash2 size={18} />
-                  </button>
-                ) : null}
-              </>
+              page && onDelete ? (
+                <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Seite löschen" title="Seite löschen" onClick={() => onDelete(page)}>
+                  <Trash2 size={18} />
+                </button>
+              ) : null
             }
           />
         ) : !inline ? (
@@ -214,7 +210,6 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
               <h2 className="text-2xl font-bold tracking-normal">{title || (page ? "Wiki-Seite bearbeiten" : "Wiki-Seite anlegen")}</h2>
             </div>
             <div className="flex items-center gap-2">
-              {page ? <CopyReferenceButton reference={String(page.id)} variant="hero" /> : null}
               {onOpenInTab ? (
                 <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="In neuem Tab öffnen" title="In neuem Tab öffnen" onClick={onOpenInTab}>
                   <ExternalLink size={18} />
@@ -284,6 +279,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                   placeholder="Wiki-Inhalt"
                   testIdPrefix="wiki-page-form-content"
                   onImageUpload={uploadContentImage}
+                  wikiPages={pages}
                   className="min-h-[400px]"
                   fill
                   onChange={(value) => {
@@ -394,19 +390,21 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
           ) : null}
         </div>
 
-        <footer className={`flex flex-wrap items-center gap-3 border-t border-line bg-white px-5 py-4 ${embeddedActionPage ? "justify-between" : "justify-end"}`}>
-          {embeddedActionPage ? (
-            <div className="flex items-center gap-2">
-              <CopyReferenceButton reference={String(embeddedActionPage.id)} />
-              {onDelete ? (
-                <Button aria-label="Seite löschen" title="Seite löschen" variant="danger" icon={<Trash2 size={16} />} className="h-8 w-8 px-0" onClick={() => onDelete(embeddedActionPage)} />
-              ) : null}
-            </div>
+        <footer className={`flex flex-wrap items-center gap-3 border-t border-line bg-white px-5 py-4 ${embeddedActionPage && onDelete ? "justify-between" : "justify-end"}`}>
+          {embeddedActionPage && onDelete ? (
+            <Button
+              className="text-crimson hover:bg-crimson/10"
+              icon={<Trash2 size={18} />}
+              variant="ghost"
+              onClick={() => onDelete(embeddedActionPage)}
+            >
+              Löschen
+            </Button>
           ) : null}
           <div className="flex items-center gap-2">
-            <Button onClick={() => void requestClose()}>Verwerfen</Button>
-            <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={saving}>
-              Veröffentlichen
+            <Button onClick={() => void requestClose()}>Abbrechen</Button>
+            <Button type="submit" variant="primary" disabled={saving}>
+              Speichern
             </Button>
           </div>
         </footer>

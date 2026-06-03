@@ -7,6 +7,7 @@
 import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { config } from "../../../apps/api/src/config.js";
 import {
   buildTestApp,
   createMilestone,
@@ -211,5 +212,50 @@ describe("Notes API", () => {
     const res = await supertest(app.server).get(`/api/notes/${note.id}`).expect(200);
 
     expect(res.body.contentJson).toEqual(contentJson);
+  });
+
+  describe("Auth-Schutz: Reader-Negativfall", () => {
+    let authApp: FastifyInstance;
+    let originalAuthBypassAdmin: boolean;
+    let originalApiKey: string | null;
+
+    beforeAll(async () => {
+      originalAuthBypassAdmin = config.authBypassAdmin;
+      originalApiKey = config.apiKey;
+      authApp = await buildTestApp(testDb, { enableAuth: true });
+    });
+
+    beforeEach(async () => {
+      config.authBypassAdmin = false;
+      config.apiKey = null;
+      await truncateAll(testDb.pool);
+    });
+
+    afterAll(async () => {
+      config.authBypassAdmin = originalAuthBypassAdmin;
+      config.apiKey = originalApiKey;
+      await authApp?.close();
+    });
+
+    it("Reader darf keine Note anlegen (403)", async () => {
+      const admin = supertest.agent(authApp.server);
+      await admin.post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
+      const project = (await admin.post("/api/projects").send({ name: "Reader Note Test", status: "active" }).expect(201)).body as { id: number };
+      const roles = (await admin.get("/api/admin/roles").expect(200)).body as Array<{ key: string; id: number }>;
+      const readerRole = roles.find((r) => r.key === "reader")!;
+      await admin.post("/api/admin/users").send({
+        firstName: "Reader", lastName: "Note",
+        email: "reader-notes-auth@example.test",
+        roleId: readerRole.id, password: "password123", isActive: true
+      }).expect(201);
+
+      const reader = supertest.agent(authApp.server);
+      await reader.post("/api/auth/login").send({ email: "reader-notes-auth@example.test", password: "password123" }).expect(200);
+
+      await reader.post(`/api/projects/${project.id}/notes`)
+        .send({ title: "Nicht erlaubt", contentJson: { type: "doc", content: [] } })
+        .expect(403);
+      await reader.get(`/api/projects/${project.id}/notes`).expect(200);
+    });
   });
 });

@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 03.06.26 | 09:49:02 | Fix | Deploy Runtime Toolbar | ✅ |
 | 03.06.26 | 07:24:49 | Feature | Codex Skills Sync | ✅ |
 | 02.06.26 | 15:55:14 | Feature | MS-46 TipTap Image Extensions | âœ… |
 | 02.06.26 | 10:37:17 | Fix | TASK-203 Projektzuordnung | âœ… |

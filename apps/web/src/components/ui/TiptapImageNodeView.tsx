@@ -1,6 +1,6 @@
 import type { ReactNodeViewProps } from "@tiptap/react";
 import { NodeViewWrapper } from "@tiptap/react";
-import { AlignCenter, AlignLeft } from "lucide-react";
+import { AlignCenter, AlignLeft, GripVertical } from "lucide-react";
 import { useRef } from "react";
 import type { ImageAlign, ImageFloat } from "./tiptap-image-node";
 
@@ -128,6 +128,14 @@ export function TiptapImageNodeView({ node, updateAttributes, selected }: ReactN
           >
             <span className="text-[11px] font-bold leading-none">◨</span>
           </ToolbarBtn>
+          <div className="mx-0.5 h-4 w-px bg-line" />
+          <div
+            data-drag-handle
+            className="flex h-6 w-6 cursor-grab items-center justify-center rounded text-steel-500 hover:bg-line/50 hover:text-ink"
+            title="Verschieben"
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </div>
         </div>
       )}
 

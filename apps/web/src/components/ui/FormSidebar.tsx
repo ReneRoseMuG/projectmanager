@@ -8,7 +8,7 @@ interface FormSidebarProps {
 }
 
 const FIXED_WIDTH = 260;
-const COLLAPSED_WIDTH = 12;
+const COLLAPSED_WIDTH = 16;
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -61,7 +61,7 @@ export function FormSidebar({
         type="button"
         aria-label={collapsed ? "Stammdaten öffnen" : "Stammdaten schließen"}
         title={collapsed ? "Stammdaten öffnen" : "Stammdaten schließen"}
-        className="flex w-3 shrink-0 cursor-col-resize flex-col items-center justify-center gap-[3px] transition-colors hover:bg-steel-200 focus:outline-none"
+        className="flex w-4 shrink-0 cursor-col-resize flex-col items-center justify-center gap-[3px] transition-colors hover:bg-steel-200 focus:outline-none"
         onClick={() => setCollapsed((c) => !c)}
       >
         {collapsed ? (

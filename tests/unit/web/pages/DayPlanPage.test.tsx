@@ -96,6 +96,10 @@ vi.mock("../../../../apps/web/src/components/dashboard/DashboardView", () => ({
   DashboardView: ({ context }: { context: string }) => <div data-testid="dashboard-view" data-context={context} />,
 }));
 
+vi.mock("../../../../apps/web/src/components/dashboard/DashboardWidgets", () => ({
+  DayPlanCalendarWidget: () => <div data-testid="calendar-widget" />,
+}));
+
 vi.mock("../../../../apps/web/src/components/tasks/TaskListBoardView", () => ({
   TaskListBoardView: ({ onAdd }: { onAdd: () => void }) => (
     <section data-testid="task-list-board-view">
@@ -126,6 +130,28 @@ vi.mock("../../../../apps/web/src/components/journal/JournalPanel", () => ({
   JournalPanel: () => <div data-testid="journal-panel" />,
 }));
 
+vi.mock("../../../../apps/web/src/hooks/useNotes", () => ({
+  useNotes: () => ({
+    notes: [],
+    loading: false,
+    error: null,
+    createNote: vi.fn(),
+    updateNote: vi.fn(),
+    removeNote: vi.fn(),
+  }),
+}));
+
+vi.mock("../../../../apps/web/src/hooks/useEntityComments", () => ({
+  useEntityComments: () => ({
+    comments: [],
+    loading: false,
+    error: null,
+    createComment: vi.fn(),
+    updateComment: vi.fn(),
+    removeComment: vi.fn(),
+  }),
+}));
+
 afterEach(() => {
   cleanup();
   createTaskMock.mockReset();
@@ -142,7 +168,7 @@ function renderPage() {
 }
 
 describe("DayPlanPage", () => {
-  it("rendert den Kalender-Tab direkt nach Übersicht mit eigenem Dashboard-Kontext", () => {
+  it("rendert den Kalender-Tab direkt nach Übersicht und zeigt DayPlanCalendarWidget", () => {
     renderPage();
 
     const tabLabels = screen.getAllByRole("button").map((button) => button.textContent?.trim() ?? "");
@@ -151,7 +177,7 @@ describe("DayPlanPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Kalender" }));
 
-    expect(screen.getByTestId("dashboard-view")).toHaveAttribute("data-context", "dayPlanCalendar");
+    expect(screen.getByTestId("calendar-widget")).toBeInTheDocument();
   });
 
   it("nutzt im Aufgaben-Tab TaskListBoardView ohne Verknüpfen-Button und öffnet den Create-Flow", () => {
@@ -165,5 +191,52 @@ describe("DayPlanPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe anlegen" }));
 
     expect(screen.getByTestId("task-form")).toBeInTheDocument();
+  });
+
+  it("Übersicht-Tab zeigt DashboardView mit dayPlan-Kontext", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Übersicht" }));
+
+    expect(screen.getByTestId("dashboard-view")).toHaveAttribute("data-context", "dayPlan");
+  });
+
+  it("Notizen-Tab zeigt NoteList", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Notizen" }));
+
+    expect(screen.getByTestId("note-list")).toBeInTheDocument();
+  });
+
+  it("Kommentare-Tab zeigt CommentThread", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Kommentare" }));
+
+    expect(screen.getByTestId("comment-thread")).toBeInTheDocument();
+  });
+
+  it("Journal-Tab zeigt JournalPanel", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Journal" }));
+
+    expect(screen.getByTestId("journal-panel")).toBeInTheDocument();
+  });
+
+  it("alle 6 Tabs sind in korrekter Reihenfolge vorhanden", () => {
+    renderPage();
+
+    const tabLabels = screen.getAllByRole("button").map((b) => b.textContent?.trim() ?? "");
+    // "Aufgaben" kann einen Count-Suffix haben (z.B. "Aufgaben1") → startsWith-Check
+    const exactLabels = ["Übersicht", "Kalender", "Notizen", "Kommentare", "Journal"];
+    for (const label of exactLabels) {
+      expect(tabLabels).toContain(label);
+    }
+    expect(tabLabels.some((l) => l.startsWith("Aufgaben"))).toBe(true);
+
+    expect(tabLabels.indexOf("Übersicht")).toBeLessThan(tabLabels.indexOf("Kalender"));
+    expect(tabLabels.indexOf("Kalender")).toBeLessThan(tabLabels.indexOf("Journal"));
   });
 });

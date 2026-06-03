@@ -40,3 +40,7 @@ export async function removeWikiPageRelation(id: number, targetWikiPageId: numbe
 export async function deleteWikiPage(id: number): Promise<void> {
   await api.delete(`wiki/${id}`);
 }
+
+export async function exportWiki(exportPath: string): Promise<{ filesWritten: number; exportPath: string }> {
+  return api.post("wiki/export", { json: { exportPath } }).json();
+}

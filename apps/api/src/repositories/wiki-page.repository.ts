@@ -63,6 +63,10 @@ export const wikiPageRepository = {
     return { ...current, ...data, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
   },
 
+  async findAll(database: DbSession): Promise<WikiPageRecord[]> {
+    return database.select().from(wikiPages).orderBy(wikiPages.sortOrder, wikiPages.title);
+  },
+
   async delete(database: DbSession, id: number): Promise<number> {
     return mutationAffectedRows(await database.delete(wikiPages).where(eq(wikiPages.id, id)));
   }

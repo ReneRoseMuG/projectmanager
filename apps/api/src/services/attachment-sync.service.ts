@@ -340,6 +340,33 @@ export async function syncAttachmentsOnStartup(): Promise<AttachmentSyncStats> {
         }
       }
 
+      // Files physically on remote but missing from manifest (e.g. uploaded without sync)
+      try {
+        const remoteEntries = await client.list(remoteRoot());
+        for (const entry of remoteEntries) {
+          if (entry.type !== "-") continue;
+          if (entry.name.startsWith(".")) continue;
+          if (mRemote.files[entry.name] !== undefined) continue;
+          if (fLocal[entry.name] !== undefined) continue;
+          try {
+            const result = await client.get(remoteFilePath(entry.name));
+            const buffer = Buffer.isBuffer(result) ? result : Buffer.from(String(result));
+            await fs.writeFile(path.join(config.uploadDir, entry.name), buffer);
+            const remoteEntry: SyncFileEntry = {
+              size: entry.size,
+              modifiedTime: new Date(entry.modifyTime).toISOString(),
+            };
+            fLocal[entry.name] = remoteEntry;
+            updatedRemoteFiles[entry.name] = remoteEntry;
+            pulled++;
+          } catch (err) {
+            errors.push(`pull-unlisted ${entry.name}: ${String(err)}`);
+          }
+        }
+      } catch (err) {
+        errors.push(`remote-list: ${String(err)}`);
+      }
+
       // Files new locally (never synced before)
       for (const [filename, localEntry] of Object.entries(fLocal)) {
         if (mLocal.files[filename] !== undefined) continue;

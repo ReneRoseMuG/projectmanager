@@ -3,6 +3,7 @@ import {
   addWikiPageRelation,
   createWikiPage,
   deleteWikiPage,
+  exportAllWikiPages,
   getWikiBreadcrumb,
   getWikiPage,
   listRootWikiPages,
@@ -56,8 +57,23 @@ function rejectLegacyProjectId(request: FastifyRequest, _reply: FastifyReply, do
   done();
 }
 
+const wikiExportBodySchema = {
+  type: "object",
+  required: ["exportPath"],
+  additionalProperties: false,
+  properties: {
+    exportPath: { type: "string", minLength: 1 }
+  }
+} as const;
+
 export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
   app.get("/wiki", { schema: { response: { 200: arrayResponseSchema } } }, async () => listRootWikiPages(app.db));
+
+  app.post<{ Body: { exportPath: string } }>(
+    "/wiki/export",
+    { schema: { body: wikiExportBodySchema, response: { 200: objectResponseSchema } } },
+    async (request) => exportAllWikiPages(app.db, request.body.exportPath)
+  );
 
   app.get<{ Params: { id: number } }>(
     "/wiki/:id/children",

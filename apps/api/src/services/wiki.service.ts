@@ -1,4 +1,7 @@
-﻿import type { JsonValue, WikiPageRelationSummary } from "@taskmanager/shared-types";
+﻿import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import type { JsonValue, WikiPageRelationSummary } from "@taskmanager/shared-types";
 import { and, eq, inArray, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { wikiPageAttachments, wikiPageRelations, wikiPageTasks, wikiPageTickets } from "../db/schema.js";
@@ -448,4 +451,149 @@ export async function getWikiBreadcrumb(database: DbClient, id: number): Promise
   }
 
   return breadcrumb;
+}
+
+// ─── Wiki Export ──────────────────────────────────────────────────────────────
+
+export interface WikiExportResult {
+  filesWritten: number;
+  exportPath: string;
+}
+
+function toSlug(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "seite";
+}
+
+function resolveExportPath(rawPath: string): string {
+  if (rawPath.startsWith("~")) {
+    return path.join(os.homedir(), rawPath.slice(1));
+  }
+  return path.resolve(rawPath);
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function buildSlugMap(pages: WikiPageRecord[]): Map<number, string> {
+  const slugCounts = new Map<string, number>();
+  const slugMap = new Map<number, string>();
+  for (const page of pages) {
+    const base = toSlug(page.title);
+    const count = slugCounts.get(base) ?? 0;
+    slugCounts.set(base, count + 1);
+    slugMap.set(page.id, count === 0 ? base : `${base}-${page.id}`);
+  }
+  return slugMap;
+}
+
+function buildPathMap(pages: WikiPageRecord[], slugMap: Map<number, string>): Map<number, string> {
+  const idMap = new Map(pages.map((p) => [p.id, p]));
+  const pathMap = new Map<number, string>();
+
+  function getRelPath(id: number): string {
+    const cached = pathMap.get(id);
+    if (cached !== undefined) return cached;
+    const page = idMap.get(id);
+    if (!page) return String(id);
+    const slug = slugMap.get(id) ?? String(id);
+    const result = page.parentId !== null && idMap.has(page.parentId)
+      ? `${getRelPath(page.parentId)}/${slug}`
+      : slug;
+    pathMap.set(id, result);
+    return result;
+  }
+
+  for (const page of pages) getRelPath(page.id);
+  return pathMap;
+}
+
+function resolveWikiLinks(html: string, currentRelPath: string, pathMap: Map<number, string>): string {
+  const depth = currentRelPath.split("/").length;
+  const prefix = depth > 1 ? Array(depth).fill("..").join("/") + "/" : "";
+  return html.replace(/href="wiki:\/\/(\d+)"/g, (_m, idStr: string) => {
+    const targetPath = pathMap.get(Number(idStr));
+    return targetPath ? `href="${prefix}${targetPath}/index.html"` : `href="#"`;
+  });
+}
+
+const EXPORT_CSS = `
+body { font-family: Inter, system-ui, sans-serif; margin: 0; background: #F4F7FA; color: #0F2542; }
+main { max-width: 860px; margin: 2rem auto; background: #fff; border-radius: 0.5rem; padding: 2rem 2.5rem; box-shadow: 0 10px 28px rgba(15,37,66,0.08); }
+h1.page-title { font-size: 1.75rem; font-weight: 800; margin: 0 0 1.5rem; padding-bottom: 0.6rem; border-bottom: 2px solid #D5DEE9; color: #0F2542; }
+.rich-text-surface { color: #0F2542; font-size: 0.95rem; line-height: 1.7; }
+.rich-text-surface > *:first-child { margin-top: 0; }
+.rich-text-surface > *:last-child { margin-bottom: 0; }
+.rich-text-surface h1,.rich-text-surface h2,.rich-text-surface h3,.rich-text-surface h4 { color: #0F2542; font-weight: 700; line-height: 1.25; }
+.rich-text-surface h1 { margin: 1.25rem 0 0.75rem; border-bottom: 1px solid #D5DEE9; padding-bottom: 0.45rem; font-size: 1.5rem; }
+.rich-text-surface h2 { margin: 1.1rem 0 0.6rem; font-size: 1.2rem; }
+.rich-text-surface h3 { margin: 1rem 0 0.45rem; font-size: 1.05rem; }
+.rich-text-surface h4 { margin: 0.85rem 0 0.35rem; color: #1B355C; font-size: 0.95rem; }
+.rich-text-surface p { margin: 0.65rem 0; }
+.rich-text-surface ul,.rich-text-surface ol { margin: 0.65rem 0; padding-left: 1.35rem; }
+.rich-text-surface ul { list-style: disc; }
+.rich-text-surface ol { list-style: decimal; }
+.rich-text-surface li { margin: 0.25rem 0; }
+.rich-text-surface code { border-radius: 0.3rem; background: #E8EFF5; padding: 0.1rem 0.3rem; color: #1B355C; font-size: 0.86em; }
+.rich-text-surface blockquote { margin: 0.8rem 0; border-left: 3px solid #BACDE3; padding-left: 0.9rem; color: #4682B4; }
+.rich-text-surface hr { margin: 1rem 0; border: 0; border-top: 1px solid #D5DEE9; }
+.rich-text-surface a { color: #2F8E96; text-decoration: underline; }
+.rich-text-column-block { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(14rem,100%),1fr)); gap: 1rem; margin: 0.9rem 0; }
+.rich-text-column { min-width: 0; border-left: 2px solid #D5DEE9; padding-left: 0.75rem; }
+.tiptap-img { max-width: 100%; border-radius: 0.25rem; }
+.tiptap-img-float-left { float: left; margin: 0 1rem 0.5rem 0; }
+.tiptap-img-float-right { float: right; margin: 0 0 0.5rem 1rem; }
+.tiptap-img-center { display: block; margin-left: auto; margin-right: auto; }
+.rich-text-surface::after { content: ""; display: table; clear: both; }
+`;
+
+function buildHtmlDocument(title: string, resolvedContent: string): string {
+  return `<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(title)}</title>
+<style>${EXPORT_CSS}</style>
+</head>
+<body>
+<main>
+<h1 class="page-title">${escapeHtml(title)}</h1>
+<div class="rich-text-surface">${resolvedContent}</div>
+</main>
+</body>
+</html>`;
+}
+
+export async function exportAllWikiPages(database: DbClient, rawExportPath: string): Promise<WikiExportResult> {
+  const exportPath = resolveExportPath(rawExportPath);
+  const allPages = await wikiPageRepository.findAll(database);
+
+  const pagesWithContent = await Promise.all(
+    allPages.map(async (page) => ({
+      ...page,
+      content: await readContentFromDb(database, page.id, "wiki")
+    }))
+  );
+
+  const slugMap = buildSlugMap(allPages);
+  const pathMap = buildPathMap(allPages, slugMap);
+
+  let filesWritten = 0;
+  for (const page of pagesWithContent) {
+    const relPath = pathMap.get(page.id) ?? String(page.id);
+    const resolvedContent = resolveWikiLinks(page.content, relPath, pathMap);
+    const html = buildHtmlDocument(page.title, resolvedContent);
+    const filePath = path.join(exportPath, relPath, "index.html");
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, html, "utf-8");
+    filesWritten++;
+  }
+
+  return { filesWritten, exportPath };
 }

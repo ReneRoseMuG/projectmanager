@@ -322,7 +322,7 @@ function NavigationSection({
 
   return (
     <section className="grid gap-1" data-sidebar-section={section.label}>
-      <p className="px-3.5 pt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-white/40">
+      <p className="mx-2 mt-2 bg-white/[0.06] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/60">
         {section.label}
       </p>
       {children}
@@ -579,7 +579,7 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
   return (
     <aside
       aria-label="Hauptnavigation"
-      className={`sidebar-edge-shell hidden h-full shrink-0 overflow-hidden text-white transition-[width] duration-200 md:flex md:flex-col ${collapsed ? "w-16" : "w-[272px]"}`}
+      className={`sidebar-edge-shell hidden h-full shrink-0 overflow-hidden text-white transition-[width] duration-200 md:flex md:flex-col ${collapsed ? "w-16" : "w-[240px]"}`}
     >
       <SidebarHeader
         collapsed={collapsed}

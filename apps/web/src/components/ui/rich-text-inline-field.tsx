@@ -35,6 +35,7 @@ import {
   Bold,
   Code2,
   Columns2,
+  FileText,
   Heading1,
   Heading2,
   Heading3,
@@ -90,6 +91,8 @@ interface RichTextInlineFieldProps {
   testIdPrefix?: string;
   /** Optional image upload handler for clipboard images and toolbar file picker. */
   onImageUpload?: (file: File) => Promise<string>;
+  /** When provided, enables the wiki-page-link button in the toolbar. */
+  wikiPages?: Array<{ id: number; title: string }>;
 }
 
 interface RichTextInlineEditorProps {
@@ -102,6 +105,7 @@ interface RichTextInlineEditorProps {
   clickPosition: ClickPosition | null;
   testIdPrefix?: string;
   onImageUpload?: (file: File) => Promise<string>;
+  wikiPages?: Array<{ id: number; title: string }>;
   fill: boolean;
   commitOnBlur: boolean;
   liveUpdate: boolean;
@@ -134,7 +138,7 @@ function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload }: RichTextInlineFieldProps) {
+export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload, wikiPages }: RichTextInlineFieldProps) {
   const [originalValue, setOriginalValue] = useState("");
   const hasContent = valueFormat === "markdown" ? Boolean(value?.trim()) : hasVisibleHtmlContent(value);
   const minRowsStyle = useMemo(() => (minRows ? ({ "--rich-text-field-min-rows": minRows } as React.CSSProperties) : undefined), [minRows]);
@@ -163,6 +167,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
           clickPosition={null}
           testIdPrefix={testIdPrefix}
           onImageUpload={onImageUpload}
+          wikiPages={wikiPages}
           fill={fill}
           commitOnBlur={commitOnBlur}
           liveUpdate={liveUpdate}
@@ -216,7 +221,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
   );
 }
 
-function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
+function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, wikiPages, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
   const cancellingRef = useRef(false);
   const [imageUploadCount, setImageUploadCount] = useState(0);
   const [hasFocus, setHasFocus] = useState(false);
@@ -403,18 +408,32 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
 
   return (
     <div className={cn(fill ? "flex min-h-0 flex-1 flex-col overflow-visible" : "overflow-clip", "rounded-md border bg-white shadow-sm transition-colors", hasFocus ? "border-steel-600 ring-2 ring-steel-700/10" : "border-line")} data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
-      {toolbar !== "none" ? <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} /> : null}
+      {toolbar !== "none" ? <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} wikiPages={wikiPages} /> : null}
       <EditorContent editor={editor} className={fill ? "flex min-h-0 flex-1 flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1" : undefined} />
     </div>
   );
 }
 
-function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploading }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none">; focused: boolean; onImageUpload?: ImageUploadHandler; imageUploading: boolean }) {
+function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploading, wikiPages }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none">; focused: boolean; onImageUpload?: ImageUploadHandler; imageUploading: boolean; wikiPages?: Array<{ id: number; title: string }> }) {
   const showFullToolbar = variant === "full";
   const [pickerUploading, setPickerUploading] = useState(false);
   const [, setToolbarVersion] = useState(0);
+  const [wikiPickerOpen, setWikiPickerOpen] = useState(false);
+  const [wikiFilter, setWikiFilter] = useState("");
+  const wikiPickerRef = React.useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
   const hasTextSelection = !editor.state.selection.empty;
+
+  React.useEffect(() => {
+    if (!wikiPickerOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (wikiPickerRef.current && !wikiPickerRef.current.contains(e.target as Node)) {
+        setWikiPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [wikiPickerOpen]);
 
   useEffect(() => {
     const refreshToolbarState = () => setToolbarVersion((version) => version + 1);
@@ -454,6 +473,57 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
           <ToolbarButton onClick={() => editor.chain().focus().insertColumnBlock().run()} active={editor.isActive("columnBlock")} title="Spalten" icon={<Columns2 />} />
           <ToolbarButton onClick={() => setLink(editor)} active={editor.isActive("link")} title="Link" icon={<LinkIcon />} />
           <ToolbarButton onClick={() => handleImageInsert(editor, onImageUpload, setPickerUploading, showToast)} active={false} disabled={imageUploading || pickerUploading || !onImageUpload} title="Bild" icon={imageUploading || pickerUploading ? <Loader2 /> : <ImageIcon />} />
+          {wikiPages && wikiPages.length > 0 ? (
+            <div className="relative" ref={wikiPickerRef}>
+              <ToolbarButton
+                onClick={() => { setWikiPickerOpen((open) => !open); setWikiFilter(""); }}
+                active={wikiPickerOpen}
+                title="Wiki-Seiten-Link"
+                icon={<FileText />}
+              />
+              {wikiPickerOpen ? (
+                <div className="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border border-line bg-white shadow-md">
+                  <div className="border-b border-line p-1.5">
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Seite suchen…"
+                      value={wikiFilter}
+                      onChange={(e) => setWikiFilter(e.target.value)}
+                      className="w-full rounded border border-line px-2 py-1 text-xs outline-none focus:border-teal"
+                      onMouseDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <ul className="max-h-48 overflow-y-auto py-1">
+                    {wikiPages
+                      .filter((p) => p.title.toLowerCase().includes(wikiFilter.toLowerCase()))
+                      .map((p) => (
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1.5 text-left text-xs text-ink hover:bg-shell"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              if (editor.state.selection.empty) {
+                                editor.chain().focus().insertContent(`<a href="wiki://${p.id}">${p.title}</a>`).run();
+                              } else {
+                                editor.chain().focus().setLink({ href: `wiki://${p.id}` }).run();
+                              }
+                              setWikiPickerOpen(false);
+                            }}
+                          >
+                            {p.title}
+                          </button>
+                        </li>
+                      ))}
+                    {wikiPages.filter((p) => p.title.toLowerCase().includes(wikiFilter.toLowerCase())).length === 0 ? (
+                      <li className="px-3 py-2 text-xs text-steel-500">Keine Treffer</li>
+                    ) : null}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <Separator />
           <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("left").run()} active={editor.isActive({ textAlign: "left" })} title="Links" icon={<AlignLeft />} />
           <ToolbarButton onClick={() => editor.chain().focus().setTextAlign("center").run()} active={editor.isActive({ textAlign: "center" })} title="Mitte" icon={<AlignCenter />} />
@@ -467,22 +537,48 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
   );
 }
 
-function toggleSelectionHighlight(editor: Editor) {
-  const { from, to, empty } = editor.state.selection;
-  if (empty) {
-    return;
+function getSelectionRange(editor: Editor): { from: number; to: number } | null {
+  const domSel = window.getSelection();
+  if (domSel && !domSel.isCollapsed && domSel.rangeCount > 0) {
+    const domRange = domSel.getRangeAt(0);
+    try {
+      const from = editor.view.posAtDOM(domRange.startContainer, domRange.startOffset);
+      const to = editor.view.posAtDOM(domRange.endContainer, domRange.endOffset);
+      const lo = Math.min(from, to);
+      const hi = Math.max(from, to);
+      if (hi > lo) return { from: lo, to: hi };
+    } catch {
+      // fall through to state-based fallback
+    }
   }
+  const { from, to, empty } = editor.state.selection;
+  if (empty) return null;
+  return { from, to };
+}
 
-  editor.chain().focus().setTextSelection({ from, to }).toggleHighlight({ color: "#fff3bf" }).setTextSelection({ from, to }).run();
+function toggleSelectionHighlight(editor: Editor) {
+  const range = getSelectionRange(editor);
+  if (!range) return;
+
+  const highlightType = editor.state.schema.marks.highlight;
+  if (!highlightType) return;
+
+  const hasHighlight = editor.state.doc.rangeHasMark(range.from, range.to, highlightType);
+  if (hasHighlight) {
+    editor.view.dispatch(editor.state.tr.removeMark(range.from, range.to, highlightType));
+  } else {
+    editor.view.dispatch(editor.state.tr.addMark(range.from, range.to, highlightType.create({ color: "#fff3bf" })));
+  }
 }
 
 function unsetSelectionHighlight(editor: Editor) {
-  const { from, to, empty } = editor.state.selection;
-  if (empty) {
-    return;
-  }
+  const range = getSelectionRange(editor);
+  if (!range) return;
 
-  editor.chain().focus().setTextSelection({ from, to }).unsetHighlight().setTextSelection({ from, to }).run();
+  const highlightType = editor.state.schema.marks.highlight;
+  if (!highlightType) return;
+
+  editor.view.dispatch(editor.state.tr.removeMark(range.from, range.to, highlightType));
 }
 
 function setLink(editor: Editor) {

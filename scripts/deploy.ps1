@@ -1,19 +1,88 @@
-# scripts/deploy.ps1
+﻿# scripts/deploy.ps1
 # Baut den Projekt Manager und kopiert ihn in das Deployment-Verzeichnis.
-# Standardziel: %APPDATA%\Projekt Manager
+# Standardziel: %LOCALAPPDATA%\Projekt Manager
 #
 # Verwendung:
 #   .\scripts\deploy.ps1
 #   .\scripts\deploy.ps1 -Target "C:\MeinPfad\Projekt Manager"
 
 param(
-    [string]$Target = "$env:APPDATA\Projekt Manager"
+    [string]$Target = "$env:LOCALAPPDATA\Projekt Manager"
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
+$Target = [System.IO.Path]::GetFullPath($Target)
+
+function Invoke-CheckedCommand([scriptblock]$Command, [string]$FailureMessage) {
+    & $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "$FailureMessage (Exit code: $LASTEXITCODE)"
+    }
+}
+
+function Sync-Dir([string]$From, [string]$To) {
+    if (-not (Test-Path $From)) {
+        Write-Warning "Quellordner nicht gefunden, wird übersprungen: $From"
+        return
+    }
+
+    New-Item -ItemType Directory -Force -Path $To | Out-Null
+    robocopy $From $To /MIR /NJH /NJS /NFL /NDL /NP 2>&1 | Out-Null
+    if ($LASTEXITCODE -ge 8) {
+        throw "robocopy fehlgeschlagen (Exit code: $LASTEXITCODE) beim Kopieren von '$From' nach '$To'"
+    }
+}
+
+function Copy-File([string]$From, [string]$To) {
+    if (-not (Test-Path $From)) {
+        Write-Warning "Quelldatei nicht gefunden, wird übersprungen: $From"
+        return
+    }
+
+    New-Item -ItemType Directory -Force -Path (Split-Path $To -Parent) | Out-Null
+    Copy-Item -Force -Path $From -Destination $To
+}
+
+function Write-RuntimePackageJson([string]$Path) {
+    $apiPackage = Get-Content -Path "$repoRoot\apps\api\package.json" -Raw | ConvertFrom-Json
+    $mcpPackage = Get-Content -Path "$repoRoot\apps\mcp-server\package.json" -Raw | ConvertFrom-Json
+    $dependencies = [ordered]@{}
+
+    foreach ($dependencySource in @($apiPackage.dependencies, $mcpPackage.dependencies)) {
+        foreach ($dependency in $dependencySource.PSObject.Properties) {
+            $dependencies[$dependency.Name] = $dependency.Value
+        }
+    }
+
+    $dependencies["@taskmanager/shared-types"] = "file:packages/shared-types"
+
+    $runtimePackage = [ordered]@{
+        name = "projekt-manager-runtime"
+        version = "0.1.0"
+        private = $true
+        type = "module"
+        dependencies = $dependencies
+    }
+
+    $runtimePackage | ConvertTo-Json -Depth 10 | Set-Content -Path $Path -Encoding UTF8
+}
+
+function Stop-ExistingToolbar([string]$ToolbarPath) {
+    $escapedToolbarPath = [WildcardPattern]::Escape($ToolbarPath)
+    Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe'" |
+        Where-Object { $_.CommandLine -like "*$escapedToolbarPath*" -or $_.CommandLine -like "*toolbar.ps1*" } |
+        ForEach-Object {
+            try {
+                Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop
+                Write-Host "  Laufende Toolbar beendet: Prozess $($_.ProcessId)" -ForegroundColor Gray
+            } catch {
+                Write-Warning "Toolbar-Prozess $($_.ProcessId) konnte nicht beendet werden: $($_.Exception.Message)"
+            }
+        }
+}
 
 Write-Host ""
 Write-Host "===============================" -ForegroundColor Cyan
@@ -24,10 +93,8 @@ Write-Host "  Quelle : $repoRoot"
 Write-Host "  Ziel   : $Target"
 Write-Host ""
 
-# --- Voraussetzungen pruefen ---
-
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Error "node.exe nicht gefunden. Bitte Node.js installieren (https://nodejs.org)."
+        Write-Error "node.exe nicht gefunden. Bitte Node.js installieren (https://nodejs.org)."
     exit 1
 }
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
@@ -35,150 +102,177 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-# --- Schritt 1: Build ---
-
-Write-Host "[1/5] Projekt wird kompiliert..." -ForegroundColor Yellow
+Write-Host "[1/7] Projekt wird kompiliert..." -ForegroundColor Yellow
 Push-Location $repoRoot
 try {
-    npm run build
-    if ($LASTEXITCODE -ne 0) { throw "Build fehlgeschlagen (Exit code: $LASTEXITCODE)" }
+    Invoke-CheckedCommand { npm run build } "Build fehlgeschlagen"
+    Invoke-CheckedCommand { node apps/api/scripts/copy-migrations-to-dist.mjs } "Migrationen konnten nicht nach dist kopiert werden"
 } finally {
     Pop-Location
 }
 
-# --- Schritt 2: Zielstruktur anlegen ---
-
-Write-Host "[2/5] Zielverzeichnisse werden angelegt..." -ForegroundColor Yellow
+Write-Host "[2/7] Runtime-Zielstruktur wird vorbereitet..." -ForegroundColor Yellow
 
 $subdirs = @(
     "apps\api\dist",
+    "apps\api\uploads",
+    "apps\api\previews",
+    "apps\api\content",
     "apps\web\dist",
     "apps\mcp-server\dist",
-    "packages\shared-types\dist"
+    "packages\shared-types\dist",
+    "docs\Zertifikate",
+    "runtime-logs",
+    "scripts"
 )
 foreach ($sub in $subdirs) {
     New-Item -ItemType Directory -Force -Path "$Target\$sub" | Out-Null
 }
 
-# --- Hilfsfunktion: Verzeichnis spiegeln mit robocopy ---
+Write-RuntimePackageJson "$Target\package.json"
 
-function Sync-Dir([string]$From, [string]$To) {
-    if (-not (Test-Path $From)) {
-        Write-Warning "Quellordner nicht gefunden, wird uebersprungen: $From"
-        return
-    }
-    # robocopy gibt 0-7 bei Erfolg zurueck, 8+ bei Fehler
-    robocopy $From $To /MIR /NJH /NJS /NFL /NDL /NP 2>&1 | Out-Null
-    if ($LASTEXITCODE -ge 8) {
-        throw "robocopy fehlgeschlagen (Exit code: $LASTEXITCODE) beim Kopieren von '$From' nach '$To'"
-    }
-}
+Write-Host "[3/7] Dateien werden synchronisiert..." -ForegroundColor Yellow
 
-# --- Schritt 3: Dateien synchronisieren ---
-
-Write-Host "[3/5] Dateien werden synchronisiert..." -ForegroundColor Yellow
-
-# Root-Workspace-Dateien
-Copy-Item -Force "$repoRoot\package.json"      "$Target\package.json"
-Copy-Item -Force "$repoRoot\package-lock.json" "$Target\package-lock.json"
-if (Test-Path "$repoRoot\tsconfig.base.json") {
-    Copy-Item -Force "$repoRoot\tsconfig.base.json" "$Target\tsconfig.base.json"
-}
-
-# API: kompiliertes dist + package.json
-Sync-Dir "$repoRoot\apps\api\dist"         "$Target\apps\api\dist"
-Copy-Item -Force "$repoRoot\apps\api\package.json" "$Target\apps\api\package.json"
-
-# Web: vite-Build (statische Dateien) + package.json
-Sync-Dir "$repoRoot\apps\web\dist"         "$Target\apps\web\dist"
-Copy-Item -Force "$repoRoot\apps\web\package.json" "$Target\apps\web\package.json"
-
-# MCP-Server: kompiliertes dist + package.json
-Sync-Dir "$repoRoot\apps\mcp-server\dist"  "$Target\apps\mcp-server\dist"
-Copy-Item -Force "$repoRoot\apps\mcp-server\package.json" "$Target\apps\mcp-server\package.json"
-
-# Shared Types: kompiliertes dist + package.json
+Sync-Dir "$repoRoot\apps\api\dist" "$Target\apps\api\dist"
+Sync-Dir "$repoRoot\apps\web\dist" "$Target\apps\web\dist"
+Sync-Dir "$repoRoot\apps\mcp-server\dist" "$Target\apps\mcp-server\dist"
 Sync-Dir "$repoRoot\packages\shared-types\dist" "$Target\packages\shared-types\dist"
-Copy-Item -Force "$repoRoot\packages\shared-types\package.json" "$Target\packages\shared-types\package.json"
-
-# Zertifikate (benoetigt fuer SSL-Datenbankverbindung)
 Sync-Dir "$repoRoot\docs\Zertifikate" "$Target\docs\Zertifikate"
 
-# --- Schritt 4: Produktions-Abhaengigkeiten installieren ---
+Copy-File "$repoRoot\packages\shared-types\package.json" "$Target\packages\shared-types\package.json"
+Copy-File "$repoRoot\scripts\serve-static.mjs" "$Target\scripts\serve-static.mjs"
+if (Test-Path "$repoRoot\tsconfig.base.json") {
+    Copy-File "$repoRoot\tsconfig.base.json" "$Target\tsconfig.base.json"
+}
 
-Write-Host "[4/5] Node-Abhaengigkeiten werden installiert (nur Produktion)..." -ForegroundColor Yellow
+$envTarget = "$Target\apps\api\.env"
+if (-not (Test-Path $envTarget)) {
+    if (Test-Path "$repoRoot\apps\api\.env") {
+        Copy-File "$repoRoot\apps\api\.env" $envTarget
+        Write-Host "  .env aus Quell-Repo kopiert." -ForegroundColor Gray
+    } elseif (Test-Path "$repoRoot\apps\api\.env.example") {
+        Copy-File "$repoRoot\apps\api\.env.example" $envTarget
+        Write-Host "  .env.example als .env kopiert. Bitte Konfiguration prüfen!" -ForegroundColor Magenta
+    } else {
+        Write-Warning "Keine .env oder .env.example für die API gefunden."
+    }
+} else {
+    Write-Host "  .env bereits vorhanden, wird nicht überschrieben." -ForegroundColor Gray
+}
+
+Write-Host "[4/7] Runtime-Abhängigkeiten werden installiert..." -ForegroundColor Yellow
 Push-Location $Target
 try {
-    npm ci --omit=dev
-    if ($LASTEXITCODE -ne 0) { throw "npm ci fehlgeschlagen (Exit code: $LASTEXITCODE)" }
+    Invoke-CheckedCommand { npm install --omit=dev --no-audit --fund=false } "Runtime-Abhängigkeiten konnten nicht installiert werden"
+    Invoke-CheckedCommand { npm prune --omit=dev --no-audit --fund=false } "Runtime-Abhängigkeiten konnten nicht bereinigt werden"
 } finally {
     Pop-Location
 }
 
-# --- Schritt 5: .env und Startscript einrichten ---
-
-Write-Host "[5/5] Konfiguration und Startscript werden eingerichtet..." -ForegroundColor Yellow
-
-# .env fuer die API: nur anlegen wenn noch nicht vorhanden
-$envTarget = "$Target\apps\api\.env"
-if (-not (Test-Path $envTarget)) {
-    if (Test-Path "$repoRoot\apps\api\.env") {
-        Copy-Item "$repoRoot\apps\api\.env" $envTarget
-        Write-Host "  .env aus Quell-Repo kopiert." -ForegroundColor Gray
-    } elseif (Test-Path "$repoRoot\apps\api\.env.example") {
-        Copy-Item "$repoRoot\apps\api\.env.example" $envTarget
-        Write-Host "  .env.example als .env kopiert. Bitte Konfiguration pruefen!" -ForegroundColor Magenta
-    }
-} else {
-    Write-Host "  .env bereits vorhanden, wird nicht ueberschrieben." -ForegroundColor Gray
+Write-Host "[5/7] Datenbankmigration wird ausgeführt..." -ForegroundColor Yellow
+Push-Location "$Target\apps\api"
+try {
+    Invoke-CheckedCommand { node dist\db\migrate.js } "Datenbankmigration fehlgeschlagen"
+} finally {
+    Pop-Location
 }
 
-# Start.ps1 erzeugen (startet Dienste ohne sichtbares Terminal)
+Write-Host "[6/7] Start- und Stop-Scripts werden eingerichtet..." -ForegroundColor Yellow
+
 $startPs1Path = "$Target\Start.ps1"
 $startPs1Content = @'
-# Start.ps1 - Projekt Manager starten (kein Terminal-Fenster)
+# Start.ps1 - Projekt Manager starten
+$ErrorActionPreference = "Stop"
+Add-Type -AssemblyName System.Net.Http
 $root = $PSScriptRoot
 $pidFile = "$root\pm-pids.txt"
+$logDir = "$root\runtime-logs"
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+$startLog = "$logDir\start.log"
 
+function Write-StartLog([string]$Message) {
+    Add-Content -Path $startLog -Value "$(Get-Date -Format o) $Message" -Encoding UTF8
+}
+
+function Test-HttpReady([string]$Uri) {
+    $client = [System.Net.Http.HttpClient]::new()
+    $response = $null
+    try {
+        $client.Timeout = [TimeSpan]::FromSeconds(2)
+        $response = $client.GetAsync($Uri).GetAwaiter().GetResult()
+        return [int]$response.StatusCode -ge 200 -and [int]$response.StatusCode -lt 400
+    } catch {
+        return $false
+    } finally {
+        if ($response) { $response.Dispose() }
+        $client.Dispose()
+    }
+}
+
+function Wait-HttpReady([string]$Name, [string]$Uri, [System.Diagnostics.Process]$Process) {
+    for ($i = 0; $i -lt 30; $i++) {
+        if (Test-HttpReady $Uri) {
+            return
+        }
+        if ($Process.HasExited) {
+            throw "$Name wurde beendet, bevor $Uri erreichbar war. Siehe runtime-logs."
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw "$Name ist nicht erreichbar: $Uri. Siehe runtime-logs."
+}
+
+Write-StartLog "starting api"
 $api = Start-Process -FilePath "node" `
     -ArgumentList "dist\index.js" `
     -WorkingDirectory "$root\apps\api" `
     -WindowStyle Hidden `
     -PassThru
 
-$web = Start-Process -FilePath "npx.cmd" `
-    -ArgumentList "--yes", "serve@14", "apps\web\dist", "-l", "5173", "-s" `
+Write-StartLog "starting web"
+$web = Start-Process -FilePath "node" `
+    -ArgumentList "scripts\serve-static.mjs", "apps\web\dist" `
     -WorkingDirectory $root `
     -WindowStyle Hidden `
     -PassThru
 
 "$($api.Id) $($web.Id)" | Set-Content $pidFile -Encoding UTF8
+Write-StartLog "pid file written: $($api.Id) $($web.Id)"
 
-Start-Sleep -Seconds 3
-Start-Process "http://localhost:5173"
+Wait-HttpReady "API" "http://127.0.0.1:3001/api/health" $api
+Write-StartLog "api ready"
+Wait-HttpReady "Web" "http://127.0.0.1:5173" $web
+Write-StartLog "web ready"
+
+Write-StartLog "opening browser"
+Start-Process -FilePath "explorer.exe" -ArgumentList "http://localhost:5173"
+Write-StartLog "browser opened"
+exit 0
 '@
 Set-Content -Path $startPs1Path -Value $startPs1Content -Encoding UTF8
 
-# Stop.ps1 erzeugen
 $stopPs1Path = "$Target\Stop.ps1"
 $stopPs1Content = @'
 # Stop.ps1 - Projekt Manager beenden
+$ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 $pidFile = "$root\pm-pids.txt"
 
 $targetPids = [System.Collections.Generic.HashSet[int]]::new()
 
-# Schritt 1: gespeicherte PIDs aus pm-pids.txt
 if (Test-Path $pidFile) {
     (Get-Content $pidFile -Raw).Trim() -split '\s+' |
         Where-Object { $_ -match '^\d+$' } |
         ForEach-Object { [void]$targetPids.Add([int]$_) }
 }
 
-# Schritt 2: Fallback - Prozesse die auf Port 3001 (API) oder 5173 (Web) lauschen
 foreach ($port in @(3001, 5173)) {
     $conn = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
-    if ($conn) { [void]$targetPids.Add([int]$conn.OwningProcess) }
+    if ($conn) {
+        foreach ($item in @($conn)) {
+            [void]$targetPids.Add([int]$item.OwningProcess)
+        }
+    }
 }
 
 if ($targetPids.Count -eq 0) {
@@ -200,13 +294,15 @@ Write-Host "Projekt Manager gestoppt." -ForegroundColor Green
 '@
 Set-Content -Path $stopPs1Path -Value $stopPs1Content -Encoding UTF8
 
-$psExe      = (Get-Command powershell.exe).Source
+Write-Host "[7/7] Toolbar-Verknüpfungen werden eingerichtet und gestartet..." -ForegroundColor Yellow
+
+$psExe = (Get-Command powershell.exe).Source
 $toolbarPs1 = "$repoRoot\scripts\toolbar.ps1"
+$toolbarArgs = "-WindowStyle Hidden -ExecutionPolicy Bypass -NonInteractive -File `"$toolbarPs1`" -DeployDir `"$Target`" -RepoRoot `"$repoRoot`""
 $shell = New-Object -ComObject WScript.Shell
 
-# Alte Eintraege bereinigen (bat-basierte Shortcuts, veraltete Start.ps1-Shortcuts)
 $desktopPath = [Environment]::GetFolderPath('Desktop')
-$startupDir  = [Environment]::GetFolderPath('Startup')
+$startupDir = [Environment]::GetFolderPath('Startup')
 @(
     "$desktopPath\Projekt Manager.lnk",
     "$desktopPath\Projekt Manager.bat",
@@ -218,29 +314,29 @@ $startupDir  = [Environment]::GetFolderPath('Startup')
     Write-Host "  Alten Eintrag entfernt: $_" -ForegroundColor Gray
 }
 
-# Desktop-Verknuepfung → Tray-Toolbar (silent via powershell.exe)
-$desktopPath = [Environment]::GetFolderPath('Desktop')
 $shortcutPath = "$desktopPath\Projekt Manager.lnk"
 $shortcut = $shell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath       = $psExe
-$shortcut.Arguments        = "-WindowStyle Hidden -ExecutionPolicy Bypass -NonInteractive -File `"$toolbarPs1`""
+$shortcut.TargetPath = $psExe
+$shortcut.Arguments = $toolbarArgs
 $shortcut.WorkingDirectory = $repoRoot
-$shortcut.WindowStyle      = 7
-$shortcut.Description      = "Projekt Manager Toolbar"
+$shortcut.WindowStyle = 7
+$shortcut.Description = "Projekt Manager Toolbar"
 $shortcut.Save()
-Write-Host "  Desktop-Verknuepfung : $shortcutPath" -ForegroundColor Gray
+Write-Host "  Desktop-Verknüpfung : $shortcutPath" -ForegroundColor Gray
 
-# Autostart-Verknuepfung → Tray-Toolbar
-$startupDir  = [Environment]::GetFolderPath('Startup')
 $startupPath = "$startupDir\Projekt Manager.lnk"
 $shortcut2 = $shell.CreateShortcut($startupPath)
-$shortcut2.TargetPath       = $psExe
-$shortcut2.Arguments        = "-WindowStyle Hidden -ExecutionPolicy Bypass -NonInteractive -File `"$toolbarPs1`""
+$shortcut2.TargetPath = $psExe
+$shortcut2.Arguments = $toolbarArgs
 $shortcut2.WorkingDirectory = $repoRoot
-$shortcut2.WindowStyle      = 7
-$shortcut2.Description      = "Projekt Manager Toolbar"
+$shortcut2.WindowStyle = 7
+$shortcut2.Description = "Projekt Manager Toolbar"
 $shortcut2.Save()
-Write-Host "  Autostart-Verknuepfung: $startupPath" -ForegroundColor Gray
+Write-Host "  Autostart-Verknüpfung: $startupPath" -ForegroundColor Gray
+
+Stop-ExistingToolbar $toolbarPs1
+Start-Process -FilePath $psExe -ArgumentList $toolbarArgs -WorkingDirectory $repoRoot -WindowStyle Hidden
+Write-Host "  Toolbar gestartet." -ForegroundColor Gray
 
 Write-Host ""
 Write-Host "================================" -ForegroundColor Green
@@ -253,3 +349,9 @@ Write-Host "  Stop     : $stopPs1Path"
 Write-Host "  Desktop  : $shortcutPath"
 Write-Host "  Autostart: $startupPath"
 Write-Host ""
+
+
+
+
+
+

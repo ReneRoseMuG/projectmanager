@@ -1,6 +1,6 @@
-# scripts/update.ps1 - Projekt Manager aktualisieren (sichtbares Terminal)
+﻿# scripts/update.ps1 - Projekt Manager aktualisieren (sichtbares Terminal)
 param(
-    [string]$DeployDir = "$env:APPDATA\Projekt Manager",
+    [string]$DeployDir = "$env:LOCALAPPDATA\Projekt Manager",
     [string]$RepoRoot  = (Split-Path $PSScriptRoot -Parent)
 )
 
@@ -20,19 +20,19 @@ Write-Host "[1/3] Dienste werden gestoppt..." -ForegroundColor Yellow
 if (Test-Path $stopPs1) {
     & $stopPs1
 } else {
-    Write-Host "  Stop.ps1 nicht gefunden, wird uebersprungen." -ForegroundColor Gray
+    Write-Host "  Stop.ps1 nicht gefunden, wird übersprungen." -ForegroundColor Gray
 }
 
 # Schritt 2: Deploy
 Write-Host ""
-Write-Host "[2/3] Deployment wird ausgefuehrt..." -ForegroundColor Yellow
+Write-Host "[2/3] Deployment wird ausgeführt..." -ForegroundColor Yellow
 Write-Host ""
-& $deployPs1
+& $deployPs1 -Target $DeployDir
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Host "FEHLER: Deployment fehlgeschlagen (Exit $LASTEXITCODE)." -ForegroundColor Red
     Write-Host ""
-    Read-Host "Fenster schliessen? [Enter druecken]"
+    Read-Host "Fenster schließen? [Enter drücken]"
     exit 1
 }
 
@@ -51,4 +51,5 @@ Write-Host "===============================" -ForegroundColor Green
 Write-Host "   Update abgeschlossen!       " -ForegroundColor Green
 Write-Host "===============================" -ForegroundColor Green
 Write-Host ""
-Read-Host "Fenster schliessen? [Enter druecken]"
+Read-Host "Fenster schließen? [Enter drücken]"
+

@@ -309,4 +309,35 @@ describe("CommentThread", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("rendert identische Struktur für Task-, Ticket- und Projekt-Kontext", () => {
+    const ownerTypes = [
+      [{ type: "task" as const, id: 10 }],
+      [{ type: "ticket" as const, id: 20 }],
+      [{ type: "project" as const, id: 30 }],
+    ];
+
+    for (const owners of ownerTypes) {
+      const ownerComments = [
+        {
+          id: 1,
+          owners,
+          body: "<p>Kommentar</p>",
+          createdAt: "2026-05-17T08:00:00.000Z",
+          updatedAt: "2026-05-17T08:00:00.000Z",
+          version: 1,
+        },
+      ];
+
+      const { unmount } = render(
+        <CommentThread comments={ownerComments} onCreate={vi.fn()} onUpdate={vi.fn()} onDelete={vi.fn()} />,
+      );
+
+      expect(screen.getByRole("button", { name: "Kommentar anlegen" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Löschen" })).toBeInTheDocument();
+
+      unmount();
+    }
+  });
 });

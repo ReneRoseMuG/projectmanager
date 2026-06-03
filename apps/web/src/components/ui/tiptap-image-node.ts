@@ -74,15 +74,15 @@ export const ResizableImage = Node.create({
     return [{ tag: "img[src]" }];
   },
 
-  renderHTML({ HTMLAttributes }) {
-    const { src, alt, title, width, float, align } = HTMLAttributes as {
+  renderHTML({ node, HTMLAttributes }) {
+    const { src, alt, title } = HTMLAttributes as {
       src: string;
       alt?: string;
       title?: string;
-      width?: number | null;
-      float: ImageFloat;
-      align: ImageAlign;
     };
+    const width = node.attrs.width as number | null;
+    const float = node.attrs.float as ImageFloat;
+    const align = node.attrs.align as ImageAlign;
 
     const classes: string[] = ["tiptap-img"];
     if (float === "left") classes.push("tiptap-img-float-left");

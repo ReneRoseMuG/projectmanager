@@ -1,11 +1,14 @@
-# scripts/toolbar.ps1 - Projekt Manager Tray-Toolbar
-param()
+﻿# scripts/toolbar.ps1 - Projekt Manager Tray-Toolbar
+param(
+    [string]$DeployDir = "$env:LOCALAPPDATA\Projekt Manager",
+    [string]$RepoRoot = (Split-Path $PSScriptRoot -Parent)
+)
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$script:repoRoot  = Split-Path $PSScriptRoot -Parent
-$script:deployDir = "$env:APPDATA\Projekt Manager"
+$script:repoRoot  = $RepoRoot
+$script:deployDir = $DeployDir
 $script:startPs1  = "$script:deployDir\Start.ps1"
 $script:stopPs1   = "$script:deployDir\Stop.ps1"
 $script:updatePs1 = "$PSScriptRoot\update.ps1"
@@ -36,7 +39,7 @@ $itemStart = New-Object System.Windows.Forms.ToolStripMenuItem "Projekt Manager 
 $itemStart.Add_Click({
     if (-not (Test-Path $script:startPs1)) {
         [System.Windows.Forms.MessageBox]::Show(
-            "Start.ps1 nicht gefunden.`nBitte zuerst deploy.ps1 ausfuehren.",
+            "Start.ps1 nicht gefunden.`nBitte zuerst deploy.ps1 ausführen.",
             "Projekt Manager", "OK", "Warning") | Out-Null
         return
     }
@@ -86,7 +89,7 @@ $menu.Items.Add($itemExit) | Out-Null
 
 $script:tray.ContextMenuStrip = $menu
 
-# Linksklick oeffnet dasselbe Kontextmenue
+# Linksklick öffnet dasselbe Kontextmenü
 $script:tray.Add_MouseClick({
     param($sender, $e)
     if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
@@ -98,3 +101,4 @@ $script:tray.Add_MouseClick({
 })
 
 [System.Windows.Forms.Application]::Run()
+

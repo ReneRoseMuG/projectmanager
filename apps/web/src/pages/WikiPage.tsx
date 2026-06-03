@@ -3,11 +3,11 @@ import type {
   WikiPageInput,
   DraftComment,
 } from "@taskmanager/shared-types";
-import { FileText, Plus } from "lucide-react";
+import { Download, FileText, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createEntityComment } from "../api/comments";
-import { Button } from "../components/ui/Button";
+import { exportWiki } from "../api/wiki";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { EmptyState } from "../components/ui/EmptyState";
 import { PageHero } from "../components/ui/PageHero";
@@ -17,6 +17,7 @@ import { WikiPageForm } from "../components/wiki/WikiPageForm";
 import { WikiTree } from "../components/wiki/WikiTree";
 import { errorMessage } from "../hooks/errors";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import { useHasPermission } from "../hooks/usePermissions";
 import { useStandaloneView } from "../hooks/useStandaloneView";
 import { useProjects } from "../hooks/useProjects";
 import { useWiki, type WikiTreeNode } from "../hooks/useWiki";
@@ -42,6 +43,8 @@ export function WikiPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [formParent, setFormParent] = useState<WikiPageType | null>(null);
   const [inlineDirty, setInlineDirty] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const canWrite = useHasPermission("wiki", "write");
   const standalone = useStandaloneView();
   const flatPages = useMemo(() => flattenTree(wiki.tree), [wiki.tree]);
   const inlineParent = wiki.page?.parentId
@@ -139,6 +142,22 @@ export function WikiPage() {
     }
   };
 
+  const runExport = async () => {
+    const exportPath = (() => {
+      try { return window.localStorage.getItem("ui.wiki-export-path") ?? "~/Dokumente/Projekt Manager/Wiki"; }
+      catch { return "~/Dokumente/Projekt Manager/Wiki"; }
+    })();
+    setExporting(true);
+    try {
+      const result = await exportWiki(exportPath);
+      showToast({ tone: "success", title: `Export abgeschlossen`, message: `${result.filesWritten} Seiten nach ${result.exportPath}` });
+    } catch (exportError) {
+      showToast({ tone: "error", title: "Export fehlgeschlagen", message: errorMessage(exportError) });
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const requestInlineNavigation = async () => {
     if (!inlineDirty) {
       return true;
@@ -158,21 +177,24 @@ export function WikiPage() {
         variant="list"
         title="Wiki"
         subtitle={wiki.loading ? "" : `${countPages(wiki.tree)} Seiten`}
-        actions={
-          <Button
-            variant="primary"
-            icon={<Plus size={17} />}
-            onClick={() => openCreate(null)}
+        actions={canWrite && !wiki.loading && countPages(wiki.tree) > 0 ? (
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={() => void runExport()}
+            className="flex h-9 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-steel-700 transition hover:bg-shell disabled:cursor-not-allowed disabled:opacity-50"
+            title="Wiki als HTML exportieren"
           >
-            Neue Seite
-          </Button>
-        }
+            <Download size={15} />
+            {exporting ? "Exportiert…" : "Exportieren"}
+          </button>
+        ) : undefined}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {wiki.loading ? (
           <>
-            <div className="w-[280px] shrink-0 bg-gradient-to-b from-steel-800 to-steel-900" />
+            <div className="w-[256px] shrink-0 bg-gradient-to-b from-steel-800 to-steel-900" />
             <div className="flex-1 p-5">
               <TaskListSkeleton />
             </div>

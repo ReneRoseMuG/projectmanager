@@ -26,6 +26,9 @@ import {
   attachments,
   backlogItems,
   comments,
+  dayPlanNotes,
+  dayPlanTasks,
+  dayPlans,
   featureRelations,
   featureTasks,
   featureTickets,
@@ -1130,6 +1133,69 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
 
       const remaining = (await testDb.db.select().from(comments));
       expect(remaining).toHaveLength(0);
+    });
+  });
+
+  // =========================================================================
+  // DAY PLAN LÖSCHEN (DB-Ebene, kein API-Delete-Endpoint)
+  // =========================================================================
+
+  describe("deleteDayPlan (DB-Ebene) – dayPlanTask/dayPlanNote-Join bereinigt", () => {
+    it("DayPlan-Löschung kaskadiert dayPlanTasks-Join, Task selbst bleibt erhalten", async () => {
+      const project = await createProject(app);
+      const task = await createTask(app, project.id, { title: "Cascade DayPlan Task" });
+
+      // DayPlan direkt in DB anlegen (user_id=1 entspricht dem Admin-Seed-User)
+      const [dayPlanResult] = await testDb.pool.execute(
+        "INSERT INTO day_plans (user_id, date, status, version, created_at, updated_at) VALUES (1, '2026-06-15', 'open', 1, NOW(), NOW())"
+      );
+      const dayPlanId = (dayPlanResult as { insertId: number }).insertId;
+
+      await testDb.pool.execute(
+        "INSERT INTO day_plan_tasks (owner_id, task_id) VALUES (?, ?)",
+        [dayPlanId, task.id]
+      );
+
+      const before = await testDb.db.select().from(dayPlanTasks).where(eq(dayPlanTasks.taskId, task.id));
+      expect(before).toHaveLength(1);
+
+      // Kaskaden-Auslöser: DayPlan auf DB-Ebene löschen
+      await testDb.db.delete(dayPlans).where(eq(dayPlans.id, dayPlanId));
+
+      const afterJoin = await testDb.db.select().from(dayPlanTasks).where(eq(dayPlanTasks.taskId, task.id));
+      expect(afterJoin).toHaveLength(0);
+
+      // Task selbst noch vorhanden
+      await supertest(app.server).get(`/api/tasks/${task.id}`).expect(200);
+    });
+
+    it("DayPlan-Löschung kaskadiert dayPlanNotes-Join, Note selbst bleibt erhalten", async () => {
+      // DayPlan direkt anlegen
+      const [dayPlanResult] = await testDb.pool.execute(
+        "INSERT INTO day_plans (user_id, date, status, version, created_at, updated_at) VALUES (1, '2026-06-16', 'open', 1, NOW(), NOW())"
+      );
+      const dayPlanId = (dayPlanResult as { insertId: number }).insertId;
+
+      // Note anlegen und verknüpfen (content_json hat kein DEFAULT → muss angegeben werden)
+      const [noteResult] = await testDb.pool.execute(
+        "INSERT INTO notes (title, content_json, version, created_at, updated_at) VALUES ('Cascade Note', '{}', 1, NOW(), NOW())"
+      );
+      const noteId = (noteResult as { insertId: number }).insertId;
+      await testDb.pool.execute(
+        "INSERT INTO day_plan_notes (day_plan_id, note_id) VALUES (?, ?)",
+        [dayPlanId, noteId]
+      );
+
+      const beforeJoin = await testDb.db.select().from(dayPlanNotes).where(eq(dayPlanNotes.dayPlanId, dayPlanId));
+      expect(beforeJoin).toHaveLength(1);
+
+      await testDb.db.delete(dayPlans).where(eq(dayPlans.id, dayPlanId));
+
+      const afterJoin = await testDb.db.select().from(dayPlanNotes).where(eq(dayPlanNotes.dayPlanId, dayPlanId));
+      expect(afterJoin).toHaveLength(0);
+
+      const remainingNote = await testDb.db.select().from(notes).where(eq(notes.id, noteId));
+      expect(remainingNote).toHaveLength(1);
     });
   });
 });

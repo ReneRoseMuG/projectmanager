@@ -41,14 +41,21 @@ export const ColumnBlock = Node.create({
     return {
       insertColumnBlock:
         () =>
-        ({ commands }) =>
-          commands.insertContent({
+        ({ commands, state }) => {
+          const { $from } = state.selection;
+          for (let depth = $from.depth; depth > 0; depth--) {
+            if ($from.node(depth).type.name === "columnBlock") {
+              return false;
+            }
+          }
+          return commands.insertContent({
             type: this.name,
             content: [
               { type: "column", content: [{ type: "paragraph" }] },
               { type: "column", content: [{ type: "paragraph" }] }
             ]
-          })
+          });
+        }
     };
   }
 });

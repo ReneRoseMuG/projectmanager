@@ -652,4 +652,46 @@ describe("Tickets API", () => {
 
     await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
   });
+
+  describe("Auth-Schutz: Reader-Negativfall", () => {
+    let authApp: FastifyInstance;
+    let originalAuthBypassAdmin: boolean;
+    let originalApiKey: string | null;
+
+    beforeAll(async () => {
+      originalAuthBypassAdmin = config.authBypassAdmin;
+      originalApiKey = config.apiKey;
+      authApp = await buildTestApp(testDb, { enableAuth: true });
+    });
+
+    beforeEach(async () => {
+      config.authBypassAdmin = false;
+      config.apiKey = null;
+      await truncateAll(testDb.pool);
+    });
+
+    afterAll(async () => {
+      config.authBypassAdmin = originalAuthBypassAdmin;
+      config.apiKey = originalApiKey;
+      await authApp?.close();
+    });
+
+    it("Reader darf kein Ticket anlegen (403)", async () => {
+      const admin = supertest.agent(authApp.server);
+      await admin.post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
+      const roles = (await admin.get("/api/admin/roles").expect(200)).body as Array<{ key: string; id: number }>;
+      const readerRole = roles.find((r) => r.key === "reader")!;
+      await admin.post("/api/admin/users").send({
+        firstName: "Reader", lastName: "Test",
+        email: "reader-tickets-auth@example.test",
+        roleId: readerRole.id, password: "password123", isActive: true
+      }).expect(201);
+
+      const reader = supertest.agent(authApp.server);
+      await reader.post("/api/auth/login").send({ email: "reader-tickets-auth@example.test", password: "password123" }).expect(200);
+
+      await reader.post("/api/tickets").send({ title: "Nicht erlaubt", type: "bug" }).expect(403);
+      await reader.get("/api/tickets").expect(200);
+    });
+  });
 });

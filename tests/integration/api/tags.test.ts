@@ -8,6 +8,7 @@
 import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { config } from "../../../apps/api/src/config.js";
 import { buildTestApp, createMilestone, createProject, createTag, createTask, createTicket, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 describe("Tags API", () => {
@@ -281,5 +282,50 @@ describe("Tags API", () => {
       .patch(`/api/tags/${tag.id}`)
       .send({ name: "veraltet", expectedVersion: tag.version })
       .expect(409);
+  });
+
+  describe("Auth-Schutz: Reader-Negativfall", () => {
+    let authApp: FastifyInstance;
+    let originalAuthBypassAdmin: boolean;
+    let originalApiKey: string | null;
+
+    beforeAll(async () => {
+      originalAuthBypassAdmin = config.authBypassAdmin;
+      originalApiKey = config.apiKey;
+      authApp = await buildTestApp(testDb, { enableAuth: true });
+    });
+
+    beforeEach(async () => {
+      config.authBypassAdmin = false;
+      config.apiKey = null;
+      await truncateAll(testDb.pool);
+    });
+
+    afterAll(async () => {
+      config.authBypassAdmin = originalAuthBypassAdmin;
+      config.apiKey = originalApiKey;
+      await authApp?.close();
+    });
+
+    it("Reader darf Tags nicht anlegen und nicht setzen (403)", async () => {
+      const admin = supertest.agent(authApp.server);
+      await admin.post("/api/auth/login").send({ email: "admin@local", password: "password123" }).expect(200);
+      const project = (await admin.post("/api/projects").send({ name: "Reader Tag Test", status: "active" }).expect(201)).body as { id: number };
+      const tag = (await admin.post("/api/tags").send({ name: "admin-tag", color: "#6366f1" }).expect(201)).body as { id: number };
+      const roles = (await admin.get("/api/admin/roles").expect(200)).body as Array<{ key: string; id: number }>;
+      const readerRole = roles.find((r) => r.key === "reader")!;
+      await admin.post("/api/admin/users").send({
+        firstName: "Reader", lastName: "Tags",
+        email: "reader-tags-auth@example.test",
+        roleId: readerRole.id, password: "password123", isActive: true
+      }).expect(201);
+
+      const reader = supertest.agent(authApp.server);
+      await reader.post("/api/auth/login").send({ email: "reader-tags-auth@example.test", password: "password123" }).expect(200);
+
+      await reader.post("/api/tags").send({ name: "reader-tag", color: "#ef4444" }).expect(403);
+      await reader.put(`/api/projects/${project.id}/tags`).send({ tagIds: [tag.id] }).expect(403);
+      await reader.get("/api/tags").expect(200);
+    });
   });
 });
