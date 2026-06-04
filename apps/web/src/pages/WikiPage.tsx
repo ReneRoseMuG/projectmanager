@@ -4,7 +4,7 @@ import type {
   DraftComment,
 } from "@taskmanager/shared-types";
 import { Download, FileText, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createEntityComment } from "../api/comments";
 import { exportWiki } from "../api/wiki";
@@ -43,6 +43,11 @@ export function WikiPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [formParent, setFormParent] = useState<WikiPageType | null>(null);
   const [inlineDirty, setInlineDirty] = useState(false);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    setEditing(false);
+  }, [activePageId]);
   const [exporting, setExporting] = useState(false);
   const canWrite = useHasPermission("wiki", "write");
   const standalone = useStandaloneView();
@@ -88,6 +93,7 @@ export function WikiPage() {
         relatedPageIds,
       );
       showToast({ tone: "success", title: "Wiki-Seite gespeichert" });
+      setEditing(false);
     } catch (wikiError) {
       showToast({
         tone: "error",
@@ -223,7 +229,11 @@ export function WikiPage() {
                   onSubmit={submitInlineForm}
                   onDelete={deletePage}
                   onDirtyChange={setInlineDirty}
-                  onClose={() => navigate(standalone ? withStandaloneView("/wiki") : "/wiki")}
+                  editable={editing}
+                  onEdit={() => setEditing(true)}
+                  onClose={editing
+                    ? () => setEditing(false)
+                    : () => navigate(standalone ? withStandaloneView("/wiki") : "/wiki")}
                 />
               ) : (
                 <EmptyState

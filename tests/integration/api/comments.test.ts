@@ -51,7 +51,7 @@ describe("Comments API", () => {
       .send({ body: "Erster Kommentar" })
       .expect(201);
 
-    expect(res.body.body).toBe("Erster Kommentar");
+    expect(res.body.body).toBe("<p>Erster Kommentar</p>");
     expect(res.body.owners).toEqual([{ type: "task", id: task.id }]);
   });
 
@@ -131,8 +131,10 @@ describe("Comments API", () => {
     const created = await supertest(app.server).post(owner.path).send({ body }).expect(201);
     const listed = await supertest(app.server).get(owner.path).expect(200);
 
-    expect(created.body).toEqual(expect.objectContaining({ body, owners: [{ type: ownerType, id: owner.id }] }));
-    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, body, owners: [{ type: ownerType, id: owner.id }] })]);
+    const normalizedBody = `<p>${body}</p>`;
+
+    expect(created.body).toEqual(expect.objectContaining({ body: normalizedBody, owners: [{ type: ownerType, id: owner.id }] }));
+    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, body: normalizedBody, owners: [{ type: ownerType, id: owner.id }] })]);
   });
 
   it("POST ohne body gibt 400 zurueck", async () => {
@@ -157,8 +159,8 @@ describe("Comments API", () => {
     const res = await supertest(app.server).get(`/api/tasks/${task.id}/comments`).expect(200);
 
     expect(res.body).toHaveLength(2);
-    expect(res.body[0].body).toBe("Erster");
-    expect(res.body[1].body).toBe("Zweiter");
+    expect(res.body[0].body).toBe("<p>Erster</p>");
+    expect(res.body[1].body).toBe("<p>Zweiter</p>");
   });
 
   it("PATCH /api/comments/:id aktualisiert einen Kommentar versioniert", async () => {
@@ -174,6 +176,18 @@ describe("Comments API", () => {
     expect(res.body).toEqual(expect.objectContaining({ id: comment.id, body: "<h1>Neu</h1>", version: comment.version + 1 }));
     const listed = await supertest(app.server).get(`/api/tasks/${task.id}/comments`).expect(200);
     expect(listed.body[0]).toEqual(expect.objectContaining({ id: comment.id, body: "<h1>Neu</h1>", version: comment.version + 1 }));
+  });
+
+  it("normalisiert Markdown-Kommentare beim Erstellen zu HTML", async () => {
+    const project = await createProject(app);
+    const task = await createTask(app, project.id);
+
+    const res = await supertest(app.server)
+      .post(`/api/tasks/${task.id}/comments`)
+      .send({ body: "**Fett** und `Code`" })
+      .expect(201);
+
+    expect(res.body.body).toBe("<p><strong>Fett</strong> und <code>Code</code></p>");
   });
 
   it("PATCH /api/comments/:id verlangt expectedVersion und meldet Versionskonflikte", async () => {

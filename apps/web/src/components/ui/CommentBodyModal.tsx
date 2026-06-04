@@ -2,19 +2,17 @@ import { MessageSquare } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
+import { richTextToHtml, richTextToPlainText } from "../../utils/richText";
 import { FormModal } from "./FormModal";
 import { RichTextInlineField, type RichTextValueFormat } from "./rich-text-inline-field";
 import { Section } from "./Section";
 
 export function commentTextFromHtml(value: string) {
-  return value
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .trim();
+  return richTextToPlainText(value);
 }
 
-export function commentValueFormat(value: string): RichTextValueFormat {
-  return value.trim().startsWith("<") ? "html" : "markdown";
+export function commentValueFormat(_value: string): RichTextValueFormat {
+  return "html";
 }
 
 interface CommentBodyModalProps {
@@ -49,8 +47,8 @@ export function CommentBodyModal({
       setSaving(false);
       return;
     }
-    setContent(initialBody);
-    setContentFormat(initialBody ? commentValueFormat(initialBody) : "html");
+    setContent(richTextToHtml(initialBody));
+    setContentFormat("html");
   }, [initialBody, open]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {

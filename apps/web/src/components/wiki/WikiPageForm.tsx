@@ -1,5 +1,5 @@
 import type { DraftComment, Note, Project, WikiPage, WikiPageInput, WikiPageRelationSummary } from "@taskmanager/shared-types";
-import { ExternalLink, Trash2, X } from "lucide-react";
+import { ExternalLink, Pencil, Trash2, X } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { uploadContentImage } from "../../api/content-images";
@@ -41,6 +41,10 @@ interface WikiPageFormProps {
   inlineChrome?: "embedded" | "standalone";
   onDelete?: (page: WikiPage) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  /** Controls read/edit mode for inline wiki pages. Defaults to false when inline, true otherwise. */
+  editable?: boolean;
+  /** Called when the user clicks the Edit button in read mode. */
+  onEdit?: () => void;
 }
 
 function flattenTree(nodes: WikiTreeNode[]): WikiPage[] {
@@ -57,7 +61,7 @@ const tabs: Array<Tab<WikiPageFormTab>> = [
   { value: "journal", label: "Journal" }
 ];
 
-export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onPostCreate, onClose, onOpenInTab, inline = false, inlineChrome = "standalone", onDelete, onDirtyChange }: WikiPageFormProps) {
+export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onPostCreate, onClose, onOpenInTab, inline = false, inlineChrome = "standalone", onDelete, onDirtyChange, editable, onEdit }: WikiPageFormProps) {
   const { confirm } = useConfirm();
   const { showToast } = useToast();
   const pageId = page?.id ?? null;
@@ -75,7 +79,19 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
   const [activeTab, setActiveTab] = useState<WikiPageFormTab>("details");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const effectiveEditable = editable ?? (inline ? false : true);
   const parentPageTitle = pages.find((item) => item.id === parentId)?.title ?? parent?.title ?? null;
+
+  useEffect(() => {
+    if (!effectiveEditable) {
+      setDirty(false);
+      setTitle(page?.title ?? "");
+      setParentId(page?.parentId ?? null);
+      setContent(page?.content ?? "");
+      setRelatedPages(page?.relatedPages ?? []);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveEditable]);
 
   useEffect(() => {
     if (!open) {
@@ -189,11 +205,18 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
             breadcrumb={["Wiki", parentPageTitle ?? "Root"]}
             title={title || (page ? "Wiki-Seite bearbeiten" : "Wiki-Seite anlegen")}
             actions={
-              page && onDelete ? (
-                <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Seite löschen" title="Seite löschen" onClick={() => onDelete(page)}>
-                  <Trash2 size={18} />
-                </button>
-              ) : null
+              <>
+                {!effectiveEditable && onEdit ? (
+                  <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Bearbeiten" title="Bearbeiten" onClick={onEdit}>
+                    <Pencil size={18} />
+                  </button>
+                ) : null}
+                {page && onDelete ? (
+                  <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Seite löschen" title="Seite löschen" onClick={() => onDelete(page)}>
+                    <Trash2 size={18} />
+                  </button>
+                ) : null}
+              </>
             }
           />
         ) : !inline ? (
@@ -221,6 +244,14 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
             </div>
           </div>
         </header>
+        ) : null}
+        {inline && inlineChrome === "embedded" && !effectiveEditable && onEdit ? (
+          <div className="flex items-center justify-end border-b border-line bg-shell px-5 py-2">
+            <button type="button" className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-steel-600 hover:bg-line/50 hover:text-ink" onClick={onEdit}>
+              <Pencil size={14} />
+              Bearbeiten
+            </button>
+          </div>
         ) : null}
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
 
@@ -280,6 +311,8 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                   testIdPrefix="wiki-page-form-content"
                   onImageUpload={uploadContentImage}
                   wikiPages={pages}
+                  editable={effectiveEditable}
+                  commitOnBlur={effectiveEditable}
                   className="min-h-[400px]"
                   fill
                   onChange={(value) => {
@@ -390,24 +423,26 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
           ) : null}
         </div>
 
-        <footer className={`flex flex-wrap items-center gap-3 border-t border-line bg-white px-5 py-4 ${embeddedActionPage && onDelete ? "justify-between" : "justify-end"}`}>
-          {embeddedActionPage && onDelete ? (
-            <Button
-              className="text-crimson hover:bg-crimson/10"
-              icon={<Trash2 size={18} />}
-              variant="ghost"
-              onClick={() => onDelete(embeddedActionPage)}
-            >
-              Löschen
-            </Button>
-          ) : null}
-          <div className="flex items-center gap-2">
-            <Button onClick={() => void requestClose()}>Abbrechen</Button>
-            <Button type="submit" variant="primary" disabled={saving}>
-              Speichern
-            </Button>
-          </div>
-        </footer>
+        {effectiveEditable ? (
+          <footer className={`flex flex-wrap items-center gap-3 border-t border-line bg-white px-5 py-4 ${embeddedActionPage && onDelete ? "justify-between" : "justify-end"}`}>
+            {embeddedActionPage && onDelete ? (
+              <Button
+                className="text-crimson hover:bg-crimson/10"
+                icon={<Trash2 size={18} />}
+                variant="ghost"
+                onClick={() => onDelete(embeddedActionPage)}
+              >
+                Löschen
+              </Button>
+            ) : null}
+            <div className="flex items-center gap-2">
+              <Button onClick={() => void requestClose()}>Abbrechen</Button>
+              <Button type="submit" variant="primary" disabled={saving}>
+                Speichern
+              </Button>
+            </div>
+          </footer>
+        ) : null}
       </form>
   );
 

@@ -1,5 +1,5 @@
 import type { JsonObject, JsonValue } from "@taskmanager/shared-types";
-import { richTextToPlainText } from "../../utils/richText";
+import { escapeHtml as escapeRichTextHtml, richTextToHtml, richTextToPreviewText } from "../../utils/richText";
 
 export type NoteContentFormat = "html" | "markdown";
 
@@ -13,7 +13,7 @@ function isJsonRecord(value: JsonValue): value is Record<string, JsonValue> {
 }
 
 export function escapeHtml(value: string) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return escapeRichTextHtml(value);
 }
 
 function collectText(value: JsonValue): string[] {
@@ -38,23 +38,18 @@ export function noteContentToEditorContent(value: JsonObject): NoteEditorContent
   }
 
   if (typeof value.markdown === "string") {
-    return { value: value.markdown, format: "markdown" };
+    return { value: richTextToHtml(value.markdown), format: "html" };
   }
 
-  const legacyText = collectText(value).join(" ").trim();
+  const legacyText = collectText(value).join("").trim();
   return legacyText
-    ? { value: legacyText, format: "markdown" }
+    ? { value: richTextToHtml(legacyText), format: "html" }
     : { value: "", format: "html" };
 }
 
 export function noteContentToPreviewText(value: JsonObject): string {
   const content = noteContentToEditorContent(value);
-  const preview =
-    content.format === "html"
-      ? richTextToPlainText(content.value)
-      : content.value.replace(/\s+/g, " ").trim();
-
-  return preview;
+  return richTextToPreviewText(content.value);
 }
 
 export function htmlToNoteContent(html: string): JsonObject {

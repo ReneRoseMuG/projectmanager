@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { config } from "../config.js";
+import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 
 // ─── Manifest types ──────────────────────────────────────────────────────────
 
@@ -212,6 +213,7 @@ export function isSyncInProgress(): boolean {
 // ─── Startup sync ─────────────────────────────────────────────────────────────
 
 export async function syncAttachmentsOnStartup(): Promise<AttachmentSyncStats> {
+  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   const readiness = getAttachmentSyncReadiness();
   if (!readiness.ready) {
     const stats: AttachmentSyncStats = {
@@ -410,6 +412,7 @@ export async function syncAttachmentsOnStartup(): Promise<AttachmentSyncStats> {
 // ─── Per-file operations ──────────────────────────────────────────────────────
 
 export async function pushAttachmentToRemote(filename: string, buffer: Buffer): Promise<void> {
+  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   if (!getAttachmentSyncReadiness().ready) return;
   try {
     await withSftp(async (client) => {
@@ -430,6 +433,7 @@ export async function pushAttachmentToRemote(filename: string, buffer: Buffer): 
 }
 
 export async function removeAttachmentFromRemote(filename: string): Promise<void> {
+  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   if (!getAttachmentSyncReadiness().ready) return;
   try {
     await withSftp(async (client) => {

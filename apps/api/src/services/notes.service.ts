@@ -21,6 +21,7 @@ import {
   type JournalFieldDefinition,
   type JournalObjectRef
 } from "./journal.service.js";
+import { normalizeNoteContentJson } from "./rich-text.service.js";
 
 type MappableNoteRecord = Pick<NoteRecord, "id" | "title" | "contentJson" | "version" | "createdAt" | "updatedAt">;
 type NoteOwner = { type: "project" | "milestone" | "task" | "dayPlan" | "ticket" | "wikiPage"; id: number };
@@ -243,7 +244,7 @@ export async function createProjectNote(database: DbClient, projectId: number, i
   const created = await database.transaction(async (tx) => {
     const note = await noteRepository.create(tx, {
       title: cleanTitle(input.title),
-      contentJson: stringifyJsonObject(input.contentJson)
+      contentJson: stringifyJsonObject(normalizeNoteContentJson(input.contentJson))
     }, actor?.actorUserId ?? undefined);
     await tx.insert(projectNotes).values({ projectId, noteId: note.id });
     const noteObject = noteJournalObject(note);
@@ -259,7 +260,7 @@ export async function createTaskNote(database: DbClient, taskId: number, input: 
   const created = await database.transaction(async (tx) => {
     const note = await noteRepository.create(tx, {
       title: cleanTitle(input.title),
-      contentJson: stringifyJsonObject(input.contentJson)
+      contentJson: stringifyJsonObject(normalizeNoteContentJson(input.contentJson))
     }, actor?.actorUserId ?? undefined);
     await tx.insert(taskNotes).values({ taskId, noteId: note.id });
     const noteObject = noteJournalObject(note);
@@ -275,7 +276,7 @@ export async function createMilestoneNote(database: DbClient, milestoneId: numbe
   const created = await database.transaction(async (tx) => {
     const note = await noteRepository.create(tx, {
       title: cleanTitle(input.title),
-      contentJson: stringifyJsonObject(input.contentJson)
+      contentJson: stringifyJsonObject(normalizeNoteContentJson(input.contentJson))
     }, actor?.actorUserId ?? undefined);
     await tx.insert(milestoneNotes).values({ milestoneId, noteId: note.id });
     const noteObject = noteJournalObject(note);
@@ -291,7 +292,7 @@ export async function createTicketNote(database: DbClient, ticketId: number, inp
   const created = await database.transaction(async (tx) => {
     const note = await noteRepository.create(tx, {
       title: cleanTitle(input.title),
-      contentJson: stringifyJsonObject(input.contentJson)
+      contentJson: stringifyJsonObject(normalizeNoteContentJson(input.contentJson))
     }, actor?.actorUserId ?? undefined);
     await tx.insert(ticketNotes).values({ ticketId, noteId: note.id });
     const noteObject = noteJournalObject(note);
@@ -307,7 +308,7 @@ export async function createDayPlanNote(database: DbClient, dayPlanId: number, u
   const created = await database.transaction(async (tx) => {
     const note = await noteRepository.create(tx, {
       title: cleanTitle(input.title),
-      contentJson: stringifyJsonObject(input.contentJson)
+      contentJson: stringifyJsonObject(normalizeNoteContentJson(input.contentJson))
     }, actor?.actorUserId ?? undefined);
     await dayPlanRepository.addNote(tx, dayPlanId, note.id);
     const noteObject = noteJournalObject(note);
@@ -323,7 +324,7 @@ export async function createWikiPageNote(database: DbClient, wikiPageId: number,
   const created = await database.transaction(async (tx) => {
     const note = await noteRepository.create(tx, {
       title: cleanTitle(input.title),
-      contentJson: stringifyJsonObject(input.contentJson)
+      contentJson: stringifyJsonObject(normalizeNoteContentJson(input.contentJson))
     }, actor?.actorUserId ?? undefined);
     await tx.insert(wikiPageNotes).values({ wikiPageId, noteId: note.id });
     const noteObject = noteJournalObject(note);
@@ -365,7 +366,7 @@ export async function updateNote(database: DbClient, id: number, input: NoteUpda
     values.title = cleanTitle(input.title);
   }
   if (input.contentJson !== undefined) {
-    values.contentJson = stringifyJsonObject(input.contentJson);
+    values.contentJson = stringifyJsonObject(normalizeNoteContentJson(input.contentJson));
   }
   if (Object.keys(values).length === 0) {
     throw badRequest("No note fields provided");

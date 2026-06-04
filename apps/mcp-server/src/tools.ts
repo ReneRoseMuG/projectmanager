@@ -27,7 +27,7 @@ import type {
 import { z } from "zod";
 import { ProjectManagerApiError, type ProjectManagerApiClient } from "./api-client.js";
 import { buildReferenceContext } from "./reference-context.js";
-import { plainTextDocument } from "./rich-text.js";
+import { htmlDocument, textToHtml } from "./rich-text.js";
 
 export type ParentType = "project" | "milestone";
 export type LinkParentType = ParentType | "feature" | "useCase";
@@ -319,9 +319,30 @@ function withoutParent<T extends { parentType: string; parentId: number }>(input
   return body;
 }
 
+type DescriptionPayload = { description?: string | null };
+
+function withHtmlDescription<T extends DescriptionPayload>(input: T): T {
+  if (input.description === undefined) {
+    return input;
+  }
+  return { ...input, description: textToHtml(input.description) } as T;
+}
+
+function withoutParentWithHtmlDescription<T extends { parentType: string; parentId: number } & DescriptionPayload>(input: T): Omit<T, "parentType" | "parentId"> {
+  return withHtmlDescription(withoutParent(input) as Omit<T, "parentType" | "parentId"> & DescriptionPayload) as Omit<T, "parentType" | "parentId">;
+}
+
+function withoutIdWithHtmlDescription<T extends { id: number } & DescriptionPayload>(input: T): Omit<T, "id"> {
+  return withHtmlDescription(withoutId(input) as Omit<T, "id"> & DescriptionPayload) as Omit<T, "id">;
+}
+
 function withoutAttachment<T extends { attachment?: unknown }>(input: T): Omit<T, "attachment"> {
   const { attachment: _attachment, ...body } = input;
   return body;
+}
+
+function withoutAttachmentWithHtmlDescription<T extends { attachment?: unknown } & DescriptionPayload>(input: T): Omit<T, "attachment"> {
+  return withHtmlDescription(withoutAttachment(input) as Omit<T, "attachment"> & DescriptionPayload) as Omit<T, "attachment">;
 }
 
 function withoutId<T extends { id: number }>(input: T): Omit<T, "id"> {
@@ -427,7 +448,7 @@ async function createNotesBulk(client: ProjectManagerApiClient, input: z.infer<t
         index,
         result: await client.post<Note>(`${extendedOwnerPath(input.parentType, input.parentId)}/notes`, {
           title: note.title,
-          contentJson: plainTextDocument(note.text)
+          contentJson: htmlDocument(note.text)
         })
       });
     } catch (error) {
@@ -444,7 +465,7 @@ async function createCommentsBulk(client: ProjectManagerApiClient, input: z.infe
     try {
       created.push({
         index,
-        result: await client.post<Comment>(`${extendedOwnerPath(input.parentType, input.parentId)}/comments`, { body: comment.body })
+        result: await client.post<Comment>(`${extendedOwnerPath(input.parentType, input.parentId)}/comments`, { body: textToHtml(comment.body) ?? "" })
       });
     } catch (error) {
       errors.push(bulkFailure(index, "create", error));
@@ -487,7 +508,7 @@ async function createTasksBulk(
     }
 
     try {
-      const createdTask = await client.post<Task>(path, withoutAttachment(task) satisfies TaskInput);
+      const createdTask = await client.post<Task>(path, withoutAttachmentWithHtmlDescription(task) satisfies TaskInput);
       const result: { task: Task; attachment?: Attachment } = { task: createdTask };
       if (task.attachment) {
         try {
@@ -522,7 +543,7 @@ async function createTicketsBulk(
     }
 
     try {
-      const createdTicket = await client.post<Ticket>(path, withoutAttachment(ticket) satisfies TicketInput);
+      const createdTicket = await client.post<Ticket>(path, withoutAttachmentWithHtmlDescription(ticket) satisfies TicketInput);
       const result: { ticket: Ticket; attachment?: Attachment } = { ticket: createdTicket };
       if (ticket.attachment) {
         try {
@@ -658,21 +679,21 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       title: "Projekt erstellen",
       description: "Erstellt ein neues Projekt mit Stammdaten, Beschreibung, Status, Farbe und Zeitraum.",
       inputSchema: projectCreateSchema,
-      execute: (input) => client.post<Project>("projects", input satisfies ProjectInput)
+      execute: (input) => client.post<Project>("projects", withHtmlDescription(input) satisfies ProjectInput)
     }),
     defineTool({
       name: "create_milestone",
       title: "Meilenstein erstellen",
       description: "Erstellt einen neuen Meilenstein unter einem Projekt mit Stammdaten, Beschreibung, Status, Farbe und Zeitraum.",
       inputSchema: milestoneCreateSchema,
-      execute: ({ projectId, ...body }) => client.post<Milestone>(`projects/${projectId}/milestones`, body satisfies Omit<MilestoneInput, "projectId">)
+      execute: ({ projectId, ...body }) => client.post<Milestone>(`projects/${projectId}/milestones`, withHtmlDescription(body) satisfies Omit<MilestoneInput, "projectId">)
     }),
     defineTool({
       name: "add_task_to_parent",
       title: "Aufgabe hinzufügen",
       description: "Legt eine normale Aufgabe an einem Projekt oder Meilenstein an und befüllt die Stammdatenfelder.",
       inputSchema: taskInputSchema,
-      execute: (input) => client.post<Task>(`${ownerPath(input.parentType, input.parentId)}/tasks`, withoutParent(input) satisfies TaskInput)
+      execute: (input) => client.post<Task>(`${ownerPath(input.parentType, input.parentId)}/tasks`, withoutParentWithHtmlDescription(input) satisfies TaskInput)
     }),
     defineTool({
       name: "add_task_list_to_parent",
@@ -696,7 +717,7 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       execute: (input) =>
         client.post<Task>(`${ownerPath(input.parentType, input.parentId)}/tasks`, {
           title: input.title,
-          description: input.editorialBrief,
+          description: textToHtml(input.editorialBrief),
           status: input.status,
           priority: input.priority,
           responsibleUserId: input.responsibleUserId,
@@ -708,7 +729,7 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       title: "Ticket hinzufügen",
       description: "Legt ein Ticket an einem Projekt oder Meilenstein an und befüllt die Stammdatenfelder.",
       inputSchema: ticketInputSchema,
-      execute: (input) => client.post<Ticket>(`${ownerPath(input.parentType, input.parentId)}/tickets`, withoutParent(input) satisfies TicketInput)
+      execute: (input) => client.post<Ticket>(`${ownerPath(input.parentType, input.parentId)}/tickets`, withoutParentWithHtmlDescription(input) satisfies TicketInput)
     }),
     defineTool({
       name: "add_ticket_list_to_parent",
@@ -729,7 +750,7 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       title: "Kommentar hinzufügen",
       description: "Legt einen Kommentar an Projekt, Meilenstein, Task, Ticket, Feature oder Use Case an.",
       inputSchema: commentInputSchema,
-      execute: (input) => client.post<Comment>(`${extendedOwnerPath(input.parentType, input.parentId)}/comments`, { body: input.body })
+      execute: (input) => client.post<Comment>(`${extendedOwnerPath(input.parentType, input.parentId)}/comments`, { body: textToHtml(input.body) ?? "" })
     }),
     defineTool({
       name: "add_comments_to_parent",
@@ -746,7 +767,7 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       execute: (input) =>
         client.post<Note>(`${extendedOwnerPath(input.parentType, input.parentId)}/notes`, {
           title: input.title,
-          contentJson: plainTextDocument(input.text)
+          contentJson: htmlDocument(input.text)
         })
     }),
     defineTool({
@@ -775,42 +796,42 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       title: "Projekt aktualisieren",
       description: "Aktualisiert Projektstammdaten und Beschreibung versionsgeschützt.",
       inputSchema: updateProjectSchema,
-      execute: (input) => updateVersioned<Project>(client, `projects/${input.id}`, withoutId(input) satisfies Omit<ProjectUpdate, "expectedVersion">)
+      execute: (input) => updateVersioned<Project>(client, `projects/${input.id}`, withoutIdWithHtmlDescription(input) satisfies Omit<ProjectUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "update_milestone",
       title: "Meilenstein aktualisieren",
       description: "Aktualisiert Meilenstein-Stammdaten und Beschreibung versionsgeschützt.",
       inputSchema: updateMilestoneSchema,
-      execute: (input) => updateVersioned<Milestone>(client, `milestones/${input.id}`, withoutId(input) satisfies Omit<MilestoneUpdate, "expectedVersion">)
+      execute: (input) => updateVersioned<Milestone>(client, `milestones/${input.id}`, withoutIdWithHtmlDescription(input) satisfies Omit<MilestoneUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "update_task",
       title: "Aufgabe aktualisieren",
       description: "Aktualisiert Aufgabenstammdaten und Beschreibung versionsgeschützt.",
       inputSchema: updateTaskSchema,
-      execute: (input) => updateVersioned<Task>(client, `tasks/${input.id}`, withoutId(input) satisfies Omit<TaskUpdate, "expectedVersion">)
+      execute: (input) => updateVersioned<Task>(client, `tasks/${input.id}`, withoutIdWithHtmlDescription(input) satisfies Omit<TaskUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "update_ticket",
       title: "Ticket aktualisieren",
       description: "Aktualisiert Ticketstammdaten, Beschreibung und Lösung versionsgeschützt.",
       inputSchema: updateTicketSchema,
-      execute: (input) => updateVersioned<Ticket>(client, `tickets/${input.id}`, withoutId(input) satisfies Omit<TicketUpdate, "expectedVersion">)
+      execute: (input) => updateVersioned<Ticket>(client, `tickets/${input.id}`, withoutIdWithHtmlDescription(input) satisfies Omit<TicketUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "create_feature",
       title: "Feature erstellen",
       description: "Erstellt ein neues Feature mit Beschreibung und optionalem Content.",
       inputSchema: featureCreateSchema,
-      execute: (input) => client.post<Feature>("features", input satisfies FeatureInput)
+      execute: (input) => client.post<Feature>("features", withHtmlDescription(input) satisfies FeatureInput)
     }),
     defineTool({
       name: "update_feature",
       title: "Feature aktualisieren",
       description: "Aktualisiert Feature-Stammdaten, Beschreibung und Content versionsgeschützt.",
       inputSchema: updateFeatureSchema,
-      execute: (input) => updateVersioned<Feature>(client, `features/${input.id}`, withoutId(input) satisfies Omit<FeatureUpdate, "expectedVersion">)
+      execute: (input) => updateVersioned<Feature>(client, `features/${input.id}`, withoutIdWithHtmlDescription(input) satisfies Omit<FeatureUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "link_feature_to_parent",
@@ -829,28 +850,28 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       title: "Use Case erstellen",
       description: "Erstellt einen neuen Use Case unter einem Feature.",
       inputSchema: useCaseCreateSchema,
-      execute: (input) => client.post<UseCase>(`features/${input.featureId}/use-cases`, input satisfies UseCaseInput)
+      execute: (input) => client.post<UseCase>(`features/${input.featureId}/use-cases`, withHtmlDescription(input) satisfies UseCaseInput)
     }),
     defineTool({
       name: "update_use_case",
       title: "Use Case aktualisieren",
       description: "Aktualisiert Use-Case-Stammdaten, Feature-Zuordnung, Beschreibung und Content versionsgeschützt.",
       inputSchema: updateUseCaseSchema,
-      execute: (input) => updateVersioned<UseCase>(client, `use-cases/${input.id}`, withoutId(input) satisfies Omit<UseCaseUpdate, "expectedVersion">)
+      execute: (input) => updateVersioned<UseCase>(client, `use-cases/${input.id}`, withoutIdWithHtmlDescription(input) satisfies Omit<UseCaseUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "add_task_to_use_case",
       title: "Use-Case-Aufgabe hinzufügen",
       description: "Legt eine Aufgabe an einem Use Case an.",
       inputSchema: useCaseChildSchema,
-      execute: ({ useCaseId, ...body }) => client.post<Task>(`use-cases/${useCaseId}/tasks`, body satisfies TaskInput)
+      execute: ({ useCaseId, ...body }) => client.post<Task>(`use-cases/${useCaseId}/tasks`, withHtmlDescription(body) satisfies TaskInput)
     }),
     defineTool({
       name: "add_ticket_to_use_case",
       title: "Use-Case-Ticket hinzufügen",
       description: "Legt ein Ticket an einem Use Case an.",
       inputSchema: useCaseChildSchema,
-      execute: ({ useCaseId, ...body }) => client.post<Ticket>(`use-cases/${useCaseId}/tickets`, body satisfies TicketInput)
+      execute: ({ useCaseId, ...body }) => client.post<Ticket>(`use-cases/${useCaseId}/tickets`, withHtmlDescription(body) satisfies TicketInput)
     })
   ];
 }

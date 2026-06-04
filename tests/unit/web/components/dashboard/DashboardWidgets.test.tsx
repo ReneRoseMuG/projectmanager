@@ -350,7 +350,7 @@ describe("DashboardWidgetCard", () => {
       {
         id: 1,
         title: "Fokus",
-        contentJson: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "Heute Review abschließen" }] }] },
+        contentJson: { markdown: "**Heute** Review abschließen" },
         version: 1,
         createdAt: "2026-05-28T06:00:00.000Z",
         updatedAt: "2026-05-28T07:00:00.000Z",
@@ -361,6 +361,7 @@ describe("DashboardWidgetCard", () => {
 
     expect(screen.getByText("Fokus")).toBeInTheDocument();
     expect(screen.getByText("Heute Review abschließen")).toBeInTheDocument();
+    expect(screen.queryByText(/\*\*Heute\*\*/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Fokus/i })).not.toBeInTheDocument();
   });
 
@@ -423,6 +424,26 @@ describe("DashboardWidgetCard", () => {
 
     expect(screen.getByText("HTML Kommentar")).toBeInTheDocument();
     expect(screen.queryByText(/<p>|<\/p>|<strong>/)).not.toBeInTheDocument();
+  });
+
+  it("rendert Kommentarvorschauen ohne rohe Markdown-Marker", () => {
+    const comments: RecentComment[] = [
+      {
+        id: 5,
+        body: "**Fetter** Kommentar",
+        createdAt: "2026-05-27T06:00:00.000Z",
+        updatedAt: "2026-05-27T06:05:00.000Z",
+        authorName: "Admin",
+        entityType: "task",
+        entityId: 81,
+        entityLabel: "Aufgabe"
+      }
+    ];
+
+    renderWithRouter("commentJournal", comments);
+
+    expect(screen.getByText("Fetter Kommentar")).toBeInTheDocument();
+    expect(screen.queryByText(/\*\*Fetter\*\*/)).not.toBeInTheDocument();
   });
 
   it("öffnet im DayPlan-Kontext den Aufgaben-Create-Dialog aus dem Widget-Header", () => {

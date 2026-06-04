@@ -35,7 +35,11 @@ export default defineConfig({
       ATTACHMENT_BASE_PATH: path.join(runtimeRoot, "uploads"),
       UPLOAD_DIR: path.join(runtimeRoot, "uploads"),
       PREVIEW_CACHE_DIR: path.join(runtimeRoot, "previews"),
-      CONTENT_DIR: path.join(runtimeRoot, "content")
+      CONTENT_DIR: path.join(runtimeRoot, "content"),
+      ATTACHMENT_SYNC_ENABLED: "false",
+      SFTP_HOST: "",
+      SFTP_USER: "",
+      SFTP_PASSWORD: ""
     }
   }
 });

@@ -45,6 +45,7 @@ import {
   type JournalActor,
   type JournalObjectRef
 } from "./journal.service.js";
+import { textToHtml } from "./rich-text.service.js";
 
 const commentSelect = {
   id: comments.id,
@@ -826,7 +827,7 @@ export async function listEntityComments(database: DbClient, entityType: Comment
 export async function createEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, input: CommentInput, actor?: JournalActor | null): Promise<Comment> {
   const owner = { type: entityType, id: entityId };
   await ensureOwnerExists(database, owner);
-  const body = requireNonEmpty(input.body, "body");
+  const body = requireNonEmpty(textToHtml(input.body), "body");
   const created = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
     const comment = await commentRepository.create(tx, {
@@ -872,7 +873,7 @@ export async function linkEntityComment(database: DbClient, entityType: CommentE
 }
 
 export async function updateComment(database: DbClient, id: number, input: CommentUpdate, actor?: JournalActor | null): Promise<Comment> {
-  const body = requireNonEmpty(input.body, "body");
+  const body = requireNonEmpty(textToHtml(input.body), "body");
   const updated = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbClient;
     const current = await commentRepository.findById(tx, id);

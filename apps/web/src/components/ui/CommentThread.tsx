@@ -3,6 +3,7 @@ import { MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useHasPermission } from "../../hooks/usePermissions";
 import { formatHumanDate } from "../../utils/date";
+import { richTextToHtml } from "../../utils/richText";
 import { Button } from "./Button";
 import { CommentBodyModal, commentTextFromHtml, commentValueFormat } from "./CommentBodyModal";
 import { EmptyState } from "./EmptyState";
@@ -41,6 +42,7 @@ function CommentCard({
   onDelete: (id: number) => Promise<void>;
 }) {
   const valueFormat = commentValueFormat(comment.body);
+  const body = richTextToHtml(comment.body);
 
   return (
     <ItemCard
@@ -55,7 +57,7 @@ function CommentCard({
       }
       body={
         <RichTextInlineField
-          value={comment.body}
+          value={body}
           valueFormat={valueFormat}
           readOnly
           testIdPrefix={`comment-thread-comment-${comment.id}-body`}

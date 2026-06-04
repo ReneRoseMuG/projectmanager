@@ -13,7 +13,6 @@ export interface AppConfig {
   };
   port: number;
   corsOrigin: string;
-  attachmentBasePath: string;
   uploadDir: string;
   previewCacheDir: string;
   previewTextMaxBytes: number;
@@ -77,7 +76,6 @@ export const config: AppConfig = {
   },
   port: Number(process.env.PORT ?? 3001),
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
-  attachmentBasePath: resolveFromApiRoot(process.env.ATTACHMENT_BASE_PATH ?? process.env.UPLOAD_DIR ?? "./uploads"),
   uploadDir: resolveFromApiRoot(process.env.ATTACHMENT_BASE_PATH ?? process.env.UPLOAD_DIR ?? "./uploads"),
   previewCacheDir: resolveFromApiRoot(process.env.PREVIEW_CACHE_DIR ?? "./previews"),
   previewTextMaxBytes: numberFromEnv(process.env.PREVIEW_TEXT_MAX_BYTES, 100 * 1024),

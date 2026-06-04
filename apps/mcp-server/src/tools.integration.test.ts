@@ -227,7 +227,7 @@ describe("MCP tools integration", () => {
       responsibleUserId: 1,
       dueDate: "2026-06-01"
     });
-    expect(createdTask).toMatchObject({ title: "MCP Tool Aufgabe", description: "Per MCP angelegt" });
+    expect(createdTask).toMatchObject({ title: "MCP Tool Aufgabe", description: "<p>Per MCP angelegt</p>" });
 
     expect(
       await callTool<Task>(executedTools, "link_task_to_parent", {
@@ -261,7 +261,7 @@ describe("MCP tools integration", () => {
     });
     expect(editorialTask).toMatchObject({
       title: "Redaktion: Beschreibung schärfen",
-      description: "Bitte fachlich überarbeiten.",
+      description: "<p>Bitte fachlich überarbeiten.</p>",
       status: "todo",
       priority: "medium"
     });
@@ -309,7 +309,7 @@ describe("MCP tools integration", () => {
       parentId: project.id,
       body: "MCP Kommentar"
     });
-    expect(comment).toMatchObject({ body: "MCP Kommentar" });
+    expect(comment).toMatchObject({ body: "<p>MCP Kommentar</p>" });
 
     const note = await callTool<Note>(executedTools, "add_note_to_parent", {
       parentType: "project",
@@ -318,7 +318,7 @@ describe("MCP tools integration", () => {
       text: "Absatz eins\n\nAbsatz zwei"
     });
     expect(note.title).toBe("MCP Notiz");
-    expect(note.contentJson).toMatchObject({ type: "doc" });
+    expect(note.contentJson).toMatchObject({ html: "<p>Absatz eins</p><p>Absatz zwei</p>" });
 
     const attachmentContent = "MCP attachment content";
     const attachment = await callTool<Attachment>(executedTools, "add_attachment_to_parent", {
@@ -359,7 +359,7 @@ describe("MCP tools integration", () => {
       comments: [{ body: "Bulk Kommentar 1" }, { body: "Bulk Kommentar 2" }]
     });
     expect(bulkComments).toMatchObject({ requested: 2, createdCount: 2, errorCount: 0 });
-    expect(bulkComments.created.map((entry) => entry.result.body)).toEqual(["Bulk Kommentar 1", "Bulk Kommentar 2"]);
+    expect(bulkComments.created.map((entry) => entry.result.body)).toEqual(["<p>Bulk Kommentar 1</p>", "<p>Bulk Kommentar 2</p>"]);
 
     const bulkAttachments = await callTool<BulkResult<Attachment>>(executedTools, "add_attachments_to_parent", {
       parentType: "milestone",
@@ -439,7 +439,7 @@ describe("MCP tools integration", () => {
     expect(context.root.children.tickets).toEqual(expect.arrayContaining([expect.objectContaining({ id: ticket.id })]));
     expect(context.root.children.features).toEqual(expect.arrayContaining([expect.objectContaining({ id: feature.id })]));
     expect(context.root.support.notes).toEqual(expect.arrayContaining([expect.objectContaining({ id: note.id, title: "MCP Notiz" })]));
-    expect(context.root.support.comments).toEqual(expect.arrayContaining([expect.objectContaining({ id: comment.id, body: "MCP Kommentar" })]));
+    expect(context.root.support.comments).toEqual(expect.arrayContaining([expect.objectContaining({ id: comment.id, body: "<p>MCP Kommentar</p>" })]));
     const taskContext = context.root.children.tasks.find((child) => child.id === task.id);
     expect(taskContext?.support.attachments).toEqual(
       expect.arrayContaining([
@@ -452,20 +452,20 @@ describe("MCP tools integration", () => {
 
     expect(await callTool<Project>(executedTools, "update_project", { id: project.id, name: "MCP Projekt aktualisiert", description: "Projektbeschreibung MCP", status: "active", color: "#2563eb", startDate: "2026-05-01", dueDate: "2026-08-01" })).toMatchObject({
       name: "MCP Projekt aktualisiert",
-      description: "Projektbeschreibung MCP",
+      description: "<p>Projektbeschreibung MCP</p>",
       dueDate: "2026-08-01"
     });
     expect(
       await callTool<Milestone>(executedTools, "update_milestone", { id: milestone.id, name: "MCP Meilenstein aktualisiert", description: "Meilensteinbeschreibung MCP", status: "active", color: "#14b8a6", startDate: null, dueDate: "2026-07-15" })
-    ).toMatchObject({ name: "MCP Meilenstein aktualisiert", description: "Meilensteinbeschreibung MCP", dueDate: "2026-07-15" });
+    ).toMatchObject({ name: "MCP Meilenstein aktualisiert", description: "<p>Meilensteinbeschreibung MCP</p>", dueDate: "2026-07-15" });
     expect(await callTool<Task>(executedTools, "update_task", { id: task.id, title: "MCP Aufgabe aktualisiert", description: "Aufgabenbeschreibung MCP", status: "in_progress", priority: "high", responsibleUserId: 1, dueDate: "2026-06-20" })).toMatchObject({
       title: "MCP Aufgabe aktualisiert",
-      description: "Aufgabenbeschreibung MCP",
+      description: "<p>Aufgabenbeschreibung MCP</p>",
       priority: "high"
     });
     expect(await callTool<Ticket>(executedTools, "update_ticket", { id: ticket.id, title: "MCP Ticket aktualisiert", type: "bug", description: "Ticketbeschreibung MCP", status: "resolved", priority: "high", reporterUserId: 1, responsibleUserId: 1, environment: "Integrationstest", affectedVersion: "0.2.0", dueDate: "2026-06-30", resolution: "fixed" })).toMatchObject({
       title: "MCP Ticket aktualisiert",
-      description: "Ticketbeschreibung MCP",
+      description: "<p>Ticketbeschreibung MCP</p>",
       resolution: "fixed"
     });
 
@@ -486,7 +486,7 @@ describe("MCP tools integration", () => {
         content: "# Aktualisiertes Feature",
         sortOrder: 20
       })
-    ).toMatchObject({ title: "MCP Tool Feature aktualisiert", description: "Featurebeschreibung MCP", content: "# Aktualisiertes Feature", sortOrder: 20 });
+    ).toMatchObject({ title: "MCP Tool Feature aktualisiert", description: "<p>Featurebeschreibung MCP</p>", content: "# Aktualisiertes Feature", sortOrder: 20 });
 
     const linkedFeatures = await callTool<Feature[]>(executedTools, "link_feature_to_parent", {
       parentType: "project",
@@ -514,7 +514,7 @@ describe("MCP tools integration", () => {
         sortOrder: 30,
         featureId: createdFeature.id
       })
-    ).toMatchObject({ title: "MCP Tool Use Case aktualisiert", description: "Use-Case-Beschreibung MCP", content: "# Aktualisierter Use Case", sortOrder: 30 });
+    ).toMatchObject({ title: "MCP Tool Use Case aktualisiert", description: "<p>Use-Case-Beschreibung MCP</p>", content: "# Aktualisierter Use Case", sortOrder: 30 });
 
     expect(
       await callTool<Task>(executedTools, "add_task_to_use_case", {

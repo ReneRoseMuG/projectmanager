@@ -7,7 +7,7 @@
  * - CommentThread rendert Empty-, Listen-, Create-, Update- und Delete-Zustände.
  * - Bestehende Kommentare werden im Modal bearbeitet, nicht über die Listenansicht gespeichert.
  * - Leere Kommentartexte werden nicht gesendet.
- * - Legacy-Markdown-Kommentare werden als Markdown an den Inline-Editor übergeben.
+ * - Legacy-Markdown-Kommentare werden vor Anzeige und Bearbeitung in HTML normalisiert.
  *
  * Fehlerfälle:
  * - Update muss die konkrete Kommentar-ID und expectedVersion verwenden.
@@ -208,7 +208,7 @@ describe("CommentThread", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Speichern" })).not.toBeInTheDocument());
   });
 
-  it("übergibt Legacy-Markdown als Markdown und speichert Editor-HTML", async () => {
+  it("normalisiert Legacy-Markdown als HTML und speichert Editor-HTML", async () => {
     const onUpdate = vi.fn().mockResolvedValue(undefined);
     render(
       <CommentThread
@@ -227,7 +227,8 @@ describe("CommentThread", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: "Bearbeiten" })[0] as HTMLElement);
     const editor = screen.getByLabelText("Kommentar bearbeiten");
-    expect(editor).toHaveAttribute("data-value-format", "markdown");
+    expect(editor).toHaveAttribute("data-value-format", "html");
+    expect(editor).toHaveValue("<h1>Titel</h1><p><strong>fett</strong></p>");
     fireEvent.change(editor, {
       target: { value: "<h1>Titel</h1><p><strong>fett</strong></p>" },
     });
@@ -239,6 +240,23 @@ describe("CommentThread", () => {
         expectedVersion: 3,
       }),
     );
+  });
+
+  it("rendert Legacy-Markdown-Kommentare in der Kartenansicht ohne rohe Markdown-Marker", () => {
+    render(
+      <CommentThread
+        comments={[{ ...comments[0], body: "**fett** und `code`" }]}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
+
+    expect(screen.getByText("fett")).toBeInTheDocument();
+    expect(screen.getByText("code")).toBeInTheDocument();
+    expect(screen.queryByText(/\*\*fett\*\*/)).not.toBeInTheDocument();
   });
 
   it("onDelete wird mit korrekter id aufgerufen", async () => {

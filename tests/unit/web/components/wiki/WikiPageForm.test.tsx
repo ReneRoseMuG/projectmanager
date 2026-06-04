@@ -51,6 +51,7 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
     testIdPrefix,
     className,
     fill,
+    editable,
   }: {
     value: string | null | undefined;
     onChange: (value: string) => void;
@@ -58,12 +59,14 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
     testIdPrefix?: string;
     className?: string;
     fill?: boolean;
+    editable?: boolean;
   }) {
     return (
       <textarea
         aria-label={placeholder ?? "Rich Text"}
         className={className}
         data-fill={fill ? "true" : undefined}
+        data-editable={editable === false ? "false" : "true"}
         data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
         value={value ?? ""}
         onChange={(event) => onChange(event.currentTarget.value)}
@@ -169,7 +172,7 @@ describe("WikiPageForm", () => {
 
     expect(screen.getByTestId("wiki-page-form-content-view")).toHaveValue(wikiPage.content);
     fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: "<p>Wiki aktualisiert</p>" } });
-    fireEvent.click(screen.getByRole("button", { name: "Veröffentlichen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Wiki aktualisiert</p>" }), []));
   });
@@ -254,12 +257,58 @@ describe("WikiPageForm", () => {
   it("lässt eine bestehende Inline-Seite nach dem Speichern geöffnet", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
-    renderWithProviders(<WikiPageForm inline open page={wikiPage} tree={[]} projects={[]} onSubmit={onSubmit} onClose={onClose} />);
+    renderWithProviders(<WikiPageForm inline editable open page={wikiPage} tree={[]} projects={[]} onSubmit={onSubmit} onClose={onClose} />);
 
     fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: "<p>Inline aktualisiert</p>" } });
-    fireEvent.click(screen.getByRole("button", { name: "Veröffentlichen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Inline aktualisiert</p>" }), []));
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("T-RM1 öffnet Inline-Seite standardmäßig im Lesemodus (kein Footer, kein Speichern)", () => {
+    renderWithProviders(<WikiPageForm inline open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Speichern" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Abbrechen" })).not.toBeInTheDocument();
+  });
+
+  it("T-RM2 zeigt Bearbeiten-Button im Lesemodus des Standalone-Inline-Modus", () => {
+    const onEdit = vi.fn();
+    renderWithProviders(<WikiPageForm inline inlineChrome="standalone" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} onEdit={onEdit} />);
+
+    const editButton = screen.getByRole("button", { name: "Bearbeiten" });
+    expect(editButton).toBeInTheDocument();
+    fireEvent.click(editButton);
+    expect(onEdit).toHaveBeenCalled();
+  });
+
+  it("T-RM3 zeigt Bearbeiten-Button im Lesemodus des Embedded-Inline-Modus", () => {
+    const onEdit = vi.fn();
+    renderWithProviders(<WikiPageForm inline inlineChrome="embedded" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} onEdit={onEdit} />);
+
+    const editButton = screen.getByRole("button", { name: "Bearbeiten" });
+    expect(editButton).toBeInTheDocument();
+    fireEvent.click(editButton);
+    expect(onEdit).toHaveBeenCalled();
+  });
+
+  it("T-RM4 zeigt Footer mit Speichern/Abbrechen im Bearbeitungsmodus", () => {
+    renderWithProviders(<WikiPageForm inline editable open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Speichern" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abbrechen" })).toBeInTheDocument();
+  });
+
+  it("T-RM5 übergibt editable=false an RichTextInlineField im Lesemodus", () => {
+    renderWithProviders(<WikiPageForm inline open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("wiki-page-form-content-view")).toHaveAttribute("data-editable", "false");
+  });
+
+  it("T-RM6 übergibt editable=true an RichTextInlineField im Bearbeitungsmodus", () => {
+    renderWithProviders(<WikiPageForm inline editable open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("wiki-page-form-content-view")).toHaveAttribute("data-editable", "true");
   });
 });

@@ -87,6 +87,18 @@ describe("NoteList", () => {
     expect(onEdit).toHaveBeenCalledWith(notes[0]);
   });
 
+  it("rendert Legacy-Markdown-Notizen ohne rohe Markdown-Marker", () => {
+    const legacyNote: Note = {
+      ...notes[0],
+      contentJson: { markdown: "**fett** und `code`" },
+    };
+
+    render(<NoteList notes={[legacyNote]} onCreate={vi.fn().mockResolvedValue(undefined)} onEdit={vi.fn()} onDelete={vi.fn()} />);
+
+    expect(screen.getByText("fett und code")).toBeInTheDocument();
+    expect(screen.queryByText(/\*\*fett\*\*/)).not.toBeInTheDocument();
+  });
+
   it("wechselt in den Listenmodus und öffnet Rows per Doppelklick", () => {
     const onEdit = vi.fn();
 

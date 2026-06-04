@@ -56,9 +56,12 @@ import {
   Underline as UnderlineIcon
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Markdown } from "tiptap-markdown";
 import { errorMessage } from "../../hooks/errors";
+import { useStandaloneView } from "../../hooks/useStandaloneView";
 import { hasVisibleHtmlContent } from "../../lib/html-utils";
+import { withStandaloneView } from "../../utils/standalone";
 import { useToast } from "./ToastProvider";
 import { Column, ColumnBlock } from "./tiptap-column-node";
 import { ResizableImage } from "./tiptap-image-node";
@@ -93,6 +96,8 @@ interface RichTextInlineFieldProps {
   onImageUpload?: (file: File) => Promise<string>;
   /** When provided, enables the wiki-page-link button in the toolbar. */
   wikiPages?: Array<{ id: number; title: string }>;
+  /** When false, mounts TipTap in non-editable mode: no toolbar interaction, wiki:// links navigable on click. */
+  editable?: boolean;
 }
 
 interface RichTextInlineEditorProps {
@@ -109,6 +114,7 @@ interface RichTextInlineEditorProps {
   fill: boolean;
   commitOnBlur: boolean;
   liveUpdate: boolean;
+  editable?: boolean;
   onLiveChange: (html: string) => void;
   onFocusStart: (html: string) => void;
   onCommit: (html: string) => void;
@@ -138,7 +144,7 @@ function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload, wikiPages }: RichTextInlineFieldProps) {
+export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload, wikiPages, editable }: RichTextInlineFieldProps) {
   const [originalValue, setOriginalValue] = useState("");
   const hasContent = valueFormat === "markdown" ? Boolean(value?.trim()) : hasVisibleHtmlContent(value);
   const minRowsStyle = useMemo(() => (minRows ? ({ "--rich-text-field-min-rows": minRows } as React.CSSProperties) : undefined), [minRows]);
@@ -168,6 +174,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
           testIdPrefix={testIdPrefix}
           onImageUpload={onImageUpload}
           wikiPages={wikiPages}
+          editable={editable}
           fill={fill}
           commitOnBlur={commitOnBlur}
           liveUpdate={liveUpdate}
@@ -221,11 +228,13 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
   );
 }
 
-function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, wikiPages, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
+function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, wikiPages, editable, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
   const cancellingRef = useRef(false);
   const [imageUploadCount, setImageUploadCount] = useState(0);
   const [hasFocus, setHasFocus] = useState(false);
   const { showToast } = useToast();
+  const navigate = useNavigate();
+  const standalone = useStandaloneView();
   const editorAttributes = useMemo(() => {
     const attributes: Record<string, string> = {
       class: cn("rich-text-surface max-w-none", Boolean(minRows) && "rich-text-inline-min-rows", fill && "min-h-full flex-1")
@@ -265,6 +274,7 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
     extensions,
     content: value,
     autofocus: false,
+    editable: editable ?? true,
     editorProps: {
       attributes: editorAttributes,
       transformPastedText(text: string): string {
@@ -402,13 +412,48 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [editor, originalValue]);
 
+  useEffect(() => {
+    if (!editor) return;
+    editor.setEditable(editable ?? true);
+  }, [editor, editable]);
+
+  const handleContainerClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const anchor = target.closest('a[href^="wiki://"]');
+    if (!anchor) return;
+    const href = anchor.getAttribute("href");
+    if (!href) return;
+    const isModified = event.ctrlKey || event.metaKey;
+    if ((editable ?? true) && !isModified) return;
+    event.preventDefault();
+    const id = href.slice("wiki://".length);
+    navigate(standalone ? withStandaloneView(`/wiki/${id}`) : `/wiki/${id}`);
+  };
+
   if (!editor) {
     return null;
   }
 
   return (
-    <div className={cn(fill ? "flex min-h-0 flex-1 flex-col overflow-visible" : "overflow-clip", "rounded-md border bg-white shadow-sm transition-colors", hasFocus ? "border-steel-600 ring-2 ring-steel-700/10" : "border-line")} data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}>
-      {toolbar !== "none" ? <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} wikiPages={wikiPages} /> : null}
+    <div
+      className={cn(
+        fill ? "flex min-h-0 flex-1 flex-col overflow-visible" : "overflow-clip",
+        "rounded-md border bg-white shadow-sm transition-colors",
+        editable === false
+          ? "border-transparent shadow-none"
+          : hasFocus
+            ? "border-steel-600 ring-2 ring-steel-700/10"
+            : "border-line"
+      )}
+      data-testid={testIdPrefix ? `${testIdPrefix}-editor` : undefined}
+      onClick={handleContainerClick}
+    >
+      {toolbar !== "none" ? (
+        <div className={editable === false ? "invisible pointer-events-none" : undefined}>
+          <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} wikiPages={wikiPages} />
+        </div>
+      ) : null}
       <EditorContent editor={editor} className={fill ? "flex min-h-0 flex-1 flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1" : undefined} />
     </div>
   );

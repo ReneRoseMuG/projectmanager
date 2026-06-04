@@ -125,12 +125,13 @@ describe("Notes API", () => {
     const owner = await createOwner();
     const title = `Notiz fuer ${label}`;
     const contentJson = { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: label }] }] };
+    const normalizedContentJson = { html: `<p>${label}</p>` };
 
     const created = await supertest(app.server).post(owner.path).send({ title, contentJson }).expect(201);
     const listed = await supertest(app.server).get(owner.path).expect(200);
 
-    expect(created.body).toEqual(expect.objectContaining({ title, contentJson }));
-    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, title, contentJson })]);
+    expect(created.body).toEqual(expect.objectContaining({ title, contentJson: normalizedContentJson }));
+    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, title, contentJson: normalizedContentJson })]);
   });
 
   it("DELETE /api/wiki/:id entfernt verknuepfte Wiki-Notizen vollstaendig", async () => {
@@ -179,7 +180,18 @@ describe("Notes API", () => {
       .expect(200);
 
     expect(res.body.title).toBe("Aktualisiert");
-    expect(res.body.contentJson).toEqual(contentJson);
+    expect(res.body.contentJson).toEqual({ html: "<p>Neu</p>" });
+  });
+
+  it("normalisiert Markdown-Notizinhalt beim Erstellen zu contentJson.html", async () => {
+    const project = await createProject(app);
+
+    const res = await supertest(app.server)
+      .post(`/api/projects/${project.id}/notes`)
+      .send({ title: "Markdown-Notiz", contentJson: { markdown: "**Fett** und `Code`" } })
+      .expect(201);
+
+    expect(res.body.contentJson).toEqual({ html: "<p><strong>Fett</strong> und <code>Code</code></p>" });
   });
 
   it("DELETE /api/notes/:id loescht Notiz und Join-Eintraege", async () => {
@@ -193,7 +205,7 @@ describe("Notes API", () => {
     expect(list.body).toHaveLength(0);
   });
 
-  it("contentJson mit verschachteltem TipTap-Inhalt wird korrekt gespeichert und gelesen", async () => {
+  it("contentJson mit verschachteltem TipTap-Inhalt wird als HTML gespeichert und gelesen", async () => {
     const project = await createProject(app);
     const contentJson = {
       type: "doc",
@@ -211,7 +223,7 @@ describe("Notes API", () => {
     const note = await createNoteForProject(app, project.id, { contentJson });
     const res = await supertest(app.server).get(`/api/notes/${note.id}`).expect(200);
 
-    expect(res.body.contentJson).toEqual(contentJson);
+    expect(res.body.contentJson).toEqual({ html: "<p>Hallo Welt</p>" });
   });
 
   describe("Auth-Schutz: Reader-Negativfall", () => {

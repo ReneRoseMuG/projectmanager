@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 04.06.26 | 10:28:47 | Feature | MS-51 Richtext-Normalisierung | ⚠️ |
+| 04.06.26 | 10:03:22 | Feature | MS-50 Wiki Lesemodus + wiki://-Link-Interceptor | ✅ |
 | 03.06.26 | 09:49:02 | Fix | Deploy Runtime Toolbar | ✅ |
 | 03.06.26 | 07:24:49 | Feature | Codex Skills Sync | ✅ |
 | 02.06.26 | 15:55:14 | Feature | MS-46 TipTap Image Extensions | âœ… |

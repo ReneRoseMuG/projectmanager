@@ -1,4 +1,4 @@
-import type { JsonObject } from "@taskmanager/shared-types";
+import type { JsonObject, JsonValue } from "@taskmanager/shared-types";
 
 export function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -17,10 +17,10 @@ function inlineMarkdownToHtml(value: string): string {
     .replace(/`(.+?)`/g, "<code>$1</code>");
 }
 
-export function textToHtml(value: string | null | undefined): string | null {
+export function textToHtml(value: string | null | undefined): string {
   const trimmed = value?.trim() ?? "";
   if (!trimmed) {
-    return null;
+    return "";
   }
   if (isHtmlContent(trimmed)) {
     return trimmed;
@@ -50,20 +50,34 @@ export function textToHtml(value: string | null | undefined): string | null {
     .join("");
 }
 
-export function htmlDocument(text: string): JsonObject {
-  return { html: textToHtml(text) ?? "" };
+function isJsonRecord(value: JsonValue): value is Record<string, JsonValue> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function plainTextDocument(text: string): JsonObject {
-  return {
-    type: "doc",
-    content: text
-      .split(/\n{2,}/)
-      .map((paragraph) => paragraph.trim())
-      .filter(Boolean)
-      .map((paragraph) => ({
-        type: "paragraph",
-        content: [{ type: "text", text: paragraph }]
-      }))
-  };
+function collectProseMirrorText(value: JsonValue): string[] {
+  if (!isJsonRecord(value)) {
+    return [];
+  }
+  if (typeof value.text === "string") {
+    return [value.text];
+  }
+  if (Array.isArray(value.content)) {
+    return value.content.flatMap(collectProseMirrorText);
+  }
+  return [];
+}
+
+export function normalizeNoteContentJson(contentJson: JsonObject | undefined): JsonObject {
+  if (!contentJson) {
+    return { html: "" };
+  }
+  if (typeof contentJson.html === "string") {
+    return { ...contentJson, html: textToHtml(contentJson.html) };
+  }
+  if (typeof contentJson.markdown === "string") {
+    return { html: textToHtml(contentJson.markdown) };
+  }
+
+  const legacyText = collectProseMirrorText(contentJson).join("").trim();
+  return legacyText ? { html: textToHtml(legacyText) } : contentJson;
 }

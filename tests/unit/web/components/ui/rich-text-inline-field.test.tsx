@@ -30,6 +30,7 @@ import { ToastProvider } from "../../../../../apps/web/src/components/ui/ToastPr
 interface MockEditor {
   getHTML: ReturnType<typeof vi.fn<[], string>>;
   getAttributes: ReturnType<typeof vi.fn<[string], Record<string, string | undefined>>>;
+  setEditable: ReturnType<typeof vi.fn<[boolean], void>>;
   commands: {
     setContent: ReturnType<typeof vi.fn<[string, { emitUpdate?: boolean }?], void>>;
     blur: ReturnType<typeof vi.fn<[], void>>;
@@ -118,6 +119,8 @@ interface MockEditorConfig {
   onBlur?: (input: { editor: MockEditor }) => void;
 }
 
+const navigateMock = vi.hoisted(() => vi.fn());
+
 const tiptapMock = vi.hoisted(() => ({
   editor: undefined as MockEditor | undefined,
   config: undefined as MockEditorConfig | undefined,
@@ -171,11 +174,17 @@ function createPasteTransaction(): MockPasteTransaction {
   return tr;
 }
 
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => navigateMock,
+  useLocation: () => ({ search: "", pathname: "/", state: null, key: "default", hash: "" }),
+}));
+
 vi.mock("@tiptap/react", () => ({
   useEditor: vi.fn((config: MockEditorConfig) => {
     const editor: MockEditor = {
       getHTML: vi.fn(() => tiptapMock.html),
       getAttributes: vi.fn<[string], Record<string, string | undefined>>(() => ({})),
+      setEditable: vi.fn(),
       commands: {
         setContent: vi.fn(),
         blur: vi.fn(() => {
@@ -547,5 +556,75 @@ describe("RichTextInlineField", () => {
     expect(promptSpy).not.toHaveBeenCalled();
     expect(tiptapMock.chain).toBeUndefined();
     promptSpy.mockRestore();
+  });
+
+  it("T-EN1 blendet Toolbar im Lesemodus aus ohne Layout-Shift (invisible, not removed)", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} editable={false} testIdPrefix="field" />);
+
+    const toolbar = screen.getByTestId("rich-text-toolbar");
+    expect(toolbar).toBeInTheDocument();
+    expect(toolbar.parentElement).toHaveClass("invisible");
+    expect(toolbar.parentElement).toHaveClass("pointer-events-none");
+  });
+
+  it("T-EN2 zeigt Toolbar im Bearbeitungsmodus ohne invisible-Klasse (default editable)", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    const toolbar = screen.getByTestId("rich-text-toolbar");
+    expect(toolbar).toBeInTheDocument();
+    expect(toolbar.parentElement).not.toHaveClass("invisible");
+  });
+
+  it("T-EN3 navigiert bei einfachem Klick auf wiki://-Link im Lesemodus", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} editable={false} testIdPrefix="field" />);
+
+    const editorContainer = screen.getByTestId("field-editor");
+    const anchor = document.createElement("a");
+    anchor.href = "wiki://42";
+    anchor.textContent = "Wiki Link";
+    editorContainer.appendChild(anchor);
+
+    fireEvent.click(anchor);
+
+    expect(navigateMock).toHaveBeenCalledWith("/wiki/42");
+  });
+
+  it("T-EN4 navigiert bei Ctrl+Klick auf wiki://-Link im Bearbeitungsmodus", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    const editorContainer = screen.getByTestId("field-editor");
+    const anchor = document.createElement("a");
+    anchor.href = "wiki://99";
+    editorContainer.appendChild(anchor);
+
+    fireEvent.click(anchor, { ctrlKey: true });
+
+    expect(navigateMock).toHaveBeenCalledWith("/wiki/99");
+  });
+
+  it("T-EN5 navigiert NICHT bei einfachem Klick auf wiki://-Link im Bearbeitungsmodus", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    const editorContainer = screen.getByTestId("field-editor");
+    const anchor = document.createElement("a");
+    anchor.href = "wiki://99";
+    editorContainer.appendChild(anchor);
+
+    fireEvent.click(anchor);
+
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("T-EN6 ignoriert Klicks auf externe https://-Links", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} editable={false} testIdPrefix="field" />);
+
+    const editorContainer = screen.getByTestId("field-editor");
+    const anchor = document.createElement("a");
+    anchor.href = "https://example.com";
+    editorContainer.appendChild(anchor);
+
+    fireEvent.click(anchor);
+
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 });

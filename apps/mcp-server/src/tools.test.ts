@@ -141,7 +141,7 @@ describe("MCP tool definitions", () => {
 
     expect(client.post).toHaveBeenNthCalledWith(1, "projects", {
       name: "MCP Projekt",
-      description: "Beschreibung",
+      description: "<p>Beschreibung</p>",
       status: "active",
       color: "#2563eb",
       startDate: "2026-05-01",
@@ -149,7 +149,7 @@ describe("MCP tool definitions", () => {
     });
     expect(client.post).toHaveBeenNthCalledWith(2, "projects/1/milestones", {
       name: "MCP Meilenstein",
-      description: "Ziel",
+      description: "<p>Ziel</p>",
       status: "todo",
       color: null,
       startDate: null,
@@ -172,7 +172,7 @@ describe("MCP tool definitions", () => {
 
     expect(client.post).toHaveBeenCalledWith("milestones/7/tasks", {
       title: "Projektbeschreibung redigieren",
-      description: "Bitte Tonalität vereinheitlichen.",
+      description: "<p>Bitte Tonalität vereinheitlichen.</p>",
       status: "todo",
       priority: "medium",
       responsibleUserId: 7,
@@ -296,7 +296,7 @@ describe("MCP tool definitions", () => {
       parentType: "task",
       parentId: 9,
       notes: [
-        { title: "Notiz 1", text: "Erste Notiz" },
+        { title: "Notiz 1", text: "**Erste** Notiz" },
         { title: "Notiz 2", text: "Zweite Notiz" }
       ]
     })) as BulkResult<{ id: number }>;
@@ -314,8 +314,8 @@ describe("MCP tool definitions", () => {
       "tickets/8/comments",
       "tickets/8/comments"
     ]);
-    expect(client.post.mock.calls[0]?.[1]).toMatchObject({ title: "Notiz 1", contentJson: { type: "doc" } });
-    expect(client.post.mock.calls[2]?.[1]).toEqual({ body: "Kommentar 1" });
+    expect(client.post.mock.calls[0]?.[1]).toEqual({ title: "Notiz 1", contentJson: { html: "<p><strong>Erste</strong> Notiz</p>" } });
+    expect(client.post.mock.calls[2]?.[1]).toEqual({ body: "<p>Kommentar 1</p>" });
   });
 
   it("uploads bulk attachments to the same parent serially", async () => {
@@ -418,7 +418,7 @@ describe("MCP tool definitions", () => {
         "features/4/tasks",
         {
           title: "Task mit Datei",
-          description: "Beschreibung",
+          description: "<p>Beschreibung</p>",
           status: "todo",
           priority: "medium"
         }
@@ -437,7 +437,7 @@ describe("MCP tool definitions", () => {
         {
           title: "Ticket mit Datei",
           type: "bug",
-          description: "Beschreibung",
+          description: "<p>Beschreibung</p>",
           status: "open",
           priority: "high"
         }
@@ -491,7 +491,7 @@ describe("MCP tool definitions", () => {
     expect(client.get).toHaveBeenCalledWith("tasks/5");
     expect(client.patch).toHaveBeenCalledWith("tasks/5", {
       title: "Neue Aufgabe",
-      description: "Neu",
+      description: "<p>Neu</p>",
       status: "in_progress",
       priority: "high",
       responsibleUserId: null,

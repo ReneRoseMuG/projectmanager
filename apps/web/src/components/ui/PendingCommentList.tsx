@@ -2,6 +2,7 @@ import type { DraftComment } from "@taskmanager/shared-types";
 import { MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useHasPermission } from "../../hooks/usePermissions";
+import { richTextToHtml } from "../../utils/richText";
 import { Button } from "./Button";
 import { CommentBodyModal, commentTextFromHtml, commentValueFormat } from "./CommentBodyModal";
 import { EmptyState } from "./EmptyState";
@@ -86,7 +87,7 @@ export function PendingCommentList({ comments, onAdd, onUpdate, onRemove }: Pend
             }
             body={
               <RichTextInlineField
-                value={comment.text}
+                value={richTextToHtml(comment.text)}
                 valueFormat={commentValueFormat(comment.text)}
                 readOnly
                 testIdPrefix={`pending-comment-${comment.index}-body`}

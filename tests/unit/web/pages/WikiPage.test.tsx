@@ -124,12 +124,18 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
     open,
     page,
     onDirtyChange,
+    editable,
+    onEdit,
+    onClose,
   }: {
     inline?: boolean;
     inlineChrome?: "embedded" | "standalone";
     open: boolean;
     page?: typeof wikiFixtures.wikiAlpha | null;
     onDirtyChange?: (dirty: boolean) => void;
+    editable?: boolean;
+    onEdit?: () => void;
+    onClose?: () => void;
   }) {
     if (!open) {
       return null;
@@ -137,10 +143,16 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
 
     if (inline) {
       return (
-        <form data-testid="wiki-inline-form" data-inline-chrome={inlineChrome}>
+        <form data-testid="wiki-inline-form" data-inline-chrome={inlineChrome} data-editable={editable ? "true" : "false"}>
           <h2>{page?.title}</h2>
           <button type="button" onClick={() => onDirtyChange?.(true)}>
             Inline Dirty
+          </button>
+          <button type="button" onClick={() => onEdit?.()}>
+            Bearbeiten starten
+          </button>
+          <button type="button" onClick={() => onClose?.()}>
+            Schließen
           </button>
         </form>
       );
@@ -148,6 +160,10 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
 
     return <div data-testid="wiki-create-modal">Neue Wiki-Seite</div>;
   },
+}));
+
+vi.mock("../../../../apps/web/src/hooks/usePermissions", () => ({
+  useHasPermission: () => true,
 }));
 
 vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({
@@ -235,6 +251,53 @@ describe("WikiPage Inline-Redesign", () => {
     renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Inline Dirty" }));
+    fireEvent.click(screen.getByRole("button", { name: "Wiki Beta" }));
+
+    await waitFor(() => expect(router.navigate).toHaveBeenCalledWith("/wiki/11"));
+  });
+
+  it("T-WP1 öffnet Wiki-Seite standardmäßig im Lesemodus (editable=false)", () => {
+    renderPage();
+
+    expect(screen.getByTestId("wiki-inline-form")).toHaveAttribute("data-editable", "false");
+  });
+
+  it("T-WP2 wechselt in den Bearbeitungsmodus nach onEdit-Aufruf", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Bearbeiten starten" }));
+
+    expect(screen.getByTestId("wiki-inline-form")).toHaveAttribute("data-editable", "true");
+  });
+
+  it("T-WP3 kehrt zum Lesemodus zurück wenn onClose im Bearbeitungsmodus aufgerufen wird", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Bearbeiten starten" }));
+    expect(screen.getByTestId("wiki-inline-form")).toHaveAttribute("data-editable", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Schließen" }));
+
+    expect(screen.getByTestId("wiki-inline-form")).toHaveAttribute("data-editable", "false");
+    expect(router.navigate).not.toHaveBeenCalledWith(expect.stringContaining("/wiki"));
+  });
+
+  it("T-WP4 navigiert weg wenn onClose im Lesemodus aufgerufen wird", () => {
+    renderPage();
+
+    expect(screen.getByTestId("wiki-inline-form")).toHaveAttribute("data-editable", "false");
+    fireEvent.click(screen.getByRole("button", { name: "Schließen" }));
+
+    expect(router.navigate).toHaveBeenCalledWith("/wiki");
+  });
+
+  it("T-WP5 setzt Bearbeitungsmodus zurück beim Seitenwechsel", async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Bearbeiten starten" }));
+    expect(screen.getByTestId("wiki-inline-form")).toHaveAttribute("data-editable", "true");
+
+    router.params = { id: "11" };
     fireEvent.click(screen.getByRole("button", { name: "Wiki Beta" }));
 
     await waitFor(() => expect(router.navigate).toHaveBeenCalledWith("/wiki/11"));
