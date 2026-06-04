@@ -244,6 +244,36 @@ async function listCommentOwners(database: DbClient, commentId: number): Promise
   ];
 }
 
+async function listCommentOwnersForMany(database: DbClient, commentIds: number[]): Promise<Map<number, CommentOwner[]>> {
+  const result = new Map<number, CommentOwner[]>();
+  for (const id of commentIds) result.set(id, []);
+  if (commentIds.length === 0) return result;
+
+  const [projectRows, taskRows, milestoneRows, featureRows, useCaseRows, backlogRows, wikiRows, dayPlanRows, ticketRows] = await Promise.all([
+    database.select({ commentId: projectComments.commentId, ownerId: projectComments.projectId }).from(projectComments).where(inArray(projectComments.commentId, commentIds)),
+    database.select({ commentId: taskComments.commentId, ownerId: taskComments.taskId }).from(taskComments).where(inArray(taskComments.commentId, commentIds)),
+    database.select({ commentId: milestoneComments.commentId, ownerId: milestoneComments.milestoneId }).from(milestoneComments).where(inArray(milestoneComments.commentId, commentIds)),
+    database.select({ commentId: featureComments.commentId, ownerId: featureComments.featureId }).from(featureComments).where(inArray(featureComments.commentId, commentIds)),
+    database.select({ commentId: useCaseComments.commentId, ownerId: useCaseComments.useCaseId }).from(useCaseComments).where(inArray(useCaseComments.commentId, commentIds)),
+    database.select({ commentId: backlogItemComments.commentId, ownerId: backlogItemComments.backlogItemId }).from(backlogItemComments).where(inArray(backlogItemComments.commentId, commentIds)),
+    database.select({ commentId: wikiPageComments.commentId, ownerId: wikiPageComments.wikiPageId }).from(wikiPageComments).where(inArray(wikiPageComments.commentId, commentIds)),
+    database.select({ commentId: dayPlanComments.commentId, ownerId: dayPlanComments.dayPlanId }).from(dayPlanComments).where(inArray(dayPlanComments.commentId, commentIds)),
+    database.select({ commentId: ticketComments.commentId, ownerId: ticketComments.ticketId }).from(ticketComments).where(inArray(ticketComments.commentId, commentIds))
+  ]);
+
+  for (const row of projectRows) result.get(row.commentId)?.push({ type: "project", id: row.ownerId });
+  for (const row of taskRows) result.get(row.commentId)?.push({ type: "task", id: row.ownerId });
+  for (const row of milestoneRows) result.get(row.commentId)?.push({ type: "milestone", id: row.ownerId });
+  for (const row of featureRows) result.get(row.commentId)?.push({ type: "feature", id: row.ownerId });
+  for (const row of useCaseRows) result.get(row.commentId)?.push({ type: "useCase", id: row.ownerId });
+  for (const row of backlogRows) result.get(row.commentId)?.push({ type: "backlogItem", id: row.ownerId });
+  for (const row of wikiRows) result.get(row.commentId)?.push({ type: "wikiPage", id: row.ownerId });
+  for (const row of dayPlanRows) result.get(row.commentId)?.push({ type: "dayPlan", id: row.ownerId });
+  for (const row of ticketRows) result.get(row.commentId)?.push({ type: "ticket", id: row.ownerId });
+
+  return result;
+}
+
 async function insertCommentLink(database: DbSession, owner: CommentOwner, commentId: number): Promise<void> {
   if (owner.type === "project") {
     await database.insert(projectComments).ignore().values({ projectId: owner.id, commentId });
@@ -781,7 +811,16 @@ export async function listEntityComments(database: DbClient, entityType: Comment
   const owner = { type: entityType, id: entityId };
   await ensureOwnerExists(database, owner);
   const records = await selectOwnerComments(database, owner);
-  return Promise.all(records.map((comment) => mapComment(database, comment)));
+  if (records.length === 0) return [];
+  const ownersMap = await listCommentOwnersForMany(database, records.map((r) => r.id));
+  return records.map((record) => ({
+    id: record.id,
+    owners: ownersMap.get(record.id) ?? [],
+    body: record.body,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    version: record.version
+  }));
 }
 
 export async function createEntityComment(database: DbClient, entityType: CommentEntityType, entityId: number, input: CommentInput, actor?: JournalActor | null): Promise<Comment> {
