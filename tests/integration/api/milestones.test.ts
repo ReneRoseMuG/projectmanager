@@ -159,7 +159,7 @@ describe("Milestones API", () => {
 
     const comment = await supertest(app.server).post(`/api/milestones/${milestone.id}/comments`).send({ body: "Milestone-Kommentar" }).expect(201);
     const comments = await supertest(app.server).get(`/api/milestones/${milestone.id}/comments`).expect(200);
-    expect(comments.body).toEqual([expect.objectContaining({ id: comment.body.id, body: "Milestone-Kommentar" })]);
+    expect(comments.body).toEqual([expect.objectContaining({ id: comment.body.id, body: "<p>Milestone-Kommentar</p>" })]);
 
     const attachment = await supertest(app.server)
       .post(`/api/milestones/${milestone.id}/attachments`)

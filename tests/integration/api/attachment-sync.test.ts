@@ -377,9 +377,6 @@ describe("Attachment-Sync API", () => {
   it("GET /api/attachment-sync/status gibt Readiness und lastSync zurück", async () => {
     const app = await buildTestApp(testDb);
     try {
-      const { registerAttachmentSyncRoutes } = await import("../../../apps/api/src/routes/attachment-sync.js");
-      await app.register(registerAttachmentSyncRoutes, { prefix: "/api" });
-
       const res = await supertest(app.server)
         .get("/api/attachment-sync/status")
         .expect(200);
@@ -400,9 +397,6 @@ describe("Attachment-Sync API", () => {
   it("POST /api/attachment-sync/run gibt SyncStats zurück", async () => {
     const app = await buildTestApp(testDb);
     try {
-      const { registerAttachmentSyncRoutes } = await import("../../../apps/api/src/routes/attachment-sync.js");
-      await app.register(registerAttachmentSyncRoutes, { prefix: "/api" });
-
       const res = await supertest(app.server)
         .post("/api/attachment-sync/run")
         .expect(200);

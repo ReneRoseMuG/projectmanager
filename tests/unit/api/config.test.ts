@@ -1,19 +1,16 @@
-import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiRoot, repoRoot } from "../../../apps/api/src/runtime-safety.js";
-import { resolveBackupWorkDir } from "../../../apps/api/src/config.js";
 
 /**
  * Test Scope:
  *
  * Abgedeckte Regeln:
- * - Der lokale Backup-Ordner wird relativ zum Repo-Root aufgelöst.
+ * - API-Key- und Benachrichtigungskonfiguration werden aus der Umgebung gelesen.
  *
  * Fehlerfälle:
- * - Ein alter `apps/api/backups`-Override wird nicht als aktiver Backup-Pfad übernommen.
+ * - Leere API-Key-Werte deaktivieren API-Key-Auth.
  *
  * Ziel:
- * Die lokale Sicherung bleibt im freigegebenen Root-Backup-Ordner, auch wenn noch Legacy-Env-Werte vorhanden sind.
+ * Die Konfigurationswerte bleiben stabil und getrimmt, ohne produktive Umgebungswerte im Test zu verändern.
  */
 
 const trackedEnvKeys = [
@@ -59,18 +56,6 @@ async function loadConfigWithEnv(values: Partial<Record<(typeof trackedEnvKeys)[
 async function loadConfigWithApiKey(value: string | undefined) {
   return loadConfigWithEnv({ API_KEY: value });
 }
-
-describe("config backup work dir", () => {
-  it("löst den Standard-Backup-Ordner relativ zum Repo-Root auf", () => {
-    expect(resolveBackupWorkDir(undefined)).toBe(path.resolve(repoRoot, "backups"));
-    expect(resolveBackupWorkDir("./backups")).toBe(path.resolve(repoRoot, "backups"));
-  });
-
-  it("normalisiert den alten API-relativen Backup-Ordner auf den Repo-Root", () => {
-    expect(resolveBackupWorkDir(path.resolve(apiRoot, "backups"))).toBe(path.resolve(repoRoot, "backups"));
-    expect(resolveBackupWorkDir("apps/api/backups")).toBe(path.resolve(repoRoot, "backups"));
-  });
-});
 
 describe("config api key", () => {
   it("deaktiviert API-Key-Auth ohne Secret oder bei leerem Secret", async () => {

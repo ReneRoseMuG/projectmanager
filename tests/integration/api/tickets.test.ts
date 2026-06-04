@@ -609,7 +609,7 @@ describe("Tickets API", () => {
 
     const res = await supertest(app.server).post(`/api/tickets/${ticket.id}/comments`).send({ body: "Ticket comment" }).expect(201);
 
-    expect(res.body).toMatchObject({ owners: [{ type: "ticket", id: ticket.id }], body: "Ticket comment" });
+    expect(res.body).toMatchObject({ owners: [{ type: "ticket", id: ticket.id }], body: "<p>Ticket comment</p>" });
   });
 
   it("Ticket comments appear in detail", async () => {
@@ -618,7 +618,7 @@ describe("Tickets API", () => {
 
     const res = await supertest(app.server).get(`/api/tickets/${ticket.id}`).expect(200);
 
-    expect(res.body.comments[0].body).toBe("Ticket comment");
+    expect(res.body.comments[0].body).toBe("<p>Ticket comment</p>");
   });
 
   it("POST /api/tickets/:id/attachments uploads a ticket file", async () => {

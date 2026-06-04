@@ -2,6 +2,10 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 04.06.26 | 17:55:45 | Fix | API-Restfehler Tests | ⚠️ |
+| 04.06.26 | 17:46:07 | Fix | API-Testdrift und DB-SSL | ⚠️ |
+| 04.06.26 | 17:14:25 | 2 | Vollständiger Testlauf | ⚠️ |
+| 04.06.26 | 16:58:55 | 1 | Test-Upload-Isolation | ✅ |
 | 04.06.26 | 16:40:58 | Fix | Lokaler Upload-Pfad | ✅ |
 | 04.06.26 | 10:28:47 | Feature | MS-51 Richtext-Normalisierung | ⚠️ |
 | 04.06.26 | 10:03:22 | Feature | MS-50 Wiki Lesemodus + wiki://-Link-Interceptor | ✅ |

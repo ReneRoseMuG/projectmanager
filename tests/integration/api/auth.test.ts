@@ -385,7 +385,7 @@ describe("Auth API", () => {
       .patch(`/api/comments/${comment.body.id}`)
       .send({ body: "Admin aktualisiert", expectedVersion: comment.body.version })
       .expect(200);
-    expect(updated.body).toEqual(expect.objectContaining({ body: "Admin aktualisiert", version: comment.body.version + 1 }));
+    expect(updated.body).toEqual(expect.objectContaining({ body: "<p>Admin aktualisiert</p>", version: comment.body.version + 1 }));
 
     const roles = await admin.get("/api/admin/roles").expect(200);
     const readerRole = roles.body.find((role: { key: string }) => role.key === "reader") as { id: number };

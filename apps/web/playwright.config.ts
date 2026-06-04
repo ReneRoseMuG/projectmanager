@@ -48,6 +48,7 @@ export default defineConfig({
         DB_NAME: dbName,
         DB_USER: process.env.DB_USER ?? testEnv.TEST_DB_USER ?? "taskmanager",
         DB_PASSWORD: process.env.DB_PASSWORD ?? testEnv.TEST_DB_PASSWORD ?? "",
+        DB_SSL: "false",
         UPLOAD_DIR: path.join(e2eRuntimeRoot, "uploads"),
         PREVIEW_CACHE_DIR: path.join(e2eRuntimeRoot, "previews"),
         CONTENT_DIR: path.join(e2eRuntimeRoot, "content"),

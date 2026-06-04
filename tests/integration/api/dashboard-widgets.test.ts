@@ -74,7 +74,7 @@ describe("Dashboard widget data API", () => {
       .expect(201);
 
     await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Offen überfällig", status: "todo", priority: "high", dueDate: "2026-05-01" }).expect(201);
-    await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "In Arbeit", status: "in_progress", priority: "medium", dueDate: "2026-06-01" }).expect(201);
+    await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "In Arbeit", status: "in_progress", priority: "medium", dueDate: "2999-06-01" }).expect(201);
     await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Erledigt alt", status: "done", priority: "low", dueDate: "2026-05-01" }).expect(201);
     await admin.post(`/api/projects/${project.body.id}/tasks`).send({ title: "Frei geschlossener Status", status: closedStatus.body.key, priority: "low", dueDate: "2026-05-01" }).expect(201);
     await admin.post(`/api/projects/${project.body.id}/tickets`).send({ title: "Bug offen", type: "bug", status: "open", priority: "urgent" }).expect(201);
@@ -136,7 +136,7 @@ describe("Dashboard widget data API", () => {
     expect(comments.body).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          body: "Kommentar am Meilenstein-Task",
+          body: "<p>Kommentar am Meilenstein-Task</p>",
           entityType: "task",
           entityId: milestoneTask.body.id,
           entityLabel: "Meilensteinaufgabe"
@@ -193,7 +193,7 @@ describe("Dashboard widget data API", () => {
     expect(globalComments.body[0]).toEqual(
       expect.objectContaining({
         id: editedComment.body.id,
-        body: "Bearbeiteter Kommentar",
+        body: "<p>Bearbeiteter Kommentar</p>",
         updatedAt: updatedComment.body.updatedAt,
         entityType: "task",
         entityId: task.body.id
@@ -201,11 +201,11 @@ describe("Dashboard widget data API", () => {
     );
     expect(globalComments.body.map((comment: { body: string }) => comment.body)).toEqual(
       expect.arrayContaining([
-        "Kommentar im anderen Projekt",
-        "Feature-Kommentar global",
-        "Use-Case-Kommentar global",
-        "Backlog-Kommentar global",
-        "Wiki-Kommentar global"
+        "<p>Kommentar im anderen Projekt</p>",
+        "<p>Feature-Kommentar global</p>",
+        "<p>Use-Case-Kommentar global</p>",
+        "<p>Backlog-Kommentar global</p>",
+        "<p>Wiki-Kommentar global</p>"
       ])
     );
 
@@ -292,8 +292,8 @@ describe("Dashboard widget data API", () => {
     // commentJournal für Meilenstein A: direkter Kommentar und Task-Kommentar
     const recentComments = await admin.get(`/api/comments/recent?ownerType=milestone&ownerId=${ms.body.id}`).expect(200);
     const commentBodies = recentComments.body.map((c: { body: string }) => c.body);
-    expect(commentBodies).toContain("Direkter Meilenstein-Kommentar");
-    expect(commentBodies).toContain("Task-Kommentar im Meilenstein");
+    expect(commentBodies).toContain("<p>Direkter Meilenstein-Kommentar</p>");
+    expect(commentBodies).toContain("<p>Task-Kommentar im Meilenstein</p>");
 
     // attachmentJournal für Meilenstein A
     const recentAttachments = await admin.get(`/api/attachments/recent?ownerType=milestone&ownerId=${ms.body.id}`).expect(200);
@@ -336,8 +336,8 @@ describe("Dashboard widget data API", () => {
     // commentJournal für Task-Kontext: nur eigene Kommentare
     const recentComments = await admin.get(`/api/comments/recent?ownerType=task&ownerId=${parentTask.body.id}`).expect(200);
     const commentBodies = recentComments.body.map((c: { body: string }) => c.body);
-    expect(commentBodies).toContain("Eltern-Kommentar");
-    expect(commentBodies).not.toContain("Fremder Kommentar");
+    expect(commentBodies).toContain("<p>Eltern-Kommentar</p>");
+    expect(commentBodies).not.toContain("<p>Fremder Kommentar</p>");
   });
 
   // =========================================================================
@@ -483,6 +483,6 @@ describe("Dashboard widget data API", () => {
 
     // commentJournal für DayPlan-Owner
     const recentComments = await admin.get(`/api/comments/recent?ownerType=dayPlan&ownerId=${dayPlanId}`).expect(200);
-    expect(recentComments.body.map((c: { body: string }) => c.body)).toContain("Tagesplan-Kommentar");
+    expect(recentComments.body.map((c: { body: string }) => c.body)).toContain("<p>Tagesplan-Kommentar</p>");
   });
 });

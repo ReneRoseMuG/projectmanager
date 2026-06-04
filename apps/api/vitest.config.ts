@@ -28,6 +28,7 @@ export default defineConfig({
       TEST_DB_PORT: testEnv.TEST_DB_PORT ?? process.env.TEST_DB_PORT ?? "3306",
       TEST_DB_USER: testEnv.TEST_DB_USER ?? process.env.TEST_DB_USER ?? "root",
       TEST_DB_PASSWORD: testEnv.TEST_DB_PASSWORD ?? process.env.TEST_DB_PASSWORD ?? "",
+      DB_SSL: "false",
       ADMIN_EMAIL: "admin@local",
       ADMIN_FIRST_NAME: "Test",
       ADMIN_LAST_NAME: "Admin",
