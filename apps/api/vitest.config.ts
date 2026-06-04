@@ -32,7 +32,6 @@ export default defineConfig({
       ADMIN_FIRST_NAME: "Test",
       ADMIN_LAST_NAME: "Admin",
       ADMIN_INITIAL_PASSWORD: "password123",
-      ATTACHMENT_BASE_PATH: path.join(runtimeRoot, "uploads"),
       UPLOAD_DIR: path.join(runtimeRoot, "uploads"),
       PREVIEW_CACHE_DIR: path.join(runtimeRoot, "previews"),
       CONTENT_DIR: path.join(runtimeRoot, "content"),

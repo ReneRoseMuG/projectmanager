@@ -64,6 +64,7 @@ function booleanFromEnv(value: string | undefined): boolean {
 const configuredSessionSecret = process.env.SESSION_SECRET?.trim();
 const configuredApiKey = process.env.API_KEY?.trim();
 const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim() || "admin@local";
+const configuredUploadDir = process.env.UPLOAD_DIR?.trim();
 
 export const config: AppConfig = {
   db: {
@@ -76,7 +77,7 @@ export const config: AppConfig = {
   },
   port: Number(process.env.PORT ?? 3001),
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
-  uploadDir: resolveFromApiRoot(process.env.ATTACHMENT_BASE_PATH ?? process.env.UPLOAD_DIR ?? "./uploads"),
+  uploadDir: resolveFromApiRoot(configuredUploadDir || "./uploads"),
   previewCacheDir: resolveFromApiRoot(process.env.PREVIEW_CACHE_DIR ?? "./previews"),
   previewTextMaxBytes: numberFromEnv(process.env.PREVIEW_TEXT_MAX_BYTES, 100 * 1024),
   previewConversionMaxBytes: numberFromEnv(process.env.PREVIEW_CONVERSION_MAX_BYTES, 25 * 1024 * 1024),

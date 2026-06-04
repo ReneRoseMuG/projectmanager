@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 04.06.26 | 16:40:58 | Fix | Lokaler Upload-Pfad | ✅ |
 | 04.06.26 | 10:28:47 | Feature | MS-51 Richtext-Normalisierung | ⚠️ |
 | 04.06.26 | 10:03:22 | Feature | MS-50 Wiki Lesemodus + wiki://-Link-Interceptor | ✅ |
 | 03.06.26 | 09:49:02 | Fix | Deploy Runtime Toolbar | ✅ |
