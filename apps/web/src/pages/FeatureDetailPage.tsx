@@ -6,7 +6,7 @@ import type {
   Feature,
   FeatureInput,
 } from "@taskmanager/shared-types";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { uploadFeatureAttachment } from "../api/attachments";
 import { createEntityComment } from "../api/comments";
@@ -78,6 +78,20 @@ export function FeatureDetailPage() {
       throw featureError;
     }
   };
+
+  const autoSaveFeature = useCallback(async (input: FeatureInput): Promise<void> => {
+    if (!features.feature) return;
+    const f = features.feature;
+    const fieldsChanged =
+      input.title !== f.title ||
+      (input.content ?? "") !== (f.content ?? "") ||
+      input.status !== f.status ||
+      input.responsibleUserId !== f.responsibleUserId;
+
+    if (!fieldsChanged) return;
+
+    await features.updateFeature(f.id, { ...input, expectedVersion: f.version });
+  }, [features]);
 
   const postCreateFeature = async (
     featureId: number,
@@ -202,6 +216,7 @@ export function FeatureDetailPage() {
         initialProjectId={initialProjectId}
         initialTab={initialTab}
         onSubmit={saveFeature}
+        onAutoSave={features.feature ? autoSaveFeature : undefined}
         onDelete={deleteFeature}
         savingLabel={savingLabel}
         onPostCreate={postCreateFeature}

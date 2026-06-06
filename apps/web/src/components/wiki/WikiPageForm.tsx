@@ -1,7 +1,9 @@
 import type { DraftComment, Note, Project, WikiPage, WikiPageInput, WikiPageRelationSummary } from "@taskmanager/shared-types";
 import { ExternalLink, Pencil, Trash2, X } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useAutoSave } from "../../hooks/useAutoSave";
+import { SaveStatus } from "../ui/SaveStatus";
 import { uploadContentImage } from "../../api/content-images";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
@@ -15,6 +17,7 @@ import { JournalPanel } from "../journal/JournalPanel";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { Button } from "../ui/Button";
+import { CopyReferenceButton } from "../ui/CopyReferenceButton";
 import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
@@ -34,6 +37,7 @@ interface WikiPageFormProps {
   tree: WikiTreeNode[];
   projects: Project[];
   onSubmit: (input: WikiPageInput, relatedPageIds: number[]) => Promise<WikiPage | void>;
+  onAutoSave?: (input: WikiPageInput, relatedPageIds: number[]) => Promise<void>;
   onPostCreate?: (pageId: number, pending: { comments: DraftComment[]; relatedPageIds: number[] }) => Promise<void>;
   onClose: () => void;
   onOpenInTab?: () => void;
@@ -62,7 +66,7 @@ const tabs: Array<Tab<WikiPageFormTab>> = [
   { value: "journal", label: "Journal" }
 ];
 
-export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onPostCreate, onClose, onOpenInTab, inline = false, inlineChrome = "standalone", onDelete, onDirtyChange, editable, onEdit, onNavigateToWikiPage }: WikiPageFormProps) {
+export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onAutoSave, onPostCreate, onClose, onOpenInTab, inline = false, inlineChrome = "standalone", onDelete, onDirtyChange, editable, onEdit, onNavigateToWikiPage }: WikiPageFormProps) {
   const { confirm } = useConfirm();
   const { showToast } = useToast();
   const pageId = page?.id ?? null;
@@ -77,6 +81,20 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
   const [relatedPages, setRelatedPages] = useState<WikiPageRelationSummary[]>([]);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const formStateRef = useRef({ title, parentId, content, relatedPages });
+  formStateRef.current = { title, parentId, content, relatedPages };
+  const autoSave = useAutoSave({
+    enabled: !!page && !!onAutoSave,
+    save: async () => {
+      if (!onAutoSave) return;
+      const s = formStateRef.current;
+      await onAutoSave(
+        { title: s.title, parentId: s.parentId, content: s.content },
+        s.relatedPages.map((p) => p.id),
+      );
+    },
+  });
+  const af = page ? autoSave.flush : undefined;
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
   const [activeTab, setActiveTab] = useState<WikiPageFormTab>("details");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
@@ -212,6 +230,8 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                     <Pencil size={18} />
                   </button>
                 ) : null}
+                {page && onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : null}
+                {page ? <CopyReferenceButton reference={String(page.id)} variant="hero" /> : null}
                 {page && onDelete ? (
                   <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Seite löschen" title="Seite löschen" onClick={() => onDelete(page)}>
                     <Trash2 size={18} />
@@ -234,6 +254,8 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
               <h2 className="text-2xl font-bold tracking-normal">{title || (page ? "Wiki-Seite bearbeiten" : "Wiki-Seite anlegen")}</h2>
             </div>
             <div className="flex items-center gap-2">
+              {page && onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : null}
+              {page ? <CopyReferenceButton reference={String(page.id)} variant="hero" /> : null}
               {onOpenInTab ? (
                 <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="In neuem Tab öffnen" title="In neuem Tab öffnen" onClick={onOpenInTab}>
                   <ExternalLink size={18} />
@@ -269,6 +291,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                         setTitle(event.target.value);
                         setDirty(true);
                       }}
+                      onBlur={af}
                       required
                     />
                   </FormField>
@@ -277,8 +300,11 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                       className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-teal"
                       value={parentId ?? ""}
                       onChange={(event) => {
-                        setParentId(event.target.value ? Number(event.target.value) : null);
+                        const v = event.target.value ? Number(event.target.value) : null;
+                        setParentId(v);
+                        formStateRef.current = { ...formStateRef.current, parentId: v };
                         setDirty(true);
+                        af?.();
                       }}
                     >
                       <option value="">Root-Seite</option>
@@ -302,7 +328,9 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                   onNavigate={onNavigateToWikiPage}
                   onChange={(nextPages) => {
                     setRelatedPages(nextPages);
+                    formStateRef.current = { ...formStateRef.current, relatedPages: nextPages };
                     setDirty(true);
+                    af?.();
                   }}
                 />
               </Section>
@@ -320,7 +348,9 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                   fill
                   onChange={(value) => {
                     setContent(value);
+                    formStateRef.current = { ...formStateRef.current, content: value };
                     setDirty(true);
+                    af?.();
                   }}
                 />
               </Section>
@@ -426,7 +456,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
           ) : null}
         </div>
 
-        {effectiveEditable ? (
+        {effectiveEditable && (!page || !onAutoSave) ? (
           <footer className={`flex flex-wrap items-center gap-3 border-t border-line bg-white px-5 py-4 ${embeddedActionPage && onDelete ? "justify-between" : "justify-end"}`}>
             {embeddedActionPage && onDelete ? (
               <Button

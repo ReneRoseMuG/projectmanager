@@ -28,8 +28,8 @@ import { FeatureForm } from "../../../../../apps/web/src/components/features/Fea
 
 describe("FeatureForm", () => {
   it("verdrahtet Body, Parent-Kontext und Sidebar-Felder ohne entfernte Felder", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(feature);
-    renderWithProviders(<FeatureForm open feature={feature} onSubmit={onSubmit} onClose={vi.fn()} />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />);
 
     const sidebar = screen.getByTestId("form-sidebar");
     const sidebarSelects = within(sidebar).getAllByRole("combobox");
@@ -46,10 +46,9 @@ describe("FeatureForm", () => {
     fireEvent.change(screen.getByDisplayValue(feature.title), { target: { value: "Feature Beta" } });
     fireEvent.change(sidebarSelects[0], { target: { value: "done" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
+      expect(onAutoSave).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Feature Beta",
           status: "done",
@@ -58,22 +57,21 @@ describe("FeatureForm", () => {
         })
       )
     );
-    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("description");
-    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
+    expect(onAutoSave.mock.calls[0]?.[0]).not.toHaveProperty("description");
+    expect(onAutoSave.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
   });
 
   it("bindet RichTextInlineField an Inhalt und sendet keine Kurzbeschreibung oder Sortierung", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(feature);
-    renderWithProviders(<FeatureForm open feature={feature} onSubmit={onSubmit} onClose={vi.fn()} />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />);
 
     expect(screen.queryByTestId("feature-form-description-view")).not.toBeInTheDocument();
     expect(screen.getByTestId("feature-form-content-view")).toHaveValue(feature.content);
     fireEvent.change(screen.getByTestId("feature-form-content-view"), { target: { value: "<p>Neuer Inhalt</p>" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Neuer Inhalt</p>" })));
-    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("description");
-    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
+    await waitFor(() => expect(onAutoSave).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Neuer Inhalt</p>" })));
+    expect(onAutoSave.mock.calls[0]?.[0]).not.toHaveProperty("description");
+    expect(onAutoSave.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
   });
 
   it("stellt Bild-Upload für Inhalt im Edit-Modus bereit", () => {

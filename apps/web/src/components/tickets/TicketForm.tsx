@@ -23,6 +23,7 @@ import { useAttachments } from "../../hooks/useAttachments";
 import { useAuth } from "../../hooks/useAuth";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { errorMessage } from "../../hooks/errors";
+import { useAutoSave } from "../../hooks/useAutoSave";
 import { useNotes } from "../../hooks/useNotes";
 import { useHasPermission } from "../../hooks/usePermissions";
 import { useTicketDetail } from "../../hooks/useTicketDetail";
@@ -50,6 +51,7 @@ import { TagPicker } from "../tags/TagPicker";
 import { Button } from "../ui/Button";
 import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
+import { SaveStatus } from "../ui/SaveStatus";
 import { DatePicker } from "../ui/DatePicker";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
@@ -100,6 +102,8 @@ interface TicketFormProps {
   initialStatus?: TicketStatus;
   title?: string;
   onSubmit: (input: TicketFormInput) => Promise<Ticket | void>;
+  onAutoSave?: (input: TicketFormInput) => Promise<void>;
+  onDelete?: () => void;
   onClose: () => void;
   onChanged?: () => Promise<void>;
   savingLabel?: string;
@@ -147,6 +151,8 @@ export function TicketForm({
   initialStatus = "open",
   title = "Ticket",
   onSubmit,
+  onAutoSave,
+  onDelete,
   onClose,
   onChanged,
   savingLabel,
@@ -198,6 +204,38 @@ export function TicketForm({
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const prevOpenRef = useRef(false);
+
+  const formStateRef = useRef({ ticketTitle, description, type, status, priority, resolution, responsibleUserId, reporterUserId, dueDate, environment, affectedVersion, selectedTags });
+  formStateRef.current = { ticketTitle, description, type, status, priority, resolution, responsibleUserId, reporterUserId, dueDate, environment, affectedVersion, selectedTags };
+
+  const autoSave = useAutoSave({
+    enabled: !!ticket && !!onAutoSave,
+    save: async () => {
+      if (!onAutoSave) return;
+      const s = formStateRef.current;
+      const isClosed = isCatalogStatusClosed(catalogs.entries, "workStatus", s.status);
+      await onAutoSave({
+        title: s.ticketTitle,
+        description: s.description,
+        type: ticketTypeValue(catalogs.entries, s.type),
+        status: ticketStatusValue(catalogs.entries, s.status),
+        priority: priorityValue(catalogs.entries, s.priority),
+        resolution: isClosed ? s.resolution : null,
+        responsibleUserId: s.responsibleUserId,
+        reporterUserId: s.reporterUserId,
+        environment: s.type === "bug" ? s.environment : null,
+        affectedVersion: s.type === "bug" ? s.affectedVersion : null,
+        dueDate: s.dueDate || null,
+        tagIds: s.selectedTags.map((t) => t.id),
+        pendingSubTickets: [],
+        pendingRelations: [],
+        pendingComments: [],
+        pendingNotes: [],
+        pendingFiles: [],
+      });
+    },
+  });
+  const af = ticket ? autoSave.flush : undefined;
 
   useEffect(() => {
     if (!open) {
@@ -344,11 +382,15 @@ export function TicketForm({
       <FormModal
         open={open}
         title={ticket ? "Ticket bearbeiten" : title}
+        entityTitle={ticket?.title}
         objectReference={ticket ? objectReference("ticket", ticket.id) : undefined}
         icon={<Bug size={20} />}
-        breadcrumb={["Tickets", ticket ? `TICKET-${ticket.id}` : "Neu"]}
-        submitLabel={saving ? (savingLabel ?? "Speichern...") : ticket ? "Speichern" : "Ticket anlegen"}
+        breadcrumb={["Tickets"]}
+        submitLabel={saving ? (savingLabel ?? "Speichern...") : "Ticket anlegen"}
         saving={saving}
+        hideFooter={!!ticket}
+        onDelete={onDelete}
+        saveStatus={ticket ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
         onSubmit={submit}
         onClose={onClose}
         variant={variant}
@@ -375,10 +417,10 @@ export function TicketForm({
                 <Section className="flex flex-1 flex-col">
                   <div className="flex flex-1 flex-col gap-4">
                     <FormField label="Titel" required>
-                      <Input value={ticketTitle} onChange={(event) => setTicketTitle(event.target.value)} required autoFocus={!ticket} />
+                      <Input value={ticketTitle} onChange={(event) => setTicketTitle(event.target.value)} onBlur={af} required autoFocus={!ticket} />
                     </FormField>
                     <FormField label="Beschreibung" fill>
-                      <RichTextInlineField value={description} placeholder="Beschreibung" fill minRows={12} testIdPrefix="ticket-description" onImageUpload={uploadContentImage} onChange={setDescription} />
+                      <RichTextInlineField value={description} placeholder="Beschreibung" fill minRows={12} testIdPrefix="ticket-description" onImageUpload={uploadContentImage} onChange={(v) => { setDescription(v); formStateRef.current = { ...formStateRef.current, description: v }; af?.(); }} />
                     </FormField>
                   </div>
                 </Section>
@@ -386,30 +428,30 @@ export function TicketForm({
             </div>
             <FormSidebar storageKey="ticket-form-sidebar">
               {showParentContexts ? <ParentContextField parents={currentTicket?.parentContexts} /> : null}
-              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
-              <CatalogSelect label="Typ" icon={<SlidersHorizontal size={14} />} variant="panel" kind="ticketType" value={type} onChange={setType} />
-              <CatalogSelect label="Priorität" icon={<Flag size={14} />} variant="panel" kind="priority" value={priority} onChange={setPriority} />
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={(v) => { setStatus(v); formStateRef.current = { ...formStateRef.current, status: v }; af?.(); }} />
+              <CatalogSelect label="Typ" icon={<SlidersHorizontal size={14} />} variant="panel" kind="ticketType" value={type} onChange={(v) => { setType(v); formStateRef.current = { ...formStateRef.current, type: v }; af?.(); }} />
+              <CatalogSelect label="Priorität" icon={<Flag size={14} />} variant="panel" kind="priority" value={priority} onChange={(v) => { setPriority(v); formStateRef.current = { ...formStateRef.current, priority: v }; af?.(); }} />
               {statusClosed ? (
                 <Select
                   label="Lösung"
                   icon={<ListChecks size={14} />}
                   variant="panel"
                   value={resolution}
-                  onChange={(e) => setResolution(e.target.value as TicketResolution)}
+                  onChange={(e) => { const v = e.target.value as TicketResolution; setResolution(v); formStateRef.current = { ...formStateRef.current, resolution: v }; af?.(); }}
                 >
                   {resolutionOptions.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </Select>
               ) : null}
-              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => { const v = event.target.value; setDueDate(v); formStateRef.current = { ...formStateRef.current, dueDate: v }; af?.(); }} />
               <UserSelectField
                 label="Zuständig"
                 icon={<Users size={14} />}
                 variant="panel"
                 value={responsibleUserId}
                 selectedUser={currentTicket?.responsibleUser ?? null}
-                onChange={setResponsibleUserId}
+                onChange={(v) => { setResponsibleUserId(v); formStateRef.current = { ...formStateRef.current, responsibleUserId: v }; af?.(); }}
               />
               <UserSelectField
                 label="Meldende Person"
@@ -417,19 +459,19 @@ export function TicketForm({
                 variant="panel"
                 value={reporterUserId}
                 selectedUser={currentTicket?.reporterUser ?? null}
-                onChange={setReporterUserId}
+                onChange={(v) => { setReporterUserId(v); formStateRef.current = { ...formStateRef.current, reporterUserId: v }; af?.(); }}
               />
               {type === "bug" ? (
                 <>
                   <FormField label="Umgebung" icon={<Activity size={14} />} variant="panel">
-                    <Input value={environment} onChange={(event) => setEnvironment(event.target.value)} />
+                    <Input value={environment} onChange={(event) => setEnvironment(event.target.value)} onBlur={af} />
                   </FormField>
                   <FormField label="Betroffene Version" icon={<History size={14} />} variant="panel">
-                    <Input value={affectedVersion} onChange={(event) => setAffectedVersion(event.target.value)} />
+                    <Input value={affectedVersion} onChange={(event) => setAffectedVersion(event.target.value)} onBlur={af} />
                   </FormField>
                 </>
               ) : null}
-              <TagPicker selected={selectedTags} onChange={setSelectedTags} variant="panel" />
+              <TagPicker selected={selectedTags} onChange={(v) => { setSelectedTags(v); formStateRef.current = { ...formStateRef.current, selectedTags: v }; af?.(); }} variant="panel" />
             </FormSidebar>
           </div>
         ) : null}

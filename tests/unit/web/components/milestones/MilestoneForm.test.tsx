@@ -322,8 +322,8 @@ describe("MilestoneForm", () => {
   });
 
   it("verdrahtet Body und Sidebar-Felder mit Initialdaten und Submit-Payload", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(milestone);
-    renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project, otherProject]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project, otherProject]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} variant="page" />);
 
     const sidebar = screen.getByTestId("form-sidebar");
     const sidebarSelects = within(sidebar).getAllByRole("combobox");
@@ -343,10 +343,9 @@ describe("MilestoneForm", () => {
     fireEvent.change(dateInputs[0], { target: { value: "2026-07-01" } });
     fireEvent.change(dateInputs[1], { target: { value: "2026-07-31" } });
     fireEvent.click(within(sidebar).getByTestId("tag-picker"));
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
+      expect(onAutoSave).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: otherProject.id,
           name: "Meilenstein Beta",
@@ -361,14 +360,13 @@ describe("MilestoneForm", () => {
   });
 
   it("bindet RichTextInlineField an die Beschreibung", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(milestone);
-    renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} variant="page" />);
 
     expect(screen.getByTestId("milestone-description-view")).toHaveValue(milestone.description);
     fireEvent.change(screen.getByTestId("milestone-description-view"), { target: { value: "<p>Meilenstein aktualisiert</p>" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Meilenstein aktualisiert</p>" }), []));
+    await waitFor(() => expect(onAutoSave).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Meilenstein aktualisiert</p>" }), []));
   });
 
   it("stellt Bild-Upload für die Beschreibung im Edit-Modus bereit", () => {

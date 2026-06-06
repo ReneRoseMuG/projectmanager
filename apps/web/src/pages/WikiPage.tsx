@@ -104,6 +104,27 @@ export function WikiPage() {
     }
   };
 
+  const autoSaveInlineForm = async (input: WikiPageInput, relatedPageIds: number[]) => {
+    if (!wiki.page) return;
+    const p = wiki.page;
+    const currentRelatedPageIds = p.relatedPages.map((rp) => rp.id).sort((a, b) => a - b);
+    const nextRelatedPageIds = [...relatedPageIds].sort((a, b) => a - b);
+    const fieldsChanged =
+      input.title !== p.title ||
+      (input.content ?? "") !== (p.content ?? "") ||
+      (input.parentId ?? null) !== (p.parentId ?? null);
+    const relationsChanged =
+      nextRelatedPageIds.length !== currentRelatedPageIds.length ||
+      nextRelatedPageIds.some((id, i) => id !== currentRelatedPageIds[i]);
+
+    if (!fieldsChanged && !relationsChanged) return;
+
+    await wiki.updateWikiPage(p.id, { ...input, expectedVersion: p.version });
+    if (relationsChanged) {
+      await wiki.syncWikiPageRelations(p.id, currentRelatedPageIds, relatedPageIds);
+    }
+  };
+
   const postCreatePage = async (
     pageId: number,
     pending: { comments: DraftComment[]; relatedPageIds: number[] },
@@ -227,6 +248,7 @@ export function WikiPage() {
                   tree={wiki.tree}
                   projects={projects}
                   onSubmit={submitInlineForm}
+                  onAutoSave={wiki.page ? autoSaveInlineForm : undefined}
                   onDelete={deletePage}
                   onDirtyChange={setInlineDirty}
                   editable={editing}

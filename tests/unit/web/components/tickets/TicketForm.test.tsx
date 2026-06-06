@@ -29,8 +29,8 @@ function changeLastInput(value: string) {
 
 describe("TicketForm", () => {
   it("verdrahtet Body, Parent-Kontext und Sidebar-Felder mit Submit-Payload", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(<TicketForm open ticket={ticket} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} variant="page" />);
 
     const sidebar = screen.getByTestId("form-sidebar");
     const sidebarSelects = within(sidebar).getAllByRole("combobox");
@@ -51,10 +51,9 @@ describe("TicketForm", () => {
     fireEvent.change(within(sidebar).getByLabelText("Umgebung"), { target: { value: "Chrome" } });
     fireEvent.change(within(sidebar).getByLabelText("Betroffene Version"), { target: { value: "1.2.3" } });
     fireEvent.click(within(sidebar).getByRole("button", { name: "Tags 0" }));
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
+      expect(onAutoSave).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Ticket Beta",
           type: "bug",
@@ -72,14 +71,13 @@ describe("TicketForm", () => {
   });
 
   it("bindet RichTextInlineField an die Beschreibung", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(<TicketForm open ticket={ticket} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} variant="page" />);
 
     expect(screen.getByTestId("ticket-description-view")).toHaveValue(ticket.description);
     fireEvent.change(screen.getByTestId("ticket-description-view"), { target: { value: "<p>Ticket aktualisiert</p>" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Ticket aktualisiert</p>" })));
+    await waitFor(() => expect(onAutoSave).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Ticket aktualisiert</p>" })));
   });
 
   it("zeigt im Create-Modus alle erwarteten Detail-Tabs ohne Journal", () => {

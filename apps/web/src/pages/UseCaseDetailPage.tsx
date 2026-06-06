@@ -5,7 +5,7 @@ import type {
   UseCase,
   UseCaseInput,
 } from "@taskmanager/shared-types";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { createEntityComment } from "../api/comments";
 import { createOwnerTask, linkOwnerTask } from "../api/tasks";
@@ -95,6 +95,22 @@ export function UseCaseDetailPage() {
       throw useCaseError;
     }
   };
+
+  const autoSaveUseCase = useCallback(async (input: UseCaseInput): Promise<void> => {
+    if (!useCase) return;
+    const uc = useCase;
+    const fieldsChanged =
+      input.title !== uc.title ||
+      (input.content ?? "") !== (uc.content ?? "") ||
+      input.status !== uc.status ||
+      (input.featureId ?? null) !== (uc.featureId ?? null) ||
+      input.responsibleUserId !== uc.responsibleUserId;
+
+    if (!fieldsChanged) return;
+
+    const updated = await useCases.updateUseCase(uc.id, { ...input, expectedVersion: uc.version });
+    setUseCase(updated);
+  }, [useCase, useCases]);
 
   const postCreateUseCase = async (
     useCaseId: number,
@@ -197,6 +213,7 @@ export function UseCaseDetailPage() {
         variant="page"
         initialTab={initialTab}
         onSubmit={submitUseCase}
+        onAutoSave={useCase ? autoSaveUseCase : undefined}
         onPostCreate={postCreateUseCase}
         onDelete={deleteUseCase}
         onClose={closePage}

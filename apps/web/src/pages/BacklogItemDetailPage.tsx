@@ -1,5 +1,5 @@
 import type { BacklogItem, BacklogItemInput, DraftComment } from "@taskmanager/shared-types";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { getBacklogItem } from "../api/backlog";
 import { createEntityComment } from "../api/comments";
@@ -83,6 +83,23 @@ export function BacklogItemDetailPage() {
     }
   };
 
+  const autoSaveBacklogItem = useCallback(async (input: BacklogItemInput): Promise<void> => {
+    if (!item) return;
+    const i = item;
+    const fieldsChanged =
+      input.title !== i.title ||
+      (input.description ?? "") !== (i.description ?? "") ||
+      input.status !== i.status ||
+      (input.featureId ?? null) !== (i.featureId ?? null) ||
+      input.responsibleUserId !== i.responsibleUserId ||
+      input.sortOrder !== i.sortOrder;
+
+    if (!fieldsChanged) return;
+
+    const updated = await backlog.updateItem(i.id, { ...input, expectedVersion: i.version });
+    setItem(updated);
+  }, [item, backlog]);
+
   const postCreateBacklogItem = async (
     itemId: number,
     pending: { comments: DraftComment[] },
@@ -138,6 +155,7 @@ export function BacklogItemDetailPage() {
         features={features.features}
         variant="page"
         onSubmit={submitBacklogItem}
+        onAutoSave={item ? autoSaveBacklogItem : undefined}
         onPostCreate={postCreateBacklogItem}
         onClose={closePage}
         onOpenInTab={openInTab}

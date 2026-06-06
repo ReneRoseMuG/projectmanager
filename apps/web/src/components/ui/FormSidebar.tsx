@@ -80,13 +80,13 @@ export function FormSidebar({
         )}
       </button>
       <div
-        className="min-h-0 flex-1 overflow-y-auto p-3 transition-opacity duration-150"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 transition-opacity duration-150"
         style={{
           opacity: collapsed ? 0 : 1,
           pointerEvents: collapsed ? "none" : "auto",
         }}
       >
-        <div className="grid gap-2.5">{children}</div>
+        <div className="grid min-w-0 gap-2.5">{children}</div>
       </div>
     </aside>
   );

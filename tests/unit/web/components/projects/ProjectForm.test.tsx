@@ -62,9 +62,9 @@ describe("ProjectForm", () => {
   });
 
   it("verdrahtet Sidebar-Felder mit Initialdaten und Submit-Payload", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(project);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
     const datedProject = { ...project, startDate: "2026-05-01", dueDate: "2026-05-31" };
-    renderWithProviders(<ProjectForm open project={datedProject} onSubmit={onSubmit} onClose={vi.fn()} />);
+    renderWithProviders(<ProjectForm open project={datedProject} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />);
 
     const sidebar = screen.getByTestId("form-sidebar");
     const sidebarSelects = within(sidebar).getAllByRole("combobox");
@@ -83,10 +83,9 @@ describe("ProjectForm", () => {
     fireEvent.change(dateInputs[0], { target: { value: "2026-06-01" } });
     fireEvent.change(dateInputs[1], { target: { value: "2026-06-30" } });
     fireEvent.click(within(sidebar).getByRole("button", { name: "Tags 0" }));
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
+      expect(onAutoSave).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "Projekt Beta",
           status: "done",
@@ -100,14 +99,13 @@ describe("ProjectForm", () => {
   });
 
   it("bindet das RichTextInlineField an die Projektbeschreibung", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(project);
-    renderWithProviders(<ProjectForm open project={project} onSubmit={onSubmit} onClose={vi.fn()} />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<ProjectForm open project={project} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />);
 
     expect(screen.getByTestId("project-description-view")).toHaveValue(project.description);
     fireEvent.change(screen.getByTestId("project-description-view"), { target: { value: "<p>Projekt aktualisiert</p>" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Projekt aktualisiert</p>" }), []));
+    await waitFor(() => expect(onAutoSave).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Projekt aktualisiert</p>" }), []));
   });
 
   it("stellt Bild-Upload für die Projektbeschreibung im Edit-Modus bereit", () => {

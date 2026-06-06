@@ -37,8 +37,8 @@ describe("UseCaseForm", () => {
   });
 
   it("verdrahtet Body, Parent-Kontext und Sidebar-Felder ohne entfernte Felder", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(useCase);
-    renderWithProviders(<UseCaseForm open useCase={useCase} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<UseCaseForm open useCase={useCase} features={[feature]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />);
 
     const sidebar = screen.getByTestId("form-sidebar");
     const sidebarSelects = within(sidebar).getAllByRole("combobox");
@@ -56,10 +56,9 @@ describe("UseCaseForm", () => {
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Feature" }), { target: { value: "" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
     fireEvent.change(sidebarSelects[2], { target: { value: "done" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
+      expect(onAutoSave).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Use Case Beta",
           featureId: undefined,
@@ -69,22 +68,21 @@ describe("UseCaseForm", () => {
         })
       )
     );
-    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("description");
-    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
+    expect(onAutoSave.mock.calls[0]?.[0]).not.toHaveProperty("description");
+    expect(onAutoSave.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
   });
 
   it("bindet RichTextInlineField an Inhalt und sendet keine Kurzbeschreibung oder Sortierung", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(useCase);
-    renderWithProviders(<UseCaseForm open useCase={useCase} currentFeatureId={feature.id} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<UseCaseForm open useCase={useCase} currentFeatureId={feature.id} features={[feature]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />);
 
     expect(screen.queryByTestId("use-case-description-view")).not.toBeInTheDocument();
     expect(screen.getByTestId("use-case-content-view")).toHaveValue(useCase.content);
     fireEvent.change(screen.getByTestId("use-case-content-view"), { target: { value: "<p>Neuer Use-Case-Inhalt</p>" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Neuer Use-Case-Inhalt</p>" })));
-    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("description");
-    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
+    await waitFor(() => expect(onAutoSave).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Neuer Use-Case-Inhalt</p>" })));
+    expect(onAutoSave.mock.calls[0]?.[0]).not.toHaveProperty("description");
+    expect(onAutoSave.mock.calls[0]?.[0]).not.toHaveProperty("sortOrder");
   });
 
   it("zeigt im Create-Modus die Relation-Tabs und keinen Dateien-Tab", () => {

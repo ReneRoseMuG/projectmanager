@@ -135,8 +135,8 @@ describe("BacklogItemForm", () => {
   });
 
   it("verdrahtet Body, Parent-Kontext und Sidebar-Felder mit Submit-Payload", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<BacklogItemForm open item={backlogItem} features={[feature]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    render(<BacklogItemForm open item={backlogItem} features={[feature]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} variant="page" />);
 
     const sidebar = screen.getByTestId("form-sidebar");
     const sidebarSelects = within(sidebar).getAllByRole("combobox");
@@ -153,10 +153,9 @@ describe("BacklogItemForm", () => {
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Feature" }), { target: { value: String(feature.id) } });
     fireEvent.change(within(sidebar).getByLabelText("Sortierung"), { target: { value: "12" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
+      expect(onAutoSave).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Backlog Beta",
           status: "done",
@@ -169,14 +168,13 @@ describe("BacklogItemForm", () => {
   });
 
   it("bindet RichTextInlineField an die Beschreibung", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
-    render(<BacklogItemForm open item={backlogItem} features={[]} onSubmit={onSubmit} onClose={vi.fn()} variant="page" />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    render(<BacklogItemForm open item={backlogItem} features={[]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} variant="page" />);
 
     expect(screen.getByTestId("backlog-item-description-view")).toHaveValue(backlogItem.description);
     fireEvent.change(screen.getByTestId("backlog-item-description-view"), { target: { value: "<p>Backlog aktualisiert</p>" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Backlog aktualisiert</p>" })));
+    await waitFor(() => expect(onAutoSave).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Backlog aktualisiert</p>" })));
   });
 
   it("zeigt im Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {

@@ -40,6 +40,7 @@ import { addTicketRelation, createOwnerTicket, createSubTicket, createTicketNote
 import { errorMessage, errorMessageAsync } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useAuth } from "../../hooks/useAuth";
+import { useAutoSave } from "../../hooks/useAutoSave";
 import { useBacklog } from "../../hooks/useBacklog";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useFeatures } from "../../hooks/useFeatures";
@@ -82,6 +83,7 @@ import { DatePicker } from "../ui/DatePicker";
 import { EmptyState } from "../ui/EmptyState";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { SaveStatus } from "../ui/SaveStatus";
 import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
@@ -108,6 +110,7 @@ interface ProjectFormProps {
   open: boolean;
   project?: Project | null;
   onSubmit: (input: ProjectInput, tagIds: number[]) => Promise<Project | void>;
+  onAutoSave?: (input: ProjectInput, tagIds: number[]) => Promise<void>;
   onClose: () => void;
   onDelete?: (project: Project) => Promise<boolean>;
   savingLabel?: string;
@@ -189,6 +192,7 @@ export function ProjectForm({
   open,
   project,
   onSubmit,
+  onAutoSave,
   onClose,
   onDelete,
   savingLabel,
@@ -257,6 +261,30 @@ export function ProjectForm({
   const [createTaskForMilestone, setCreateTaskForMilestone] = useState<Milestone | null>(null);
   const [createTicketForMilestone, setCreateTicketForMilestone] = useState<Milestone | null>(null);
   const prevOpenRef = useRef(false);
+
+  const formStateRef = useRef({ name, description, status, color, startDate, dueDate, responsibleUserId, selectedTags });
+  formStateRef.current = { name, description, status, color, startDate, dueDate, responsibleUserId, selectedTags };
+
+  const autoSave = useAutoSave({
+    enabled: !!project && !!onAutoSave,
+    save: async () => {
+      if (!onAutoSave) return;
+      const s = formStateRef.current;
+      await onAutoSave(
+        {
+          name: s.name,
+          description: s.description,
+          status: resolveCatalogEntryKey(catalogs.entries, "workStatus", s.status, "active"),
+          color: s.color,
+          startDate: s.startDate || null,
+          dueDate: s.dueDate || null,
+          responsibleUserId: s.responsibleUserId,
+        },
+        s.selectedTags.map((t) => t.id),
+      );
+    },
+  });
+  const af = project ? autoSave.flush : undefined;
   const createTaskOwner = createTaskForMilestone ? { type: "milestone" as const, id: createTaskForMilestone.id } : null;
   const createTicketOwner = createTicketForMilestone ? { type: "milestone" as const, id: createTicketForMilestone.id } : null;
   const milestoneTaskActions = useTasks(createTaskOwner);
@@ -752,31 +780,16 @@ export function ProjectForm({
       <FormModal
         open={open}
         title={project ? "Projekt bearbeiten" : "Projekt anlegen"}
+        entityTitle={project?.name}
         objectReference={project ? objectReference("project", project.id) : undefined}
         icon={<FolderKanban size={21} />}
-        breadcrumb={["Projekte", project ? project.name : "Neues Projekt"]}
+        breadcrumb={["Projekte"]}
         onSubmit={submit}
         saving={saving}
-        submitLabel={
-          saving
-            ? (savingLabel ?? "Speichern…")
-            : project
-              ? "Speichern"
-              : "Projekt anlegen"
-        }
-        footerStart={
-          project && onDelete ? (
-            <Button
-              className="text-crimson hover:bg-crimson/10"
-              icon={<Trash2 size={18} />}
-              variant="ghost"
-              disabled={deleting}
-              onClick={() => void deleteCurrentProject()}
-            >
-              Löschen
-            </Button>
-          ) : undefined
-        }
+        submitLabel={saving ? (savingLabel ?? "Speichern…") : "Projekt anlegen"}
+        hideFooter={!!project}
+        onDelete={project && onDelete ? () => { void deleteCurrentProject(); } : undefined}
+        saveStatus={project ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
@@ -802,13 +815,14 @@ export function ProjectForm({
                       <Input
                         value={name}
                         onChange={(event) => setName(event.target.value)}
+                        onBlur={af}
                         required
                       />
                     </FormField>
                     <FormField label="Beschreibung" fill>
                       <RichTextInlineField
                         value={description}
-                        onChange={setDescription}
+                        onChange={(v) => { setDescription(v); formStateRef.current = { ...formStateRef.current, description: v }; af?.(); }}
                         placeholder="Worum geht es in diesem Projekt?"
                         fill
                         minRows={5}
@@ -821,18 +835,18 @@ export function ProjectForm({
               </div>
             </div>
             <FormSidebar storageKey="project-form-sidebar">
-              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={(v) => { setStatus(v); formStateRef.current = { ...formStateRef.current, status: v }; af?.(); }} />
               <UserSelectField
                 label="Verantwortlich"
                 icon={<Users size={14} />}
                 variant="panel"
                 value={responsibleUserId}
                 selectedUser={project?.responsibleUser ?? null}
-                onChange={setResponsibleUserId}
+                onChange={(v) => { setResponsibleUserId(v); formStateRef.current = { ...formStateRef.current, responsibleUserId: v }; af?.(); }}
               />
-              <DatePicker label="Start" variant="panel" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-              <TagPicker selected={selectedTags} onChange={setSelectedTags} variant="panel" />
+              <DatePicker label="Start" variant="panel" value={startDate} onChange={(event) => { const v = event.target.value; setStartDate(v); formStateRef.current = { ...formStateRef.current, startDate: v }; af?.(); }} />
+              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => { const v = event.target.value; setDueDate(v); formStateRef.current = { ...formStateRef.current, dueDate: v }; af?.(); }} />
+              <TagPicker selected={selectedTags} onChange={(v) => { setSelectedTags(v); formStateRef.current = { ...formStateRef.current, selectedTags: v }; af?.(); }} variant="panel" />
               {project ? (
                 <ProjectWikiPanel
                   wikiPageId={projectWikiRelation.wikiPageId}
