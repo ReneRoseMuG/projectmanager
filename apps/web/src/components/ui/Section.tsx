@@ -13,6 +13,19 @@ interface SectionProps {
   fill?: boolean;
   collapsible?: boolean;
   defaultCollapsed?: boolean;
+  /** localStorage-Schlüssel für persistenten Collapse-Zustand */
+  storageKey?: string;
+}
+
+function readStoredBoolean(key: string, fallback: boolean): boolean {
+  try {
+    const stored = window.localStorage.getItem(key);
+    if (stored === "true") return true;
+    if (stored === "false") return false;
+    return fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 /** Shared panel section for form and detail content. */
@@ -25,8 +38,21 @@ export function Section({
   fill = false,
   collapsible = false,
   defaultCollapsed = false,
+  storageKey,
 }: SectionProps) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const [collapsed, setCollapsed] = useState(() =>
+    storageKey ? readStoredBoolean(storageKey, defaultCollapsed) : defaultCollapsed
+  );
+
+  const toggle = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      if (storageKey) {
+        try { window.localStorage.setItem(storageKey, String(next)); } catch { /* ignore */ }
+      }
+      return next;
+    });
+  };
 
   const sectionClass = fill
     ? `flex h-full min-h-0 flex-1 flex-col ${className}`
@@ -45,7 +71,7 @@ export function Section({
               <button
                 type="button"
                 className="flex min-w-0 items-center gap-1.5 text-left"
-                onClick={() => setCollapsed((c) => !c)}
+                onClick={toggle}
               >
                 <span className="text-sm font-semibold text-ink">{title}</span>
                 <ChevronDown

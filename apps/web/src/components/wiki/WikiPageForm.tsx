@@ -319,7 +319,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
                 </div>
               </Section>
 
-              <Section title="Verwandte Themen" collapsible>
+              <Section title="Verwandte Themen" collapsible storageKey="wiki-related-pages-collapsed">
                 <RelatedPagesSelector
                   pages={pages}
                   projects={projects}
