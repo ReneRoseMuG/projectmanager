@@ -1,5 +1,6 @@
 import type { Tag } from "@taskmanager/shared-types";
 import { Minus, Plus, Tag as TagIcon } from "lucide-react";
+import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ColorPicker } from "../ui/ColorPicker";
 import { useTags } from "../../hooks/useTags";
@@ -44,11 +45,13 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
   const { tags, createTag } = useTags();
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const [search, setSearch] = useState("");
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(DEFAULT_TAG_COLOR);
   const [showNewColorPicker, setShowNewColorPicker] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const portalRef = useRef<HTMLDivElement>(null);
 
   const selectedIds = useMemo(() => new Set(selected.map((t) => t.id)), [selected]);
   const availableTags = useMemo(
@@ -64,14 +67,37 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-        setSearch("");
-      }
+      const target = event.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (portalRef.current?.contains(target)) return;
+      setOpen(false);
+      setSearch("");
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
+
+  // For the panel variant inside FormSidebar: track container position while dropdown is open
+  // so the fixed-position portal dropdown stays aligned on scroll/resize.
+  useEffect(() => {
+    if (!open || variant !== "panel") return;
+
+    const updateRect = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setAnchorRect(rect);
+        setDropUp(window.innerHeight - rect.bottom < 300);
+      }
+    };
+
+    updateRect();
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
+    return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
+    };
+  }, [open, variant]);
 
   const removeTag = (tagId: number) => {
     onChange(selected.filter((t) => t.id !== tagId));
@@ -97,6 +123,7 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
         setDropUp(window.innerHeight - rect.bottom < 300);
+        setAnchorRect(rect);
       }
     }
     setOpen((v) => !v);
@@ -113,10 +140,8 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
     </button>
   );
 
-  const dropdownPositionClass = dropUp ? "bottom-full mb-1" : "top-full mt-1";
-
-  const dropdown = open ? (
-    <div className={`absolute right-0 ${dropdownPositionClass} z-50 w-64 rounded-md border border-line bg-white shadow-md`}>
+  const dropdownContent = (
+    <>
       <div className="p-2">
         <input
           className="h-8 w-full rounded border border-line px-2 text-sm outline-none focus:border-steel-600"
@@ -183,10 +208,23 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
           </div>
         ) : null}
       </div>
-    </div>
-  ) : null;
+    </>
+  );
 
   if (variant === "panel") {
+    // Compute portal position: align dropdown right edge to container right edge, open below or above.
+    const portalStyle: React.CSSProperties | undefined = anchorRect
+      ? {
+          position: "fixed",
+          zIndex: 9999,
+          width: 256,
+          right: window.innerWidth - anchorRect.right,
+          ...(dropUp
+            ? { bottom: window.innerHeight - anchorRect.top + 4 }
+            : { top: anchorRect.bottom + 4 }),
+        }
+      : undefined;
+
     return (
       <div ref={containerRef} className="relative rounded-lg border border-line bg-white shadow-sm">
         <div className="flex h-9 items-center gap-2 border-b border-line px-2.5">
@@ -199,10 +237,23 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
             <TagPill key={tag.id} tag={tag} onRemove={removeTag} />
           ))}
         </div>
-        {dropdown}
+        {open && portalStyle
+          ? createPortal(
+              <div
+                ref={portalRef}
+                style={portalStyle}
+                className="rounded-md border border-line bg-white shadow-md"
+              >
+                {dropdownContent}
+              </div>,
+              document.body,
+            )
+          : null}
       </div>
     );
   }
+
+  const dropdownPositionClass = dropUp ? "bottom-full mb-1" : "top-full mt-1";
 
   return (
     <div ref={containerRef} className="grid gap-1">
@@ -217,7 +268,11 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
           ))}
           {addButton}
         </div>
-        {dropdown}
+        {open ? (
+          <div className={`absolute right-0 ${dropdownPositionClass} z-50 w-64 rounded-md border border-line bg-white shadow-md`}>
+            {dropdownContent}
+          </div>
+        ) : null}
       </div>
     </div>
   );

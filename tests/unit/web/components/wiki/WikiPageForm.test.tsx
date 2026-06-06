@@ -192,21 +192,11 @@ describe("WikiPageForm", () => {
     expect(screen.getByRole("button", { name: "Dateien" })).toBeInTheDocument();
   });
 
-  it("zeigt im Edit-Kopfbereich ID kopieren ohne Vorschau und Versionen", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { writeText },
-    });
-
+  it("zeigt im Edit-Kopfbereich keine Vorschau- und Versions-Buttons", () => {
     renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.queryByRole("button", { name: "Vorschau" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Versionen" })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "ID 5 kopieren" }));
-
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith("5"));
   });
 
   it("zeigt im Edit-Modus keinen 'In neuem Tab öffnen'-Button, wenn onOpenInTab fehlt", () => {

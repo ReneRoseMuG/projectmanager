@@ -615,6 +615,19 @@ describe("RichTextInlineField", () => {
     expect(navigateMock).not.toHaveBeenCalled();
   });
 
+  it("T-27 setzt Flex-Fill-Klassen wenn fill=true", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} fill testIdPrefix="field" />);
+
+    // Äußerer Container (field-view) erhält flex min-h-0 flex-1 flex-col
+    const outerDiv = screen.getByTestId("field-view");
+    expect(outerDiv).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
+
+    // Editor-Wrapper (field-editor) erhält overflow-visible statt overflow-clip
+    const editorDiv = screen.getByTestId("field-editor");
+    expect(editorDiv).toHaveClass("flex", "min-h-0", "flex-1", "flex-col", "overflow-visible");
+    expect(editorDiv).not.toHaveClass("overflow-clip");
+  });
+
   it("T-EN6 ignoriert Klicks auf externe https://-Links", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} editable={false} testIdPrefix="field" />);
 

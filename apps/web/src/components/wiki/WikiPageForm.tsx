@@ -45,6 +45,7 @@ interface WikiPageFormProps {
   editable?: boolean;
   /** Called when the user clicks the Edit button in read mode. */
   onEdit?: () => void;
+  onNavigateToWikiPage?: (pageId: number) => void;
 }
 
 function flattenTree(nodes: WikiTreeNode[]): WikiPage[] {
@@ -61,7 +62,7 @@ const tabs: Array<Tab<WikiPageFormTab>> = [
   { value: "journal", label: "Journal" }
 ];
 
-export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onPostCreate, onClose, onOpenInTab, inline = false, inlineChrome = "standalone", onDelete, onDirtyChange, editable, onEdit }: WikiPageFormProps) {
+export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onPostCreate, onClose, onOpenInTab, inline = false, inlineChrome = "standalone", onDelete, onDirtyChange, editable, onEdit, onNavigateToWikiPage }: WikiPageFormProps) {
   const { confirm } = useConfirm();
   const { showToast } = useToast();
   const pageId = page?.id ?? null;
@@ -291,12 +292,14 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onP
                 </div>
               </Section>
 
-              <Section title="Verwandte Themen">
+              <Section title="Verwandte Themen" collapsible>
                 <RelatedPagesSelector
                   pages={pages}
                   projects={projects}
                   currentPageId={page?.id}
                   selectedPages={relatedPages}
+                  readOnly={!effectiveEditable}
+                  onNavigate={onNavigateToWikiPage}
                   onChange={(nextPages) => {
                     setRelatedPages(nextPages);
                     setDirty(true);

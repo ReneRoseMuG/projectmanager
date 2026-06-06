@@ -150,8 +150,8 @@ export function WikiPage() {
 
   const runExport = async () => {
     const exportPath = (() => {
-      try { return window.localStorage.getItem("ui.wiki-export-path") ?? "~/Dokumente/Projekt Manager/Wiki"; }
-      catch { return "~/Dokumente/Projekt Manager/Wiki"; }
+      try { return window.localStorage.getItem("ui.wiki-export-path") ?? "~/Documents/Projekt Manager/Wiki"; }
+      catch { return "~/Documents/Projekt Manager/Wiki"; }
     })();
     setExporting(true);
     try {
@@ -231,6 +231,7 @@ export function WikiPage() {
                   onDirtyChange={setInlineDirty}
                   editable={editing}
                   onEdit={() => setEditing(true)}
+                  onNavigateToWikiPage={(id) => navigate(standalone ? withStandaloneView(`/wiki/${id}`) : `/wiki/${id}`)}
                   onClose={editing
                     ? () => setEditing(false)
                     : () => navigate(standalone ? withStandaloneView("/wiki") : "/wiki")}

@@ -104,6 +104,8 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
           title={task.title}
           objectReference={objectReference("task", task.id)}
           accentColor={statusColumns.find((c) => c.value === task.status)?.color}
+          childCount={task.subtaskCount}
+          onOpen={() => onOpen(task)}
           onOpenInTab={onOpenInTab ? () => onOpenInTab(task) : undefined}
         />
       )}

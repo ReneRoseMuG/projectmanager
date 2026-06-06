@@ -230,6 +230,26 @@ describe("TicketListBoardView", () => {
     });
   });
 
+  it("rendert geschlossene Tickets als ClosedItemRow mit childCount und onOpen", () => {
+    const closedTicket = buildTicket({ id: 99, title: "Abgeschlossenes Ticket", status: "done", subTicketCount: 3 });
+    const onOpen = vi.fn();
+    const { container } = renderTicketList({ tickets: [closedTicket], onOpen });
+
+    // ClosedItemRow zeigt den Titel als h3 mit line-clamp-2
+    const closedCard = screen.getByRole("heading", { name: "Abgeschlossenes Ticket" }).closest("article");
+    expect(closedCard).not.toBeNull();
+
+    // childCount-Footer mit subTicketCount=3
+    expect(screen.getByText("3")).toBeInTheDocument();
+
+    // Klick öffnet das Ticket
+    fireEvent.click(closedCard!);
+    expect(onOpen).toHaveBeenCalledWith(closedTicket);
+
+    // Kein reguläres article.p-5 Board-Card für das geschlossene Ticket
+    expect(container.querySelector("article.p-5")).not.toBeInTheDocument();
+  });
+
   it("zeigt EmptyState wenn keine Tickets vorhanden sind", () => {
     const { container } = renderTicketList({ tickets: [] });
 

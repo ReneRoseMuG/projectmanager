@@ -9,6 +9,8 @@ interface RelatedPagesSelectorProps {
   currentPageId?: number;
   selectedPages: WikiPageRelationSummary[];
   onChange: (pages: WikiPageRelationSummary[]) => void;
+  readOnly?: boolean;
+  onNavigate?: (pageId: number) => void;
 }
 
 function toSummary(page: WikiPage): WikiPageRelationSummary {
@@ -45,7 +47,7 @@ function collectDescendantIds(rootId: number, childrenByParent: Map<number | nul
   return ids;
 }
 
-export function RelatedPagesSelector({ pages, projects, currentPageId, selectedPages, onChange }: RelatedPagesSelectorProps) {
+export function RelatedPagesSelector({ pages, projects, currentPageId, selectedPages, onChange, readOnly, onNavigate }: RelatedPagesSelectorProps) {
   const [query, setQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState("all");
 
@@ -96,6 +98,24 @@ export function RelatedPagesSelector({ pages, projects, currentPageId, selectedP
   const removePage = (pageId: number) => {
     onChange(selectedPages.filter((page) => page.id !== pageId));
   };
+
+  if (readOnly) {
+    if (selectedPages.length === 0) return null;
+    return (
+      <div className="grid gap-2 sm:grid-cols-2">
+        {selectedPages.map((page) => (
+          <button
+            key={page.id}
+            type="button"
+            className="flex min-h-12 items-center gap-3 rounded-md border border-line bg-white px-3 py-2 text-left transition hover:border-teal/50 hover:bg-teal/5"
+            onClick={() => onNavigate?.(page.id)}
+          >
+            <span className="min-w-0 truncate text-sm font-medium text-teal">{page.title}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-3">

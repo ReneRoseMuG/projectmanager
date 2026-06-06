@@ -152,6 +152,8 @@ export function TicketListBoardView({
           title={ticket.title}
           objectReference={objectReference("ticket", ticket.id)}
           accentColor={statusColumns.find((c) => c.value === ticket.status)?.color}
+          childCount={ticket.subTicketCount}
+          onOpen={() => onOpen(ticket)}
           onOpenInTab={onOpenInTab ? () => onOpenInTab(ticket) : undefined}
         />
       )}

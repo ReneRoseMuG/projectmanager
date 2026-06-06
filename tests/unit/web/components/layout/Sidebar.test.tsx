@@ -143,7 +143,7 @@ describe("Sidebar", () => {
 
     const sidebar = screen.getByText("Projekt Manager").closest("aside");
 
-    expect(sidebar).toHaveClass("sidebar-edge-shell", "w-[272px]");
+    expect(sidebar).toHaveClass("sidebar-edge-shell", "w-[240px]");
     expect(sidebar).not.toHaveClass("min-w-60");
     expect(screen.getByText("Lokal · v0.1.0")).toBeInTheDocument();
     expect(screen.queryByTitle("Aktualisieren")).not.toBeInTheDocument();
@@ -255,7 +255,7 @@ describe("Sidebar", () => {
     const settingsTitle = screen.getByText("Einstellungen");
     const settingsLink = screen.getByText("Meine Einstellungen");
 
-    expect(sidebar).toHaveClass("w-[272px]");
+    expect(sidebar).toHaveClass("w-[240px]");
     expect(sidebar).not.toHaveClass("min-w-60");
     expect(sidebarHeader).toHaveTextContent("Projekt Manager");
     expect(globalSearch).toHaveClass("px-3", "py-2");
@@ -282,7 +282,7 @@ describe("Sidebar", () => {
 
     fireEvent.click(screen.getByTitle("Navigation aufklappen"));
 
-    expect(sidebar).toHaveClass("w-[272px]");
+    expect(sidebar).toHaveClass("w-[240px]");
     expect(sidebar).not.toHaveClass("min-w-60");
     expect(window.localStorage.getItem("ui.sidebar.collapsed")).toBe("false");
     expect(screen.getByTitle("Navigation einklappen")).toBeInTheDocument();

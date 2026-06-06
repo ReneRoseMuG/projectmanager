@@ -61,7 +61,7 @@ export function FormSidebar({
         type="button"
         aria-label={collapsed ? "Stammdaten öffnen" : "Stammdaten schließen"}
         title={collapsed ? "Stammdaten öffnen" : "Stammdaten schließen"}
-        className="flex w-4 shrink-0 cursor-col-resize flex-col items-center justify-center gap-[3px] transition-colors hover:bg-steel-200 focus:outline-none"
+        className="flex w-4 shrink-0 cursor-col-resize flex-col items-center justify-center gap-[3px] bg-steel-200 transition-colors hover:bg-steel-300 focus:outline-none"
         onClick={() => setCollapsed((c) => !c)}
       >
         {collapsed ? (

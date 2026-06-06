@@ -70,7 +70,7 @@ describe("FormSidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Stammdaten schließen" }));
     vi.advanceTimersByTime(350);
 
-    expect(screen.getByTestId("form-sidebar")).toHaveStyle({ width: "32px" });
+    expect(screen.getByTestId("form-sidebar")).toHaveStyle({ width: "16px" });
     expect(window.localStorage.getItem("task-sidebar-collapsed")).toBe("true");
   });
 
@@ -83,7 +83,7 @@ describe("FormSidebar", () => {
       </FormSidebar>,
     );
 
-    expect(screen.getByTestId("form-sidebar")).toHaveStyle({ width: "32px" });
+    expect(screen.getByTestId("form-sidebar")).toHaveStyle({ width: "16px" });
     expect(screen.getByText("Stammdaten")).toBeInTheDocument();
   });
 });

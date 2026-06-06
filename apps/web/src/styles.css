@@ -167,6 +167,25 @@ textarea {
   border-top: 1px solid theme("colors.line");
 }
 
+.rich-text-surface a {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 0.05rem 0.4rem;
+  font-weight: 500;
+  color: var(--color-teal);
+  background: color-mix(in srgb, var(--color-teal) 8%, transparent);
+  text-decoration: none;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.rich-text-surface a:hover {
+  background: color-mix(in srgb, var(--color-teal) 16%, transparent);
+  color: var(--color-steel-700);
+}
+
 .rich-text-column-block {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));

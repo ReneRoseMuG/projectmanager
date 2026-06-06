@@ -14,7 +14,8 @@
  * Ziel:
  * Die gemeinsame Section-Komponente gegen Layout-Regressionen zwischen Formularfeldern und füllenden Tab-Inhalten absichern.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Section } from "../../../../../apps/web/src/components/ui/Section";
 
@@ -33,6 +34,53 @@ describe("Section", () => {
     const section = screen.getByText("Details").closest("section");
 
     expect(section).toHaveClass("rounded-lg", "border", "border-line", "bg-white", "p-2.5", "shadow-panel");
+  });
+
+  it("kollabierbare Section zeigt Inhalt standardmäßig", () => {
+    render(
+      <Section title="Verwandte Themen" collapsible>
+        <div>Inhalt</div>
+      </Section>
+    );
+
+    expect(screen.getByText("Inhalt")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verwandte Themen" })).toBeInTheDocument();
+  });
+
+  it("kollabierbare Section versteckt Inhalt nach Klick", () => {
+    render(
+      <Section title="Verwandte Themen" collapsible>
+        <div>Inhalt</div>
+      </Section>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Verwandte Themen" }));
+
+    expect(screen.queryByText("Inhalt")).not.toBeInTheDocument();
+  });
+
+  it("kollabierbare Section zeigt Inhalt nach erneutem Klick", () => {
+    render(
+      <Section title="Verwandte Themen" collapsible>
+        <div>Inhalt</div>
+      </Section>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Verwandte Themen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Verwandte Themen" }));
+
+    expect(screen.getByText("Inhalt")).toBeInTheDocument();
+  });
+
+  it("kollabierbare Section startet eingeklappt bei defaultCollapsed", () => {
+    render(
+      <Section title="Verwandte Themen" collapsible defaultCollapsed>
+        <div>Inhalt</div>
+      </Section>
+    );
+
+    expect(screen.queryByText("Inhalt")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Verwandte Themen" })).toBeInTheDocument();
   });
 
   it("rendert Fill-Sections ohne zusätzlichen Außenrand", () => {

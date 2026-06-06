@@ -48,6 +48,12 @@ describe("ProjectForm", () => {
     expect(detailsBody).toHaveClass("w-full");
     expect(detailsBody).not.toHaveClass("max-w-5xl");
 
+    // Details-Tab: Flex-Fill-Kette — overflow-hidden statt overflow-auto damit der Editor wächst
+    const contentWrapper = detailsBody?.parentElement;
+    expect(contentWrapper).toHaveClass("overflow-hidden");
+    expect(contentWrapper).not.toHaveClass("overflow-auto");
+    expect(contentWrapper).toHaveClass("flex", "flex-col");
+
     clickTab("Aufgaben");
 
     const boardBody = screen.getByTestId("owner-task-board").closest("section")?.parentElement;

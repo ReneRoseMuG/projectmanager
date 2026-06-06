@@ -21,11 +21,12 @@ interface WikiNodeProps {
 
 const TOGGLE_WIDTH = 16;
 const MIN_WIDTH = 240;
-const MAX_WIDTH = 380;
+const MAX_WIDTH = 560;
 // Fixed horizontal space per row (excluding text and level indent):
-// pl-3(12) + expand(32) + gap(4) + link-px-2(8+8) + gap(4) + action1(32) + gap(4) + action2(32) + pr-4(16) + toggle(16) = 168
-const FIXED_OVERHEAD = 168;
+// pl-3(12) + expand(32) + gap(4) + link-px-2(8+8) + gap(4) + action1(32) + gap(4) + action2(32) + paddingRight(20) = 156
+const FIXED_OVERHEAD = 156;
 const LEVEL_INDENT = 14;
+const WIDTH_BUFFER = 16;
 
 function measureTextWidth(text: string): number {
   try {
@@ -159,8 +160,14 @@ export function WikiTree({ tree, onCreate, onNavigate }: WikiTreeProps) {
 
   useEffect(() => {
     if (tree.length === 0) return;
-    const ideal = computeIdealWidth(tree);
-    setContentWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, ideal)));
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      const ideal = computeIdealWidth(tree) + WIDTH_BUFFER;
+      setContentWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, ideal)));
+    };
+    void document.fonts.ready.then(run).catch(run);
+    return () => { cancelled = true; };
   }, [tree]);
 
   const totalWidth = collapsed ? TOGGLE_WIDTH : contentWidth + TOGGLE_WIDTH;

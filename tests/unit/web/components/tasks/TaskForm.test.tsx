@@ -299,4 +299,18 @@ describe("TaskForm", () => {
 
     expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
   });
+
+  it("Details-Tab nutzt Flex-Fill-Layout unabhängig von der Variante", () => {
+    renderWithProviders(<TaskForm open task={task} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    // Content-Wrapper muss overflow-hidden haben (nicht overflow-auto) damit Fill wirkt
+    const contentWrapper = screen.getByDisplayValue(task.title).closest("section")?.parentElement?.parentElement;
+    expect(contentWrapper).toHaveClass("overflow-hidden");
+    expect(contentWrapper).not.toHaveClass("overflow-auto");
+
+    // FormField Beschreibung hat flex-Layout (fill=true), nicht grid
+    const descriptionField = screen.getByTestId("task-description-view").parentElement;
+    expect(descriptionField).toHaveClass("flex");
+    expect(descriptionField).not.toHaveClass("grid");
+  });
 });

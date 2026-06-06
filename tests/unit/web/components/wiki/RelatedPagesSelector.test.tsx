@@ -96,6 +96,24 @@ function renderSelector(options: {
   return onChange;
 }
 
+function renderReadOnly(options: {
+  selectedPages: WikiPageRelationSummary[];
+  onNavigate?: ReturnType<typeof vi.fn>;
+}) {
+  const onNavigate = options.onNavigate ?? vi.fn();
+  render(
+    <RelatedPagesSelector
+      pages={[]}
+      projects={[]}
+      selectedPages={options.selectedPages}
+      onChange={vi.fn()}
+      readOnly
+      onNavigate={onNavigate}
+    />
+  );
+  return onNavigate;
+}
+
 afterEach(() => {
   cleanup();
 });
@@ -123,6 +141,47 @@ describe("RelatedPagesSelector", () => {
     expect(screen.queryByRole("button", { name: "Beta Release als verwandte Seite hinzufügen" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Alpha Linked als verwandte Seite hinzufügen" })).not.toBeInTheDocument();
     expect(screen.getByText("Alpha Linked")).toBeInTheDocument();
+  });
+
+  it("zeigt im readOnly-Modus ausgewählte Seiten als navigierbare Buttons", () => {
+    const onNavigate = vi.fn();
+    renderReadOnly({
+      selectedPages: [
+        { id: 7, title: "Alpha Onboarding", parentId: null },
+        { id: 8, title: "Beta Release", parentId: null },
+      ],
+      onNavigate,
+    });
+
+    expect(screen.getByRole("button", { name: "Alpha Onboarding" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Beta Release" })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Verwandte Seite suchen")).not.toBeInTheDocument();
+  });
+
+  it("ruft onNavigate mit der Seiten-ID auf, wenn ein Link geklickt wird", () => {
+    const onNavigate = vi.fn();
+    renderReadOnly({
+      selectedPages: [{ id: 7, title: "Alpha Onboarding", parentId: null }],
+      onNavigate,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Alpha Onboarding" }));
+
+    expect(onNavigate).toHaveBeenCalledOnce();
+    expect(onNavigate).toHaveBeenCalledWith(7);
+  });
+
+  it("rendert im readOnly-Modus ohne ausgewählte Seiten nichts", () => {
+    const { container } = render(
+      <RelatedPagesSelector
+        pages={[]}
+        projects={[]}
+        selectedPages={[]}
+        onChange={vi.fn()}
+        readOnly
+      />
+    );
+    expect(container.firstChild).toBeNull();
   });
 
   it("grenzt Suchtreffer über den Projektfilter ein", () => {

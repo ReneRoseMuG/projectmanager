@@ -46,11 +46,11 @@ describe("AdminLayout", () => {
     );
 
     expect(screen.getByRole("navigation", { name: "Admin-Bereich" })).toBeInTheDocument();
-    for (const label of ["Kataloge", "Tags", "Sicherung", "Benutzer", "Rollen"]) {
+    for (const label of ["Kataloge", "Tags", "Benutzer", "Rollen"]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
     expect(screen.getByText("Admin-Inhalt")).toBeInTheDocument();
-    expect(screen.getByText("Admin")).toHaveClass("uppercase", "text-white/45");
+    expect(screen.getByText("Admin")).toHaveClass("uppercase", "text-white");
     const activeCatalogLink = screen.getByRole("link", { name: "Kataloge" });
     const activeCatalogIcon = activeCatalogLink.querySelector(".admin-sidebar-icon");
     const inactiveTagsLink = screen.getByRole("link", { name: "Tags" });

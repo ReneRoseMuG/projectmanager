@@ -270,7 +270,8 @@ describe("CommentThread", () => {
       />,
     );
 
-    const deleteButton = screen.getAllByRole("button", { name: "Löschen" })[1];
+    // Nach Sortierung absteigend (neuester zuerst): id=2 an Index 0, id=1 an Index 1
+    const deleteButton = screen.getAllByRole("button", { name: "Löschen" })[0];
     expect(deleteButton).toBeDefined();
     fireEvent.click(deleteButton as HTMLElement);
 

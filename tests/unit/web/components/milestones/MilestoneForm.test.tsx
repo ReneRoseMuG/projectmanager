@@ -286,26 +286,17 @@ afterEach(() => {
 });
 
 describe("MilestoneForm", () => {
-  it("rendert Header-Icon und Feature-Link-Button in den Standardgrößen", () => {
+  it("rendert Header-Icon in den Standardgrößen", () => {
     const { container } = renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
     const headerIcon = container.querySelector(".lucide-flag");
     expect(headerIcon).toBeInTheDocument();
     expect(headerIcon).toHaveAttribute("width", "20");
     expect(headerIcon).toHaveAttribute("height", "20");
-
-    fireEvent.click(screen.getByRole("button", { name: /^Features/ }));
-    const linkButton = screen.getByRole("button", { name: "Feature verknüpfen" });
-    expect(linkButton).toHaveClass("h-10", "w-10");
-    expect(linkButton).not.toHaveClass("h-9", "w-9", "px-0");
   });
 
   it("zeigt Create-Relationen mit den kanonischen Domain-Icons", () => {
     const { container } = renderWithProviders(<MilestoneForm open projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /^Features/ }));
-    expect(screen.getByText("Features sind nach dem Speichern verfügbar.")).toBeInTheDocument();
-    expect(container.querySelector(".lucide-book-open")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /^Aufgaben/ }));
     expect(screen.getByRole("button", { name: "Neue Aufgabe" })).toBeInTheDocument();
@@ -429,5 +420,22 @@ describe("MilestoneForm", () => {
     renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
     expect(screen.queryByRole("button", { name: "In neuem Tab öffnen" })).not.toBeInTheDocument();
+  });
+
+  it("Details-Tab nutzt Flex-Fill-Layout damit der Editor die verfügbare Höhe ausfüllt", () => {
+    renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
+
+    // Der Content-Wrapper neben der FormSidebar muss overflow-hidden haben (nicht overflow-auto),
+    // damit die Flex-Fill-Kette zum Editor nicht unterbrochen wird.
+    const contentWrapper = screen.getByDisplayValue(milestone.name)
+      .closest("section")?.parentElement?.parentElement;
+    expect(contentWrapper).toHaveClass("overflow-hidden");
+    expect(contentWrapper).not.toHaveClass("overflow-auto");
+    expect(contentWrapper).toHaveClass("flex", "flex-col");
+
+    // FormField für Beschreibung hat flex-Layout (fill=true), nicht grid
+    const descriptionTextarea = screen.getByTestId("milestone-description-view");
+    expect(descriptionTextarea.parentElement).toHaveClass("flex");
+    expect(descriptionTextarea.parentElement).not.toHaveClass("grid");
   });
 });

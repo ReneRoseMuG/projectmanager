@@ -112,8 +112,8 @@ const tabs: Array<Tab<TaskFormTab>> = [
   { value: "details", label: "Details" },
   { value: "subtasks", label: "Subtasks" },
   { value: "tickets", label: "Tickets" },
-  { value: "comments", label: "Kommentare" },
   { value: "notes", label: "Notizen" },
+  { value: "comments", label: "Kommentare" },
   { value: "attachments", label: "Dateien" },
   { value: "journal", label: "Journal" },
 ];
@@ -198,6 +198,7 @@ export function TaskForm({
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
   const [pendingTicketViewMode, setPendingTicketViewMode] = useState<ViewMode>("kanban");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [isCreatingNote, setIsCreatingNote] = useState(false);
   const prevOpenRef = useRef(false);
 
   useEffect(() => {
@@ -285,21 +286,20 @@ export function TaskForm({
   };
 
   const createNote = async () => {
+    setIsCreatingNote(true);
+  };
+
+  const handleCreateNote = async (title: string, contentJson: Note["contentJson"]) => {
     try {
-      const note = await notes.createNote({
-        title: "Ohne Titel",
-        contentJson: {},
-      });
-      if (note) {
-        setEditingNote(note);
-        showToast({ tone: "success", title: "Notiz erstellt" });
-      }
+      await notes.createNote({ title, contentJson });
+      showToast({ tone: "success", title: "Notiz erstellt" });
     } catch (noteError) {
       showToast({
         tone: "error",
         title: "Notiz konnte nicht erstellt werden",
         message: errorMessage(noteError),
       });
+      throw noteError;
     }
   };
 
@@ -437,9 +437,9 @@ export function TaskForm({
         {activeTab === "details" ? (
           <div className="flex min-h-0 w-full flex-1">
             <div className="min-w-0 flex-1 overflow-auto p-2.5">
-              <div className="grid w-full gap-4">
-                <Section>
-                  <div className="grid gap-4">
+              <div className="flex min-h-full flex-col gap-4 w-full">
+                <Section className="flex flex-1 flex-col">
+                  <div className="flex flex-1 flex-col gap-4">
                     <FormField label="Titel" required>
                       <Input
                         value={title}
@@ -448,10 +448,11 @@ export function TaskForm({
                         autoFocus={!task}
                       />
                     </FormField>
-                    <FormField label="Beschreibung">
+                    <FormField label="Beschreibung" fill>
                       <RichTextInlineField
                         value={description}
                         placeholder="Beschreibung"
+                        fill
                         minRows={12}
                         testIdPrefix="task-description"
                         onImageUpload={uploadContentImage}
@@ -696,10 +697,11 @@ export function TaskForm({
                   }}
                 />
                 <NoteEditor
-                  note={editingNote}
-                  open={Boolean(editingNote)}
+                  note={isCreatingNote ? null : editingNote}
+                  open={isCreatingNote || Boolean(editingNote)}
                   onSave={notes.updateNote}
-                  onClose={() => setEditingNote(null)}
+                  onCreateNote={handleCreateNote}
+                  onClose={() => { setEditingNote(null); setIsCreatingNote(false); }}
                 />
               </>
             ) : (

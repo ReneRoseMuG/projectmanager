@@ -6,7 +6,7 @@ import { Section } from "../../components/ui/Section";
 
 const STORAGE_KEY = "ui.kanban-sidebar-width";
 const WIKI_EXPORT_PATH_KEY = "ui.wiki-export-path";
-const WIKI_EXPORT_PATH_DEFAULT = "~/Dokumente/Projekt Manager/Wiki";
+const WIKI_EXPORT_PATH_DEFAULT = "~/Documents/Projekt Manager/Wiki";
 const DEFAULT_WIDTH = 270;
 const MIN_WIDTH = 150;
 const MAX_WIDTH = 600;

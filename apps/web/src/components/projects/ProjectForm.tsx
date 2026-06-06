@@ -148,8 +148,8 @@ const baseTabs: Array<Tab<ProjectFormTab>> = [
   { value: "tasks", label: "Aufgaben" },
   { value: "tickets", label: "Tickets" },
   { value: "features", label: "Features" },
-  { value: "comments", label: "Kommentare" },
   { value: "notes", label: "Notizen" },
+  { value: "comments", label: "Kommentare" },
   { value: "attachments", label: "Dateien" },
   { value: "backlog", label: "Backlog" },
   { value: "journal", label: "Journal" },
@@ -239,6 +239,7 @@ export function ProjectForm({
     useState<ViewMode>("kanban");
   const [featureViewMode, setFeatureViewMode] = useState<ViewMode>("kanban");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [isCreatingNote, setIsCreatingNote] = useState(false);
   const canReadJournal = useHasPermission("journal", "read");
   const canCreateTasks = useHasPermission("tasks", "write");
   const canCreateTickets = useHasPermission("tickets", "write");
@@ -382,21 +383,20 @@ export function ProjectForm({
   };
 
   const createNote = async () => {
+    setIsCreatingNote(true);
+  };
+
+  const handleCreateNote = async (title: string, contentJson: Note["contentJson"]) => {
     try {
-      const note = await notes.createNote({
-        title: "Ohne Titel",
-        contentJson: {},
-      });
-      if (note) {
-        setEditingNote(note);
-        showToast({ tone: "success", title: "Notiz erstellt" });
-      }
+      await notes.createNote({ title, contentJson });
+      showToast({ tone: "success", title: "Notiz erstellt" });
     } catch (noteError) {
       showToast({
         tone: "error",
         title: "Notiz konnte nicht erstellt werden",
         message: errorMessage(noteError),
       });
+      throw noteError;
     }
   };
 
@@ -795,25 +795,28 @@ export function ProjectForm({
         {activeTab === "details" ? (
           <div className="flex min-h-0 w-full flex-1">
             <div className="min-w-0 flex-1 overflow-auto p-2.5">
-              <div className="grid w-full gap-4">
-                <Section>
-                  <FormField label="Projektname" required className="min-w-0">
-                    <Input
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      required
-                    />
-                  </FormField>
-                  <FormField label="Beschreibung" className="mt-4">
-                    <RichTextInlineField
-                      value={description}
-                      onChange={setDescription}
-                      placeholder="Worum geht es in diesem Projekt?"
-                      minRows={5}
-                      testIdPrefix="project-description"
-                      onImageUpload={uploadContentImage}
-                    />
-                  </FormField>
+              <div className="flex min-h-full flex-col gap-4 w-full">
+                <Section className="flex flex-1 flex-col">
+                  <div className="flex flex-1 flex-col gap-4">
+                    <FormField label="Projektname" required className="min-w-0">
+                      <Input
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        required
+                      />
+                    </FormField>
+                    <FormField label="Beschreibung" fill>
+                      <RichTextInlineField
+                        value={description}
+                        onChange={setDescription}
+                        placeholder="Worum geht es in diesem Projekt?"
+                        fill
+                        minRows={5}
+                        testIdPrefix="project-description"
+                        onImageUpload={uploadContentImage}
+                      />
+                    </FormField>
+                  </div>
                 </Section>
               </div>
             </div>
@@ -1070,10 +1073,11 @@ export function ProjectForm({
                   onDelete={(note) => void notes.removeNote(note.id)}
                 />
                 <NoteEditor
-                  note={editingNote}
-                  open={Boolean(editingNote)}
+                  note={isCreatingNote ? null : editingNote}
+                  open={isCreatingNote || Boolean(editingNote)}
                   onSave={notes.updateNote}
-                  onClose={() => setEditingNote(null)}
+                  onCreateNote={handleCreateNote}
+                  onClose={() => { setEditingNote(null); setIsCreatingNote(false); }}
                 />
               </>
             ) : (

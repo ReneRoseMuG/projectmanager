@@ -528,7 +528,7 @@ function DraggableItemWrapper({
   );
 }
 
-const CLOSED_SIDEBAR_WIDTH = 270;
+const CLOSED_SIDEBAR_WIDTH = 300;
 const CLOSED_SIDEBAR_STRIP_WIDTH = 12;
 
 function readStoredBoolean(key: string, fallback: boolean): boolean {

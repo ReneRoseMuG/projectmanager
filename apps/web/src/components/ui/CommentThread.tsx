@@ -1,6 +1,6 @@
 import type { Comment, CommentUpdate } from "@taskmanager/shared-types";
 import { MessageSquare, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useHasPermission } from "../../hooks/usePermissions";
 import { formatHumanDate } from "../../utils/date";
 import { richTextToHtml } from "../../utils/richText";
@@ -60,6 +60,7 @@ function CommentCard({
           value={body}
           valueFormat={valueFormat}
           readOnly
+          minRows={3}
           testIdPrefix={`comment-thread-comment-${comment.id}-body`}
           onChange={() => undefined}
         />
@@ -145,12 +146,17 @@ export function CommentThread({
     });
   };
 
+  const sortedComments = useMemo(
+    () => [...comments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [comments],
+  );
+
   const editingComment = modalState?.mode === "edit" ? modalState.comment : null;
 
   return (
     <>
       <ListBoardView
-        items={comments}
+        items={sortedComments}
         mode={mode}
         onModeChange={setMode}
         onAdd={() => setModalState({ mode: "create" })}

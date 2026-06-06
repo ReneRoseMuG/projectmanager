@@ -162,7 +162,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
 
   if (!readOnly) {
     return (
-      <div className={cn("relative group", fill && "flex min-h-0 flex-1 flex-col", className)} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}>
+      <div className={cn("relative group", fill && "flex flex-1 flex-col", className)} data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}>
         <RichTextInlineEditor
           value={value ?? ""}
           valueFormat={valueFormat}
@@ -438,7 +438,7 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
   return (
     <div
       className={cn(
-        fill ? "flex min-h-0 flex-1 flex-col overflow-visible" : "overflow-clip",
+        fill ? "flex flex-1 flex-col overflow-y-auto" : "overflow-clip",
         "rounded-md border bg-white shadow-sm transition-colors",
         editable === false
           ? "border-transparent shadow-none"
@@ -450,11 +450,11 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
       onClick={handleContainerClick}
     >
       {toolbar !== "none" ? (
-        <div className={editable === false ? "invisible pointer-events-none" : undefined}>
+        <div className={cn("sticky top-0 z-10", editable === false ? "invisible pointer-events-none" : undefined)}>
           <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} wikiPages={wikiPages} />
         </div>
       ) : null}
-      <EditorContent editor={editor} className={fill ? "flex min-h-0 flex-1 flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1" : undefined} />
+      <EditorContent editor={editor} className={fill ? "flex flex-1 flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1" : undefined} />
     </div>
   );
 }
@@ -491,9 +491,13 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
   }, [editor]);
 
   return (
-    <div data-testid="rich-text-toolbar" className={cn("sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-t-md border-b border-line bg-shell p-1.5 transition-opacity", focused ? "opacity-100" : "opacity-60")}>
-      <ToolbarButton onClick={() => unsetSelectionHighlight(editor)} active={false} disabled={!hasTextSelection} title="Hervorhebungen entfernen" icon={<RemoveFormatting />} />
-      <Separator />
+    <div data-testid="rich-text-toolbar" className={cn("flex flex-wrap items-center gap-1 rounded-t-md border-b border-line bg-shell p-1.5 transition-opacity", (focused || wikiPickerOpen) ? "opacity-100" : "opacity-60")}>
+      {!showFullToolbar ? (
+        <>
+          <ToolbarButton onClick={() => unsetSelectionHighlight(editor)} active={false} disabled={!hasTextSelection} title="Hervorhebungen entfernen" icon={<RemoveFormatting />} />
+          <Separator />
+        </>
+      ) : null}
       <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Fett" icon={<Bold />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Kursiv" icon={<Italic />} />
       <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Unterstrichen" icon={<UnderlineIcon />} />
@@ -550,7 +554,11 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
                             onMouseDown={(e) => {
                               e.preventDefault();
                               if (editor.state.selection.empty) {
-                                editor.chain().focus().insertContent(`<a href="wiki://${p.id}">${p.title}</a>`).run();
+                                editor.chain().focus().insertContent({
+                                  type: 'text',
+                                  text: p.title,
+                                  marks: [{ type: 'link', attrs: { href: `wiki://${p.id}` } }],
+                                }).run();
                               } else {
                                 editor.chain().focus().setLink({ href: `wiki://${p.id}` }).run();
                               }

@@ -14,10 +14,11 @@ interface FormFieldProps {
   error?: string;
   children: ReactNode;
   className?: string;
+  fill?: boolean;
 }
 
 /** Shared form field wrapper for label, control and helper text. */
-export function FormField({ label, icon, action, variant = "default", htmlFor, required = false, hint, error, children, className = "" }: FormFieldProps) {
+export function FormField({ label, icon, action, variant = "default", htmlFor, required = false, hint, error, children, className = "", fill = false }: FormFieldProps) {
   const generatedId = useId();
   const childArray = Children.toArray(children);
   const onlyChild =
@@ -56,7 +57,7 @@ export function FormField({ label, icon, action, variant = "default", htmlFor, r
   }
 
   return (
-    <div className={`grid gap-1 ${className}`}>
+    <div className={fill ? `flex flex-1 flex-col gap-1 ${className}` : `grid gap-1 ${className}`}>
       {icon ? (
         <div className="flex items-center gap-1.5">
           <span className="shrink-0 text-steel-400">{icon}</span>

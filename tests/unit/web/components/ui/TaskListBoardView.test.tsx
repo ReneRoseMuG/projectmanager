@@ -268,6 +268,27 @@ describe("TaskListBoardView", () => {
     expect(container.querySelector("article[class*='border-l-[4px]']")).not.toBeInTheDocument();
   });
 
+  it("rendert geschlossene Tasks als ClosedItemRow mit childCount und onOpen", () => {
+    const closedTask = buildTask({ id: 99, title: "Abgeschlossene Aufgabe", status: "done", subtaskCount: 5 });
+    const onOpen = vi.fn();
+    const { container } = renderTaskList({ tasks: [closedTask], onOpen });
+
+    // ClosedItemRow verwendet border-l-[3px] (im Gegensatz zu ItemCard/ItemRow mit border-l-[4px])
+    const closedCard = screen.getByRole("heading", { name: "Abgeschlossene Aufgabe" }).closest("article");
+    expect(closedCard).not.toBeNull();
+    expect(closedCard).toHaveClass("line-clamp-2".split(" ")[0]); // Titel hat line-clamp-2
+
+    // childCount-Footer mit subtaskCount=5
+    expect(screen.getByText("5")).toBeInTheDocument();
+
+    // Klick auf Karte öffnet die Aufgabe
+    fireEvent.click(closedCard!);
+    expect(onOpen).toHaveBeenCalledWith(closedTask);
+
+    // Im Board-Modus erscheint keine reguläre article.p-5 Karte für den geschlossenen Task
+    expect(container.querySelector("article.p-5")).not.toBeInTheDocument();
+  });
+
   it("filtert die Suche ausschließlich nach Aufgaben-Titel", () => {
     const tasks = [
       buildTask({

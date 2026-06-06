@@ -15,12 +15,13 @@ interface NoteEditorProps {
   note: Note | null;
   open: boolean;
   onSave: (id: number, input: NoteUpdate) => Promise<unknown>;
+  onCreateNote?: (title: string, contentJson: Note["contentJson"]) => Promise<unknown>;
   onClose: () => void;
   variant?: "modal" | "page";
   onOpenInTab?: () => void;
 }
 
-export function NoteEditor({ note, open, onSave, onClose, variant = "modal", onOpenInTab }: NoteEditorProps) {
+export function NoteEditor({ note, open, onSave, onCreateNote, onClose, variant = "modal", onOpenInTab }: NoteEditorProps) {
   const { confirm } = useConfirm();
   const [title, setTitle] = useState("Ohne Titel");
   const [content, setContent] = useState("");
@@ -31,15 +32,21 @@ export function NoteEditor({ note, open, onSave, onClose, variant = "modal", onO
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!open || !note) {
-      return;
+    if (!open) return;
+    if (note) {
+      const nextContent = noteContentToEditorContent(note.contentJson);
+      setTitle(note.title);
+      setContent(nextContent.value);
+      setContentFormat(nextContent.format);
+      setLocalVersion(note.version);
+      setLastSavedContentJson(note.contentJson);
+    } else {
+      setTitle("Ohne Titel");
+      setContent("");
+      setContentFormat("html");
+      setLocalVersion(null);
+      setLastSavedContentJson(null);
     }
-    const nextContent = noteContentToEditorContent(note.contentJson);
-    setTitle(note.title);
-    setContent(nextContent.value);
-    setContentFormat(nextContent.format);
-    setLocalVersion(note.version);
-    setLastSavedContentJson(note.contentJson);
     setDirty(false);
   }, [note, open]);
 
@@ -81,8 +88,18 @@ export function NoteEditor({ note, open, onSave, onClose, variant = "modal", onO
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    await save();
-    onClose();
+    if (!note && onCreateNote) {
+      setSaving(true);
+      try {
+        await onCreateNote(title, htmlToNoteContent(content));
+        onClose();
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      await save();
+      onClose();
+    }
   };
 
   const requestClose = async () => {
@@ -101,21 +118,22 @@ export function NoteEditor({ note, open, onSave, onClose, variant = "modal", onO
     }
   };
 
+  const isCreateMode = !note && Boolean(onCreateNote);
   return (
     <FormModal
-      open={open && Boolean(note)}
+      open={open && (Boolean(note) || isCreateMode)}
       title={title || "Ohne Titel"}
       icon={<StickyNote size={20} />}
-      breadcrumb={["Notizen", "Bearbeiten"]}
+      breadcrumb={["Notizen", isCreateMode ? "Anlegen" : "Bearbeiten"]}
       onSubmit={submit}
       onClose={() => void requestClose()}
       saving={saving}
-      submitLabel="Speichern"
+      submitLabel={isCreateMode ? "Anlegen" : "Speichern"}
       cancelLabel="Schließen"
       variant={variant}
-      onOpenInTab={onOpenInTab}
+      onOpenInTab={isCreateMode ? undefined : onOpenInTab}
       footerStart={
-        note ? (
+        !isCreateMode && note ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="ghost" className="text-crimson hover:bg-crimson/10" icon={<Trash2 size={16} />} disabled>
               Löschen
@@ -124,38 +142,35 @@ export function NoteEditor({ note, open, onSave, onClose, variant = "modal", onO
         ) : null
       }
     >
-      {note ? (
-        <>
-          <Section>
-            <FormField label="Titel">
-              <input
-                className="h-11 rounded-md border border-line bg-white px-3 text-lg font-semibold outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
-                value={title}
-                required
-                onChange={(event) => {
-                  setTitle(event.target.value);
-                  setDirty(true);
-                }}
-              />
-            </FormField>
-          </Section>
+      <Section>
+        <FormField label="Titel">
+          <input
+            className="h-11 rounded-md border border-line bg-white px-3 text-lg font-semibold outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10"
+            value={title}
+            required
+            onChange={(event) => {
+              setTitle(event.target.value);
+              setDirty(true);
+            }}
+          />
+        </FormField>
+      </Section>
 
-          <Section>
-            <RichTextInlineField
-              key={`${note.id}-${contentFormat}`}
-              value={content}
-              valueFormat={contentFormat}
-              testIdPrefix="note-editor-content"
-              onChange={(value) => {
-                setContent(value);
-                setContentFormat("html");
-                setDirty(true);
-              }}
-              onImageUpload={uploadContentImage}
-            />
-          </Section>
-        </>
-      ) : null}
+      <Section>
+        <RichTextInlineField
+          key={note ? `${note.id}-${contentFormat}` : "create"}
+          value={content}
+          valueFormat={contentFormat}
+          testIdPrefix="note-editor-content"
+          minRows={12}
+          onChange={(value) => {
+            setContent(value);
+            setContentFormat("html");
+            setDirty(true);
+          }}
+          onImageUpload={uploadContentImage}
+        />
+      </Section>
     </FormModal>
   );
 }
