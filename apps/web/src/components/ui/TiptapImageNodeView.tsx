@@ -1,7 +1,7 @@
 import type { ReactNodeViewProps } from "@tiptap/react";
 import { NodeViewWrapper } from "@tiptap/react";
 import { AlignCenter, AlignLeft, GripVertical } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { ImageAlign, ImageFloat } from "./tiptap-image-node";
 
 function cn(...classes: Array<string | false | null | undefined>) {
@@ -43,6 +43,15 @@ export function TiptapImageNodeView({ node, updateAttributes, selected }: ReactN
   const storedWidth = node.attrs.width as number | null;
 
   const imgRef = useRef<HTMLImageElement>(null);
+  // Tracks active drag cleanup so the effect can remove listeners on unmount
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  // Remove any dangling document listeners when the node view unmounts
+  useEffect(() => {
+    return () => {
+      cleanupRef.current?.();
+    };
+  }, []);
 
   const isFloatLeft = float === "left";
   const isFloatRight = float === "right";
@@ -67,6 +76,9 @@ export function TiptapImageNodeView({ node, updateAttributes, selected }: ReactN
     const img = imgRef.current;
     if (!img) return;
 
+    // The NodeViewWrapper div is the direct parent of the img
+    const wrapperEl = img.parentElement as HTMLElement | null;
+
     const startX = e.clientX;
     const startWidth = img.offsetWidth || img.naturalWidth || 400;
 
@@ -74,6 +86,15 @@ export function TiptapImageNodeView({ node, updateAttributes, selected }: ReactN
       const delta = me.clientX - startX;
       const newWidth = Math.max(80, startWidth + delta);
       img.style.width = `${newWidth}px`;
+      // Grow/shrink the wrapper in sync so the resize handle follows the edge
+      // and max-width on the wrapper does not block enlargement
+      if (wrapperEl) wrapperEl.style.width = `${newWidth}px`;
+    };
+
+    const cleanup = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      cleanupRef.current = null;
     };
 
     const onUp = () => {
@@ -81,10 +102,10 @@ export function TiptapImageNodeView({ node, updateAttributes, selected }: ReactN
       if (finalWidth > 0) {
         updateAttributes({ width: finalWidth });
       }
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
+      cleanup();
     };
 
+    cleanupRef.current = cleanup;
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
   };
@@ -143,7 +164,7 @@ export function TiptapImageNodeView({ node, updateAttributes, selected }: ReactN
         ref={imgRef}
         src={src}
         alt={alt ?? ""}
-        className="block max-w-full rounded"
+        className="block rounded"
         style={{ width: storedWidth ? `${storedWidth}px` : undefined }}
         draggable={false}
       />
