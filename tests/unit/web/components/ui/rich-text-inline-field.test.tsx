@@ -10,6 +10,7 @@
  * - Eingefügter Markdown-Plain-Text wird zentral durch die Markdown-Extension in HTML konvertiert.
  * - Bilder können nur über einen expliziten Upload-Handler eingefügt werden.
  * - Im Edit-Zustand wird nur die feste Toolbar gerendert, keine zusätzliche Auswahl- oder Floating-Bar.
+ * - Wiki-Seiten-Links behalten eine navigierbare App-Route und eine auslesbare Datenbank-ID.
  * - TipTap wird im Test gemockt, die Leseansicht wird real gerendert.
  *
  * Fehlerfälle:
@@ -66,7 +67,7 @@ interface MockCommandChain {
   insertColumnBlock: () => MockCommandChain;
   extendMarkRange: () => MockCommandChain;
   unsetLink: () => MockCommandChain;
-  setLink: () => MockCommandChain;
+  setLink: (attrs?: Record<string, string>) => MockCommandChain;
   unsetColor: () => MockCommandChain;
   unsetMark: (name: string) => MockCommandChain;
   setImage: (attrs?: Record<string, string>) => MockCommandChain;
@@ -575,6 +576,35 @@ describe("RichTextInlineField", () => {
     expect(toolbar.parentElement).not.toHaveClass("invisible");
   });
 
+  it("T-WL1 fügt Wiki-Link mit App-Route und Datenbank-ID ein", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} wikiPages={[{ id: 42, title: "Wiki Beta" }]} testIdPrefix="field" />);
+    const activeEditor = tiptapMock.editor;
+    if (!activeEditor) {
+      throw new Error("Editor mock was not created");
+    }
+    activeEditor.state.selection.empty = true;
+
+    fireEvent.click(screen.getByRole("button", { name: "Wiki-Seiten-Link" }));
+    fireEvent.mouseDown(screen.getByRole("button", { name: "Wiki Beta" }));
+
+    expect(tiptapMock.chain?.insertContent).toHaveBeenCalledWith({
+      type: "text",
+      text: "Wiki Beta",
+      marks: [{ type: "link", attrs: { href: "/wiki/42", wikiPageId: "42" } }]
+    });
+    expect(tiptapMock.chain?.run).toHaveBeenCalled();
+  });
+
+  it("T-WL2 setzt Wiki-Link mit App-Route und Datenbank-ID auf die Auswahl", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} wikiPages={[{ id: 77, title: "Wiki Gamma" }]} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Wiki-Seiten-Link" }));
+    fireEvent.mouseDown(screen.getByRole("button", { name: "Wiki Gamma" }));
+
+    expect(tiptapMock.chain?.setLink).toHaveBeenCalledWith({ href: "/wiki/77", wikiPageId: "77" });
+    expect(tiptapMock.chain?.run).toHaveBeenCalled();
+  });
+
   it("T-EN3 navigiert bei einfachem Klick auf wiki://-Link im Lesemodus", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} editable={false} testIdPrefix="field" />);
 
@@ -585,6 +615,23 @@ describe("RichTextInlineField", () => {
     editorContainer.appendChild(anchor);
 
     fireEvent.click(anchor);
+
+    expect(navigateMock).toHaveBeenCalledWith("/wiki/42");
+  });
+
+  it("T-EN3b navigiert über Datenbank-ID, wenn ein Kind im Wiki-Link geklickt wird", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} editable={false} testIdPrefix="field" />);
+
+    const editorContainer = screen.getByTestId("field-editor");
+    const anchor = document.createElement("a");
+    anchor.href = "/wiki/42";
+    anchor.setAttribute("data-wiki-page-id", "42");
+    const label = document.createElement("span");
+    label.textContent = "Wiki Link";
+    anchor.appendChild(label);
+    editorContainer.appendChild(anchor);
+
+    fireEvent.click(label);
 
     expect(navigateMock).toHaveBeenCalledWith("/wiki/42");
   });

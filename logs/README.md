@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 06.06.26 | 17:40:40 | Fix | Wiki HTML Links | ⚠️ |
 | 05.06.26 | 12:00:00 | Fix | Editor Fill — Details Tabs (Projekt/Meilenstein/Aufgabe/Ticket) | ✅ |
 | 05.06.26 | 11:25:14 | Fix | TKT-75+83 Closed Sidebar Cards + Tag Picker Portal | ✅ |
 | 04.06.26 | 17:55:45 | Fix | API-Restfehler Tests | ⚠️ |

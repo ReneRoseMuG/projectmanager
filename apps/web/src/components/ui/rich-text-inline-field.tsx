@@ -140,8 +140,80 @@ interface ClickPosition {
 
 const IMAGE_UPLOAD_PLACEHOLDER = "[Bild wird hochgeladen...]";
 
+const WikiAwareLink = Link.extend({
+  addAttributes() {
+    return {
+      ...(this.parent?.() ?? {}),
+      wikiPageId: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute("data-wiki-page-id"),
+        renderHTML: (attributes: { wikiPageId?: unknown }) => {
+          const wikiPageId = attributes.wikiPageId;
+          if (typeof wikiPageId !== "string" || wikiPageId.trim() === "") {
+            return {};
+          }
+
+          return { "data-wiki-page-id": wikiPageId };
+        }
+      }
+    };
+  }
+});
+
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function wikiPageEditorHref(pageId: number): string {
+  return `/wiki/${pageId}`;
+}
+
+function wikiPageLinkAttrs(pageId: number): { href: string; wikiPageId: string } {
+  return {
+    href: wikiPageEditorHref(pageId),
+    wikiPageId: String(pageId)
+  };
+}
+
+function parseWikiPageId(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function getWikiPageIdFromHref(href: string | null | undefined): number | null {
+  if (!href) {
+    return null;
+  }
+
+  const wikiProtocolMatch = /^wiki:\/\/(\d+)$/.exec(href);
+  if (wikiProtocolMatch) {
+    return parseWikiPageId(wikiProtocolMatch[1]);
+  }
+
+  const routeMatch = /^\/wiki\/(\d+)(?:[?#].*)?$/.exec(href);
+  if (routeMatch) {
+    return parseWikiPageId(routeMatch[1]);
+  }
+
+  return null;
+}
+
+function getWikiPageIdFromAnchor(anchor: HTMLAnchorElement): number | null {
+  return parseWikiPageId(anchor.getAttribute("data-wiki-page-id"))
+    ?? getWikiPageIdFromHref(anchor.getAttribute("href"));
+}
+
+function closestWikiPageAnchor(target: EventTarget | null): HTMLAnchorElement | null {
+  if (!(target instanceof Node)) {
+    return null;
+  }
+
+  const targetElement = target instanceof Element ? target : target.parentElement;
+  return targetElement?.closest<HTMLAnchorElement>('a[data-wiki-page-id], a[href^="wiki://"], a[href^="/wiki/"]') ?? null;
 }
 
 export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload, wikiPages, editable }: RichTextInlineFieldProps) {
@@ -249,10 +321,11 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
   const extensions = useMemo(
     () => [
       StarterKit.configure({
-        heading: { levels: [1, 2, 3, 4] }
+        heading: { levels: [1, 2, 3, 4] },
+        link: false
       }),
       Underline,
-      Link.configure({ openOnClick: false, protocols: ['wiki'] }),
+      WikiAwareLink.configure({ openOnClick: false, protocols: ['wiki'] }),
       ResizableImage,
       TldrawNode,
       Column,
@@ -418,17 +491,14 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
   }, [editor, editable]);
 
   const handleContainerClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    const anchor = target.closest('a[href^="wiki://"]');
+    const anchor = closestWikiPageAnchor(event.target);
     if (!anchor) return;
-    const href = anchor.getAttribute("href");
-    if (!href) return;
+    const wikiPageId = getWikiPageIdFromAnchor(anchor);
+    if (wikiPageId === null) return;
     const isModified = event.ctrlKey || event.metaKey;
     if ((editable ?? true) && !isModified) return;
     event.preventDefault();
-    const id = href.slice("wiki://".length);
-    navigate(standalone ? withStandaloneView(`/wiki/${id}`) : `/wiki/${id}`);
+    navigate(standalone ? withStandaloneView(`/wiki/${wikiPageId}`) : `/wiki/${wikiPageId}`);
   };
 
   if (!editor) {
@@ -557,10 +627,10 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
                                 editor.chain().focus().insertContent({
                                   type: 'text',
                                   text: p.title,
-                                  marks: [{ type: 'link', attrs: { href: `wiki://${p.id}` } }],
+                                  marks: [{ type: 'link', attrs: wikiPageLinkAttrs(p.id) }],
                                 }).run();
                               } else {
-                                editor.chain().focus().setLink({ href: `wiki://${p.id}` }).run();
+                                editor.chain().focus().setLink(wikiPageLinkAttrs(p.id)).run();
                               }
                               setWikiPickerOpen(false);
                             }}

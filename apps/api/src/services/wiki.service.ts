@@ -516,10 +516,15 @@ function buildPathMap(pages: WikiPageRecord[], slugMap: Map<number, string>): Ma
 function resolveWikiLinks(html: string, currentRelPath: string, pathMap: Map<number, string>): string {
   const depth = currentRelPath.split("/").length;
   const prefix = depth > 1 ? Array(depth).fill("..").join("/") + "/" : "";
-  return html.replace(/href="wiki:\/\/(\d+)"/g, (_m, idStr: string) => {
+
+  const resolveHref = (_match: string, idStr: string) => {
     const targetPath = pathMap.get(Number(idStr));
     return targetPath ? `href="${prefix}${targetPath}/index.html"` : `href="#"`;
-  });
+  };
+
+  return html
+    .replace(/href="wiki:\/\/(\d+)"/g, resolveHref)
+    .replace(/href="\/wiki\/(\d+)(?:[?#][^"]*)?"/g, resolveHref);
 }
 
 const EXPORT_CSS = `

@@ -16,6 +16,7 @@
  * Abgedeckte Regeln:
  * - Wiki-Seiten können als Root- und Unterseiten angelegt werden.
  * - Content wird DB-first gespeichert und gelesen.
+ * - Der HTML-Export schreibt interne Wiki-Links als relative Dateisystem-Links.
  * - Legacy-Dateipfade bleiben als Fallback lesbar.
  * - Seiten mit Unterseiten sind vor direktem Löschen geschützt.
  *
@@ -28,6 +29,9 @@
  */
 
 import type { FastifyInstance } from "fastify";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { buildTestApp, createProject, createTask, createTestDb, createTicket, createWikiPage, truncateAll, type TestDb } from "../../fixtures/api/index.js";
@@ -237,6 +241,30 @@ describe("Wiki API", () => {
     expect(relation).toBeUndefined();
     expect(taskLink).toBeUndefined();
     expect(ticketLink).toBeUndefined();
+  });
+
+  it("Export schreibt Wiki-Seiten-Links als relative HTML-Dateipfade", async () => {
+    const exportRoot = await fs.mkdtemp(path.join(os.tmpdir(), "projekt-manager-wiki-export-"));
+    try {
+      const target = await createWikiPage(app, { title: "Ziel Seite" });
+      await createWikiPage(app, {
+        title: "Quell Seite",
+        content: `<p><a data-wiki-page-id="${target.id}" href="/wiki/${target.id}">Ziel</a> <a href="wiki://${target.id}">Alt</a></p>`
+      });
+
+      const res = await supertest(app.server)
+        .post("/api/wiki/export")
+        .send({ exportPath: exportRoot })
+        .expect(200);
+
+      expect(res.body.filesWritten).toBe(2);
+      const exportedSource = await fs.readFile(path.join(exportRoot, "quell-seite", "index.html"), "utf-8");
+      expect(exportedSource).toContain('href="ziel-seite/index.html"');
+      expect(exportedSource).not.toContain(`href="/wiki/${target.id}"`);
+      expect(exportedSource).not.toContain(`href="wiki://${target.id}"`);
+    } finally {
+      await fs.rm(exportRoot, { recursive: true, force: true });
+    }
   });
 
   it("Unbekannte Parent-Seite liefert 404", async () => {
