@@ -252,7 +252,7 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
         heading: { levels: [1, 2, 3, 4] }
       }),
       Underline,
-      Link.configure({ openOnClick: false }),
+      Link.configure({ openOnClick: false, protocols: ['wiki'] }),
       ResizableImage,
       TldrawNode,
       Column,
