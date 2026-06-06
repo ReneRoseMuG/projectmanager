@@ -1,4 +1,4 @@
-import { ExternalLink, Save, X } from "lucide-react";
+import { ExternalLink, Save, Trash2, X } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { Button } from "./Button";
 import { CopyReferenceButton } from "./CopyReferenceButton";
@@ -9,6 +9,8 @@ interface FormModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
+  /** When set, shown as the main header title; `title` moves into the breadcrumb. */
+  entityTitle?: string;
   objectReference?: string;
   icon?: ReactNode;
   breadcrumb?: string[];
@@ -17,6 +19,12 @@ interface FormModalProps {
   submitLabel?: string;
   cancelLabel?: string;
   footerStart?: ReactNode;
+  /** When true the footer with Save/Cancel buttons is hidden (used in auto-save edit mode). */
+  hideFooter?: boolean;
+  /** When provided a delete icon button is rendered in the header. */
+  onDelete?: () => void;
+  /** Auto-save status indicator rendered in the header next to the action buttons. */
+  saveStatus?: ReactNode;
   headerMeta?: ReactNode;
   variant?: "modal" | "page";
   onOpenInTab?: () => void;
@@ -32,6 +40,7 @@ export function FormModal({
   open,
   onClose,
   title,
+  entityTitle,
   objectReference,
   icon,
   breadcrumb = [],
@@ -40,6 +49,9 @@ export function FormModal({
   submitLabel = "Speichern",
   cancelLabel = "Abbrechen",
   footerStart,
+  hideFooter = false,
+  onDelete,
+  saveStatus,
   headerMeta,
   variant = "modal",
   onOpenInTab,
@@ -71,13 +83,16 @@ export function FormModal({
     >
       <PageHero
         variant="detail"
-        title={title}
-        breadcrumb={breadcrumb}
+        title={entityTitle ?? title}
+        breadcrumb={entityTitle ? [...breadcrumb, title] : breadcrumb}
         icon={icon}
         metaPills={headerMeta}
         fixedHeight={isPage}
         actions={
           <>
+            {saveStatus ? (
+              <div className="flex items-center pr-1">{saveStatus}</div>
+            ) : null}
             {objectReference ? (
               <CopyReferenceButton
                 reference={objectReference}
@@ -95,14 +110,30 @@ export function FormModal({
                 <ExternalLink size={18} />
               </button>
             ) : null}
+            {onDelete ? (
+              <button
+                type="button"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-crimson/30 hover:text-white"
+                aria-label="Löschen"
+                title="Löschen"
+                onClick={onDelete}
+              >
+                <Trash2 size={18} />
+              </button>
+            ) : null}
             <button
               type="button"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white"
+              className={
+                isPage
+                  ? "flex h-9 items-center gap-1.5 rounded-full px-3 text-sm text-white/80 hover:bg-white/12 hover:text-white"
+                  : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white"
+              }
               aria-label="Schließen"
               title="Schließen"
               onClick={onClose}
             >
               <X size={18} />
+              {isPage ? <span>Zurück</span> : null}
             </button>
           </>
         }
@@ -133,22 +164,22 @@ export function FormModal({
         {children}
       </div>
 
-      <footer
-        className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4"
-      >
-        <div className="flex flex-wrap items-center gap-2">{footerStart}</div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <Button onClick={onClose}>{cancelLabel}</Button>
-          <Button
-            type="submit"
-            variant="primary"
-            icon={<Save size={16} />}
-            disabled={saving}
-          >
-            {submitLabel}
-          </Button>
-        </div>
-      </footer>
+      {!hideFooter ? (
+        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-white px-5 py-4">
+          <div className="flex flex-wrap items-center gap-2">{footerStart}</div>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Button onClick={onClose}>{cancelLabel}</Button>
+            <Button
+              type="submit"
+              variant="primary"
+              icon={<Save size={16} />}
+              disabled={saving}
+            >
+              {submitLabel}
+            </Button>
+          </div>
+        </footer>
+      ) : null}
     </form>
   );
 

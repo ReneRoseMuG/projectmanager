@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAutoSave } from "../../hooks/useAutoSave";
+import { SaveStatus } from "../ui/SaveStatus";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { uploadContentImage } from "../../api/content-images";
@@ -85,6 +87,7 @@ interface FeatureFormProps {
   open: boolean;
   feature?: Feature | null;
   onSubmit: (input: FeatureInput) => Promise<Feature | void>;
+  onAutoSave?: (input: FeatureInput) => Promise<void>;
   onClose: () => void;
   onDelete?: (feature: Feature) => Promise<boolean>;
   savingLabel?: string;
@@ -198,6 +201,7 @@ export function FeatureForm({
   open,
   feature,
   onSubmit,
+  onAutoSave,
   onClose,
   onDelete,
   savingLabel,
@@ -266,6 +270,22 @@ export function FeatureForm({
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
   const prevOpenRef = useRef(false);
+  const formStateRef = useRef({ title, content, status, responsibleUserId });
+  formStateRef.current = { title, content, status, responsibleUserId };
+  const autoSave = useAutoSave({
+    enabled: !!feature && !!onAutoSave,
+    save: async () => {
+      if (!onAutoSave) return;
+      const s = formStateRef.current;
+      await onAutoSave({
+        title: s.title,
+        status: featureStatusValue(catalogs.entries, s.status, "draft"),
+        responsibleUserId: s.responsibleUserId,
+        content: s.content,
+      });
+    },
+  });
+  const af = feature ? autoSave.flush : undefined;
 
   const handleTabChange = (nextTab: FeatureFormTab) => {
     setActiveTab(nextTab);
@@ -509,30 +529,15 @@ export function FeatureForm({
       <FormModal
         open={open}
         title={feature ? "Feature bearbeiten" : "Neues Feature"}
+        entityTitle={feature?.title}
         objectReference={feature ? objectReference("feature", feature.id) : undefined}
         icon={<BookOpen size={20} />}
-        breadcrumb={["Features", feature ? "Bearbeiten" : "Neu"]}
-        submitLabel={
-          saving
-            ? (savingLabel ?? "Speichern…")
-            : feature
-              ? "Speichern"
-              : "Feature anlegen"
-        }
+        breadcrumb={["Features"]}
+        submitLabel={saving ? (savingLabel ?? "Speichern…") : "Feature anlegen"}
         saving={saving}
-        footerStart={
-          feature && onDelete ? (
-            <Button
-              className="text-crimson hover:bg-crimson/10"
-              icon={<Trash2 size={18} />}
-              variant="ghost"
-              disabled={deleting}
-              onClick={() => void deleteCurrentFeature()}
-            >
-              Löschen
-            </Button>
-          ) : undefined
-        }
+        hideFooter={!!feature}
+        onDelete={feature && onDelete ? () => { void deleteCurrentFeature(); } : undefined}
+        saveStatus={feature ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
         onSubmit={submit}
         onClose={onClose}
         variant={variant}
@@ -556,6 +561,7 @@ export function FeatureForm({
                       autoFocus={!feature}
                       value={title}
                       onChange={(event) => setTitle(event.target.value)}
+                      onBlur={af}
                       required
                     />
                   </FormField>
@@ -566,20 +572,24 @@ export function FeatureForm({
                     placeholder="Feature-Inhalt"
                     testIdPrefix="feature-form-content"
                     onImageUpload={uploadContentImage}
-                    onChange={setContent}
+                    onChange={(v) => {
+                      setContent(v);
+                      formStateRef.current = { ...formStateRef.current, content: v };
+                      af?.();
+                    }}
                   />
                 </Section>
               </div>
             </div>
             <FormSidebar storageKey="feature-form-sidebar">
-              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="featureStatus" value={status} onChange={setStatus} />
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="featureStatus" value={status} onChange={(v) => { setStatus(v); formStateRef.current = { ...formStateRef.current, status: v }; af?.(); }} />
               <UserSelectField
                 label="Verantwortlich"
                 icon={<Users size={14} />}
                 variant="panel"
                 value={responsibleUserId}
                 selectedUser={feature?.responsibleUser ?? null}
-                onChange={setResponsibleUserId}
+                onChange={(v) => { setResponsibleUserId(v); formStateRef.current = { ...formStateRef.current, responsibleUserId: v }; af?.(); }}
               />
               <SelectParent
                 type="project"

@@ -1,4 +1,5 @@
 import type { DraftComment, DraftNote, Milestone, MilestoneInput } from "@taskmanager/shared-types";
+import { useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { uploadMilestoneAttachment } from "../api/attachments";
 import { createEntityComment } from "../api/comments";
@@ -109,6 +110,34 @@ export function MilestoneDetailPage() {
     }
   };
 
+  const autoSaveMilestone = useCallback(async (input: MilestoneInput, tagIds: number[]): Promise<void> => {
+    if (!milestone) return;
+    const m = milestone;
+    const fieldsChanged =
+      input.name !== m.name ||
+      (input.description ?? "") !== (m.description ?? "") ||
+      (input.status ?? m.status) !== m.status ||
+      (input.color ?? null) !== m.color ||
+      (input.startDate ?? null) !== m.startDate ||
+      (input.dueDate ?? null) !== m.dueDate ||
+      (input.responsibleUserId ?? null) !== m.responsibleUserId;
+
+    const currentTagIds = m.tags.map((t) => t.id).sort((a, b) => a - b);
+    const nextTagIds = [...tagIds].sort((a, b) => a - b);
+    const tagsChanged =
+      nextTagIds.length !== currentTagIds.length ||
+      nextTagIds.some((id, i) => id !== currentTagIds[i]);
+
+    if (!fieldsChanged && !tagsChanged) return;
+
+    const updated = await updateMilestone(
+      m.id,
+      { ...input, expectedVersion: m.version },
+      tagsChanged ? tagIds : undefined,
+    );
+    await statusCascade.startMilestoneCascade(m, updated);
+  }, [milestone, updateMilestone, statusCascade]);
+
   const postCreateMilestone = async (
     milestoneId: number,
     pending: {
@@ -193,6 +222,7 @@ export function MilestoneDetailPage() {
         initialTab={initialTab}
         variant="page"
         onSubmit={submitMilestone}
+        onAutoSave={milestone ? autoSaveMilestone : undefined}
         onPostCreate={postCreateMilestone}
         onDelete={deleteMilestone}
         onClose={closePage}

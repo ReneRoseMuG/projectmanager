@@ -14,6 +14,8 @@ import type {
 import { BookOpen, Bug, Layers3, ListChecks, ListTodo, Trash2, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAutoSave } from "../../hooks/useAutoSave";
+import { SaveStatus } from "../ui/SaveStatus";
 import { useLocation, useNavigate } from "react-router-dom";
 import { uploadContentImage } from "../../api/content-images";
 import { useAuth } from "../../hooks/useAuth";
@@ -63,6 +65,7 @@ interface UseCaseFormProps {
   currentFeatureId?: number;
   features?: Feature[];
   onSubmit: (input: UseCaseInput) => Promise<UseCase | void>;
+  onAutoSave?: (input: UseCaseInput) => Promise<void>;
   onPostCreate?: (
     useCaseId: number,
     pending: {
@@ -147,6 +150,7 @@ export function UseCaseForm({
   currentFeatureId,
   features = [],
   onSubmit,
+  onAutoSave,
   onPostCreate,
   onDelete,
   onClose,
@@ -183,6 +187,23 @@ export function UseCaseForm({
   const [taskDraftOpen, setTaskDraftOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
   const prevOpenRef = useRef(false);
+  const formStateRef = useRef({ title, content, status, selectedFeatureId, responsibleUserId });
+  formStateRef.current = { title, content, status, selectedFeatureId, responsibleUserId };
+  const autoSave = useAutoSave({
+    enabled: !!useCase && !!onAutoSave,
+    save: async () => {
+      if (!onAutoSave) return;
+      const s = formStateRef.current;
+      await onAutoSave({
+        featureId: s.selectedFeatureId ? Number(s.selectedFeatureId) : undefined,
+        title: s.title,
+        status: featureStatusValue(catalogs.entries, s.status, "draft"),
+        content: s.content,
+        responsibleUserId: s.responsibleUserId,
+      });
+    },
+  });
+  const af = useCase ? autoSave.flush : undefined;
   const candidateFeatureId = useCase?.featureId ?? (typeof selectedFeatureId === "number" ? selectedFeatureId : currentFeatureId);
   const taskCandidateOwner: TaskOwner | null = useCase
     ? { type: "useCase", id: useCase.id }
@@ -348,26 +369,17 @@ export function UseCaseForm({
       <FormModal
         open={open}
         title={useCase ? "Use Case bearbeiten" : "Use Case anlegen"}
+        entityTitle={useCase?.title}
         objectReference={useCase ? objectReference("useCase", useCase.id) : undefined}
         icon={<Layers3 size={20} />}
-        breadcrumb={["Use Cases", useCase ? useCase.title : "Neu"]}
+        breadcrumb={["Use Cases"]}
         onSubmit={submit}
         saving={saving}
+        hideFooter={!!useCase}
+        onDelete={useCase && onDelete ? () => { void deleteCurrentUseCase(); } : undefined}
+        saveStatus={useCase ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
         onOpenInTab={onOpenInTab}
         headerMeta={<StatusPill kind="featureStatus" value={status} />}
-        footerStart={
-          useCase && onDelete ? (
-            <Button
-              className="text-crimson hover:bg-crimson/10"
-              icon={<Trash2 size={18} />}
-              variant="ghost"
-              disabled={deleting}
-              onClick={() => void deleteCurrentUseCase()}
-            >
-              Löschen
-            </Button>
-          ) : undefined
-        }
         onClose={onClose}
         variant={variant}
         contentLayout={activeTab === "details" ? "flush" : "default"}
@@ -389,6 +401,7 @@ export function UseCaseForm({
                       autoFocus
                       value={title}
                       onChange={(event) => setTitle(event.target.value)}
+                      onBlur={af}
                       required
                     />
                   </FormField>
@@ -407,7 +420,11 @@ export function UseCaseForm({
                     placeholder="Use-Case-Inhalt"
                     testIdPrefix="use-case-content"
                     onImageUpload={uploadContentImage}
-                    onChange={setContent}
+                    onChange={(v) => {
+                      setContent(v);
+                      formStateRef.current = { ...formStateRef.current, content: v };
+                      af?.();
+                    }}
                   />
                 </Section>
               </div>
@@ -419,11 +436,12 @@ export function UseCaseForm({
                 icon={<BookOpen size={14} />}
                 variant="panel"
                 value={selectedFeatureId}
-                onChange={(event) =>
-                  setSelectedFeatureId(
-                    event.target.value ? Number(event.target.value) : "",
-                  )
-                }
+                onChange={(event) => {
+                  const v = event.target.value ? Number(event.target.value) : ("" as const);
+                  setSelectedFeatureId(v);
+                  formStateRef.current = { ...formStateRef.current, selectedFeatureId: v };
+                  af?.();
+                }}
               >
                 <option value="">Ohne Feature</option>
                 {features.map((feature) => (
@@ -438,9 +456,9 @@ export function UseCaseForm({
                 variant="panel"
                 value={responsibleUserId}
                 selectedUser={useCase?.responsibleUser ?? null}
-                onChange={setResponsibleUserId}
+                onChange={(v) => { setResponsibleUserId(v); formStateRef.current = { ...formStateRef.current, responsibleUserId: v }; af?.(); }}
               />
-              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="featureStatus" value={status} onChange={setStatus} />
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="featureStatus" value={status} onChange={(v) => { setStatus(v); formStateRef.current = { ...formStateRef.current, status: v }; af?.(); }} />
             </FormSidebar>
           </div>
         ) : null}

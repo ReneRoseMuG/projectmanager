@@ -30,10 +30,12 @@ import { toDateInput } from "../../utils/date";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useAuth } from "../../hooks/useAuth";
+import { useAutoSave } from "../../hooks/useAutoSave";
 import { useNotes } from "../../hooks/useNotes";
 import { useTaskDetail } from "../../hooks/useTaskDetail";
 import { objectReference } from "../../lib/references";
 import { TagPicker } from "../tags/TagPicker";
+import { SaveStatus } from "../ui/SaveStatus";
 import { AttachmentList } from "../attachments/AttachmentList";
 import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { TaskDashboard } from "../dashboard/DashboardView";
@@ -77,6 +79,8 @@ interface TaskFormProps {
   owner?: TaskOwner;
   initialStatus?: TaskStatus;
   onSubmit: (input: TaskFormInput) => Promise<Task | void>;
+  onAutoSave?: (input: TaskFormInput) => Promise<void>;
+  onDelete?: () => void;
   onClose: () => void;
   onChanged?: () => Promise<void>;
   savingLabel?: string;
@@ -153,6 +157,8 @@ export function TaskForm({
   owner,
   initialStatus = "active",
   onSubmit,
+  onAutoSave,
+  onDelete,
   onClose,
   onChanged,
   savingLabel,
@@ -195,6 +201,33 @@ export function TaskForm({
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const prevOpenRef = useRef(false);
+
+  // Updated synchronously before each flush so doSave reads fresh values
+  const formStateRef = useRef({ title, description, status, priority, responsibleUserId, dueDate, selectedTags });
+  formStateRef.current = { title, description, status, priority, responsibleUserId, dueDate, selectedTags };
+
+  const autoSave = useAutoSave({
+    enabled: !!task && !!onAutoSave,
+    save: async () => {
+      if (!onAutoSave) return;
+      const s = formStateRef.current;
+      await onAutoSave({
+        title: s.title,
+        description: s.description,
+        status: resolveCatalogEntryKey(catalogs.entries, "workStatus", s.status, "active"),
+        priority: resolveCatalogEntryKey(catalogs.entries, "priority", s.priority, "medium"),
+        responsibleUserId: s.responsibleUserId,
+        dueDate: s.dueDate || null,
+        tagIds: s.selectedTags.map((t) => t.id),
+        pendingSubtasks: [],
+        pendingTickets: [],
+        pendingComments: [],
+        pendingNotes: [],
+        pendingFiles: [],
+      });
+    },
+  });
+  const af = task ? autoSave.flush : undefined;
 
   useEffect(() => {
     if (!open) {
@@ -380,17 +413,15 @@ export function TaskForm({
       <FormModal
         open={open}
         title={task ? "Aufgabe bearbeiten" : "Aufgabe anlegen"}
+        entityTitle={task?.title}
         objectReference={task ? objectReference("task", task.id) : undefined}
         icon={<ListTodo size={20} />}
-        breadcrumb={["Aufgaben", task ? task.title : "Neu"]}
-        submitLabel={
-          saving
-            ? (savingLabel ?? "Speichern…")
-            : task
-              ? "Speichern"
-              : "Aufgabe anlegen"
-        }
+        breadcrumb={["Aufgaben"]}
+        submitLabel={saving ? (savingLabel ?? "Speichern…") : "Aufgabe anlegen"}
         saving={saving}
+        hideFooter={!!task}
+        onDelete={onDelete}
+        saveStatus={task ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
         onSubmit={submit}
         onClose={onClose}
         variant={variant}
@@ -433,6 +464,7 @@ export function TaskForm({
                       <Input
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
+                        onBlur={af}
                         required
                         autoFocus={!task}
                       />
@@ -444,7 +476,11 @@ export function TaskForm({
                         minRows={12}
                         testIdPrefix="task-description"
                         onImageUpload={uploadContentImage}
-                        onChange={setDescription}
+                        onChange={(v) => {
+                          setDescription(v);
+                          formStateRef.current = { ...formStateRef.current, description: v };
+                          af?.();
+                        }}
                       />
                     </FormField>
                   </div>
@@ -452,18 +488,18 @@ export function TaskForm({
               </div>
             </div>
             <FormSidebar storageKey="task-form-sidebar">
-              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
-              <CatalogSelect label="Priorität" icon={<Flag size={14} />} variant="panel" kind="priority" value={priority} onChange={setPriority} />
-              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={(v) => { setStatus(v); formStateRef.current = { ...formStateRef.current, status: v }; af?.(); }} />
+              <CatalogSelect label="Priorität" icon={<Flag size={14} />} variant="panel" kind="priority" value={priority} onChange={(v) => { setPriority(v); formStateRef.current = { ...formStateRef.current, priority: v }; af?.(); }} />
+              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => { const v = event.target.value; setDueDate(v); formStateRef.current = { ...formStateRef.current, dueDate: v }; af?.(); }} />
               <UserSelectField
                 label="Verantwortlich"
                 icon={<Users size={14} />}
                 variant="panel"
                 value={responsibleUserId}
                 selectedUser={currentTask?.responsibleUser ?? null}
-                onChange={setResponsibleUserId}
+                onChange={(v) => { setResponsibleUserId(v); formStateRef.current = { ...formStateRef.current, responsibleUserId: v }; af?.(); }}
               />
-              <TagPicker selected={selectedTags} onChange={setSelectedTags} variant="panel" />
+              <TagPicker selected={selectedTags} onChange={(v) => { setSelectedTags(v); formStateRef.current = { ...formStateRef.current, selectedTags: v }; af?.(); }} variant="panel" />
             </FormSidebar>
           </div>
         ) : null}

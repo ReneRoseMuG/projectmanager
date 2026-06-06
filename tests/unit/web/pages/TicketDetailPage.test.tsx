@@ -34,6 +34,14 @@ vi.mock("react-router-dom", async (importOriginal) => {
   };
 });
 
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({}),
+}));
+
+vi.mock("../../../../apps/web/src/components/ui/ConfirmDialogProvider", () => ({
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+}));
+
 vi.mock("../../../../apps/web/src/components/tickets/TicketForm", () => ({
   TicketForm({ onOpenInTab }: { onOpenInTab?: () => void }) {
     return onOpenInTab ? (

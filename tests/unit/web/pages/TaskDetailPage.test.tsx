@@ -39,6 +39,10 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({}),
 }));
 
+vi.mock("../../../../apps/web/src/components/ui/ConfirmDialogProvider", () => ({
+  useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+}));
+
 vi.mock("../../../../apps/web/src/components/tasks/TaskForm", () => ({
   TaskForm({
     closeOnSubmit,

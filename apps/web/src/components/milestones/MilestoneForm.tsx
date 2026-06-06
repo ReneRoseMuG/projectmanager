@@ -28,6 +28,7 @@ import { uploadContentImage } from "../../api/content-images";
 import { errorMessage } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useAuth } from "../../hooks/useAuth";
+import { useAutoSave } from "../../hooks/useAutoSave";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useFeatures } from "../../hooks/useFeatures";
 import { useMilestoneFeatureLinks } from "../../hooks/useDocLinks";
@@ -56,6 +57,7 @@ import { DatePicker } from "../ui/DatePicker";
 import { EmptyState } from "../ui/EmptyState";
 import { FormField } from "../ui/FormField";
 import { FormModal } from "../ui/FormModal";
+import { SaveStatus } from "../ui/SaveStatus";
 import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
@@ -82,6 +84,7 @@ interface MilestoneFormProps {
     input: MilestoneInput,
     tagIds: number[],
   ) => Promise<Milestone | void>;
+  onAutoSave?: (input: MilestoneInput, tagIds: number[]) => Promise<void>;
   onClose: () => void;
   onDelete?: (milestone: Milestone) => Promise<boolean>;
   savingLabel?: string;
@@ -147,6 +150,7 @@ export function MilestoneForm({
   initialProjectId,
   lockProjectSelection = false,
   onSubmit,
+  onAutoSave,
   onClose,
   onDelete,
   savingLabel,
@@ -198,6 +202,33 @@ export function MilestoneForm({
   const [pendingNotes, setPendingNotes] = useState<DraftNote[]>([]);
   const [pendingFiles, setPendingFiles] = useState<DraftFile[]>([]);
   const prevOpenRef = useRef(false);
+
+  const formStateRef = useRef({ name, description, status, color, startDate, dueDate, responsibleUserId, selectedTags, projectId });
+  formStateRef.current = { name, description, status, color, startDate, dueDate, responsibleUserId, selectedTags, projectId };
+
+  const autoSave = useAutoSave({
+    enabled: !!milestone && !!onAutoSave,
+    save: async () => {
+      if (!onAutoSave) return;
+      const s = formStateRef.current;
+      if (!s.projectId) return;
+      await onAutoSave(
+        {
+          projectId: s.projectId as number,
+          name: s.name,
+          description: s.description,
+          status: resolveCatalogEntryKey(catalogs.entries, "workStatus", s.status, "active"),
+          color: s.color,
+          startDate: s.startDate || null,
+          dueDate: s.dueDate || null,
+          responsibleUserId: s.responsibleUserId,
+        },
+        s.selectedTags.map((t) => t.id),
+      );
+    },
+  });
+  const af = milestone ? autoSave.flush : undefined;
+
   const returnTo = `${location.pathname}${location.search}`;
   const projectOptions = projects.map((project) => ({
     value: project.id,
@@ -448,35 +479,17 @@ export function MilestoneForm({
       <FormModal
         open={open}
         title={milestone ? "Meilenstein bearbeiten" : "Meilenstein anlegen"}
+        entityTitle={milestone?.name}
         objectReference={milestone ? objectReference("milestone", milestone.id) : undefined}
         icon={<Flag size={20} />}
-        breadcrumb={[
-          "Meilensteine",
-          milestone ? milestone.name : "Neuer Meilenstein",
-        ]}
+        breadcrumb={["Meilensteine"]}
         onSubmit={submit}
         saving={saving}
-        submitLabel={
-          saving
-            ? (savingLabel ?? "Speichern...")
-            : milestone
-              ? "Speichern"
-              : "Meilenstein anlegen"
-        }
+        submitLabel={saving ? (savingLabel ?? "Speichern...") : "Meilenstein anlegen"}
         onOpenInTab={onOpenInTab}
-        footerStart={
-          milestone && onDelete ? (
-            <Button
-              className="text-crimson hover:bg-crimson/10"
-              icon={<Trash2 size={18} />}
-              variant="ghost"
-              disabled={deleting}
-              onClick={() => void deleteCurrentMilestone()}
-            >
-              Löschen
-            </Button>
-          ) : undefined
-        }
+        hideFooter={!!milestone}
+        onDelete={milestone && onDelete ? () => { void deleteCurrentMilestone(); } : undefined}
+        saveStatus={milestone ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
         onClose={onClose}
         variant={variant}
         contentLayout={activeTab === "details" ? "flush" : "default"}
@@ -500,13 +513,14 @@ export function MilestoneForm({
                     <Input
                       value={name}
                       onChange={(inputEvent) => setName(inputEvent.target.value)}
+                      onBlur={af}
                       required
                     />
                   </FormField>
                   <FormField label="Beschreibung" className="mt-4">
                     <RichTextInlineField
                       value={description}
-                      onChange={setDescription}
+                      onChange={(v) => { setDescription(v); formStateRef.current = { ...formStateRef.current, description: v }; af?.(); }}
                       placeholder="Wofür steht dieser Meilenstein?"
                       minRows={12}
                       testIdPrefix="milestone-description"
@@ -539,18 +553,18 @@ export function MilestoneForm({
                   </option>
                 ))}
               </Select>
-              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={setStatus} />
+              <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={(v) => { setStatus(v); formStateRef.current = { ...formStateRef.current, status: v }; af?.(); }} />
               <UserSelectField
                 label="Verantwortlich"
                 icon={<Users size={14} />}
                 variant="panel"
                 value={responsibleUserId}
                 selectedUser={milestone?.responsibleUser ?? null}
-                onChange={setResponsibleUserId}
+                onChange={(v) => { setResponsibleUserId(v); formStateRef.current = { ...formStateRef.current, responsibleUserId: v }; af?.(); }}
               />
-              <DatePicker label="Start" variant="panel" value={startDate} onChange={(inputEvent) => setStartDate(inputEvent.target.value)} />
-              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(inputEvent) => setDueDate(inputEvent.target.value)} />
-              <TagPicker selected={selectedTags} onChange={setSelectedTags} variant="panel" />
+              <DatePicker label="Start" variant="panel" value={startDate} onChange={(inputEvent) => { const v = inputEvent.target.value; setStartDate(v); formStateRef.current = { ...formStateRef.current, startDate: v }; af?.(); }} />
+              <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(inputEvent) => { const v = inputEvent.target.value; setDueDate(v); formStateRef.current = { ...formStateRef.current, dueDate: v }; af?.(); }} />
+              <TagPicker selected={selectedTags} onChange={(v) => { setSelectedTags(v); formStateRef.current = { ...formStateRef.current, selectedTags: v }; af?.(); }} variant="panel" />
             </FormSidebar>
           </div>
         ) : null}

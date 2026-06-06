@@ -4,7 +4,7 @@ import type {
   TaskStatus,
 } from "@taskmanager/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { uploadTaskAttachment } from "../api/attachments";
 import { createEntityComment } from "../api/comments";
@@ -13,6 +13,7 @@ import { createSubtask, type TaskOwner } from "../api/tasks";
 import { setTaskTags } from "../api/tags";
 import { createOwnerTicket, linkOwnerTicket } from "../api/tickets";
 import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
+import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
@@ -48,6 +49,7 @@ export function TaskDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const isCreateMode = params.id === undefined;
   const taskId = isCreateMode ? null : Number(params.id);
   const owner = parseTaskOwner(searchParams);
@@ -74,6 +76,53 @@ export function TaskDetailPage() {
         }
       : undefined;
 
+  const autoSaveTask = useCallback(async (input: TaskFormInput): Promise<void> => {
+    if (!detail.task) return;
+    const t = detail.task;
+    const { tagIds, ...taskInput } = input;
+
+    const fieldsChanged =
+      taskInput.title !== t.title ||
+      (taskInput.description ?? "") !== (t.description ?? "") ||
+      taskInput.status !== t.status ||
+      taskInput.priority !== t.priority ||
+      taskInput.responsibleUserId !== t.responsibleUserId ||
+      taskInput.dueDate !== t.dueDate;
+
+    const currentTagIds = (t.tags ?? []).map((tag) => tag.id).sort((a, b) => a - b);
+    const nextTagIds = [...tagIds].sort((a, b) => a - b);
+    const tagsChanged =
+      nextTagIds.length !== currentTagIds.length ||
+      nextTagIds.some((id, index) => id !== currentTagIds[index]);
+
+    if (!fieldsChanged && !tagsChanged) return;
+
+    await Promise.all([
+      fieldsChanged
+        ? taskController.updateTask(t.id, { ...taskInput, expectedVersion: t.version })
+        : Promise.resolve(undefined),
+      tagsChanged ? setTaskTags(t.id, tagIds) : Promise.resolve(undefined),
+    ]);
+    if (tagsChanged) void invalidateTags(queryClient);
+  }, [detail.task, taskController, queryClient]);
+
+  const handleDelete = useCallback(async () => {
+    if (!detail.task) return;
+    const approved = await confirm({
+      title: "Aufgabe löschen?",
+      body: `Die Aufgabe „${detail.task.title}" wird unwiderruflich entfernt.`,
+      severity: "danger",
+      confirmLabel: "Löschen",
+    });
+    if (!approved) return;
+    try {
+      await taskController.removeTask(detail.task.id);
+      closePage();
+    } catch (err) {
+      showToast({ tone: "error", title: "Aufgabe konnte nicht gelöscht werden", message: errorMessage(err) });
+    }
+  }, [detail.task, taskController, confirm, showToast]);
+
   const submitTask = async (input: TaskFormInput): Promise<Task | void> => {
     const {
       tagIds,
@@ -84,49 +133,6 @@ export function TaskDetailPage() {
       pendingFiles,
       ...taskInput
     } = input;
-
-    if (!isCreateMode && detail.task) {
-      const t = detail.task;
-
-      const fieldsChanged =
-        taskInput.title !== t.title ||
-        (taskInput.description ?? "") !== (t.description ?? "") ||
-        taskInput.status !== t.status ||
-        taskInput.priority !== t.priority ||
-        taskInput.responsibleUserId !== t.responsibleUserId ||
-        taskInput.dueDate !== t.dueDate;
-
-      const currentTagIds = (t.tags ?? []).map((tag) => tag.id).sort((a, b) => a - b);
-      const nextTagIds = [...tagIds].sort((a, b) => a - b);
-      const tagsChanged =
-        nextTagIds.length !== currentTagIds.length ||
-        nextTagIds.some((id, index) => id !== currentTagIds[index]);
-
-      if (!fieldsChanged && !tagsChanged) {
-        return t;
-      }
-
-      try {
-        const [updatedTask] = await Promise.all([
-          fieldsChanged
-            ? taskController.updateTask(t.id, { ...taskInput, expectedVersion: t.version })
-            : Promise.resolve(undefined),
-          tagsChanged ? setTaskTags(t.id, tagIds) : Promise.resolve(undefined),
-        ]);
-        if (tagsChanged) {
-          void invalidateTags(queryClient);
-        }
-        showToast({ tone: "success", title: "Aufgabe gespeichert" });
-        return (updatedTask as Task | undefined) ?? t;
-      } catch (taskError) {
-        showToast({
-          tone: "error",
-          title: "Aufgabe konnte nicht gespeichert werden",
-          message: errorMessage(taskError),
-        });
-        throw taskError;
-      }
-    }
 
     if (!owner) {
       throw new Error("Aufgaben benötigen einen Parent-Kontext.");
@@ -230,6 +236,8 @@ export function TaskDetailPage() {
         variant="page"
         savingLabel={savingLabel}
         onSubmit={submitTask}
+        onAutoSave={!isCreateMode ? autoSaveTask : undefined}
+        onDelete={!isCreateMode && detail.task ? handleDelete : undefined}
         onClose={closePage}
         onChanged={detail.reload}
         onOpenInTab={openInTab}

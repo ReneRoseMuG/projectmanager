@@ -6,7 +6,7 @@ import type {
   Project,
   ProjectInput,
 } from "@taskmanager/shared-types";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { uploadProjectAttachment } from "../api/attachments";
 import { createEntityComment } from "../api/comments";
@@ -98,6 +98,34 @@ export function ProjectDetailPage() {
       throw projectError;
     }
   };
+
+  const autoSaveProject = useCallback(async (input: ProjectInput, tagIds: number[]): Promise<void> => {
+    if (!project) return;
+    const p = project;
+    const fieldsChanged =
+      input.name !== p.name ||
+      (input.description ?? "") !== (p.description ?? "") ||
+      (input.status ?? p.status) !== p.status ||
+      (input.color ?? null) !== p.color ||
+      (input.startDate ?? null) !== p.startDate ||
+      (input.dueDate ?? null) !== p.dueDate ||
+      (input.responsibleUserId ?? null) !== p.responsibleUserId;
+
+    const currentTagIds = p.tags.map((t) => t.id).sort((a, b) => a - b);
+    const nextTagIds = [...tagIds].sort((a, b) => a - b);
+    const tagsChanged =
+      nextTagIds.length !== currentTagIds.length ||
+      nextTagIds.some((id, i) => id !== currentTagIds[i]);
+
+    if (!fieldsChanged && !tagsChanged) return;
+
+    const updated = await updateProject(
+      p.id,
+      { ...input, expectedVersion: p.version },
+      tagsChanged ? tagIds : undefined,
+    );
+    await statusCascade.startProjectCascade(p, updated);
+  }, [project, updateProject, statusCascade]);
 
   const postCreateProject = async (
     projectId: number,
@@ -212,6 +240,7 @@ export function ProjectDetailPage() {
         variant="page"
         initialTab={initialTab}
         onSubmit={submitProject}
+        onAutoSave={project ? autoSaveProject : undefined}
         onDelete={deleteProject}
         savingLabel={savingLabel}
         onPostCreate={postCreateProject}

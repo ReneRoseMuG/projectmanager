@@ -48,8 +48,8 @@ describe("TaskForm", () => {
   });
 
   it("verdrahtet Body, Parent-Kontext und Sidebar-Felder mit Submit-Payload", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(<TaskForm open task={task} onSubmit={onSubmit} onClose={vi.fn()} />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<TaskForm open task={task} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />);
 
     const sidebar = screen.getByTestId("form-sidebar");
     const sidebarSelects = within(sidebar).getAllByRole("combobox");
@@ -68,10 +68,9 @@ describe("TaskForm", () => {
     fireEvent.change(dueDate as HTMLInputElement, { target: { value: "2026-06-20" } });
     fireEvent.change(within(sidebar).getByRole("combobox", { name: "Verantwortlich" }), { target: { value: "" } });
     fireEvent.click(within(sidebar).getByRole("button", { name: "Tags 0" }));
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() =>
-      expect(onSubmit).toHaveBeenCalledWith(
+      expect(onAutoSave).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Aufgabe Beta",
           status: "in_progress",
@@ -85,14 +84,13 @@ describe("TaskForm", () => {
   });
 
   it("bindet das RichTextInlineField an die Aufgabenbeschreibung", async () => {
-    const onSubmit = vi.fn().mockResolvedValue(undefined);
-    renderWithProviders(<TaskForm open task={task} onSubmit={onSubmit} onClose={vi.fn()} />);
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(<TaskForm open task={task} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />);
 
     expect(screen.getByTestId("task-description-view")).toHaveValue(task.description);
     fireEvent.change(screen.getByTestId("task-description-view"), { target: { value: "<p>Aufgabe aktualisiert</p>" } });
-    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Aufgabe aktualisiert</p>" })));
+    await waitFor(() => expect(onAutoSave).toHaveBeenCalledWith(expect.objectContaining({ description: "<p>Aufgabe aktualisiert</p>" })));
   });
 
   it("stellt Bild-Upload für die Beschreibung im Edit-Modus bereit", () => {

@@ -1,4 +1,6 @@
 import type { TicketStatus } from "@taskmanager/shared-types";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   addTicketRelation,
@@ -13,12 +15,14 @@ import {
   TicketForm,
   type TicketFormInput,
 } from "../components/tickets/TicketForm";
+import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage, errorMessageAsync } from "../hooks/errors";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useTicketDetail } from "../hooks/useTicketDetail";
 import { useTickets } from "../hooks/useTickets";
+import { invalidateTags } from "../queries/invalidation";
 import { withStandaloneView } from "../utils/standalone";
 
 function parseTicketOwner(
@@ -48,7 +52,9 @@ export function TicketDetailPage() {
   const params = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const isCreateMode = params.id === undefined;
   const ticketId = isCreateMode ? null : Number(params.id);
   const owner = parseTicketOwner(searchParams);
@@ -132,11 +138,9 @@ export function TicketDetailPage() {
     }
   };
 
-  const saveTicket = async (input: TicketFormInput) => {
-    const ticket = detail.ticket;
-    if (!ticket) {
-      return;
-    }
+  const autoSaveTicket = useCallback(async (input: TicketFormInput): Promise<void> => {
+    if (!detail.ticket) return;
+    const t = detail.ticket;
     const { tagIds } = input;
     const ticketInput = {
       title: input.title,
@@ -153,45 +157,51 @@ export function TicketDetailPage() {
     };
 
     const fieldsChanged =
-      ticketInput.title !== ticket.title ||
-      ticketInput.type !== ticket.type ||
-      (ticketInput.description ?? "") !== (ticket.description ?? "") ||
-      ticketInput.status !== ticket.status ||
-      ticketInput.priority !== ticket.priority ||
-      (ticketInput.resolution ?? null) !== (ticket.resolution ?? null) ||
-      ticketInput.reporterUserId !== ticket.reporterUserId ||
-      ticketInput.responsibleUserId !== ticket.responsibleUserId ||
-      (ticketInput.environment ?? null) !== (ticket.environment ?? null) ||
-      (ticketInput.affectedVersion ?? null) !== (ticket.affectedVersion ?? null) ||
-      ticketInput.dueDate !== ticket.dueDate;
+      ticketInput.title !== t.title ||
+      ticketInput.type !== t.type ||
+      (ticketInput.description ?? "") !== (t.description ?? "") ||
+      ticketInput.status !== t.status ||
+      ticketInput.priority !== t.priority ||
+      (ticketInput.resolution ?? null) !== (t.resolution ?? null) ||
+      ticketInput.reporterUserId !== t.reporterUserId ||
+      ticketInput.responsibleUserId !== t.responsibleUserId ||
+      (ticketInput.environment ?? null) !== (t.environment ?? null) ||
+      (ticketInput.affectedVersion ?? null) !== (t.affectedVersion ?? null) ||
+      ticketInput.dueDate !== t.dueDate;
 
-    const currentTagIds = ticket.tags.map((t) => t.id).sort((a, b) => a - b);
+    const currentTagIds = t.tags.map((tag) => tag.id).sort((a, b) => a - b);
     const nextTagIds = [...tagIds].sort((a, b) => a - b);
     const tagsChanged =
       nextTagIds.length !== currentTagIds.length ||
       nextTagIds.some((id, i) => id !== currentTagIds[i]);
 
-    if (!fieldsChanged && !tagsChanged) {
-      return;
-    }
+    if (!fieldsChanged && !tagsChanged) return;
 
+    await Promise.all([
+      fieldsChanged
+        ? detail.updateTicket({ ...ticketInput, expectedVersion: t.version })
+        : Promise.resolve(undefined),
+      tagsChanged ? setTicketTags(t.id, tagIds) : Promise.resolve(undefined),
+    ]);
+    if (tagsChanged) void invalidateTags(queryClient);
+  }, [detail, queryClient]);
+
+  const handleDeleteTicket = useCallback(async () => {
+    if (!detail.ticket) return;
+    const approved = await confirm({
+      title: "Ticket löschen?",
+      body: `Das Ticket „${detail.ticket.title}" wird unwiderruflich entfernt.`,
+      severity: "danger",
+      confirmLabel: "Löschen",
+    });
+    if (!approved) return;
     try {
-      await Promise.all([
-        fieldsChanged
-          ? detail.updateTicket({ ...ticketInput, expectedVersion: ticket.version })
-          : Promise.resolve(undefined),
-        tagsChanged ? setTicketTags(ticket.id, tagIds) : Promise.resolve(undefined),
-      ]);
-      showToast({ tone: "success", title: "Ticket gespeichert" });
-    } catch (ticketError) {
-      showToast({
-        tone: "error",
-        title: "Ticket konnte nicht gespeichert werden",
-        message: errorMessage(ticketError),
-      });
-      throw ticketError;
+      await tickets.removeTicket(detail.ticket.id);
+      closePage();
+    } catch (err) {
+      showToast({ tone: "error", title: "Ticket konnte nicht gelöscht werden", message: errorMessage(err) });
     }
-  };
+  }, [detail.ticket, tickets, confirm, showToast]);
 
   if (isCreateMode) {
     return (
@@ -235,7 +245,9 @@ export function TicketDetailPage() {
         ticket={detail.ticket}
         owner={owner}
         variant="page"
-        onSubmit={saveTicket}
+        onSubmit={autoSaveTicket}
+        onAutoSave={autoSaveTicket}
+        onDelete={handleDeleteTicket}
         onClose={closePage}
         onChanged={detail.reload}
         onOpenInTab={openInTab}

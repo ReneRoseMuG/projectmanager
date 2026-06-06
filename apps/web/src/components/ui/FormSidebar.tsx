@@ -88,8 +88,8 @@ export function FormSidebar({
           </span>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          <div className="grid gap-2.5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3">
+          <div className="grid min-w-0 gap-2.5">{children}</div>
         </div>
       )}
     </aside>
