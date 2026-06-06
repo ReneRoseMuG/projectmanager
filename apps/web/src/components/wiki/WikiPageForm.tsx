@@ -92,13 +92,14 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
         { title: s.title, parentId: s.parentId, content: s.content },
         s.relatedPages.map((p) => p.id),
       );
+      setDirty(false);
     },
   });
   const af = page ? autoSave.flush : undefined;
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
   const [activeTab, setActiveTab] = useState<WikiPageFormTab>("details");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const effectiveEditable = editable ?? (inline ? false : true);
+  const effectiveEditable = (!!page && !!onAutoSave) || (editable ?? (inline ? false : true));
   const parentPageTitle = pages.find((item) => item.id === parentId)?.title ?? parent?.title ?? null;
 
   useEffect(() => {
