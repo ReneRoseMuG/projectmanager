@@ -100,7 +100,11 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
   const [activeTab, setActiveTab] = useState<WikiPageFormTab>("details");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const effectiveEditable = (!!page && !!onAutoSave) || (editable ?? (inline ? false : true));
-  const parentPageTitle = pages.find((item) => item.id === parentId)?.title ?? parent?.title ?? null;
+  const parentPage = parentId !== null ? pages.find((item) => item.id === parentId) ?? parent ?? null : null;
+  const parentPageSummary: WikiPageRelationSummary | null = parentPage
+    ? { id: parentPage.id, title: parentPage.title, parentId: parentPage.parentId }
+    : null;
+  const parentPageTitle = parentPageSummary?.title ?? null;
 
   useEffect(() => {
     if (!effectiveEditable) {
@@ -283,7 +287,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
           {activeTab === "details" ? (
             <div className="grid min-h-full grid-rows-[auto_auto_minmax(0,1fr)] gap-4 p-4 md:p-5">
               <Section>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4">
                   <FormField label="Titel">
                     <input
                       className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-teal focus:ring-2 focus:ring-teal/15"
@@ -296,26 +300,6 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
                       required
                     />
                   </FormField>
-                  <FormField label="Übergeordnete Seite">
-                    <select
-                      className="h-11 rounded-md border border-line bg-white px-3 text-sm outline-none focus:border-teal"
-                      value={parentId ?? ""}
-                      onChange={(event) => {
-                        const v = event.target.value ? Number(event.target.value) : null;
-                        setParentId(v);
-                        formStateRef.current = { ...formStateRef.current, parentId: v };
-                        setDirty(true);
-                        af?.();
-                      }}
-                    >
-                      <option value="">Root-Seite</option>
-                      {pages.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.title}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
                 </div>
               </Section>
 
@@ -324,6 +308,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
                   pages={pages}
                   projects={projects}
                   currentPageId={page?.id}
+                  parentPage={parentPageSummary}
                   selectedPages={relatedPages}
                   readOnly={!effectiveEditable}
                   onNavigate={onNavigateToWikiPage}

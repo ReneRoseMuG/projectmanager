@@ -17,12 +17,14 @@
  * - Wiki-Seiten können als Root- und Unterseiten angelegt werden.
  * - Content wird DB-first gespeichert und gelesen.
  * - Der HTML-Export schreibt interne Wiki-Links als relative Dateisystem-Links.
+ * - Parent-Wechsel verhindern eigene Nachfahren als Ziel.
  * - Legacy-Dateipfade bleiben als Fallback lesbar.
  * - Seiten mit Unterseiten sind vor direktem Löschen geschützt.
  *
  * Fehlerfälle:
  * - Fehlende oder unbekannte Parent-Seiten liefern Fehler.
  * - Löschen einer Seite mit Kindern liefert 409.
+ * - Parent-Zyklen liefern 400.
  *
  * Ziel:
  * Wiki-API, Hierarchie und HTML-Content-Persistenz isoliert absichern.
@@ -157,6 +159,24 @@ describe("Wiki API", () => {
     const page = await createWikiPage(app, { title: "Wiki Project Legacy" });
 
     await supertest(app.server).patch(`/api/wiki/${page.id}`).send({ projectId: 1, expectedVersion: page.version }).expect(400);
+  });
+
+  it("PATCH parentId erlaubt gültige Wechsel und verhindert Parent-Zyklen", async () => {
+    const root = await createWikiPage(app, { title: "Root Parent Move" });
+    const child = await createWikiPage(app, { title: "Child Parent Move", parentId: root.id });
+    const grandchild = await createWikiPage(app, { title: "Grandchild Parent Move", parentId: child.id });
+
+    const moved = await supertest(app.server)
+      .patch(`/api/wiki/${grandchild.id}`)
+      .send({ parentId: root.id, expectedVersion: grandchild.version })
+      .expect(200);
+    expect(moved.body.parentId).toBe(root.id);
+
+    const rejected = await supertest(app.server)
+      .patch(`/api/wiki/${root.id}`)
+      .send({ parentId: child.id, expectedVersion: root.version })
+      .expect(400);
+    expect(rejected.body.error).toBe("BAD_REQUEST");
   });
 
   it("GET /api/wiki gibt Root-Seiten und ChildCount zurück", async () => {

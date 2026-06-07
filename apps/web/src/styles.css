@@ -175,6 +175,7 @@ textarea {
   font-weight: 500;
   color: var(--color-teal);
   background: color-mix(in srgb, var(--color-teal) 8%, transparent);
+  cursor: pointer;
   text-decoration: none;
   transition:
     background 140ms ease,

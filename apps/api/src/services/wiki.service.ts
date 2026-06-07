@@ -153,7 +153,18 @@ async function ensureParentExists(database: DbClient, parentId: number | null | 
   if (parentId === pageId) {
     throw badRequest("A wiki page cannot be its own parent");
   }
-  await getWikiPageRecord(database, parentId);
+  let current: WikiPageRecord | undefined = await getWikiPageRecord(database, parentId);
+  const visited = new Set<number>();
+  while (current) {
+    if (current.id === pageId) {
+      throw badRequest("A wiki page cannot be moved below one of its descendants");
+    }
+    if (visited.has(current.id)) {
+      throw badRequest("Wiki parent chain contains a cycle");
+    }
+    visited.add(current.id);
+    current = current.parentId === null ? undefined : await getWikiPageRecord(database, current.parentId);
+  }
 }
 
 async function readWikiContent(database: DbClient, record: WikiPageRecord): Promise<string> {

@@ -649,7 +649,7 @@ describe("RichTextInlineField", () => {
     expect(navigateMock).toHaveBeenCalledWith("/wiki/99");
   });
 
-  it("T-EN5 navigiert NICHT bei einfachem Klick auf wiki://-Link im Bearbeitungsmodus", () => {
+  it("T-EN5 navigiert bei einfachem Klick auf wiki://-Link im Bearbeitungsmodus", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
 
     const editorContainer = screen.getByTestId("field-editor");
@@ -659,7 +659,7 @@ describe("RichTextInlineField", () => {
 
     fireEvent.click(anchor);
 
-    expect(navigateMock).not.toHaveBeenCalled();
+    expect(navigateMock).toHaveBeenCalledWith("/wiki/99");
   });
 
   it("T-27 setzt Flex-Fill-Klassen wenn fill=true", () => {

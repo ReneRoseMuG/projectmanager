@@ -82,6 +82,8 @@ function renderSelector(options: {
   projects?: Project[];
   selectedPages?: WikiPageRelationSummary[];
   currentPageId?: number;
+  parentPage?: WikiPageRelationSummary | null;
+  onNavigate?: ReturnType<typeof vi.fn>;
 }) {
   const onChange = vi.fn();
   render(
@@ -89,8 +91,10 @@ function renderSelector(options: {
       pages={options.pages}
       projects={options.projects ?? []}
       currentPageId={options.currentPageId}
+      parentPage={options.parentPage}
       selectedPages={options.selectedPages ?? []}
       onChange={onChange}
+      onNavigate={options.onNavigate}
     />
   );
   return onChange;
@@ -124,7 +128,7 @@ describe("RelatedPagesSelector", () => {
       pages: [makePage(1, "Alpha Onboarding"), makePage(2, "Beta Release")]
     });
 
-    expect(screen.getByText("Gib einen Suchbegriff ein, um verwandte Seiten vorzuschlagen.")).toBeInTheDocument();
+    expect(screen.queryByText("Gib einen Suchbegriff ein, um verwandte Seiten vorzuschlagen.")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Alpha Onboarding als verwandte Seite hinzufügen" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Beta Release als verwandte Seite hinzufügen" })).not.toBeInTheDocument();
   });
@@ -141,6 +145,41 @@ describe("RelatedPagesSelector", () => {
     expect(screen.queryByRole("button", { name: "Beta Release als verwandte Seite hinzufügen" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Alpha Linked als verwandte Seite hinzufügen" })).not.toBeInTheDocument();
     expect(screen.getByText("Alpha Linked")).toBeInTheDocument();
+  });
+
+  it("zeigt Parent und verwandte Themen als navigierbare Link-Chips", () => {
+    const onNavigate = vi.fn();
+    const onChange = renderSelector({
+      pages: [makePage(1, "Rootseite"), makePage(2, "Alpha Linked", 1)],
+      parentPage: { id: 1, title: "Rootseite", parentId: null },
+      selectedPages: [{ id: 2, title: "Alpha Linked", parentId: 1 }],
+      onNavigate,
+    });
+
+    expect(screen.getByText("Übergeordnete Seite:")).toBeInTheDocument();
+    const parentLink = screen.getByRole("button", { name: "Rootseite" });
+    const relatedLink = screen.getByRole("button", { name: "Alpha Linked" });
+    expect(parentLink.parentElement).toHaveClass("inline-flex");
+    expect(relatedLink.parentElement).toHaveClass("inline-flex");
+
+    fireEvent.click(parentLink);
+    fireEvent.click(relatedLink);
+    expect(onNavigate).toHaveBeenCalledWith(1);
+    expect(onNavigate).toHaveBeenCalledWith(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Alpha Linked entfernen" }));
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("zeigt Root-Seite als nicht klickbare Parent-Zeile", () => {
+    renderSelector({
+      pages: [makePage(1, "Alpha Onboarding")],
+      parentPage: null,
+    });
+
+    expect(screen.getByText("Übergeordnete Seite:")).toBeInTheDocument();
+    expect(screen.getByText("Root-Seite")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Root-Seite" })).not.toBeInTheDocument();
   });
 
   it("zeigt im readOnly-Modus ausgewählte Seiten als navigierbare Buttons", () => {

@@ -2,6 +2,9 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 07.06.26 | 05:25:06 | Feature | WikiTree Drag Parent | ✅ |
+| 07.06.26 | 04:52:15 | Fix | Verwandte Themen Hinweistext | ✅ |
+| 07.06.26 | 04:47:59 | Fix | Wiki Link Klick im Editor | ⚠️ |
 | 06.06.26 | 17:40:40 | Fix | Wiki HTML Links | ⚠️ |
 | 05.06.26 | 12:00:00 | Fix | Editor Fill — Details Tabs (Projekt/Meilenstein/Aufgabe/Ticket) | ✅ |
 | 05.06.26 | 11:25:14 | Fix | TKT-75+83 Closed Sidebar Cards + Tag Picker Portal | ✅ |

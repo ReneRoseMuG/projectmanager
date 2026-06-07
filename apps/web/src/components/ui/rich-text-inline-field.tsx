@@ -96,7 +96,7 @@ interface RichTextInlineFieldProps {
   onImageUpload?: (file: File) => Promise<string>;
   /** When provided, enables the wiki-page-link button in the toolbar. */
   wikiPages?: Array<{ id: number; title: string }>;
-  /** When false, mounts TipTap in non-editable mode: no toolbar interaction, wiki:// links navigable on click. */
+  /** When false, mounts TipTap in non-editable mode: no toolbar interaction. Wiki links navigate on click in both modes. */
   editable?: boolean;
 }
 
@@ -495,8 +495,6 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
     if (!anchor) return;
     const wikiPageId = getWikiPageIdFromAnchor(anchor);
     if (wikiPageId === null) return;
-    const isModified = event.ctrlKey || event.metaKey;
-    if ((editable ?? true) && !isModified) return;
     event.preventDefault();
     navigate(standalone ? withStandaloneView(`/wiki/${wikiPageId}`) : `/wiki/${wikiPageId}`);
   };

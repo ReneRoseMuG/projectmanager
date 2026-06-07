@@ -1,5 +1,7 @@
-import { ChevronDown, ChevronRight, ExternalLink, FileText, Plus } from "lucide-react";
-import type { MouseEvent } from "react";
+import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import { ChevronDown, ChevronRight, ExternalLink, FileText, GripVertical, Plus } from "lucide-react";
+import type { CSSProperties, MouseEvent } from "react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { WikiTreeNode } from "../../hooks/useWiki";
@@ -9,6 +11,8 @@ interface WikiTreeProps {
   tree: WikiTreeNode[];
   onCreate: (parent: WikiTreeNode | null) => void;
   onNavigate?: (page: WikiTreeNode) => Promise<boolean> | boolean;
+  canMove?: boolean;
+  onMove?: (page: WikiTreeNode, nextParentId: number | null) => Promise<void>;
 }
 
 interface WikiNodeProps {
@@ -17,6 +21,7 @@ interface WikiNodeProps {
   level: number;
   onCreate: (parent: WikiTreeNode) => void;
   onNavigate?: (page: WikiTreeNode) => Promise<boolean> | boolean;
+  canMove: boolean;
 }
 
 const TOGGLE_WIDTH = 16;
@@ -25,8 +30,11 @@ const MAX_WIDTH = 560;
 // Fixed horizontal space per row (excluding text and level indent):
 // pl-3(12) + expand(32) + gap(4) + link-px-2(8+8) + gap(4) + action1(32) + gap(4) + action2(32) + paddingRight(20) = 156
 const FIXED_OVERHEAD = 156;
+const MOVE_HANDLE_OVERHEAD = 32;
 const LEVEL_INDENT = 14;
 const WIDTH_BUFFER = 16;
+const WIKI_ROOT_DROP_ID = "wiki-root";
+const WIKI_PAGE_DROP_PREFIX = "wiki-page-";
 
 function measureTextWidth(text: string): number {
   try {
@@ -40,12 +48,12 @@ function measureTextWidth(text: string): number {
   }
 }
 
-function computeIdealWidth(nodes: WikiTreeNode[], level = 0): number {
+function computeIdealWidth(nodes: WikiTreeNode[], canMove: boolean, level = 0): number {
   let max = 0;
   for (const node of nodes) {
-    const w = Math.ceil(measureTextWidth(node.title)) + level * LEVEL_INDENT + FIXED_OVERHEAD;
+    const w = Math.ceil(measureTextWidth(node.title)) + level * LEVEL_INDENT + FIXED_OVERHEAD + (canMove ? MOVE_HANDLE_OVERHEAD : 0);
     if (w > max) max = w;
-    const childMax = computeIdealWidth(node.children, level + 1);
+    const childMax = computeIdealWidth(node.children, canMove, level + 1);
     if (childMax > max) max = childMax;
   }
   return max;
@@ -62,11 +70,80 @@ function readStoredBoolean(key: string, fallback: boolean): boolean {
   }
 }
 
-function WikiNode({ node, activeId, level, onCreate, onNavigate }: WikiNodeProps) {
+function pageDropId(pageId: number): string {
+  return `${WIKI_PAGE_DROP_PREFIX}${pageId}`;
+}
+
+function getDragPage(data: unknown): WikiTreeNode | null {
+  if (!data || typeof data !== "object" || !("page" in data)) {
+    return null;
+  }
+  const page = (data as { page?: WikiTreeNode }).page;
+  return page ?? null;
+}
+
+function getDropParentId(overId: string | number | undefined): number | null | undefined {
+  if (overId === undefined) {
+    return undefined;
+  }
+  if (overId === WIKI_ROOT_DROP_ID) {
+    return null;
+  }
+  if (typeof overId !== "string" || !overId.startsWith(WIKI_PAGE_DROP_PREFIX)) {
+    return undefined;
+  }
+  const pageId = Number(overId.slice(WIKI_PAGE_DROP_PREFIX.length));
+  return Number.isInteger(pageId) && pageId > 0 ? pageId : undefined;
+}
+
+function containsPage(node: WikiTreeNode, pageId: number): boolean {
+  return node.children.some((child) => child.id === pageId || containsPage(child, pageId));
+}
+
+function WikiRootDropZone({ canMove }: { canMove: boolean }) {
+  const drop = useDroppable({
+    id: WIKI_ROOT_DROP_ID,
+    disabled: !canMove
+  });
+
+  if (!canMove) {
+    return null;
+  }
+
+  return (
+    <div
+      ref={drop.setNodeRef}
+      className={`mb-2 rounded-md border border-dashed px-2 py-1.5 text-xs font-semibold transition ${
+        drop.isOver ? "border-teal bg-teal/15 text-white" : "border-white/20 bg-white/[0.04] text-white/55"
+      }`}
+    >
+      Root-Ebene
+    </div>
+  );
+}
+
+function WikiNode({ node, activeId, level, onCreate, onNavigate, canMove }: WikiNodeProps) {
   const [expanded, setExpanded] = useState(true);
   const navigate = useNavigate();
   const hasChildren = node.children.length > 0;
   const pagePath = `/wiki/${node.id}`;
+  const drop = useDroppable({
+    id: pageDropId(node.id),
+    disabled: !canMove
+  });
+  const drag = useDraggable({
+    id: pageDropId(node.id),
+    data: { page: node },
+    disabled: !canMove
+  });
+  const rowStyle: CSSProperties = {
+    paddingLeft: `${level * LEVEL_INDENT}px`,
+    transform: drag.transform ? CSS.Translate.toString(drag.transform) : undefined
+  };
+  const setRowRef = (element: HTMLDivElement | null) => {
+    drop.setNodeRef(element);
+    drag.setNodeRef(element);
+  };
 
   const openPage = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!onNavigate) return;
@@ -83,9 +160,23 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate }: WikiNodeProps
   return (
     <div className="grid gap-1">
       <div
-        className={`wiki-tree-nav-row flex items-center gap-1${activeId === node.id ? " wiki-tree-nav-row-active" : ""}`}
-        style={{ paddingLeft: `${level * LEVEL_INDENT}px` }}
+        ref={setRowRef}
+        className={`wiki-tree-nav-row flex items-center gap-1${activeId === node.id ? " wiki-tree-nav-row-active" : ""}${drop.isOver ? " ring-1 ring-white/35" : ""}${drag.isDragging ? " opacity-60" : ""}`}
+        style={rowStyle}
       >
+        {canMove ? (
+          <button
+            ref={drag.setActivatorNodeRef}
+            type="button"
+            className="wiki-tree-action-btn flex h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-md active:cursor-grabbing"
+            aria-label={`${node.title} verschieben`}
+            title="Verschieben"
+            {...drag.attributes}
+            {...drag.listeners}
+          >
+            <GripVertical size={15} />
+          </button>
+        ) : null}
         <button
           type="button"
           className="wiki-tree-expand-btn flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
@@ -136,6 +227,7 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate }: WikiNodeProps
               level={level + 1}
               onCreate={onCreate}
               onNavigate={onNavigate}
+              canMove={canMove}
             />
           ))}
         </div>
@@ -144,11 +236,13 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate }: WikiNodeProps
   );
 }
 
-export function WikiTree({ tree, onCreate, onNavigate }: WikiTreeProps) {
+export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove }: WikiTreeProps) {
   const params = useParams();
   const activeId = Number.isFinite(Number(params.id)) ? Number(params.id) : null;
   const [collapsed, setCollapsed] = useState(() => readStoredBoolean("wiki-tree-collapsed", false));
   const [contentWidth, setContentWidth] = useState(MIN_WIDTH);
+  const [activeDragPage, setActiveDragPage] = useState<WikiTreeNode | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   useEffect(() => {
     try {
@@ -163,12 +257,33 @@ export function WikiTree({ tree, onCreate, onNavigate }: WikiTreeProps) {
     let cancelled = false;
     const run = () => {
       if (cancelled) return;
-      const ideal = computeIdealWidth(tree) + WIDTH_BUFFER;
+      const ideal = computeIdealWidth(tree, canMove) + WIDTH_BUFFER;
       setContentWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, ideal)));
     };
-    void document.fonts.ready.then(run).catch(run);
+    void (document.fonts?.ready ?? Promise.resolve()).then(run).catch(run);
     return () => { cancelled = true; };
-  }, [tree]);
+  }, [canMove, tree]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragPage(getDragPage(event.active.data.current));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragPage(null);
+    if (!onMove) {
+      return;
+    }
+    const page = getDragPage(event.active.data.current);
+    const nextParentId = getDropParentId(event.over?.id);
+    if (!page || nextParentId === undefined || page.id === nextParentId || page.parentId === nextParentId) {
+      return;
+    }
+    if (nextParentId !== null && containsPage(page, nextParentId)) {
+      return;
+    }
+
+    void Promise.resolve(onMove(page, nextParentId)).catch(() => undefined);
+  };
 
   const totalWidth = collapsed ? TOGGLE_WIDTH : contentWidth + TOGGLE_WIDTH;
 
@@ -187,37 +302,48 @@ export function WikiTree({ tree, onCreate, onNavigate }: WikiTreeProps) {
           pointerEvents: collapsed ? "none" : "auto",
         }}
       >
-        <div className="mb-2 flex items-center justify-between px-2">
-          <span className="text-xs font-bold uppercase tracking-wide text-white/45">
-            Seiten
-          </span>
-          <button
-            type="button"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-white/55 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-            aria-label="Neue Root-Seite"
-            title="Neue Root-Seite"
-            onClick={() => onCreate(null)}
-          >
-            <Plus size={14} />
-          </button>
-        </div>
-        {tree.length === 0 ? (
-          <div className="px-2 py-6 text-center">
-            <FileText size={20} className="mx-auto mb-2 text-white/30" />
-            <p className="text-sm font-medium text-white/60">Keine Wiki-Seiten</p>
-            <p className="mt-0.5 text-xs text-white/40">Starte mit einer Root-Seite.</p>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveDragPage(null)}>
+          <div className="mb-2 flex items-center justify-between px-2">
+            <span className="text-xs font-bold uppercase tracking-wide text-white/45">
+              Seiten
+            </span>
+            <button
+              type="button"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-white/55 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+              aria-label="Neue Root-Seite"
+              title="Neue Root-Seite"
+              onClick={() => onCreate(null)}
+            >
+              <Plus size={14} />
+            </button>
           </div>
-        ) : null}
-        {tree.map((node) => (
-          <WikiNode
-            key={node.id}
-            node={node}
-            activeId={activeId}
-            level={0}
-            onCreate={onCreate}
-            onNavigate={onNavigate}
-          />
-        ))}
+          <WikiRootDropZone canMove={canMove} />
+          {tree.length === 0 ? (
+            <div className="px-2 py-6 text-center">
+              <FileText size={20} className="mx-auto mb-2 text-white/30" />
+              <p className="text-sm font-medium text-white/60">Keine Wiki-Seiten</p>
+              <p className="mt-0.5 text-xs text-white/40">Starte mit einer Root-Seite.</p>
+            </div>
+          ) : null}
+          {tree.map((node) => (
+            <WikiNode
+              key={node.id}
+              node={node}
+              activeId={activeId}
+              level={0}
+              onCreate={onCreate}
+              onNavigate={onNavigate}
+              canMove={canMove}
+            />
+          ))}
+          <DragOverlay>
+            {activeDragPage ? (
+              <div className="rounded-md border border-white/20 bg-steel-700 px-3 py-2 text-sm font-semibold text-white shadow-lg">
+                {activeDragPage.title}
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       {/* Toggle strip — absolute on right edge, always reachable */}

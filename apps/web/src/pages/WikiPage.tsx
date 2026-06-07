@@ -169,6 +169,21 @@ export function WikiPage() {
     }
   };
 
+  const moveWikiPage = async (page: WikiTreeNode, nextParentId: number | null) => {
+    try {
+      await wiki.updateWikiPage(page.id, {
+        parentId: nextParentId,
+        expectedVersion: page.version,
+      });
+    } catch (wikiError) {
+      showToast({
+        tone: "error",
+        title: "Wiki-Seite konnte nicht verschoben werden",
+        message: errorMessage(wikiError),
+      });
+    }
+  };
+
   const runExport = async () => {
     const exportPath = (() => {
       try { return window.localStorage.getItem("ui.wiki-export-path") ?? "~/Documents/Projekt Manager/Wiki"; }
@@ -228,7 +243,7 @@ export function WikiPage() {
           </>
         ) : (
           <>
-            <WikiTree tree={wiki.tree} onCreate={openCreate} onNavigate={requestInlineNavigation} />
+            <WikiTree tree={wiki.tree} onCreate={openCreate} onNavigate={requestInlineNavigation} canMove={canWrite} onMove={moveWikiPage} />
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               {wiki.error ? (
                 <div className="px-5 pt-5">
@@ -289,6 +304,11 @@ export function WikiPage() {
         projects={projects}
         onSubmit={submitForm}
         onPostCreate={postCreatePage}
+        onNavigateToWikiPage={(id) => {
+          setFormOpen(false);
+          setFormParent(null);
+          navigate(standalone ? withStandaloneView(`/wiki/${id}`) : `/wiki/${id}`);
+        }}
         onClose={() => {
           setFormOpen(false);
           setFormParent(null);

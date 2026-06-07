@@ -31,10 +31,44 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, screen } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WikiTree } from "../../../../../apps/web/src/components/wiki/WikiTree";
 import type { WikiTreeNode } from "../../../../../apps/web/src/hooks/useWiki";
+
+const dndMock = vi.hoisted(() => ({
+  context: undefined as
+    | {
+        onDragEnd?: (event: unknown) => void;
+      }
+    | undefined
+}));
+
+vi.mock("@dnd-kit/core", () => ({
+  DndContext({ children, onDragEnd }: { children: ReactNode; onDragEnd?: (event: unknown) => void }) {
+    dndMock.context = { onDragEnd };
+    return <div data-testid="wiki-tree-dnd-context">{children}</div>;
+  },
+  DragOverlay({ children }: { children: ReactNode }) {
+    return <div data-testid="wiki-tree-drag-overlay">{children}</div>;
+  },
+  PointerSensor: vi.fn(),
+  useSensor: vi.fn(() => ({})),
+  useSensors: vi.fn((...sensors: unknown[]) => sensors),
+  useDroppable: vi.fn(() => ({
+    isOver: false,
+    setNodeRef: vi.fn()
+  })),
+  useDraggable: vi.fn(({ disabled, id }: { disabled?: boolean; id: string }) => ({
+    attributes: { "data-draggable-id": id },
+    listeners: disabled ? {} : { onPointerDown: vi.fn() },
+    setActivatorNodeRef: vi.fn(),
+    setNodeRef: vi.fn(),
+    transform: null,
+    isDragging: false
+  }))
+}));
 
 const childPage: WikiTreeNode = {
   id: 2,
@@ -62,18 +96,38 @@ const rootPage: WikiTreeNode = {
   children: [childPage],
 };
 
-function renderTree(onCreate = vi.fn()) {
+const targetRootPage: WikiTreeNode = {
+  ...childPage,
+  id: 3,
+  parentId: null,
+  title: "Ziel Root",
+  childCount: 0,
+  children: [],
+};
+
+function renderTree(
+  onCreate = vi.fn(),
+  options: { tree?: WikiTreeNode[]; canMove?: boolean; onMove?: (page: WikiTreeNode, nextParentId: number | null) => Promise<void> } = {}
+) {
   return render(
     <MemoryRouter initialEntries={["/wiki/2"]}>
       <Routes>
-        <Route path="/wiki/:id" element={<WikiTree tree={[rootPage]} onCreate={onCreate} />} />
+        <Route path="/wiki/:id" element={<WikiTree tree={options.tree ?? [rootPage]} onCreate={onCreate} canMove={options.canMove} onMove={options.onMove} />} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
+function triggerDragEnd(page: WikiTreeNode, overId: string | null) {
+  dndMock.context?.onDragEnd?.({
+    active: { data: { current: { page } } },
+    over: overId === null ? null : { id: overId }
+  });
+}
+
 afterEach(() => {
   cleanup();
+  dndMock.context = undefined;
 });
 
 describe("WikiTree", () => {
@@ -121,5 +175,37 @@ describe("WikiTree", () => {
 
     expect(screen.queryByRole("link", { name: "Unterseite" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ausklappen" })).toBeInTheDocument();
+  });
+
+  it("zeigt Griphandles bei canMove und verschiebt auf eine Zielseite", () => {
+    const onMove = vi.fn().mockResolvedValue(undefined);
+    renderTree(vi.fn(), { tree: [rootPage, targetRootPage], canMove: true, onMove });
+
+    expect(screen.getByRole("button", { name: "Unterseite verschieben" })).toBeInTheDocument();
+
+    triggerDragEnd(childPage, "wiki-page-3");
+
+    expect(onMove).toHaveBeenCalledWith(childPage, 3);
+  });
+
+  it("verschiebt Seiten über die Root-Zone auf Root-Ebene", () => {
+    const onMove = vi.fn().mockResolvedValue(undefined);
+    renderTree(vi.fn(), { canMove: true, onMove });
+
+    expect(screen.getByText("Root-Ebene")).toBeInTheDocument();
+
+    triggerDragEnd(childPage, "wiki-root");
+
+    expect(onMove).toHaveBeenCalledWith(childPage, null);
+  });
+
+  it("ignoriert Drops auf sich selbst oder ohne Ziel", () => {
+    const onMove = vi.fn().mockResolvedValue(undefined);
+    renderTree(vi.fn(), { canMove: true, onMove });
+
+    triggerDragEnd(childPage, "wiki-page-2");
+    triggerDragEnd(childPage, null);
+
+    expect(onMove).not.toHaveBeenCalled();
   });
 });
