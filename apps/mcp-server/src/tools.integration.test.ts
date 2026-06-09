@@ -170,6 +170,8 @@ describe("MCP tools integration", () => {
     expect(await callTool<Ticket[]>(executedTools, "list_tickets_for_parent", { parentType: "project", parentId: project.id })).toEqual([
       expect.objectContaining({ id: ticket.id })
     ]);
+    expect(await callTool<Task[]>(executedTools, "list_all_tasks")).toEqual(expect.arrayContaining([expect.objectContaining({ id: task.id })]));
+    expect(await callTool<Ticket[]>(executedTools, "list_all_tickets")).toEqual(expect.arrayContaining([expect.objectContaining({ id: ticket.id })]));
     expect(await callTool<Task>(executedTools, "get_task", { id: task.id })).toMatchObject({ id: task.id });
     expect(await callTool<Ticket>(executedTools, "get_ticket", { id: ticket.id })).toMatchObject({ id: ticket.id });
     expect(await callTool<Feature[]>(executedTools, "list_features")).toEqual(expect.arrayContaining([expect.objectContaining({ id: feature.id })]));
@@ -250,6 +252,12 @@ describe("MCP tools integration", () => {
         taskId: createdTask.id
       })
     ).toMatchObject({ id: createdTask.id, title: "MCP Tool Aufgabe" });
+    expect(await callTool<Task[]>(executedTools, "list_tasks_for_parent", { parentType: "feature", parentId: feature.id })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: createdTask.id })])
+    );
+    expect(await callTool<Task[]>(executedTools, "list_tasks_for_parent", { parentType: "useCase", parentId: useCase.id })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: createdTask.id })])
+    );
 
     const editorialTask = await callTool<Task>(executedTools, "assign_editorial_task", {
       parentType: "milestone",
@@ -303,6 +311,12 @@ describe("MCP tools integration", () => {
         ticketId: createdTicket.id
       })
     ).toMatchObject({ id: createdTicket.id, title: "MCP Tool Ticket" });
+    expect(await callTool<Ticket[]>(executedTools, "list_tickets_for_parent", { parentType: "feature", parentId: feature.id })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: createdTicket.id })])
+    );
+    expect(await callTool<Ticket[]>(executedTools, "list_tickets_for_parent", { parentType: "useCase", parentId: useCase.id })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: createdTicket.id })])
+    );
 
     const comment = await callTool<Comment>(executedTools, "add_comment_to_parent", {
       parentType: "project",
@@ -431,6 +445,9 @@ describe("MCP tools integration", () => {
     expect(bulkTickets).toMatchObject({ requested: 1, createdCount: 1, errorCount: 0 });
     expect(bulkTickets.created[0]?.result.ticket).toMatchObject({ title: "Bulk Ticket mit Attachment" });
     expect(bulkTickets.created[0]?.result.attachment).toMatchObject({ originalName: "bulk-ticket.txt", owners: [{ type: "ticket", id: bulkTickets.created[0]?.result.ticket.id }] });
+    expect(await callTool<Ticket[]>(executedTools, "list_tickets_for_parent", { parentType: "task", parentId: task.id })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: bulkTickets.created[0]?.result.ticket.id })])
+    );
 
     const context = await callTool<ReferenceContext>(executedTools, "get_reference_context", { reference: `PROJ-${project.id}` });
     expect(context.normalizedReference).toBe(`PROJ-${project.id}`);
@@ -534,6 +551,43 @@ describe("MCP tools integration", () => {
         priority: "medium"
       })
     ).toMatchObject({ title: "Use-Case-Ticket MCP" });
+
+    const openTaskReport = await callTool<{ openCount: number; totalCount: number; groups: unknown[] }>(executedTools, "report_open_tasks");
+    expect(openTaskReport.openCount).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(openTaskReport.groups)).toBe(true);
+
+    const openTicketReport = await callTool<{ openCount: number; totalCount: number; groups: unknown[] }>(executedTools, "report_open_tickets");
+    expect(openTicketReport.openCount).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(openTicketReport.groups)).toBe(true);
+
+    const activityReport = await callTool<{ count: number; groups: unknown[] }>(executedTools, "report_activity", { limit: 50 });
+    expect(activityReport.count).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(activityReport.groups)).toBe(true);
+
+    const delProject = await seedClient.post<Project>("projects", { name: "Delete Projekt", status: "active" });
+    const delMilestone = await seedClient.post<Milestone>(`projects/${delProject.id}/milestones`, { name: "Delete Meilenstein", status: "active" });
+    const delTask = await seedClient.post<Task>(`projects/${delProject.id}/tasks`, { title: "Delete Aufgabe", status: "todo", priority: "medium" });
+    const delTicket = await seedClient.post<Ticket>(`projects/${delProject.id}/tickets`, { title: "Delete Ticket", type: "bug", status: "open", priority: "low" });
+    const delFeature = await seedClient.post<Feature>("features", { title: "Delete Feature", status: "active" });
+    const delUseCase = await seedClient.post<UseCase>(`features/${delFeature.id}/use-cases`, { title: "Delete Use Case", status: "active" });
+
+    const preview = await callTool<{ target: { type: string }; cascadeImpact: { total: number; tasks: number; tickets: number } }>(
+      executedTools,
+      "preview_delete",
+      { reference: `PROJ-${delProject.id}` }
+    );
+    expect(preview.target.type).toBe("project");
+    expect(preview.cascadeImpact.tasks).toBeGreaterThanOrEqual(1);
+    expect(preview.cascadeImpact.tickets).toBeGreaterThanOrEqual(1);
+
+    expect(await callTool(executedTools, "delete_use_case", { id: delUseCase.id })).toMatchObject({ deleted: true, type: "useCase", id: delUseCase.id });
+    expect(await callTool(executedTools, "delete_feature", { id: delFeature.id })).toMatchObject({ deleted: true, type: "feature", id: delFeature.id });
+    expect(await callTool(executedTools, "delete_task", { id: delTask.id })).toMatchObject({ deleted: true, type: "task", id: delTask.id });
+    expect(await callTool(executedTools, "delete_ticket", { id: delTicket.id })).toMatchObject({ deleted: true, type: "ticket", id: delTicket.id });
+    expect(await callTool(executedTools, "delete_milestone", { id: delMilestone.id })).toMatchObject({ deleted: true, type: "milestone", id: delMilestone.id });
+    expect(await callTool(executedTools, "delete_project", { id: delProject.id })).toMatchObject({ deleted: true, type: "project", id: delProject.id });
+
+    await expect(seedClient.get<Project>(`projects/${delProject.id}`)).rejects.toThrow();
 
     expect([...executedTools].sort()).toEqual(expectedToolNames);
   });

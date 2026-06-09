@@ -30,8 +30,10 @@ Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt u
 | `get_project` | Liest ein einzelnes Projekt mit Beschreibung, Status, Version und Tags. | `id` | Projekt |
 | `list_milestones` | Listet Meilensteine, optional gefiltert nach Projekt. | optional `projectId` | Meilensteinliste |
 | `get_milestone` | Liest einen einzelnen Meilenstein mit Beschreibung, Status, Version und Tags. | `id` | Meilenstein |
-| `list_tasks_for_parent` | Listet Aufgaben an einem Projekt oder Meilenstein. | `parentType`, `parentId` | Aufgabenliste |
-| `list_tickets_for_parent` | Listet Tickets an einem Projekt oder Meilenstein. | `parentType`, `parentId` | Ticketliste |
+| `list_tasks_for_parent` | Listet Aufgaben an einem Projekt, Meilenstein, Feature oder Use Case. | `parentType`, `parentId` | Aufgabenliste |
+| `list_tickets_for_parent` | Listet Tickets an einem Projekt, Meilenstein, einer Aufgabe, einem Feature oder Use Case. | `parentType`, `parentId` | Ticketliste |
+| `list_all_tasks` | Listet alle Root-Aufgaben global inklusive `parentContexts`, ohne Parent-Einschränkung. | keine | Aufgabenliste |
+| `list_all_tickets` | Listet alle Root-Tickets global inklusive `parentContexts`, ohne Parent-Einschränkung. | keine | Ticketliste |
 | `get_task` | Liest eine einzelne Aufgabe mit aktueller Version. | `id` | Aufgabe |
 | `get_ticket` | Liest ein einzelnes Ticket mit aktueller Version. | `id` | Ticket |
 | `list_features` | Listet alle Features ohne Content. | keine | Featureliste |
@@ -82,11 +84,36 @@ Bulk-Tools laufen seriell und liefern kein einzelnes Objekt, sondern ein Ergebni
 |---|---|---|---|
 | `link_feature_to_parent` | Verknüpft ein Feature mit einem Projekt oder Meilenstein, ohne bestehende Feature-Links zu entfernen. | `parentType`, `parentId`, `featureId` | Aktuelle Featureliste des Parents |
 
+## Löschen
+
+| Tool | Zweck | Wichtige Eingaben | Ergebnis |
+|---|---|---|---|
+| `preview_delete` | Zeigt vor dem Löschen den rekursiven Kontextbaum und eine Zusammenfassung der kaskadierend betroffenen Kinder und Supportobjekte. Read-only. | `reference`, z. B. `PROJ-1` | `target`, `cascadeImpact`, `warnings`, `tree` |
+| `delete_project` | Löscht ein Projekt inklusive serverseitiger Kaskade. | `id` | `{ deleted, type, id }` |
+| `delete_milestone` | Löscht einen Meilenstein inklusive serverseitiger Kaskade. | `id` | `{ deleted, type, id }` |
+| `delete_task` | Löscht eine Aufgabe inklusive Subtask-Subtree und Supportobjekten. | `id` | `{ deleted, type, id }` |
+| `delete_ticket` | Löscht ein Ticket inklusive Subticket-Subtree und Supportobjekten. | `id` | `{ deleted, type, id }` |
+| `delete_feature` | Löscht ein Feature inklusive kaskadierter Use Cases und Supportobjekte. | `id` | `{ deleted, type, id }` |
+| `delete_use_case` | Löscht einen Use Case inklusive serverseitiger Kaskade. | `id` | `{ deleted, type, id }` |
+
+Löschungen sind destruktiv. Offene Relationen (z. B. Ticket-Beziehungen) führen serverseitig zu einem `409`-Blocker, der als MCP-Tool-Fehler zurückgegeben wird. `preview_delete` ändert keine Daten und sollte vor jeder Löschung genutzt werden.
+
+## Reports
+
+| Tool | Zweck | Wichtige Eingaben | Ergebnis |
+|---|---|---|---|
+| `report_open_tasks` | Aggregiert offene Root-Aufgaben (Status nicht als abgeschlossen markiert) gruppiert nach Parent-Kontext. | keine | `generatedAt`, `totalCount`, `openCount`, `groups[]` mit `context` und `items[]` |
+| `report_open_tickets` | Aggregiert offene Root-Tickets gruppiert nach Parent-Kontext. | keine | `generatedAt`, `totalCount`, `openCount`, `groups[]` mit `context` und `items[]` |
+| `report_activity` | Aggregiert den Änderungsverlauf (Aufgaben, Tickets, Kommentare, Notizen u. a.) aus dem Journal nach Änderungsdatum, gruppiert nach Kontext/Parent. | optional `from`, `to`, `limit` (max. 100) | `generatedAt`, `count`, `nextCursor`, `groups[]` mit `context` und `entries[]` |
+
+„Offen" bestimmt sich über den Katalog: ein Status gilt als abgeschlossen, wenn sein `workStatus`-Katalogeintrag `isClosed = true` hat. `report_activity` liest das globale Journal und ordnet jeden Eintrag seinem primären Kontext zu (`parent` vor `owner` vor `self`).
+
 ## Unterstützte Parent-Typen
 
 | Kontext | Unterstützte Werte |
 |---|---|
-| Aufgaben und Tickets an Parent | `project`, `milestone` |
+| Aufgaben am Parent lesen | `project`, `milestone`, `feature`, `useCase` |
+| Tickets am Parent lesen | `project`, `milestone`, `task`, `feature`, `useCase` |
 | Aufgabenliste an Parent | `project`, `milestone`, `feature`, `useCase` |
 | Ticketliste an Parent | `project`, `milestone`, `task`, `feature`, `useCase` |
 | Kommentare | `project`, `milestone`, `task`, `ticket`, `feature`, `useCase` |

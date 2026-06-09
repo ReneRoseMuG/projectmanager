@@ -6,6 +6,10 @@ import type {
   Feature,
   FeatureInput,
   FeatureUpdate,
+  JournalContextRelation,
+  JournalEntry,
+  JournalListResponse,
+  JournalObjectType,
   Milestone,
   MilestoneInput,
   MilestoneUpdate,
@@ -22,11 +26,12 @@ import type {
   UseCase,
   UseCaseInput,
   UseCaseUpdate,
-  UserOption
+  UserOption,
+  VisibleParentContext
 } from "@taskmanager/shared-types";
 import { z } from "zod";
 import { ProjectManagerApiError, type ProjectManagerApiClient } from "./api-client.js";
-import { buildReferenceContext } from "./reference-context.js";
+import { buildReferenceContext, type ReferenceContext, type ReferenceContextNode } from "./reference-context.js";
 import { htmlDocument, textToHtml } from "./rich-text.js";
 
 export type ParentType = "project" | "milestone";
@@ -75,6 +80,10 @@ const taskCreateParentSchema = z.object({
   parentId: z.number().int().positive()
 });
 const ticketCreateParentSchema = z.object({
+  parentType: z.enum(["project", "milestone", "task", "feature", "useCase"]),
+  parentId: z.number().int().positive()
+});
+const ticketListParentSchema = z.object({
   parentType: z.enum(["project", "milestone", "task", "feature", "useCase"]),
   parentId: z.number().int().positive()
 });
@@ -560,6 +569,207 @@ async function createTicketsBulk(
   return bulkResult(input.tickets.length, created, errors);
 }
 
+interface DeletionImpact {
+  milestones: number;
+  features: number;
+  useCases: number;
+  tasks: number;
+  tickets: number;
+  notes: number;
+  comments: number;
+  attachments: number;
+  total: number;
+}
+
+function countNodeByType(impact: DeletionImpact, type: ReferenceContextNode["type"]): void {
+  switch (type) {
+    case "milestone":
+      impact.milestones += 1;
+      break;
+    case "feature":
+      impact.features += 1;
+      break;
+    case "useCase":
+      impact.useCases += 1;
+      break;
+    case "task":
+      impact.tasks += 1;
+      break;
+    case "ticket":
+      impact.tickets += 1;
+      break;
+    case "project":
+      break;
+  }
+}
+
+function addSupportCounts(impact: DeletionImpact, node: ReferenceContextNode): void {
+  impact.notes += node.support.notes.length;
+  impact.comments += node.support.comments.length;
+  impact.attachments += node.support.attachments.length;
+}
+
+function summarizeDeletionImpact(context: ReferenceContext): DeletionImpact {
+  const impact: DeletionImpact = {
+    milestones: 0,
+    features: 0,
+    useCases: 0,
+    tasks: 0,
+    tickets: 0,
+    notes: 0,
+    comments: 0,
+    attachments: 0,
+    total: 0
+  };
+  const counted = new Set<string>();
+
+  const walkChildren = (node: ReferenceContextNode): void => {
+    const groups = [node.children.milestones, node.children.features, node.children.useCases, node.children.tasks, node.children.tickets];
+    for (const group of groups) {
+      for (const child of group) {
+        const key = `${child.type}:${child.id}`;
+        if (child.alreadyVisited || counted.has(key)) {
+          continue;
+        }
+        counted.add(key);
+        countNodeByType(impact, child.type);
+        impact.total += 1;
+        addSupportCounts(impact, child);
+        walkChildren(child);
+      }
+    }
+  };
+
+  addSupportCounts(impact, context.root);
+  walkChildren(context.root);
+  return impact;
+}
+
+interface ReportGroup<Item> {
+  context: VisibleParentContext | null;
+  itemCount: number;
+  items: Item[];
+}
+
+function groupByParentContexts<Row extends { parentContexts?: VisibleParentContext[] }, Item>(rows: Row[], toItem: (row: Row) => Item): ReportGroup<Item>[] {
+  const groups = new Map<string, ReportGroup<Item>>();
+  const order: string[] = [];
+  const ensure = (key: string, context: VisibleParentContext | null): ReportGroup<Item> => {
+    let group = groups.get(key);
+    if (!group) {
+      group = { context, itemCount: 0, items: [] };
+      groups.set(key, group);
+      order.push(key);
+    }
+    return group;
+  };
+  for (const row of rows) {
+    const contexts = row.parentContexts ?? [];
+    if (contexts.length === 0) {
+      ensure("none", null).items.push(toItem(row));
+      continue;
+    }
+    for (const context of contexts) {
+      ensure(`${context.type}:${context.id}`, context).items.push(toItem(row));
+    }
+  }
+  return order.map((key) => {
+    const group = groups.get(key) as ReportGroup<Item>;
+    group.itemCount = group.items.length;
+    return group;
+  });
+}
+
+function closedWorkStatusKeys(catalogs: CatalogEntry[]): Set<string> {
+  return new Set(catalogs.filter((entry) => entry.kind === "workStatus" && entry.isClosed).map((entry) => entry.key));
+}
+
+function taskReportItem(task: Task) {
+  return {
+    reference: `TASK-${task.id}`,
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    priority: task.priority,
+    dueDate: task.dueDate,
+    updatedAt: task.updatedAt,
+    responsibleUser: task.responsibleUser?.fullName ?? null
+  };
+}
+
+function ticketReportItem(ticket: Ticket) {
+  return {
+    reference: `TKT-${ticket.id}`,
+    id: ticket.id,
+    title: ticket.title,
+    type: ticket.type,
+    status: ticket.status,
+    priority: ticket.priority,
+    dueDate: ticket.dueDate,
+    updatedAt: ticket.updatedAt,
+    responsibleUser: ticket.responsibleUser?.fullName ?? null
+  };
+}
+
+interface ActivityContext {
+  type: JournalObjectType;
+  id: number;
+  label: string;
+}
+
+function primaryActivityContext(entry: JournalEntry): ActivityContext {
+  const byRelation = (relation: JournalContextRelation): JournalEntry["contexts"][number] | undefined =>
+    entry.contexts.find((context) => context.relation === relation);
+  const chosen = byRelation("parent") ?? byRelation("owner") ?? byRelation("self") ?? entry.contexts[0];
+  if (chosen) {
+    return { type: chosen.objectType, id: chosen.objectId, label: chosen.objectLabel };
+  }
+  return { type: entry.objectType, id: entry.objectId, label: entry.objectLabel };
+}
+
+function groupActivityByContext(entries: JournalEntry[]) {
+  const groups = new Map<string, { context: ActivityContext; entryCount: number; entries: Array<ReturnType<typeof activityEntryItem>> }>();
+  const order: string[] = [];
+  for (const entry of entries) {
+    const context = primaryActivityContext(entry);
+    const key = `${context.type}:${context.id}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = { context, entryCount: 0, entries: [] };
+      groups.set(key, group);
+      order.push(key);
+    }
+    group.entries.push(activityEntryItem(entry));
+  }
+  return order.map((key) => {
+    const group = groups.get(key);
+    if (!group) {
+      throw new Error(`Missing activity group ${key}`);
+    }
+    group.entryCount = group.entries.length;
+    return group;
+  });
+}
+
+function activityEntryItem(entry: JournalEntry) {
+  return {
+    id: entry.id,
+    operation: entry.operation,
+    objectType: entry.objectType,
+    objectId: entry.objectId,
+    objectLabel: entry.objectLabel,
+    summary: entry.summary,
+    actorName: entry.actorName,
+    createdAt: entry.createdAt
+  };
+}
+
+const activityReportSchema = z.object({
+  from: z.string().min(1).optional(),
+  to: z.string().min(1).optional(),
+  limit: z.number().int().positive().max(100).optional()
+});
+
 export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefinition[] {
   return [
     defineTool({
@@ -593,16 +803,30 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
     defineTool({
       name: "list_tasks_for_parent",
       title: "Aufgaben am Parent lesen",
-      description: "Liest Aufgaben für ein Projekt oder einen Meilenstein.",
-      inputSchema: parentSchema,
-      execute: ({ parentType, parentId }) => client.get<Task[]>(`${ownerPath(parentType, parentId)}/tasks`)
+      description: "Liest Aufgaben für ein Projekt, einen Meilenstein, ein Feature oder einen Use Case. Subtasks einer Aufgabe liefert get_task.",
+      inputSchema: linkParentSchema,
+      execute: ({ parentType, parentId }) => client.get<Task[]>(`${linkOwnerPath(parentType, parentId)}/tasks`)
     }),
     defineTool({
       name: "list_tickets_for_parent",
       title: "Tickets am Parent lesen",
-      description: "Liest Tickets für ein Projekt oder einen Meilenstein.",
-      inputSchema: parentSchema,
-      execute: ({ parentType, parentId }) => client.get<Ticket[]>(`${ownerPath(parentType, parentId)}/tickets`)
+      description: "Liest Tickets für ein Projekt, einen Meilenstein, eine Aufgabe, ein Feature oder einen Use Case. Subtickets eines Tickets liefert get_ticket.",
+      inputSchema: ticketListParentSchema,
+      execute: ({ parentType, parentId }) => client.get<Ticket[]>(`${extendedOwnerPath(parentType, parentId)}/tickets`)
+    }),
+    defineTool({
+      name: "list_all_tasks",
+      title: "Alle Aufgaben listen",
+      description: "Liest alle Root-Aufgaben global inklusive parentContexts, ohne Parent-Einschränkung. Subtasks erscheinen über parentContexts bzw. get_task.",
+      inputSchema: z.object({}),
+      execute: () => client.get<Task[]>("tasks")
+    }),
+    defineTool({
+      name: "list_all_tickets",
+      title: "Alle Tickets listen",
+      description: "Liest alle Root-Tickets global inklusive parentContexts, ohne Parent-Einschränkung. Subtickets erscheinen über parentContexts bzw. get_ticket.",
+      inputSchema: z.object({}),
+      execute: () => client.get<Ticket[]>("tickets")
     }),
     defineTool({
       name: "get_task",
@@ -872,6 +1096,144 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       description: "Legt ein Ticket an einem Use Case an.",
       inputSchema: useCaseChildSchema,
       execute: ({ useCaseId, ...body }) => client.post<Ticket>(`use-cases/${useCaseId}/tickets`, withHtmlDescription(body) satisfies TicketInput)
+    }),
+    defineTool({
+      name: "preview_delete",
+      title: "Löschvorschau",
+      description:
+        "Zeigt vor dem Löschen den rekursiven Kontextbaum eines Objekts und eine Zusammenfassung der kaskadierend betroffenen Kinder und Supportobjekte. Read-only. Tatsächliche Kaskaden und 409-Blocker werden beim echten Löschen serverseitig erzwungen.",
+      inputSchema: referenceSchema,
+      execute: async ({ reference }) => {
+        const context = await buildReferenceContext(client, reference);
+        return {
+          reference: context.reference,
+          normalizedReference: context.normalizedReference,
+          target: { type: context.root.type, reference: context.root.reference },
+          cascadeImpact: summarizeDeletionImpact(context),
+          warnings: context.warnings,
+          tree: context.root
+        };
+      }
+    }),
+    defineTool({
+      name: "delete_project",
+      title: "Projekt löschen",
+      description: "Löscht ein Projekt inklusive serverseitiger Kaskade. Offene Relationen führen zu einem Blocker-Fehler.",
+      inputSchema: idSchema,
+      execute: async ({ id }) => {
+        await client.del(`projects/${id}`);
+        return { deleted: true, type: "project", id };
+      }
+    }),
+    defineTool({
+      name: "delete_milestone",
+      title: "Meilenstein löschen",
+      description: "Löscht einen Meilenstein inklusive serverseitiger Kaskade. Offene Relationen führen zu einem Blocker-Fehler.",
+      inputSchema: idSchema,
+      execute: async ({ id }) => {
+        await client.del(`milestones/${id}`);
+        return { deleted: true, type: "milestone", id };
+      }
+    }),
+    defineTool({
+      name: "delete_task",
+      title: "Aufgabe löschen",
+      description: "Löscht eine Aufgabe inklusive Subtask-Subtree und Supportobjekten. Offene Relationen führen zu einem Blocker-Fehler.",
+      inputSchema: idSchema,
+      execute: async ({ id }) => {
+        await client.del(`tasks/${id}`);
+        return { deleted: true, type: "task", id };
+      }
+    }),
+    defineTool({
+      name: "delete_ticket",
+      title: "Ticket löschen",
+      description: "Löscht ein Ticket inklusive Subticket-Subtree und Supportobjekten. Offene Relationen führen zu einem Blocker-Fehler.",
+      inputSchema: idSchema,
+      execute: async ({ id }) => {
+        await client.del(`tickets/${id}`);
+        return { deleted: true, type: "ticket", id };
+      }
+    }),
+    defineTool({
+      name: "delete_feature",
+      title: "Feature löschen",
+      description: "Löscht ein Feature inklusive kaskadierter Use Cases und Supportobjekte. Offene Relationen führen zu einem Blocker-Fehler.",
+      inputSchema: idSchema,
+      execute: async ({ id }) => {
+        await client.del(`features/${id}`);
+        return { deleted: true, type: "feature", id };
+      }
+    }),
+    defineTool({
+      name: "delete_use_case",
+      title: "Use Case löschen",
+      description: "Löscht einen Use Case inklusive serverseitiger Kaskade. Offene Relationen führen zu einem Blocker-Fehler.",
+      inputSchema: idSchema,
+      execute: async ({ id }) => {
+        await client.del(`use-cases/${id}`);
+        return { deleted: true, type: "useCase", id };
+      }
+    }),
+    defineTool({
+      name: "report_open_tasks",
+      title: "Report: offene Aufgaben",
+      description: "Aggregiert alle offenen Root-Aufgaben (Status nicht als abgeschlossen markiert) gruppiert nach Parent-Kontext.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const [tasks, catalogs] = await Promise.all([client.get<Task[]>("tasks"), client.get<CatalogEntry[]>("catalogs")]);
+        const closed = closedWorkStatusKeys(catalogs);
+        const open = tasks.filter((task) => !closed.has(task.status));
+        return {
+          generatedAt: new Date().toISOString(),
+          totalCount: tasks.length,
+          openCount: open.length,
+          groups: groupByParentContexts(open, taskReportItem)
+        };
+      }
+    }),
+    defineTool({
+      name: "report_open_tickets",
+      title: "Report: offene Tickets",
+      description: "Aggregiert alle offenen Root-Tickets (Status nicht als abgeschlossen markiert) gruppiert nach Parent-Kontext.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const [tickets, catalogs] = await Promise.all([client.get<Ticket[]>("tickets"), client.get<CatalogEntry[]>("catalogs")]);
+        const closed = closedWorkStatusKeys(catalogs);
+        const open = tickets.filter((ticket) => !closed.has(ticket.status));
+        return {
+          generatedAt: new Date().toISOString(),
+          totalCount: tickets.length,
+          openCount: open.length,
+          groups: groupByParentContexts(open, ticketReportItem)
+        };
+      }
+    }),
+    defineTool({
+      name: "report_activity",
+      title: "Report: Arbeitsverlauf",
+      description:
+        "Aggregiert den Änderungsverlauf (Aufgaben, Tickets, Kommentare, Notizen und weitere Objekte) aus dem Journal nach Änderungsdatum, gruppiert nach Kontext/Parent. Optional auf einen Zeitraum begrenzbar.",
+      inputSchema: activityReportSchema,
+      execute: async ({ from, to, limit }) => {
+        const params = new URLSearchParams();
+        params.set("limit", String(limit ?? 100));
+        if (from) {
+          params.set("from", from);
+        }
+        if (to) {
+          params.set("to", to);
+        }
+        const response = await client.get<JournalListResponse>(`journal?${params.toString()}`);
+        return {
+          generatedAt: new Date().toISOString(),
+          from: from ?? null,
+          to: to ?? null,
+          count: response.entries.length,
+          nextCursor: response.nextCursor,
+          groups: groupActivityByContext(response.entries)
+        };
+      }
     })
   ];
 }

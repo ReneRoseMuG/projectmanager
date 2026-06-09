@@ -17,7 +17,9 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 $Target = [System.IO.Path]::GetFullPath($Target)
 
 function Invoke-CheckedCommand([scriptblock]$Command, [string]$FailureMessage) {
-    & $Command
+    # 2>&1 | Out-Default: stderr in stdout mergen, damit NativeCommandError bei
+    # $ErrorActionPreference=Stop nicht faelschlicherweise den Lauf abbricht.
+    & $Command 2>&1 | Out-Default
     if ($LASTEXITCODE -ne 0) {
         throw "$FailureMessage (Exit code: $LASTEXITCODE)"
     }
@@ -82,6 +84,24 @@ function Stop-ExistingToolbar([string]$ToolbarPath) {
                 Write-Warning "Toolbar-Prozess $($_.ProcessId) konnte nicht beendet werden: $($_.Exception.Message)"
             }
         }
+}
+
+function Read-EnvLocal([string]$Path) {
+    $result = @{}
+    if (-not (Test-Path $Path)) { return $result }
+    foreach ($rawLine in Get-Content $Path -Encoding UTF8) {
+        $line = $rawLine.Trim()
+        if (-not $line -or $line.StartsWith("#")) { continue }
+        $idx = $line.IndexOf("=")
+        if ($idx -le 0) { continue }
+        $key = $line.Substring(0, $idx).Trim()
+        $val = $line.Substring($idx + 1).Trim()
+        if ($val.Length -ge 2 -and (($val[0] -eq '"' -and $val[-1] -eq '"') -or ($val[0] -eq "'" -and $val[-1] -eq "'"))) {
+            $val = $val.Substring(1, $val.Length - 2)
+        }
+        $result[$key] = $val
+    }
+    return $result
 }
 
 Write-Host ""
@@ -179,7 +199,26 @@ try {
 
 Write-Host "[6/7] Start- und Stop-Scripts werden eingerichtet..." -ForegroundColor Yellow
 
+$localEnv    = Read-EnvLocal "$repoRoot\.env.local"
+$mcpApiKey   = if ($localEnv.ContainsKey("PROJECT_MANAGER_API_KEY")) { $localEnv["PROJECT_MANAGER_API_KEY"] } elseif ($localEnv.ContainsKey("API_KEY")) { $localEnv["API_KEY"] } else { "" }
+$mcpAuthMode = if ($localEnv.ContainsKey("MCP_HTTP_AUTH_MODE")) { $localEnv["MCP_HTTP_AUTH_MODE"] } else { "none" }
+$mcpPort     = if ($localEnv.ContainsKey("MCP_HTTP_PORT"))     { $localEnv["MCP_HTTP_PORT"] }     else { "3010" }
+$mcpPath     = if ($localEnv.ContainsKey("MCP_HTTP_PATH"))     { $localEnv["MCP_HTTP_PATH"] }     else { "/mcp" }
+$ngrokDomain = "motivator-sizably-rind.ngrok-free.dev"
+
+$ngrokCmd = Get-Command ngrok -ErrorAction SilentlyContinue
+if ($ngrokCmd) {
+    $ngrokExe = $ngrokCmd.Source
+} else {
+    $wingetNgrok = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe\ngrok.exe"
+    if (Test-Path $wingetNgrok) { $ngrokExe = $wingetNgrok }
+    else { throw "ngrok nicht gefunden. Bitte 'winget install ngrok.ngrok' ausfuehren." }
+}
+Write-Host "  ngrok : $ngrokExe" -ForegroundColor Gray
+Write-Host "  domain: $ngrokDomain" -ForegroundColor Gray
+
 $startPs1Path = "$Target\Start.ps1"
+# Statischer Teil 1: Hilfsfunktionen und API/Web-Start
 $startPs1Content = @'
 # Start.ps1 - Projekt Manager starten
 $ErrorActionPreference = "Stop"
@@ -236,8 +275,38 @@ $web = Start-Process -FilePath "node" `
     -WindowStyle Hidden `
     -PassThru
 
-"$($api.Id) $($web.Id)" | Set-Content $pidFile -Encoding UTF8
-Write-StartLog "pid file written: $($api.Id) $($web.Id)"
+'@
+
+# Dynamischer Teil: MCP-Server und ngrok mit zur Deploy-Zeit aufgeloesten Werten
+$startPs1Content += @"
+
+# MCP-Server starten
+`$env:PROJECT_MANAGER_API_KEY      = "$mcpApiKey"
+`$env:PROJECT_MANAGER_API_BASE_URL = "http://localhost:3001/api"
+`$env:MCP_HTTP_AUTH_MODE           = "$mcpAuthMode"
+`$env:MCP_HTTP_HOST                = "127.0.0.1"
+`$env:MCP_HTTP_PORT                = "$mcpPort"
+`$env:MCP_HTTP_PATH                = "$mcpPath"
+Write-StartLog "starting mcp"
+`$mcp = Start-Process -FilePath "node" ``
+    -ArgumentList "apps\mcp-server\dist\http.js" ``
+    -WorkingDirectory `$root ``
+    -WindowStyle Hidden ``
+    -PassThru
+
+# ngrok-Tunnel starten
+Write-StartLog "starting ngrok"
+`$tunnel = Start-Process -FilePath "$ngrokExe" ``
+    -ArgumentList "http", "--domain=$ngrokDomain", "$mcpPort" ``
+    -WindowStyle Hidden ``
+    -PassThru
+
+"@
+
+# Statischer Teil 2: PID-Datei, Warten, Browser oeffnen
+$startPs1Content += @'
+"$($api.Id) $($web.Id) $($mcp.Id) $($tunnel.Id)" | Set-Content $pidFile -Encoding UTF8
+Write-StartLog "pid file written: $($api.Id) $($web.Id) $($mcp.Id) $($tunnel.Id)"
 
 Wait-HttpReady "API" "http://127.0.0.1:3001/api/health" $api
 Write-StartLog "api ready"
@@ -266,7 +335,7 @@ if (Test-Path $pidFile) {
         ForEach-Object { [void]$targetPids.Add([int]$_) }
 }
 
-foreach ($port in @(3001, 5173)) {
+foreach ($port in @(3001, 5173, 3010)) {
     $conn = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     if ($conn) {
         foreach ($item in @($conn)) {
@@ -277,16 +346,19 @@ foreach ($port in @(3001, 5173)) {
 
 if ($targetPids.Count -eq 0) {
     Write-Host "Keine laufenden Projekt-Manager-Prozesse gefunden." -ForegroundColor Yellow
-    if (Test-Path $pidFile) { Remove-Item $pidFile -Force }
-    exit 0
+} else {
+    foreach ($p in $targetPids) {
+        $proc = Get-Process -Id $p -ErrorAction SilentlyContinue
+        if ($proc) {
+            Stop-Process -Id $p -Force
+            Write-Host "Prozess $p ($($proc.Name)) beendet." -ForegroundColor Green
+        }
+    }
 }
 
-foreach ($p in $targetPids) {
-    $proc = Get-Process -Id $p -ErrorAction SilentlyContinue
-    if ($proc) {
-        Stop-Process -Id $p -Force
-        Write-Host "Prozess $p ($($proc.Name)) beendet." -ForegroundColor Green
-    }
+Get-Process -Name "ngrok" -ErrorAction SilentlyContinue | ForEach-Object {
+    Stop-Process -Id $_.Id -Force
+    Write-Host "Ngrok-Tunnel beendet (Prozess $($_.Id))." -ForegroundColor Green
 }
 
 if (Test-Path $pidFile) { Remove-Item $pidFile -Force }

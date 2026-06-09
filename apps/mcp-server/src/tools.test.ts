@@ -9,7 +9,7 @@ import { errorResult } from "./tool-result.js";
  *
  * Abgedeckte Regeln:
  * - MCP-v1 bietet vollständige Create-, Update- und Resolve-Tools an.
- * - Destruktive Delete-Tools bleiben bewusst außerhalb der MCP-Oberfläche.
+ * - Delete-Tools löschen pro Typ über die DELETE-Endpunkte; preview_delete bleibt read-only.
  * - Schreibende Tools befüllen Stammdatenfelder und verwenden Versionsschutz.
  * - Feature-Verknüpfungen erhalten bestehende Links.
  *
@@ -27,6 +27,7 @@ interface MockClient {
   postForm: ReturnType<typeof vi.fn>;
   patch: ReturnType<typeof vi.fn>;
   put: ReturnType<typeof vi.fn>;
+  del: ReturnType<typeof vi.fn>;
 }
 
 interface BulkCreated<Result> {
@@ -56,7 +57,8 @@ function createMockClient(): MockClient & ProjectManagerApiClient {
     post: vi.fn(),
     postForm: vi.fn(),
     patch: vi.fn(),
-    put: vi.fn()
+    put: vi.fn(),
+    del: vi.fn()
   } as unknown as MockClient & ProjectManagerApiClient;
 }
 
@@ -102,9 +104,20 @@ describe("MCP tool definitions", () => {
       "update_feature",
       "update_use_case",
       "resolve_reference",
-      "get_reference_context"
+      "get_reference_context",
+      "list_all_tasks",
+      "list_all_tickets",
+      "preview_delete",
+      "delete_project",
+      "delete_milestone",
+      "delete_task",
+      "delete_ticket",
+      "delete_feature",
+      "delete_use_case",
+      "report_open_tasks",
+      "report_open_tickets",
+      "report_activity"
     ]));
-    expect(names.some((name) => name.startsWith("delete_"))).toBe(false);
     [
       "update_project_description",
       "update_milestone_description",
@@ -653,6 +666,99 @@ describe("MCP tool definitions", () => {
 
     expect(client.get).toHaveBeenCalledWith("projects/1/features");
     expect(client.put).toHaveBeenCalledWith("projects/1/features", { featureIds: [2, 4, 9] });
+  });
+
+  it("deletes each domain type over the matching DELETE endpoint", async () => {
+    const cases: Array<{ name: string; path: string; type: string }> = [
+      { name: "delete_project", path: "projects/1", type: "project" },
+      { name: "delete_milestone", path: "milestones/2", type: "milestone" },
+      { name: "delete_task", path: "tasks/3", type: "task" },
+      { name: "delete_ticket", path: "tickets/4", type: "ticket" },
+      { name: "delete_feature", path: "features/5", type: "feature" },
+      { name: "delete_use_case", path: "use-cases/6", type: "useCase" }
+    ];
+
+    for (const testCase of cases) {
+      const client = createMockClient();
+      client.del.mockResolvedValue(undefined);
+      const id = Number.parseInt(testCase.path.split("/")[1] ?? "0", 10);
+
+      const result = await tool(testCase.name, client).execute({ id });
+
+      expect(client.del).toHaveBeenCalledWith(testCase.path);
+      expect(result).toEqual({ deleted: true, type: testCase.type, id });
+    }
+  });
+
+  it("previews deletion impact without calling DELETE", async () => {
+    const client = createMappedClient({
+      "tasks/3": { id: 3, subtasks: [{ id: 7 }], notes: [{ id: 1 }], comments: [], attachments: [] },
+      "tasks/3/tickets": [],
+      "tasks/7": { id: 7, subtasks: [], notes: [], comments: [{ id: 2 }], attachments: [] },
+      "tasks/7/tickets": []
+    });
+
+    const preview = await tool("preview_delete", client).execute({ reference: "TASK-3" });
+
+    expect(client.del).not.toHaveBeenCalled();
+    expect(preview).toMatchObject({
+      normalizedReference: "TASK-3",
+      target: { type: "task", reference: "TASK-3" },
+      cascadeImpact: { tasks: 1, notes: 1, comments: 1, total: 1 }
+    });
+  });
+
+  it("reports open tasks grouped by parent context and skips closed statuses", async () => {
+    const client = createMappedClient({
+      tasks: [
+        { id: 1, title: "Offen A", status: "todo", priority: "high", dueDate: null, updatedAt: "2026-06-01T00:00:00.000Z", responsibleUser: { fullName: "Rose, Rene" }, parentContexts: [{ type: "milestone", id: 65, label: "MCP", origin: "direct" }] },
+        { id: 2, title: "Offen B", status: "in_progress", priority: "medium", dueDate: null, updatedAt: "2026-06-02T00:00:00.000Z", responsibleUser: null, parentContexts: [] },
+        { id: 3, title: "Erledigt", status: "done", priority: "low", dueDate: null, updatedAt: "2026-06-03T00:00:00.000Z", responsibleUser: null, parentContexts: [{ type: "milestone", id: 65, label: "MCP", origin: "direct" }] }
+      ],
+      catalogs: [
+        { kind: "workStatus", key: "todo", isClosed: false },
+        { kind: "workStatus", key: "in_progress", isClosed: false },
+        { kind: "workStatus", key: "done", isClosed: true }
+      ]
+    });
+
+    const report = await tool("report_open_tasks", client).execute({});
+
+    expect(report).toMatchObject({ totalCount: 3, openCount: 2 });
+    const result = report as { groups: Array<{ context: { id: number } | null; itemCount: number; items: Array<{ reference: string }> }> };
+    const milestoneGroup = result.groups.find((group) => group.context?.id === 65);
+    expect(milestoneGroup?.items.map((item) => item.reference)).toEqual(["TASK-1"]);
+    const neutralGroup = result.groups.find((group) => group.context === null);
+    expect(neutralGroup?.items.map((item) => item.reference)).toEqual(["TASK-2"]);
+  });
+
+  it("reports the activity journal grouped by primary context", async () => {
+    const client = createMappedClient({
+      "journal?limit=100": {
+        entries: [
+          {
+            id: 10,
+            operation: "update",
+            objectType: "comment",
+            objectId: 5,
+            objectLabel: "Kommentar",
+            summary: "Kommentar geändert",
+            actorName: "Rose, Rene",
+            createdAt: "2026-06-09T10:00:00.000Z",
+            changes: [],
+            contexts: [{ id: 1, objectType: "task", objectId: 3, objectLabel: "Aufgabe", relation: "parent" }]
+          }
+        ],
+        nextCursor: null
+      }
+    });
+
+    const report = await tool("report_activity", client).execute({});
+
+    expect(report).toMatchObject({ count: 1, nextCursor: null });
+    const result = report as { groups: Array<{ context: { type: string; id: number }; entries: Array<{ id: number }> }> };
+    expect(result.groups[0]?.context).toMatchObject({ type: "task", id: 3 });
+    expect(result.groups[0]?.entries[0]?.id).toBe(10);
   });
 
   it("formats API errors as MCP error results", () => {
