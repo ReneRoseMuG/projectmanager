@@ -72,6 +72,9 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
   const editableTags = tagEditingEnabled ? tagController.tags : undefined;
   const handleTagsChange = tagEditingEnabled ? onTagsChange : undefined;
 
+  // Das Status-Pill auf Karte/Zeile ist editierbar, sobald ein onStatusChange-Handler übergeben wird –
+  // auch in read-only-Kontexten wie Dashboard-Widgets. Toolbar, Anlegen, Löschen, Fälligkeit, Tags und
+  // Kanban-Drag (onItemStatusChange) bleiben weiterhin an readOnly gekoppelt.
   return (
     <ListBoardView
       items={visibleTasks}
@@ -97,8 +100,8 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
       filters={readOnly ? undefined : filters}
       loading={loading}
       emptyState={<EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben" body="Für diesen Kontext sind noch keine Aufgaben vorhanden." tone="fern" variant="tinted" />}
-      renderCard={(task) => <TaskCard task={task} allTags={editableTags} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={readOnly || !canDelete || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
-      renderRow={(task) => <TaskCard task={task} allTags={editableTags} variant="row" onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={readOnly || !canDelete || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
+      renderCard={(task) => <TaskCard task={task} allTags={editableTags} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={readOnly || !canDelete || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
+      renderRow={(task) => <TaskCard task={task} allTags={editableTags} variant="row" onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={readOnly || !canDelete || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
       renderClosedRow={(task) => (
         <ClosedItemRow
           title={task.title}
