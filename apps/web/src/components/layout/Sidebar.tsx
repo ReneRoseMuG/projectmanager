@@ -24,7 +24,6 @@ import {
 import { useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import webPackage from "../../../package.json";
 import { useHealthCheck } from "../../hooks/useHealthCheck";
 import { hasPermission } from "../../hooks/usePermissions";
 import { withStandaloneView } from "../../utils/standalone";
@@ -151,7 +150,7 @@ function SidebarHeader({
           Projekt Manager
         </span>
         <span className="mt-0.5 block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">
-          Lokal · v{webPackage.version}
+          Lokal
         </span>
       </div>
       <button
