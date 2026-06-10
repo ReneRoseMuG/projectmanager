@@ -273,12 +273,15 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
           </div>
         </header>
         ) : null}
-        {inline && inlineChrome === "embedded" && !effectiveEditable && onEdit ? (
-          <div className="flex items-center justify-end border-b border-line bg-shell px-5 py-2">
-            <button type="button" className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-steel-600 hover:bg-line/50 hover:text-ink" onClick={onEdit}>
-              <Pencil size={14} />
-              Bearbeiten
-            </button>
+        {embeddedActionPage && (onAutoSave || (!effectiveEditable && onEdit)) ? (
+          <div className="flex min-h-[40px] items-center justify-end gap-3 border-b border-line bg-shell px-5 py-2">
+            {onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} tone="onLight" /> : null}
+            {!effectiveEditable && onEdit ? (
+              <button type="button" className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-steel-600 hover:bg-line/50 hover:text-ink" onClick={onEdit}>
+                <Pencil size={14} />
+                Bearbeiten
+              </button>
+            ) : null}
           </div>
         ) : null}
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
