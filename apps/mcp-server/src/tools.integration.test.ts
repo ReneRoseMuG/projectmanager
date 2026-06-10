@@ -564,6 +564,15 @@ describe("MCP tools integration", () => {
     expect(activityReport.count).toBeGreaterThanOrEqual(1);
     expect(Array.isArray(activityReport.groups)).toBe(true);
 
+    const workDossier = await callTool<{
+      parent: { reference: string; type: string };
+      sections: { done: unknown[]; inProgress: unknown[]; waiting: unknown[] };
+      summary: { openTaskCount: number };
+    }>(executedTools, "report_work_dossier", { reference: `PROJ-${project.id}` });
+    expect(workDossier.parent).toMatchObject({ reference: `PROJ-${project.id}`, type: "project" });
+    expect(Array.isArray(workDossier.sections.waiting)).toBe(true);
+    expect(workDossier.summary.openTaskCount).toBeGreaterThanOrEqual(1);
+
     const delProject = await seedClient.post<Project>("projects", { name: "Delete Projekt", status: "active" });
     const delMilestone = await seedClient.post<Milestone>(`projects/${delProject.id}/milestones`, { name: "Delete Meilenstein", status: "active" });
     const delTask = await seedClient.post<Task>(`projects/${delProject.id}/tasks`, { title: "Delete Aufgabe", status: "todo", priority: "medium" });

@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 10.06.26 | 07:14:00 | Feature | Arbeitsbericht-Dossier MCP-Tool | ✅ |
 | 07.06.26 | 05:25:06 | Feature | WikiTree Drag Parent | ✅ |
 | 07.06.26 | 04:52:15 | Fix | Verwandte Themen Hinweistext | ✅ |
 | 07.06.26 | 04:47:59 | Fix | Wiki Link Klick im Editor | ⚠️ |

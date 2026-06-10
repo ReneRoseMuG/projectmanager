@@ -3,6 +3,7 @@ import { ProjectManagerApiError, type ProjectManagerApiClient } from "./api-clie
 import { parseReferenceInput, type ReferenceContext } from "./reference-context.js";
 import { createToolDefinitions } from "./tools.js";
 import { errorResult } from "./tool-result.js";
+import { buildWorkDossier, type WorkDossier } from "./work-dossier.js";
 
 /**
  * Test Scope:
@@ -116,7 +117,8 @@ describe("MCP tool definitions", () => {
       "delete_use_case",
       "report_open_tasks",
       "report_open_tickets",
-      "report_activity"
+      "report_activity",
+      "report_work_dossier"
     ]));
     [
       "update_project_description",
@@ -759,6 +761,84 @@ describe("MCP tool definitions", () => {
     const result = report as { groups: Array<{ context: { type: string; id: number }; entries: Array<{ id: number }> }> };
     expect(result.groups[0]?.context).toMatchObject({ type: "task", id: 3 });
     expect(result.groups[0]?.entries[0]?.id).toBe(10);
+  });
+
+  it("builds a parent work dossier with done, in-progress and waiting buckets", async () => {
+    const recent = "2026-06-09T08:00:00.000Z";
+    const stale = "2026-05-01T00:00:00.000Z";
+    const responses: Record<string, unknown> = {
+      "projects/1": { id: 1, name: "Demo", status: "active" },
+      catalogs: [
+        { kind: "workStatus", key: "todo", isClosed: false },
+        { kind: "workStatus", key: "in_progress", isClosed: false },
+        { kind: "workStatus", key: "open", isClosed: false },
+        { kind: "workStatus", key: "done", isClosed: true },
+        { kind: "workStatus", key: "resolved", isClosed: true }
+      ],
+      "projects/1/tasks": [
+        { id: 1, title: "Wartet", status: "todo", priority: "high", dueDate: null, updatedAt: stale, responsibleUser: { fullName: "Rose, Rene" }, subtaskCount: 0, commentCount: 0 },
+        { id: 2, title: "In Arbeit", status: "in_progress", priority: "medium", dueDate: null, updatedAt: recent, responsibleUser: null, subtaskCount: 0, commentCount: 1 },
+        { id: 3, title: "Erledigt kürzlich", status: "done", priority: "low", dueDate: null, updatedAt: recent, responsibleUser: null, subtaskCount: 0, commentCount: 1 },
+        { id: 4, title: "Erledigt alt", status: "done", priority: "low", dueDate: null, updatedAt: stale, responsibleUser: null, subtaskCount: 0, commentCount: 1 }
+      ],
+      "projects/1/tickets": [
+        { id: 5, title: "Offenes Ticket", type: "bug", status: "open", priority: "high", dueDate: null, updatedAt: recent, resolvedAt: null, responsibleUser: null, subTicketCount: 0, commentCount: 0 },
+        { id: 6, title: "Gelöstes Ticket", type: "bug", status: "resolved", priority: "high", dueDate: null, updatedAt: recent, resolvedAt: recent, responsibleUser: { fullName: "Rose, Rene" }, subTicketCount: 0, commentCount: 1 }
+      ],
+      "projects/1/comments": [{ id: 300, body: "<p>Projektnotiz</p>", createdAt: "2026-06-08T09:00:00.000Z", updatedAt: "2026-06-08T09:00:00.000Z", owners: [], version: 1 }],
+      "tasks/2": { id: 2, comments: [{ id: 301, body: "<p>arbeite dran</p>", createdAt: "2026-06-09T07:00:00.000Z", updatedAt: "2026-06-09T07:00:00.000Z", owners: [], version: 1 }], subtasks: [], notes: [], attachments: [] },
+      "tasks/3": { id: 3, comments: [{ id: 302, body: "<p>fertig</p>", createdAt: "2026-06-09T10:00:00.000Z", updatedAt: "2026-06-09T10:00:00.000Z", owners: [], version: 1 }], subtasks: [], notes: [], attachments: [] },
+      "tickets/5": { id: 5, comments: [], relations: [], subTickets: [], notes: [], attachments: [] },
+      "tickets/6": { id: 6, comments: [{ id: 303, body: "<p>geschlossen</p>", createdAt: "2026-06-09T11:00:00.000Z", updatedAt: "2026-06-09T11:00:00.000Z", owners: [], version: 1 }], relations: [{ id: 1, relationType: "blocks", direction: "outgoing", ticket: { id: 7, title: "Folgeticket" } }], subTickets: [], notes: [], attachments: [] }
+    };
+    const journalEntries = [
+      { id: 99, operation: "update", objectType: "task", objectId: 2, objectLabel: "In Arbeit", summary: "Status geändert", actorName: "Rose, Rene", createdAt: "2026-06-09T07:30:00.000Z", changes: [], contexts: [] },
+      { id: 100, operation: "update", objectType: "task", objectId: 999, objectLabel: "Fremd", summary: "Unbeteiligt", actorName: "Rose, Rene", createdAt: "2026-06-09T07:30:00.000Z", changes: [], contexts: [] }
+    ];
+    const client = createMockClient();
+    client.get.mockImplementation((path: string) => {
+      if (path.startsWith("journal")) {
+        return Promise.resolve({ entries: journalEntries, nextCursor: null });
+      }
+      if (Object.hasOwn(responses, path)) {
+        return Promise.resolve(responses[path]);
+      }
+      return Promise.reject(new Error(`Unexpected GET ${path}`));
+    });
+
+    const dossier = (await buildWorkDossier(client, "Projekt ID 1", { now: new Date("2026-06-10T12:00:00.000Z") })) as WorkDossier;
+
+    expect(dossier.parent).toMatchObject({ reference: "PROJ-1", type: "project", name: "Demo" });
+    expect(dossier.window.closedWithinDays).toBe(3);
+    expect(dossier.sections.done.map((item) => item.reference).sort()).toEqual(["TASK-3", "TKT-6"]);
+    expect(dossier.sections.inProgress.map((item) => item.reference)).toEqual(["TASK-2"]);
+    expect(dossier.sections.waiting.map((item) => item.reference).sort()).toEqual(["TASK-1", "TKT-5"]);
+    expect(dossier.summary).toMatchObject({
+      openTaskCount: 2,
+      openTicketCount: 1,
+      recentlyClosedTaskCount: 1,
+      recentlyClosedTicketCount: 1,
+      doneCount: 2,
+      inProgressCount: 1,
+      waitingCount: 2
+    });
+    expect(dossier.comments.map((comment) => comment.id)).toEqual([300, 301, 302, 303]);
+    expect(dossier.comments[0]).toMatchObject({ id: 300, source: "PROJ-1" });
+    expect(dossier.relations).toEqual([
+      { from: "TKT-6", to: "TKT-7", relationType: "blocks", direction: "outgoing", targetTitle: "Folgeticket" }
+    ]);
+    expect(dossier.activity.map((entry) => entry.id)).toEqual([99]);
+
+    const fetchedPaths = client.get.mock.calls.map(([path]) => path);
+    expect(fetchedPaths).not.toContain("tasks/4");
+    expect(fetchedPaths).not.toContain("tasks/1");
+  });
+
+  it("rejects work dossier references that are not a project or milestone", async () => {
+    const client = createMockClient();
+
+    await expect(buildWorkDossier(client, "TASK-3")).rejects.toThrow(/Projekt.*Meilenstein/);
+    expect(client.get).not.toHaveBeenCalled();
   });
 
   it("formats API errors as MCP error results", () => {

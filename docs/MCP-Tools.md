@@ -105,8 +105,11 @@ Löschungen sind destruktiv. Offene Relationen (z. B. Ticket-Beziehungen) führe
 | `report_open_tasks` | Aggregiert offene Root-Aufgaben (Status nicht als abgeschlossen markiert) gruppiert nach Parent-Kontext. | keine | `generatedAt`, `totalCount`, `openCount`, `groups[]` mit `context` und `items[]` |
 | `report_open_tickets` | Aggregiert offene Root-Tickets gruppiert nach Parent-Kontext. | keine | `generatedAt`, `totalCount`, `openCount`, `groups[]` mit `context` und `items[]` |
 | `report_activity` | Aggregiert den Änderungsverlauf (Aufgaben, Tickets, Kommentare, Notizen u. a.) aus dem Journal nach Änderungsdatum, gruppiert nach Kontext/Parent. | optional `from`, `to`, `limit` (max. 100) | `generatedAt`, `count`, `nextCursor`, `groups[]` mit `context` und `entries[]` |
+| `report_work_dossier` | Stellt für ein Projekt oder einen Meilenstein ein vorkorreliertes Arbeitsbericht-Dossier zusammen: kürzlich erledigte, in Arbeit befindliche und offen wartende Aufgaben/Tickets samt Kommentarverlauf, Beziehungen und gefilterten Journal-Änderungen. Datengrundlage für einen erzählenden Arbeitsstandsbericht, keine fertige Prosa. | `reference` (PROJ-N/MS-N), optional `closedWithinDays` (Default 3, max. 90) | `generatedAt`, `parent`, `window`, `summary`, `sections` (`done`/`inProgress`/`waiting`), `comments[]`, `relations[]`, `activity[]`, `warnings[]` |
 
 „Offen" bestimmt sich über den Katalog: ein Status gilt als abgeschlossen, wenn sein `workStatus`-Katalogeintrag `isClosed = true` hat. `report_activity` liest das globale Journal und ordnet jeden Eintrag seinem primären Kontext zu (`parent` vor `owner` vor `self`).
+
+`report_work_dossier` nimmt alle offenen Aufgaben/Tickets eines Parents auf und ergänzt sie um geschlossene Items, die innerhalb der letzten `closedWithinDays` Kalendertage (inklusive heute) aktualisiert wurden. Offene Items mit Status `in_progress`/`in_review` landen in `inProgress`, übrige offene in `waiting`, kürzlich geschlossene in `done`. Kommentare und Ticket-Beziehungen werden je Item aufgelöst und zusätzlich als chronologische Gesamtliste bzw. Kantenliste geliefert; das Journal wird auf den Parent und die aufgenommenen Items gefiltert. Der erzählende Bericht selbst wird vom aufrufenden Modell aus diesen Daten formuliert.
 
 ## Unterstützte Parent-Typen
 

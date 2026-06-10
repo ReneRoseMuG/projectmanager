@@ -33,6 +33,7 @@ import { z } from "zod";
 import { ProjectManagerApiError, type ProjectManagerApiClient } from "./api-client.js";
 import { buildReferenceContext, type ReferenceContext, type ReferenceContextNode } from "./reference-context.js";
 import { htmlDocument, textToHtml } from "./rich-text.js";
+import { buildWorkDossier } from "./work-dossier.js";
 
 export type ParentType = "project" | "milestone";
 export type LinkParentType = ParentType | "feature" | "useCase";
@@ -770,6 +771,11 @@ const activityReportSchema = z.object({
   limit: z.number().int().positive().max(100).optional()
 });
 
+const workDossierSchema = z.object({
+  reference: z.string().min(1).describe("Projekt- oder Meilenstein-Referenz, z. B. PROJ-3 oder MS-12."),
+  closedWithinDays: z.number().int().positive().max(90).optional().describe("Kalendertage-Fenster für kürzlich erledigte Items. Default 3.")
+});
+
 export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefinition[] {
   return [
     defineTool({
@@ -1234,6 +1240,14 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
           groups: groupActivityByContext(response.entries)
         };
       }
+    }),
+    defineTool({
+      name: "report_work_dossier",
+      title: "Report: Arbeitsbericht-Dossier",
+      description:
+        "Stellt für ein Projekt (PROJ-N) oder einen Meilenstein (MS-N) ein vorkorreliertes Arbeitsbericht-Dossier zusammen: kürzlich erledigte (geschlossen und innerhalb closedWithinDays Kalendertagen aktualisiert, Default 3), in Arbeit befindliche und offen wartende Aufgaben und Tickets, dazu chronologischer Kommentarverlauf, Beziehungen (blocks/related/duplicate) und gefilterte Journal-Änderungen. Liefert strukturierte Daten als Grundlage für einen erzählenden Arbeitsstandsbericht, keine fertige Prosa. Aus den Daten einen zusammenhängenden Bericht formulieren: was wurde erledigt, was liegt an, was ist offen, und welche Zusammenhänge bestehen zwischen Tickets, Aufgaben und Kommentaren.",
+      inputSchema: workDossierSchema,
+      execute: ({ reference, closedWithinDays }) => buildWorkDossier(client, reference, { closedWithinDays })
     })
   ];
 }
