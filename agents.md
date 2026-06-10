@@ -621,6 +621,16 @@ Nach Fertigstellung eines Auftrags richtet sich der Abschluss nach der gewählte
 
 Der Agent schreibt den Log-Eintrag gemäß Abschnitt 5 **immer** — ohne Rückfrage, ohne Nutzerbestätigung. Das ist kein optionaler Schritt.
 
+### 13.1.1 MCP-Abschlusskommentar im Projekt (automatisch, keine Rückfrage)
+
+Zusätzlich zum dateibasierten Schritt-Log schreibt der Agent nach jedem abgeschlossenen Auftrag der Klassen 4 und 5 **automatisch und ohne Rückfrage** einen kurzen Abschlusskommentar in die Projekt-Manager-App. Das gilt unabhängig davon, ob der Auftrag von einer PM-Referenz ausging.
+
+- **Ziel:** das in `docs/projekt-kontext.md` hinterlegte Standard-Log-Ziel (aktuell `PROJ-3`). Ging der Auftrag von einer spezifischen Parent-Referenz aus (`PROJ`/`MS`/`TASK`/`TKT`/`FEAT`/`UC`), wird der Kommentar zusätzlich an diesen Parent geschrieben; dafür bleibt der Skill `mcp-code-auftrag` maßgeblich.
+- **Tool:** `add_comment_to_parent`. Ist das Tool nicht verfügbar, ersatzweise `add_note_to_parent` (als Log kennzeichnen).
+- **Inhalt** (gut lesbar für den Nutzer, keine technischen Dateilisten): was erledigt wurde, wichtige Entscheidungen oder Einschränkungen, durchgeführte Prüfungen oder Tests, offene Punkte oder Blocker, welches Ergebnis der Nutzer erwarten kann.
+- **Blocker:** Ist die MCP-/API-Anbindung nicht erreichbar oder fehlt das Schreibrecht, dokumentiert der Agent dies als Blocker im Schritt-Log und gibt den Kommentartext im Chat aus. Der Auftrag gilt trotzdem als abgeschlossen; der dateibasierte Schritt-Log bleibt die verbindliche Mindestdokumentation.
+- **Ausnahmen:** Klassen 1 (reine Frage), 2 (Report) und 3 (reine Git-Operation) sind ausgenommen.
+
 ### 13.2 Testlauf
 
 > „Soll ich einen Testlauf ausführen?"

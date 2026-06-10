@@ -63,7 +63,7 @@ Spezialisierte Skills anwenden wenn zutreffend:
 
 ## Schritt 5: Log nach der Ausführung
 
-Fragen: „Soll ich ein kurzes Log als Kommentar am Parent hinterlegen?"
+Nach Abschluss schreibt der Agent **automatisch und ohne Rückfrage** einen Abschlusskommentar — gemäß `agents.md §13.1.1`. Geloggt wird an den Auftrags-Parent **und** an das Standard-Log-Ziel aus `docs/projekt-kontext.md` (aktuell `PROJ-3`), sofern beide nicht identisch sind.
 
 Log ist für den Nutzer — gut lesbar, keine technischen Dateilisten:
 - Was erledigt wurde

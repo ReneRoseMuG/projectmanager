@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 10.06.26 | 08:03:10 | Feature | MCP-Abschlusskommentar Pflicht + feste Projekt-ID | ✅ |
+| 10.06.26 | 07:51:57 | AP01 | MS-67 Baseline & Messung | ✅ |
 | 10.06.26 | 07:14:00 | Feature | Arbeitsbericht-Dossier MCP-Tool | ✅ |
 | 07.06.26 | 05:25:06 | Feature | WikiTree Drag Parent | ✅ |
 | 07.06.26 | 04:52:15 | Fix | Verwandte Themen Hinweistext | ✅ |
