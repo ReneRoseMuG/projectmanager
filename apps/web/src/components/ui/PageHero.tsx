@@ -101,7 +101,7 @@ export function PageHero(props: PageHeroProps) {
             </span>
           ) : null}
           <div className="min-w-0">
-            <h2 className="max-w-[760px] text-2xl font-bold leading-tight tracking-normal text-white md:text-3xl">
+            <h2 className="truncate text-2xl font-bold leading-tight tracking-normal text-white md:text-3xl">
               {props.title}
             </h2>
             {props.subtitle ? (
