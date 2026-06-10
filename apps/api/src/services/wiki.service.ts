@@ -9,6 +9,7 @@ import { firstRow } from "../db/query-utils.js";
 import { assertVersion } from "../repositories/base.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { wikiPageRepository, type WikiPageRecord, type WikiPageUpdateData } from "../repositories/wiki-page.repository.js";
+import { contentImageRepository } from "../repositories/content-image.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { readContentFromDb } from "./content.service.js";
 import { requireNonEmpty } from "./helpers.js";
@@ -471,13 +472,22 @@ export interface WikiExportResult {
   exportPath: string;
 }
 
+// Verzeichnis-/Dateinamen des statischen Exports. Per TKT-96 dürfen Umlaute und
+// Leerzeichen NICHT verändert werden — die Namen spiegeln den Seitentitel und es
+// werden nur Zeichen entfernt, die in Windows-/POSIX-Pfaden unzulässig sind.
+const ILLEGAL_PATH_CHARS = /[<>:"/\\|?*]/g;
+const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
 function toSlug(title: string): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || "seite";
+  const cleaned = title
+    .replace(ILLEGAL_PATH_CHARS, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\.+/, "")
+    .replace(/[ .]+$/, "")
+    .trim();
+  if (!cleaned) return "seite";
+  return WINDOWS_RESERVED_NAME.test(cleaned) ? `${cleaned}-seite` : cleaned;
 }
 
 function resolveExportPath(rawPath: string): string {
@@ -496,8 +506,9 @@ function buildSlugMap(pages: WikiPageRecord[]): Map<number, string> {
   const slugMap = new Map<number, string>();
   for (const page of pages) {
     const base = toSlug(page.title);
-    const count = slugCounts.get(base) ?? 0;
-    slugCounts.set(base, count + 1);
+    const key = base.toLowerCase();
+    const count = slugCounts.get(key) ?? 0;
+    slugCounts.set(key, count + 1);
     slugMap.set(page.id, count === 0 ? base : `${base}-${page.id}`);
   }
   return slugMap;
@@ -524,18 +535,92 @@ function buildPathMap(pages: WikiPageRecord[], slugMap: Map<number, string>): Ma
   return pathMap;
 }
 
+// Jede Seite liegt unter <root>/<relPath>/index.html, also genau so viele
+// Verzeichnisse unter der Export-Wurzel wie relPath Segmente hat. Links und Assets
+// werden relativ zu dieser Datei adressiert.
+function exportPrefix(relPath: string): string {
+  return "../".repeat(relPath.split("/").length);
+}
+
+// Pfadsegmente können jetzt Leerzeichen/Umlaute enthalten (TKT-96); jede erzeugte
+// URL wird daher pro Segment prozentkodiert, damit sie im Browser gültig bleibt.
+function encodeRelPath(relPath: string): string {
+  return relPath.split("/").map((segment) => encodeURIComponent(segment)).join("/");
+}
+
 function resolveWikiLinks(html: string, currentRelPath: string, pathMap: Map<number, string>): string {
-  const depth = currentRelPath.split("/").length;
-  const prefix = depth > 1 ? Array(depth).fill("..").join("/") + "/" : "";
+  const prefix = exportPrefix(currentRelPath);
 
   const resolveHref = (_match: string, idStr: string) => {
     const targetPath = pathMap.get(Number(idStr));
-    return targetPath ? `href="${prefix}${targetPath}/index.html"` : `href="#"`;
+    return targetPath ? `href="${prefix}${encodeRelPath(targetPath)}/index.html"` : `href="#"`;
   };
 
   return html
     .replace(/href="wiki:\/\/(\d+)"/g, resolveHref)
     .replace(/href="\/wiki\/(\d+)(?:[?#][^"]*)?"/g, resolveHref);
+}
+
+const CONTENT_IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/svg+xml": "svg",
+  "image/avif": "avif",
+  "image/bmp": "bmp",
+  "image/x-icon": "ico"
+};
+
+function extensionForMimeType(mimeType: string): string {
+  return CONTENT_IMAGE_EXTENSIONS[mimeType.toLowerCase()] ?? "img";
+}
+
+// Intern (DB) gespeicherte Editor-Bilder, z. B. src="/api/content/images/<uuid>".
+const CONTENT_IMAGE_SRC_PATTERN = 'src="((?:/api)?/content/images/([^"?#]+))(?:[?#][^"]*)?"';
+
+// Kopiert intern gespeicherte Bilder nach <root>/assets/images/ und schreibt die
+// src-Attribute auf relative Exportpfade um (TKT-100). exportedImages dedupliziert
+// über Seiten hinweg; null bedeutet "Bild nicht gefunden", die URL bleibt dann unverändert.
+async function resolveContentImages(
+  database: DbClient,
+  html: string,
+  prefix: string,
+  exportPath: string,
+  exportedImages: Map<string, string | null>
+): Promise<string> {
+  const matches = [...html.matchAll(new RegExp(CONTENT_IMAGE_SRC_PATTERN, "g"))];
+  if (matches.length === 0) return html;
+
+  const replacements = new Map<string, string>();
+  for (const match of matches) {
+    const fullMatch = match[0];
+    const id = match[2];
+    if (fullMatch === undefined || id === undefined) continue;
+    if (replacements.has(fullMatch)) continue;
+    if (!exportedImages.has(id)) {
+      const image = await contentImageRepository.findById(database, id);
+      if (image) {
+        const fileName = `${id}.${extensionForMimeType(image.mimeType)}`;
+        const assetsDir = path.join(exportPath, "assets", "images");
+        await fs.mkdir(assetsDir, { recursive: true });
+        await fs.writeFile(path.join(assetsDir, fileName), image.data);
+        exportedImages.set(id, fileName);
+      } else {
+        exportedImages.set(id, null);
+      }
+    }
+    const fileName = exportedImages.get(id);
+    if (!fileName) continue;
+    replacements.set(fullMatch, `src="${prefix}assets/images/${fileName}"`);
+  }
+
+  let result = html;
+  for (const [fullMatch, replacement] of replacements) {
+    result = result.split(fullMatch).join(replacement);
+  }
+  return result;
 }
 
 const EXPORT_CSS = `
@@ -599,11 +684,14 @@ export async function exportAllWikiPages(database: DbClient, rawExportPath: stri
 
   const slugMap = buildSlugMap(allPages);
   const pathMap = buildPathMap(allPages, slugMap);
+  const exportedImages = new Map<string, string | null>();
 
   let filesWritten = 0;
   for (const page of pagesWithContent) {
     const relPath = pathMap.get(page.id) ?? String(page.id);
-    const resolvedContent = resolveWikiLinks(page.content, relPath, pathMap);
+    const prefix = exportPrefix(relPath);
+    const withLinks = resolveWikiLinks(page.content, relPath, pathMap);
+    const resolvedContent = await resolveContentImages(database, withLinks, prefix, exportPath, exportedImages);
     const html = buildHtmlDocument(page.title, resolvedContent);
     const filePath = path.join(exportPath, relPath, "index.html");
     await fs.mkdir(path.dirname(filePath), { recursive: true });

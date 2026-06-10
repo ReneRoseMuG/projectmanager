@@ -1,7 +1,7 @@
 import type { Note, NoteInput, NoteUpdate } from "@taskmanager/shared-types";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
-import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
+import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { dayPlanNotes, dayPlans, milestoneNotes, milestones, notes, projectNotes, projects, taskNotes, tasks, ticketNotes, tickets, wikiPageNotes, wikiPages } from "../db/schema.js";
 import { dayPlanRepository } from "../repositories/day-plan.repository.js";
 import { noteRepository, type NoteRecord, type NoteUpdateData } from "../repositories/note.repository.js";
@@ -153,7 +153,7 @@ export async function listProjectNotes(database: DbClient, projectId: number): P
     .from(projectNotes)
     .innerJoin(notes, eq(projectNotes.noteId, notes.id))
     .where(eq(projectNotes.projectId, projectId))
-    .orderBy(desc(notes.updatedAt));
+    .orderBy(...recencyOrder(notes));
 
   return rows.map(mapNote);
 }
@@ -172,7 +172,7 @@ export async function listTaskNotes(database: DbClient, taskId: number): Promise
     .from(taskNotes)
     .innerJoin(notes, eq(taskNotes.noteId, notes.id))
     .where(eq(taskNotes.taskId, taskId))
-    .orderBy(desc(notes.updatedAt));
+    .orderBy(...recencyOrder(notes));
 
   return rows.map(mapNote);
 }
@@ -191,7 +191,7 @@ export async function listMilestoneNotes(database: DbClient, milestoneId: number
     .from(milestoneNotes)
     .innerJoin(notes, eq(milestoneNotes.noteId, notes.id))
     .where(eq(milestoneNotes.milestoneId, milestoneId))
-    .orderBy(notes.createdAt, notes.id);
+    .orderBy(...recencyOrder(notes));
 
   return rows.map(mapNote);
 }
@@ -210,7 +210,7 @@ export async function listTicketNotes(database: DbClient, ticketId: number): Pro
     .from(ticketNotes)
     .innerJoin(notes, eq(ticketNotes.noteId, notes.id))
     .where(eq(ticketNotes.ticketId, ticketId))
-    .orderBy(desc(notes.updatedAt));
+    .orderBy(...recencyOrder(notes));
 
   return rows.map(mapNote);
 }
@@ -234,7 +234,7 @@ export async function listWikiPageNotes(database: DbClient, wikiPageId: number):
     .from(wikiPageNotes)
     .innerJoin(notes, eq(wikiPageNotes.noteId, notes.id))
     .where(eq(wikiPageNotes.wikiPageId, wikiPageId))
-    .orderBy(desc(notes.updatedAt));
+    .orderBy(...recencyOrder(notes));
 
   return rows.map(mapNote);
 }

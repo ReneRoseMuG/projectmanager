@@ -159,6 +159,36 @@ describe("Tasks API", () => {
     expect(milestoneTasks.body.find((task: { id: number }) => task.id === duplicateTask.id).visibleParent).toMatchObject({ type: "milestone", id: milestone.id, origin: "direct" });
   });
 
+  it("GET /api/projects/:id/tasks sortiert innerhalb einer Statusgruppe nach Aktualität (neueste zuerst)", async () => {
+    // TKT-113: Auflistungen sind app-weit nach updatedAt, dann createdAt absteigend sortiert
+    // — innerhalb der Statusgruppen. Gegenbeispiel: ein Update lässt die ältere Aufgabe
+    // nach oben springen, weil updatedAt führt.
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const project = await createProject(app);
+    const taskA = await createTask(app, project.id, { title: "Älter", status: "todo" });
+    await delay(10);
+    const taskB = await createTask(app, project.id, { title: "Neuer", status: "todo" });
+
+    const order = async (): Promise<number[]> => {
+      const res = await supertest(app.server).get(`/api/projects/${project.id}/tasks`).expect(200);
+      return (res.body as Array<{ id: number; status: string }>)
+        .filter((task) => task.status === "todo" && (task.id === taskA.id || task.id === taskB.id))
+        .map((task) => task.id);
+    };
+
+    // Frisch erstellt: neuere Aufgabe (taskB) steht vor der älteren (taskA).
+    expect(await order()).toEqual([taskB.id, taskA.id]);
+
+    await delay(10);
+    await supertest(app.server)
+      .patch(`/api/tasks/${taskA.id}`)
+      .send({ title: "Älter, aber gerade bearbeitet", expectedVersion: taskA.version })
+      .expect(200);
+
+    // Nach dem Update führt taskA, weil updatedAt vor createdAt sortiert wird.
+    expect(await order()).toEqual([taskA.id, taskB.id]);
+  });
+
   it("GET /api/tasks/:id gibt Task mit Subtask-Count zurueck", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);

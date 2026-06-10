@@ -28,6 +28,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { RichTextInlineField } from "../../../../../apps/web/src/components/ui/rich-text-inline-field";
 import { ToastProvider } from "../../../../../apps/web/src/components/ui/ToastProvider";
 
+interface MockMark {
+  type: string;
+  attrs?: Record<string, unknown>;
+}
+
+interface MockMarkType {
+  create: ReturnType<typeof vi.fn<[Record<string, unknown>?], MockMark>>;
+}
+
+interface MockMarkTransaction {
+  op: "addMark" | "removeMark";
+  from: number;
+  to: number;
+}
+
 interface MockEditor {
   getHTML: ReturnType<typeof vi.fn<[], string>>;
   getAttributes: ReturnType<typeof vi.fn<[string], Record<string, string | undefined>>>;
@@ -44,9 +59,20 @@ interface MockEditor {
   off: ReturnType<typeof vi.fn<[string, () => void], void>>;
   state: {
     selection: { empty: boolean; from: number; to: number };
+    tr: {
+      addMark: ReturnType<typeof vi.fn<[number, number, MockMark], MockMarkTransaction>>;
+      removeMark: ReturnType<typeof vi.fn<[number, number, MockMarkType], MockMarkTransaction>>;
+    };
+    doc: {
+      rangeHasMark: ReturnType<typeof vi.fn<[number, number, MockMarkType], boolean>>;
+    };
+    schema: {
+      marks: Record<string, MockMarkType>;
+    };
   };
   view: {
     posAtCoords: ReturnType<typeof vi.fn<[{ left: number; top: number }], { pos: number } | null>>;
+    dispatch: ReturnType<typeof vi.fn<[MockMarkTransaction], void>>;
   };
 }
 
@@ -182,6 +208,9 @@ vi.mock("react-router-dom", () => ({
 
 vi.mock("@tiptap/react", () => ({
   useEditor: vi.fn((config: MockEditorConfig) => {
+    const makeMarkType = (name: string): MockMarkType => ({
+      create: vi.fn((attrs?: Record<string, unknown>): MockMark => ({ type: name, attrs }))
+    });
     const editor: MockEditor = {
       getHTML: vi.fn(() => tiptapMock.html),
       getAttributes: vi.fn<[string], Record<string, string | undefined>>(() => ({})),
@@ -199,10 +228,27 @@ vi.mock("@tiptap/react", () => ({
       on: vi.fn(),
       off: vi.fn(),
       state: {
-        selection: { empty: false, from: 2, to: 5 }
+        selection: { empty: false, from: 2, to: 5 },
+        tr: {
+          addMark: vi.fn((from: number, to: number): MockMarkTransaction => ({ op: "addMark", from, to })),
+          removeMark: vi.fn((from: number, to: number): MockMarkTransaction => ({ op: "removeMark", from, to }))
+        },
+        doc: {
+          rangeHasMark: vi.fn(() => false)
+        },
+        schema: {
+          marks: {
+            bold: makeMarkType("bold"),
+            italic: makeMarkType("italic"),
+            underline: makeMarkType("underline"),
+            strike: makeMarkType("strike"),
+            highlight: makeMarkType("highlight")
+          }
+        }
       },
       view: {
-        posAtCoords: vi.fn((_coords: { left: number; top: number }): { pos: number } | null => ({ pos: 1 }))
+        posAtCoords: vi.fn((_coords: { left: number; top: number }): { pos: number } | null => ({ pos: 1 })),
+        dispatch: vi.fn()
       }
     };
 
@@ -423,14 +469,103 @@ describe("RichTextInlineField", () => {
     expect(screen.getByRole("button", { name: "Formatierung entfernen" })).toBeInTheDocument();
   });
 
-  it("T-14b wendet Highlight nur auf die aktuelle Textselektion an", () => {
+  it("T-CB1 kopiert den Editor-HTML-Inhalt in die Zwischenablage", () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    tiptapMock.html = "<p>Zu kopieren</p>";
+    renderWithProviders(<RichTextInlineField value="<p>Zu kopieren</p>" onChange={vi.fn()} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "HTML kopieren" }));
+
+    expect(writeText).toHaveBeenCalledWith("<p>Zu kopieren</p>");
+  });
+
+  it("T-CB2 kopiert auch bei leerem Editor ohne Fehler", () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    tiptapMock.html = "<p></p>";
+    renderWithProviders(<RichTextInlineField value="" onChange={vi.fn()} testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "HTML kopieren" }));
+
+    expect(writeText).toHaveBeenCalledWith("<p></p>");
+  });
+
+  it("T-14b wendet Highlight per Dispatch nur auf die aktuelle Selektion an", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+    const activeEditor = tiptapMock.editor;
+    if (!activeEditor) {
+      throw new Error("Editor mock was not created");
+    }
 
     fireEvent.click(screen.getByRole("button", { name: "Hervorheben" }));
 
-    expect(tiptapMock.chain?.setTextSelection).toHaveBeenCalledWith({ from: 2, to: 5 });
-    expect(tiptapMock.chain?.toggleHighlight).toHaveBeenCalled();
-    expect(tiptapMock.chain?.run).toHaveBeenCalled();
+    // Highlight wird über eine ProseMirror-Transaktion exakt auf den Selektionsbereich
+    // {2,5} angewendet, nicht blockweite chain-Befehle. rangeHasMark=false → addMark.
+    const highlightType = activeEditor.state.schema.marks.highlight;
+    expect(highlightType?.create).toHaveBeenCalledWith({ color: "#fff3bf" });
+    expect(activeEditor.state.doc.rangeHasMark).toHaveBeenCalledWith(2, 5, highlightType);
+    expect(activeEditor.state.tr.addMark).toHaveBeenCalledWith(2, 5, expect.objectContaining({ type: "highlight" }));
+    expect(activeEditor.state.tr.removeMark).not.toHaveBeenCalled();
+    expect(activeEditor.view.dispatch).toHaveBeenCalledTimes(1);
+    expect(activeEditor.view.dispatch).toHaveBeenCalledWith({ op: "addMark", from: 2, to: 5 });
+  });
+
+  it("T-14c entfernt Highlight per Dispatch, wenn die Selektion bereits hervorgehoben ist", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+    const activeEditor = tiptapMock.editor;
+    if (!activeEditor) {
+      throw new Error("Editor mock was not created");
+    }
+    activeEditor.state.doc.rangeHasMark.mockReturnValue(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hervorheben" }));
+
+    const highlightType = activeEditor.state.schema.marks.highlight;
+    expect(activeEditor.state.tr.removeMark).toHaveBeenCalledWith(2, 5, highlightType);
+    expect(activeEditor.state.tr.addMark).not.toHaveBeenCalled();
+    expect(activeEditor.view.dispatch).toHaveBeenCalledTimes(1);
+    expect(activeEditor.view.dispatch).toHaveBeenCalledWith({ op: "removeMark", from: 2, to: 5 });
+  });
+
+  it.each([
+    { id: "T-14d", label: "Fett", mark: "bold" },
+    { id: "T-14e", label: "Kursiv", mark: "italic" },
+    { id: "T-14f", label: "Unterstrichen", mark: "underline" },
+    { id: "T-14g", label: "Durchgestrichen", mark: "strike" }
+  ])("$id wendet $label per Dispatch auf die aktuelle Selektion an", ({ label, mark }) => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+    const activeEditor = tiptapMock.editor;
+    if (!activeEditor) {
+      throw new Error("Editor mock was not created");
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: label }));
+
+    // Inline-Marks folgen demselben Dispatch-Pfad wie Highlight: addMark exakt auf {2,5}.
+    const markType = activeEditor.state.schema.marks[mark];
+    expect(activeEditor.state.doc.rangeHasMark).toHaveBeenCalledWith(2, 5, markType);
+    expect(activeEditor.state.tr.addMark).toHaveBeenCalledWith(2, 5, expect.objectContaining({ type: mark }));
+    expect(activeEditor.state.tr.removeMark).not.toHaveBeenCalled();
+    expect(activeEditor.view.dispatch).toHaveBeenCalledTimes(1);
+    expect(activeEditor.view.dispatch).toHaveBeenCalledWith({ op: "addMark", from: 2, to: 5 });
+  });
+
+  it("T-14h schaltet eine Inline-Mark per Dispatch ab, wenn die Selektion sie bereits trägt", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} testIdPrefix="field" />);
+    const activeEditor = tiptapMock.editor;
+    if (!activeEditor) {
+      throw new Error("Editor mock was not created");
+    }
+    activeEditor.state.doc.rangeHasMark.mockReturnValue(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Fett" }));
+
+    const boldType = activeEditor.state.schema.marks.bold;
+    expect(activeEditor.state.tr.removeMark).toHaveBeenCalledWith(2, 5, boldType);
+    expect(activeEditor.state.tr.addMark).not.toHaveBeenCalled();
+    expect(activeEditor.view.dispatch).toHaveBeenCalledTimes(1);
+    expect(activeEditor.view.dispatch).toHaveBeenCalledWith({ op: "removeMark", from: 2, to: 5 });
   });
 
   it("T-15 setzt die MindesthÃ¶he fÃ¼r Leseansicht und Editor", () => {
@@ -459,8 +594,11 @@ describe("RichTextInlineField", () => {
 
     fireEvent.click(screen.getByTestId("field-view"));
 
+    // Der Editor-Container clippt seinen Inhalt; die Sticky-Klassen liegen auf dem
+    // Toolbar-Wrapper (Elternelement), damit die Leiste beim Scrollen oben bleibt und
+    // dank bg-white/border-b den darunter scrollenden Inhalt verdeckt.
     expect(screen.getByTestId("field-editor")).toHaveClass("overflow-clip");
-    expect(screen.getByTestId("rich-text-toolbar")).toHaveClass("sticky", "top-0", "z-10");
+    expect(screen.getByTestId("rich-text-toolbar").parentElement).toHaveClass("sticky", "top-0", "z-10", "bg-white", "border-b", "border-line");
   });
 
   it("T-23 normalisiert überzählige Leerzeilen beim Einfügen", () => {
@@ -665,13 +803,13 @@ describe("RichTextInlineField", () => {
   it("T-27 setzt Flex-Fill-Klassen wenn fill=true", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} fill testIdPrefix="field" />);
 
-    // Äußerer Container (field-view) erhält flex min-h-0 flex-1 flex-col
+    // Äußerer Container (field-view) streckt sich als Flex-Spalte über den Parent.
     const outerDiv = screen.getByTestId("field-view");
-    expect(outerDiv).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
+    expect(outerDiv).toHaveClass("flex", "flex-1", "flex-col");
 
-    // Editor-Wrapper (field-editor) erhält overflow-visible statt overflow-clip
+    // Editor-Wrapper (field-editor) scrollt via overflow-y-auto statt zu clippen.
     const editorDiv = screen.getByTestId("field-editor");
-    expect(editorDiv).toHaveClass("flex", "min-h-0", "flex-1", "flex-col", "overflow-visible");
+    expect(editorDiv).toHaveClass("flex", "flex-1", "flex-col", "overflow-y-auto");
     expect(editorDiv).not.toHaveClass("overflow-clip");
   });
 

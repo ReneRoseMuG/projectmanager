@@ -20,10 +20,12 @@
  * - Legacy-/Markdown-Inhalte werden roh an den Editor übergeben.
  * - Nicht editiertes Legacy-Markdown wird bei Titelspeicherung nicht als HTML überschrieben.
  * - Speichern im Notizmodal propagiert nicht in die übergeordnete Detail-Form.
+ * - Im Edit-Mode flusht das Schließen die Änderung (Auto-Save) statt einen Verwerfen-Dialog zu zeigen (TKT-95).
  *
  * Fehlerfälle:
  * - Aktualisierter HTML-Inhalt muss beim Speichern serialisiert werden.
  * - Parent-Submit darf beim Speichern der Notiz nicht ausgelöst werden.
+ * - Im Create-Mode (kein Auto-Save) bleibt der Verwerfen-Dialog bei ungespeicherten Änderungen erhalten.
  *
  * Ziel:
  * Die Rich-Text-Integration und das Modal-Verhalten im Notizeditor absichern.
@@ -179,5 +181,30 @@ describe("NoteEditor", () => {
     );
     expect(onClose).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
+  });
+
+  it("flusht beim Schließen im Edit-Mode statt einen Verwerfen-Dialog zu zeigen (TKT-95)", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    renderWithProviders(<NoteEditor open note={note} onSave={onSave} onClose={onClose} />);
+
+    fireEvent.change(screen.getByTestId("note-editor-content-view"), { target: { value: "<p>geändert</p>" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Schließen" })[0]);
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(onSave).toHaveBeenCalled();
+    expect(screen.queryByText("Änderungen verwerfen?")).not.toBeInTheDocument();
+  });
+
+  it("behält im Create-Mode den Verwerfen-Dialog bei ungespeicherten Änderungen", async () => {
+    const onCreateNote = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    renderWithProviders(<NoteEditor open note={null} onSave={vi.fn()} onCreateNote={onCreateNote} onClose={onClose} />);
+
+    fireEvent.change(screen.getByTestId("note-editor-content-view"), { target: { value: "<p>neu</p>" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Schließen" })[0]);
+
+    await waitFor(() => expect(screen.getByText("Änderungen verwerfen?")).toBeInTheDocument());
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -18,10 +18,10 @@
  * Abgedeckte Regeln:
  * - Ausgewählte Wiki-Seiten werden als Inline-Formular gerendert.
  * - Der Create-Button öffnet weiterhin das Formular im Modal-Modus.
- * - Dirty-State aus dem Inline-Formular schützt die Tree-Navigation.
+ * - Tree-Navigation läuft direkt ohne Dirty-Guard/Verwerfen-Dialog (Auto-Save persistiert, TKT-95).
  *
  * Fehlerfälle:
- * - Bei unbestätigtem Dirty-Dialog darf kein Seitenwechsel ausgelöst werden.
+ * - Ein Seitenwechsel darf keinen Verwerfen-Dialog mehr auslösen.
  * - Der Create-Modus darf kein Inline-Formular für eine bestehende Seite benötigen.
  *
  * Ziel:
@@ -123,7 +123,6 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
     inlineChrome,
     open,
     page,
-    onDirtyChange,
     editable,
     onEdit,
     onClose,
@@ -132,7 +131,6 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
     inlineChrome?: "embedded" | "standalone";
     open: boolean;
     page?: typeof wikiFixtures.wikiAlpha | null;
-    onDirtyChange?: (dirty: boolean) => void;
     editable?: boolean;
     onEdit?: () => void;
     onClose?: () => void;
@@ -145,9 +143,6 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
       return (
         <form data-testid="wiki-inline-form" data-inline-chrome={inlineChrome} data-editable={editable ? "true" : "false"}>
           <h2>{page?.title}</h2>
-          <button type="button" onClick={() => onDirtyChange?.(true)}>
-            Inline Dirty
-          </button>
           <button type="button" onClick={() => onEdit?.()}>
             Bearbeiten starten
           </button>
@@ -235,25 +230,13 @@ describe("WikiPage Inline-Redesign", () => {
     expect(screen.getByTestId("wiki-create-modal")).toBeInTheDocument();
   });
 
-  it("blockiert Tree-Navigation bei unbestätigten Inline-Änderungen", async () => {
-    confirmMock.mockResolvedValueOnce(false);
+  it("navigiert bei Tree-Klick direkt ohne Dirty-Guard/Verwerfen-Dialog (TKT-95)", async () => {
     renderPage();
 
-    fireEvent.click(screen.getByRole("button", { name: "Inline Dirty" }));
-    fireEvent.click(screen.getByRole("button", { name: "Wiki Beta" }));
-
-    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
-    expect(router.navigate).not.toHaveBeenCalledWith("/wiki/11");
-  });
-
-  it("erlaubt Tree-Navigation nach bestätigtem Dirty-Dialog", async () => {
-    confirmMock.mockResolvedValueOnce(true);
-    renderPage();
-
-    fireEvent.click(screen.getByRole("button", { name: "Inline Dirty" }));
     fireEvent.click(screen.getByRole("button", { name: "Wiki Beta" }));
 
     await waitFor(() => expect(router.navigate).toHaveBeenCalledWith("/wiki/11"));
+    expect(confirmMock).not.toHaveBeenCalled();
   });
 
   it("T-WP1 öffnet Wiki-Seite standardmäßig im Lesemodus (editable=false)", () => {

@@ -44,7 +44,6 @@ interface WikiPageFormProps {
   inline?: boolean;
   inlineChrome?: "embedded" | "standalone";
   onDelete?: (page: WikiPage) => void;
-  onDirtyChange?: (dirty: boolean) => void;
   /** Controls read/edit mode for inline wiki pages. Defaults to false when inline, true otherwise. */
   editable?: boolean;
   /** Called when the user clicks the Edit button in read mode. */
@@ -66,7 +65,7 @@ const tabs: Array<Tab<WikiPageFormTab>> = [
   { value: "journal", label: "Journal" }
 ];
 
-export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onAutoSave, onPostCreate, onClose, onOpenInTab, inline = false, inlineChrome = "standalone", onDelete, onDirtyChange, editable, onEdit, onNavigateToWikiPage }: WikiPageFormProps) {
+export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onAutoSave, onPostCreate, onClose, onOpenInTab, inline = false, inlineChrome = "standalone", onDelete, editable, onEdit, onNavigateToWikiPage }: WikiPageFormProps) {
   const { confirm } = useConfirm();
   const { showToast } = useToast();
   const pageId = page?.id ?? null;
@@ -138,10 +137,6 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, page?.id, parent?.id]);
 
-  useEffect(() => {
-    onDirtyChange?.(open && dirty);
-  }, [dirty, onDirtyChange, open]);
-
   const createNote = async () => {
     try {
       const note = await notes.createNote({ title: "Ohne Titel", contentJson: {} });
@@ -185,21 +180,25 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
     }
   };
 
-  const requestClose = async () => {
-    if (!dirty) {
-      onClose();
-      return;
-    }
-    const approved = await confirm({
-      title: "Änderungen verwerfen?",
-      body: "Die Wiki-Seite enthält ungespeicherte Änderungen.",
-      severity: "warn",
-      confirmLabel: "Verwerfen"
-    });
-    if (approved) {
-      onClose();
+  // Persist any pending auto-save before leaving the editor. The title only flushes
+  // on blur, so navigation triggers a final flush. No discard prompt: with auto-save
+  // there is nothing unsaved to guard against (TKT-95).
+  const flushPendingSave = async (): Promise<void> => {
+    if (page && onAutoSave && dirty) {
+      await autoSave.flush();
     }
   };
+
+  const requestClose = async () => {
+    await flushPendingSave();
+    onClose();
+  };
+
+  const navigateToWikiPage = onNavigateToWikiPage
+    ? (pageId: number) => {
+        void flushPendingSave().then(() => onNavigateToWikiPage(pageId));
+      }
+    : undefined;
 
   const visibleTabs = page
     ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
@@ -317,7 +316,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
                   parentPage={parentPageSummary}
                   selectedPages={relatedPages}
                   readOnly={!effectiveEditable}
-                  onNavigate={onNavigateToWikiPage}
+                  onNavigate={navigateToWikiPage}
                   onChange={(nextPages) => {
                     setRelatedPages(nextPages);
                     formStateRef.current = { ...formStateRef.current, relatedPages: nextPages };
@@ -336,6 +335,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
                   wikiPages={pages}
                   editable={effectiveEditable}
                   commitOnBlur={effectiveEditable}
+                  onBeforeNavigate={flushPendingSave}
                   className="min-h-[400px]"
                   fill
                   onChange={(value) => {

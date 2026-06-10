@@ -33,8 +33,10 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Check,
   Code2,
   Columns2,
+  Copy,
   FileText,
   Heading1,
   Heading2,
@@ -98,6 +100,11 @@ interface RichTextInlineFieldProps {
   wikiPages?: Array<{ id: number; title: string }>;
   /** When false, mounts TipTap in non-editable mode: no toolbar interaction. Wiki links navigate on click in both modes. */
   editable?: boolean;
+  /**
+   * Runs before a wiki link inside the content navigates away. Lets the host
+   * complete a pending auto-save first; navigation proceeds only when it resolves true.
+   */
+  onBeforeNavigate?: () => void | Promise<void>;
 }
 
 interface RichTextInlineEditorProps {
@@ -115,6 +122,7 @@ interface RichTextInlineEditorProps {
   commitOnBlur: boolean;
   liveUpdate: boolean;
   editable?: boolean;
+  onBeforeNavigate?: () => void | Promise<void>;
   onLiveChange: (html: string) => void;
   onFocusStart: (html: string) => void;
   onCommit: (html: string) => void;
@@ -216,7 +224,7 @@ function closestWikiPageAnchor(target: EventTarget | null): HTMLAnchorElement | 
   return targetElement?.closest<HTMLAnchorElement>('a[data-wiki-page-id], a[href^="wiki://"], a[href^="/wiki/"]') ?? null;
 }
 
-export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload, wikiPages, editable }: RichTextInlineFieldProps) {
+export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload, wikiPages, editable, onBeforeNavigate }: RichTextInlineFieldProps) {
   const [originalValue, setOriginalValue] = useState("");
   const hasContent = valueFormat === "markdown" ? Boolean(value?.trim()) : hasVisibleHtmlContent(value);
   const minRowsStyle = useMemo(() => (minRows ? ({ "--rich-text-field-min-rows": minRows } as React.CSSProperties) : undefined), [minRows]);
@@ -247,6 +255,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
           onImageUpload={onImageUpload}
           wikiPages={wikiPages}
           editable={editable}
+          onBeforeNavigate={onBeforeNavigate}
           fill={fill}
           commitOnBlur={commitOnBlur}
           liveUpdate={liveUpdate}
@@ -300,7 +309,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
   );
 }
 
-function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, wikiPages, editable, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
+function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, wikiPages, editable, onBeforeNavigate, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
   const cancellingRef = useRef(false);
   const [imageUploadCount, setImageUploadCount] = useState(0);
   const [hasFocus, setHasFocus] = useState(false);
@@ -496,7 +505,13 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
     const wikiPageId = getWikiPageIdFromAnchor(anchor);
     if (wikiPageId === null) return;
     event.preventDefault();
-    navigate(standalone ? withStandaloneView(`/wiki/${wikiPageId}`) : `/wiki/${wikiPageId}`);
+    const target = standalone ? withStandaloneView(`/wiki/${wikiPageId}`) : `/wiki/${wikiPageId}`;
+    if (onBeforeNavigate) {
+      // Persist any pending auto-save, then always navigate (no dirty guard, TKT-95).
+      void Promise.resolve(onBeforeNavigate()).then(() => navigate(target));
+      return;
+    }
+    navigate(target);
   };
 
   if (!editor) {
@@ -536,6 +551,17 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
   const wikiPickerRef = React.useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
   const hasTextSelection = !editor.state.selection.empty;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyHtml = async () => {
+    try {
+      await navigator.clipboard.writeText(editor.getHTML());
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      showToast({ tone: "error", title: "Kopieren fehlgeschlagen" });
+    }
+  };
 
   React.useEffect(() => {
     if (!wikiPickerOpen) return;
@@ -652,6 +678,8 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
           <Separator />
           <ToolbarButton onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} active={false} title="Formatierung entfernen" icon={<RemoveFormatting />} />
           <ToolbarButton onClick={() => editor.chain().focus().insertContent({ type: "tldraw", attrs: { snapshot: "" } }).run()} active={false} title="Zeichnung einfügen" icon={<PenLine />} />
+          <Separator />
+          <ToolbarButton onClick={() => void handleCopyHtml()} active={copied} title={copied ? "Kopiert" : "HTML kopieren"} icon={copied ? <Check /> : <Copy />} />
         </>
       ) : null}
     </div>

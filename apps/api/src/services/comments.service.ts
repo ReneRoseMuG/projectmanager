@@ -27,7 +27,7 @@ import {
   wikiPageComments,
   wikiPages
 } from "../db/schema.js";
-import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
+import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { commentRepository, type CommentRecord } from "../repositories/comment.repository.js";
 import { notFound } from "../utils/errors.js";
 import { requireNonEmpty } from "./helpers.js";
@@ -346,7 +346,7 @@ async function selectOwnerComments(database: DbClient, owner: CommentOwner): Pro
       .from(projectComments)
       .innerJoin(comments, eq(projectComments.commentId, comments.id))
       .where(eq(projectComments.projectId, owner.id))
-      .orderBy(comments.createdAt, comments.id);
+      .orderBy(...recencyOrder(comments));
   }
   if (owner.type === "task") {
     return database
@@ -354,7 +354,7 @@ async function selectOwnerComments(database: DbClient, owner: CommentOwner): Pro
       .from(taskComments)
       .innerJoin(comments, eq(taskComments.commentId, comments.id))
       .where(eq(taskComments.taskId, owner.id))
-      .orderBy(comments.createdAt, comments.id);
+      .orderBy(...recencyOrder(comments));
   }
   if (owner.type === "milestone") {
     return database
@@ -362,7 +362,7 @@ async function selectOwnerComments(database: DbClient, owner: CommentOwner): Pro
       .from(milestoneComments)
       .innerJoin(comments, eq(milestoneComments.commentId, comments.id))
       .where(eq(milestoneComments.milestoneId, owner.id))
-      .orderBy(comments.createdAt, comments.id);
+      .orderBy(...recencyOrder(comments));
   }
   if (owner.type === "feature") {
     return database
@@ -370,7 +370,7 @@ async function selectOwnerComments(database: DbClient, owner: CommentOwner): Pro
       .from(featureComments)
       .innerJoin(comments, eq(featureComments.commentId, comments.id))
       .where(eq(featureComments.featureId, owner.id))
-      .orderBy(comments.createdAt, comments.id);
+      .orderBy(...recencyOrder(comments));
   }
   if (owner.type === "useCase") {
     return database
@@ -378,7 +378,7 @@ async function selectOwnerComments(database: DbClient, owner: CommentOwner): Pro
       .from(useCaseComments)
       .innerJoin(comments, eq(useCaseComments.commentId, comments.id))
       .where(eq(useCaseComments.useCaseId, owner.id))
-      .orderBy(comments.createdAt, comments.id);
+      .orderBy(...recencyOrder(comments));
   }
   if (owner.type === "backlogItem") {
     return database
@@ -386,7 +386,7 @@ async function selectOwnerComments(database: DbClient, owner: CommentOwner): Pro
       .from(backlogItemComments)
       .innerJoin(comments, eq(backlogItemComments.commentId, comments.id))
       .where(eq(backlogItemComments.backlogItemId, owner.id))
-      .orderBy(comments.createdAt, comments.id);
+      .orderBy(...recencyOrder(comments));
   }
   if (owner.type === "wikiPage") {
     return database
@@ -394,7 +394,7 @@ async function selectOwnerComments(database: DbClient, owner: CommentOwner): Pro
       .from(wikiPageComments)
       .innerJoin(comments, eq(wikiPageComments.commentId, comments.id))
       .where(eq(wikiPageComments.wikiPageId, owner.id))
-      .orderBy(comments.createdAt, comments.id);
+      .orderBy(...recencyOrder(comments));
   }
   if (owner.type === "dayPlan") {
     return database
@@ -402,14 +402,14 @@ async function selectOwnerComments(database: DbClient, owner: CommentOwner): Pro
       .from(dayPlanComments)
       .innerJoin(comments, eq(dayPlanComments.commentId, comments.id))
       .where(eq(dayPlanComments.dayPlanId, owner.id))
-      .orderBy(comments.createdAt, comments.id);
+      .orderBy(...recencyOrder(comments));
   }
   return database
     .select(commentSelect)
     .from(ticketComments)
     .innerJoin(comments, eq(ticketComments.commentId, comments.id))
     .where(eq(ticketComments.ticketId, owner.id))
-    .orderBy(comments.createdAt, comments.id);
+    .orderBy(...recencyOrder(comments));
 }
 
 type RecentCommentOwner = { type: "project" | "milestone" | "task" | "dayPlan"; id: number };

@@ -1,7 +1,7 @@
 ﻿import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
-import { desc, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
+import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { backlogItems, milestones, projectAttachments, projectComments, projectNotes, projects, projectTasks, projectTickets, tasks, wikiPages } from "../db/schema.js";
 import { projectRepository, type ProjectRecord } from "../repositories/project.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
@@ -166,7 +166,7 @@ async function getProjectCounts(database: DbClient, projectIds: number[]): Promi
 }
 
 export async function listProjects(database: DbClient): Promise<Project[]> {
-  const rows = await database.select().from(projects).orderBy(desc(projects.createdAt));
+  const rows = await database.select().from(projects).orderBy(...recencyOrder(projects));
   const ids = rows.map((project) => project.id);
   const counts = await getProjectCounts(database, ids);
   const tagsByProject = await getProjectTagsMap(database, ids);

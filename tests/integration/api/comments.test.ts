@@ -148,7 +148,7 @@ describe("Comments API", () => {
     await supertest(app.server).post("/api/tasks/9999/comments").send({ body: "Kommentar" }).expect(404);
   });
 
-  it("GET /api/tasks/:id/comments gibt Kommentare chronologisch zurueck", async () => {
+  it("GET /api/tasks/:id/comments gibt Kommentare nach Aktualität (neueste zuerst) zurueck", async () => {
     const project = await createProject(app);
     const task = await createTask(app, project.id);
 
@@ -158,9 +158,10 @@ describe("Comments API", () => {
 
     const res = await supertest(app.server).get(`/api/tasks/${task.id}/comments`).expect(200);
 
+    // TKT-113: Kommentar-Auflistungen sind app-weit nach Aktualität sortiert (neueste zuerst).
     expect(res.body).toHaveLength(2);
-    expect(res.body[0].body).toBe("<p>Erster</p>");
-    expect(res.body[1].body).toBe("<p>Zweiter</p>");
+    expect(res.body[0].body).toBe("<p>Zweiter</p>");
+    expect(res.body[1].body).toBe("<p>Erster</p>");
   });
 
   it("PATCH /api/comments/:id aktualisiert einen Kommentar versioniert", async () => {

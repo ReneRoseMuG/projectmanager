@@ -2,6 +2,9 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 10.06.26 | 17:00:24 | Fix/Feature | MS-56 Wiki-Export (Umlaute/Bilder/Links), Autosave-Navigation, Editor-Copy + Input-Autocomplete | ✅ |
+| 10.06.26 | 16:02:46 | Fix | TKT-95 Auto-Save vor Navigationsvorgang abschließen | ✅ |
+| 10.06.26 | 15:27:34 | Fix | Rich-Text-Inline-Field Unit-Tests nachgeführt (T-14b/T-22/T-27 + Mark-Buttons) | ✅ |
 | 10.06.26 | 15:24:14 | Fix | TKT-98 Wiki Dateiupload Tab-Reset | ✅ |
 | 10.06.26 | 15:11:19 | Fix | TKT-89 Textstile Wort-Scope (Fett/Kursiv/U/Strike) | ✅ |
 | 10.06.26 | 14:22:06 | Fix | TKT-101 Feature doppeltes Parent entfernt | ✅ |

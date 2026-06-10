@@ -23,9 +23,11 @@
  * - Fehler beim Save setzen Status auf "error" und liefern errorMessage.
  * - flush() ist ohne Effekt wenn enabled=false.
  * - Nach Unmount wird kein State mehr gesetzt.
+ * - flush() ist awaitbar: löst zu true (gespeichert / nichts zu tun) bzw. false (Fehler) auf.
+ * - Ein flush() während eines laufenden Saves löst erst nach dem nachgelagerten Save auf.
  *
  * Fehlerfälle:
- * - save() wirft → status wird "error", errorMessage enthält die Nachricht.
+ * - save() wirft → status wird "error", errorMessage enthält die Nachricht, flush() → false.
  * - Zweites flush() während erstem Save löst nach Abschluss einen zweiten Save aus.
  *
  * Ziel:
@@ -149,5 +151,74 @@ describe("useAutoSave", () => {
 
     expect(saveV1).not.toHaveBeenCalled();
     expect(saveV2).toHaveBeenCalledTimes(1);
+  });
+
+  it("flush() löst zu true auf wenn der Save erfolgreich ist", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave({ enabled: true, save }));
+
+    let resolved: boolean | undefined;
+    await act(async () => {
+      resolved = await result.current.flush();
+    });
+
+    expect(resolved).toBe(true);
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it("flush() löst zu false auf wenn der Save fehlschlägt", async () => {
+    const save = vi.fn().mockRejectedValue(new Error("Speicherfehler"));
+    const { result } = renderHook(() => useAutoSave({ enabled: true, save }));
+
+    let resolved: boolean | undefined;
+    await act(async () => {
+      resolved = await result.current.flush();
+    });
+
+    expect(resolved).toBe(false);
+    expect(result.current.status).toBe("error");
+  });
+
+  it("flush() löst sofort zu true auf wenn enabled=false (nichts zu speichern)", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave({ enabled: false, save }));
+
+    let resolved: boolean | undefined;
+    await act(async () => {
+      resolved = await result.current.flush();
+    });
+
+    expect(resolved).toBe(true);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("flush() während eines laufenden Saves löst erst nach dem nachgelagerten Save auf", async () => {
+    let resolveFirst!: () => void;
+    const firstSave = new Promise<void>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const save = vi.fn().mockReturnValueOnce(firstSave).mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave({ enabled: true, save }));
+
+    let firstFlush!: Promise<boolean>;
+    act(() => {
+      firstFlush = result.current.flush();
+    });
+    expect(result.current.status).toBe("saving");
+
+    let secondFlush!: Promise<boolean>;
+    act(() => {
+      secondFlush = result.current.flush();
+    });
+
+    let secondResolved: boolean | undefined;
+    await act(async () => {
+      resolveFirst();
+      secondResolved = await secondFlush;
+    });
+
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(secondResolved).toBe(true);
+    expect(await firstFlush).toBe(true);
   });
 });
