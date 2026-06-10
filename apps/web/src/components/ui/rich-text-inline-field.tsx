@@ -518,7 +518,7 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
       onClick={handleContainerClick}
     >
       {toolbar !== "none" ? (
-        <div className={cn("sticky top-0 z-10", editable === false ? "invisible pointer-events-none" : undefined)}>
+        <div className={cn("sticky top-0 z-10 border-b border-line bg-white", editable === false ? "invisible pointer-events-none" : undefined)}>
           <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} wikiPages={wikiPages} />
         </div>
       ) : null}
