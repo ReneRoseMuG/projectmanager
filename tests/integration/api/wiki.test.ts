@@ -16,7 +16,9 @@
  * Abgedeckte Regeln:
  * - Wiki-Seiten können als Root- und Unterseiten angelegt werden.
  * - Content wird DB-first gespeichert und gelesen.
- * - Der HTML-Export schreibt interne Wiki-Links als relative Dateisystem-Links.
+ * - Der HTML-Export schreibt interne Wiki-Links als relative Dateisystem-Links (real auflösend).
+ * - Der Export erhält Umlaute in Datei-/Verzeichnisnamen und im Inhalt (keine Transliteration).
+ * - Der Export kopiert intern (DB) gespeicherte Bilder nach assets/images und schreibt src relativ um.
  * - Parent-Wechsel verhindern eigene Nachfahren als Ziel.
  * - Legacy-Dateipfade bleiben als Fallback lesbar.
  * - Seiten mit Unterseiten sind vor direktem Löschen geschützt.
@@ -263,7 +265,7 @@ describe("Wiki API", () => {
     expect(ticketLink).toBeUndefined();
   });
 
-  it("Export schreibt Wiki-Seiten-Links als relative HTML-Dateipfade", async () => {
+  it("Export schreibt Wiki-Seiten-Links als relative HTML-Dateipfade (TKT-97)", async () => {
     const exportRoot = await fs.mkdtemp(path.join(os.tmpdir(), "projekt-manager-wiki-export-"));
     try {
       const target = await createWikiPage(app, { title: "Ziel Seite" });
@@ -278,10 +280,85 @@ describe("Wiki API", () => {
         .expect(200);
 
       expect(res.body.filesWritten).toBe(2);
-      const exportedSource = await fs.readFile(path.join(exportRoot, "quell-seite", "index.html"), "utf-8");
-      expect(exportedSource).toContain('href="ziel-seite/index.html"');
+      const sourceFile = path.join(exportRoot, "Quell Seite", "index.html");
+      const exportedSource = await fs.readFile(sourceFile, "utf-8");
+      // Eine Ebene hoch zur Zielseite, Leerzeichen prozentkodiert.
+      expect(exportedSource).toContain('href="../Ziel%20Seite/index.html"');
       expect(exportedSource).not.toContain(`href="/wiki/${target.id}"`);
       expect(exportedSource).not.toContain(`href="wiki://${target.id}"`);
+
+      // Der relative Link löst real auf eine existierende Zieldatei auf.
+      const resolved = path.resolve(path.dirname(sourceFile), "../Ziel Seite/index.html");
+      expect(resolved).toBe(path.join(exportRoot, "Ziel Seite", "index.html"));
+      await expect(fs.access(resolved)).resolves.toBeUndefined();
+    } finally {
+      await fs.rm(exportRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("Export erhält Umlaute in Datei-/Verzeichnisnamen und im Inhalt (TKT-96)", async () => {
+    const exportRoot = await fs.mkdtemp(path.join(os.tmpdir(), "projekt-manager-wiki-export-"));
+    try {
+      await createWikiPage(app, {
+        title: "Über Ärger",
+        content: "<p>Größe und Spaß: ä ö ü ß Ä Ö Ü</p>"
+      });
+
+      await supertest(app.server).post("/api/wiki/export").send({ exportPath: exportRoot }).expect(200);
+
+      const exported = await fs.readFile(path.join(exportRoot, "Über Ärger", "index.html"), "utf-8");
+      expect(exported).toContain("Größe und Spaß: ä ö ü ß Ä Ö Ü");
+      expect(exported).toContain("<title>Über Ärger</title>");
+      expect(exported).toContain("Über Ärger</h1>");
+
+      // Keine Transliteration: der alte ASCII-Slug darf nicht entstehen.
+      await expect(fs.access(path.join(exportRoot, "ueber-aerger"))).rejects.toThrow();
+    } finally {
+      await fs.rm(exportRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("Export kopiert interne Bilder nach assets/images und schreibt src relativ um (TKT-100)", async () => {
+    const exportRoot = await fs.mkdtemp(path.join(os.tmpdir(), "projekt-manager-wiki-export-"));
+    try {
+      const bytesA = Buffer.from("fake-png-bytes-A");
+      const bytesB = Buffer.from("fake-png-bytes-B");
+      const usedA = await supertest(app.server)
+        .post("/api/content/images")
+        .attach("file", bytesA, { filename: "a.png", contentType: "image/png" })
+        .expect(201);
+      const usedB = await supertest(app.server)
+        .post("/api/content/images")
+        .attach("file", bytesB, { filename: "b.png", contentType: "image/png" })
+        .expect(201);
+      const unused = await supertest(app.server)
+        .post("/api/content/images")
+        .attach("file", Buffer.from("unused-image"), { filename: "u.png", contentType: "image/png" })
+        .expect(201);
+
+      const idA = usedA.body.url.split("/").pop();
+      const idB = usedB.body.url.split("/").pop();
+      const idUnused = unused.body.url.split("/").pop();
+
+      await createWikiPage(app, {
+        title: "Bilder",
+        content: `<p><img src="${usedA.body.url}"><img src="${usedB.body.url}"></p>`
+      });
+
+      await supertest(app.server).post("/api/wiki/export").send({ exportPath: exportRoot }).expect(200);
+
+      // Beide referenzierten Bilder liegen mit Originalbytes im assets-Verzeichnis.
+      expect(await fs.readFile(path.join(exportRoot, "assets", "images", `${idA}.png`))).toEqual(bytesA);
+      expect(await fs.readFile(path.join(exportRoot, "assets", "images", `${idB}.png`))).toEqual(bytesB);
+
+      // src ist relativ umgeschrieben, kein interner API-Verweis bleibt übrig.
+      const exported = await fs.readFile(path.join(exportRoot, "Bilder", "index.html"), "utf-8");
+      expect(exported).toContain(`src="../assets/images/${idA}.png"`);
+      expect(exported).toContain(`src="../assets/images/${idB}.png"`);
+      expect(exported).not.toContain("/content/images/");
+
+      // Ungenutztes DB-Bild wird nicht exportiert.
+      await expect(fs.access(path.join(exportRoot, "assets", "images", `${idUnused}.png`))).rejects.toThrow();
     } finally {
       await fs.rm(exportRoot, { recursive: true, force: true });
     }

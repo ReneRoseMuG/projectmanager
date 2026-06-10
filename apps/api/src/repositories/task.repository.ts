@@ -1,6 +1,6 @@
 ﻿import { eq, inArray, isNull } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
-import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
+import { firstRow, insertId, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { tasks } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -22,11 +22,11 @@ export const taskRepository = {
   },
 
   async findRootTasks(database: DbSession): Promise<TaskRecord[]> {
-    return database.select().from(tasks).where(isNull(tasks.parentId)).orderBy(tasks.status, tasks.updatedAt);
+    return database.select().from(tasks).where(isNull(tasks.parentId)).orderBy(tasks.status, ...recencyOrder(tasks));
   },
 
   async findChildren(database: DbSession, parentId: number): Promise<TaskRecord[]> {
-    return database.select().from(tasks).where(eq(tasks.parentId, parentId)).orderBy(tasks.createdAt, tasks.id);
+    return database.select().from(tasks).where(eq(tasks.parentId, parentId)).orderBy(tasks.status, ...recencyOrder(tasks));
   },
 
   async findByIds(database: DbSession, ids: number[]): Promise<TaskRecord[]> {

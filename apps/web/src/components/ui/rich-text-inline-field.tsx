@@ -33,8 +33,10 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Check,
   Code2,
   Columns2,
+  Copy,
   FileText,
   Heading1,
   Heading2,
@@ -98,6 +100,11 @@ interface RichTextInlineFieldProps {
   wikiPages?: Array<{ id: number; title: string }>;
   /** When false, mounts TipTap in non-editable mode: no toolbar interaction. Wiki links navigate on click in both modes. */
   editable?: boolean;
+  /**
+   * Runs before a wiki link inside the content navigates away. Lets the host
+   * complete a pending auto-save first; navigation proceeds only when it resolves true.
+   */
+  onBeforeNavigate?: () => void | Promise<void>;
 }
 
 interface RichTextInlineEditorProps {
@@ -115,6 +122,7 @@ interface RichTextInlineEditorProps {
   commitOnBlur: boolean;
   liveUpdate: boolean;
   editable?: boolean;
+  onBeforeNavigate?: () => void | Promise<void>;
   onLiveChange: (html: string) => void;
   onFocusStart: (html: string) => void;
   onCommit: (html: string) => void;
@@ -216,7 +224,7 @@ function closestWikiPageAnchor(target: EventTarget | null): HTMLAnchorElement | 
   return targetElement?.closest<HTMLAnchorElement>('a[data-wiki-page-id], a[href^="wiki://"], a[href^="/wiki/"]') ?? null;
 }
 
-export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload, wikiPages, editable }: RichTextInlineFieldProps) {
+export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload, wikiPages, editable, onBeforeNavigate }: RichTextInlineFieldProps) {
   const [originalValue, setOriginalValue] = useState("");
   const hasContent = valueFormat === "markdown" ? Boolean(value?.trim()) : hasVisibleHtmlContent(value);
   const minRowsStyle = useMemo(() => (minRows ? ({ "--rich-text-field-min-rows": minRows } as React.CSSProperties) : undefined), [minRows]);
@@ -247,6 +255,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
           onImageUpload={onImageUpload}
           wikiPages={wikiPages}
           editable={editable}
+          onBeforeNavigate={onBeforeNavigate}
           fill={fill}
           commitOnBlur={commitOnBlur}
           liveUpdate={liveUpdate}
@@ -300,7 +309,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
   );
 }
 
-function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, wikiPages, editable, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
+function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, wikiPages, editable, onBeforeNavigate, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
   const cancellingRef = useRef(false);
   const [imageUploadCount, setImageUploadCount] = useState(0);
   const [hasFocus, setHasFocus] = useState(false);
@@ -496,7 +505,13 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
     const wikiPageId = getWikiPageIdFromAnchor(anchor);
     if (wikiPageId === null) return;
     event.preventDefault();
-    navigate(standalone ? withStandaloneView(`/wiki/${wikiPageId}`) : `/wiki/${wikiPageId}`);
+    const target = standalone ? withStandaloneView(`/wiki/${wikiPageId}`) : `/wiki/${wikiPageId}`;
+    if (onBeforeNavigate) {
+      // Persist any pending auto-save, then always navigate (no dirty guard, TKT-95).
+      void Promise.resolve(onBeforeNavigate()).then(() => navigate(target));
+      return;
+    }
+    navigate(target);
   };
 
   if (!editor) {
@@ -518,7 +533,7 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
       onClick={handleContainerClick}
     >
       {toolbar !== "none" ? (
-        <div className={cn("sticky top-0 z-10", editable === false ? "invisible pointer-events-none" : undefined)}>
+        <div className={cn("sticky top-0 z-10 border-b border-line bg-white", editable === false ? "invisible pointer-events-none" : undefined)}>
           <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} wikiPages={wikiPages} />
         </div>
       ) : null}
@@ -536,6 +551,17 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
   const wikiPickerRef = React.useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
   const hasTextSelection = !editor.state.selection.empty;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyHtml = async () => {
+    try {
+      await navigator.clipboard.writeText(editor.getHTML());
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      showToast({ tone: "error", title: "Kopieren fehlgeschlagen" });
+    }
+  };
 
   React.useEffect(() => {
     if (!wikiPickerOpen) return;
@@ -566,10 +592,10 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
           <Separator />
         </>
       ) : null}
-      <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Fett" icon={<Bold />} />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Kursiv" icon={<Italic />} />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Unterstrichen" icon={<UnderlineIcon />} />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive("strike")} title="Durchgestrichen" icon={<Strikethrough />} />
+      <ToolbarButton onClick={() => toggleSelectionMark(editor, "bold")} active={editor.isActive("bold")} title="Fett" icon={<Bold />} />
+      <ToolbarButton onClick={() => toggleSelectionMark(editor, "italic")} active={editor.isActive("italic")} title="Kursiv" icon={<Italic />} />
+      <ToolbarButton onClick={() => toggleSelectionMark(editor, "underline")} active={editor.isActive("underline")} title="Unterstrichen" icon={<UnderlineIcon />} />
+      <ToolbarButton onClick={() => toggleSelectionMark(editor, "strike")} active={editor.isActive("strike")} title="Durchgestrichen" icon={<Strikethrough />} />
       <ToolbarButton onClick={() => toggleSelectionHighlight(editor)} active={hasTextSelection && editor.isActive("highlight")} disabled={!hasTextSelection} title="Hervorheben" icon={<Highlighter />} />
       <Separator />
       <ToolbarButton onClick={() => editor.chain().focus().setParagraph().run()} active={editor.isActive("paragraph")} title="Absatz" icon={<Text />} />
@@ -652,6 +678,8 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
           <Separator />
           <ToolbarButton onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} active={false} title="Formatierung entfernen" icon={<RemoveFormatting />} />
           <ToolbarButton onClick={() => editor.chain().focus().insertContent({ type: "tldraw", attrs: { snapshot: "" } }).run()} active={false} title="Zeichnung einfügen" icon={<PenLine />} />
+          <Separator />
+          <ToolbarButton onClick={() => void handleCopyHtml()} active={copied} title={copied ? "Kopiert" : "HTML kopieren"} icon={copied ? <Check /> : <Copy />} />
         </>
       ) : null}
     </div>
@@ -675,6 +703,26 @@ function getSelectionRange(editor: Editor): { from: number; to: number } | null 
   const { from, to, empty } = editor.state.selection;
   if (empty) return null;
   return { from, to };
+}
+
+// Toolbar marks must follow the visible DOM selection, not editor.state.selection,
+// which can be stale after a toolbar interaction and otherwise spreads the mark
+// across the whole block. Mirrors the highlight handler's range-based approach.
+function toggleSelectionMark(editor: Editor, markName: string) {
+  const range = getSelectionRange(editor);
+  if (!range) {
+    editor.chain().focus().toggleMark(markName).run();
+    return;
+  }
+
+  const markType = editor.state.schema.marks[markName];
+  if (!markType) return;
+
+  const hasMark = editor.state.doc.rangeHasMark(range.from, range.to, markType);
+  const transaction = hasMark
+    ? editor.state.tr.removeMark(range.from, range.to, markType)
+    : editor.state.tr.addMark(range.from, range.to, markType.create());
+  editor.view.dispatch(transaction);
 }
 
 function toggleSelectionHighlight(editor: Editor) {

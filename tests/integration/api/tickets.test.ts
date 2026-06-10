@@ -291,6 +291,36 @@ describe("Tickets API", () => {
     expect(milestoneTickets.body.find((ticket: { id: number }) => ticket.id === duplicateTicket.id).visibleParent).toMatchObject({ type: "milestone", id: milestone.id, origin: "direct" });
   });
 
+  it("GET /api/projects/:id/tickets sortiert innerhalb einer Statusgruppe nach Aktualität statt nach Position", async () => {
+    // TKT-113: Tickets werden in Auflistungen nach updatedAt, dann createdAt absteigend sortiert
+    // — nicht mehr nach dem manuellen position-Feld. ticketA wird zuerst erstellt (niedrigere
+    // Position); unter der alten Positions-Sortierung käme es zuerst, unter Aktualität zuletzt.
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const project = await createProject(app, { name: "Ticket-Sortierung" });
+    const ticketA = await createTicket(app, project.id, { title: "Älter", status: "open" });
+    await delay(10);
+    const ticketB = await createTicket(app, project.id, { title: "Neuer", status: "open" });
+
+    const order = async (): Promise<number[]> => {
+      const res = await supertest(app.server).get(`/api/projects/${project.id}/tickets`).expect(200);
+      return (res.body as TestTicket[])
+        .filter((ticket) => ticket.status === "open" && (ticket.id === ticketA.id || ticket.id === ticketB.id))
+        .map((ticket) => ticket.id);
+    };
+
+    // Frisch erstellt: neueres Ticket (ticketB) steht vor dem älteren (ticketA).
+    expect(await order()).toEqual([ticketB.id, ticketA.id]);
+
+    await delay(10);
+    await supertest(app.server)
+      .patch(`/api/tickets/${ticketA.id}`)
+      .send({ title: "Älter, aber gerade bearbeitet", expectedVersion: ticketA.version })
+      .expect(200);
+
+    // Nach dem Update führt ticketA, weil updatedAt vor createdAt sortiert wird.
+    expect(await order()).toEqual([ticketA.id, ticketB.id]);
+  });
+
   it("owner ticket lists stay isolated until an explicit link is created", async () => {
     const owners = await createOwners();
     const projectOwner = owners[0];

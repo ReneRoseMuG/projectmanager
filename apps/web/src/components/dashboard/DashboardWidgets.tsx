@@ -749,10 +749,12 @@ function TaskBoardWidget({
   tasks,
   mode,
   onOpen,
+  onStatusChange,
 }: {
   tasks: Task[] | undefined;
   mode: "kanban" | "list";
   onOpen: (task: Task) => void;
+  onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>;
 }) {
   return (
     <TaskListBoardView
@@ -762,9 +764,43 @@ function TaskBoardWidget({
       onAdd={() => undefined}
       onOpen={onOpen}
       onDelete={() => undefined}
+      onStatusChange={onStatusChange}
       readOnly
     />
   );
+}
+
+/** Day-Plan-Variante des Aufgaben-Widgets: erlaubt den Statuswechsel direkt auf der Karte. */
+function DayPlanTaskBoardWidget({
+  tasks,
+  mode,
+  dayPlanDate,
+  onOpen,
+}: {
+  tasks: Task[] | undefined;
+  mode: "kanban" | "list";
+  dayPlanDate?: string;
+  onOpen: (task: Task) => void;
+}) {
+  const { showToast } = useToast();
+  const canWriteTasks = useHasPermission("tasks", "write");
+  const canWriteDayPlans = useHasPermission("dayPlans", "write");
+  const dayPlan = useDayPlan(dayPlanDate ?? "", Boolean(dayPlanDate));
+  const canEditStatus = canWriteTasks && canWriteDayPlans && Boolean(dayPlanDate);
+
+  const handleStatusChange = canEditStatus
+    ? async (task: Task, status: Task["status"]) => {
+        try {
+          await dayPlan.updateTask(task.id, { status, expectedVersion: task.version });
+          showToast({ tone: "success", title: "Aufgabe aktualisiert" });
+        } catch (taskError) {
+          showToast({ tone: "error", title: "Aufgabe konnte nicht aktualisiert werden", message: errorMessage(taskError) });
+          throw taskError;
+        }
+      }
+    : undefined;
+
+  return <TaskBoardWidget tasks={tasks} mode={mode} onOpen={onOpen} onStatusChange={handleStatusChange} />;
 }
 
 function TicketBoardWidget({
@@ -839,7 +875,8 @@ export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: Das
   const returnTo = `${location.pathname}${location.search}`;
   const usesOwnData = widget.widgetId === "calendar" || widget.widgetId === "upcomingEvents";
   const query = useDashboardWidgetData(widget, owner, !usesOwnData);
-  const dayPlanAction = context === "dayPlan" && owner?.type === "dayPlan" ? <DayPlanWidgetAction widget={widget} owner={owner} context={context} dayPlanDate={dayPlanDate} /> : undefined;
+  const isDayPlanContext = context === "dayPlan" && owner?.type === "dayPlan";
+  const dayPlanAction = isDayPlanContext ? <DayPlanWidgetAction widget={widget} owner={owner} context={context} dayPlanDate={dayPlanDate} /> : undefined;
   const navigateToDetail = (type: "task" | "ticket" | "milestone" | "project", id: number) => {
     navigate(dashboardDetailPath(type, id, returnTo));
   };
@@ -904,8 +941,20 @@ export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: Das
       {widget.widgetId === "attachmentJournal" ? <AttachmentRows attachments={query.data as RecentAttachment[] | undefined} /> : null}
       {widget.widgetId === "milestoneProgress" ? <MilestoneRows milestones={query.data as Milestone[] | undefined} /> : null}
       {widget.widgetId === "overdueTasks" ? <TaskRows tasks={query.data as Task[] | undefined} emptyTitle="Keine überfälligen Aufgaben" /> : null}
-      {widget.widgetId === "taskBoard" ? <TaskBoardWidget tasks={query.data as Task[] | undefined} mode="kanban" onOpen={(task) => navigateToDetail("task", task.id)} /> : null}
-      {widget.widgetId === "taskList" ? <TaskBoardWidget tasks={query.data as Task[] | undefined} mode="list" onOpen={(task) => navigateToDetail("task", task.id)} /> : null}
+      {widget.widgetId === "taskBoard" ? (
+        isDayPlanContext ? (
+          <DayPlanTaskBoardWidget tasks={query.data as Task[] | undefined} mode="kanban" dayPlanDate={dayPlanDate} onOpen={(task) => navigateToDetail("task", task.id)} />
+        ) : (
+          <TaskBoardWidget tasks={query.data as Task[] | undefined} mode="kanban" onOpen={(task) => navigateToDetail("task", task.id)} />
+        )
+      ) : null}
+      {widget.widgetId === "taskList" ? (
+        isDayPlanContext ? (
+          <DayPlanTaskBoardWidget tasks={query.data as Task[] | undefined} mode="list" dayPlanDate={dayPlanDate} onOpen={(task) => navigateToDetail("task", task.id)} />
+        ) : (
+          <TaskBoardWidget tasks={query.data as Task[] | undefined} mode="list" onOpen={(task) => navigateToDetail("task", task.id)} />
+        )
+      ) : null}
       {widget.widgetId === "ticketBoard" ? <TicketBoardWidget tickets={query.data as Ticket[] | undefined} mode="kanban" onOpen={(ticket) => navigateToDetail("ticket", ticket.id)} /> : null}
       {widget.widgetId === "ticketList" ? <TicketBoardWidget tickets={query.data as Ticket[] | undefined} mode="list" onOpen={(ticket) => navigateToDetail("ticket", ticket.id)} /> : null}
       {widget.widgetId === "milestoneBoard" ? <MilestoneBoardWidget milestones={query.data as Milestone[] | undefined} mode="kanban" onOpen={(milestone) => navigateToDetail("milestone", milestone.id)} /> : null}

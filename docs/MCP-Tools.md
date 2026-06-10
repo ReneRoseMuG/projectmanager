@@ -1,6 +1,6 @@
 # MCP-Tools
 
-**Stand:** 29.05.26
+**Stand:** 09.06.26
 
 Diese Übersicht beschreibt die aktuell verfügbaren MCP-Tools des Projekt-Managers. Die Tools sind für Clients wie Claude Desktop oder ChatGPT gedacht und laufen gegen die bestehenden API-Routen der App.
 
@@ -49,10 +49,12 @@ Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt u
 
 | Tool | Zweck | Wichtige Eingaben | Ergebnis |
 |---|---|---|---|
-| `add_task_to_parent` | Legt eine Aufgabe an einem Projekt oder Meilenstein an und befüllt Stammdatenfelder. | `parentType`, `parentId`, `title`, optional `description`, `status`, `priority`, `assignee`, `dueDate` | Neue Aufgabe |
+| `create_project` | Legt ein neues Projekt mit Stammdaten an. | `name`, optional `description`, `status`, `color`, `startDate`, `dueDate`, `responsibleUserId` | Neues Projekt |
+| `create_milestone` | Legt einen neuen Meilenstein unter einem Projekt an. | `projectId`, `name`, optional `description`, `status`, `color`, `startDate`, `dueDate`, `responsibleUserId` | Neuer Meilenstein |
+| `add_task_to_parent` | Legt eine Aufgabe an einem Projekt oder Meilenstein an und befüllt Stammdatenfelder. | `parentType`, `parentId`, `title`, optional `description`, `status`, `priority`, `responsibleUserId`, `dueDate` | Neue Aufgabe |
 | `add_task_list_to_parent` | Legt mehrere Aufgaben seriell an einem Projekt, Meilenstein, Feature oder Use Case an. | `parentType`, `parentId`, `tasks[]`, je Aufgabe optional `attachment` mit `fileName`, `contentBase64`, `mimetype` | Bulk-Ergebnis mit neuen Aufgaben und optionalen Attachments |
-| `assign_editorial_task` | Vergibt eine redaktionelle Aufgabe als normale Aufgabe mit Briefing. | `parentType`, `parentId`, `title`, `editorialBrief`, optional `status`, `priority`, `assignee`, `dueDate` | Neue Aufgabe |
-| `add_ticket_to_parent` | Legt ein Ticket an einem Projekt oder Meilenstein an und befüllt Stammdatenfelder. | `parentType`, `parentId`, `title`, optional `type`, `description`, `status`, `priority`, `reporter`, `assignee`, `environment`, `affectedVersion`, `dueDate` | Neues Ticket |
+| `assign_editorial_task` | Vergibt eine redaktionelle Aufgabe als normale Aufgabe mit Briefing. | `parentType`, `parentId`, `title`, `editorialBrief`, optional `status`, `priority`, `responsibleUserId`, `dueDate` | Neue Aufgabe |
+| `add_ticket_to_parent` | Legt ein Ticket an einem Projekt oder Meilenstein an und befüllt Stammdatenfelder. | `parentType`, `parentId`, `title`, optional `type`, `description`, `status`, `priority`, `reporterUserId`, `responsibleUserId`, `environment`, `affectedVersion`, `dueDate` | Neues Ticket |
 | `add_ticket_list_to_parent` | Legt mehrere Tickets seriell an einem Projekt, Meilenstein, Task, Feature oder Use Case an. | `parentType`, `parentId`, `tickets[]`, je Ticket optional `attachment` mit `fileName`, `contentBase64`, `mimetype` | Bulk-Ergebnis mit neuen Tickets und optionalen Attachments |
 | `add_comment_to_parent` | Legt einen Kommentar an Projekt, Meilenstein, Aufgabe, Ticket, Feature oder Use Case an. | `parentType`, `parentId`, `body` | Neuer Kommentar |
 | `add_comments_to_parent` | Legt mehrere Kommentare seriell an Projekt, Meilenstein, Aufgabe, Ticket, Feature oder Use Case an. | `parentType`, `parentId`, `comments[]` mit `body` | Bulk-Ergebnis mit neuen Kommentaren |
@@ -60,28 +62,32 @@ Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt u
 | `add_notes_to_parent` | Legt mehrere Textnotizen seriell an Projekt, Meilenstein, Aufgabe oder Ticket an. | `parentType`, `parentId`, `notes[]` mit optional `title` und `text` | Bulk-Ergebnis mit neuen Notizen |
 | `add_attachment_to_parent` | Hängt eine Base64-codierte Datei an Projekt, Meilenstein, Aufgabe, Feature oder Ticket an. | `parentType`, `parentId`, `fileName`, `contentBase64`, optional `mimetype` | Neues Attachment |
 | `add_attachments_to_parent` | Hängt mehrere Base64-codierte Dateien seriell an Projekt, Meilenstein, Aufgabe, Feature oder Ticket an. | `parentType`, `parentId`, `attachments[]` mit `fileName`, `contentBase64`, optional `mimetype` | Bulk-Ergebnis mit neuen Attachments |
-| `create_feature` | Erstellt ein neues Feature mit Beschreibung und optionalem Content. | `title`, optional `description`, `content`, `status` | Neues Feature |
-| `create_use_case` | Erstellt einen neuen Use Case unter einem Feature. | `featureId`, `title`, optional `description`, `content`, `status` | Neuer Use Case |
-| `add_task_to_use_case` | Legt eine Aufgabe an einem Use Case an. | `useCaseId`, `title`, optional `description`, `status`, `priority`, `assignee`, `dueDate` | Neue Aufgabe |
-| `add_ticket_to_use_case` | Legt ein Ticket an einem Use Case an. | `useCaseId`, `title`, optional `type`, `description`, `status`, `priority`, `reporter`, `assignee`, `environment`, `affectedVersion`, `dueDate` | Neues Ticket |
+| `create_feature` | Erstellt ein neues Feature mit Beschreibung und optionalem Content. | `title`, optional `description`, `content`, `status`, `sortOrder`, `responsibleUserId` | Neues Feature |
+| `create_use_case` | Erstellt einen neuen Use Case unter einem Feature. | `featureId`, `title`, optional `description`, `content`, `status`, `sortOrder`, `responsibleUserId` | Neuer Use Case |
+| `add_task_to_use_case` | Legt eine Aufgabe an einem Use Case an. | `useCaseId`, `title`, optional `description`, `status`, `priority`, `responsibleUserId` | Neue Aufgabe |
+| `add_ticket_to_use_case` | Legt ein Ticket an einem Use Case an. | `useCaseId`, `title`, optional `description`, `status`, `priority`, `responsibleUserId` | Neues Ticket |
 
 Bulk-Tools laufen seriell und liefern kein einzelnes Objekt, sondern ein Ergebnis mit `requested`, `createdCount`, `errorCount`, `created[]` und `errors[]`. Wenn bei einer kombinierten Task-/Ticket-Anlage der optionale Attachment-Upload nach erfolgreicher Objektanlage fehlschlägt, bleibt das neue Objekt bestehen und der Attachment-Fehler wird im Ergebnis gemeldet.
 
-## Redaktion und Inhaltsüberarbeitung
+## Aktualisieren
+
+Die Update-Tools überarbeiten komplette Stammdaten samt Beschreibung beziehungsweise Content versionsgeschützt. Alle Felder außer `id` sind optional; nur übergebene Felder werden geändert.
 
 | Tool | Zweck | Wichtige Eingaben | Ergebnis |
 |---|---|---|---|
-| `update_project_description` | Überarbeitet die Projektbeschreibung versionsgeschützt. | `id`, `description` | Aktualisiertes Projekt |
-| `update_milestone_description` | Überarbeitet die Meilensteinbeschreibung versionsgeschützt. | `id`, `description` | Aktualisierter Meilenstein |
-| `update_task_description` | Überarbeitet die Aufgabenbeschreibung versionsgeschützt. | `id`, `description` | Aktualisierte Aufgabe |
-| `update_ticket_description` | Überarbeitet die Ticketbeschreibung versionsgeschützt. | `id`, `description` | Aktualisiertes Ticket |
-| `update_feature_content` | Überarbeitet Feature-Beschreibung und/oder Feature-Content versionsgeschützt. | `id`, optional `description`, `content` | Aktualisiertes Feature |
-| `update_use_case_content` | Überarbeitet Use-Case-Beschreibung und/oder Use-Case-Content versionsgeschützt. | `id`, optional `description`, `content` | Aktualisierter Use Case |
+| `update_project` | Aktualisiert Projektstammdaten und Beschreibung versionsgeschützt. | `id`, optional `name`, `description`, `status`, `color`, `startDate`, `dueDate`, `responsibleUserId` | Aktualisiertes Projekt |
+| `update_milestone` | Aktualisiert Meilenstein-Stammdaten und Beschreibung versionsgeschützt. | `id`, optional `name`, `description`, `status`, `color`, `startDate`, `dueDate` | Aktualisierter Meilenstein |
+| `update_task` | Aktualisiert Aufgabenstammdaten und Beschreibung versionsgeschützt. | `id`, optional `title`, `description`, `status`, `priority`, `responsibleUserId`, `dueDate` | Aktualisierte Aufgabe |
+| `update_ticket` | Aktualisiert Ticketstammdaten, Beschreibung und Lösung versionsgeschützt. | `id`, optional `title`, `type`, `description`, `status`, `priority`, `reporterUserId`, `responsibleUserId`, `environment`, `affectedVersion`, `dueDate`, `resolution` | Aktualisiertes Ticket |
+| `update_feature` | Aktualisiert Feature-Stammdaten, Beschreibung und Content versionsgeschützt. | `id`, optional `title`, `status`, `description`, `content`, `sortOrder`, `responsibleUserId` | Aktualisiertes Feature |
+| `update_use_case` | Aktualisiert Use-Case-Stammdaten, Feature-Zuordnung, Beschreibung und Content versionsgeschützt. | `id`, optional `title`, `status`, `description`, `content`, `sortOrder`, `responsibleUserId`, `featureId` | Aktualisierter Use Case |
 
 ## Verknüpfungen
 
 | Tool | Zweck | Wichtige Eingaben | Ergebnis |
 |---|---|---|---|
+| `link_task_to_parent` | Verknüpft eine bestehende Aufgabe mit einem Projekt, Meilenstein, Feature oder Use Case, ohne sie neu anzulegen. | `parentType`, `parentId`, `taskId` | Verknüpfte Aufgabe |
+| `link_ticket_to_parent` | Verknüpft ein bestehendes Ticket mit einem Projekt, Meilenstein, Feature oder Use Case, ohne es neu anzulegen. | `parentType`, `parentId`, `ticketId` | Verknüpftes Ticket |
 | `link_feature_to_parent` | Verknüpft ein Feature mit einem Projekt oder Meilenstein, ohne bestehende Feature-Links zu entfernen. | `parentType`, `parentId`, `featureId` | Aktuelle Featureliste des Parents |
 
 ## Löschen
@@ -122,6 +128,8 @@ Löschungen sind destruktiv. Offene Relationen (z. B. Ticket-Beziehungen) führe
 | Kommentare | `project`, `milestone`, `task`, `ticket`, `feature`, `useCase` |
 | Notizen | `project`, `milestone`, `task`, `ticket` |
 | Attachments | `project`, `milestone`, `task`, `feature`, `ticket` |
+| Aufgaben-Verknüpfung | `project`, `milestone`, `feature`, `useCase` |
+| Ticket-Verknüpfung | `project`, `milestone`, `feature`, `useCase` |
 | Feature-Verknüpfung | `project`, `milestone` |
 
 ## Testabdeckung

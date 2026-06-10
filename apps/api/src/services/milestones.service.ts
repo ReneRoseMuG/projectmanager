@@ -1,7 +1,7 @@
 import type { Milestone, MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
-import { desc, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { firstRow } from "../db/query-utils.js";
+import { firstRow, recencyOrder } from "../db/query-utils.js";
 import { milestoneAttachments, milestoneComments, milestoneFeatures, milestoneNotes, milestones, milestoneTasks, milestoneTickets, projects, tasks } from "../db/schema.js";
 import { milestoneRepository, type MilestoneRecord } from "../repositories/milestone.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
@@ -181,13 +181,13 @@ async function mapMilestoneList(database: DbClient, rows: MilestoneRecord[]): Pr
 }
 
 export async function listMilestones(database: DbClient): Promise<Milestone[]> {
-  const rows = await database.select().from(milestones).orderBy(desc(milestones.createdAt));
+  const rows = await database.select().from(milestones).orderBy(...recencyOrder(milestones));
   return mapMilestoneList(database, rows);
 }
 
 export async function listProjectMilestones(database: DbClient, projectId: number): Promise<Milestone[]> {
   await ensureProjectExists(database, projectId);
-  const rows = await database.select().from(milestones).where(eq(milestones.projectId, projectId)).orderBy(desc(milestones.createdAt));
+  const rows = await database.select().from(milestones).where(eq(milestones.projectId, projectId)).orderBy(...recencyOrder(milestones));
   return mapMilestoneList(database, rows);
 }
 

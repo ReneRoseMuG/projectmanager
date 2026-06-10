@@ -1,6 +1,6 @@
 ﻿import { and, asc, desc, eq } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
-import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
+import { firstRow, insertId, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { comments, dayPlanComments, dayPlanEvents, dayPlanNotes, dayPlans, dayPlanTasks, events, notes, tasks } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -164,7 +164,7 @@ export const dayPlanRepository = {
       .from(dayPlanComments)
       .innerJoin(comments, eq(dayPlanComments.commentId, comments.id))
       .where(eq(dayPlanComments.dayPlanId, dayPlanId))
-      .orderBy(asc(comments.createdAt), asc(comments.id));
+      .orderBy(...recencyOrder(comments));
   },
 
   async addComment(database: DbSession, dayPlanId: number, commentId: number): Promise<void> {

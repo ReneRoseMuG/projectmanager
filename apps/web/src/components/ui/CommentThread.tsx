@@ -147,7 +147,14 @@ export function CommentThread({
   };
 
   const sortedComments = useMemo(
-    () => [...comments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    () =>
+      [...comments].sort((a, b) => {
+        const byUpdated = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        if (byUpdated !== 0) return byUpdated;
+        const byCreated = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        if (byCreated !== 0) return byCreated;
+        return b.id - a.id;
+      }),
     [comments],
   );
 

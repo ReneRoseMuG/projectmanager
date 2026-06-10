@@ -2,7 +2,7 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { dayPlanTasks, featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks, wikiPageTasks, wikiPages } from "../db/schema.js";
-import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
+import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
@@ -340,7 +340,7 @@ async function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Promis
       .from(projectTasks)
       .innerJoin(tasks, eq(projectTasks.taskId, tasks.id))
       .where(and(eq(projectTasks.ownerId, owner.id), isNull(tasks.parentId)))
-      .orderBy(tasks.status, projectTasks.position);
+      .orderBy(tasks.status, ...recencyOrder(tasks));
   }
   if (owner.type === "feature") {
     return database
@@ -348,7 +348,7 @@ async function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Promis
       .from(featureTasks)
       .innerJoin(tasks, eq(featureTasks.taskId, tasks.id))
       .where(and(eq(featureTasks.ownerId, owner.id), isNull(tasks.parentId)))
-      .orderBy(tasks.status, featureTasks.position);
+      .orderBy(tasks.status, ...recencyOrder(tasks));
   }
   if (owner.type === "milestone") {
     return database
@@ -356,7 +356,7 @@ async function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Promis
       .from(milestoneTasks)
       .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
       .where(and(eq(milestoneTasks.ownerId, owner.id), isNull(tasks.parentId)))
-      .orderBy(tasks.status, milestoneTasks.position);
+      .orderBy(tasks.status, ...recencyOrder(tasks));
   }
   if (owner.type === "wikiPage") {
     return database
@@ -364,7 +364,7 @@ async function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Promis
       .from(wikiPageTasks)
       .innerJoin(tasks, eq(wikiPageTasks.taskId, tasks.id))
       .where(and(eq(wikiPageTasks.ownerId, owner.id), isNull(tasks.parentId)))
-      .orderBy(tasks.status, wikiPageTasks.position);
+      .orderBy(tasks.status, ...recencyOrder(tasks));
   }
 
   return database
@@ -372,7 +372,7 @@ async function selectOwnerTaskRows(database: DbClient, owner: TaskOwner): Promis
     .from(useCaseTasks)
     .innerJoin(tasks, eq(useCaseTasks.taskId, tasks.id))
     .where(and(eq(useCaseTasks.ownerId, owner.id), isNull(tasks.parentId)))
-    .orderBy(tasks.status, useCaseTasks.position);
+    .orderBy(tasks.status, ...recencyOrder(tasks));
 }
 
 async function selectProjectMilestoneTaskRows(database: DbClient, projectId: number): Promise<OwnerTaskRecord[]> {
@@ -387,7 +387,7 @@ async function selectProjectMilestoneTaskRows(database: DbClient, projectId: num
     .innerJoin(milestones, eq(milestoneTasks.ownerId, milestones.id))
     .innerJoin(tasks, eq(milestoneTasks.taskId, tasks.id))
     .where(and(eq(milestones.projectId, projectId), isNull(tasks.parentId)))
-    .orderBy(tasks.status, milestoneTasks.position);
+    .orderBy(tasks.status, ...recencyOrder(tasks));
 
   return milestoneRows.map((row) => {
     const { milestoneId, milestoneName, ...taskRow } = row;

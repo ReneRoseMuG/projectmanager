@@ -145,7 +145,7 @@ describe("Sidebar", () => {
 
     expect(sidebar).toHaveClass("sidebar-edge-shell", "w-[240px]");
     expect(sidebar).not.toHaveClass("min-w-60");
-    expect(screen.getByText("Lokal · v0.1.0")).toBeInTheDocument();
+    expect(screen.getByText("Lokal")).toBeInTheDocument();
     expect(screen.queryByTitle("Aktualisieren")).not.toBeInTheDocument();
     const navigation = screen.getByRole("navigation", {
       name: "Navigationsbereiche",

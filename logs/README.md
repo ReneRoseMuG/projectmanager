@@ -2,6 +2,17 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 10.06.26 | 17:00:24 | Fix/Feature | MS-56 Wiki-Export (Umlaute/Bilder/Links), Autosave-Navigation, Editor-Copy + Input-Autocomplete | ✅ |
+| 10.06.26 | 16:02:46 | Fix | TKT-95 Auto-Save vor Navigationsvorgang abschließen | ✅ |
+| 10.06.26 | 15:27:34 | Fix | Rich-Text-Inline-Field Unit-Tests nachgeführt (T-14b/T-22/T-27 + Mark-Buttons) | ✅ |
+| 10.06.26 | 15:24:14 | Fix | TKT-98 Wiki Dateiupload Tab-Reset | ✅ |
+| 10.06.26 | 15:11:19 | Fix | TKT-89 Textstile Wort-Scope (Fett/Kursiv/U/Strike) | ✅ |
+| 10.06.26 | 14:22:06 | Fix | TKT-101 Feature doppeltes Parent entfernt | ✅ |
+| 10.06.26 | 14:22:05 | Fix | TKT-119 Wiki Save-Status (embedded) | ✅ |
+| 10.06.26 | 14:22:04 | Fix | TKT-118 Seitenheader-Titel kürzen | ✅ |
+| 10.06.26 | 14:22:03 | Fix | TKT-114 Sticky-Editorbar Hintergrund | ✅ |
+| 10.06.26 | 14:22:02 | Fix | TKT-109 Version im Navigation-Header | ✅ |
+| 10.06.26 | 14:22:01 | Fix | TKT-107 Subticket-Counter in Footer | ✅ |
 | 10.06.26 | 08:25:57 | AP07 | MS-67 Per-Worker-Auth/Session | ✅ |
 | 10.06.26 | 08:21:10 | AP05 | MS-67 Per-Worker-Server & Port | ✅ |
 | 10.06.26 | 08:18:00 | AP06 | MS-67 Per-Worker-Storage | ✅ |

@@ -103,6 +103,16 @@ export function NoteEditor({ note, open, onSave, onCreateNote, onClose, variant 
   };
 
   const requestClose = async () => {
+    if (note) {
+      // Edit-Mode speichert automatisch — offene Änderung beim Schließen flushen
+      // statt einen (mit Auto-Save obsoleten) Verwerfen-Dialog zu zeigen (TKT-95).
+      if (dirty) {
+        await save();
+      }
+      onClose();
+      return;
+    }
+    // Create-Mode hat kein Auto-Save: ungespeicherte neue Notiz weiterhin absichern.
     if (!dirty) {
       onClose();
       return;

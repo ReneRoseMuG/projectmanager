@@ -1,6 +1,6 @@
 ﻿import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
-import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
+import { firstRow, insertId, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { tickets } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
@@ -39,11 +39,11 @@ export const ticketRepository = {
   },
 
   async findRootTickets(database: DbSession): Promise<TicketRecord[]> {
-    return database.select().from(tickets).where(isNull(tickets.parentId)).orderBy(tickets.status, tickets.position);
+    return database.select().from(tickets).where(isNull(tickets.parentId)).orderBy(tickets.status, ...recencyOrder(tickets));
   },
 
   async findChildren(database: DbSession, parentId: number): Promise<TicketRecord[]> {
-    return database.select().from(tickets).where(eq(tickets.parentId, parentId)).orderBy(tickets.status, tickets.position);
+    return database.select().from(tickets).where(eq(tickets.parentId, parentId)).orderBy(tickets.status, ...recencyOrder(tickets));
   },
 
   async findByIds(database: DbSession, ids: number[]): Promise<TicketRecord[]> {

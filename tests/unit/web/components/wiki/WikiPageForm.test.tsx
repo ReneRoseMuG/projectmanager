@@ -20,12 +20,14 @@
  * - Der Modal-Modus bietet die ID-Kopieraktion und den Open-in-Tab-Button weiterhin nur bei Prop-Übergabe.
  * - Der Inline-Modus rendert ohne Modal, mit PageHero, Delete-Aktion und Journal-Gating.
  * - Inline-Speichern einer bestehenden Seite lässt die Seite geöffnet.
+ * - Bei aktivem Auto-Save schließt das Formular nach erfolgreichem Save ohne Verwerfen-Dialog (TKT-95).
  *
  * Fehlerfälle:
  * - Aktualisierter Inhalt muss im Submit-Payload landen.
  * - Die Wiki-Seiten-ID muss in die Zwischenablage kopiert werden.
  * - Unberechtigte Nutzer dürfen den Journal-Tab nicht sehen.
  * - Inline-Save darf nicht versehentlich schließen.
+ * - Auch bei fehlgeschlagenem Save schließt das Formular ohne Verwerfen-Dialog (Fehler via SaveStatus).
  *
  * Ziel:
  * Die Rich-Text-Integration, Support-Tabs und den neuen Inline-Modus des Wiki-Formulars absichern.
@@ -300,5 +302,38 @@ describe("WikiPageForm", () => {
     renderWithProviders(<WikiPageForm inline editable open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.getByTestId("wiki-page-form-content-view")).toHaveAttribute("data-editable", "true");
+  });
+
+  it("speichert vor dem Schließen statt einen Verwerfen-Dialog zu zeigen (TKT-95)", async () => {
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    renderWithProviders(
+      <WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={onClose} />,
+    );
+
+    fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: "<p>geändert</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Schließen" }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(onAutoSave).toHaveBeenCalled();
+    expect(screen.queryByText("Änderungen verwerfen?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Speichern fehlgeschlagen")).not.toBeInTheDocument();
+  });
+
+  it("schließt auch bei fehlgeschlagenem Save ohne Verwerfen-Dialog (TKT-95)", async () => {
+    const onAutoSave = vi.fn().mockRejectedValue(new Error("Konflikt"));
+    const onClose = vi.fn();
+    renderWithProviders(
+      <WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={onClose} />,
+    );
+
+    fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: "<p>geändert</p>" } });
+    fireEvent.click(screen.getByRole("button", { name: "Schließen" }));
+
+    // Kein Dirty-Guard mehr: das Formular schließt, der Fehler wird über SaveStatus angezeigt.
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(onAutoSave).toHaveBeenCalled();
+    expect(screen.queryByText("Änderungen verwerfen?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Speichern fehlgeschlagen")).not.toBeInTheDocument();
   });
 });

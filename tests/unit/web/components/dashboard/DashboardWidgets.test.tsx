@@ -20,9 +20,11 @@
  * - Kommentar-Widgets verlinken auch Wiki-, Backlog- und DayPlan-Träger korrekt.
  * - noteList rendert persönliche Notizen read-only mit Vorschau.
  * - Das neue Milestone-Listenwidget ist als „Meilensteinliste“ im Widget-Katalog benannt.
+ * - Im DayPlan-Kontext ist der Status direkt auf der Aufgabenkarte editierbar (TKT-112), in anderen Kontexten nicht.
  *
  * Fehlerfälle:
  * - Read-only Widget-Karten mit No-op onOpen oder falscher Detailroute.
+ * - Aufgaben-Widget-Karte ohne tasks:write-Recht ohne Status-Editor.
  *
  * Ziel:
  * Die Dashboard-Widget-Verdrahtung gegen verlorene Detailnavigation absichern.
@@ -41,6 +43,7 @@ const widgetData = vi.hoisted(() => new Map<string, unknown>());
 const calendarEvents = vi.hoisted(() => ({ value: [] as CalendarEvent[] }));
 const permissions = vi.hoisted(() => new Map<string, boolean>());
 const createNoteMock = vi.hoisted(() => vi.fn());
+const updateTaskMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../../../apps/web/src/hooks/useDashboards", () => ({
   useDashboardWidgetData(widget: { widgetId: string }) {
@@ -57,6 +60,7 @@ vi.mock("../../../../../apps/web/src/hooks/useDayPlan", () => ({
   useDayPlan: () => ({
     createTask: vi.fn(),
     createEvent: vi.fn(),
+    updateTask: updateTaskMock,
   }),
 }));
 
@@ -302,6 +306,7 @@ afterEach(() => {
   calendarEvents.value = [];
   permissions.clear();
   createNoteMock.mockReset();
+  updateTaskMock.mockReset();
 });
 
 describe("DashboardWidgetCard", () => {
@@ -524,5 +529,43 @@ describe("DashboardWidgetCard", () => {
     });
 
     expect(screen.queryByRole("button", { name: "Nächste Termine: neu anlegen" })).not.toBeInTheDocument();
+  });
+
+  it("erlaubt im DayPlan-Kontext den Statuswechsel direkt auf der Aufgabenkarte", async () => {
+    renderWithRouter("taskBoard", [buildTask({ id: 11, title: "Board Aufgabe", status: "todo", version: 4 })], {
+      context: "dayPlan",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Offen" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "In Arbeit" }));
+
+    await waitFor(() => expect(updateTaskMock).toHaveBeenCalledWith(11, { status: "in_progress", expectedVersion: 4 }));
+  });
+
+  it("zeigt die Aufgaben-Widget-Karte außerhalb des DayPlan-Kontexts ohne Status-Editor", () => {
+    renderWithRouter("taskBoard", [buildTask({ id: 12, title: "Projekt Aufgabe", status: "todo" })], {
+      context: "project",
+      owner: { type: "project", id: 99 },
+    });
+
+    expect(screen.getByText("Projekt Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Offen" })).not.toBeInTheDocument();
+    expect(updateTaskMock).not.toHaveBeenCalled();
+  });
+
+  it("bietet ohne tasks:write-Recht keinen Status-Editor auf der DayPlan-Aufgabenkarte", () => {
+    permissions.set("tasks:write", false);
+
+    renderWithRouter("taskBoard", [buildTask({ id: 13, title: "Gesperrte Aufgabe", status: "todo" })], {
+      context: "dayPlan",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    expect(screen.getByText("Gesperrte Aufgabe")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Offen" })).not.toBeInTheDocument();
+    expect(updateTaskMock).not.toHaveBeenCalled();
   });
 });

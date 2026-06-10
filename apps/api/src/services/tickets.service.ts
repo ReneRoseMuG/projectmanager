@@ -14,7 +14,7 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureTickets, features, milestoneTickets, milestones, projectTickets, projects, taskTickets, tasks, ticketAttachments, ticketComments, ticketNotes, ticketRelations, tickets, useCases, useCaseTickets, wikiPageTickets, wikiPages } from "../db/schema.js";
-import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
+import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { ticketRepository, type TicketRecord } from "../repositories/ticket.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { deleteTicketAttachmentsForIds, listTicketAttachments } from "./attachments.service.js";
@@ -302,7 +302,7 @@ async function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): Pr
       .from(projectTickets)
       .innerJoin(tickets, eq(projectTickets.ticketId, tickets.id))
       .where(and(eq(projectTickets.ownerId, owner.id), isNull(tickets.parentId)))
-      .orderBy(tickets.status, projectTickets.position);
+      .orderBy(tickets.status, ...recencyOrder(tickets));
   }
   if (owner.type === "task") {
     return database
@@ -310,7 +310,7 @@ async function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): Pr
       .from(taskTickets)
       .innerJoin(tickets, eq(taskTickets.ticketId, tickets.id))
       .where(and(eq(taskTickets.ownerId, owner.id), isNull(tickets.parentId)))
-      .orderBy(tickets.status, taskTickets.position);
+      .orderBy(tickets.status, ...recencyOrder(tickets));
   }
   if (owner.type === "milestone") {
     return database
@@ -318,7 +318,7 @@ async function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): Pr
       .from(milestoneTickets)
       .innerJoin(tickets, eq(milestoneTickets.ticketId, tickets.id))
       .where(and(eq(milestoneTickets.ownerId, owner.id), isNull(tickets.parentId)))
-      .orderBy(tickets.status, milestoneTickets.position);
+      .orderBy(tickets.status, ...recencyOrder(tickets));
   }
   if (owner.type === "feature") {
     return database
@@ -326,7 +326,7 @@ async function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): Pr
       .from(featureTickets)
       .innerJoin(tickets, eq(featureTickets.ticketId, tickets.id))
       .where(and(eq(featureTickets.ownerId, owner.id), isNull(tickets.parentId)))
-      .orderBy(tickets.status, featureTickets.position);
+      .orderBy(tickets.status, ...recencyOrder(tickets));
   }
   if (owner.type === "wikiPage") {
     return database
@@ -334,7 +334,7 @@ async function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): Pr
       .from(wikiPageTickets)
       .innerJoin(tickets, eq(wikiPageTickets.ticketId, tickets.id))
       .where(and(eq(wikiPageTickets.ownerId, owner.id), isNull(tickets.parentId)))
-      .orderBy(tickets.status, wikiPageTickets.position);
+      .orderBy(tickets.status, ...recencyOrder(tickets));
   }
 
   return database
@@ -342,7 +342,7 @@ async function selectOwnerTicketRows(database: DbClient, owner: TicketOwner): Pr
     .from(useCaseTickets)
     .innerJoin(tickets, eq(useCaseTickets.ticketId, tickets.id))
     .where(and(eq(useCaseTickets.ownerId, owner.id), isNull(tickets.parentId)))
-    .orderBy(tickets.status, useCaseTickets.position);
+    .orderBy(tickets.status, ...recencyOrder(tickets));
 }
 
 async function selectProjectMilestoneTicketRows(database: DbClient, projectId: number): Promise<TicketRecordWithBoardPosition[]> {
@@ -357,7 +357,7 @@ async function selectProjectMilestoneTicketRows(database: DbClient, projectId: n
     .innerJoin(milestones, eq(milestoneTickets.ownerId, milestones.id))
     .innerJoin(tickets, eq(milestoneTickets.ticketId, tickets.id))
     .where(and(eq(milestones.projectId, projectId), isNull(tickets.parentId)))
-    .orderBy(tickets.status, milestoneTickets.position);
+    .orderBy(tickets.status, ...recencyOrder(tickets));
 
   return milestoneRows.map((row) => {
     const { milestoneId, milestoneName, ...ticketRow } = row;

@@ -66,7 +66,6 @@ import { FormModal } from "../ui/FormModal";
 import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
-import { ParentContextField } from "../ui/ParentContextField";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
 import { PendingRelationList } from "../ui/PendingRelationList";
@@ -427,10 +426,6 @@ export function FeatureForm({
     projects.loading ||
     Boolean(feature && projectLinks.loading) ||
     !canWriteProjectRelations;
-  const showParentContexts =
-    stableInitialProjectId === undefined &&
-    (feature?.parentContexts?.length ?? 0) > 0;
-
   const changeParentProject = async (item: SelectParentItem | null) => {
     const nextProjectId = item ? Number(item.id) : null;
     if (!feature) {
@@ -582,7 +577,6 @@ export function FeatureForm({
               </div>
             </div>
             <FormSidebar storageKey="feature-form-sidebar">
-              {showParentContexts ? <ParentContextField parents={feature?.parentContexts} /> : null}
               <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="featureStatus" value={status} onChange={(v) => { setStatus(v); formStateRef.current = { ...formStateRef.current, status: v }; af?.(); }} />
               <UserSelectField
                 label="Verantwortlich"

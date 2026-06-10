@@ -42,7 +42,6 @@ export function WikiPage() {
   const { confirm } = useConfirm();
   const [formOpen, setFormOpen] = useState(false);
   const [formParent, setFormParent] = useState<WikiPageType | null>(null);
-  const [inlineDirty, setInlineDirty] = useState(false);
   const [editing, setEditing] = useState(false);
 
   useEffect(() => {
@@ -200,19 +199,6 @@ export function WikiPage() {
     }
   };
 
-  const requestInlineNavigation = async () => {
-    if (!inlineDirty) {
-      return true;
-    }
-
-    return confirm({
-      title: "Änderungen verwerfen?",
-      body: "Die Wiki-Seite enthält ungespeicherte Änderungen.",
-      severity: "warn",
-      confirmLabel: "Verwerfen",
-    });
-  };
-
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
       <PageHero
@@ -243,7 +229,7 @@ export function WikiPage() {
           </>
         ) : (
           <>
-            <WikiTree tree={wiki.tree} onCreate={openCreate} onNavigate={requestInlineNavigation} canMove={canWrite} onMove={moveWikiPage} />
+            <WikiTree tree={wiki.tree} onCreate={openCreate} canMove={canWrite} onMove={moveWikiPage} />
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               {wiki.error ? (
                 <div className="px-5 pt-5">
@@ -265,7 +251,6 @@ export function WikiPage() {
                   onSubmit={submitInlineForm}
                   onAutoSave={wiki.page ? autoSaveInlineForm : undefined}
                   onDelete={deletePage}
-                  onDirtyChange={setInlineDirty}
                   editable={editing}
                   onEdit={() => setEditing(true)}
                   onNavigateToWikiPage={(id) => navigate(standalone ? withStandaloneView(`/wiki/${id}`) : `/wiki/${id}`)}
