@@ -133,7 +133,10 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
     if (!page) {
       setPendingComments([]);
     }
-  }, [open, page, parent]);
+  // Depend on identities (ids), not object references: a refetch of the same page
+  // (e.g. after uploading an attachment) must not reset the active tab or form fields. TKT-98.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, page?.id, parent?.id]);
 
   useEffect(() => {
     onDirtyChange?.(open && dirty);
