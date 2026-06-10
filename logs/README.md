@@ -2,6 +2,12 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 10.06.26 | 14:22:06 | Fix | TKT-101 Feature doppeltes Parent entfernt | ✅ |
+| 10.06.26 | 14:22:05 | Fix | TKT-119 Wiki Save-Status (embedded) | ✅ |
+| 10.06.26 | 14:22:04 | Fix | TKT-118 Seitenheader-Titel kürzen | ✅ |
+| 10.06.26 | 14:22:03 | Fix | TKT-114 Sticky-Editorbar Hintergrund | ✅ |
+| 10.06.26 | 14:22:02 | Fix | TKT-109 Version im Navigation-Header | ✅ |
+| 10.06.26 | 14:22:01 | Fix | TKT-107 Subticket-Counter in Footer | ✅ |
 | 07.06.26 | 05:25:06 | Feature | WikiTree Drag Parent | ✅ |
 | 07.06.26 | 04:52:15 | Fix | Verwandte Themen Hinweistext | ✅ |
 | 07.06.26 | 04:47:59 | Fix | Wiki Link Klick im Editor | ⚠️ |
