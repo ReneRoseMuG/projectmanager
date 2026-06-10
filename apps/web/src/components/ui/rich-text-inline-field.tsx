@@ -566,10 +566,10 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
           <Separator />
         </>
       ) : null}
-      <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="Fett" icon={<Bold />} />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="Kursiv" icon={<Italic />} />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="Unterstrichen" icon={<UnderlineIcon />} />
-      <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive("strike")} title="Durchgestrichen" icon={<Strikethrough />} />
+      <ToolbarButton onClick={() => toggleSelectionMark(editor, "bold")} active={editor.isActive("bold")} title="Fett" icon={<Bold />} />
+      <ToolbarButton onClick={() => toggleSelectionMark(editor, "italic")} active={editor.isActive("italic")} title="Kursiv" icon={<Italic />} />
+      <ToolbarButton onClick={() => toggleSelectionMark(editor, "underline")} active={editor.isActive("underline")} title="Unterstrichen" icon={<UnderlineIcon />} />
+      <ToolbarButton onClick={() => toggleSelectionMark(editor, "strike")} active={editor.isActive("strike")} title="Durchgestrichen" icon={<Strikethrough />} />
       <ToolbarButton onClick={() => toggleSelectionHighlight(editor)} active={hasTextSelection && editor.isActive("highlight")} disabled={!hasTextSelection} title="Hervorheben" icon={<Highlighter />} />
       <Separator />
       <ToolbarButton onClick={() => editor.chain().focus().setParagraph().run()} active={editor.isActive("paragraph")} title="Absatz" icon={<Text />} />
@@ -675,6 +675,26 @@ function getSelectionRange(editor: Editor): { from: number; to: number } | null 
   const { from, to, empty } = editor.state.selection;
   if (empty) return null;
   return { from, to };
+}
+
+// Toolbar marks must follow the visible DOM selection, not editor.state.selection,
+// which can be stale after a toolbar interaction and otherwise spreads the mark
+// across the whole block. Mirrors the highlight handler's range-based approach.
+function toggleSelectionMark(editor: Editor, markName: string) {
+  const range = getSelectionRange(editor);
+  if (!range) {
+    editor.chain().focus().toggleMark(markName).run();
+    return;
+  }
+
+  const markType = editor.state.schema.marks[markName];
+  if (!markType) return;
+
+  const hasMark = editor.state.doc.rangeHasMark(range.from, range.to, markType);
+  const transaction = hasMark
+    ? editor.state.tr.removeMark(range.from, range.to, markType)
+    : editor.state.tr.addMark(range.from, range.to, markType.create());
+  editor.view.dispatch(transaction);
 }
 
 function toggleSelectionHighlight(editor: Editor) {

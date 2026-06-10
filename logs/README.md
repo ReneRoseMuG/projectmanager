@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 10.06.26 | 15:11:19 | Fix | TKT-89 Textstile Wort-Scope (Fett/Kursiv/U/Strike) | ✅ |
 | 10.06.26 | 14:22:06 | Fix | TKT-101 Feature doppeltes Parent entfernt | ✅ |
 | 10.06.26 | 14:22:05 | Fix | TKT-119 Wiki Save-Status (embedded) | ✅ |
 | 10.06.26 | 14:22:04 | Fix | TKT-118 Seitenheader-Titel kürzen | ✅ |
