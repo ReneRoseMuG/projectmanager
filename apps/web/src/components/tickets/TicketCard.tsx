@@ -82,18 +82,12 @@ function TicketCardBody({ description }: { description: string }) {
 function TicketCardFooter({ ticket, allTags, ticketClosed, onDueDateChange, onTagsChange }: { ticket: Ticket; allTags?: Tag[]; ticketClosed: boolean; onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void> }) {
   const overdue = !ticketClosed && isOverdue(ticket.dueDate);
   const closedDate = ticketClosed ? (ticket.resolvedAt ?? ticket.updatedAt) : null;
-  const hasMeta = ticket.subTicketCount > 0 || Boolean(ticket.dueDate) || Boolean(closedDate);
+  const hasMeta = Boolean(ticket.dueDate) || Boolean(closedDate);
 
   return (
     <div className="grid gap-3">
       {hasMeta ? (
         <div className="flex flex-wrap items-center gap-3 text-xs text-steel-600">
-          {ticket.subTicketCount > 0 ? (
-            <span className="inline-flex items-center gap-1">
-              <GitBranch size={14} />
-              {ticket.subTicketCount}
-            </span>
-          ) : null}
           {ticket.dueDate ? (
             <span className={`inline-flex items-center gap-1 font-semibold ${overdue ? "text-crimson" : ""}`}>
               Fällig
@@ -113,6 +107,9 @@ function TicketCardFooter({ ticket, allTags, ticketClosed, onDueDateChange, onTa
 }
 
 function TicketSupportFooter({ ticket, allTags, onTagsChange, bordered = true }: { ticket: Ticket; allTags?: Tag[]; onTagsChange?: (ticketId: number, tagIds: number[]) => void | Promise<void>; bordered?: boolean }) {
+  const subTicketCounters = ticket.subTicketCount > 0
+    ? [{ icon: <GitBranch size={14} aria-hidden="true" />, value: ticket.subTicketCount, label: "Subtickets" }]
+    : [];
   return (
     <div className="grid min-w-0 gap-2">
       <div className="flex flex-wrap gap-2">
@@ -122,6 +119,7 @@ function TicketSupportFooter({ ticket, allTags, onTagsChange, bordered = true }:
         tags={ticket.tags}
         allTags={allTags}
         onTagsChange={onTagsChange ? (tagIds) => onTagsChange(ticket.id, tagIds) : undefined}
+        leadingCounters={subTicketCounters}
         attachmentCount={ticket.attachmentCount}
         noteCount={ticket.noteCount}
         commentCount={ticket.commentCount}
