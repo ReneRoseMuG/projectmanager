@@ -4,6 +4,7 @@ import mysql from "mysql2/promise";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import * as schema from "../../../apps/api/src/db/schema.js";
+import { assertSafeTestDatabaseTarget } from "../../../apps/api/src/runtime-safety.js";
 
 export type TestDb = {
   db: ReturnType<typeof drizzle<typeof schema>>;
@@ -39,7 +40,7 @@ const defaultCatalogEntries = [
   ["ticketType", "task", "Aufgabe", 400, 0, "var(--color-steel-500)"]
 ] as const;
 
-function baseConnectionConfig() {
+export function baseConnectionConfig() {
   // TEST_DB_* vars take precedence so tests can use a local MySQL
   // independent of the production DB configured in apps/api/.env
   return {
@@ -50,7 +51,7 @@ function baseConnectionConfig() {
   };
 }
 
-async function seedDefaultCatalogEntries(pool: mysql.Pool): Promise<void> {
+export async function seedDefaultCatalogEntries(pool: mysql.Pool): Promise<void> {
   for (const [kind, key, label, sort_order, is_closed, color] of defaultCatalogEntries) {
     await pool.execute(
       "INSERT INTO catalog_entries (kind, `key`, label, sort_order, is_closed, color, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())",
@@ -59,7 +60,7 @@ async function seedDefaultCatalogEntries(pool: mysql.Pool): Promise<void> {
   }
 }
 
-async function seedDefaultAuth(pool: mysql.Pool): Promise<void> {
+export async function seedDefaultAuth(pool: mysql.Pool): Promise<void> {
   // Use explicit IDs so that role_id=1 (admin), role_id=2 (editor), role_id=3 (reader)
   // and user id=1 (admin) are always stable across truncate cycles.
   await pool.execute(
@@ -87,6 +88,9 @@ async function seedDefaultAuth(pool: mysql.Pool): Promise<void> {
 export async function createTestDb(): Promise<TestDb> {
   const dbName = `taskmanager_test_${process.pid}_${crypto.randomUUID().replace(/-/g, "")}`;
   const connConfig = baseConnectionConfig();
+
+  // Refuse to create/drop anything but an approved temporary test database.
+  assertSafeTestDatabaseTarget(connConfig.host, dbName);
 
   const adminConn = await mysql.createConnection(connConfig);
   await adminConn.execute(

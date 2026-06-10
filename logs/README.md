@@ -2,6 +2,12 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 10.06.26 | 08:25:57 | AP07 | MS-67 Per-Worker-Auth/Session | ✅ |
+| 10.06.26 | 08:21:10 | AP05 | MS-67 Per-Worker-Server & Port | ✅ |
+| 10.06.26 | 08:18:00 | AP06 | MS-67 Per-Worker-Storage | ✅ |
+| 10.06.26 | 08:16:18 | AP03 | MS-67 Per-Worker-DB-Lifecycle | ✅ |
+| 10.06.26 | 08:11:18 | AP04 | MS-67 DB-Safety-Guard | ✅ |
+| 10.06.26 | 08:07:18 | AP02 | MS-67 Architektur Server-pro-Worker | ✅ |
 | 10.06.26 | 08:03:10 | Feature | MCP-Abschlusskommentar Pflicht + feste Projekt-ID | ✅ |
 | 10.06.26 | 07:51:57 | AP01 | MS-67 Baseline & Messung | ✅ |
 | 10.06.26 | 07:14:00 | Feature | Arbeitsbericht-Dossier MCP-Tool | ✅ |

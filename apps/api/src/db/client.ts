@@ -3,6 +3,11 @@ import mysql from "mysql2/promise";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { config } from "../config.js";
+import { assertSafeTestDatabaseTarget } from "../runtime-safety.js";
+
+// In test mode this refuses to connect to anything but an approved temporary test
+// database. Outside test mode it is a no-op, so production startup is unaffected.
+assertSafeTestDatabaseTarget(config.db.host, config.db.name);
 
 export const mysqlPool = mysql.createPool({
   host: config.db.host,
