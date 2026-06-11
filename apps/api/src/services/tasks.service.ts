@@ -689,13 +689,15 @@ export async function getTaskStats(database: DbClient, owner?: DashboardTaskOwne
 
 export async function listRecentTasks(
   database: DbClient,
-  options: { owner?: DashboardTaskOwner; limit?: number; sort?: "createdAt" | "updatedAt" } = {}
+  options: { owner?: DashboardTaskOwner; limit?: number; sort?: "createdAt" | "updatedAt"; includeClosed?: boolean } = {}
 ): Promise<Task[]> {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
   const sort = options.sort ?? "updatedAt";
-  const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
+  // Board- und Listen-Widgets zeigen geschlossene Aufgaben in einer eigenen Geschlossen-Gruppe;
+  // nur das Journal-Widget ("Aktuelle Aufgaben") blendet sie weiterhin per Default aus.
+  const closedStatusKeys = options.includeClosed ? null : await listClosedCatalogEntryKeys(database, "workStatus");
   return [...(await listDashboardTasks(database, options.owner))]
-    .filter((task) => isOpenTaskStatus(task.status, closedStatusKeys))
+    .filter((task) => closedStatusKeys === null || isOpenTaskStatus(task.status, closedStatusKeys))
     .sort((left, right) => dateKey(right[sort]) - dateKey(left[sort]) || right.id - left.id)
     .slice(0, limit);
 }

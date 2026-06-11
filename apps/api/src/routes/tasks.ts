@@ -97,6 +97,15 @@ const dashboardTaskQuerySchema = {
   }
 } as const;
 
+const dashboardRecentTaskQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    ...dashboardTaskQuerySchema.properties,
+    includeClosed: { type: "boolean" }
+  }
+} as const;
+
 const dashboardOverdueTaskQuerySchema = {
   type: "object",
   additionalProperties: false,
@@ -142,13 +151,13 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  app.get<{ Querystring: { ownerType?: DashboardTaskOwner["type"]; ownerId?: number; limit?: number; sort?: "createdAt" | "updatedAt" } }>(
+  app.get<{ Querystring: { ownerType?: DashboardTaskOwner["type"]; ownerId?: number; limit?: number; sort?: "createdAt" | "updatedAt"; includeClosed?: boolean } }>(
     "/tasks/recent",
-    { schema: { querystring: dashboardTaskQuerySchema, response: { 200: arrayResponseSchema } } },
+    { schema: { querystring: dashboardRecentTaskQuerySchema, response: { 200: arrayResponseSchema } } },
     async (request) => {
       const owner = taskOwnerFromQuery(request.query);
       await ensureDashboardDayPlanAccess(app, request, owner);
-      return listRecentTasks(app.db, { owner, limit: request.query.limit, sort: request.query.sort });
+      return listRecentTasks(app.db, { owner, limit: request.query.limit, sort: request.query.sort, includeClosed: request.query.includeClosed });
     }
   );
 

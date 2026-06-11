@@ -17,9 +17,11 @@
  * Abgedeckte Regeln:
  * - Meilenstein-Widgets laden ohne Dashboard-Owner globale Meilensteine statt leerer Daten.
  * - Projektbezogene Meilenstein-Widgets bleiben auf den Projekt-Endpunkt eingegrenzt.
+ * - taskList/taskBoard fordern geschlossene Aufgaben über includeClosed an, taskJournal nicht.
  *
  * Fehlerfälle:
  * - Ein no-owner Meilenstein-Widget würde sonst trotz vorhandener Meilensteine leer bleiben.
+ * - Ohne includeClosed würde eine geschlossene Aufgabe aus Board-/Listen-Widgets verschwinden.
  *
  * Ziel:
  * Die Datenquelle der Meilenstein-Widgets auf Startseite und globalem Dashboard absichern.
@@ -67,5 +69,26 @@ describe("dashboard api client", () => {
 
     expect(apiMocks.get).toHaveBeenCalledWith("projects/7/milestones");
     expect(data).toEqual(milestones);
+  });
+
+  it("fordert für taskList und taskBoard geschlossene Aufgaben mit includeClosed an", async () => {
+    apiMocks.json.mockResolvedValue([]);
+
+    await getDashboardWidgetData("taskList", { type: "dayPlan", id: 5 });
+    await getDashboardWidgetData("taskBoard", { type: "dayPlan", id: 5 });
+
+    for (const call of apiMocks.get.mock.calls) {
+      expect(call[0]).toBe("tasks/recent");
+      expect((call[1] as { searchParams: Record<string, unknown> }).searchParams).toMatchObject({ ownerType: "dayPlan", ownerId: 5, includeClosed: "true" });
+    }
+  });
+
+  it("lädt taskJournal ohne includeClosed, sodass geschlossene Aufgaben ausgeblendet bleiben", async () => {
+    apiMocks.json.mockResolvedValue([]);
+
+    await getDashboardWidgetData("taskJournal", { type: "dayPlan", id: 5 });
+
+    expect(apiMocks.get).toHaveBeenCalledWith("tasks/recent", { searchParams: { ownerType: "dayPlan", ownerId: 5 } });
+    expect((apiMocks.get.mock.calls[0]![1] as { searchParams: Record<string, unknown> }).searchParams).not.toHaveProperty("includeClosed");
   });
 });

@@ -90,8 +90,10 @@ export async function getDashboardTaskStats(owner?: DashboardOwner): Promise<Tas
   return api.get("tasks/stats", { searchParams: ownerSearchParams(owner) }).json<TaskStats>();
 }
 
-export async function getDashboardRecentTasks(owner?: DashboardOwner, params: DashboardWidgetParams = {}): Promise<Task[]> {
-  return api.get("tasks/recent", { searchParams: widgetSearchParams(owner, params) }).json<Task[]>();
+export async function getDashboardRecentTasks(owner?: DashboardOwner, params: DashboardWidgetParams = {}, includeClosed = false): Promise<Task[]> {
+  return api
+    .get("tasks/recent", { searchParams: { ...widgetSearchParams(owner, params), ...(includeClosed ? { includeClosed: "true" } : {}) } })
+    .json<Task[]>();
 }
 
 export async function getDashboardOverdueTasks(owner?: DashboardOwner, limit?: number): Promise<Task[]> {
@@ -192,7 +194,7 @@ export async function getDashboardWidgetData(widgetId: DashboardWidgetId, owner?
     return getDashboardMilestones(owner, params.limit ?? 10);
   }
   if (widgetId === "taskBoard" || widgetId === "taskList") {
-    return getDashboardRecentTasks(owner, params);
+    return getDashboardRecentTasks(owner, params, true);
   }
   if (widgetId === "ticketBoard" || widgetId === "ticketList") {
     return getDashboardRecentTickets(owner, params);

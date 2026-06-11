@@ -3,6 +3,7 @@
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
 | 11.06.26 | 07:42:31 | Feature | Persönliche Planung datumsübergreifend (Aufgaben/Termine) + kollabierbare Listengruppen | ✅ |
+| 10.06.26 | 17:40:56 | Fix | Aufgabenliste-Widget: geschlossene Aufgaben sichtbar (includeClosed) | ✅ |
 | 10.06.26 | 17:00:24 | Fix/Feature | MS-56 Wiki-Export (Umlaute/Bilder/Links), Autosave-Navigation, Editor-Copy + Input-Autocomplete | ✅ |
 | 10.06.26 | 16:02:46 | Fix | TKT-95 Auto-Save vor Navigationsvorgang abschließen | ✅ |
 | 10.06.26 | 15:27:34 | Fix | Rich-Text-Inline-Field Unit-Tests nachgeführt (T-14b/T-22/T-27 + Mark-Buttons) | ✅ |

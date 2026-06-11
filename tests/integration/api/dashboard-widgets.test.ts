@@ -7,6 +7,7 @@
  * - Startseiten-/Global-Widgetdaten ohne Owner liefern globale statt nur eigene Aktivität.
  * - Überfällige Aufgaben berücksichtigen offene Status und Fälligkeitsdatum.
  * - Aktuelle Aufgaben und Tickets werten geschlossene Katalogeinträge über isClosed aus.
+ * - tasks/recent mit includeClosed=true behält geschlossene Aufgaben für Board-/Listen-Widgets.
  * - Neue Widgetdaten-Endpunkte bleiben authentifizierungspflichtig.
  *
  * Fehlerfälle:
@@ -484,5 +485,36 @@ describe("Dashboard widget data API", () => {
     // commentJournal für DayPlan-Owner
     const recentComments = await admin.get(`/api/comments/recent?ownerType=dayPlan&ownerId=${dayPlanId}`).expect(200);
     expect(recentComments.body.map((c: { body: string }) => c.body)).toContain("<p>Tagesplan-Kommentar</p>");
+  });
+
+  // =========================================================================
+  // Schritt 6: includeClosed für Board-/Listen-Widgets (taskBoard, taskList)
+  // =========================================================================
+
+  it("Schritt 6 – tasks/recent mit includeClosed hält geschlossene Aufgaben für Board-/Listen-Widgets sichtbar", async () => {
+    const admin = await loginAdmin(app);
+    const date = "2026-09-20";
+
+    const dayPlanRes = await admin.get(`/api/day-plans/${date}`).expect(200);
+    const dayPlanId = (dayPlanRes.body as { id: number }).id;
+
+    const openTask = await admin.post(`/api/day-plans/${date}/tasks`).send({ title: "Offene DayPlan-Aufgabe", status: "todo", priority: "medium" }).expect(201);
+    const closingTask = await admin.post(`/api/day-plans/${date}/tasks`).send({ title: "Zu schließende DayPlan-Aufgabe", status: "todo", priority: "high" }).expect(201);
+
+    // Aufgabe auf "done" (geschlossener Systemstatus) setzen – wie im Widget
+    await admin.patch(`/api/tasks/${closingTask.body.id}`).send({ status: "done", expectedVersion: closingTask.body.version }).expect(200);
+
+    // Default (Journal-Verhalten): geschlossene Aufgabe wird ausgeblendet
+    const recentDefault = await admin.get(`/api/tasks/recent?ownerType=dayPlan&ownerId=${dayPlanId}`).expect(200);
+    const defaultTitles = recentDefault.body.map((t: { title: string }) => t.title);
+    expect(defaultTitles).toContain("Offene DayPlan-Aufgabe");
+    expect(defaultTitles).not.toContain("Zu schließende DayPlan-Aufgabe");
+
+    // Board/Liste: includeClosed=true behält die geschlossene Aufgabe für die Geschlossen-Gruppe
+    const recentWithClosed = await admin.get(`/api/tasks/recent?ownerType=dayPlan&ownerId=${dayPlanId}&includeClosed=true`).expect(200);
+    const withClosedTitles = recentWithClosed.body.map((t: { title: string }) => t.title);
+    expect(withClosedTitles).toContain("Offene DayPlan-Aufgabe");
+    expect(withClosedTitles).toContain("Zu schließende DayPlan-Aufgabe");
+    expect(openTask.body.title).toBe("Offene DayPlan-Aufgabe");
   });
 });
