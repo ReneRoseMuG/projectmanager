@@ -682,6 +682,16 @@ Entitäten: `features`, `useCases`, `wikiPages`, `featureRelations`
 - Wiki-Seiten sind hierarchisch via `parentId` (restrict on delete), optional einem Projekt zugeordnet
 - Navigation: `/features`, `/features/:id`, `/wiki`, `/wiki/:id`
 
+#### Titel-Konvention für Features und Use Cases (verbindlich)
+
+Titel von Features und Use Cases folgen einem festen Schema (per Migration am 2026-06-11 durchgesetzt):
+
+- **Feature:** `FT(NN): Titel` — `NN` 2-stellig, **kein** Leerzeichen zwischen `FT` und Klammer. Bestehende FT-Nummern werden beibehalten; Lücken in der Nummernfolge sind gewollt.
+- **Use Case:** `UC (FF/NN): Titel` — `FF` = Feature-Nummer, `NN` = laufende UC-Nummer innerhalb des Features, beide 2-stellig; Leerzeichen nach `UC`, Schrägstrich zwischen den Zahlen.
+- **Titel-Body:** echte deutsche Umlaute (kein `ae/oe/ue/ss`), deutsche Groß-/Kleinschreibung (Satz-/Nomen-Schreibweise, **kein** Title-Case je Wort), keine Slug-Bindestriche als Wortrenner.
+- Ein neuer Use Case erhält die nächste freie `NN` seines Features.
+- FF-Nummern dürfen über die zwei Projekt-Sets hinweg kollidieren (z. B. tragen Feature 9 *Kundenverwaltung* und Feature 35 *Dashboard* beide `FT(09)`); die Nummern sind nur projektintern eindeutig — das ist akzeptiert.
+
 ### Domäne 3 — Tickets & Bug-Tracking
 
 Entitäten: `tickets`, `ticketRelations`, `ticketTags`, `ticketNotes`, `projectTickets`, `milestoneTickets`, `taskTickets`, `featureTickets`, `useCaseTickets`
