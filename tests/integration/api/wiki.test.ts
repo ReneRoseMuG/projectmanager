@@ -18,7 +18,7 @@
  * - Content wird DB-first gespeichert und gelesen.
  * - Der HTML-Export schreibt interne Wiki-Links als relative Dateisystem-Links (real auflösend).
  * - Der Export erhält Umlaute in Datei-/Verzeichnisnamen und im Inhalt (keine Transliteration).
- * - Der Export kopiert intern (DB) gespeicherte Bilder nach assets/images und schreibt src relativ um.
+ * - Der Export kopiert intern (DB) gespeicherte Bilder seitenlokal nach assets/images und schreibt src relativ um.
  * - Parent-Wechsel verhindern eigene Nachfahren als Ziel.
  * - Legacy-Dateipfade bleiben als Fallback lesbar.
  * - Seiten mit Unterseiten sind vor direktem Löschen geschützt.
@@ -318,7 +318,7 @@ describe("Wiki API", () => {
     }
   });
 
-  it("Export kopiert interne Bilder nach assets/images und schreibt src relativ um (TKT-100)", async () => {
+  it("Export kopiert interne Bilder seitenlokal nach assets/images und schreibt src relativ um (TKT-100)", async () => {
     const exportRoot = await fs.mkdtemp(path.join(os.tmpdir(), "projekt-manager-wiki-export-"));
     try {
       const bytesA = Buffer.from("fake-png-bytes-A");
@@ -340,25 +340,29 @@ describe("Wiki API", () => {
       const idB = usedB.body.url.split("/").pop();
       const idUnused = unused.body.url.split("/").pop();
 
+      const parent = await createWikiPage(app, { title: "Kapitel" });
       await createWikiPage(app, {
         title: "Bilder",
-        content: `<p><img src="${usedA.body.url}"><img src="${usedB.body.url}"></p>`
+        parentId: parent.id,
+        content: `<p><img class="tiptap-img" src="${usedA.body.url}?v=1"><img src="http://localhost:5173${usedB.body.url}" class="tiptap-img"></p>`
       });
 
       await supertest(app.server).post("/api/wiki/export").send({ exportPath: exportRoot }).expect(200);
 
-      // Beide referenzierten Bilder liegen mit Originalbytes im assets-Verzeichnis.
-      expect(await fs.readFile(path.join(exportRoot, "assets", "images", `${idA}.png`))).toEqual(bytesA);
-      expect(await fs.readFile(path.join(exportRoot, "assets", "images", `${idB}.png`))).toEqual(bytesB);
+      // Beide referenzierten Bilder liegen mit Originalbytes im kopierbaren Seitenordner.
+      const pageDir = path.join(exportRoot, "Kapitel", "Bilder");
+      expect(await fs.readFile(path.join(pageDir, "assets", "images", `${idA}.png`))).toEqual(bytesA);
+      expect(await fs.readFile(path.join(pageDir, "assets", "images", `${idB}.png`))).toEqual(bytesB);
 
       // src ist relativ umgeschrieben, kein interner API-Verweis bleibt übrig.
-      const exported = await fs.readFile(path.join(exportRoot, "Bilder", "index.html"), "utf-8");
-      expect(exported).toContain(`src="../assets/images/${idA}.png"`);
-      expect(exported).toContain(`src="../assets/images/${idB}.png"`);
+      const exported = await fs.readFile(path.join(pageDir, "index.html"), "utf-8");
+      expect(exported).toContain(`src="assets/images/${idA}.png"`);
+      expect(exported).toContain(`src="assets/images/${idB}.png"`);
       expect(exported).not.toContain("/content/images/");
 
       // Ungenutztes DB-Bild wird nicht exportiert.
-      await expect(fs.access(path.join(exportRoot, "assets", "images", `${idUnused}.png`))).rejects.toThrow();
+      await expect(fs.access(path.join(pageDir, "assets", "images", `${idUnused}.png`))).rejects.toThrow();
+      await expect(fs.access(path.join(exportRoot, "assets", "images", `${idA}.png`))).rejects.toThrow();
     } finally {
       await fs.rm(exportRoot, { recursive: true, force: true });
     }

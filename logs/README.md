@@ -2,6 +2,9 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 11.06.26 | 14:47:51 | Fix | Wiki-Export seitenlokale Bilder | ⚠️ |
+| 11.06.26 | 14:31:25 | Fix | Wiki-Export Bilder-src | ✅ |
+| 11.06.26 | 12:00:30 | Feature | MCP-Tools für Backlog Items (create_backlog_item, update_backlog_item) | ✅ |
 | 11.06.26 | 07:42:31 | Feature | Persönliche Planung datumsübergreifend (Aufgaben/Termine) + kollabierbare Listengruppen | ✅ |
 | 10.06.26 | 17:40:56 | Fix | Aufgabenliste-Widget: geschlossene Aufgaben sichtbar (includeClosed) | ✅ |
 | 10.06.26 | 17:00:24 | Fix/Feature | MS-56 Wiki-Export (Umlaute/Bilder/Links), Autosave-Navigation, Editor-Copy + Input-Autocomplete | ✅ |

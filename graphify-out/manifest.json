@@ -5,8 +5,8 @@
     "semantic_hash": ""
   },
   ".claude/settings.json": {
-    "mtime": 1780901317.5389934,
-    "ast_hash": "af5683cedca023035194f9ad92eb0eef",
+    "mtime": 1781161211.4224906,
+    "ast_hash": "416ef95987b8c44084d251bd85a361fb",
     "semantic_hash": ""
   },
   ".claude/settings.local.json": {
@@ -170,8 +170,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/repositories/day-plan.repository.ts": {
-    "mtime": 1781104223.5828621,
-    "ast_hash": "fef0e533f9ff5ea24fc998695d9fc19e",
+    "mtime": 1781161211.4392774,
+    "ast_hash": "223a02f00f7cc76f176f0f41cd30b87d",
     "semantic_hash": ""
   },
   "apps/api/src/repositories/feature.repository.ts": {
@@ -300,8 +300,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/routes/day-plans.ts": {
-    "mtime": 1780296512.9565682,
-    "ast_hash": "501aeeec0486a31f2a8758578d385247",
+    "mtime": 1781161211.4412827,
+    "ast_hash": "9166f72619edd71bf4e46c706a14faa7",
     "semantic_hash": ""
   },
   "apps/api/src/routes/doc-links.ts": {
@@ -375,7 +375,7 @@
     "semantic_hash": ""
   },
   "apps/api/src/routes/tasks.ts": {
-    "mtime": 1781105898.794676,
+    "mtime": 1781161217.6952376,
     "ast_hash": "56344a1ed056679b66f34f14d599463b",
     "semantic_hash": ""
   },
@@ -460,8 +460,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/day-plan.service.ts": {
-    "mtime": 1780296532.470532,
-    "ast_hash": "b2ca9112129ee237e18f106664ee30b9",
+    "mtime": 1781161211.4412827,
+    "ast_hash": "12070b982bc41b5a7200e43a210c721f",
     "semantic_hash": ""
   },
   "apps/api/src/services/doc-links.service.ts": {
@@ -555,7 +555,7 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/tasks.service.ts": {
-    "mtime": 1781105881.7317677,
+    "mtime": 1781161217.6993887,
     "ast_hash": "81c6f212a11bdd2f26cdfe17d4afc02d",
     "semantic_hash": ""
   },
@@ -700,13 +700,13 @@
     "semantic_hash": ""
   },
   "apps/mcp-server/src/tools.test.ts": {
-    "mtime": 1781104198.6965659,
-    "ast_hash": "09a08706d37c1fb94c3330a8af03c819",
+    "mtime": 1781171970.037926,
+    "ast_hash": "07caee49f647c57ff58569175d197af7",
     "semantic_hash": ""
   },
   "apps/mcp-server/src/tools.ts": {
-    "mtime": 1781104198.6965659,
-    "ast_hash": "d2ae6cc927368610899376789c45d474",
+    "mtime": 1781171957.096781,
+    "ast_hash": "0ebd2f5f66495bfb9d23c1dc737e6ad7",
     "semantic_hash": ""
   },
   "apps/mcp-server/src/work-dossier.ts": {
@@ -805,13 +805,13 @@
     "semantic_hash": ""
   },
   "apps/web/src/api/dashboard.ts": {
-    "mtime": 1781105908.3742402,
+    "mtime": 1781161217.6993887,
     "ast_hash": "85fe8b2b95d1aef70a54070a03603811",
     "semantic_hash": ""
   },
   "apps/web/src/api/day-plans.ts": {
-    "mtime": 1780296513.0059204,
-    "ast_hash": "7bee47c7b62a6671eb5dad02ce56854a",
+    "mtime": 1781161211.4412827,
+    "ast_hash": "e89213ec452ab98157601a4025a8d798",
     "semantic_hash": ""
   },
   "apps/web/src/api/doc-links.ts": {
@@ -1040,8 +1040,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/dashboard/DashboardWidgets.tsx": {
-    "mtime": 1781104223.5889452,
-    "ast_hash": "6169fbf08ab200df04d7b6216ade28c7",
+    "mtime": 1781161211.4412827,
+    "ast_hash": "012524b2941f116b16e28f356a47e4ab",
     "semantic_hash": ""
   },
   "apps/web/src/components/dashboard/widgetRegistry.tsx": {
@@ -1250,8 +1250,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/tasks/TaskListBoardView.tsx": {
-    "mtime": 1781104223.5919425,
-    "ast_hash": "bb6eb473284a3dedcddcd32e058844e4",
+    "mtime": 1781161211.4412827,
+    "ast_hash": "d7e4c01265defdd5f4687908c9882222",
     "semantic_hash": ""
   },
   "apps/web/src/components/tickets/OwnerTicketBoard.tsx": {
@@ -1435,8 +1435,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/ListBoardView.tsx": {
-    "mtime": 1780901317.5545118,
-    "ast_hash": "285f66303ef51913b86036c1dce67aaa",
+    "mtime": 1781161211.4412827,
+    "ast_hash": "3e9dac55dc11912d499a4ad1bc8dc604",
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/Modal.tsx": {
@@ -1750,8 +1750,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/hooks/useDayPlan.ts": {
-    "mtime": 1780296513.1049323,
-    "ast_hash": "6e8bf0811930070dcb1631b1f9afbd49",
+    "mtime": 1781161211.4412827,
+    "ast_hash": "d2f71de3297dd7a4e8a277c1bf759eec",
     "semantic_hash": ""
   },
   "apps/web/src/hooks/useDocLinks.ts": {
@@ -1940,8 +1940,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/pages/DayPlanPage.tsx": {
-    "mtime": 1780469359.9069233,
-    "ast_hash": "94094ffe36669dcba8295b55dec12851",
+    "mtime": 1781161211.4412827,
+    "ast_hash": "c17bdb05104fe2baa6400c760df4c2e0",
     "semantic_hash": ""
   },
   "apps/web/src/pages/FeatureDetailPage.tsx": {
@@ -2105,8 +2105,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/queries/queryKeys.ts": {
-    "mtime": 1780412744.513739,
-    "ast_hash": "80f6367f67c03f045d750fda8671bf60",
+    "mtime": 1781161211.4412827,
+    "ast_hash": "61f0f487571fe6a18fad9e2a1e4a38bd",
     "semantic_hash": ""
   },
   "apps/web/src/types.ts": {
@@ -2270,8 +2270,8 @@
     "semantic_hash": ""
   },
   "tests/browser/web/day-plan.spec.ts": {
-    "mtime": 1780469359.9281962,
-    "ast_hash": "efaed9b3b4f53bdf4f6e09a6d44addfb",
+    "mtime": 1781161211.504154,
+    "ast_hash": "e4710c9e10fb816b8f5ae8a058341718",
     "semantic_hash": ""
   },
   "tests/browser/web/domain-test-utils.ts": {
@@ -2460,7 +2460,7 @@
     "semantic_hash": ""
   },
   "tests/integration/api/dashboard-widgets.test.ts": {
-    "mtime": 1781105971.1840117,
+    "mtime": 1781161217.7406685,
     "ast_hash": "792855a3ad137bac99160f4ec0f81a08",
     "semantic_hash": ""
   },
@@ -2680,7 +2680,7 @@
     "semantic_hash": ""
   },
   "tests/unit/web/api/dashboard.test.ts": {
-    "mtime": 1781105996.5048134,
+    "mtime": 1781161217.7406685,
     "ast_hash": "48615eaebe4070d7f24848460df7e84f",
     "semantic_hash": ""
   },
@@ -2860,8 +2860,8 @@
     "semantic_hash": ""
   },
   "tests/unit/web/components/ui/ListBoardView.test.tsx": {
-    "mtime": 1780296532.5745606,
-    "ast_hash": "36215a0865c068d136ff869423f25aa9",
+    "mtime": 1781161211.5058148,
+    "ast_hash": "096a57474ba606b93bf4fed4c39a6fbd",
     "semantic_hash": ""
   },
   "tests/unit/web/components/ui/MilestoneListBoardView.test.tsx": {
@@ -3040,8 +3040,8 @@
     "semantic_hash": ""
   },
   "tests/unit/web/pages/DayPlanPage.test.tsx": {
-    "mtime": 1780474466.7221258,
-    "ast_hash": "999cfdc4773acb28546d18c8ef82599a",
+    "mtime": 1781161211.5058148,
+    "ast_hash": "f88d36b1b4abbf965110de5c964a5d09",
     "semantic_hash": ""
   },
   "tests/unit/web/pages/FeatureDetailPage.test.tsx": {
@@ -3165,8 +3165,8 @@
     "semantic_hash": ""
   },
   ".claude/skills/code-discipline/SKILL.md": {
-    "mtime": 1780469359.89029,
-    "ast_hash": "09e75a3106fb16bc7d2636e23af2b828",
+    "mtime": 1781161211.4224906,
+    "ast_hash": "34b52d4bf34c2e08e7ddccf4fef4da1e",
     "semantic_hash": ""
   },
   ".claude/skills/datenmodell/SKILL.md": {
@@ -3190,13 +3190,13 @@
     "semantic_hash": ""
   },
   ".claude/skills/mcp-code-auftrag/SKILL.md": {
-    "mtime": 1781104198.6910534,
-    "ast_hash": "ff2b30cbd0202576792c3bd610e3608d",
+    "mtime": 1781161211.4224906,
+    "ast_hash": "788e9ab34fb2f7c4b5786f56b045777f",
     "semantic_hash": ""
   },
   ".claude/skills/planungsleitplanken/SKILL.md": {
-    "mtime": 1780469359.8962996,
-    "ast_hash": "612840158b9c44b62bd7a02cfa42cb60",
+    "mtime": 1781161211.4224906,
+    "ast_hash": "75e85025f69901bb963c44bef353b83c",
     "semantic_hash": ""
   },
   ".claude/skills/projekt-manager/SKILL.md": {
@@ -3210,8 +3210,8 @@
     "semantic_hash": ""
   },
   ".claude/skills/test-entwurfsleitplanken/SKILL.md": {
-    "mtime": 1780469359.897305,
-    "ast_hash": "3ca2e9c356016c9ca8c74b6082007727",
+    "mtime": 1781161211.4224906,
+    "ast_hash": "e03de1f569d7cda632d344b855cf5d97",
     "semantic_hash": ""
   },
   ".claude/skills/test-quality-review/SKILL.md": {
@@ -3225,8 +3225,8 @@
     "semantic_hash": ""
   },
   "agents.md": {
-    "mtime": 1781104198.6930552,
-    "ast_hash": "4b81b2ad4b1d6b76001c850c4ce21f58",
+    "mtime": 1781161211.4384785,
+    "ast_hash": "f5fce2e4739e8fee2e3524084b71497e",
     "semantic_hash": ""
   },
   "apps/mcp-server/README.md": {
@@ -6180,8 +6180,8 @@
     "semantic_hash": ""
   },
   "logs/README.md": {
-    "mtime": 1781106088.6862276,
-    "ast_hash": "cd8ec820a65937a7a7cccaffd2e64d57",
+    "mtime": 1781172027.7196677,
+    "ast_hash": "db944c82503bdf87998d74d5c27cf8a2",
     "semantic_hash": ""
   },
   "logs/ms26-api-build-latest.txt": {
@@ -6395,8 +6395,38 @@
     "semantic_hash": ""
   },
   "logs/2026-06-10-17-40-56-fix-aufgabenliste-widget-geschlossen.md": {
-    "mtime": 1781106082.6038437,
-    "ast_hash": "7a12e4ad1ffe0ac2f5c7dd17b9223574",
+    "mtime": 1781161217.9261034,
+    "ast_hash": "ec6861a9f0b2f3f2e2054a5e4d3b1b73",
+    "semantic_hash": ""
+  },
+  "tests/integration/api/day-plan-cross-date.test.ts": {
+    "mtime": 1781161211.5051622,
+    "ast_hash": "de95afa230b19d969e88e68466c3bba6",
+    "semantic_hash": ""
+  },
+  "tests/unit/web/hooks/useDayPlan.test.tsx": {
+    "mtime": 1781161211.5058148,
+    "ast_hash": "51cf1574290bb2e4fea66c5d79da4599",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1781161211.4224906,
+    "ast_hash": "d2b66d4ca2f3114b27046a0703e1e560",
+    "semantic_hash": ""
+  },
+  "Titel-Migration-Vorschau.md": {
+    "mtime": 1781161211.4374702,
+    "ast_hash": "502e5cc7ba6de07462de1abf93f104f1",
+    "semantic_hash": ""
+  },
+  "logs/2026-06-11-07-42-31-feature-persoenliche-planung-datumsuebergreifend.md": {
+    "mtime": 1781161211.4889326,
+    "ast_hash": "11a647109aa67c8279417eb5cc91768b",
+    "semantic_hash": ""
+  },
+  "logs/2026-06-11-12-00-30-feature-mcp-backlog-tools.md": {
+    "mtime": 1781172023.233432,
+    "ast_hash": "39112d141ac590cc64411409f5a7e39b",
     "semantic_hash": ""
   }
 }

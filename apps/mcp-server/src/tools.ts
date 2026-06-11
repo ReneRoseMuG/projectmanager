@@ -1,6 +1,9 @@
 import { TICKET_RESOLUTIONS } from "@taskmanager/shared-types";
 import type {
   Attachment,
+  BacklogItem,
+  BacklogItemInput,
+  BacklogItemUpdate,
   CatalogEntry,
   Comment,
   Feature,
@@ -248,6 +251,27 @@ const updateUseCaseSchema = idSchema.extend({
   sortOrder: z.number().int().optional(),
   responsibleUserId: z.number().int().positive().nullable().optional(),
   featureId: z.number().int().positive().optional()
+});
+const backlogCreateSchema = z.object({
+  projectId: z.number().int().positive(),
+  title: z.string().min(1),
+  description: z.string().nullable().optional(),
+  status: z.string().min(1).optional(),
+  importKey: z.string().nullable().optional(),
+  featureId: z.number().int().positive().nullable().optional(),
+  useCaseId: z.number().int().positive().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional()
+});
+const updateBacklogSchema = idSchema.extend({
+  title: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  status: z.string().min(1).optional(),
+  importKey: z.string().nullable().optional(),
+  featureId: z.number().int().positive().nullable().optional(),
+  useCaseId: z.number().int().positive().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+  responsibleUserId: z.number().int().positive().nullable().optional()
 });
 const referenceSchema = z.object({
   reference: z.string().min(1)
@@ -1088,6 +1112,20 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       description: "Aktualisiert Use-Case-Stammdaten, Feature-Zuordnung, Beschreibung und Content versionsgeschützt.",
       inputSchema: updateUseCaseSchema,
       execute: (input) => updateVersioned<UseCase>(client, `use-cases/${input.id}`, withoutIdWithHtmlDescription(input) satisfies Omit<UseCaseUpdate, "expectedVersion">)
+    }),
+    defineTool({
+      name: "create_backlog_item",
+      title: "Backlog Item erstellen",
+      description: "Legt ein Backlog Item (Ideenspeicher) an einem Projekt an. Optional mit Feature-/Use-Case-Bezug, Status, Verantwortlichem und Sortierung.",
+      inputSchema: backlogCreateSchema,
+      execute: ({ projectId, ...body }) => client.post<BacklogItem>(`projects/${projectId}/backlog`, withHtmlDescription(body) satisfies BacklogItemInput)
+    }),
+    defineTool({
+      name: "update_backlog_item",
+      title: "Backlog Item aktualisieren",
+      description: "Aktualisiert Stammdaten, Beschreibung und Bezüge eines Backlog Items versionsgeschützt.",
+      inputSchema: updateBacklogSchema,
+      execute: (input) => updateVersioned<BacklogItem>(client, `backlog/${input.id}`, withoutIdWithHtmlDescription(input) satisfies Omit<BacklogItemUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "add_task_to_use_case",

@@ -104,6 +104,8 @@ describe("MCP tool definitions", () => {
       "update_ticket",
       "update_feature",
       "update_use_case",
+      "create_backlog_item",
+      "update_backlog_item",
       "resolve_reference",
       "get_reference_context",
       "list_all_tasks",
@@ -512,6 +514,53 @@ describe("MCP tool definitions", () => {
       responsibleUserId: null,
       dueDate: "2026-06-10",
       expectedVersion: 3
+    });
+  });
+
+  it("creates backlog items at the project path with HTML description and without projectId in the body", async () => {
+    const client = createMockClient();
+    client.post.mockResolvedValue({ id: 7, version: 1 });
+
+    await tool("create_backlog_item", client).execute({
+      projectId: 1,
+      title: "Ansprechpartner je Kunde",
+      description: "Mehrere Kontakte je Kunde",
+      status: "open",
+      featureId: 3,
+      useCaseId: null,
+      sortOrder: 10,
+      responsibleUserId: 1
+    });
+
+    expect(client.post).toHaveBeenCalledWith("projects/1/backlog", {
+      title: "Ansprechpartner je Kunde",
+      description: "<p>Mehrere Kontakte je Kunde</p>",
+      status: "open",
+      featureId: 3,
+      useCaseId: null,
+      sortOrder: 10,
+      responsibleUserId: 1
+    });
+  });
+
+  it("updates backlog items with the current expectedVersion and HTML description", async () => {
+    const client = createMockClient();
+    client.get.mockResolvedValue({ id: 7, version: 2 });
+    client.patch.mockResolvedValue({ id: 7, version: 3 });
+
+    await tool("update_backlog_item", client).execute({
+      id: 7,
+      title: "Aktualisiert",
+      description: "Neuer Text",
+      status: "in_progress"
+    });
+
+    expect(client.get).toHaveBeenCalledWith("backlog/7");
+    expect(client.patch).toHaveBeenCalledWith("backlog/7", {
+      title: "Aktualisiert",
+      description: "<p>Neuer Text</p>",
+      status: "in_progress",
+      expectedVersion: 2
     });
   });
 

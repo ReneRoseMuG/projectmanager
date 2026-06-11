@@ -578,42 +578,55 @@ function extensionForMimeType(mimeType: string): string {
 }
 
 // Intern (DB) gespeicherte Editor-Bilder, z. B. src="/api/content/images/<uuid>".
-const CONTENT_IMAGE_SRC_PATTERN = 'src="((?:/api)?/content/images/([^"?#]+))(?:[?#][^"]*)?"';
+const CONTENT_IMAGE_SRC_ATTR_PATTERN = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+const CONTENT_IMAGE_PATH_PATTERN = /^\/?(?:api\/)?content\/images\/([^/?#]+)$/;
 
-// Kopiert intern gespeicherte Bilder nach <root>/assets/images/ und schreibt die
-// src-Attribute auf relative Exportpfade um (TKT-100). exportedImages dedupliziert
-// über Seiten hinweg; null bedeutet "Bild nicht gefunden", die URL bleibt dann unverändert.
+function contentImageIdFromSrc(src: string): string | null {
+  try {
+    const url = new URL(src, "http://projekt-manager.local");
+    const match = url.pathname.match(CONTENT_IMAGE_PATH_PATTERN);
+    return match?.[1] ? decodeURIComponent(match[1]) : null;
+  } catch {
+    const pathOnly = src.split(/[?#]/, 1)[0] ?? "";
+    const match = pathOnly.match(CONTENT_IMAGE_PATH_PATTERN);
+    return match?.[1] ? decodeURIComponent(match[1]) : null;
+  }
+}
+
+// Kopiert intern gespeicherte Bilder in den jeweiligen Seitenordner. So bleibt jede
+// exportierte Seite bzw. jeder Wiki-Unterordner für sich kopierbar.
 async function resolveContentImages(
   database: DbClient,
   html: string,
-  prefix: string,
-  exportPath: string,
-  exportedImages: Map<string, string | null>
+  pageExportDir: string
 ): Promise<string> {
-  const matches = [...html.matchAll(new RegExp(CONTENT_IMAGE_SRC_PATTERN, "g"))];
+  const matches = [...html.matchAll(CONTENT_IMAGE_SRC_ATTR_PATTERN)];
   if (matches.length === 0) return html;
 
   const replacements = new Map<string, string>();
+  const pageImages = new Map<string, string | null>();
   for (const match of matches) {
     const fullMatch = match[0];
-    const id = match[2];
-    if (fullMatch === undefined || id === undefined) continue;
+    const src = match[1] ?? match[2] ?? match[3];
+    if (fullMatch === undefined || src === undefined) continue;
+    const id = contentImageIdFromSrc(src);
+    if (!id) continue;
     if (replacements.has(fullMatch)) continue;
-    if (!exportedImages.has(id)) {
+    if (!pageImages.has(id)) {
       const image = await contentImageRepository.findById(database, id);
       if (image) {
         const fileName = `${id}.${extensionForMimeType(image.mimeType)}`;
-        const assetsDir = path.join(exportPath, "assets", "images");
+        const assetsDir = path.join(pageExportDir, "assets", "images");
         await fs.mkdir(assetsDir, { recursive: true });
         await fs.writeFile(path.join(assetsDir, fileName), image.data);
-        exportedImages.set(id, fileName);
+        pageImages.set(id, fileName);
       } else {
-        exportedImages.set(id, null);
+        pageImages.set(id, null);
       }
     }
-    const fileName = exportedImages.get(id);
+    const fileName = pageImages.get(id);
     if (!fileName) continue;
-    replacements.set(fullMatch, `src="${prefix}assets/images/${fileName}"`);
+    replacements.set(fullMatch, `src="assets/images/${fileName}"`);
   }
 
   let result = html;
@@ -684,16 +697,15 @@ export async function exportAllWikiPages(database: DbClient, rawExportPath: stri
 
   const slugMap = buildSlugMap(allPages);
   const pathMap = buildPathMap(allPages, slugMap);
-  const exportedImages = new Map<string, string | null>();
 
   let filesWritten = 0;
   for (const page of pagesWithContent) {
     const relPath = pathMap.get(page.id) ?? String(page.id);
-    const prefix = exportPrefix(relPath);
     const withLinks = resolveWikiLinks(page.content, relPath, pathMap);
-    const resolvedContent = await resolveContentImages(database, withLinks, prefix, exportPath, exportedImages);
+    const pageExportDir = path.join(exportPath, relPath);
+    const resolvedContent = await resolveContentImages(database, withLinks, pageExportDir);
     const html = buildHtmlDocument(page.title, resolvedContent);
-    const filePath = path.join(exportPath, relPath, "index.html");
+    const filePath = path.join(pageExportDir, "index.html");
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, html, "utf-8");
     filesWritten++;
