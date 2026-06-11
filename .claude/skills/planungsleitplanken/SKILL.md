@@ -15,7 +15,7 @@ description: >
 
 1. Auftrag gemäß `agents.md` §0 klassifizieren (Klasse 1–5)
 2. Aktuellen Branch und Working Tree prüfen wenn Änderungen möglich
-3. Nur benötigte Repo-Abschnitte lesen — erst bei Bedarf erweitern
+3. Bei Code-Bezug zuerst Graphify (`graphify query/path/explain`), dann nur benötigte Repo-Abschnitte lesen — erst bei Bedarf erweitern
 4. Betroffene Domänen, Schichten, Dateien, API, Datenmodell, Frontend-State, Tests, Logs und Abnahmekriterien identifizieren
 5. Explizit entscheiden ob Auth, Rollen, Permissions, Migrationen, Dumps, Fixtures und UI-Regeln betroffen sind
 6. Annahmen und Blocker benennen — keine stillen Architektur-, Produkt- oder Scope-Entscheidungen
@@ -34,6 +34,8 @@ description: >
 - Was kann kaputtgehen — wie wird das Risiko begrenzt?
 
 ## Architektur-Referenz
+
+Tiefergehende Architekturarbeit: `docs/architektur-leitfaden.md` (Datenmodell & Schichten). UI/Design: `docs/design-leitfaden.md`.
 
 **Schichten:**
 - Shared Types → `packages/shared-types`
@@ -161,3 +163,4 @@ Abbrechen und Blocker dokumentieren wenn:
 - Benötigte Task-Datei oder Schema-Quelle fehlt und alle abhängigen Schritte brauchen sie
 
 Bauplan: `docs/skill-documentation/planungsleitplanken.md`
+Quelle (Ebene 1): Skill Library `core/planung.md` + `core/graphify-protocol.md` — dort zuerst ändern, dann hier nachziehen.

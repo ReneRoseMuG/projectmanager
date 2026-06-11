@@ -19,7 +19,7 @@ import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
 import { TaskListBoardView } from "../components/tasks/TaskListBoardView";
 import { errorMessage } from "../hooks/errors";
 import { useCatalogs } from "../hooks/useCatalogs";
-import { useDayPlan } from "../hooks/useDayPlan";
+import { useDayPlan, useDayPlanTasks } from "../hooks/useDayPlan";
 import { useEntityComments } from "../hooks/useEntityComments";
 import { useNotes } from "../hooks/useNotes";
 import { useHasPermission } from "../hooks/usePermissions";
@@ -58,7 +58,7 @@ function DayPlanTasks({
   tasks: TaskBoardItem[];
   loading: boolean;
   createTask: ReturnType<typeof useDayPlan>["createTask"];
-  unlinkTask: ReturnType<typeof useDayPlan>["unlinkTask"];
+  unlinkTask: (taskId: number) => Promise<void>;
   updateTask: ReturnType<typeof useDayPlan>["updateTask"];
 }) {
   const navigate = useNavigate();
@@ -128,6 +128,7 @@ function DayPlanTasks({
   return (
     <>
       <TaskListBoardView
+        boardId="dayplan-tasks"
         tasks={tasks}
         loading={loading}
         viewMode={viewMode}
@@ -212,18 +213,19 @@ function DayPlanComments({ dayPlanId }: { dayPlanId: number }) {
 export function DayPlanPage() {
   const date = todayKey();
   const dayPlanController = useDayPlan(date);
-  const { dayPlan, loading, error, createTask, updateTask, unlinkTask } = dayPlanController;
+  const { dayPlan, loading, error, createTask, updateTask } = dayPlanController;
+  const dayPlanTasks = useDayPlanTasks();
   const [activeTab, setActiveTab] = useState<DayPlanTab>("overview");
 
   const tabItems = useMemo(
     () =>
       tabs.map((tab) => {
         if (tab.value === "tasks") {
-          return { ...tab, count: dayPlan?.tasks.length ?? 0 };
+          return { ...tab, count: dayPlanTasks.tasks.length };
         }
         return tab;
       }),
-    [dayPlan?.tasks.length],
+    [dayPlanTasks.tasks.length],
   );
 
   return (
@@ -248,10 +250,10 @@ export function DayPlanPage() {
               {activeTab === "tasks" ? (
                 <DayPlanTasks
                   dayPlanDate={date}
-                  tasks={dayPlan.tasks}
-                  loading={loading}
+                  tasks={dayPlanTasks.tasks}
+                  loading={dayPlanTasks.loading}
                   createTask={createTask}
-                  unlinkTask={unlinkTask}
+                  unlinkTask={dayPlanTasks.unlinkTask}
                   updateTask={updateTask}
                 />
               ) : null}

@@ -63,12 +63,19 @@ const tasks: TaskBoardItem[] = [
 
 vi.mock("../../../../apps/web/src/hooks/useDayPlan", () => ({
   useDayPlan: () => ({
-    dayPlan: { id: 7, tasks },
+    dayPlan: { id: 7, tasks: [] },
     loading: false,
     error: null,
     createTask: createTaskMock,
-    unlinkTask: unlinkTaskMock,
+    unlinkTask: vi.fn(),
     updateTask: updateTaskMock,
+  }),
+  // Cross-date personal task list (date filter removed): drives the tab counter and the Aufgaben tab.
+  useDayPlanTasks: () => ({
+    tasks,
+    loading: false,
+    error: null,
+    unlinkTask: unlinkTaskMock,
   }),
 }));
 
@@ -191,6 +198,14 @@ describe("DayPlanPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe anlegen" }));
 
     expect(screen.getByTestId("task-form")).toBeInTheDocument();
+  });
+
+  it("Aufgaben-Tab-Zähler nutzt die datumsübergreifende Liste aus useDayPlanTasks", () => {
+    renderPage();
+
+    const tabLabels = screen.getAllByRole("button").map((button) => button.textContent?.trim() ?? "");
+    // tasks-Fixture hat genau 1 Eintrag; dayPlan.tasks ist leer → Zähler (1) muss aus useDayPlanTasks stammen.
+    expect(tabLabels.some((label) => label.startsWith("Aufgaben") && label.includes("1"))).toBe(true);
   });
 
   it("Übersicht-Tab zeigt DashboardView mit dayPlan-Kontext", () => {

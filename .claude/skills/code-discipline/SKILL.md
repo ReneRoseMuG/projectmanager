@@ -13,6 +13,7 @@ description: >
 ## Prinzip 1: Zuerst lesen, dann ändern
 
 Vor jeder Dateiänderung:
+- Bei Code-Bezug zuerst Graphify (`graphify query/path/explain`), dann gezielt lesen
 - Ganze Komponente oder Modul verstehen wie es heute funktioniert
 - Alle UI-Elemente identifizieren: Buttons, Inputs, Icons, Event-Handler, conditional Renders
 - Bei CSS: welche anderen Komponenten teilen dieselben Klassen oder Parent-Selektoren
@@ -38,6 +39,7 @@ Vor der ersten Änderung:
 - Nichts umbenennen das nicht kaputt ist
 - Keine Dateien außerhalb des Auftrags reorganisieren
 - Nötige Nebenänderungen explizit benennen
+- In einer Test- oder Fix-Session keinen über den Auftrag hinausgehenden Produktivcode ändern
 
 ## Prinzip 5: Preservation Checklist vor dem Abschluss
 
@@ -63,3 +65,4 @@ Vor der ersten Änderung:
 Bei Befund: sofort korrigieren, außer der Auftrag erlaubt ausdrücklich das Offenlassen.
 
 Bauplan: `docs/skill-documentation/code-discipline.md`
+Quelle (Ebene 1): Skill Library `core/code-discipline.md` — dort zuerst ändern, dann hier nachziehen.

@@ -241,14 +241,42 @@ test.describe("Persönliche Planung – Aufgaben", () => {
         .first();
 
       const [response] = await Promise.all([
+        // Datumsunabhängiges Lösen (entfernter Datumsfilter): DELETE /day-plans/tasks/:taskId
         page.waitForResponse(
-          (r) => r.url().includes(`${apiBaseUrl}/day-plans/${today}/tasks/${task.id}`) && r.request().method() === "DELETE",
+          (r) => r.url().includes(`${apiBaseUrl}/day-plans/tasks/${task.id}`) && r.request().method() === "DELETE",
         ),
         deleteButton.click(),
       ]);
       expect(response.ok()).toBeTruthy();
 
       await expect(page.getByText(task.title)).toHaveCount(0);
+    } finally {
+      await deleteTask(request, task.id);
+    }
+  });
+
+  test("Statusgruppe einklappen verbirgt Aufgaben und bleibt nach Reload eingeklappt", async ({ page, request }) => {
+    const today = todayIsoDate();
+    const task = await createDayPlanTask(request, today, uniqueTitle("E2E DayPlan Gruppe Einklappen"));
+
+    try {
+      await openDayPlan(page);
+      await switchTab(page, "Aufgaben");
+      await expect(page.getByText(task.title)).toBeVisible();
+
+      // Statusgruppe der Aufgabe über die Kopfzeile einklappen.
+      const groupSection = page.locator("section[data-status-column]").filter({ hasText: task.title }).first();
+      await groupSection.getByRole("button", { name: /einklappen$/ }).click();
+      await expect(page.getByText(task.title)).toHaveCount(0);
+
+      // Persistenz: nach Reload bleibt die Gruppe eingeklappt.
+      await page.reload();
+      await switchTab(page, "Aufgaben");
+      await expect(page.getByText(task.title)).toHaveCount(0);
+
+      // Wieder ausklappen macht die Aufgabe sichtbar.
+      await page.getByRole("button", { name: /ausklappen$/ }).first().click();
+      await expect(page.getByText(task.title)).toBeVisible();
     } finally {
       await deleteTask(request, task.id);
     }

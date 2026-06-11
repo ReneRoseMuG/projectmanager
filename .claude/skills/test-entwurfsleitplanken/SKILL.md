@@ -24,7 +24,14 @@ Ein Test ist nur tragfähig wenn er:
 - keine produktiven Daten, Uploads, Inhalte oder Backups berührt
 - seine Testebene ehrlich benennt
 
+## Schutzregeln
+
+- In einer Code-Test-Fix-Session keinen Produktivcode ändern, der nicht ausdrücklich beauftragt ist.
+- Keine vollständigen oder breiten Testläufe ohne ausdrückliche Beauftragung — standardmäßig nur die direkt betroffenen Tests (vgl. `agents.md §13.2`).
+
 ## Pflichtablauf vor dem Testentwurf
+
+Bei Code-Bezug zuerst Graphify anwenden (`graphify query` für den geänderten Bereich, `graphify path` zur Persistenz/zum Service), dann:
 
 1. Testebene festlegen: Unit, Integration oder Browser/E2E
 2. Zu beweisendes Verhalten in einem Satz: Ausgangszustand → Aktion → erwartetes Ergebnis
@@ -139,3 +146,4 @@ Jeder Testplan benennt konkret:
 Wenn diese Punkte nicht beantwortbar sind: nicht raten — Blocker dokumentieren.
 
 Bauplan: `docs/skill-documentation/test-entwurfsleitplanken.md`
+Quelle (Ebene 1): Skill Library `testing/01-test-skill.md` + `core/graphify-protocol.md` — dort zuerst ändern, dann hier nachziehen.

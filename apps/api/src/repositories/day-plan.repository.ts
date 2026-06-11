@@ -108,6 +108,27 @@ export const dayPlanRepository = {
       .orderBy(asc(dayPlanTasks.position), asc(tasks.id));
   },
 
+  /** All tasks linked to any of the user's day plans, across all dates. May contain a task more than once. */
+  async listTasksForUser(database: DbSession, userId: number): Promise<DayPlanTaskRow[]> {
+    return database
+      .select(taskSelect)
+      .from(dayPlanTasks)
+      .innerJoin(dayPlans, eq(dayPlanTasks.ownerId, dayPlans.id))
+      .innerJoin(tasks, eq(dayPlanTasks.taskId, tasks.id))
+      .where(eq(dayPlans.userId, userId))
+      .orderBy(asc(dayPlanTasks.position), asc(tasks.id));
+  },
+
+  /** Ids of the user's day plans that currently link the given task. */
+  async listDayPlanIdsForUserTask(database: DbSession, userId: number, taskId: number): Promise<number[]> {
+    const rows = await database
+      .select({ ownerId: dayPlanTasks.ownerId })
+      .from(dayPlanTasks)
+      .innerJoin(dayPlans, eq(dayPlanTasks.ownerId, dayPlans.id))
+      .where(and(eq(dayPlans.userId, userId), eq(dayPlanTasks.taskId, taskId)));
+    return rows.map((row) => row.ownerId);
+  },
+
   async listEvents(database: DbSession, dayPlanId: number): Promise<DayPlanEventRow[]> {
     return database
       .select(eventSelect)
@@ -115,6 +136,18 @@ export const dayPlanRepository = {
       .innerJoin(events, eq(dayPlanEvents.eventId, events.id))
       .where(eq(dayPlanEvents.ownerId, dayPlanId))
       .orderBy(asc(dayPlanEvents.position), asc(events.startTime), asc(events.id));
+  },
+
+  /** Event ids linked to any of the user's day plans, across all dates. May contain an id more than once. */
+  async listEventIdsForUser(database: DbSession, userId: number): Promise<number[]> {
+    const rows = await database
+      .select({ eventId: dayPlanEvents.eventId })
+      .from(dayPlanEvents)
+      .innerJoin(dayPlans, eq(dayPlanEvents.ownerId, dayPlans.id))
+      .innerJoin(events, eq(dayPlanEvents.eventId, events.id))
+      .where(eq(dayPlans.userId, userId))
+      .orderBy(asc(events.startTime), asc(events.id));
+    return rows.map((row) => row.eventId);
   },
 
   async addTask(database: DbSession, dayPlanId: number, taskId: number, position: number): Promise<void> {

@@ -57,6 +57,7 @@ Nur ändern was durch Auftrag oder freigegebenen Plan gedeckt ist.
 Blockierte Teilaufgaben dokumentieren und mit unabhängigen Schritten weitermachen.
 
 Spezialisierte Skills anwenden wenn zutreffend:
+- Analyse / Code-Verständnis → `exploration`, `architektur`, `datenmodell` (Graphify zuerst)
 - Planung → `planungsleitplanken`
 - Tests → `test-entwurfsleitplanken`
 - Code-Änderung → `code-discipline`
@@ -81,3 +82,4 @@ Parent-Status auf `pending` setzen — erst nach Ausführung und optionaler Log-
 Kein Status-Update-Tool → als Blocker melden.
 
 Bauplan: `docs/skill-documentation/mcp-code-auftrag.md`
+Quelle (Ebene 1): Skill Library `core/work-order.md` + `core/00-auftrags-orchestrator.md` — dort zuerst ändern, dann hier nachziehen.

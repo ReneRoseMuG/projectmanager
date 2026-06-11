@@ -119,7 +119,9 @@ export const queryKeys = {
   },
   dayPlans: {
     root: ["dayPlans"] as const,
-    detail: (date: string) => [...queryKeys.dayPlans.root, "detail", date] as const
+    detail: (date: string) => [...queryKeys.dayPlans.root, "detail", date] as const,
+    tasks: () => [...queryKeys.dayPlans.root, "tasks"] as const,
+    events: () => [...queryKeys.dayPlans.root, "events"] as const
   },
   journal: {
     root: ["journal"] as const,

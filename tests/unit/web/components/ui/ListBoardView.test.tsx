@@ -15,7 +15,7 @@
  * Die gemeinsame ListBoardView-Infrastruktur gegen Regressionsfehler bei Moduswechsel, Aktionen und Basis-Item-Komponenten absichern.
  */
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, screen, within } from "@testing-library/dom";
+import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -89,6 +89,7 @@ function renderListBoardView({
 
 afterEach(() => {
   cleanup();
+  window.localStorage.clear();
 });
 
 describe("ListBoardView", () => {
@@ -613,6 +614,73 @@ describe("ListBoardView", () => {
     });
 
     expect(onSearchChange).toHaveBeenCalledWith("Alpha");
+  });
+});
+
+describe("ListBoardView Listengruppen kollabierbar (persistent)", () => {
+  const groupItems: TestItem[] = [
+    { id: 1, title: "Alpha", description: "Offen", status: "todo" },
+    { id: 2, title: "Beta", description: "Erledigt", status: "done" },
+  ];
+
+  function renderGrouped(boardId: string) {
+    return render(
+      <ListBoardView
+        boardId={boardId}
+        items={groupItems}
+        mode="list"
+        onModeChange={vi.fn()}
+        onAdd={vi.fn()}
+        statusKey="status"
+        statusColumns={[
+          { value: "todo", label: "Offen", sortOrder: 100 },
+          { value: "done", label: "Erledigt", sortOrder: 200, isClosed: true },
+        ]}
+        renderCard={(item) => <ItemCard header={<h3>Card {item.title}</h3>} />}
+        renderRow={(item) => <ItemRow title={`Row ${item.title}`} description={item.description} />}
+      />,
+    );
+  }
+
+  it("klappt eine Statusgruppe per Kopfzeile ein, verbirgt deren Items und persistiert den Zustand", async () => {
+    renderGrouped("dp");
+
+    // Beide Gruppen zunächst ausgeklappt → beide Zeilen sichtbar.
+    expect(screen.getByText("Row Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Row Beta")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Erledigt einklappen" }));
+
+    // Eingeklappt: Items der "Erledigt"-Gruppe verschwinden, "Offen" bleibt sichtbar (Gegenbeispiel).
+    expect(screen.queryByText("Row Beta")).not.toBeInTheDocument();
+    expect(screen.getByText("Row Alpha")).toBeInTheDocument();
+    const collapsedSection = document.querySelector("section[data-status-column='done']") as HTMLElement;
+    expect(collapsedSection).toHaveAttribute("data-status-collapsed", "true");
+
+    await waitFor(() => {
+      expect(JSON.parse(window.localStorage.getItem("dp-list-collapsed") ?? "{}")).toMatchObject({ done: true });
+    });
+  });
+
+  it("stellt den eingeklappten Zustand aus dem Speicher wieder her", () => {
+    window.localStorage.setItem("dp-list-collapsed", JSON.stringify({ done: true }));
+    renderGrouped("dp");
+
+    const collapsedSection = document.querySelector("section[data-status-column='done']") as HTMLElement;
+    expect(collapsedSection).toHaveAttribute("data-status-collapsed", "true");
+    expect(screen.queryByText("Row Beta")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Erledigt ausklappen" })).toBeInTheDocument();
+    // "Offen" bleibt ausgeklappt.
+    expect(screen.getByText("Row Alpha")).toBeInTheDocument();
+  });
+
+  it("erbt den Einklapp-Zustand einer anderen boardId nicht", () => {
+    window.localStorage.setItem("dp-list-collapsed", JSON.stringify({ done: true }));
+    renderGrouped("other");
+
+    const doneSection = document.querySelector("section[data-status-column='done']") as HTMLElement;
+    expect(doneSection).not.toHaveAttribute("data-status-collapsed");
+    expect(screen.getByText("Row Beta")).toBeInTheDocument();
   });
 });
 

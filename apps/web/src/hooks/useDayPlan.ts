@@ -1,4 +1,4 @@
-import type { DayPlanUpdate, EventInput, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+import type { CalendarEvent, DayPlanUpdate, EventInput, TaskBoardItem, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
@@ -7,14 +7,70 @@ import {
   getDayPlan,
   linkDayPlanEvent as linkDayPlanEventRequest,
   linkDayPlanTask as linkDayPlanTaskRequest,
+  listDayPlanEvents as listDayPlanEventsRequest,
+  listDayPlanTasks as listDayPlanTasksRequest,
   unlinkDayPlanEvent as unlinkDayPlanEventRequest,
   unlinkDayPlanTask as unlinkDayPlanTaskRequest,
+  unlinkDayPlanTaskAnyDate as unlinkDayPlanTaskAnyDateRequest,
   updateDayPlan as updateDayPlanRequest,
   updateDayPlanTask as updateDayPlanTaskRequest
 } from "../api/day-plans";
 import { invalidateDayPlan } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
+
+/**
+ * Date-independent personal task list: all tasks linked to any of the current user's day plans.
+ * Used by the Persönliche Planung so tasks no longer disappear when the day rolls over.
+ */
+export function useDayPlanTasks(enabled = true) {
+  const queryClient = useQueryClient();
+
+  const tasksQuery = useQuery({
+    queryKey: queryKeys.dayPlans.tasks(),
+    queryFn: listDayPlanTasksRequest,
+    enabled
+  });
+
+  const unlinkTaskMutation = useMutation({
+    mutationFn: (taskId: number) => unlinkDayPlanTaskAnyDateRequest(taskId),
+    onSuccess: async () => {
+      await invalidateDayPlan(queryClient);
+    }
+  });
+
+  const unlinkTask = useCallback(
+    async (taskId: number) => {
+      await unlinkTaskMutation.mutateAsync(taskId);
+    },
+    [unlinkTaskMutation]
+  );
+
+  return {
+    tasks: tasksQuery.data ?? ([] as TaskBoardItem[]),
+    loading: tasksQuery.isLoading,
+    error: toQueryError(tasksQuery.error),
+    unlinkTask
+  };
+}
+
+/**
+ * Date-independent personal events: all events linked to any of the current user's day plans.
+ * Used by the Persönliche Planung calendar so appointments stay visible across days.
+ */
+export function useDayPlanEvents(enabled = true) {
+  const eventsQuery = useQuery({
+    queryKey: queryKeys.dayPlans.events(),
+    queryFn: listDayPlanEventsRequest,
+    enabled
+  });
+
+  return {
+    events: eventsQuery.data ?? ([] as CalendarEvent[]),
+    loading: eventsQuery.isLoading,
+    error: toQueryError(eventsQuery.error)
+  };
+}
 
 export function useDayPlan(date: string, enabled = true) {
   const queryClient = useQueryClient();

@@ -20,7 +20,7 @@ import { AlertTriangle, ExternalLink, Inbox, Plus, StickyNote } from "lucide-rea
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCalendarTasks } from "../../hooks/useCalendarTasks";
-import { useDayPlan } from "../../hooks/useDayPlan";
+import { useDayPlan, useDayPlanEvents } from "../../hooks/useDayPlan";
 import { useEvents } from "../../hooks/useEvents";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useDashboardWidgetData } from "../../hooks/useDashboards";
@@ -150,10 +150,6 @@ function WidgetError({ message }: { message: string }) {
       variant="tinted"
     />
   );
-}
-
-function isDayPlanEvent(event: { owners: Array<{ type: string; id: number }> }, owner?: DashboardOwner): boolean {
-  return owner?.type === "dayPlan" && event.owners.some((eventOwner) => eventOwner.type === "dayPlan" && eventOwner.id === owner.id);
 }
 
 function DayPlanWidgetAction({
@@ -508,13 +504,14 @@ function CalendarWidget({ owner, context, dayPlanDate }: { owner?: DashboardOwne
   const events = useEvents(undefined, canReadEvents);
   const isDayPlanCalendar = owner?.type === "dayPlan" && (context === "dayPlan" || context === "dayPlanCalendar");
   const dayPlan = useDayPlan(dayPlanDate ?? "", isDayPlanCalendar && Boolean(dayPlanDate));
+  const dayPlanEventsQuery = useDayPlanEvents(canReadEvents && isDayPlanCalendar);
   const calendarTasks = useCalendarTasks(canReadTasks && !isDayPlanCalendar);
   const { showToast } = useToast();
   const [formOpen, setFormOpen] = useState(false);
   const [formDate, setFormDate] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
-  if (events.loading || calendarTasks.loading) {
+  if (events.loading || calendarTasks.loading || dayPlanEventsQuery.loading) {
     return <CalendarSkeleton />;
   }
 
@@ -568,7 +565,7 @@ function CalendarWidget({ owner, context, dayPlanDate }: { owner?: DashboardOwne
   return (
     <>
       <CalendarWidgetView
-        events={canReadEvents ? (isDayPlanCalendar ? events.events.filter((event) => isDayPlanEvent(event, owner)) : events.events) : []}
+        events={canReadEvents ? (isDayPlanCalendar ? dayPlanEventsQuery.events : events.events) : []}
         tasks={canReadTasks && !isDayPlanCalendar ? calendarTasks.tasks : []}
         compact
         mode={interactive ? "interactive" : "readonly"}
@@ -603,18 +600,19 @@ export function DayPlanCalendarWidget({ owner, dayPlanDate }: { owner: { type: "
   const canDeleteEvents = useHasPermission("events", "delete");
   const canWriteDayPlans = useHasPermission("dayPlans", "write");
   const events = useEvents(undefined, canReadEvents);
+  const dayPlanEventsQuery = useDayPlanEvents(canReadEvents);
   const dayPlan = useDayPlan(dayPlanDate ?? "", Boolean(dayPlanDate));
   const { showToast } = useToast();
   const [formOpen, setFormOpen] = useState(false);
   const [formDate, setFormDate] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
-  if (events.loading) {
+  if (events.loading || dayPlanEventsQuery.loading) {
     return <CalendarSkeleton />;
   }
 
   const interactive = canWriteEvents && Boolean(dayPlanDate) && canWriteDayPlans;
-  const dayPlanEvents = canReadEvents ? events.events.filter((event) => isDayPlanEvent(event, owner)) : [];
+  const dayPlanEvents = canReadEvents ? dayPlanEventsQuery.events : [];
 
   const handleDateClick = interactive
     ? (date: string) => {

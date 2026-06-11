@@ -32,6 +32,7 @@ interface TaskListBoardViewProps {
   canDelete?: boolean;
   readOnly?: boolean;
   loading?: boolean;
+  boardId?: string;
 }
 
 function toListBoardMode(viewMode: ViewMode): ListBoardMode {
@@ -52,7 +53,7 @@ function matchesSearch(task: Task, searchValue: string) {
 }
 
 /** Task-specific ListBoardView adapter with status Kanban columns. */
-export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange, linkAction, filters, showCreateActions = true, canDelete = true, readOnly = false, loading = false }: TaskListBoardViewProps) {
+export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange, linkAction, filters, showCreateActions = true, canDelete = true, readOnly = false, loading = false, boardId }: TaskListBoardViewProps) {
   const catalogs = useCatalogs();
   const canReadTags = useHasPermission("tags", "read");
   const canWriteTasks = useHasPermission("tasks", "write");
@@ -77,6 +78,7 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
   // Kanban-Drag (onItemStatusChange) bleiben weiterhin an readOnly gekoppelt.
   return (
     <ListBoardView
+      boardId={boardId}
       items={visibleTasks}
       mode={toListBoardMode(viewMode)}
       onModeChange={(mode) => {

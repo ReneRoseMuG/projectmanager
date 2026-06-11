@@ -7,12 +7,15 @@ import {
   findOrCreateDayPlanByUserAndDate,
   linkDayPlanEvent,
   linkDayPlanTask,
+  listDayPlanEventsForUser,
+  listDayPlanTasksForUser,
   unlinkDayPlanEvent,
   unlinkDayPlanTask,
+  unlinkDayPlanTaskForUser,
   updateDayPlanForUserAndDate
 } from "../services/day-plan.service.js";
 import { createJournalActor } from "../services/journal.service.js";
-import { expectedVersionPropertySchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, objectResponseSchema, taskIdParamSchema } from "../utils/route-schemas.js";
 
 const dateParamSchema = {
   type: "object",
@@ -98,6 +101,37 @@ const eventBodySchema = {
 } as const;
 
 export async function registerDayPlanRoutes(app: FastifyInstance): Promise<void> {
+  // Date-independent personal views: all tasks/events linked to any of the current user's day plans.
+  // Static routes take precedence over the parametric "/day-plans/:date" in Fastify's router.
+  // The auth override pins the permission resource to "dayPlans" (the path also contains "/tasks").
+  app.get(
+    "/day-plans/tasks",
+    { config: { auth: { resource: "dayPlans", action: "read" } }, schema: { response: { 200: arrayResponseSchema } } },
+    async (request) => {
+      const currentUser = await requireCurrentUser(request);
+      return listDayPlanTasksForUser(app.db, currentUser.id);
+    }
+  );
+
+  app.get(
+    "/day-plans/events",
+    { config: { auth: { resource: "dayPlans", action: "read" } }, schema: { response: { 200: arrayResponseSchema } } },
+    async (request) => {
+      const currentUser = await requireCurrentUser(request);
+      return listDayPlanEventsForUser(app.db, currentUser.id);
+    }
+  );
+
+  app.delete<{ Params: { taskId: number } }>(
+    "/day-plans/tasks/:taskId",
+    { config: { auth: { resource: "dayPlans", action: "delete" } }, schema: { params: taskIdParamSchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
+      const currentUser = await requireCurrentUser(request);
+      await unlinkDayPlanTaskForUser(app.db, currentUser.id, request.params.taskId, createJournalActor(currentUser));
+      return reply.status(204).send();
+    }
+  );
+
   app.get<{ Params: { date: string } }>(
     "/day-plans/:date",
     { schema: { params: dateParamSchema, response: { 200: objectResponseSchema } } },

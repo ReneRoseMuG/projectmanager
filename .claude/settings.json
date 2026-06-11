@@ -1,4 +1,9 @@
 {
+  "permissions": {
+    "allow": [
+      "mcp__plugin_projekt-manager_projekt-manager__*"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

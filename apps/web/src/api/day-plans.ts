@@ -22,6 +22,18 @@ export async function unlinkDayPlanTask(date: string, taskId: number): Promise<v
   await api.delete(`day-plans/${date}/tasks/${taskId}`).json();
 }
 
+export async function listDayPlanTasks(): Promise<TaskBoardItem[]> {
+  return api.get("day-plans/tasks").json<TaskBoardItem[]>();
+}
+
+export async function listDayPlanEvents(): Promise<CalendarEvent[]> {
+  return api.get("day-plans/events").json<CalendarEvent[]>();
+}
+
+export async function unlinkDayPlanTaskAnyDate(taskId: number): Promise<void> {
+  await api.delete(`day-plans/tasks/${taskId}`).json();
+}
+
 export async function createDayPlanEvent(date: string, input: EventInput): Promise<CalendarEvent> {
   return api.post(`day-plans/${date}/events`, { json: input }).json<CalendarEvent>();
 }

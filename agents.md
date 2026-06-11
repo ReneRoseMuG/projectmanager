@@ -623,7 +623,7 @@ Der Agent schreibt den Log-Eintrag gemäß Abschnitt 5 **immer** — ohne Rückf
 
 ### 13.1.1 MCP-Abschlusskommentar im Projekt (automatisch, keine Rückfrage)
 
-Zusätzlich zum dateibasierten Schritt-Log schreibt der Agent nach jedem abgeschlossenen Auftrag der Klassen 4 und 5 **automatisch und ohne Rückfrage** einen kurzen Abschlusskommentar in die Projekt-Manager-App. Das gilt unabhängig davon, ob der Auftrag von einer PM-Referenz ausging.
+Zusätzlich zum dateibasierten Schritt-Log schreibt der Agent **einmal nach Abschluss der gesamten Aufgabe** — nicht nach einzelnen Teilschritten oder Unteraufgaben — **automatisch und ohne Rückfrage** einen kurzen Abschlusskommentar in die Projekt-Manager-App. Das gilt für jeden Änderungsauftrag der Klassen 4 und 5, unabhängig davon, ob der Auftrag von einer PM-Referenz ausging. Der dateibasierte Schritt-Log nach Abschnitt 5 bleibt davon unberührt und wird weiterhin pro Teilaufgabe geschrieben.
 
 - **Ziel:** das in `docs/projekt-kontext.md` hinterlegte Standard-Log-Ziel (aktuell `PROJ-3`). Ging der Auftrag von einer spezifischen Parent-Referenz aus (`PROJ`/`MS`/`TASK`/`TKT`/`FEAT`/`UC`), wird der Kommentar zusätzlich an diesen Parent geschrieben; dafür bleibt der Skill `mcp-code-auftrag` maßgeblich.
 - **Tool:** `add_comment_to_parent`. Ist das Tool nicht verfügbar, ersatzweise `add_note_to_parent` (als Log kennzeichnen).

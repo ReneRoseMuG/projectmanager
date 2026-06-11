@@ -19,7 +19,7 @@ import type {
   CatalogEntry,
   StatusCatalogKind,
 } from "@taskmanager/shared-types";
-import { Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import type { ViewMode } from "../../types";
@@ -273,6 +273,7 @@ interface StatusSectionProps {
   collapsed: boolean;
   children: ReactNode;
   renderColumnAddButton: (column: StatusColumn) => ReactNode;
+  onToggle?: () => void;
 }
 
 function statusSectionClass(
@@ -296,6 +297,7 @@ function PlainStatusSection({
   collapsed,
   children,
   renderColumnAddButton,
+  onToggle,
 }: StatusSectionProps) {
   if (collapsed) {
     return (
@@ -305,6 +307,7 @@ function PlainStatusSection({
         knownColumn={knownColumn}
         layout={layout}
         renderColumnAddButton={renderColumnAddButton}
+        onToggle={onToggle}
       />
     );
   }
@@ -320,6 +323,7 @@ function PlainStatusSection({
         column={column}
         itemCount={itemCount}
         renderColumnAddButton={renderColumnAddButton}
+        onToggle={onToggle}
       />
       {children}
     </section>
@@ -334,6 +338,7 @@ function DroppableStatusSection({
   collapsed,
   children,
   renderColumnAddButton,
+  onToggle,
 }: StatusSectionProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.value,
@@ -351,6 +356,7 @@ function DroppableStatusSection({
         setNodeRef={setNodeRef}
         droppable={knownColumn}
         renderColumnAddButton={renderColumnAddButton}
+        onToggle={onToggle}
       />
     );
   }
@@ -368,6 +374,7 @@ function DroppableStatusSection({
         column={column}
         itemCount={itemCount}
         renderColumnAddButton={renderColumnAddButton}
+        onToggle={onToggle}
       />
       {children}
     </section>
@@ -383,6 +390,7 @@ function CollapsedStatusSection({
   setNodeRef,
   droppable = false,
   renderColumnAddButton,
+  onToggle,
 }: {
   column: StatusColumn;
   itemCount: number;
@@ -392,6 +400,7 @@ function CollapsedStatusSection({
   setNodeRef?: (element: HTMLElement | null) => void;
   droppable?: boolean;
   renderColumnAddButton: (column: StatusColumn) => ReactNode;
+  onToggle?: () => void;
 }) {
   const overClass = isOver ? " ring-2 ring-fern/40 brightness-[1.02]" : "";
 
@@ -419,6 +428,17 @@ function CollapsedStatusSection({
     );
   }
 
+  const collapsedLabel = (
+    <>
+      <h2 className="min-w-0 truncate text-sm font-semibold text-steel-600">
+        {column.label}
+      </h2>
+      <span className="rounded bg-steel-100 px-2 py-0.5 text-xs font-semibold text-steel-600">
+        {itemCount}
+      </span>
+    </>
+  );
+
   return (
     <section
       ref={setNodeRef}
@@ -429,14 +449,20 @@ function CollapsedStatusSection({
       data-status-column={column.value}
       data-status-known={knownColumn ? "true" : "false"}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <h2 className="min-w-0 truncate text-sm font-semibold text-steel-600">
-          {column.label}
-        </h2>
-        <span className="rounded bg-steel-100 px-2 py-0.5 text-xs font-semibold text-steel-600">
-          {itemCount}
-        </span>
-      </div>
+      {onToggle ? (
+        <button
+          type="button"
+          className="flex min-w-0 items-center gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-fern/40"
+          aria-expanded={false}
+          aria-label={`${column.label} ausklappen`}
+          onClick={onToggle}
+        >
+          <ChevronRight size={16} className="shrink-0 text-steel-500" />
+          {collapsedLabel}
+        </button>
+      ) : (
+        <div className="flex min-w-0 items-center gap-2">{collapsedLabel}</div>
+      )}
       <div className="shrink-0">{renderColumnAddButton(column)}</div>
     </section>
   );
@@ -446,24 +472,43 @@ function StatusSectionHeader({
   column,
   itemCount,
   renderColumnAddButton,
+  onToggle,
 }: {
   column: StatusColumn;
   itemCount: number;
   renderColumnAddButton: (column: StatusColumn) => ReactNode;
+  onToggle?: () => void;
 }) {
+  const label = (
+    <>
+      <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
+        {column.label}
+      </h2>
+      <span className="rounded bg-steel-100 px-2 py-0.5 text-xs font-semibold text-steel-600">
+        {itemCount}
+      </span>
+    </>
+  );
+
   return (
     <header
       className="flex min-w-0 items-center justify-between gap-2 rounded-t-lg border-b border-line/60 bg-white px-3 py-2"
       style={statusHeaderStyle(column)}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <h2 className="min-w-0 truncate text-sm font-semibold text-ink">
-          {column.label}
-        </h2>
-        <span className="rounded bg-steel-100 px-2 py-0.5 text-xs font-semibold text-steel-600">
-          {itemCount}
-        </span>
-      </div>
+      {onToggle ? (
+        <button
+          type="button"
+          className="flex min-w-0 items-center gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-fern/40"
+          aria-expanded={true}
+          aria-label={`${column.label} einklappen`}
+          onClick={onToggle}
+        >
+          <ChevronDown size={16} className="shrink-0 text-steel-500" />
+          {label}
+        </button>
+      ) : (
+        <div className="flex min-w-0 items-center gap-2">{label}</div>
+      )}
       {renderColumnAddButton(column)}
     </header>
   );
@@ -539,6 +584,29 @@ function readStoredBoolean(key: string, fallback: boolean): boolean {
     return fallback;
   } catch {
     return fallback;
+  }
+}
+
+/** Reads a persisted `{ [statusValue]: collapsed }` map for list-mode group collapsing. */
+function readStoredCollapseMap(key: string): Record<string, boolean> {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+    const result: Record<string, boolean> = {};
+    for (const [groupValue, collapsed] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof collapsed === "boolean") {
+        result[groupValue] = collapsed;
+      }
+    }
+    return result;
+  } catch {
+    return {};
   }
 }
 
@@ -684,6 +752,24 @@ function ListBoardViewContent<T>({
 }: ListBoardViewProps<T>) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [activeItem, setActiveItem] = useState<T | null>(null);
+  const [collapsedListGroups, setCollapsedListGroups] = useState<Record<string, boolean>>(
+    () => readStoredCollapseMap(`${boardId}-list-collapsed`),
+  );
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(`${boardId}-list-collapsed`, JSON.stringify(collapsedListGroups));
+      } catch {
+        // localStorage may be unavailable in privacy mode.
+      }
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [collapsedListGroups, boardId]);
+
+  const toggleListGroup = useCallback((value: string, effectiveCollapsed: boolean) => {
+    setCollapsedListGroups((current) => ({ ...current, [value]: !effectiveCollapsed }));
+  }, []);
   const orderedStatusColumns = sortedStatusColumns(statusColumns);
   const hasStatusGrouping =
     statusKey !== undefined &&
@@ -793,7 +879,11 @@ function ListBoardViewContent<T>({
       >
         {visibleGroups.map((group) => {
           const knownColumn = isKnownStatusGroup(orderedStatusColumns, group);
-          const collapsed = group.items.length === 0 && knownColumn;
+          const autoCollapsed = group.items.length === 0 && knownColumn;
+          // In list mode the user can collapse/expand any status group; the choice persists per board.
+          // Board mode keeps the existing auto-collapse of empty known columns and is not user-toggleable here.
+          const collapsed = layout === "list" ? (collapsedListGroups[group.column.value] ?? autoCollapsed) : autoCollapsed;
+          const onToggle = layout === "list" ? () => toggleListGroup(group.column.value, collapsed) : undefined;
           const Section =
             dndEnabled && knownColumn
               ? DroppableStatusSection
@@ -807,6 +897,7 @@ function ListBoardViewContent<T>({
               layout={layout}
               collapsed={collapsed}
               renderColumnAddButton={renderColumnAddButton}
+              onToggle={onToggle}
             >
               {collapsed ? null : (
                 <div className="grid gap-3 p-3">

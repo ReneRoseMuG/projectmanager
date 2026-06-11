@@ -235,6 +235,50 @@ export async function createDayPlanTask(database: DbClient, userId: number, rawD
   return { ...(await mapTask(database, created)), boardPosition: position };
 }
 
+export async function listDayPlanTasksForUser(database: DbClient, userId: number): Promise<TaskBoardItem[]> {
+  const rows = await dayPlanRepository.listTasksForUser(database, userId);
+  const seen = new Set<number>();
+  const unique: DayPlanTaskRow[] = [];
+  for (const row of rows) {
+    if (!seen.has(row.id)) {
+      seen.add(row.id);
+      unique.push(row);
+    }
+  }
+  return Promise.all(unique.map((row) => mapDayPlanTask(database, row)));
+}
+
+export async function listDayPlanEventsForUser(database: DbClient, userId: number): Promise<CalendarEvent[]> {
+  const eventIds = await dayPlanRepository.listEventIdsForUser(database, userId);
+  const uniqueIds = [...new Set(eventIds)];
+  return Promise.all(uniqueIds.map((eventId) => getEvent(database, eventId)));
+}
+
+export async function unlinkDayPlanTaskForUser(database: DbClient, userId: number, taskId: number, actor?: JournalActor | null): Promise<void> {
+  const task = await ensureTaskRecord(database, taskId);
+  const ownerIds = await dayPlanRepository.listDayPlanIdsForUserTask(database, userId, taskId);
+  if (ownerIds.length === 0) {
+    throw notFound(`Task ${taskId} is not linked to any day plan of user ${userId}`);
+  }
+  await database.transaction(async (tx) => {
+    const taskObject = taskJournalObject(task);
+    for (const ownerId of ownerIds) {
+      const dayPlan = await dayPlanRepository.findById(tx, ownerId);
+      await dayPlanRepository.removeTask(tx, ownerId, taskId);
+      if (dayPlan) {
+        const ownerObject = dayPlanObject(dayPlan);
+        await recordJournalEntry(tx, {
+          operation: "unlink",
+          object: taskObject,
+          summary: buildUnlinkSummary(ownerObject, taskObject),
+          actor,
+          contexts: [makeJournalContext(ownerObject, "owner")]
+        });
+      }
+    }
+  });
+}
+
 export async function linkDayPlanTask(database: DbClient, userId: number, rawDate: string, taskId: number, actor?: JournalActor | null): Promise<TaskBoardItem> {
   const dayPlan = await findOrCreateDayPlanByUserAndDate(database, userId, rawDate, actor);
   const task = await ensureTaskRecord(database, taskId);
