@@ -1,4 +1,4 @@
-import { test, expect, type APIRequestContext } from "@playwright/test";
+import { test, expect, type APIRequestContext } from "./fixtures";
 import type { ResolvedSetting, SettingsResolvedResponse } from "@taskmanager/shared-types";
 import { apiBaseUrl, authenticatedGoto, ensureApiAuth, expectToast } from "./domain-test-utils";
 

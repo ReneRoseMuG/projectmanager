@@ -19,7 +19,7 @@
  * - WikiPageForm bindet RichTextInlineField an den Formular-State.
  * - Der Modal-Modus bietet die ID-Kopieraktion und den Open-in-Tab-Button weiterhin nur bei Prop-Übergabe.
  * - Der Inline-Modus rendert ohne Modal, mit PageHero, Delete-Aktion und Journal-Gating.
- * - Der eingebettete Inline-Modus bietet die WIKI-Kopieraktion im Kopfbereich.
+ * - Der Standalone-Inline-Modus bietet die WIKI-Kopieraktion im Hero; embedded überlässt den Kopf der Seite.
  * - Inline-Speichern einer bestehenden Seite lässt die Seite geöffnet.
  * - Bei aktivem Auto-Save schließt das Formular nach erfolgreichem Save ohne Verwerfen-Dialog (TKT-95).
  *
@@ -223,16 +223,22 @@ describe("WikiPageForm", () => {
     expect(container.querySelector('[data-testid="page-hero"][data-variant="detail"]')).toBeInTheDocument();
   });
 
-  it("zeigt im eingebetteten Modus die WIKI-Kopieraktion im Kopfbereich", () => {
-    renderWithProviders(<WikiPageForm inline inlineChrome="embedded" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+  it("zeigt im Standalone-Modus die WIKI-Kopieraktion im Hero", () => {
+    renderWithProviders(<WikiPageForm inline inlineChrome="standalone" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "ID WIKI-5 kopieren" })).toBeInTheDocument();
   });
 
-  it("kopiert die WIKI-Referenz im eingebetteten Modus in die Zwischenablage", async () => {
+  it("rendert im eingebetteten Modus keine Kopieraktion (Kopf liegt in der Seite)", () => {
+    renderWithProviders(<WikiPageForm inline inlineChrome="embedded" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "ID WIKI-5 kopieren" })).not.toBeInTheDocument();
+  });
+
+  it("kopiert die WIKI-Referenz im Standalone-Modus in die Zwischenablage", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    renderWithProviders(<WikiPageForm inline inlineChrome="embedded" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+    renderWithProviders(<WikiPageForm inline inlineChrome="standalone" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "ID WIKI-5 kopieren" }));
 

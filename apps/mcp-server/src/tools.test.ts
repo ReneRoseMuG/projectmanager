@@ -118,6 +118,10 @@ describe("MCP tool definitions", () => {
       "update_ticket",
       "update_feature",
       "update_use_case",
+      "list_wiki_pages",
+      "get_wiki_page",
+      "create_wiki_page",
+      "update_wiki_page",
       "create_backlog_item",
       "update_backlog_item",
       "resolve_reference",
@@ -238,6 +242,70 @@ describe("MCP tool definitions", () => {
     const result = (await tool("list_tags", client).execute({})) as Array<{ name: string }>;
 
     expect(result).toEqual([expect.objectContaining({ name: "Bug" })]);
+  });
+
+  it("creates a wiki page and converts markdown content to HTML", async () => {
+    const client = createMockClient();
+    client.post.mockResolvedValue({ id: 7, title: "Handbuch", content: "<h1>Handbuch</h1>", version: 1 });
+
+    const result = await tool("create_wiki_page", client).execute({
+      title: "Handbuch",
+      content: "# Handbuch\n\nEinleitung mit **fett**."
+    });
+
+    expect(client.post).toHaveBeenCalledWith("wiki", {
+      title: "Handbuch",
+      content: "<h1>Handbuch</h1><p>Einleitung mit <strong>fett</strong>.</p>"
+    });
+    expect(result).toMatchObject({ id: 7 });
+  });
+
+  it("creates a wiki page and keeps ready HTML content unchanged", async () => {
+    const client = createMockClient();
+    client.post.mockResolvedValue({ id: 8, title: "Tabelle", version: 1 });
+
+    await tool("create_wiki_page", client).execute({
+      title: "Tabelle",
+      parentId: 3,
+      content: "<table><tr><td>A</td></tr></table>"
+    });
+
+    expect(client.post).toHaveBeenCalledWith("wiki", {
+      title: "Tabelle",
+      parentId: 3,
+      content: "<table><tr><td>A</td></tr></table>"
+    });
+  });
+
+  it("updates a wiki page with the current version and converts content", async () => {
+    const client = createMockClient();
+    client.get.mockResolvedValue({ id: 5, title: "Alt", content: "<p>alt</p>", version: 4 });
+    client.patch.mockResolvedValue({ id: 5, title: "Neu", version: 5 });
+
+    await tool("update_wiki_page", client).execute({ id: 5, title: "Neu", content: "neu" });
+
+    expect(client.get).toHaveBeenCalledWith("wiki/5");
+    expect(client.patch).toHaveBeenCalledWith("wiki/5", {
+      title: "Neu",
+      content: "<p>neu</p>",
+      expectedVersion: 4
+    });
+  });
+
+  it("lists wiki root pages and children", async () => {
+    const client = createMappedClient({
+      wiki: [{ id: 1, title: "Wurzel", version: 1 }],
+      "wiki/1/children": [{ id: 2, title: "Kind", version: 1 }]
+    });
+
+    expect(await tool("list_wiki_pages", client).execute({})).toEqual([expect.objectContaining({ id: 1 })]);
+    expect(await tool("list_wiki_pages", client).execute({ parentId: 1 })).toEqual([expect.objectContaining({ id: 2 })]);
+  });
+
+  it("reads a single wiki page", async () => {
+    const client = createMappedClient({ "wiki/9": { id: 9, title: "Seite", content: "<p>x</p>", version: 2 } });
+
+    expect(await tool("get_wiki_page", client).execute({ id: 9 })).toMatchObject({ id: 9, content: "<p>x</p>" });
   });
 
   it("creates projects and milestones with full metadata fields", async () => {

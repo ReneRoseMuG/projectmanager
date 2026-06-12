@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { apiBaseUrl, authenticatedGoto, ensureApiAuth, uniqueTitle } from "./domain-test-utils";
 
 test.describe.configure({ mode: "serial" });

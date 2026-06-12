@@ -5,8 +5,14 @@ import {
   type Page,
 } from "@playwright/test";
 
+// Per-worker API base URL: each Playwright worker (TEST_PARALLEL_INDEX) talks to its
+// own API server on port (base + index), matching workerApiPort() in worker-servers.ts.
+// An explicit PLAYWRIGHT_API_BASE_URL still wins (serial / custom runs).
+const apiPortBase = Number(process.env.PLAYWRIGHT_API_PORT_BASE ?? 3101);
+const workerParallelIndex = Number(process.env.TEST_PARALLEL_INDEX ?? 0);
 export const apiBaseUrl =
-  process.env.PLAYWRIGHT_API_BASE_URL ?? "http://127.0.0.1:3101/api";
+  process.env.PLAYWRIGHT_API_BASE_URL ??
+  `http://127.0.0.1:${apiPortBase + workerParallelIndex}/api`;
 
 export function todayIsoDate(date = new Date()) {
   const year = date.getFullYear();
@@ -604,9 +610,14 @@ export async function deleteComment(
 }
 
 export function formPage(page: Page, heading: string | RegExp) {
+  // The form header (PageHero, data-testid="page-hero") shows the label as the heading
+  // for "anlegen" forms; for "bearbeiten" forms the heading becomes the entity name and
+  // the label ("… bearbeiten") moves into the breadcrumb (see FormModal). Match the label
+  // anywhere inside the form's page-hero so both create and edit detail forms are found.
+  const exact = typeof heading === "string" ? { exact: true } : undefined;
   return page
     .locator("form")
-    .filter({ has: page.getByRole("heading", { name: heading }) })
+    .filter({ has: page.getByTestId("page-hero").getByText(heading, exact) })
     .last();
 }
 

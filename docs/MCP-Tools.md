@@ -40,6 +40,8 @@ Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt u
 | `get_feature` | Liest ein Feature inklusive Content. | `id` | Feature |
 | `list_use_cases` | Listet Use Cases eines Features. | `featureId` | Use-Case-Liste |
 | `get_use_case` | Liest einen Use Case inklusive Content. | `id` | Use Case |
+| `list_wiki_pages` | Listet Wiki-Seiten: ohne Angabe die obersten Seiten, mit `parentId` die direkten Unterseiten. | optional `parentId` | Wiki-Seitenliste |
+| `get_wiki_page` | Liest eine einzelne Wiki-Seite inklusive Inhalt, Hierarchie und Version. | `id` | Wiki-Seite |
 | `resolve_reference` | Lädt ein Einzelobjekt anhand einer Kurzreferenz. | `reference`, z. B. `TASK-10` | Projekt, Meilenstein, Aufgabe, Ticket, Feature oder Use Case |
 | `get_reference_context` | Lädt ein Objekt anhand einer Referenz inklusive rekursiver Kinder und Supportobjekte. | `reference`, z. B. `MS-12` oder `Meilenstein ID 12` | Kontextbaum mit `root`, `children`, `support` und `warnings` |
 | `list_catalogs` | Liest Status-, Prioritäts- und Tickettyp-Kataloge als Lookup für Schreibtools. | keine | Katalogeinträge |
@@ -67,6 +69,7 @@ Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt u
 | `remove_tags_from_parent` | Entfernt benannte Tags von einem Projekt, Meilenstein, einer Aufgabe oder einem Ticket. Nicht zugewiesene oder unbekannte Namen werden übergangen; der Tag selbst bleibt im System bestehen. | `parentType`, `parentId`, `tags[]` (Tag-Namen) | Aktualisierte Tagliste des Trägers plus `removed`, `notPresent` |
 | `create_feature` | Erstellt ein neues Feature mit Beschreibung und optionalem Content. | `title`, optional `description`, `content`, `status`, `sortOrder`, `responsibleUserId` | Neues Feature |
 | `create_use_case` | Erstellt einen neuen Use Case unter einem Feature. | `featureId`, `title`, optional `description`, `content`, `status`, `sortOrder`, `responsibleUserId` | Neuer Use Case |
+| `create_wiki_page` | Legt eine neue Wiki-Seite an. Inhalt als Markdown oder HTML (Markdown wird in HTML umgewandelt, Tabellen nur als HTML). | `title`, optional `parentId`, `content`, `sortOrder` | Neue Wiki-Seite |
 | `add_task_to_use_case` | Legt eine Aufgabe an einem Use Case an. | `useCaseId`, `title`, optional `description`, `status`, `priority`, `responsibleUserId` | Neue Aufgabe |
 | `add_ticket_to_use_case` | Legt ein Ticket an einem Use Case an. | `useCaseId`, `title`, optional `description`, `status`, `priority`, `responsibleUserId` | Neues Ticket |
 
@@ -84,6 +87,7 @@ Die Update-Tools überarbeiten komplette Stammdaten samt Beschreibung beziehungs
 | `update_ticket` | Aktualisiert Ticketstammdaten, Beschreibung und Lösung versionsgeschützt. | `id`, optional `title`, `type`, `description`, `status`, `priority`, `reporterUserId`, `responsibleUserId`, `environment`, `affectedVersion`, `dueDate`, `resolution` | Aktualisiertes Ticket |
 | `update_feature` | Aktualisiert Feature-Stammdaten, Beschreibung und Content versionsgeschützt. | `id`, optional `title`, `status`, `description`, `content`, `sortOrder`, `responsibleUserId` | Aktualisiertes Feature |
 | `update_use_case` | Aktualisiert Use-Case-Stammdaten, Feature-Zuordnung, Beschreibung und Content versionsgeschützt. | `id`, optional `title`, `status`, `description`, `content`, `sortOrder`, `responsibleUserId`, `featureId` | Aktualisierter Use Case |
+| `update_wiki_page` | Aktualisiert Titel, Inhalt, Hierarchie oder Sortierung einer Wiki-Seite versionsgeschützt. Inhalt als Markdown oder HTML. | `id`, optional `title`, `parentId`, `content`, `sortOrder` | Aktualisierte Wiki-Seite |
 
 ## Verknüpfungen
 

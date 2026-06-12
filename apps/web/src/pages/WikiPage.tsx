@@ -4,13 +4,15 @@ import type {
   DraftComment,
 } from "@taskmanager/shared-types";
 import { Download, FileText, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createEntityComment } from "../api/comments";
 import { exportWiki } from "../api/wiki";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
+import { DetailHeaderActions } from "../components/ui/DetailHeaderActions";
 import { EmptyState } from "../components/ui/EmptyState";
 import { PageHero } from "../components/ui/PageHero";
+import { SaveStatus } from "../components/ui/SaveStatus";
 import { TaskListSkeleton } from "../components/ui/Skeleton";
 import { useToast } from "../components/ui/ToastProvider";
 import { WikiPageForm } from "../components/wiki/WikiPageForm";
@@ -21,6 +23,8 @@ import { useHasPermission } from "../hooks/usePermissions";
 import { useStandaloneView } from "../hooks/useStandaloneView";
 import { useProjects } from "../hooks/useProjects";
 import { useWiki, type WikiTreeNode } from "../hooks/useWiki";
+import type { AutoSaveStatus } from "../hooks/useAutoSave";
+import { objectReference } from "../lib/references";
 import { withStandaloneView } from "../utils/standalone";
 
 function countPages(nodes: WikiTreeNode[]): number {
@@ -43,9 +47,20 @@ export function WikiPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [formParent, setFormParent] = useState<WikiPageType | null>(null);
   const [editing, setEditing] = useState(false);
+  const [inlineSaveStatus, setInlineSaveStatus] = useState<AutoSaveStatus>("idle");
+  const [inlineSaveError, setInlineSaveError] = useState<string | null>(null);
+  const handleInlineSaveStatus = useCallback(
+    (status: AutoSaveStatus, error?: string | null) => {
+      setInlineSaveStatus(status);
+      setInlineSaveError(error ?? null);
+    },
+    [],
+  );
 
   useEffect(() => {
     setEditing(false);
+    setInlineSaveStatus("idle");
+    setInlineSaveError(null);
   }, [activePageId]);
   const [exporting, setExporting] = useState(false);
   const canWrite = useHasPermission("wiki", "write");
@@ -201,23 +216,42 @@ export function WikiPage() {
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
-      <PageHero
-        variant="list"
-        title="Wiki"
-        subtitle={wiki.loading ? "" : `${countPages(wiki.tree)} Seiten`}
-        actions={canWrite && !wiki.loading && countPages(wiki.tree) > 0 ? (
-          <button
-            type="button"
-            disabled={exporting}
-            onClick={() => void runExport()}
-            className="flex h-9 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-steel-700 transition hover:bg-shell disabled:cursor-not-allowed disabled:opacity-50"
-            title="Wiki als HTML exportieren"
-          >
-            <Download size={15} />
-            {exporting ? "Exportiert…" : "Exportieren"}
-          </button>
-        ) : undefined}
-      />
+      {wiki.page && !standalone ? (
+        <PageHero
+          variant="detail"
+          breadcrumb={["Wiki", inlineParent?.title ?? "Root"]}
+          title={wiki.page.title}
+          icon={<FileText size={20} />}
+          actions={
+            <DetailHeaderActions
+              tone="onSteel"
+              saveStatus={<SaveStatus status={inlineSaveStatus} errorMessage={inlineSaveError} />}
+              objectReference={objectReference("wikiPage", wiki.page.id)}
+              onOpenInTab={() => window.open(withStandaloneView(`/wiki/${wiki.page!.id}`), "_blank")}
+              onDelete={canWrite ? () => void deletePage(wiki.page!) : undefined}
+              deleteLabel="Seite löschen"
+            />
+          }
+        />
+      ) : (
+        <PageHero
+          variant="list"
+          title="Wiki"
+          subtitle={wiki.loading ? "" : `${countPages(wiki.tree)} Seiten`}
+          actions={canWrite && !wiki.loading && countPages(wiki.tree) > 0 ? (
+            <button
+              type="button"
+              disabled={exporting}
+              onClick={() => void runExport()}
+              className="flex h-9 items-center gap-2 rounded-md border border-line bg-white px-3 text-sm font-semibold text-steel-700 transition hover:bg-shell disabled:cursor-not-allowed disabled:opacity-50"
+              title="Wiki als HTML exportieren"
+            >
+              <Download size={15} />
+              {exporting ? "Exportiert…" : "Exportieren"}
+            </button>
+          ) : undefined}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {wiki.loading ? (
@@ -250,12 +284,8 @@ export function WikiPage() {
                   projects={projects}
                   onSubmit={submitInlineForm}
                   onAutoSave={wiki.page ? autoSaveInlineForm : undefined}
+                  onAutoSaveStatusChange={handleInlineSaveStatus}
                   onDelete={canWrite ? deletePage : undefined}
-                  onOpenInTab={
-                    !standalone && wiki.page
-                      ? () => window.open(withStandaloneView(`/wiki/${wiki.page!.id}`), "_blank")
-                      : undefined
-                  }
                   editable={editing}
                   onEdit={() => setEditing(true)}
                   onNavigateToWikiPage={(id) => navigate(standalone ? withStandaloneView(`/wiki/${id}`) : `/wiki/${id}`)}

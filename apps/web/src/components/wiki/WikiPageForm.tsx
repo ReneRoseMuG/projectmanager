@@ -2,7 +2,7 @@ import type { DraftComment, Note, Project, WikiPage, WikiPageInput, WikiPageRela
 import { Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useAutoSave } from "../../hooks/useAutoSave";
+import { useAutoSave, type AutoSaveStatus } from "../../hooks/useAutoSave";
 import { SaveStatus } from "../ui/SaveStatus";
 import { uploadContentImage } from "../../api/content-images";
 import { errorMessage } from "../../hooks/errors";
@@ -42,6 +42,8 @@ interface WikiPageFormProps {
   onPostCreate?: (pageId: number, pending: { comments: DraftComment[]; relatedPageIds: number[] }) => Promise<void>;
   onClose: () => void;
   onOpenInTab?: () => void;
+  /** Surfaces the inline auto-save status to a parent that owns the detail header (Wiki tab). */
+  onAutoSaveStatusChange?: (status: AutoSaveStatus, errorMessage?: string | null) => void;
   inline?: boolean;
   inlineChrome?: "embedded" | "standalone";
   onDelete?: (page: WikiPage) => void;
@@ -66,7 +68,7 @@ const tabs: Array<Tab<WikiPageFormTab>> = [
   { value: "journal", label: "Journal" }
 ];
 
-export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onAutoSave, onPostCreate, onClose, onOpenInTab, inline = false, inlineChrome = "standalone", onDelete, editable, onEdit, onNavigateToWikiPage }: WikiPageFormProps) {
+export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onAutoSave, onPostCreate, onClose, onOpenInTab, onAutoSaveStatusChange, inline = false, inlineChrome = "standalone", onDelete, editable, onEdit, onNavigateToWikiPage }: WikiPageFormProps) {
   const { confirm } = useConfirm();
   const { showToast } = useToast();
   const pageId = page?.id ?? null;
@@ -96,6 +98,13 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
     },
   });
   const af = page ? autoSave.flush : undefined;
+
+  // Lift the auto-save status so the owning page (Wiki tab) can show it in the
+  // shared detail header instead of a separate row inside the form.
+  useEffect(() => {
+    onAutoSaveStatusChange?.(autoSave.status, autoSave.errorMessage);
+  }, [autoSave.status, autoSave.errorMessage, onAutoSaveStatusChange]);
+
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
   const [activeTab, setActiveTab] = useState<WikiPageFormTab>("details");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
@@ -259,17 +268,9 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
             }
           />
         ) : null}
-        {embeddedActionPage ? (
+        {embeddedActionPage && !effectiveEditable && onEdit ? (
           <div className="flex min-h-[40px] items-center justify-end gap-3 border-b border-line bg-shell px-5 py-2">
-            <DetailHeaderActions
-              tone="onLight"
-              saveStatus={onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} tone="onLight" /> : undefined}
-              onEdit={!effectiveEditable && onEdit ? onEdit : undefined}
-              objectReference={objectReference("wikiPage", embeddedActionPage.id)}
-              onOpenInTab={onOpenInTab}
-              onDelete={onDelete ? () => onDelete(embeddedActionPage) : undefined}
-              deleteLabel="Seite löschen"
-            />
+            <DetailHeaderActions tone="onLight" onEdit={onEdit} />
           </div>
         ) : null}
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />

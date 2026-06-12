@@ -31,7 +31,10 @@ import type {
   UseCaseInput,
   UseCaseUpdate,
   UserOption,
-  VisibleParentContext
+  VisibleParentContext,
+  WikiPage,
+  WikiPageInput,
+  WikiPageUpdate
 } from "@taskmanager/shared-types";
 import { z } from "zod";
 import { ProjectManagerApiError, type ProjectManagerApiClient } from "./api-client.js";
@@ -253,6 +256,21 @@ const updateUseCaseSchema = idSchema.extend({
   responsibleUserId: z.number().int().positive().nullable().optional(),
   featureId: z.number().int().positive().optional()
 });
+const wikiPageListSchema = z.object({
+  parentId: z.number().int().positive().optional().describe("Optional: listet die direkten Unterseiten dieser Seite. Ohne Angabe die obersten Seiten.")
+});
+const createWikiPageSchema = z.object({
+  title: z.string().min(1),
+  parentId: z.number().int().positive().nullable().optional().describe("Übergeordnete Wiki-Seite für die Hierarchie. Ohne Angabe entsteht eine Seite auf oberster Ebene."),
+  content: z.string().optional().describe("Seiteninhalt als Markdown oder HTML. Markdown wird in HTML umgewandelt; fertiges HTML bleibt erhalten. Tabellen nur als HTML."),
+  sortOrder: z.number().int().optional()
+});
+const updateWikiPageSchema = idSchema.extend({
+  title: z.string().min(1).optional(),
+  parentId: z.number().int().positive().nullable().optional().describe("Verschiebt die Seite unter eine andere übergeordnete Seite."),
+  content: z.string().optional().describe("Neuer Seiteninhalt als Markdown oder HTML. Markdown wird in HTML umgewandelt; fertiges HTML bleibt erhalten. Tabellen nur als HTML."),
+  sortOrder: z.number().int().optional()
+});
 const backlogCreateSchema = z.object({
   projectId: z.number().int().positive(),
   title: z.string().min(1),
@@ -455,6 +473,18 @@ function withoutParentWithHtmlDescription<T extends { parentType: string; parent
 
 function withoutIdWithHtmlDescription<T extends { id: number } & DescriptionPayload>(input: T): Omit<T, "id"> {
   return withHtmlDescription(withoutId(input) as Omit<T, "id"> & DescriptionPayload) as Omit<T, "id">;
+}
+
+function withHtmlContent<T extends { content?: string | null }>(input: T): T {
+  if (input.content === undefined) {
+    return input;
+  }
+  // textToHtml wandelt Markdown/Text in HTML um und lässt bereits vorhandenes HTML unverändert.
+  return { ...input, content: textToHtml(input.content) ?? "" } as T;
+}
+
+function withoutIdWithHtmlContent<T extends { id: number; content?: string | null }>(input: T): Omit<T, "id"> {
+  return withHtmlContent(withoutId(input) as Omit<T, "id"> & { content?: string | null }) as Omit<T, "id">;
 }
 
 function withoutAttachment<T extends { attachment?: unknown }>(input: T): Omit<T, "attachment"> {
@@ -1248,6 +1278,35 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       description: "Legt ein Ticket an einem Use Case an.",
       inputSchema: useCaseChildSchema,
       execute: ({ useCaseId, ...body }) => client.post<Ticket>(`use-cases/${useCaseId}/tickets`, withHtmlDescription(body) satisfies TicketInput)
+    }),
+    defineTool({
+      name: "list_wiki_pages",
+      title: "Wiki-Seiten listen",
+      description: "Listet Wiki-Seiten. Ohne Angabe die obersten Seiten; mit parentId die direkten Unterseiten dieser Seite.",
+      inputSchema: wikiPageListSchema,
+      execute: ({ parentId }) =>
+        parentId === undefined ? client.get<WikiPage[]>("wiki") : client.get<WikiPage[]>(`wiki/${parentId}/children`)
+    }),
+    defineTool({
+      name: "get_wiki_page",
+      title: "Wiki-Seite lesen",
+      description: "Liest eine einzelne Wiki-Seite inklusive Inhalt, Hierarchie und Version.",
+      inputSchema: idSchema,
+      execute: ({ id }) => client.get<WikiPage>(`wiki/${id}`)
+    }),
+    defineTool({
+      name: "create_wiki_page",
+      title: "Wiki-Seite erstellen",
+      description: "Legt eine neue Wiki-Seite an. Der Inhalt darf Markdown oder HTML sein (Markdown wird in HTML umgewandelt, Tabellen nur als HTML). Optional unter einer übergeordneten Seite.",
+      inputSchema: createWikiPageSchema,
+      execute: (input) => client.post<WikiPage>("wiki", withHtmlContent(input) satisfies WikiPageInput)
+    }),
+    defineTool({
+      name: "update_wiki_page",
+      title: "Wiki-Seite aktualisieren",
+      description: "Aktualisiert Titel, Inhalt, Hierarchie oder Sortierung einer Wiki-Seite versionsgeschützt. Nur übergebene Felder werden geändert.",
+      inputSchema: updateWikiPageSchema,
+      execute: (input) => updateVersioned<WikiPage>(client, `wiki/${input.id}`, withoutIdWithHtmlContent(input) satisfies Omit<WikiPageUpdate, "expectedVersion">)
     }),
     defineTool({
       name: "preview_delete",

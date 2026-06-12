@@ -95,7 +95,7 @@ export function ProjectWikiPanel({
           <Button
             aria-label="Wiki-Seite verknüpfen"
             title="Wiki-Seite verknüpfen"
-            variant="ghost"
+            variant="secondary"
             size="sm"
             icon={<Link2 size={14} />}
             className="h-6 w-6 px-0"
@@ -131,13 +131,18 @@ export function ProjectWikiPanel({
             />
           </div>
         ) : (
-          <div className="rounded-md border border-dashed border-line px-3 py-2.5 text-xs text-steel-500">
+          <button
+            type="button"
+            onClick={openDialog}
+            disabled={!canOpenDialog}
+            className="w-full rounded-md border border-dashed border-line px-3 py-2.5 text-left text-xs text-steel-500 transition hover:border-steel-400 hover:bg-shell hover:text-ink disabled:cursor-default disabled:hover:border-line disabled:hover:bg-transparent disabled:hover:text-steel-500"
+          >
             {wiki.loading
               ? "Wiki-Seiten werden geladen"
               : pageOptions.length === 0
                 ? "Keine Wiki-Seiten vorhanden"
                 : "Keine Wiki-Seite verknüpft"}
-          </div>
+          </button>
         )}
 
         {wikiPageId && !linkedPage && wiki.error ? (

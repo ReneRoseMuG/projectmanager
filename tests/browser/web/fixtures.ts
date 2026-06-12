@@ -1,4 +1,4 @@
-import { test as base } from "@playwright/test";
+import { test as workerTest } from "./worker-fixtures";
 
 import {
   createMilestone,
@@ -31,7 +31,12 @@ interface DomainFixtures {
   projectWithDashboardItems: ProjectWithDashboardItemsFixture;
 }
 
-export const test = base.extend<DomainFixtures>({
+/**
+ * Domain fixtures layered on top of the worker-scoped isolation fixture
+ * (worker-fixtures.ts). Importing `test` from here gives every spec both the
+ * per-worker isolated stack (auto fixture) and the domain helpers.
+ */
+export const test = workerTest.extend<DomainFixtures>({
   milestoneWithTaskAndTicket: async ({ request }, use) => {
     const project = await createProject(request, "E2E Meilenstein Dashboard Projekt");
     const milestone = await createMilestone(request, project.id, "E2E Dashboard Meilenstein");
@@ -62,3 +67,5 @@ export const test = base.extend<DomainFixtures>({
     }
   },
 });
+
+export * from "./worker-fixtures";

@@ -12,7 +12,8 @@ import type {
   Task,
   Ticket,
   UseCase,
-  UserOption
+  UserOption,
+  WikiPage
 } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
 import fs from "node:fs/promises";
@@ -602,6 +603,35 @@ describe("MCP tools integration", () => {
     expect(workDossier.parent).toMatchObject({ reference: `PROJ-${project.id}`, type: "project" });
     expect(Array.isArray(workDossier.sections.waiting)).toBe(true);
     expect(workDossier.summary.openTaskCount).toBeGreaterThanOrEqual(1);
+
+    const createdWikiPage = await callTool<WikiPage>(executedTools, "create_wiki_page", {
+      title: "MCP Wiki Seite",
+      content: "# Überschrift\n\nEin Absatz mit **fett**."
+    });
+    expect(createdWikiPage).toMatchObject({ title: "MCP Wiki Seite" });
+    expect(createdWikiPage.content).toContain("<h1>Überschrift</h1>");
+
+    const wikiRoots = await callTool<WikiPage[]>(executedTools, "list_wiki_pages");
+    expect(wikiRoots).toEqual(expect.arrayContaining([expect.objectContaining({ id: createdWikiPage.id })]));
+
+    const childWikiPage = await callTool<WikiPage>(executedTools, "create_wiki_page", {
+      title: "MCP Unterseite",
+      parentId: createdWikiPage.id,
+      content: "Inhalt der Unterseite."
+    });
+    const wikiChildren = await callTool<WikiPage[]>(executedTools, "list_wiki_pages", { parentId: createdWikiPage.id });
+    expect(wikiChildren).toEqual(expect.arrayContaining([expect.objectContaining({ id: childWikiPage.id })]));
+
+    const fetchedWikiPage = await callTool<WikiPage>(executedTools, "get_wiki_page", { id: createdWikiPage.id });
+    expect(fetchedWikiPage).toMatchObject({ id: createdWikiPage.id, title: "MCP Wiki Seite" });
+
+    const updatedWikiPage = await callTool<WikiPage>(executedTools, "update_wiki_page", {
+      id: createdWikiPage.id,
+      title: "MCP Wiki Seite aktualisiert",
+      content: "<p>Direktes HTML bleibt erhalten.</p>"
+    });
+    expect(updatedWikiPage).toMatchObject({ title: "MCP Wiki Seite aktualisiert" });
+    expect((await seedClient.get<WikiPage>(`wiki/${createdWikiPage.id}`)).content).toBe("<p>Direktes HTML bleibt erhalten.</p>");
 
     const delProject = await seedClient.post<Project>("projects", { name: "Delete Projekt", status: "active" });
     const delMilestone = await seedClient.post<Milestone>(`projects/${delProject.id}/milestones`, { name: "Delete Meilenstein", status: "active" });

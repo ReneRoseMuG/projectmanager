@@ -126,6 +126,7 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
     editable,
     onEdit,
     onClose,
+    onAutoSaveStatusChange,
   }: {
     inline?: boolean;
     inlineChrome?: "embedded" | "standalone";
@@ -134,6 +135,10 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
     editable?: boolean;
     onEdit?: () => void;
     onClose?: () => void;
+    onAutoSaveStatusChange?: (
+      status: "idle" | "saving" | "saved" | "error",
+      errorMessage?: string | null,
+    ) => void;
   }) {
     if (!open) {
       return null;
@@ -142,12 +147,15 @@ vi.mock("../../../../apps/web/src/components/wiki/WikiPageForm", () => ({
     if (inline) {
       return (
         <form data-testid="wiki-inline-form" data-inline-chrome={inlineChrome} data-editable={editable ? "true" : "false"}>
-          <h2>{page?.title}</h2>
+          <div data-testid="inline-form-title">{page?.title}</div>
           <button type="button" onClick={() => onEdit?.()}>
             Bearbeiten starten
           </button>
           <button type="button" onClick={() => onClose?.()}>
             Schließen
+          </button>
+          <button type="button" onClick={() => onAutoSaveStatusChange?.("saved")}>
+            Save-Status melden
           </button>
         </form>
       );
@@ -219,6 +227,34 @@ describe("WikiPage Inline-Redesign", () => {
     expect(screen.getByTestId("wiki-inline-form")).toHaveAttribute("data-inline-chrome", "embedded");
     expect(screen.getByRole("heading", { name: "Wiki Alpha" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Metadaten" })).not.toBeInTheDocument();
+  });
+
+  it("nutzt den vorhandenen Wiki-Hero als Detailkopf mit ID-Kopieren statt einer Extra-Zeile", () => {
+    renderPage();
+
+    const hero = screen.getByTestId("page-hero");
+    expect(hero).toHaveAttribute("data-variant", "detail");
+    expect(screen.getByRole("button", { name: "ID WIKI-10 kopieren" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Seite löschen" })).toBeInTheDocument();
+  });
+
+  it("kopiert die WIKI-Referenz aus dem Detail-Hero in die Zwischenablage", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "ID WIKI-10 kopieren" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("WIKI-10"));
+  });
+
+  it("zeigt den aus dem Formular hochgereichten Speicherstatus im Hero", () => {
+    renderPage();
+
+    expect(screen.queryByText("Gespeichert")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save-Status melden" }));
+
+    expect(screen.getByText("Gespeichert")).toBeInTheDocument();
   });
 
   it("öffnet neue Seiten weiterhin über das Formular im Modal-Modus", () => {

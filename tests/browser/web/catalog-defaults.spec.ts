@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "./fixtures";
 import type { CatalogEntry, CatalogKind } from "@taskmanager/shared-types";
 import { apiBaseUrl, authenticatedGoto, deleteFeature, deleteMilestone, deleteProject, deleteTask, deleteTicket, ensureApiAuth, fillRichText, formPage, uniqueTitle } from "./domain-test-utils";
 

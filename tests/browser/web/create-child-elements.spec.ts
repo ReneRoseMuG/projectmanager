@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Locator, type Page } from "./fixtures";
 import { Buffer } from "node:buffer";
 import {
   authenticatedGoto,

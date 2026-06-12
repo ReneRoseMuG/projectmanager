@@ -14,7 +14,7 @@
  * Den nutzerseitigen Realtime-Abnahmefluss im Browser absichern.
  */
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 import {
   authenticatedGoto,
   apiBaseUrl,

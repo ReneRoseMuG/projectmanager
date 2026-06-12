@@ -2,6 +2,10 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 12.06.26 | 11:14:41 | Doku | Benutzerhandbuch in WIKI-19 veröffentlicht (alle 64 Werkzeuge) | ✅ |
+| 12.06.26 | 10:09:09 | Fix | Wiki-Detailkopf nutzt vorhandenen Hero statt Extra-Zeile | ✅ |
+| 12.06.26 | 10:04:12 | Feature | MCP-Wiki-Werkzeuge (list/get/create/update_wiki_page) | ✅ |
+| 12.06.26 | 09:31:36 | Doku | MCP-Benutzerhandbuch alle Werkzeuge (Ziel WIKI-19, MCP-Veröffentlichung blockiert) | ⚠️ |
 | 12.06.26 | 09:17:26 | Fix | TKT-126 Tag-Color-Picker (Feld+Popover, pflegbare Palette) + Scroll-Höhe + Reposition | ✅ |
 | 12.06.26 | 09:10:43 | Doku | MCP-Tools-Doku um Tag-Tools ergänzt | ✅ |
 | 12.06.26 | 09:06:42 | Feature | MCP-Tags (list_tags, add_tags_to_parent, remove_tags_from_parent) | ✅ |

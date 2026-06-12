@@ -24,7 +24,7 @@
  * Ziel:
  * Das Sidebar-/PageHero-Zusammenspiel nach MS-15 als beobachtbare Browser-Geometrie absichern.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { authenticatedGoto } from "./domain-test-utils";
 
 async function expectEdgeSidebarWithHero(page: Page) {
