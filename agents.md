@@ -87,13 +87,13 @@ Neue Dateien, Routes, Services oder Strukturen werden nur angelegt, wenn der Auf
 
 ### 3.0 Planungs-Skill (Pflicht)
 
-Vor jeder Planerstellung im Chat oder im Plan-Modus nutzt der Agent den Repo-Skill `skills/projekt-manager-planungsleitplanken`.
+Vor jeder Planerstellung im Chat oder im Plan-Modus nutzt der Agent den Repo-Skill `planungsleitplanken`.
 
 Der Skill ist ein Planungs-Gate und ersetzt diese Datei nicht. `agents.md` bleibt die maßgebliche Quelle; bei Widersprüchen gilt `agents.md`. Der Skill stellt sicher, dass Architekturentscheidungen, Rollen-/Permission-Regeln, Teststrategie, Branch-Hygiene, UI-Leitplanken und Abnahmekriterien bei jeder Planung geprüft werden.
 
 ### 3.0.1 Testentwurfs-Skill (Pflicht bei Tests)
 
-Sobald ein Auftrag Tests plant, ergänzt, ändert, bewertet oder ausführt, nutzt der Agent zusätzlich den Repo-Skill `skills/projekt-manager-test-entwurfsleitplanken`.
+Sobald ein Auftrag Tests plant, ergänzt, ändert, bewertet oder ausführt, nutzt der Agent zusätzlich den Repo-Skill `test-entwurfsleitplanken`.
 
 Das gilt insbesondere bei Begriffen wie „Testsuite“, „Testabdeckung“, „echte Daten“, „Integrationstest“, „E2E“, „Abnahme“, „Testfälle“ oder „Testlauf“.
 
@@ -386,8 +386,7 @@ taskmanager/
 │   ├── fixtures/                      ← Test-Fixtures und Test-Helper
 │   ├── setup/                         ← Test-Setups
 │   └── .runtime/                      ← generierte Testlaufdaten (ignoriert)
-├── skills/                            ← versionierte Skills für dieses Repo
-│   └── projekt-manager-planungsleitplanken/
+├── .claude/skills/                    ← Repo-Skills (Claude-konform, z. B. planungsleitplanken/)
 ├── docs/
 │   ├── tasks/                         ← Aufgabendateien (Abschnitt 7.1)
 │   └── ...                            ← Architektur- und Implementierungsdokumentation
@@ -501,7 +500,7 @@ Der Agent startet keinen Web-Dev-Server als Abschluss-Service, nur damit der Nut
 
 ### Testentwurfs-Gate
 
-Vor jeder Test-Erstellung, Test-Änderung oder Testabdeckungsbewertung muss der Agent `skills/projekt-manager-test-entwurfsleitplanken` anwenden und kurz im Chat oder im Schritt-Log benennen.
+Vor jeder Test-Erstellung, Test-Änderung oder Testabdeckungsbewertung muss der Agent `test-entwurfsleitplanken` anwenden und kurz im Chat oder im Schritt-Log benennen.
 
 Für Testpläne und Teständerungen dokumentiert der Agent mindestens:
 - Testebene: Unit, Integration oder Browser/E2E

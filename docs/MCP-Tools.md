@@ -1,6 +1,6 @@
 # MCP-Tools
 
-**Stand:** 09.06.26
+**Stand:** 12.06.26
 
 Diese Übersicht beschreibt die aktuell verfügbaren MCP-Tools des Projekt-Managers. Die Tools sind für Clients wie Claude Desktop oder ChatGPT gedacht und laufen gegen die bestehenden API-Routen der App.
 
@@ -43,6 +43,7 @@ Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt u
 | `resolve_reference` | Lädt ein Einzelobjekt anhand einer Kurzreferenz. | `reference`, z. B. `TASK-10` | Projekt, Meilenstein, Aufgabe, Ticket, Feature oder Use Case |
 | `get_reference_context` | Lädt ein Objekt anhand einer Referenz inklusive rekursiver Kinder und Supportobjekte. | `reference`, z. B. `MS-12` oder `Meilenstein ID 12` | Kontextbaum mit `root`, `children`, `support` und `warnings` |
 | `list_catalogs` | Liest Status-, Prioritäts- und Tickettyp-Kataloge als Lookup für Schreibtools. | keine | Katalogeinträge |
+| `list_tags` | Liest alle Tags mit Name, Farbe und Nutzungszahlen als Lookup für die Tag-Tools. | keine | Tagliste |
 | `list_users` | Listet aktive Nutzeroptionen für Assignee- und Reporter-Felder. | keine | Nutzeroptionen |
 
 ## Schreibende Tools
@@ -62,6 +63,8 @@ Der Streamable-HTTP-Transport ist standardmäßig im `bearer`-Modus geschützt u
 | `add_notes_to_parent` | Legt mehrere Textnotizen seriell an Projekt, Meilenstein, Aufgabe oder Ticket an. | `parentType`, `parentId`, `notes[]` mit optional `title` und `text` | Bulk-Ergebnis mit neuen Notizen |
 | `add_attachment_to_parent` | Hängt eine Base64-codierte Datei an Projekt, Meilenstein, Aufgabe, Feature oder Ticket an. | `parentType`, `parentId`, `fileName`, `contentBase64`, optional `mimetype` | Neues Attachment |
 | `add_attachments_to_parent` | Hängt mehrere Base64-codierte Dateien seriell an Projekt, Meilenstein, Aufgabe, Feature oder Ticket an. | `parentType`, `parentId`, `attachments[]` mit `fileName`, `contentBase64`, optional `mimetype` | Bulk-Ergebnis mit neuen Attachments |
+| `add_tags_to_parent` | Versieht ein Projekt, einen Meilenstein, eine Aufgabe oder ein Ticket mit Tags. Tags werden per Name angegeben; unbekannte Namen werden automatisch als neuer Tag angelegt, vorhandene Tags des Trägers bleiben erhalten. | `parentType`, `parentId`, `tags[]` (Tag-Namen) | Aktualisierte Tagliste des Trägers plus `added`, `created`, `alreadyPresent` |
+| `remove_tags_from_parent` | Entfernt benannte Tags von einem Projekt, Meilenstein, einer Aufgabe oder einem Ticket. Nicht zugewiesene oder unbekannte Namen werden übergangen; der Tag selbst bleibt im System bestehen. | `parentType`, `parentId`, `tags[]` (Tag-Namen) | Aktualisierte Tagliste des Trägers plus `removed`, `notPresent` |
 | `create_feature` | Erstellt ein neues Feature mit Beschreibung und optionalem Content. | `title`, optional `description`, `content`, `status`, `sortOrder`, `responsibleUserId` | Neues Feature |
 | `create_use_case` | Erstellt einen neuen Use Case unter einem Feature. | `featureId`, `title`, optional `description`, `content`, `status`, `sortOrder`, `responsibleUserId` | Neuer Use Case |
 | `add_task_to_use_case` | Legt eine Aufgabe an einem Use Case an. | `useCaseId`, `title`, optional `description`, `status`, `priority`, `responsibleUserId` | Neue Aufgabe |
@@ -128,6 +131,7 @@ Löschungen sind destruktiv. Offene Relationen (z. B. Ticket-Beziehungen) führe
 | Kommentare | `project`, `milestone`, `task`, `ticket`, `feature`, `useCase` |
 | Notizen | `project`, `milestone`, `task`, `ticket` |
 | Attachments | `project`, `milestone`, `task`, `feature`, `ticket` |
+| Tags | `project`, `milestone`, `task`, `ticket` |
 | Aufgaben-Verknüpfung | `project`, `milestone`, `feature`, `useCase` |
 | Ticket-Verknüpfung | `project`, `milestone`, `feature`, `useCase` |
 | Feature-Verknüpfung | `project`, `milestone` |

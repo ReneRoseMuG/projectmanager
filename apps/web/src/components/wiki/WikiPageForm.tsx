@@ -1,5 +1,5 @@
 import type { DraftComment, Note, Project, WikiPage, WikiPageInput, WikiPageRelationSummary } from "@taskmanager/shared-types";
-import { ExternalLink, Pencil, Trash2, X } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAutoSave } from "../../hooks/useAutoSave";
@@ -16,8 +16,9 @@ import { AttachmentUploader } from "../attachments/AttachmentUploader";
 import { JournalPanel } from "../journal/JournalPanel";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
+import { objectReference } from "../../lib/references";
 import { Button } from "../ui/Button";
-import { CopyReferenceButton } from "../ui/CopyReferenceButton";
+import { DetailHeaderActions } from "../ui/DetailHeaderActions";
 import { CommentThread } from "../ui/CommentThread";
 import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { FormField } from "../ui/FormField";
@@ -231,59 +232,44 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
             breadcrumb={["Wiki", parentPageTitle ?? "Root"]}
             title={title || (page ? "Wiki-Seite bearbeiten" : "Wiki-Seite anlegen")}
             actions={
-              <>
-                {!effectiveEditable && onEdit ? (
-                  <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Bearbeiten" title="Bearbeiten" onClick={onEdit}>
-                    <Pencil size={18} />
-                  </button>
-                ) : null}
-                {page && onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : null}
-                {page ? <CopyReferenceButton reference={String(page.id)} variant="hero" /> : null}
-                {page && onDelete ? (
-                  <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Seite löschen" title="Seite löschen" onClick={() => onDelete(page)}>
-                    <Trash2 size={18} />
-                  </button>
-                ) : null}
-              </>
+              <DetailHeaderActions
+                tone="onSteel"
+                onEdit={!effectiveEditable && onEdit ? onEdit : undefined}
+                saveStatus={page && onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
+                objectReference={page ? objectReference("wikiPage", page.id) : undefined}
+                onDelete={page && onDelete ? () => onDelete(page) : undefined}
+                deleteLabel="Seite löschen"
+              />
             }
           />
         ) : !inline ? (
-        <header className="border-b border-steel-700 bg-gradient-to-br from-steel-700 to-steel-600 px-5 py-5 text-white md:px-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="grid gap-2">
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-white/75">
-                <span>Wiki</span>
-                <span>›</span>
-                <span>{parent?.title ?? "Root"}</span>
-                <span>›</span>
-                <span>Bearbeiten</span>
-              </div>
-              <h2 className="text-2xl font-bold tracking-normal">{title || (page ? "Wiki-Seite bearbeiten" : "Wiki-Seite anlegen")}</h2>
-            </div>
-            <div className="flex items-center gap-2">
-              {page && onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : null}
-              {page ? <CopyReferenceButton reference={String(page.id)} variant="hero" /> : null}
-              {onOpenInTab ? (
-                <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="In neuem Tab öffnen" title="In neuem Tab öffnen" onClick={onOpenInTab}>
-                  <ExternalLink size={18} />
-                </button>
-              ) : null}
-              <button type="button" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white" aria-label="Schließen" title="Schließen" onClick={() => void requestClose()}>
-                <X size={18} />
-              </button>
-            </div>
-          </div>
-        </header>
+          <PageHero
+            variant="detail"
+            fixedHeight={false}
+            breadcrumb={["Wiki", parent?.title ?? "Root", "Bearbeiten"]}
+            title={title || (page ? "Wiki-Seite bearbeiten" : "Wiki-Seite anlegen")}
+            actions={
+              <DetailHeaderActions
+                tone="onSteel"
+                saveStatus={page && onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
+                objectReference={page ? objectReference("wikiPage", page.id) : undefined}
+                onOpenInTab={onOpenInTab}
+                onClose={() => void requestClose()}
+              />
+            }
+          />
         ) : null}
-        {embeddedActionPage && (onAutoSave || (!effectiveEditable && onEdit)) ? (
+        {embeddedActionPage ? (
           <div className="flex min-h-[40px] items-center justify-end gap-3 border-b border-line bg-shell px-5 py-2">
-            {onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} tone="onLight" /> : null}
-            {!effectiveEditable && onEdit ? (
-              <button type="button" className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-steel-600 hover:bg-line/50 hover:text-ink" onClick={onEdit}>
-                <Pencil size={14} />
-                Bearbeiten
-              </button>
-            ) : null}
+            <DetailHeaderActions
+              tone="onLight"
+              saveStatus={onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} tone="onLight" /> : undefined}
+              onEdit={!effectiveEditable && onEdit ? onEdit : undefined}
+              objectReference={objectReference("wikiPage", embeddedActionPage.id)}
+              onOpenInTab={onOpenInTab}
+              onDelete={onDelete ? () => onDelete(embeddedActionPage) : undefined}
+              deleteLabel="Seite löschen"
+            />
           </div>
         ) : null}
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />

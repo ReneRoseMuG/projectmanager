@@ -37,12 +37,12 @@ Alle Tools des `projekt-manager` MCP Servers stehen zur Verfügung:
 - `list_features` — Features auflisten
 - `get_feature` — ein Feature per ID abrufen
 - `create_feature` — neues Feature anlegen
-- `update_feature_content` — Feature-Inhalt aktualisieren
+- `update_feature` — Feature aktualisieren
 - `link_feature_to_parent` — Feature verknüpfen
 - `list_use_cases` — Use Cases auflisten
 - `get_use_case` — einen Use Case per ID abrufen
 - `create_use_case` — neuen Use Case anlegen
-- `update_use_case_content` — Use Case aktualisieren
+- `update_use_case` — Use Case aktualisieren
 - `add_task_to_use_case` / `add_ticket_to_use_case` — Aufgaben/Tickets zu Use Case verknüpfen
 
 **Kataloge & Benutzer**
@@ -52,12 +52,6 @@ Alle Tools des `projekt-manager` MCP Servers stehen zur Verfügung:
 **Kommentare & Notizen**
 - `add_comment_to_parent` — Kommentar hinzufügen
 - `add_note_to_parent` — Notiz hinzufügen
-
-**Beschreibungen aktualisieren**
-- `update_project_description` — Projektbeschreibung aktualisieren
-- `update_milestone_description` — Meilensteinbeschreibung aktualisieren
-- `update_task_description` — Aufgabenbeschreibung aktualisieren
-- `update_ticket_description` — Ticketbeschreibung aktualisieren
 
 ## Workflow: Beauftragung zur Bearbeitung
 
@@ -112,4 +106,4 @@ Konvertierungsregel:
 | `1. Punkt` | `<ol><li>Punkt</li></ol>` |
 | Fließtext-Absatz | `<p>Fließtext-Absatz</p>` |
 
-Betrifft: `add_task_to_parent`, `add_ticket_to_parent`, `update_milestone`, `update_task_description`, `update_ticket_description`, `update_project_description`, `add_note_to_parent`, `create_feature`, `create_use_case` — überall wo ein Textinhalt übergeben wird.
+Betrifft: `add_task_to_parent`, `add_ticket_to_parent`, `update_project`, `update_milestone`, `update_task`, `update_ticket`, `add_note_to_parent`, `create_feature`, `update_feature`, `create_use_case`, `update_use_case` — überall wo ein Textinhalt übergeben wird.

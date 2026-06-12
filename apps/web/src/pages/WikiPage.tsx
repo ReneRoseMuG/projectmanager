@@ -250,7 +250,12 @@ export function WikiPage() {
                   projects={projects}
                   onSubmit={submitInlineForm}
                   onAutoSave={wiki.page ? autoSaveInlineForm : undefined}
-                  onDelete={deletePage}
+                  onDelete={canWrite ? deletePage : undefined}
+                  onOpenInTab={
+                    !standalone && wiki.page
+                      ? () => window.open(withStandaloneView(`/wiki/${wiki.page!.id}`), "_blank")
+                      : undefined
+                  }
                   editable={editing}
                   onEdit={() => setEditing(true)}
                   onNavigateToWikiPage={(id) => navigate(standalone ? withStandaloneView(`/wiki/${id}`) : `/wiki/${id}`)}

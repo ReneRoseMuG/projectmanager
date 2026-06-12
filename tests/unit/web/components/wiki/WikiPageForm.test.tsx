@@ -19,12 +19,13 @@
  * - WikiPageForm bindet RichTextInlineField an den Formular-State.
  * - Der Modal-Modus bietet die ID-Kopieraktion und den Open-in-Tab-Button weiterhin nur bei Prop-Übergabe.
  * - Der Inline-Modus rendert ohne Modal, mit PageHero, Delete-Aktion und Journal-Gating.
+ * - Der eingebettete Inline-Modus bietet die WIKI-Kopieraktion im Kopfbereich.
  * - Inline-Speichern einer bestehenden Seite lässt die Seite geöffnet.
  * - Bei aktivem Auto-Save schließt das Formular nach erfolgreichem Save ohne Verwerfen-Dialog (TKT-95).
  *
  * Fehlerfälle:
  * - Aktualisierter Inhalt muss im Submit-Payload landen.
- * - Die Wiki-Seiten-ID muss in die Zwischenablage kopiert werden.
+ * - Die WIKI-Referenz der Seite muss in die Zwischenablage kopiert werden.
  * - Unberechtigte Nutzer dürfen den Journal-Tab nicht sehen.
  * - Inline-Save darf nicht versehentlich schließen.
  * - Auch bei fehlgeschlagenem Save schließt das Formular ohne Verwerfen-Dialog (Fehler via SaveStatus).
@@ -220,6 +221,22 @@ describe("WikiPageForm", () => {
     const { container } = renderWithProviders(<WikiPageForm inline inlineChrome="standalone" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
     expect(container.querySelector('[data-testid="page-hero"][data-variant="detail"]')).toBeInTheDocument();
+  });
+
+  it("zeigt im eingebetteten Modus die WIKI-Kopieraktion im Kopfbereich", () => {
+    renderWithProviders(<WikiPageForm inline inlineChrome="embedded" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "ID WIKI-5 kopieren" })).toBeInTheDocument();
+  });
+
+  it("kopiert die WIKI-Referenz im eingebetteten Modus in die Zwischenablage", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderWithProviders(<WikiPageForm inline inlineChrome="embedded" open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "ID WIKI-5 kopieren" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("WIKI-5"));
   });
 
   it("zeigt den Journal-Tab im Inline-Modus nur mit Berechtigung", () => {

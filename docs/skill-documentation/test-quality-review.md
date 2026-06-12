@@ -11,7 +11,7 @@ Der Skill wird verwendet wenn der Nutzer formuliert: „Testanalyse", „Testber
 ## Referenzen
 
 - `agents.md` Abschnitte 11 (Teststrategie) und 12 (Voller Testlauf)
-- `skills/projekt-manager-test-entwurfsleitplanken/SKILL.md`
+- `.claude/skills/test-entwurfsleitplanken/SKILL.md`
 - `tests/` — zentrale Testhierarchie
 
 ## Testhierarchie (Pflicht bekannt vor Analyse)

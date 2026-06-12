@@ -1,7 +1,7 @@
-import { ExternalLink, Save, Trash2, X } from "lucide-react";
+import { Save } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { Button } from "./Button";
-import { CopyReferenceButton } from "./CopyReferenceButton";
+import { DetailHeaderActions } from "./DetailHeaderActions";
 import { Modal } from "./Modal";
 import { PageHero } from "./PageHero";
 
@@ -89,53 +89,15 @@ export function FormModal({
         metaPills={headerMeta}
         fixedHeight={isPage}
         actions={
-          <>
-            {saveStatus ? (
-              <div className="flex items-center pr-1">{saveStatus}</div>
-            ) : null}
-            {objectReference ? (
-              <CopyReferenceButton
-                reference={objectReference}
-                variant="hero"
-              />
-            ) : null}
-            {onOpenInTab ? (
-              <button
-                type="button"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white"
-                aria-label="In neuem Tab öffnen"
-                title="In neuem Tab öffnen"
-                onClick={onOpenInTab}
-              >
-                <ExternalLink size={18} />
-              </button>
-            ) : null}
-            {onDelete ? (
-              <button
-                type="button"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-white/80 hover:bg-crimson/30 hover:text-white"
-                aria-label="Löschen"
-                title="Löschen"
-                onClick={onDelete}
-              >
-                <Trash2 size={18} />
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className={
-                isPage
-                  ? "flex h-9 items-center gap-1.5 rounded-full px-3 text-sm text-white/80 hover:bg-white/12 hover:text-white"
-                  : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white/80 hover:bg-white/12 hover:text-white"
-              }
-              aria-label="Schließen"
-              title="Schließen"
-              onClick={onClose}
-            >
-              <X size={18} />
-              {isPage ? <span>Zurück</span> : null}
-            </button>
-          </>
+          <DetailHeaderActions
+            tone="onSteel"
+            saveStatus={saveStatus}
+            objectReference={objectReference}
+            onOpenInTab={onOpenInTab}
+            onDelete={onDelete}
+            onClose={onClose}
+            showBackLabel={isPage}
+          />
         }
       />
 

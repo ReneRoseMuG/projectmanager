@@ -21,6 +21,8 @@ describe("objectReference", () => {
     ["ticket", 12, "TKT-12"],
     ["feature", 26, "FEAT-26"],
     ["useCase", 7, "UC-7"],
+    ["note", 3, "NOTE-3"],
+    ["wikiPage", 5, "WIKI-5"],
   ] as const)("erzeugt %s-Referenzen", (type, id, expected) => {
     expect(objectReference(type, id)).toBe(expected);
   });

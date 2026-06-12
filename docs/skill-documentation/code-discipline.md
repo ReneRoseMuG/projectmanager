@@ -114,8 +114,5 @@ Zusätzliche Prüfpunkte für dieses Repository:
 
 ## Implementierungshinweise für den Skill-Bau
 
-- Skill existiert bereits als OpenAI-Codex-Skill unter `skills/codex-code-discipline/` mit `agents/openai.yaml`
-- Für Claude: Claude-Skill unter `.claude/skills/code-discipline/` anlegen
-- Original ist auf Englisch — Skill-Bau kann Englisch beibehalten (allgemeiner Skill) oder auf Deutsch übersetzen
+- Skill liegt unter `.claude/skills/code-discipline/` (Claude-konform). Frühere OpenAI-Codex-Quelle am 2026-06-12 entfernt — Repo ist Claude-only.
 - Projektspezifische Preservation Checklist aus diesem Bauplan in den Skill übernehmen
-- Trigger depersonalisieren: „Codex" → „der Agent"

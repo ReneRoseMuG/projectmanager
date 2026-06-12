@@ -20,6 +20,7 @@ import type {
   Project,
   ProjectInput,
   ProjectUpdate,
+  Tag,
   Task,
   TaskInput,
   TaskUpdate,
@@ -316,6 +317,92 @@ function extendedOwnerPath(parentType: ExtendedParentType, parentId: number): st
 
 function attachmentOwnerPath(parentType: AttachmentParentType, parentId: number): string {
   return `${parentType}s/${parentId}`;
+}
+
+type TagParentType = ParentType | "task" | "ticket";
+
+const tagParentSchema = z.object({
+  parentType: z.enum(["project", "milestone", "task", "ticket"]),
+  parentId: z.number().int().positive()
+});
+const tagMutationSchema = tagParentSchema.extend({
+  tags: z.array(z.string().min(1)).min(1)
+});
+
+function tagOwnerPath(parentType: TagParentType, parentId: number): string {
+  return `${parentType}s/${parentId}`;
+}
+
+interface TagOwnerResource {
+  tags: Tag[];
+}
+
+function uniqueTagNames(names: string[]): string[] {
+  return [...new Set(names.map((name) => name.trim()).filter((name) => name.length > 0))];
+}
+
+async function resolveTagsByName(client: ProjectManagerApiClient, names: string[]): Promise<{ tags: Tag[]; created: string[] }> {
+  const catalog = await client.get<Tag[]>("tags");
+  const byName = new Map(catalog.map((tag) => [tag.name, tag]));
+  const tags: Tag[] = [];
+  const created: string[] = [];
+  for (const name of names) {
+    const existing = byName.get(name);
+    if (existing) {
+      tags.push(existing);
+      continue;
+    }
+    try {
+      const tag = await client.post<Tag>("tags", { name });
+      byName.set(tag.name, tag);
+      tags.push(tag);
+      created.push(name);
+    } catch (error) {
+      // Falls der Name serverseitig (z. B. abweichende Groß-/Kleinschreibung) doch existiert: vorhandenen Tag verwenden statt abbrechen.
+      if (!(error instanceof ProjectManagerApiError) || error.code !== "CONFLICT") {
+        throw error;
+      }
+      const refreshed = await client.get<Tag[]>("tags");
+      const match = refreshed.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
+      if (!match) {
+        throw error;
+      }
+      byName.set(match.name, match);
+      tags.push(match);
+    }
+  }
+  return { tags, created };
+}
+
+async function addTagsToParent(client: ProjectManagerApiClient, input: { parentType: TagParentType; parentId: number; tags: string[] }): Promise<unknown> {
+  const path = tagOwnerPath(input.parentType, input.parentId);
+  const owner = await client.get<TagOwnerResource>(path);
+  const { tags: resolved, created } = await resolveTagsByName(client, uniqueTagNames(input.tags));
+  const tagIds = new Set(owner.tags.map((tag) => tag.id));
+  const added: string[] = [];
+  const alreadyPresent: string[] = [];
+  for (const tag of resolved) {
+    if (tagIds.has(tag.id)) {
+      alreadyPresent.push(tag.name);
+    } else {
+      tagIds.add(tag.id);
+      added.push(tag.name);
+    }
+  }
+  const tags = added.length > 0 ? await client.put<Tag[]>(`${path}/tags`, { tagIds: [...tagIds] }) : owner.tags;
+  return { parentType: input.parentType, parentId: input.parentId, tags, added, created, alreadyPresent };
+}
+
+async function removeTagsFromParent(client: ProjectManagerApiClient, input: { parentType: TagParentType; parentId: number; tags: string[] }): Promise<unknown> {
+  const path = tagOwnerPath(input.parentType, input.parentId);
+  const owner = await client.get<TagOwnerResource>(path);
+  const requested = uniqueTagNames(input.tags);
+  const present = new Set(owner.tags.map((tag) => tag.name));
+  const remaining = owner.tags.filter((tag) => !requested.includes(tag.name));
+  const removed = owner.tags.filter((tag) => requested.includes(tag.name)).map((tag) => tag.name);
+  const notPresent = requested.filter((name) => !present.has(name));
+  const tags = removed.length > 0 ? await client.put<Tag[]>(`${path}/tags`, { tagIds: remaining.map((tag) => tag.id) }) : owner.tags;
+  return { parentType: input.parentType, parentId: input.parentId, tags, removed, notPresent };
 }
 
 function decodeBase64Content(contentBase64: string): Buffer {
@@ -1044,6 +1131,27 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       description: "Hängt mehrere Base64-codierte Dateien seriell an Projekt, Meilenstein, Task, Feature oder Ticket.",
       inputSchema: attachmentListInputSchema,
       execute: (input) => createAttachmentsBulk(client, input)
+    }),
+    defineTool({
+      name: "list_tags",
+      title: "Tags listen",
+      description: "Liest alle vorhandenen Tags mit Name, Farbe und Nutzungszahlen über Projekte, Meilensteine, Aufgaben und Tickets. Dient als Nachschlagewerk vor dem Verschlagworten.",
+      inputSchema: z.object({}),
+      execute: () => client.get<Tag[]>("tags")
+    }),
+    defineTool({
+      name: "add_tags_to_parent",
+      title: "Tags hinzufügen",
+      description: "Versieht ein Projekt, einen Meilenstein, eine Aufgabe oder ein Ticket mit Tags. Tags werden per Name angegeben; unbekannte Namen werden automatisch als neuer Tag angelegt. Bereits vorhandene Tags des Trägers bleiben erhalten.",
+      inputSchema: tagMutationSchema,
+      execute: (input) => addTagsToParent(client, input)
+    }),
+    defineTool({
+      name: "remove_tags_from_parent",
+      title: "Tags entfernen",
+      description: "Entfernt benannte Tags von einem Projekt, Meilenstein, einer Aufgabe oder einem Ticket. Nicht zugewiesene oder unbekannte Namen werden übergangen und im Ergebnis ausgewiesen. Der Tag selbst bleibt im System bestehen.",
+      inputSchema: tagMutationSchema,
+      execute: (input) => removeTagsFromParent(client, input)
     }),
     defineTool({
       name: "update_project",

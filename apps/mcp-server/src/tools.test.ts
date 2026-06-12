@@ -52,6 +52,17 @@ interface BulkResult<Result> {
   errors: BulkError[];
 }
 
+interface TagMutationResult {
+  parentType: string;
+  parentId: number;
+  tags: Array<{ id: number; name: string }>;
+  added?: string[];
+  created?: string[];
+  alreadyPresent?: string[];
+  removed?: string[];
+  notPresent?: string[];
+}
+
 function createMockClient(): MockClient & ProjectManagerApiClient {
   return {
     get: vi.fn(),
@@ -94,6 +105,9 @@ describe("MCP tool definitions", () => {
       "add_attachments_to_parent",
       "add_comments_to_parent",
       "add_notes_to_parent",
+      "list_tags",
+      "add_tags_to_parent",
+      "remove_tags_from_parent",
       "add_task_list_to_parent",
       "add_ticket_list_to_parent",
       "link_task_to_parent",
@@ -132,6 +146,98 @@ describe("MCP tool definitions", () => {
     ].forEach((oldName) => expect(names).not.toContain(oldName));
     expect(names.some((name) => name.includes("restore"))).toBe(false);
     expect(names.some((name) => name.includes("dump"))).toBe(false);
+  });
+
+  it("adds tags by name to a parent and auto-creates unknown tags", async () => {
+    const client = createMappedClient({
+      "tasks/5": { tags: [{ id: 1, name: "Bug", color: "#ef4444", version: 1 }] },
+      tags: [{ id: 1, name: "Bug", color: "#ef4444", version: 1 }]
+    });
+    client.post.mockResolvedValue({ id: 2, name: "Frontend", color: "#22c55e", version: 1 });
+    client.put.mockResolvedValue([
+      { id: 1, name: "Bug", color: "#ef4444", version: 1 },
+      { id: 2, name: "Frontend", color: "#22c55e", version: 1 }
+    ]);
+
+    const result = (await tool("add_tags_to_parent", client).execute({
+      parentType: "task",
+      parentId: 5,
+      tags: ["Bug", "Frontend"]
+    })) as TagMutationResult;
+
+    expect(client.post).toHaveBeenCalledWith("tags", { name: "Frontend" });
+    expect(client.put).toHaveBeenCalledWith("tasks/5/tags", { tagIds: [1, 2] });
+    expect(result.created).toEqual(["Frontend"]);
+    expect(result.added).toEqual(["Frontend"]);
+    expect(result.alreadyPresent).toEqual(["Bug"]);
+    expect(result.tags).toHaveLength(2);
+  });
+
+  it("does not write tags when every requested tag is already present", async () => {
+    const client = createMappedClient({
+      "projects/3": { tags: [{ id: 1, name: "Bug", color: "#ef4444", version: 1 }] },
+      tags: [{ id: 1, name: "Bug", color: "#ef4444", version: 1 }]
+    });
+
+    const result = (await tool("add_tags_to_parent", client).execute({
+      parentType: "project",
+      parentId: 3,
+      tags: ["Bug"]
+    })) as TagMutationResult;
+
+    expect(client.put).not.toHaveBeenCalled();
+    expect(result.added).toEqual([]);
+    expect(result.alreadyPresent).toEqual(["Bug"]);
+    expect(result.tags).toEqual([expect.objectContaining({ id: 1, name: "Bug" })]);
+  });
+
+  it("removes named tags from a parent and reports unknown names", async () => {
+    const client = createMappedClient({
+      "tickets/9": {
+        tags: [
+          { id: 1, name: "Bug", color: "#ef4444", version: 1 },
+          { id: 2, name: "Frontend", color: "#22c55e", version: 1 }
+        ]
+      }
+    });
+    client.put.mockResolvedValue([{ id: 2, name: "Frontend", color: "#22c55e", version: 1 }]);
+
+    const result = (await tool("remove_tags_from_parent", client).execute({
+      parentType: "ticket",
+      parentId: 9,
+      tags: ["Bug", "Unbekannt"]
+    })) as TagMutationResult;
+
+    expect(client.put).toHaveBeenCalledWith("tickets/9/tags", { tagIds: [2] });
+    expect(result.removed).toEqual(["Bug"]);
+    expect(result.notPresent).toEqual(["Unbekannt"]);
+    expect(result.tags).toEqual([expect.objectContaining({ id: 2, name: "Frontend" })]);
+  });
+
+  it("skips the update when no requested tag is assigned to the parent", async () => {
+    const client = createMappedClient({
+      "milestones/4": { tags: [{ id: 1, name: "Bug", color: "#ef4444", version: 1 }] }
+    });
+
+    const result = (await tool("remove_tags_from_parent", client).execute({
+      parentType: "milestone",
+      parentId: 4,
+      tags: ["Frontend"]
+    })) as TagMutationResult;
+
+    expect(client.put).not.toHaveBeenCalled();
+    expect(result.removed).toEqual([]);
+    expect(result.notPresent).toEqual(["Frontend"]);
+  });
+
+  it("lists all available tags", async () => {
+    const client = createMappedClient({
+      tags: [{ id: 1, name: "Bug", color: "#ef4444", version: 1, usageCounts: { projects: 0, milestones: 0, tasks: 1, tickets: 0 } }]
+    });
+
+    const result = (await tool("list_tags", client).execute({})) as Array<{ name: string }>;
+
+    expect(result).toEqual([expect.objectContaining({ name: "Bug" })]);
   });
 
   it("creates projects and milestones with full metadata fields", async () => {

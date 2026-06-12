@@ -131,8 +131,6 @@ Wenn diese Punkte nicht beantwortbar sind: nicht raten — Blocker dokumentieren
 
 ## Implementierungshinweise für den Skill-Bau
 
-- Skill existiert bereits als OpenAI-Codex-Skill unter `skills/projekt-manager-test-entwurfsleitplanken/` mit `agents/openai.yaml`
-- Für Claude: Claude-Skill unter `.claude/skills/test-entwurfsleitplanken/` anlegen
-- Trigger-Beschreibung depersonalisieren: „Codex" → „der Agent"
+- Skill liegt unter `.claude/skills/test-entwurfsleitplanken/` (Claude-konform). Frühere OpenAI-Codex-Quelle am 2026-06-12 entfernt — Repo ist Claude-only.
 - Trigger weit formulieren: greift auch bei indirekter Testberührung durch Code-Änderungen
 - Inhalt ist bereits projektspezifisch — kaum Anpassungsbedarf beim Skill-Bau

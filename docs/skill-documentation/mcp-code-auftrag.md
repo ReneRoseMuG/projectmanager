@@ -98,9 +98,7 @@ Kein Status-Update-Tool verfügbar → als Blocker melden und explizit nennen da
 
 ## Implementierungshinweise für den Skill-Bau
 
-- Skill existiert bereits als OpenAI-Codex-Skill unter `skills/MCP-Code_Auftrag/` mit `agents/openai.yaml`
-- Für Claude: Claude-Skill unter `.claude/skills/mcp-code-auftrag/` anlegen
-- Trigger-Beschreibung depersonalisieren: „Codex" → „der Agent"
+- Skill liegt unter `.claude/skills/mcp-code-auftrag/` (Claude-konform). Frühere OpenAI-Codex-Quelle am 2026-06-12 entfernt — Repo ist Claude-only.
 - Referenz-Format ist projektspezifisch und muss bei Übernahme in andere Projekte angepasst werden
 - Die Pflichtfrage (Schritt 3) ist bewusst hartcodiert — nicht weglassen, auch wenn Nutzer ungeduldig wirkt
 - Dieser Skill ist der einzige der aktiv nach Plan oder Direktausführung fragt — alle anderen setzen einen bereits getroffenen Entscheid voraus

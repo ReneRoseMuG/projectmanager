@@ -1,7 +1,7 @@
 import type { Tag } from "@taskmanager/shared-types";
 import { Minus, Plus, Tag as TagIcon } from "lucide-react";
 import { createPortal } from "react-dom";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ColorPicker } from "../ui/ColorPicker";
 import { useTags } from "../../hooks/useTags";
 
@@ -49,7 +49,7 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
   const [search, setSearch] = useState("");
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(DEFAULT_TAG_COLOR);
-  const [showNewColorPicker, setShowNewColorPicker] = useState(false);
+  const [listMaxHeight, setListMaxHeight] = useState(280);
   const containerRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);
 
@@ -77,27 +77,39 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  // For the panel variant inside FormSidebar: track container position while dropdown is open
-  // so the fixed-position portal dropdown stays aligned on scroll/resize.
+  // Position des Dropdowns und nutzbare Listenhöhe an die reale Lage koppeln.
+  // listMaxHeight nutzt den verfügbaren Platz statt einer festen Höhe, damit das
+  // Panel nicht zu früh in den Scrollmodus schaltet (TKT-126 Punkt 1).
+  const syncPosition = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const below = window.innerHeight - rect.bottom;
+    const willDropUp = below < 300;
+    setAnchorRect(rect);
+    setDropUp(willDropUp);
+    const space = willDropUp ? rect.top : below;
+    // Suchfeld + Neues-Tag-Zeile + Ränder reservieren, sinnvolles Min/Max.
+    setListMaxHeight(Math.max(140, Math.min(space - 140, 420)));
+  }, []);
+
   useEffect(() => {
-    if (!open || variant !== "panel") return;
-
-    const updateRect = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setAnchorRect(rect);
-        setDropUp(window.innerHeight - rect.bottom < 300);
-      }
-    };
-
-    updateRect();
-    window.addEventListener("scroll", updateRect, true);
-    window.addEventListener("resize", updateRect);
+    if (!open) return;
+    syncPosition();
+    window.addEventListener("scroll", syncPosition, true);
+    window.addEventListener("resize", syncPosition);
     return () => {
-      window.removeEventListener("scroll", updateRect, true);
-      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", syncPosition, true);
+      window.removeEventListener("resize", syncPosition);
     };
-  }, [open, variant]);
+  }, [open, syncPosition]);
+
+  // Nach dem Anlegen/Hinzufügen eines Tags wächst das Panel; die Portal-Position
+  // muss neu berechnet werden, sonst bleibt das Dropdown stehen und wirkt
+  // "nicht aktualisiert" (TKT-126 Punkt 2).
+  useEffect(() => {
+    if (open) syncPosition();
+  }, [open, selected, syncPosition]);
 
   const removeTag = (tagId: number) => {
     onChange(selected.filter((t) => t.id !== tagId));
@@ -115,17 +127,10 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
     onChange([...selected, tag]);
     setNewName("");
     setNewColor(DEFAULT_TAG_COLOR);
-    setShowNewColorPicker(false);
   };
 
   const openPicker = () => {
-    if (!open) {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (rect) {
-        setDropUp(window.innerHeight - rect.bottom < 300);
-        setAnchorRect(rect);
-      }
-    }
+    if (!open) syncPosition();
     setOpen((v) => !v);
   };
 
@@ -151,7 +156,7 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
           autoFocus
         />
       </div>
-      <div className="max-h-40 overflow-y-auto">
+      <div className="overflow-y-auto" style={{ maxHeight: listMaxHeight }}>
         {availableTags.map((tag) => (
           <button
             key={tag.id}
@@ -174,13 +179,7 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
       </div>
       <div className="border-t border-line p-2">
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-1.5">
-          <button
-            type="button"
-            className="h-7 w-7 shrink-0 rounded-full border-2 border-white shadow-sm transition hover:ring-2 hover:ring-steel-300"
-            style={{ backgroundColor: newColor }}
-            aria-label="Farbe wählen"
-            onClick={() => setShowNewColorPicker((v) => !v)}
-          />
+          <ColorPicker value={newColor} onChange={setNewColor} />
           <input
             className="h-7 min-w-0 rounded border border-line px-2 text-xs outline-none focus:border-steel-600"
             placeholder="Neues Tag…"
@@ -202,11 +201,6 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
             Neu
           </button>
         </div>
-        {showNewColorPicker ? (
-          <div className="mt-2">
-            <ColorPicker value={newColor} onChange={setNewColor} />
-          </div>
-        ) : null}
       </div>
     </>
   );

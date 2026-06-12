@@ -72,8 +72,5 @@ Plan stoppen und Blocker dokumentieren wenn:
 
 ## Implementierungshinweise für den Skill-Bau
 
-- Dieser Skill existiert bereits als OpenAI-Codex-Skill unter `skills/projekt-manager-planungsleitplanken/` mit `agents/openai.yaml`
-- Für Claude: Claude-Skill unter `.claude/skills/planungsleitplanken/` anlegen — Inhalt verweist auf `skills/projekt-manager-planungsleitplanken/SKILL.md`
+- Skill liegt unter `.claude/skills/planungsleitplanken/` (Claude-konform). Frühere OpenAI-Codex-Quelle am 2026-06-12 entfernt — Repo ist Claude-only.
 - Trigger-Beschreibung weit formulieren: greift bei jeder Planung, nicht nur bei explizitem `/plan`-Kommando
-- Alle Referenz-Dateien unter `skills/projekt-manager-planungsleitplanken/references/` liegen bereits vor und müssen nicht dupliziert werden
-- Depersonalisierung: bestehende SKILL.md noch auf „Codex" — beim Skill-Bau auf „der Agent" umstellen

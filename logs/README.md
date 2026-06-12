@@ -2,6 +2,10 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 12.06.26 | 09:17:26 | Fix | TKT-126 Tag-Color-Picker (Feld+Popover, pflegbare Palette) + Scroll-Höhe + Reposition | ✅ |
+| 12.06.26 | 09:10:43 | Doku | MCP-Tools-Doku um Tag-Tools ergänzt | ✅ |
+| 12.06.26 | 09:06:42 | Feature | MCP-Tags (list_tags, add_tags_to_parent, remove_tags_from_parent) | ✅ |
+| 12.06.26 | 07:29:21 | Feature | Detailkopf-Vereinheitlichung (Wiki ID kopieren via DetailHeaderActions) | ✅ |
 | 11.06.26 | 14:47:51 | Fix | Wiki-Export seitenlokale Bilder | ⚠️ |
 | 11.06.26 | 14:31:25 | Fix | Wiki-Export Bilder-src | ✅ |
 | 11.06.26 | 12:00:30 | Feature | MCP-Tools für Backlog Items (create_backlog_item, update_backlog_item) | ✅ |

@@ -8,6 +8,7 @@ import type {
   Milestone,
   Note,
   Project,
+  Tag,
   Task,
   Ticket,
   UseCase,
@@ -352,6 +353,35 @@ describe("MCP tools integration", () => {
     expect(await seedClient.get<Attachment[]>(`tasks/${task.id}/attachments`)).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: attachment.id, originalName: "mcp-attachment.txt" })])
     );
+
+    const tagCatalog = await callTool<Tag[]>(executedTools, "list_tags");
+    expect(Array.isArray(tagCatalog)).toBe(true);
+
+    const taggedTask = await callTool<{ tags: Tag[]; added: string[]; created: string[] }>(executedTools, "add_tags_to_parent", {
+      parentType: "task",
+      parentId: task.id,
+      tags: ["MCP Tag Alpha", "MCP Tag Beta"]
+    });
+    expect(taggedTask.created).toEqual(expect.arrayContaining(["MCP Tag Alpha", "MCP Tag Beta"]));
+    expect(taggedTask.tags).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "MCP Tag Alpha" }),
+        expect.objectContaining({ name: "MCP Tag Beta" })
+      ])
+    );
+    expect((await seedClient.get<Task>(`tasks/${task.id}`)).tags).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "MCP Tag Alpha" })])
+    );
+
+    const untaggedTask = await callTool<{ tags: Tag[]; removed: string[]; notPresent: string[] }>(executedTools, "remove_tags_from_parent", {
+      parentType: "task",
+      parentId: task.id,
+      tags: ["MCP Tag Alpha", "Nicht vergeben"]
+    });
+    expect(untaggedTask.removed).toEqual(["MCP Tag Alpha"]);
+    expect(untaggedTask.notPresent).toEqual(["Nicht vergeben"]);
+    expect(untaggedTask.tags).toEqual(expect.arrayContaining([expect.objectContaining({ name: "MCP Tag Beta" })]));
+    expect(untaggedTask.tags).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: "MCP Tag Alpha" })]));
 
     const bulkNotes = await callTool<BulkResult<Note>>(executedTools, "add_notes_to_parent", {
       parentType: "ticket",
