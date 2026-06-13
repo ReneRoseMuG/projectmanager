@@ -18,8 +18,9 @@ description: >
 3. Bei Code-Bezug zuerst Graphify (`graphify query/path/explain`), dann nur benötigte Repo-Abschnitte lesen — erst bei Bedarf erweitern
 4. Betroffene Domänen, Schichten, Dateien, API, Datenmodell, Frontend-State, Tests, Logs und Abnahmekriterien identifizieren
 5. Explizit entscheiden ob Auth, Rollen, Permissions, Migrationen, Dumps, Fixtures und UI-Regeln betroffen sind
-6. Annahmen und Blocker benennen — keine stillen Architektur-, Produkt- oder Scope-Entscheidungen
-7. Plan proportional zur Auftragsklasse — Sicherheit, Tests, Datenmigration nie weglassen wenn relevant
+6. Annahmen und Blocker benennen — keine stillen Architektur-, Produkt- oder Scope-Entscheidungen. Mehrdeutige Aufträge mit allen plausiblen Interpretationen offenlegen statt still eine zu wählen; gibt es einen einfacheren Weg, ihn vorschlagen und begründet widersprechen
+7. Beobachtbare Erfolgskriterien vorab festlegen — Auftrag in prüfbare Ziele übersetzen (z. B. „Bug fixen" → Test, der ihn reproduziert, dann grün; „Validierung" → Tests für ungültige Eingaben, dann grün)
+8. Plan proportional zur Auftragsklasse — Sicherheit, Tests, Datenmigration nie weglassen wenn relevant
 
 ## Pflichtfragen vor jedem Plan
 
@@ -32,6 +33,7 @@ description: >
 - Query-Keys, Invalidierung, TanStack-Hooks oder E2E-Setup betroffen?
 - Was bleibt bewusst unverändert?
 - Was kann kaputtgehen — wie wird das Risiko begrenzt?
+- Woran ist Erfolg beobachtbar — welcher Test oder welche Prüfung beweist die Umsetzung?
 
 ## Architektur-Referenz
 
@@ -131,6 +133,7 @@ Vor jedem Plan benennen:
 - [ ] DB-Migration nötig?
 - [ ] UI/Design-Leitfaden relevant?
 - [ ] Was bleibt unverändert?
+- [ ] Beobachtbare Erfolgskriterien / Verifikationsweg benannt
 - [ ] Risiken und Schadenspotential
 
 ## Abnahmekriterien

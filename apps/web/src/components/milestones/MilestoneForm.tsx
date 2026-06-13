@@ -723,14 +723,14 @@ export function MilestoneForm({
       />
       <TaskDraftDialog
         open={taskDraftOpen}
-        title="Aufgabe vormerken"
+        title="Aufgabe anlegen"
         breadcrumb={["Meilensteine", "Aufgabe"]}
         onCreate={(task) => setPendingTasks((items) => [...items, { kind: "new", draft: task }])}
         onClose={() => setTaskDraftOpen(false)}
       />
       <TicketDraftDialog
         open={ticketDraftOpen}
-        title="Ticket vormerken"
+        title="Ticket anlegen"
         breadcrumb={["Meilensteine", "Ticket"]}
         onCreate={(ticket) => setPendingTickets((items) => [...items, { kind: "new", draft: ticket }])}
         onClose={() => setTicketDraftOpen(false)}

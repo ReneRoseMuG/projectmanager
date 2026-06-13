@@ -14,6 +14,7 @@ interface ItemRowProps {
   footer?: ReactNode;
   onOpen?: () => void;
   className?: string;
+  descriptionClassName?: string;
   pillsClassName?: string;
   metaClassName?: string;
   actionsClassName?: string;
@@ -33,6 +34,7 @@ export function ItemRow({
   footer,
   onOpen,
   className = "",
+  descriptionClassName = "truncate",
   pillsClassName = "",
   metaClassName = "",
   actionsClassName = "",
@@ -55,7 +57,7 @@ export function ItemRow({
       <div className="min-w-0 text-left">
         <h3 className="truncate text-[14px] font-semibold text-ink">{title}</h3>
         {description ? (
-          <p className="truncate text-[12px] text-steel-500">{description}</p>
+          <p className={`${descriptionClassName} text-[12px] text-steel-500`}>{description}</p>
         ) : null}
       </div>
       {pills ? (

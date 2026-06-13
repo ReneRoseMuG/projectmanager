@@ -6,6 +6,38 @@ Diese Datei `agents.md` ist die maßgebliche Arbeitsanweisung im Repository. Ver
 
 ---
 
+## Grundhaltung für Code-Aufgaben
+
+Diese Grundhaltung gilt für jeden Auftrag, der Code oder Konfiguration ändert. Sie gewichtet **Sorgfalt über Geschwindigkeit** und ergänzt die folgenden Abschnitte, ohne sie zu ersetzen. **Bei Widerspruch gilt die speziellere oder strengere Projektregel.** Der Umfang richtet sich nach der Auftragsklasse aus §0: Triviale Aufträge (Klasse 1 und 3) brauchen keinen Reflexions-Overhead — hier gilt Augenmaß.
+
+### Erst denken, dann ändern
+
+- Annahmen explizit benennen. Bei echter Unsicherheit nachfragen statt still zu raten.
+- Sind mehrere Interpretationen plausibel, **alle benennen** — nicht stillschweigend eine wählen.
+- Existiert ein einfacherer Weg, ihn nennen und begründet widersprechen.
+- Diese Klärung gehört **vor** die Umsetzung (Analyse und Planung, vgl. §2 und §3). Sie hebelt §4.5 nicht aus: Ein Teilblocker **während** der laufenden Umsetzung unterbricht den Auftrag nicht — er wird dokumentiert, der nächste Schritt beginnt.
+
+### Einfachheit zuerst
+
+- Minimaler Code, der den Auftrag löst — nichts Spekulatives.
+- Keine Features über das Gefragte hinaus, keine Abstraktion für Einmal-Code.
+- Keine „Flexibilität" oder „Konfigurierbarkeit", die niemand verlangt hat; kein Error-Handling für unmögliche Szenarien.
+- Selbsttest: Würde ein erfahrener Entwickler das als überkompliziert bezeichnen? Wenn ja — vereinfachen. Entstehen 200 Zeilen, wo 50 genügen, neu schreiben. Ergänzt §4.2.
+
+### Chirurgische Änderungen
+
+- Nur anfassen, was der Auftrag verlangt — jede geänderte Zeile muss sich auf den Auftrag zurückführen lassen.
+- Benachbarten Code, Kommentare oder Formatierung nicht „verbessern"; nichts refactoren, das nicht kaputt ist.
+- Bestehenden Stil im berührten Code übernehmen, auch wenn man es selbst anders machen würde.
+- Verwaiste Imports, Variablen oder Funktionen entfernen, die **erst durch die eigene Änderung** ungenutzt wurden. Schon vorher vorhandenen toten Code nicht löschen, sondern als Beobachtung **melden** — Löschung nur auf Auftrag. Detail-Gate: Skill `code-discipline`.
+
+### Zielgetrieben ausführen
+
+- Auftrag vorab in überprüfbare Erfolgskriterien übersetzen: „Validierung hinzufügen" → Tests für ungültige Eingaben, dann grün; „Bug fixen" → Test, der ihn reproduziert, dann grün; „X refactoren" → Tests vorher und nachher grün.
+- Starke Erfolgskriterien erlauben eigenständiges Iterieren bis zur Verifikation und stützen die autonome Weiterarbeit nach §4.5; schwache Kriterien erzwingen ständiges Nachfragen. Plan-Gate und Abnahme: Skill `planungsleitplanken`, §13.4.
+
+---
+
 ## 0. Auftragsklassifikation (Pflicht vor jedem weiteren Schritt)
 
 Vor jeder weiteren Aktion klassifiziert der Agent den Auftrag in genau eine der folgenden Klassen:

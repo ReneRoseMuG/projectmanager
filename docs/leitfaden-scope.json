@@ -1,0 +1,48 @@
+{
+  "$schema": "Kanonische Zuordnung: welcher Leitfaden ist von Änderungen in welchen Code-Bereichen betroffen.",
+  "beschreibung": "Quelle der Wahrheit für den Stop-Hook (.claude/hooks/leitfaden-check.sh) und den Skill leitfaden-pflege. Der Hook spiegelt die Pfad-Trigger als reine Bash-Pattern; bei Änderung hier dort nachziehen.",
+  "version": 1,
+  "leitfaeden": [
+    {
+      "id": "design",
+      "datei": "docs/design-leitfaden.md",
+      "thema": "Visuelle Design-Richtlinien für das Frontend (apps/web)",
+      "trigger_globs": [
+        "apps/web/src/**/*.tsx",
+        "apps/web/src/**/*.css",
+        "apps/web/src/**/*.scss"
+      ],
+      "abschnitte": [
+        { "nr": "2", "titel": "Farben / Token-Pflicht", "wann": "neue Farben, Inline-Styles, Akzentfarben" },
+        { "nr": "3", "titel": "Typografie", "wann": "neue Schriftgrößen oder Hierarchie-Ebenen" },
+        { "nr": "4", "titel": "Abstände", "wann": "neue Spacing-Muster" },
+        { "nr": "5", "titel": "Border-Radius-System", "wann": "neue/abweichende Radii" },
+        { "nr": "6", "titel": "Schatten", "wann": "neue Schatten" },
+        { "nr": "7", "titel": "Seitenlayout", "wann": "neue Seitengrundstruktur" },
+        { "nr": "8", "titel": "Komponenten-Regeln", "wann": "neue oder geänderte UI-Komponente (Button, Badge, Modal, ItemCard, ListBoardView usw.)" },
+        { "nr": "9", "titel": "Navigations-Sidebar", "wann": "Änderungen an der Navigation" },
+        { "nr": "10", "titel": "Interaktions-Zustände", "wann": "neue Hover/Focus/Disabled/Aktiv-Muster" },
+        { "nr": "11", "titel": "Verbotene Muster", "wann": "neu eingeführte Anti-Muster, die dokumentiert/verboten werden müssen" },
+        { "nr": "13", "titel": "Bekannte Abweichungen im Ist-Zustand", "wann": "neu entdeckte Drift, die noch nicht bereinigt ist" }
+      ]
+    },
+    {
+      "id": "architektur",
+      "datei": "docs/architektur-leitfaden.md",
+      "thema": "Datenmodell, Beziehungsstruktur und Schichtarchitektur",
+      "trigger_globs": [
+        "packages/shared-types/src/**",
+        "apps/api/src/**"
+      ],
+      "abschnitte": [
+        { "nr": "1", "titel": "Objektklassifizierung", "wann": "neues Fach- oder Support-Objekt" },
+        { "nr": "2", "titel": "Beziehungsmodell", "wann": "neue Beziehung Fachobjekt↔Fachobjekt oder Support↔Fachobjekt" },
+        { "nr": "3", "titel": "Infrastrukturelle Querschnittsfelder", "wann": "neue Pflichtfelder, Versionierung, Audit, users-Bezug" },
+        { "nr": "4", "titel": "Schichtarchitektur", "wann": "neue Route, Repository, Service oder Abweichung von der Schichtreihenfolge" },
+        { "nr": "5", "titel": "Ist-Zustand und bekannter Änderungsbedarf", "wann": "Punkt erledigt oder neuer Änderungsbedarf entdeckt" },
+        { "nr": "7", "titel": "Test-Regime", "wann": "neue Test-Konventionen für Integration/E2E" }
+      ]
+    }
+  ],
+  "disziplin": "Der Hook und der Skill ÄNDERN die Leitfäden nicht selbstständig. Sie melden Befund und liefern einen Formulierungsvorschlag. Die Aufnahme in den Leitfaden erfolgt erst nach Freigabe durch Rene (gleiche Haltung wie code-inspector)."
+}

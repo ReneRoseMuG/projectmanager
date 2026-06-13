@@ -110,6 +110,7 @@ function CommentRow({
     <ItemRow
       title="Kommentar"
       description={commentPreview(comment)}
+      descriptionClassName="line-clamp-3"
       meta={<time className="text-xs text-steel-500">{formatHumanDate(comment.createdAt)}</time>}
       actions={actions}
       onOpen={canWrite ? () => onEdit(comment) : undefined}

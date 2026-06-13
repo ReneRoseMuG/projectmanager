@@ -190,7 +190,7 @@ describe("TaskForm", () => {
     clickTab("Subtasks");
     fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
     changeInput(0, "Subtask Pending");
-    fireEvent.click(screen.getByRole("button", { name: "Vormerken" }));
+    fireEvent.click(screen.getByRole("button", { name: "Anlegen" }));
     expect(screen.getByText("Subtask Pending")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Subtask Pending entfernen" }));
@@ -208,7 +208,7 @@ describe("TaskForm", () => {
     clickTab("Subtasks");
     fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
     changeInput(0, "Subtask im Create");
-    fireEvent.click(screen.getByRole("button", { name: "Vormerken" }));
+    fireEvent.click(screen.getByRole("button", { name: "Anlegen" }));
     clickTab("Tickets");
     fireEvent.click(screen.getByRole("button", { name: "Verknüpfen" }));
     fireEvent.click(screen.getByRole("button", { name: "Ticket wählen" }));
@@ -227,7 +227,7 @@ describe("TaskForm", () => {
         expect.objectContaining({
           title: "Neue Aufgabe",
           status: "in_progress",
-          pendingSubtasks: [{ title: "Subtask im Create", status: "active", priority: "medium" }],
+          pendingSubtasks: [{ title: "Subtask im Create", description: null, status: "active", priority: "medium" }],
           pendingTickets: [{ kind: "existing", ticket }],
           pendingComments: [{ text: "Task-Kommentar" }],
           pendingNotes: [{ title: "Task-Notiz", contentJson: { html: "" } }],
@@ -244,7 +244,7 @@ describe("TaskForm", () => {
     clickTab("Subtasks");
     fireEvent.click(screen.getByRole("button", { name: "Neu erstellen" }));
     changeInput(0, "Reset-Subtask");
-    fireEvent.click(screen.getByRole("button", { name: "Vormerken" }));
+    fireEvent.click(screen.getByRole("button", { name: "Anlegen" }));
     expect(screen.getByText("Reset-Subtask")).toBeInTheDocument();
 
     rerender(<TaskForm open={false} onSubmit={vi.fn()} onClose={vi.fn()} />);

@@ -1034,7 +1034,7 @@ export interface UseCaseInput {
 export type UseCaseUpdate = WithExpectedVersion<Partial<UseCaseInput>>;
 
 export type DraftTask =
-  | { kind: "new"; draft: Pick<TaskInput, "title" | "status" | "priority"> }
+  | { kind: "new"; draft: Pick<TaskInput, "title" | "description" | "status" | "priority"> }
   | { kind: "existing"; task: Task };
 
 export type DraftTicket =
@@ -1045,6 +1045,7 @@ export type DraftUseCase = { kind: "new"; draft: Pick<UseCaseInput, "title" | "s
 
 export type DraftSubtask = {
   title: string;
+  description?: string | null;
   status: TaskStatus;
   priority: Priority;
 };

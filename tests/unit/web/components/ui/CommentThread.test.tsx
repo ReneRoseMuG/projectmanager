@@ -136,6 +136,21 @@ describe("CommentThread", () => {
     expect(screen.getAllByText("17.05.26")).toHaveLength(2);
   });
 
+  it("zeigt den Kommentarinhalt in der Listenansicht mehrzeilig (mind. drei Zeilen, TKT-127)", () => {
+    render(
+      <CommentThread
+        comments={[comments[0]]}
+        onCreate={vi.fn()}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const description = screen.getByText("Erster Kommentar");
+    expect(description).toHaveClass("line-clamp-3");
+    expect(description).not.toHaveClass("truncate");
+  });
+
   it("öffnet die Bearbeitung im Modal über die Listenaktion", () => {
     render(
       <CommentThread

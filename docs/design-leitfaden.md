@@ -251,6 +251,7 @@ Kein `rounded-2xl`.
 
 Container: `rounded-lg border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm hover:shadow-panel`.  
 Linker farbiger Akzentrand als Status-Signal.  
+Beschreibung (Untertitel) standardmäßig einzeilig (`truncate`). Für inhaltsreiche Einträge (z. B. Kommentare) über `descriptionClassName` mehrzeilig erlaubt (`line-clamp-3` = max. drei Zeilen). Titel bleibt einzeilig (`truncate`).  
 Kein `rounded-xl`.
 
 ### 8.11 Modal

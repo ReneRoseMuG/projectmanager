@@ -57,11 +57,23 @@ Komplexe Auswirkungen kurz dokumentieren. Das Denken immer tun — vor der erste
 - Keinen benachbarten Code refactorn der nur anders sauberer wäre
 - Nichts umbenennen das nicht kaputt ist
 - Keine Dateien außerhalb des Auftrags reorganisieren
+- Bestehenden Stil im berührten Code übernehmen, auch wenn man es selbst anders machen würde
 - Wenn eine Nebenänderung für die Aufgabe nötig ist: explizit benennen was und warum
+- Verwaiste Imports, Variablen oder Funktionen entfernen, die erst durch die eigene Änderung ungenutzt wurden; schon vorher vorhandenen toten Code nicht löschen, sondern als Beobachtung melden
 
-Jede Out-of-Scope-Änderung kann etwas Ungefordertes kaputtmachen und macht den Diff schwerer reviewbar.
+Jede Out-of-Scope-Änderung kann etwas Ungefordertes kaputtmachen und macht den Diff schwerer reviewbar. Jede geänderte Zeile muss sich direkt auf den Auftrag zurückführen lassen.
 
-## Prinzip 5: Preservation Checklist vor dem Abschluss
+## Prinzip 5: Einfachheit zuerst — kein Over-Engineering
+
+Minimaler Code, der den Auftrag löst — nichts Spekulatives.
+
+- Keine Features über das Gefragte hinaus, keine Abstraktion für Einmal-Code
+- Keine „Flexibilität" oder „Konfigurierbarkeit", die nicht verlangt wurde
+- Kein Error-Handling für unmögliche Szenarien
+
+Selbsttest: Würde ein erfahrener Entwickler das als überkompliziert bezeichnen? Wenn ja — vereinfachen. Entstehen 200 Zeilen, wo 50 genügen: neu schreiben.
+
+## Prinzip 6: Preservation Checklist vor dem Abschluss
 
 ### UI-Änderungen
 - [ ] Alle Buttons, Inputs und interaktiven Elemente die vorher existierten sind noch vorhanden und funktional
@@ -77,6 +89,9 @@ Jede Out-of-Scope-Änderung kann etwas Ungefordertes kaputtmachen und macht den 
 ### Allgemein
 - [ ] Keine Änderung außerhalb des explizit geforderten Scopes — falls doch: ist sie notwendig und benannt?
 - [ ] Kein absichtlicher Code entfernt oder ersetzt der fehlen könnte?
+- [ ] Keine ungefragte Flexibilität, Abstraktion oder spekulatives Error-Handling (Prinzip 5)
+- [ ] Bestehender Stil im berührten Code beibehalten (Prinzip 4)
+- [ ] Schon vorher vorhandener toter Code nicht gelöscht, sondern gemeldet (Prinzip 4)
 
 Bei Befund: sofort korrigieren, außer der Auftrag erlaubt ausdrücklich das Offenlassen.
 
@@ -110,6 +125,7 @@ Zusätzliche Prüfpunkte für dieses Repository:
 | Code ist Wahrheit | Funktionierender Code schlägt veraltete Spezifikation |
 | Auswirkungen durchdenken | Seiteneffekte vor der ersten Änderung durchdenken |
 | Minimaler Scope | Nur ändern was der Auftrag verlangt |
+| Einfachheit | Minimale Lösung, kein Over-Engineering |
 | Preservation Check | Prüfen ob bestehendes Verhalten erhalten blieb |
 
 ## Implementierungshinweise für den Skill-Bau

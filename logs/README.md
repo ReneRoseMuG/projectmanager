@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 13.06.26 | 06:10:11 | Fix | TKT-125 Timepicker bedienbar + TKT-121 Aufgabe-Draft (Beschreibung, „Anlegen") | ✅ |
+| 13.06.26 | 06:04:20 | Doku | Karpathy-Grundhaltung in agents.md + code-discipline/planungsleitplanken | ✅ |
 | 12.06.26 | 11:14:41 | Doku | Benutzerhandbuch in WIKI-19 veröffentlicht (alle 64 Werkzeuge) | ✅ |
 | 12.06.26 | 10:09:09 | Fix | Wiki-Detailkopf nutzt vorhandenen Hero statt Extra-Zeile | ✅ |
 | 12.06.26 | 10:04:12 | Feature | MCP-Wiki-Werkzeuge (list/get/create/update_wiki_page) | ✅ |

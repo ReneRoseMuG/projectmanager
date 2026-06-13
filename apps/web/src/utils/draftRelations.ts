@@ -14,7 +14,7 @@ export function draftTaskItem(item: DraftTask, index: number): TaskBoardItem {
     id: -(index + 1),
     parentId: null,
     title: item.draft.title,
-    description: null,
+    description: item.draft.description ?? null,
     status: item.draft.status ?? "active",
     priority: item.draft.priority ?? "medium",
     responsibleUserId: null,

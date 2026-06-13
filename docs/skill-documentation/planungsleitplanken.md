@@ -34,8 +34,9 @@ Der Skill lädt Referenzen nur wenn sie relevant sind:
 3. Nur die benötigten Repo-Abschnitte lesen — erst bei Bedarf erweitern
 4. Betroffene Domänen, Schichten, Dateien, API, Datenmodell, Frontend-State, Tests, Logs und Abnahmekriterien identifizieren
 5. Explizit entscheiden ob Auth, Rollen, Permissions, Migrationen, Dumps, Fixtures und UI-Regeln betroffen sind
-6. Annahmen und Blocker benennen statt still Architektur-, Produkt- oder Scope-Entscheidungen zu treffen
-7. Plan proportional zur Auftragsklasse halten — Sicherheit, Tests und Datenmigration nie weglassen wenn relevant
+6. Annahmen und Blocker benennen statt still Architektur-, Produkt- oder Scope-Entscheidungen zu treffen. Mehrdeutige Aufträge mit allen plausiblen Interpretationen offenlegen statt still eine zu wählen; gibt es einen einfacheren Weg, ihn vorschlagen und begründet widersprechen
+7. Beobachtbare Erfolgskriterien vorab festlegen — den Auftrag in prüfbare Ziele übersetzen (z. B. „Bug fixen" → Test, der ihn reproduziert, dann grün; „X refactoren" → Tests vorher und nachher grün)
+8. Plan proportional zur Auftragsklasse halten — Sicherheit, Tests und Datenmigration nie weglassen wenn relevant
 
 ## Plan-Pflichtfragen
 
@@ -50,6 +51,7 @@ Vor jedem Plan beantworten:
 - Sind Query-Keys, Invalidierung, TanStack-Hooks oder E2E-Setup-Änderungen nötig?
 - Was bleibt bewusst unverändert?
 - Was kann kaputtgehen und wie wird das Risiko begrenzt?
+- Woran ist Erfolg beobachtbar — welcher Test oder welche Prüfung beweist die Umsetzung?
 
 ## Plan-Ausgabeformat
 

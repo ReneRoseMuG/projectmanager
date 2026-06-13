@@ -156,6 +156,50 @@ describe("DatePicker / Select", () => {
     );
   });
 
+  it("öffnet bei datetime-local den Picker nur über den Kalender-Button, nicht per Feld-Klick", () => {
+    const showPicker = vi.fn();
+    Object.defineProperty(HTMLInputElement.prototype, "showPicker", {
+      configurable: true,
+      value: showPicker,
+    });
+
+    try {
+      const { container } = render(
+        <DatePicker label="Start" mode="datetime-local" value="" onChange={vi.fn()} />,
+      );
+
+      // Klick ins Feld (z. B. auf das Uhrzeit-Segment) darf den Kalender nicht
+      // öffnen — sonst ist die Uhrzeit nicht bedienbar (TKT-125).
+      fireEvent.click(container.querySelector('input[type="datetime-local"]')!);
+      expect(showPicker).not.toHaveBeenCalled();
+
+      // Der Kalender-Button öffnet den Picker weiterhin explizit.
+      fireEvent.click(screen.getByRole("button", { name: "Start öffnen" }));
+      expect(showPicker).toHaveBeenCalledTimes(1);
+    } finally {
+      Reflect.deleteProperty(HTMLInputElement.prototype, "showPicker");
+    }
+  });
+
+  it("öffnet bei reinem Datum den Picker direkt per Feld-Klick", () => {
+    const showPicker = vi.fn();
+    Object.defineProperty(HTMLInputElement.prototype, "showPicker", {
+      configurable: true,
+      value: showPicker,
+    });
+
+    try {
+      const { container } = render(
+        <DatePicker label="Fällig" value="" onChange={vi.fn()} />,
+      );
+
+      fireEvent.click(container.querySelector('input[type="date"]')!);
+      expect(showPicker).toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(HTMLInputElement.prototype, "showPicker");
+    }
+  });
+
   it("Select nutzt die gemeinsame Formularhöhe und volle Breite", () => {
     const { container } = render(
       <Select label="Status" value="active" onChange={vi.fn()}>

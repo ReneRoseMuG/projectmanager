@@ -40,8 +40,19 @@ Vor der ersten Änderung:
 - Keine Dateien außerhalb des Auftrags reorganisieren
 - Nötige Nebenänderungen explizit benennen
 - In einer Test- oder Fix-Session keinen über den Auftrag hinausgehenden Produktivcode ändern
+- Bestehenden Stil im berührten Code übernehmen, auch wenn man es selbst anders machen würde
+- Verwaiste Imports/Variablen/Funktionen entfernen, die erst durch die eigene Änderung ungenutzt wurden; schon vorher vorhandenen toten Code nicht löschen, sondern als Beobachtung melden
+- Jede geänderte Zeile muss sich direkt auf den Auftrag zurückführen lassen
 
-## Prinzip 5: Preservation Checklist vor dem Abschluss
+## Prinzip 5: Einfachheit zuerst — kein Over-Engineering
+
+Minimaler Code, der den Auftrag löst — nichts Spekulatives.
+- Keine Features über das Gefragte hinaus, keine Abstraktion für Einmal-Code
+- Keine „Flexibilität" oder „Konfigurierbarkeit", die nicht verlangt wurde
+- Kein Error-Handling für unmögliche Szenarien
+- Selbsttest: Würde ein erfahrener Entwickler das als überkompliziert bezeichnen? Wenn ja — vereinfachen. Entstehen 200 Zeilen, wo 50 genügen: neu schreiben.
+
+## Prinzip 6: Preservation Checklist vor dem Abschluss
 
 ### UI
 - [ ] Alle Buttons, Inputs, interaktive Elemente noch vorhanden und funktional
@@ -53,6 +64,11 @@ Vor der ersten Änderung:
 - [ ] Alle Aufrufer der geänderten Funktion arbeiten noch korrekt
 - [ ] Alle bisher gültigen Zustände noch korrekt behandelt
 - [ ] Nichts entfernt das ein anderer Teil noch braucht
+
+### Scope & Einfachheit
+- [ ] Keine ungefragte Flexibilität, Abstraktion oder spekulatives Error-Handling (Prinzip 5)
+- [ ] Bestehender Stil im berührten Code beibehalten; nur Auftragsbezogenes geändert (Prinzip 4)
+- [ ] Schon vorher vorhandener toter Code nicht gelöscht, sondern gemeldet (Prinzip 4)
 
 ### Projektspezifisch
 - [ ] Datenabruf über TanStack Query — kein `useState` + `useEffect` für Server-State

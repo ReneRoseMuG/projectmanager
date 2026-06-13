@@ -874,7 +874,7 @@ export function TaskDraftDialog({
   open,
   onCreate,
   onClose,
-  title: dialogTitle = "Subtask vormerken",
+  title: dialogTitle = "Subtask anlegen",
   breadcrumb = ["Aufgaben", "Subtask"],
 }: {
   open: boolean;
@@ -884,6 +884,7 @@ export function TaskDraftDialog({
   breadcrumb?: string[];
 }) {
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const catalogs = useCatalogs();
   const [status, setStatus] = useState<TaskStatus>("active");
   const [priority, setPriority] = useState<Priority>("medium");
@@ -899,10 +900,12 @@ export function TaskDraftDialog({
     const nextPriority = priorityValue(catalogs.entries, priority);
     onCreate({
       title: trimmedTitle,
+      description: description || null,
       status: nextStatus,
       priority: nextPriority,
     });
     setTitle("");
+    setDescription("");
     setStatus(taskStatusValue(catalogs.entries, "active"));
     setPriority(priorityValue(catalogs.entries, "medium"));
     onClose();
@@ -914,17 +917,27 @@ export function TaskDraftDialog({
       title={dialogTitle}
       icon={<ListTodo size={20} />}
       breadcrumb={breadcrumb}
-      submitLabel="Vormerken"
+      submitLabel="Anlegen"
       onSubmit={submit}
       onClose={onClose}
     >
-      <Section title="Subtask">
+      <Section title="Allgemein">
         <FormField label="Titel" required>
           <Input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             autoFocus
             required
+          />
+        </FormField>
+        <FormField label="Beschreibung" className="mt-4">
+          <RichTextInlineField
+            value={description}
+            placeholder="Beschreibung"
+            minRows={6}
+            testIdPrefix="task-draft-description"
+            onImageUpload={uploadContentImage}
+            onChange={setDescription}
           />
         </FormField>
       </Section>
@@ -950,7 +963,7 @@ export function TicketDraftDialog({
   open,
   onCreate,
   onClose,
-  title: dialogTitle = "Ticket vormerken",
+  title: dialogTitle = "Ticket anlegen",
   breadcrumb = ["Aufgaben", "Ticket"],
 }: {
   open: boolean;
@@ -1010,7 +1023,7 @@ export function TicketDraftDialog({
       title={dialogTitle}
       icon={<Bug size={20} />}
       breadcrumb={breadcrumb}
-      submitLabel="Vormerken"
+      submitLabel="Anlegen"
       onSubmit={submit}
       onClose={onClose}
     >

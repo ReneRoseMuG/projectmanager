@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from "react";
+import type { InputHTMLAttributes, MouseEvent } from "react";
 import { useRef } from "react";
 import { CalendarClock } from "lucide-react";
 import { FormField } from "./FormField";
@@ -18,6 +18,7 @@ export function DatePicker({
   ...props
 }: DatePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isPanel = variant === "panel";
 
   const openNativePicker = () => {
     const input = inputRef.current;
@@ -32,38 +33,28 @@ export function DatePicker({
     }
   };
 
-  if (variant === "panel") {
-    return (
-      <FormField
-        label={label}
-        icon={<CalendarClock size={14} />}
-        variant="panel"
-      >
-        <input
-          ref={inputRef}
-          type={mode}
-          className={`h-10 w-full rounded-md border border-line bg-white px-3 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 ${className}`}
-          onClick={(event) => {
-            onClick?.(event);
-            openNativePicker();
-          }}
-          {...props}
-        />
-      </FormField>
-    );
-  }
+  // Bei reinem Datum öffnet ein Klick ins Feld direkt den Kalender. Bei
+  // "datetime-local" würde das den Klick auf das Uhrzeit-Segment abfangen und die
+  // Uhrzeit unbedienbar machen — dort öffnet ausschließlich der Kalender-Button.
+  const handleInputClick = (event: MouseEvent<HTMLInputElement>) => {
+    onClick?.(event);
+    if (mode === "date") {
+      openNativePicker();
+    }
+  };
 
   return (
-    <FormField label={label}>
+    <FormField
+      label={label}
+      icon={isPanel ? <CalendarClock size={14} /> : undefined}
+      variant={isPanel ? "panel" : undefined}
+    >
       <div className="relative">
         <input
           ref={inputRef}
           type={mode}
-          className={`h-11 w-full rounded-md border border-line bg-white px-3 pr-10 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 ${className}`}
-          onClick={(event) => {
-            onClick?.(event);
-            openNativePicker();
-          }}
+          className={`${isPanel ? "h-10" : "h-11"} w-full rounded-md border border-line bg-white px-3 pr-10 text-sm outline-none transition focus:border-steel-600 focus:ring-2 focus:ring-steel-700/10 ${className}`}
+          onClick={handleInputClick}
           {...props}
         />
         <button

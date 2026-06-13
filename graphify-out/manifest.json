@@ -5,13 +5,13 @@
     "semantic_hash": ""
   },
   ".claude/settings.json": {
-    "mtime": 1781243021.3535578,
-    "ast_hash": "dbb682f4f1023d7205c9333ababfa5ab",
+    "mtime": 1781323578.425716,
+    "ast_hash": "c65d658d5b1ce9682e2c737e1727abd4",
     "semantic_hash": ""
   },
   ".claude/settings.local.json": {
-    "mtime": 1781267867.4702687,
-    "ast_hash": "94cb9f877bb31e767b6701cf7840584d",
+    "mtime": 1781324484.9526124,
+    "ast_hash": "47e11be23e5646f37833dfdd366d0d23",
     "semantic_hash": ""
   },
   ".vscode/tasks.json": {
@@ -1140,8 +1140,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/milestones/MilestoneForm.tsx": {
-    "mtime": 1780753892.1483238,
-    "ast_hash": "92669c32437749a042f462c8d259f757",
+    "mtime": 1781323578.4330976,
+    "ast_hash": "9453250f8dc276ae76b8bca1fad3043d",
     "semantic_hash": ""
   },
   "apps/web/src/components/milestones/MilestoneListBoardView.tsx": {
@@ -1240,8 +1240,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/tasks/TaskForm.tsx": {
-    "mtime": 1780753909.9711926,
-    "ast_hash": "431edbf4089878bd8cd5bb0be87caf84",
+    "mtime": 1781323578.4330976,
+    "ast_hash": "ab4348582ca0fb169075b1f3f07772b9",
     "semantic_hash": ""
   },
   "apps/web/src/components/tasks/TaskLinkDialog.tsx": {
@@ -1340,8 +1340,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/CommentThread.tsx": {
-    "mtime": 1781153675.762209,
-    "ast_hash": "58433564b554c8ba1253c1a4f49b5049",
+    "mtime": 1781323981.493357,
+    "ast_hash": "93ef7e78867e64d500b842ab44109daa",
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/ConfirmDialog.tsx": {
@@ -1360,8 +1360,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/DatePicker.tsx": {
-    "mtime": 1780720017.44357,
-    "ast_hash": "5016f409314e55bd885fd0fb47f11219",
+    "mtime": 1781323578.4386723,
+    "ast_hash": "c107c8da69010d9ca87759ab7a063481",
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/DetailBoardShell.tsx": {
@@ -1425,8 +1425,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/ItemRow.tsx": {
-    "mtime": 1780128360.4846535,
-    "ast_hash": "4c6e9253dd3755f0fd785187b8118262",
+    "mtime": 1781323974.347911,
+    "ast_hash": "c78fdf7271e348c70edf9b7401f30759",
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/Label.tsx": {
@@ -2130,8 +2130,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/utils/draftRelations.ts": {
-    "mtime": 1780753821.7485352,
-    "ast_hash": "3112ec7650bcc4dd95687dc629dac5a9",
+    "mtime": 1781323578.4386723,
+    "ast_hash": "75e0680e7de5cc48b4f625e2ca45fd11",
     "semantic_hash": ""
   },
   "apps/web/src/utils/projectTaskStats.ts": {
@@ -2190,8 +2190,8 @@
     "semantic_hash": ""
   },
   "packages/shared-types/src/index.ts": {
-    "mtime": 1780753821.7826629,
-    "ast_hash": "c731f25e5f5f85035ad8176800e9ca64",
+    "mtime": 1781323578.4447498,
+    "ast_hash": "4135a9539f8466f74673f5fb21e25a0a",
     "semantic_hash": ""
   },
   "packages/shared-types/tsconfig.json": {
@@ -2795,8 +2795,8 @@
     "semantic_hash": ""
   },
   "tests/unit/web/components/tasks/TaskForm.test.tsx": {
-    "mtime": 1780753827.450556,
-    "ast_hash": "ffa7170bd3ec4dfef44a3f832481b732",
+    "mtime": 1781323578.4447498,
+    "ast_hash": "08a6489ffdea11f7725657bb82b7b586",
     "semantic_hash": ""
   },
   "tests/unit/web/components/tickets/TicketForm.test.tsx": {
@@ -2825,8 +2825,8 @@
     "semantic_hash": ""
   },
   "tests/unit/web/components/ui/CommentThread.test.tsx": {
-    "mtime": 1780753821.8384807,
-    "ast_hash": "9428ba1eb219b18536cc08b4b5243514",
+    "mtime": 1781324047.8429651,
+    "ast_hash": "0fdb5d6db8a793ab791cc8c9097280ee",
     "semantic_hash": ""
   },
   "tests/unit/web/components/ui/CopyReferenceButton.test.tsx": {
@@ -2980,8 +2980,8 @@
     "semantic_hash": ""
   },
   "tests/unit/web/components/ui/atoms.test.tsx": {
-    "mtime": 1780720017.5388129,
-    "ast_hash": "3b086931f76b9a1b1ee0c99b87db155e",
+    "mtime": 1781323578.4447498,
+    "ast_hash": "a8729ff31cf99f774f7d5c736de95134",
     "semantic_hash": ""
   },
   "tests/unit/web/components/ui/rich-text-inline-field.test.tsx": {
@@ -3165,8 +3165,8 @@
     "semantic_hash": ""
   },
   ".claude/skills/code-discipline/SKILL.md": {
-    "mtime": 1781158451.875005,
-    "ast_hash": "34b52d4bf34c2e08e7ddccf4fef4da1e",
+    "mtime": 1781323578.425716,
+    "ast_hash": "0845429d75559cd6b7fcf13b777732d5",
     "semantic_hash": ""
   },
   ".claude/skills/datenmodell/SKILL.md": {
@@ -3195,8 +3195,8 @@
     "semantic_hash": ""
   },
   ".claude/skills/planungsleitplanken/SKILL.md": {
-    "mtime": 1781158430.2422888,
-    "ast_hash": "75e85025f69901bb963c44bef353b83c",
+    "mtime": 1781323578.4323645,
+    "ast_hash": "e24a9fca8c7d31fa280adf3a72a600d5",
     "semantic_hash": ""
   },
   ".claude/skills/projekt-manager/SKILL.md": {
@@ -3225,8 +3225,8 @@
     "semantic_hash": ""
   },
   "agents.md": {
-    "mtime": 1781242522.5897748,
-    "ast_hash": "4c8f608674d157187606f2a6ce558152",
+    "mtime": 1781323578.4330976,
+    "ast_hash": "6d134ea2165d8090c747d5467aff3220",
     "semantic_hash": ""
   },
   "apps/mcp-server/README.md": {
@@ -3260,8 +3260,8 @@
     "semantic_hash": ""
   },
   "docs/skill-documentation/code-discipline.md": {
-    "mtime": 1781243678.649211,
-    "ast_hash": "45eb0fc4bc929eb61740650f72e25b4b",
+    "mtime": 1781323578.4386723,
+    "ast_hash": "f9314531d62f6c249a996d54e99f9de0",
     "semantic_hash": ""
   },
   "docs/skill-documentation/feature-editorial.md": {
@@ -3275,8 +3275,8 @@
     "semantic_hash": ""
   },
   "docs/skill-documentation/planungsleitplanken.md": {
-    "mtime": 1781243672.7407527,
-    "ast_hash": "6412b04e497f316fa1b6a3966378d137",
+    "mtime": 1781323578.4386723,
+    "ast_hash": "b88bb4a7d0ce701289afeaaeb3a00b61",
     "semantic_hash": ""
   },
   "docs/skill-documentation/projekt-manager-basis.md": {
@@ -6180,8 +6180,8 @@
     "semantic_hash": ""
   },
   "logs/README.md": {
-    "mtime": 1781255719.7986379,
-    "ast_hash": "5421c31e18621394c256e18bad778182",
+    "mtime": 1781323868.1140296,
+    "ast_hash": "dac1cdcf465f8e95f1a79e97fc4f6061",
     "semantic_hash": ""
   },
   "logs/ms26-api-build-latest.txt": {
@@ -6477,6 +6477,31 @@
   "logs/2026-06-12-11-14-41-doku-wiki19-mcp-handbuch-veroeffentlicht.md": {
     "mtime": 1781255700.5162442,
     "ast_hash": "8e523c95f3eb1bdc94602587a28c1c24",
+    "semantic_hash": ""
+  },
+  ".claude/hooks/leitfaden-check.sh": {
+    "mtime": 1781323377.2983258,
+    "ast_hash": "9ed178789e476495639d97d06b87a9d4",
+    "semantic_hash": ""
+  },
+  "docs/leitfaden-scope.json": {
+    "mtime": 1781323270.7324896,
+    "ast_hash": "717ba74d874713ecd31e35d5c934323d",
+    "semantic_hash": ""
+  },
+  ".claude/skills/leitfaden-pflege/SKILL.md": {
+    "mtime": 1781323439.862509,
+    "ast_hash": "eecd8159e3fb3a0bac12f888e388baf9",
+    "semantic_hash": ""
+  },
+  "logs/2026-06-13-06-04-20-doku-karpathy-grundhaltung.md": {
+    "mtime": 1781323517.2291076,
+    "ast_hash": "8dd106e93477b5c59666ec237f0a2d3d",
+    "semantic_hash": ""
+  },
+  "logs/2026-06-13-06-10-11-fix-tkt-125-tkt-121.md": {
+    "mtime": 1781323861.2906115,
+    "ast_hash": "bd28aa3bf7e6440e915ec2710a6f9afc",
     "semantic_hash": ""
   }
 }
