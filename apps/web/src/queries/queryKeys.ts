@@ -42,6 +42,10 @@ export const queryKeys = {
     features: (projectId: number) => [...queryKeys.projects.detail(projectId), "features"] as const,
     diary: (projectId: number) => [...queryKeys.projects.detail(projectId), "diary"] as const
   },
+  diary: {
+    root: ["diary"] as const,
+    all: () => [...queryKeys.diary.root, "all"] as const
+  },
   milestones: {
     root: ["milestones"] as const,
     list: () => [...queryKeys.milestones.root, "list"] as const,

@@ -32,6 +32,13 @@ export async function getProjectDiary(database: DbClient, projectId: number): Pr
   return record ? mapDiaryEntry(record) : null;
 }
 
+// Alle Tagebuch-Einträge projektübergreifend — Datenquelle für das Startseiten-Widget
+// „Alle Projekte". Die Zuordnung zum Projektnamen erfolgt im Frontend über die Projektliste.
+export async function listAllDiaries(database: DbClient): Promise<DiaryEntry[]> {
+  const records = await diaryEntryRepository.findAll(database);
+  return records.map(mapDiaryEntry);
+}
+
 // Direktzugriff per Eintrags-id; nötig, damit der versionsgeschützte Update-Pfad
 // (GET+PATCH auf /diary/:id) symmetrisch ist.
 export async function getDiaryEntryById(database: DbClient, id: number): Promise<DiaryEntry> {

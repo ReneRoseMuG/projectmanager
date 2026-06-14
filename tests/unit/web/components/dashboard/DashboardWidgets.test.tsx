@@ -45,6 +45,8 @@ const permissions = vi.hoisted(() => new Map<string, boolean>());
 const createNoteMock = vi.hoisted(() => vi.fn());
 const updateTaskMock = vi.hoisted(() => vi.fn());
 const diaryState = vi.hoisted(() => ({ value: { diary: null as DiaryEntry | null, loading: false, error: null as string | null, reload: vi.fn() } }));
+const allDiariesState = vi.hoisted(() => ({ value: { diaries: [] as DiaryEntry[], loading: false, error: null as string | null, reload: vi.fn() } }));
+const projectsState = vi.hoisted(() => ({ value: [] as Array<{ id: number; name: string }> }));
 
 vi.mock("../../../../../apps/web/src/hooks/useDashboards", () => ({
   useDashboardWidgetData(widget: { widgetId: string }) {
@@ -105,6 +107,11 @@ vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
 
 vi.mock("../../../../../apps/web/src/hooks/useDiary", () => ({
   useDiary: () => diaryState.value,
+  useAllDiaries: () => allDiariesState.value,
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useProjects", () => ({
+  useProjects: () => ({ projects: projectsState.value, project: null, loading: false, error: null, reload: async () => undefined }),
 }));
 
 vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
@@ -317,6 +324,9 @@ afterEach(() => {
   createNoteMock.mockReset();
   updateTaskMock.mockReset();
   diaryState.value = { diary: null, loading: false, error: null, reload: vi.fn() };
+  allDiariesState.value = { diaries: [], loading: false, error: null, reload: vi.fn() };
+  projectsState.value = [];
+  window.localStorage.clear();
 });
 
 describe("DashboardWidgetCard", () => {
@@ -624,5 +634,61 @@ describe("DashboardWidgetCard", () => {
 
     expect(screen.getByText("Kein Zugriff")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Tagebuch aktualisieren" })).not.toBeInTheDocument();
+  });
+
+  it("zeigt im Startseiten-Widget alle Tagebücher gestapelt mit Projektnamen", () => {
+    projectsState.value = [
+      { id: 3, name: "Projekt Manager" },
+      { id: 4, name: "Meisel & Gerken" },
+    ];
+    allDiariesState.value = {
+      diaries: [
+        { id: 1, projectId: 3, title: "T", content: "<p>PM-Verlauf</p>", coveredUntil: null, sourceCount: 0, version: 1, createdAt: "2026-06-14T00:00:00.000Z", updatedAt: "2026-06-14T00:00:00.000Z" },
+        { id: 2, projectId: 4, title: "T", content: "<p>MuG-Verlauf</p>", coveredUntil: null, sourceCount: 0, version: 1, createdAt: "2026-06-14T00:00:00.000Z", updatedAt: "2026-06-14T00:00:00.000Z" },
+      ],
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+    };
+
+    renderWithRouter("diaryOverview", undefined, { context: "home" });
+
+    expect(screen.getByRole("heading", { name: "Projekt Manager" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Meisel & Gerken" })).toBeInTheDocument();
+    expect(screen.getAllByTestId("diary-content")).toHaveLength(2);
+  });
+
+  it("zeigt nach Auswahl eines einzelnen Projekts dessen Tagebuch", () => {
+    projectsState.value = [{ id: 3, name: "Projekt Manager" }];
+    diaryState.value = {
+      diary: { id: 1, projectId: 3, title: "T", content: "<p>Einzelverlauf</p>", coveredUntil: null, sourceCount: 0, version: 1, createdAt: "2026-06-14T00:00:00.000Z", updatedAt: "2026-06-14T00:00:00.000Z" },
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+    };
+
+    renderWithRouter("diaryOverview", undefined, { context: "home" });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Projekt auswählen" }), { target: { value: "3" } });
+
+    expect(screen.getByTestId("diary-content")).toHaveTextContent("Einzelverlauf");
+  });
+
+  it("zeigt im Startseiten-Widget einen EmptyState, wenn projektübergreifend kein Tagebuch existiert", () => {
+    projectsState.value = [{ id: 3, name: "Projekt Manager" }];
+    allDiariesState.value = { diaries: [], loading: false, error: null, reload: vi.fn() };
+
+    renderWithRouter("diaryOverview", undefined, { context: "home" });
+
+    expect(screen.getByText("Keine Tagebücher vorhanden")).toBeInTheDocument();
+  });
+
+  it("blendet das Startseiten-Tagebuch ohne diary:read aus", () => {
+    permissions.set("diary:read", false);
+
+    renderWithRouter("diaryOverview", undefined, { context: "home" });
+
+    expect(screen.getByText("Kein Zugriff")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Projekt auswählen" })).not.toBeInTheDocument();
   });
 });

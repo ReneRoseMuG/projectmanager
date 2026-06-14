@@ -5,3 +5,8 @@ import { api } from "./client";
 export async function getProjectDiary(projectId: number): Promise<DiaryEntry | null> {
   return api.get(`projects/${projectId}/diary`).json<DiaryEntry | null>();
 }
+
+// Alle Tagebuch-Einträge projektübergreifend (Startseiten-Widget „Alle Projekte").
+export async function getAllDiaries(): Promise<DiaryEntry[]> {
+  return api.get("diary").json<DiaryEntry[]>();
+}

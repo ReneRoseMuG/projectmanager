@@ -34,13 +34,15 @@ import type { DiaryEntry } from "@taskmanager/shared-types";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as diaryApi from "../../../../apps/web/src/api/diary";
-import { useDiary } from "../../../../apps/web/src/hooks/useDiary";
+import { useAllDiaries, useDiary } from "../../../../apps/web/src/hooks/useDiary";
 
 vi.mock("../../../../apps/web/src/api/diary", () => ({
   getProjectDiary: vi.fn(),
+  getAllDiaries: vi.fn(),
 }));
 
 const getProjectDiaryMock = vi.mocked(diaryApi.getProjectDiary);
+const getAllDiariesMock = vi.mocked(diaryApi.getAllDiaries);
 
 const sampleEntry: DiaryEntry = {
   id: 5,
@@ -70,9 +72,21 @@ function Harness({ projectId, enabled }: { projectId: number | undefined; enable
   );
 }
 
+function AllHarness() {
+  const { diaries, loading, error } = useAllDiaries();
+  return (
+    <div>
+      <span data-testid="all-loading">{String(loading)}</span>
+      <span data-testid="all-error">{error ?? ""}</span>
+      <span data-testid="all-count">{String(diaries.length)}</span>
+    </div>
+  );
+}
+
 afterEach(() => {
   cleanup();
   getProjectDiaryMock.mockReset();
+  getAllDiariesMock.mockReset();
 });
 
 describe("useDiary", () => {
@@ -121,5 +135,32 @@ describe("useDiary", () => {
 
     await waitFor(() => expect(screen.getByTestId("loading")).toHaveTextContent("false"));
     expect(getProjectDiaryMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("useAllDiaries", () => {
+  it("lädt alle Tagebücher projektübergreifend", async () => {
+    getAllDiariesMock.mockResolvedValue([sampleEntry, { ...sampleEntry, id: 6, projectId: 43 }]);
+
+    render(
+      <Wrapper>
+        <AllHarness />
+      </Wrapper>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("all-count")).toHaveTextContent("2"));
+    expect(getAllDiariesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("meldet einen Fehlerzustand bei abgelehntem Request", async () => {
+    getAllDiariesMock.mockRejectedValue(new Error("Netzwerkfehler"));
+
+    render(
+      <Wrapper>
+        <AllHarness />
+      </Wrapper>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("all-error").textContent).not.toBe(""));
   });
 });

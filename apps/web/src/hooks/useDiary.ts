@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { getProjectDiary } from "../api/diary";
+import { getAllDiaries, getProjectDiary } from "../api/diary";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
@@ -23,6 +23,28 @@ export function useDiary(projectId: number | undefined, enabled = true) {
     diary: diaryQuery.data ?? null,
     loading: diaryQuery.isLoading,
     error: toQueryError(diaryQuery.error),
+    reload
+  };
+}
+
+/**
+ * Lädt alle Projekt-Tagebücher projektübergreifend (Startseiten-Widget „Alle Projekte").
+ */
+export function useAllDiaries(enabled = true) {
+  const diariesQuery = useQuery({
+    queryKey: queryKeys.diary.all(),
+    queryFn: getAllDiaries,
+    enabled
+  });
+
+  const reload = useCallback(async () => {
+    await diariesQuery.refetch();
+  }, [diariesQuery]);
+
+  return {
+    diaries: diariesQuery.data ?? [],
+    loading: diariesQuery.isLoading,
+    error: toQueryError(diariesQuery.error),
     reload
   };
 }

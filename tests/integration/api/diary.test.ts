@@ -99,6 +99,24 @@ describe("Diary API", () => {
     await supertest(app.server).get("/api/diary/999999").expect(404);
   });
 
+  it("GET /diary liefert alle Tagebücher projektübergreifend, ohne Projekte ohne Eintrag", async () => {
+    const projectA = await createProject(app, { name: "Sammel-Projekt A" });
+    const projectB = await createProject(app, { name: "Sammel-Projekt B" });
+    const projectC = await createProject(app, { name: "Sammel-Projekt C ohne Tagebuch" });
+    await supertest(app.server).post(`/api/projects/${projectA.id}/diary`).send({ title: "A", content: "<p>A</p>" }).expect(201);
+    await supertest(app.server).post(`/api/projects/${projectB.id}/diary`).send({ title: "B", content: "<p>B</p>" }).expect(201);
+
+    const res = await supertest(app.server).get("/api/diary").expect(200);
+    const projectIds = (res.body as Array<{ projectId: number }>).map((entry) => entry.projectId).sort((left, right) => left - right);
+    expect(projectIds).toEqual([projectA.id, projectB.id].sort((left, right) => left - right));
+    expect(projectIds).not.toContain(projectC.id);
+  });
+
+  it("GET /diary liefert eine leere Liste, wenn keine Tagebücher existieren", async () => {
+    const res = await supertest(app.server).get("/api/diary").expect(200);
+    expect(res.body).toEqual([]);
+  });
+
   it("PATCH aktualisiert den Inhalt und erhöht die version", async () => {
     const project = await createProject(app, { name: "Patch-Projekt" });
     const created = await supertest(app.server).post(`/api/projects/${project.id}/diary`).send({ title: "Verlauf", content: "<p>Alt</p>" }).expect(201);
@@ -208,6 +226,7 @@ describe("Diary API Berechtigungen", () => {
     const projectId = await createProjectAs(admin);
 
     await supertest(app.server).get(`/api/projects/${projectId}/diary`).expect(401);
+    await supertest(app.server).get("/api/diary").expect(401);
     await supertest(app.server).post(`/api/projects/${projectId}/diary`).send({ title: "X" }).expect(401);
     await supertest(app.server).patch("/api/diary/1").send({ title: "X", expectedVersion: 1 }).expect(401);
   });

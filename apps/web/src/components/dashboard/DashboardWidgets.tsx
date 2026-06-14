@@ -16,7 +16,7 @@ import type {
   Ticket,
   TicketStats,
 } from "@taskmanager/shared-types";
-import { AlertTriangle, BookOpen, ExternalLink, Inbox, Plus, RefreshCw, StickyNote } from "lucide-react";
+import { AlertTriangle, BookOpen, ExternalLink, Inbox, Library, Plus, RefreshCw, StickyNote } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCalendarTasks } from "../../hooks/useCalendarTasks";
@@ -54,7 +54,8 @@ import { useToast } from "../ui/ToastProvider";
 import { NoteEditor } from "../notes/NoteEditor";
 import { noteContentToPreviewText } from "../notes/noteContent";
 import { dashboardWidgetRegistry } from "./widgetRegistry";
-import { useDiary } from "../../hooks/useDiary";
+import { useAllDiaries, useDiary } from "../../hooks/useDiary";
+import { useProjects } from "../../hooks/useProjects";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { hasVisibleHtmlContent } from "../../lib/html-utils";
 
@@ -900,11 +901,96 @@ function DiaryWidget({ widget, owner }: { widget: DashboardWidgetLayout; owner?:
   );
 }
 
+const DIARY_OVERVIEW_STORAGE_KEY = "dashboard:diaryOverview:selected";
+
+// Startseiten-Widget: zeigt Projekt-Tagebücher. Über den Selektor im Kopf entweder ein
+// gewähltes Projekt oder alle Projekte gestapelt. Reine Leseschicht (FT(16)/MS-70).
+function DiaryOverviewWidget({ widget }: { widget: DashboardWidgetLayout }) {
+  const canRead = useHasPermission("diary", "read");
+  const { projects } = useProjects();
+  const [selected, setSelected] = useState<string>(() => window.localStorage.getItem(DIARY_OVERVIEW_STORAGE_KEY) ?? "all");
+
+  const allMode = selected === "all";
+  const selectedProjectId = allMode ? undefined : Number(selected);
+  const all = useAllDiaries(canRead && allMode);
+  const single = useDiary(selectedProjectId, canRead && !allMode);
+
+  const handleSelect = (value: string) => {
+    setSelected(value);
+    window.localStorage.setItem(DIARY_OVERVIEW_STORAGE_KEY, value);
+  };
+
+  const projectName = (id: number) => projects.find((project) => project.id === id)?.name ?? `Projekt ${id}`;
+  const reload = allMode ? all.reload : single.reload;
+
+  const action = canRead ? (
+    <div className="flex items-center gap-2">
+      <select
+        value={selected}
+        onChange={(event) => handleSelect(event.target.value)}
+        aria-label="Projekt auswählen"
+        className="h-8 w-40 rounded-md border border-line bg-white px-2 text-sm text-ink outline-none transition focus:border-steel-600"
+      >
+        <option value="all">Alle Projekte</option>
+        {projects.map((project) => (
+          <option key={project.id} value={String(project.id)}>
+            {project.name}
+          </option>
+        ))}
+      </select>
+      <Button variant="ghost" icon={<RefreshCw size={16} />} title="Aktualisieren" aria-label="Tagebücher aktualisieren" onClick={() => void reload()} />
+    </div>
+  ) : undefined;
+
+  let body: ReactNode;
+  if (!canRead) {
+    body = <EmptyState icon={<Library size={20} />} title="Kein Zugriff" body="Für die Tagebücher fehlt die Leseberechtigung." variant="tinted" />;
+  } else if (allMode) {
+    const withContent = all.diaries.filter((entry) => hasVisibleHtmlContent(entry.content));
+    if (all.loading) {
+      body = <WidgetLoading />;
+    } else if (all.error) {
+      body = <WidgetError message={all.error} />;
+    } else if (withContent.length === 0) {
+      body = <EmptyState icon={<Library size={20} />} title="Keine Tagebücher vorhanden" body="Für noch kein Projekt wurde ein Tagebuch geschrieben." variant="tinted" />;
+    } else {
+      body = (
+        <div className="flex h-full flex-col gap-4 overflow-y-auto">
+          {withContent.map((entry) => (
+            <div key={entry.id}>
+              <h4 className="mb-1 text-sm font-semibold text-ink">{projectName(entry.projectId)}</h4>
+              <RichTextInlineField value={entry.content} valueFormat="html" readOnly onChange={() => undefined} testIdPrefix={`diary-overview-${entry.projectId}`} />
+            </div>
+          ))}
+        </div>
+      );
+    }
+  } else if (single.loading) {
+    body = <WidgetLoading />;
+  } else if (single.error) {
+    body = <WidgetError message={single.error} />;
+  } else if (single.diary && hasVisibleHtmlContent(single.diary.content)) {
+    body = (
+      <div className="h-full overflow-y-auto">
+        <RichTextInlineField value={single.diary.content} valueFormat="html" readOnly onChange={() => undefined} testIdPrefix="diary-overview-single" />
+      </div>
+    );
+  } else {
+    body = <EmptyState icon={<Library size={20} />} title="Kein Tagebuch vorhanden" body="Für dieses Projekt wurde noch kein Tagebuch geschrieben." variant="tinted" />;
+  }
+
+  return (
+    <WidgetShell widget={widget} action={action}>
+      {body}
+    </WidgetShell>
+  );
+}
+
 export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: DashboardWidgetCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
-  const usesOwnData = widget.widgetId === "calendar" || widget.widgetId === "upcomingEvents" || widget.widgetId === "projectDiary";
+  const usesOwnData = widget.widgetId === "calendar" || widget.widgetId === "upcomingEvents" || widget.widgetId === "projectDiary" || widget.widgetId === "diaryOverview";
   const query = useDashboardWidgetData(widget, owner, !usesOwnData);
   const isDayPlanContext = context === "dayPlan" && owner?.type === "dayPlan";
   const dayPlanAction = isDayPlanContext ? <DayPlanWidgetAction widget={widget} owner={owner} context={context} dayPlanDate={dayPlanDate} /> : undefined;
@@ -946,6 +1032,10 @@ export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: Das
 
   if (widget.widgetId === "projectDiary") {
     return <DiaryWidget widget={widget} owner={owner} />;
+  }
+
+  if (widget.widgetId === "diaryOverview") {
+    return <DiaryOverviewWidget widget={widget} />;
   }
 
   if (query.loading) {

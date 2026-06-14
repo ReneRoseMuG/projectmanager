@@ -22,6 +22,10 @@ export const diaryEntryRepository = {
     return firstRow(await database.select().from(diaryEntries).where(eq(diaryEntries.id, id)));
   },
 
+  async findAll(database: DbSession): Promise<DiaryEntryRecord[]> {
+    return database.select().from(diaryEntries);
+  },
+
   async create(database: DbSession, data: DiaryEntryCreateData, userId?: number): Promise<DiaryEntryRecord> {
     const now = nowIso();
     const result = await database

@@ -183,7 +183,8 @@ export const DASHBOARD_WIDGET_IDS = [
   "milestoneListView",
   "projectBoard",
   "projectList",
-  "projectDiary"
+  "projectDiary",
+  "diaryOverview"
 ] as const;
 
 export type DashboardContext = (typeof DASHBOARD_CONTEXTS)[number];
@@ -286,7 +287,7 @@ export const DASHBOARD_ALLOWED_WIDGETS = {
   project: ["taskStatusReport", "ticketStatusReport", "milestoneProgress", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "globalJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectDiary"],
   milestone: ["taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList"],
   task: ["taskStatusReport", "taskJournal", "commentJournal", "attachmentJournal"],
-  home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
+  home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList", "diaryOverview"],
   calendar: ["calendar", "upcomingEvents", "overdueTasks", "taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
   dayPlan: ["taskList", "taskBoard", "calendar", "upcomingEvents", "overdueTasks", "commentJournal", "noteList", "globalJournal"],
   dayPlanCalendar: ["calendar", "upcomingEvents"]

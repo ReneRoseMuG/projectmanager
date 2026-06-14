@@ -1,7 +1,7 @@
 import type { DiaryEntryInput, DiaryEntryUpdate } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
-import { createProjectDiary, getDiaryEntryById, getProjectDiary, updateDiaryEntry } from "../services/diary.service.js";
-import { expectedVersionPropertySchema, idParamSchema, objectResponseSchema, projectIdParamSchema } from "../utils/route-schemas.js";
+import { createProjectDiary, getDiaryEntryById, getProjectDiary, listAllDiaries, updateDiaryEntry } from "../services/diary.service.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, projectIdParamSchema } from "../utils/route-schemas.js";
 
 const diaryBodySchema = {
   type: "object",
@@ -52,6 +52,15 @@ export async function registerDiaryRoutes(app: FastifyInstance): Promise<void> {
       schema: { params: projectIdParamSchema, body: diaryBodySchema, response: { 201: objectResponseSchema } }
     },
     async (request, reply) => reply.status(201).send(await createProjectDiary(app.db, request.params.projectId, request.body, request.currentUser?.id))
+  );
+
+  app.get(
+    "/diary",
+    {
+      config: { auth: { resource: "diary", action: "read" } },
+      schema: { response: { 200: arrayResponseSchema } }
+    },
+    async () => listAllDiaries(app.db)
   );
 
   app.get<{ Params: { id: number } }>(

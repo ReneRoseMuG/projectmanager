@@ -1040,13 +1040,13 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/dashboard/DashboardWidgets.tsx": {
-    "mtime": 1781404594.7967522,
-    "ast_hash": "dae8c6e18a028d5d884a6b0a0e341127",
+    "mtime": 1781451391.8059433,
+    "ast_hash": "d815a1e195b6431e08b386133bb9d0a3",
     "semantic_hash": ""
   },
   "apps/web/src/components/dashboard/widgetRegistry.tsx": {
-    "mtime": 1781403943.868122,
-    "ast_hash": "c1c9cedf86b52140f138e77eb3d6da1c",
+    "mtime": 1781451284.3823383,
+    "ast_hash": "d1dc01b09edca80437db263f301bb157",
     "semantic_hash": ""
   },
   "apps/web/src/components/error/ErrorBoundary.tsx": {
@@ -2105,8 +2105,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/queries/queryKeys.ts": {
-    "mtime": 1781403918.241917,
-    "ast_hash": "c84b731e58dd02fd871dffaa784fa84e",
+    "mtime": 1781451258.4417262,
+    "ast_hash": "330ce1d0da4fda73aac1a478466deb5f",
     "semantic_hash": ""
   },
   "apps/web/src/types.ts": {
@@ -2190,8 +2190,8 @@
     "semantic_hash": ""
   },
   "packages/shared-types/src/index.ts": {
-    "mtime": 1781401656.734816,
-    "ast_hash": "4cdab66a228049030473166696b3ceb6",
+    "mtime": 1781451206.9525409,
+    "ast_hash": "61a5dc629a29046a9a3446505c433463",
     "semantic_hash": ""
   },
   "packages/shared-types/tsconfig.json": {
@@ -2720,8 +2720,8 @@
     "semantic_hash": ""
   },
   "tests/unit/web/components/dashboard/DashboardWidgets.test.tsx": {
-    "mtime": 1781404594.8002687,
-    "ast_hash": "c4b5a3ee48ef165216812fcf8ea0884d",
+    "mtime": 1781451833.6044664,
+    "ast_hash": "f631c2f142db6336a95c9b438ab4e209",
     "semantic_hash": ""
   },
   "tests/unit/web/components/features/FeatureDetail.test.tsx": {
@@ -3250,8 +3250,8 @@
     "semantic_hash": ""
   },
   "docs/architektur-leitfaden.md": {
-    "mtime": 1780753821.751039,
-    "ast_hash": "9dc36d956d9d70b39e36a301d4c47244",
+    "mtime": 1781405449.4003644,
+    "ast_hash": "f9d4a423ba12e5b76775fa648fb142fe",
     "semantic_hash": ""
   },
   "docs/design-leitfaden.md": {
@@ -6520,43 +6520,53 @@
     "semantic_hash": ""
   },
   "apps/api/src/repositories/diary-entry.repository.ts": {
-    "mtime": 1781402689.004157,
-    "ast_hash": "acba71bbda6d98cf9b498022f1c57241",
+    "mtime": 1781451164.6495197,
+    "ast_hash": "d2fd16dded274c904226b0511b21165f",
     "semantic_hash": ""
   },
   "apps/api/src/routes/diary.ts": {
-    "mtime": 1781403567.222627,
-    "ast_hash": "a64a9a54d8901ca4bfc85ed4a1a68219",
+    "mtime": 1781451189.985293,
+    "ast_hash": "54b068d15fccb8e787425b376b6a9248",
     "semantic_hash": ""
   },
   "apps/api/src/services/diary.service.ts": {
-    "mtime": 1781403558.5186903,
-    "ast_hash": "84bbd5db002274ff7d008593ca1e9f5c",
+    "mtime": 1781451169.3827293,
+    "ast_hash": "0af5f83406cbbc922f5df2d594a5ade5",
     "semantic_hash": ""
   },
   "apps/web/src/api/diary.ts": {
-    "mtime": 1781403920.5793586,
-    "ast_hash": "906af27ea946f8347f9bc011395f6bcd",
+    "mtime": 1781451256.1804686,
+    "ast_hash": "f86f4987cd9d0e9ebcb9d46b6e2089bd",
     "semantic_hash": ""
   },
   "apps/web/src/hooks/useDiary.ts": {
-    "mtime": 1781403924.8051915,
-    "ast_hash": "199a06bdedaa1db805135cb7d4978b99",
+    "mtime": 1781451264.699645,
+    "ast_hash": "b65fd0476c3edd5c8152c63bf0e7f926",
     "semantic_hash": ""
   },
   "tests/integration/api/diary.test.ts": {
-    "mtime": 1781403580.073124,
-    "ast_hash": "7889f6422621e338de6803d05ec34d32",
+    "mtime": 1781451502.5909886,
+    "ast_hash": "35d43b31478fe5c264f7ec44528a3e39",
     "semantic_hash": ""
   },
   "tests/unit/web/hooks/useDiary.test.tsx": {
-    "mtime": 1781404262.3336263,
-    "ast_hash": "804496cf45c854b7d405f6b57094db4b",
+    "mtime": 1781451536.5225372,
+    "ast_hash": "64fc32946fedc98ba0f0420538752b2b",
     "semantic_hash": ""
   },
   "docs/tasks/codex-auftrag-wiki-autosave-lost-update.md": {
     "mtime": 1781352428.795206,
     "ast_hash": "dd0eec43085e66cf8375e6dc2b8f2526",
+    "semantic_hash": ""
+  },
+  ".claude/skills/tagebuch/SKILL.md": {
+    "mtime": 1781449700.0232444,
+    "ast_hash": "03059ba8535f00524dc0b89219c27082",
+    "semantic_hash": ""
+  },
+  "logs/2026-06-14-feature-ms70-tagebuch.md": {
+    "mtime": 1781405057.4440649,
+    "ast_hash": "2aaf3ae556327154c3783a4adeafd8c0",
     "semantic_hash": ""
   }
 }
