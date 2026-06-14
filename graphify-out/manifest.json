@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   ".claude/settings.local.json": {
-    "mtime": 1781324484.9526124,
-    "ast_hash": "47e11be23e5646f37833dfdd366d0d23",
+    "mtime": 1781402359.2855673,
+    "ast_hash": "8e2f89f6e0bf8ac98f12f2994076b611",
     "semantic_hash": ""
   },
   ".vscode/tasks.json": {
@@ -50,8 +50,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/app.ts": {
-    "mtime": 1780753821.6424167,
-    "ast_hash": "574cfba89803da0e0a0e7edb19804312",
+    "mtime": 1781402940.1726766,
+    "ast_hash": "01e75b2cce26e07aec2eee2728feb95e",
     "semantic_hash": ""
   },
   "apps/api/src/config.ts": {
@@ -100,8 +100,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/db/schema.ts": {
-    "mtime": 1780720017.3812022,
-    "ast_hash": "87c0df4d93c16b213b73af42ef24f4b8",
+    "mtime": 1781401713.289734,
+    "ast_hash": "4bdf43a5519b9c63cc21dd8f9f7e15d7",
     "semantic_hash": ""
   },
   "apps/api/src/index.ts": {
@@ -555,8 +555,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/tasks.service.ts": {
-    "mtime": 1781240274.633655,
-    "ast_hash": "81c6f212a11bdd2f26cdfe17d4afc02d",
+    "mtime": 1781336588.5103648,
+    "ast_hash": "696b1b6ee8ede7afc27de2b056204408",
     "semantic_hash": ""
   },
   "apps/api/src/services/tickets.service.ts": {
@@ -705,8 +705,8 @@
     "semantic_hash": ""
   },
   "apps/mcp-server/src/tools.ts": {
-    "mtime": 1781251275.5057254,
-    "ast_hash": "e3b6b367d99926ccff8815153624c00c",
+    "mtime": 1781403622.622084,
+    "ast_hash": "f11ca73bcf9ded93fef7c6d9dde00613",
     "semantic_hash": ""
   },
   "apps/mcp-server/src/work-dossier.ts": {
@@ -1005,8 +1005,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/calendar/WeekCalendar.tsx": {
-    "mtime": 1780720017.412733,
-    "ast_hash": "21cb2b9df3a989aa93a8ff26df3ba671",
+    "mtime": 1781336588.5124583,
+    "ast_hash": "495fd3d1a50d609eff54d73e5afeb38a",
     "semantic_hash": ""
   },
   "apps/web/src/components/calendar/WeekEventTile.tsx": {
@@ -1040,13 +1040,13 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/dashboard/DashboardWidgets.tsx": {
-    "mtime": 1781156338.2658794,
-    "ast_hash": "012524b2941f116b16e28f356a47e4ab",
+    "mtime": 1781404594.7967522,
+    "ast_hash": "dae8c6e18a028d5d884a6b0a0e341127",
     "semantic_hash": ""
   },
   "apps/web/src/components/dashboard/widgetRegistry.tsx": {
-    "mtime": 1780720017.418732,
-    "ast_hash": "0333cb74013c532ba11ad77b6d244138",
+    "mtime": 1781403943.868122,
+    "ast_hash": "c1c9cedf86b52140f138e77eb3d6da1c",
     "semantic_hash": ""
   },
   "apps/web/src/components/error/ErrorBoundary.tsx": {
@@ -2105,8 +2105,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/queries/queryKeys.ts": {
-    "mtime": 1781156338.2727115,
-    "ast_hash": "61f0f487571fe6a18fad9e2a1e4a38bd",
+    "mtime": 1781403918.241917,
+    "ast_hash": "c84b731e58dd02fd871dffaa784fa84e",
     "semantic_hash": ""
   },
   "apps/web/src/types.ts": {
@@ -2190,8 +2190,8 @@
     "semantic_hash": ""
   },
   "packages/shared-types/src/index.ts": {
-    "mtime": 1781323578.4447498,
-    "ast_hash": "4135a9539f8466f74673f5fb21e25a0a",
+    "mtime": 1781401656.734816,
+    "ast_hash": "4cdab66a228049030473166696b3ceb6",
     "semantic_hash": ""
   },
   "packages/shared-types/tsconfig.json": {
@@ -2385,13 +2385,13 @@
     "semantic_hash": ""
   },
   "tests/fixtures/api/app.ts": {
-    "mtime": 1780753821.8008223,
-    "ast_hash": "49d05047367b8928b2b668e74277f606",
+    "mtime": 1781403329.8599315,
+    "ast_hash": "95021b26bdbe9db0db7c1aeb1fe46006",
     "semantic_hash": ""
   },
   "tests/fixtures/api/db.ts": {
-    "mtime": 1781071976.628751,
-    "ast_hash": "e012ed785a15e2c89a92fa712728c90b",
+    "mtime": 1781401730.5489564,
+    "ast_hash": "35f8dc25e6f109584e5c88fe981b49fc",
     "semantic_hash": ""
   },
   "tests/fixtures/api/factories.ts": {
@@ -2460,8 +2460,8 @@
     "semantic_hash": ""
   },
   "tests/integration/api/dashboard-widgets.test.ts": {
-    "mtime": 1781240274.8023758,
-    "ast_hash": "792855a3ad137bac99160f4ec0f81a08",
+    "mtime": 1781336588.513463,
+    "ast_hash": "dab8d19cda5819af9b2c5270f97fa37c",
     "semantic_hash": ""
   },
   "tests/integration/api/dashboard.test.ts": {
@@ -2720,8 +2720,8 @@
     "semantic_hash": ""
   },
   "tests/unit/web/components/dashboard/DashboardWidgets.test.tsx": {
-    "mtime": 1781153675.792068,
-    "ast_hash": "2a1c204e64b64f30ba1aca45d99ca595",
+    "mtime": 1781404594.8002687,
+    "ast_hash": "c4b5a3ee48ef165216812fcf8ea0884d",
     "semantic_hash": ""
   },
   "tests/unit/web/components/features/FeatureDetail.test.tsx": {
@@ -3255,8 +3255,8 @@
     "semantic_hash": ""
   },
   "docs/design-leitfaden.md": {
-    "mtime": 1780753821.752046,
-    "ast_hash": "d9f526e54d82bb3ed161ab82b752391e",
+    "mtime": 1781325113.7365696,
+    "ast_hash": "7a985d2bb17e4933737eeaf340b3d311",
     "semantic_hash": ""
   },
   "docs/skill-documentation/code-discipline.md": {
@@ -6502,6 +6502,61 @@
   "logs/2026-06-13-06-10-11-fix-tkt-125-tkt-121.md": {
     "mtime": 1781323861.2906115,
     "ast_hash": "bd28aa3bf7e6440e915ec2710a6f9afc",
+    "semantic_hash": ""
+  },
+  "docs/tasks/codex-auftrag-tagebuch-feature.md": {
+    "mtime": 1781352004.7806807,
+    "ast_hash": "46df24cdf59e48826c788f043ab84661",
+    "semantic_hash": ""
+  },
+  "apps/api/src/db/migrations/20260614014906_dry_wendell_vaughn/migration.sql": {
+    "mtime": 1781402544.9816778,
+    "ast_hash": "268af3ffcc2fb5e8673e423eb6218293",
+    "semantic_hash": ""
+  },
+  "apps/api/src/db/migrations/20260614014906_dry_wendell_vaughn/snapshot.json": {
+    "mtime": 1781401746.762462,
+    "ast_hash": "5836bc53084e4dcd1ea2412ef6c41c48",
+    "semantic_hash": ""
+  },
+  "apps/api/src/repositories/diary-entry.repository.ts": {
+    "mtime": 1781402689.004157,
+    "ast_hash": "acba71bbda6d98cf9b498022f1c57241",
+    "semantic_hash": ""
+  },
+  "apps/api/src/routes/diary.ts": {
+    "mtime": 1781403567.222627,
+    "ast_hash": "a64a9a54d8901ca4bfc85ed4a1a68219",
+    "semantic_hash": ""
+  },
+  "apps/api/src/services/diary.service.ts": {
+    "mtime": 1781403558.5186903,
+    "ast_hash": "84bbd5db002274ff7d008593ca1e9f5c",
+    "semantic_hash": ""
+  },
+  "apps/web/src/api/diary.ts": {
+    "mtime": 1781403920.5793586,
+    "ast_hash": "906af27ea946f8347f9bc011395f6bcd",
+    "semantic_hash": ""
+  },
+  "apps/web/src/hooks/useDiary.ts": {
+    "mtime": 1781403924.8051915,
+    "ast_hash": "199a06bdedaa1db805135cb7d4978b99",
+    "semantic_hash": ""
+  },
+  "tests/integration/api/diary.test.ts": {
+    "mtime": 1781403580.073124,
+    "ast_hash": "7889f6422621e338de6803d05ec34d32",
+    "semantic_hash": ""
+  },
+  "tests/unit/web/hooks/useDiary.test.tsx": {
+    "mtime": 1781404262.3336263,
+    "ast_hash": "804496cf45c854b7d405f6b57094db4b",
+    "semantic_hash": ""
+  },
+  "docs/tasks/codex-auftrag-wiki-autosave-lost-update.md": {
+    "mtime": 1781352428.795206,
+    "ast_hash": "dd0eec43085e66cf8375e6dc2b8f2526",
     "semantic_hash": ""
   }
 }

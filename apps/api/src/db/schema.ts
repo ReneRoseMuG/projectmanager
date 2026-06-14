@@ -874,6 +874,31 @@ export const wikiPages = mysqlTable("wiki_pages", {
   updatedAt: timestampText("updated_at")
 });
 
+// Tagebuch: eine lebende, versionierte Erzählung je Projekt. Bewusst ein direkter
+// projectId-FK statt eines polymorphen Owner-Joins (wie bei Kommentaren/Anhängen),
+// da ein Tagebuch-Strang strikt zu genau einem Projekt gehört (FT(16)/MS-70).
+export const diaryEntries = mysqlTable(
+  "diary_entries",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    projectId: int("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    title: shortText("title").notNull(),
+    content: longtext("content"),
+    coveredUntil: varchar("covered_until", { length: 32 }),
+    sourceCount: int("source_count").notNull().default(0),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  },
+  (table) => ({
+    diaryEntriesProjectUnique: uniqueIndex("diary_entries_project_unique").on(table.projectId)
+  })
+);
+
 export const wikiPageRelations = mysqlTable(
   "wiki_page_relations",
   {

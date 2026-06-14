@@ -35,6 +35,7 @@ import { registerTicketsRoutes } from "./routes/tickets.js";
 import { registerUserRoutes } from "./routes/users.js";
 import { registerUseCasesRoutes } from "./routes/use-cases.js";
 import { registerWikiRoutes } from "./routes/wiki.js";
+import { registerDiaryRoutes } from "./routes/diary.js";
 import { config } from "./config.js";
 import { openFileWithDefaultApp } from "./services/file-opener.service.js";
 import { stopAllAttachmentWatchers } from "./services/attachment-watcher.service.js";
@@ -99,6 +100,7 @@ export async function buildApp(
   await app.register(registerFeaturesRoutes, { prefix: "/api" });
   await app.register(registerUseCasesRoutes, { prefix: "/api" });
   await app.register(registerWikiRoutes, { prefix: "/api" });
+  await app.register(registerDiaryRoutes, { prefix: "/api" });
   await app.register(registerBacklogRoutes, { prefix: "/api" });
   await app.register(registerDocLinksRoutes, { prefix: "/api" });
   await app.register(registerImportsRoutes, { prefix: "/api" });

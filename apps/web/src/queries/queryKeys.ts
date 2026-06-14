@@ -39,7 +39,8 @@ export const queryKeys = {
     tasks: (projectId: number) => [...queryKeys.projects.detail(projectId), "tasks"] as const,
     tickets: (projectId: number) => [...queryKeys.projects.detail(projectId), "tickets"] as const,
     backlog: (projectId: number) => [...queryKeys.projects.detail(projectId), "backlog"] as const,
-    features: (projectId: number) => [...queryKeys.projects.detail(projectId), "features"] as const
+    features: (projectId: number) => [...queryKeys.projects.detail(projectId), "features"] as const,
+    diary: (projectId: number) => [...queryKeys.projects.detail(projectId), "diary"] as const
   },
   milestones: {
     root: ["milestones"] as const,

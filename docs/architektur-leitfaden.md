@@ -29,6 +29,13 @@ Objekte ohne eigenen fachlichen Lebenszyklus, die an beliebig viele Fachobjekte 
 | Note | `notes` | n:m — eine Note kann an mehreren Parents hängen |
 | Tag | `tags` | n:m — ein Tag kann an mehreren Parents hängen |
 
+### Projektgebundene Begleitobjekte
+Objekte mit eigenem versioniertem Lebenszyklus, die in strikter 1:1-Bindung zu genau einem Fachobjekt stehen. Sie werden über einen direkten `notNull`-FK auf den Parent mit `onDelete: "cascade"` plus Unique-Index auf der Parent-Spalte angebunden — **kein** Junction (da nicht n:m) und **kein** polymorpher Owner.
+
+| Objekt | Tabelle | Beziehungsart |
+|---|---|---|
+| DiaryEntry | `diary_entries` | 1:1 zu Project — genau ein lebender, versionierter Eintrag je Projekt |
+
 ---
 
 ## 2. Beziehungsmodell
@@ -66,6 +73,8 @@ Für jeden Parent-Typ eines Support-Objekts eine eigene Junction-Tabelle:
 - **Polymorphe Felder**: `entityType: text + entityId: integer` ohne FK sind verboten. Dieses Muster erzwingt manuelle Existenzprüfungen im Service und verhindert DB-native Kaskaden.
 - **Nullable-FK mit CHECK**: `projectId?/taskId?/featureId?` mit `CHECK(genau einer gesetzt)` ist verboten. Dieses Muster verhindert n:m und ist nicht erweiterbar.
 - **Manueller Cascade im Service**: `deleteCommentsForEntity()`, `deleteAttachmentsForIds()` o.ä. als Ersatz für DB-Kaskaden sind verboten, sobald die Junction-Tabellen existieren.
+
+**Ausnahme (erlaubt):** Ein direkter, `notNull` Single-Parent-FK ist bei striktem 1:1 zulässig und fällt nicht unter das Polymorphie-/Nullable-FK-Verbot — Beispiel `diary_entries.project_id` (genau ein Tagebuch je Projekt, Unique-Index auf `project_id`, `onDelete: "cascade"`). Dieses Muster ist Projektgebundenen Begleitobjekten (§1) vorbehalten und ersetzt **nicht** die Junction-Regeln für Fach- und Support-Objekte.
 
 ---
 

@@ -174,6 +174,7 @@ const truncateTables = [
   "backlog_items",
   "use_cases",
   "wiki_pages",
+  "diary_entries",
   "wiki_page_relations",
   "feature_relations",
   "features",

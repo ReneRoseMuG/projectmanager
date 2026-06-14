@@ -182,7 +182,8 @@ export const DASHBOARD_WIDGET_IDS = [
   "milestoneList",
   "milestoneListView",
   "projectBoard",
-  "projectList"
+  "projectList",
+  "projectDiary"
 ] as const;
 
 export type DashboardContext = (typeof DASHBOARD_CONTEXTS)[number];
@@ -282,7 +283,7 @@ export interface RecentAttachment {
 
 export const DASHBOARD_ALLOWED_WIDGETS = {
   global: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
-  project: ["taskStatusReport", "ticketStatusReport", "milestoneProgress", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "globalJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView"],
+  project: ["taskStatusReport", "ticketStatusReport", "milestoneProgress", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "globalJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectDiary"],
   milestone: ["taskStatusReport", "ticketStatusReport", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "taskBoard", "taskList", "ticketBoard", "ticketList"],
   task: ["taskStatusReport", "taskJournal", "commentJournal", "attachmentJournal"],
   home: ["taskStatusReport", "ticketStatusReport", "globalJournal", "taskJournal", "ticketJournal", "commentJournal", "attachmentJournal", "overdueTasks", "calendar", "upcomingEvents", "taskBoard", "taskList", "ticketBoard", "ticketList", "milestoneBoard", "milestoneList", "milestoneListView", "projectBoard", "projectList"],
@@ -355,7 +356,7 @@ export interface ApiErrorPayload {
   statusCode: number;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "settings", "realtime", "users", "roles"] as const;
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "diary", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "settings", "realtime", "users", "roles"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";
@@ -1094,6 +1095,27 @@ export interface WikiPageInput {
 }
 
 export type WikiPageUpdate = WithExpectedVersion<Partial<WikiPageInput>>;
+
+export interface DiaryEntry {
+  id: number;
+  projectId: number;
+  title: string;
+  content?: string;
+  coveredUntil?: string | null;
+  sourceCount: number;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DiaryEntryInput {
+  title: string;
+  content?: string;
+  coveredUntil?: string | null;
+  sourceCount?: number;
+}
+
+export type DiaryEntryUpdate = WithExpectedVersion<Partial<DiaryEntryInput>>;
 
 export interface BacklogItem {
   id: number;

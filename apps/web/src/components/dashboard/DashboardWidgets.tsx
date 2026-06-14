@@ -16,7 +16,7 @@ import type {
   Ticket,
   TicketStats,
 } from "@taskmanager/shared-types";
-import { AlertTriangle, ExternalLink, Inbox, Plus, StickyNote } from "lucide-react";
+import { AlertTriangle, BookOpen, ExternalLink, Inbox, Plus, RefreshCw, StickyNote } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCalendarTasks } from "../../hooks/useCalendarTasks";
@@ -54,6 +54,9 @@ import { useToast } from "../ui/ToastProvider";
 import { NoteEditor } from "../notes/NoteEditor";
 import { noteContentToPreviewText } from "../notes/noteContent";
 import { dashboardWidgetRegistry } from "./widgetRegistry";
+import { useDiary } from "../../hooks/useDiary";
+import { RichTextInlineField } from "../ui/rich-text-inline-field";
+import { hasVisibleHtmlContent } from "../../lib/html-utils";
 
 interface DashboardWidgetCardProps {
   widget: DashboardWidgetLayout;
@@ -867,11 +870,41 @@ function ProjectBoardWidget({
   );
 }
 
+// Tagebuch-Widget: zeigt die fortlaufende Projekt-Erzählung (FT(16)/MS-70). Reine Leseschicht;
+// die Texte erzeugt der Cowork-Skill über die MCP-Tools. "Aktualisieren" lädt nur neu.
+function DiaryWidget({ widget, owner }: { widget: DashboardWidgetLayout; owner?: DashboardOwner }) {
+  const projectId = owner?.type === "project" ? owner.id : undefined;
+  const canRead = useHasPermission("diary", "read");
+  const { diary, loading, error, reload } = useDiary(projectId, canRead);
+
+  const action = canRead ? (
+    <Button variant="ghost" icon={<RefreshCw size={16} />} title="Aktualisieren" aria-label="Tagebuch aktualisieren" onClick={() => void reload()} />
+  ) : undefined;
+
+  return (
+    <WidgetShell widget={widget} action={action}>
+      {!canRead ? (
+        <EmptyState icon={<BookOpen size={20} />} title="Kein Zugriff" body="Für das Tagebuch fehlt die Leseberechtigung." variant="tinted" />
+      ) : loading ? (
+        <WidgetLoading />
+      ) : error ? (
+        <WidgetError message={error} />
+      ) : diary && hasVisibleHtmlContent(diary.content) ? (
+        <div className="h-full overflow-y-auto">
+          <RichTextInlineField value={diary.content} valueFormat="html" readOnly onChange={() => undefined} testIdPrefix="project-diary" />
+        </div>
+      ) : (
+        <EmptyState icon={<BookOpen size={20} />} title="Kein Tagebuch vorhanden" body="Für dieses Projekt wurde noch kein Tagebuch geschrieben." variant="tinted" />
+      )}
+    </WidgetShell>
+  );
+}
+
 export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: DashboardWidgetCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const returnTo = `${location.pathname}${location.search}`;
-  const usesOwnData = widget.widgetId === "calendar" || widget.widgetId === "upcomingEvents";
+  const usesOwnData = widget.widgetId === "calendar" || widget.widgetId === "upcomingEvents" || widget.widgetId === "projectDiary";
   const query = useDashboardWidgetData(widget, owner, !usesOwnData);
   const isDayPlanContext = context === "dayPlan" && owner?.type === "dayPlan";
   const dayPlanAction = isDayPlanContext ? <DayPlanWidgetAction widget={widget} owner={owner} context={context} dayPlanDate={dayPlanDate} /> : undefined;
@@ -909,6 +942,10 @@ export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: Das
         <UpcomingEventsWidget />
       </WidgetShell>
     );
+  }
+
+  if (widget.widgetId === "projectDiary") {
+    return <DiaryWidget widget={widget} owner={owner} />;
   }
 
   if (query.loading) {

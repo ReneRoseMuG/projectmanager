@@ -1,7 +1,7 @@
 ﻿import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskStats, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { dayPlanTasks, featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks, wikiPageTasks, wikiPages } from "../db/schema.js";
+import { dayPlans, dayPlanTasks, featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks, wikiPageTasks, wikiPages } from "../db/schema.js";
 import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
@@ -636,20 +636,41 @@ async function listDashboardTasks(database: DbClient, owner?: DashboardTaskOwner
     return listTasks(database);
   }
   if (owner.type === "dayPlan") {
+    // Persönliche Planung ist datumsübergreifend: alle Tagesplan-Aufgaben desselben Users,
+    // nicht nur die des übergebenen (heutigen) Plans. Der Owner-Plan ist über
+    // ensureDashboardDayPlanAccess bereits dem aktuellen User zugeordnet (keine Fremddaten).
+    const ownerPlan = await database
+      .select({ userId: dayPlans.userId })
+      .from(dayPlans)
+      .where(eq(dayPlans.id, owner.id))
+      .then(firstRow);
+    if (!ownerPlan) {
+      return [];
+    }
     const rows = await database
       .select({ ...taskSelect, boardPosition: dayPlanTasks.position })
       .from(dayPlanTasks)
       .innerJoin(tasks, eq(dayPlanTasks.taskId, tasks.id))
-      .where(and(eq(dayPlanTasks.ownerId, owner.id), isNull(tasks.parentId)))
+      .innerJoin(dayPlans, eq(dayPlanTasks.ownerId, dayPlans.id))
+      .where(and(eq(dayPlans.userId, ownerPlan.userId), isNull(tasks.parentId)))
       .orderBy(tasks.status, dayPlanTasks.position);
-    const ids = rows.map((task) => task.id);
+    // Eine Aufgabe kann an mehreren Tagesplänen hängen → dedupliziert genau einmal.
+    const seen = new Set<number>();
+    const uniqueRows = rows.filter((row) => {
+      if (seen.has(row.id)) {
+        return false;
+      }
+      seen.add(row.id);
+      return true;
+    });
+    const ids = uniqueRows.map((task) => task.id);
     const [tagsByTask, subtaskCounts, supportCountsMap] = await Promise.all([
       getTaskTagsMap(database, ids),
       getSubtaskCounts(database, ids),
       getTaskSupportCounts(database, ids)
     ]);
 
-    return Promise.all(rows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, supportCountsMap.get(task.id) ?? emptySupportCounts)));
+    return Promise.all(uniqueRows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, supportCountsMap.get(task.id) ?? emptySupportCounts)));
   }
   if (owner.type === "task") {
     return listSubtasks(database, owner.id);

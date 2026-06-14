@@ -61,6 +61,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerHealthRoutes } = await import("../../../apps/api/src/routes/health.js");
   const { registerUseCasesRoutes } = await import("../../../apps/api/src/routes/use-cases.js");
   const { registerWikiRoutes } = await import("../../../apps/api/src/routes/wiki.js");
+  const { registerDiaryRoutes } = await import("../../../apps/api/src/routes/diary.js");
   const { registerBacklogRoutes } = await import("../../../apps/api/src/routes/backlog.js");
   const { registerDocLinksRoutes } = await import("../../../apps/api/src/routes/doc-links.js");
   const { registerImportsRoutes } = await import("../../../apps/api/src/routes/imports.js");
@@ -117,6 +118,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerFeaturesRoutes, { prefix: "/api" });
   await app.register(registerUseCasesRoutes, { prefix: "/api" });
   await app.register(registerWikiRoutes, { prefix: "/api" });
+  await app.register(registerDiaryRoutes, { prefix: "/api" });
   await app.register(registerBacklogRoutes, { prefix: "/api" });
   await app.register(registerDocLinksRoutes, { prefix: "/api" });
   await app.register(registerImportsRoutes, { prefix: "/api" });

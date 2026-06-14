@@ -1,5 +1,5 @@
 import type { DashboardContext, DashboardWidgetId } from "@taskmanager/shared-types";
-import { Activity, Bug, CalendarClock, CalendarDays, ChevronRight, FileText, Flag, History, KanbanSquare, List, ListTodo, MessageSquare, Paperclip, StickyNote, type LucideIcon } from "lucide-react";
+import { Activity, BookOpen, Bug, CalendarClock, CalendarDays, ChevronRight, FileText, Flag, History, KanbanSquare, List, ListTodo, MessageSquare, Paperclip, StickyNote, type LucideIcon } from "lucide-react";
 
 export interface DashboardWidgetMeta {
   id: DashboardWidgetId;
@@ -134,6 +134,12 @@ export const dashboardWidgetRegistry: Record<DashboardWidgetId, DashboardWidgetM
     label: "Projektliste",
     description: "Listenansicht der Projekte (nur Ansicht).",
     icon: ChevronRight,
+  },
+  projectDiary: {
+    id: "projectDiary",
+    label: "Tagebuch",
+    description: "Zeigt die fortlaufende Erzählung der jüngsten Projektvorgänge.",
+    icon: BookOpen,
   },
 };
 

@@ -6,6 +6,9 @@ import type {
   BacklogItemUpdate,
   CatalogEntry,
   Comment,
+  DiaryEntry,
+  DiaryEntryInput,
+  DiaryEntryUpdate,
   Feature,
   FeatureInput,
   FeatureUpdate,
@@ -270,6 +273,22 @@ const updateWikiPageSchema = idSchema.extend({
   parentId: z.number().int().positive().nullable().optional().describe("Verschiebt die Seite unter eine andere übergeordnete Seite."),
   content: z.string().optional().describe("Neuer Seiteninhalt als Markdown oder HTML. Markdown wird in HTML umgewandelt; fertiges HTML bleibt erhalten. Tabellen nur als HTML."),
   sortOrder: z.number().int().optional()
+});
+const getProjectDiarySchema = z.object({
+  projectId: z.number().int().positive().describe("Projekt, dessen Tagebuch gelesen wird.")
+});
+const createDiaryEntrySchema = z.object({
+  projectId: z.number().int().positive(),
+  title: z.string().min(1),
+  content: z.string().optional().describe("Tagebuch-Inhalt als Markdown oder HTML. Markdown wird in HTML umgewandelt; fertiges HTML bleibt erhalten."),
+  coveredUntil: z.string().optional().describe("ISO-Zeitstempel des jüngsten eingearbeiteten Ereignisses (Wasserstand)."),
+  sourceCount: z.number().int().min(0).optional().describe("Anzahl bisher eingearbeiteter Ereignisse (informativ).")
+});
+const updateDiaryEntrySchema = idSchema.extend({
+  title: z.string().min(1).optional(),
+  content: z.string().optional().describe("Neuer Tagebuch-Inhalt als Markdown oder HTML. Markdown wird in HTML umgewandelt; fertiges HTML bleibt erhalten."),
+  coveredUntil: z.string().optional(),
+  sourceCount: z.number().int().min(0).optional()
 });
 const backlogCreateSchema = z.object({
   projectId: z.number().int().positive(),
@@ -1453,6 +1472,27 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
         "Stellt für ein Projekt (PROJ-N) oder einen Meilenstein (MS-N) ein vorkorreliertes Arbeitsbericht-Dossier zusammen: kürzlich erledigte (geschlossen und innerhalb closedWithinDays Kalendertagen aktualisiert, Default 3), in Arbeit befindliche und offen wartende Aufgaben und Tickets, dazu chronologischer Kommentarverlauf, Beziehungen (blocks/related/duplicate) und gefilterte Journal-Änderungen. Liefert strukturierte Daten als Grundlage für einen erzählenden Arbeitsstandsbericht, keine fertige Prosa. Aus den Daten einen zusammenhängenden Bericht formulieren: was wurde erledigt, was liegt an, was ist offen, und welche Zusammenhänge bestehen zwischen Tickets, Aufgaben und Kommentaren.",
       inputSchema: workDossierSchema,
       execute: ({ reference, closedWithinDays }) => buildWorkDossier(client, reference, { closedWithinDays })
+    }),
+    defineTool({
+      name: "get_project_diary",
+      title: "Projekt-Tagebuch lesen",
+      description: "Liest den fortlaufenden Tagebuch-Eintrag eines Projekts oder null, wenn das Projekt noch kein Tagebuch hat.",
+      inputSchema: getProjectDiarySchema,
+      execute: ({ projectId }) => client.get<DiaryEntry | null>(`projects/${projectId}/diary`)
+    }),
+    defineTool({
+      name: "create_diary_entry",
+      title: "Tagebuch-Eintrag anlegen",
+      description: "Legt den einzigen Tagebuch-Eintrag eines Projekts an. Der Inhalt darf Markdown oder HTML sein (Markdown wird in HTML umgewandelt, fertiges HTML bleibt erhalten).",
+      inputSchema: createDiaryEntrySchema,
+      execute: ({ projectId, ...input }) => client.post<DiaryEntry>(`projects/${projectId}/diary`, withHtmlContent(input) satisfies DiaryEntryInput)
+    }),
+    defineTool({
+      name: "update_diary_entry",
+      title: "Tagebuch-Eintrag fortschreiben",
+      description: "Schreibt den Tagebuch-Eintrag versionsgeschützt fort. Nur übergebene Felder werden geändert; die aktuelle Version wird geladen und als expectedVersion gesendet.",
+      inputSchema: updateDiaryEntrySchema,
+      execute: (input) => updateVersioned<DiaryEntry>(client, `diary/${input.id}`, withoutIdWithHtmlContent(input) satisfies Omit<DiaryEntryUpdate, "expectedVersion">)
     })
   ];
 }

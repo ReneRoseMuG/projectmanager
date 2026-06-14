@@ -8,10 +8,12 @@
  * - Überfällige Aufgaben berücksichtigen offene Status und Fälligkeitsdatum.
  * - Aktuelle Aufgaben und Tickets werten geschlossene Katalogeinträge über isClosed aus.
  * - tasks/recent mit includeClosed=true behält geschlossene Aufgaben für Board-/Listen-Widgets.
+ * - tasks/recent und tasks/stats mit dayPlan-Owner liefern Aufgaben datumsübergreifend über alle Tagespläne des Users (dedupliziert), nicht nur des übergebenen Plans.
  * - Neue Widgetdaten-Endpunkte bleiben authentifizierungspflichtig.
  *
  * Fehlerfälle:
  * - Anonyme Widgetdaten-Abfrage und unvollständige Owner-Query.
+ * - Fremder dayPlan-Owner liefert 404 (keine Fremddaten über fremde Plan-IDs).
  *
  * Ziel:
  * Die Backend-Datenbasis der Dashboard-Widgets gegen falsche Zählungen, falsche Filter und offene API-Zugriffe absichern.
@@ -516,5 +518,44 @@ describe("Dashboard widget data API", () => {
     expect(withClosedTitles).toContain("Offene DayPlan-Aufgabe");
     expect(withClosedTitles).toContain("Zu schließende DayPlan-Aufgabe");
     expect(openTask.body.title).toBe("Offene DayPlan-Aufgabe");
+  });
+
+  it("liefert Tagesplan-Widgetdaten datumsübergreifend über alle Pläne des Users und isoliert fremde", async () => {
+    const admin = await loginAdmin(app);
+
+    // Aufgaben an zwei verschiedenen Tagen → zwei verschiedene Tagespläne desselben Users.
+    const taskTag1 = await admin.post("/api/day-plans/2026-09-21/tasks").send({ title: "Aufgabe Tag 1", status: "todo", priority: "medium" }).expect(201);
+    const taskTag2 = await admin.post("/api/day-plans/2026-09-22/tasks").send({ title: "Aufgabe Tag 2", status: "todo", priority: "high" }).expect(201);
+    // Dieselbe Aufgabe zusätzlich an einem dritten Tag → muss dedupliziert genau einmal erscheinen.
+    await admin.post(`/api/day-plans/2026-09-23/tasks/${taskTag1.body.id}`).expect(200);
+
+    // Fremde Aufgabe eines anderen Users darf nie erscheinen.
+    const roles = await admin.get("/api/admin/roles").expect(200);
+    const adminRole = roles.body.find((role: { key: string }) => role.key === "admin") as { id: number };
+    await admin
+      .post("/api/admin/users")
+      .send({ firstName: "Cross", lastName: "Other", email: "cross-date-widget-other@example.test", roleId: adminRole.id, password: "password123", isActive: true })
+      .expect(201);
+    const other = supertest.agent(app.server);
+    await other.post("/api/auth/login").send({ email: "cross-date-widget-other@example.test", password: "password123" }).expect(200);
+    const foreignTask = await other.post("/api/day-plans/2026-09-21/tasks").send({ title: "Fremd", status: "todo", priority: "medium" }).expect(201);
+
+    // Owner ist NUR der Plan von Tag 1; das Widget muss dennoch alle Tage des Users liefern.
+    const planTag1 = await admin.get("/api/day-plans/2026-09-21").expect(200);
+    const ownerId = (planTag1.body as { id: number }).id;
+    const recent = await admin.get(`/api/tasks/recent?ownerType=dayPlan&ownerId=${ownerId}&includeClosed=true`).expect(200);
+    const ids = (recent.body as Array<{ id: number }>).map((task) => task.id);
+    expect(ids).toEqual(expect.arrayContaining([taskTag1.body.id, taskTag2.body.id]));
+    expect(ids).not.toContain(foreignTask.body.id);
+    // Dedupliziert: Aufgabe an zwei Plänen erscheint nur einmal.
+    expect(ids.filter((id) => id === taskTag1.body.id)).toHaveLength(1);
+
+    // Statistik-Widget zählt ebenfalls datumsübergreifend (2 Aufgaben des Users).
+    const stats = await admin.get(`/api/tasks/stats?ownerType=dayPlan&ownerId=${ownerId}`).expect(200);
+    expect(stats.body.total).toBe(2);
+
+    // Sicherheit: fremder Plan-Owner ist für den Admin nicht zugreifbar (kein Datenleck über fremde Plan-IDs).
+    const foreignPlan = await other.get("/api/day-plans/2026-09-21").expect(200);
+    await admin.get(`/api/tasks/recent?ownerType=dayPlan&ownerId=${(foreignPlan.body as { id: number }).id}`).expect(404);
   });
 });

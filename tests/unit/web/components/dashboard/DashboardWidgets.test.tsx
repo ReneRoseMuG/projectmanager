@@ -31,7 +31,7 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import type { CalendarEvent, DashboardContext, DashboardOwner, DashboardWidgetId, DashboardWidgetLayout, Milestone, Note, Project, RecentComment, Task, Ticket } from "@taskmanager/shared-types";
+import type { CalendarEvent, DashboardContext, DashboardOwner, DashboardWidgetId, DashboardWidgetLayout, DiaryEntry, Milestone, Note, Project, RecentComment, Task, Ticket } from "@taskmanager/shared-types";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -44,6 +44,7 @@ const calendarEvents = vi.hoisted(() => ({ value: [] as CalendarEvent[] }));
 const permissions = vi.hoisted(() => new Map<string, boolean>());
 const createNoteMock = vi.hoisted(() => vi.fn());
 const updateTaskMock = vi.hoisted(() => vi.fn());
+const diaryState = vi.hoisted(() => ({ value: { diary: null as DiaryEntry | null, loading: false, error: null as string | null, reload: vi.fn() } }));
 
 vi.mock("../../../../../apps/web/src/hooks/useDashboards", () => ({
   useDashboardWidgetData(widget: { widgetId: string }) {
@@ -100,6 +101,14 @@ vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
 
 vi.mock("../../../../../apps/web/src/hooks/usePermissions", () => ({
   useHasPermission: (resource: string, action: string) => permissions.get(`${resource}:${action}`) ?? true,
+}));
+
+vi.mock("../../../../../apps/web/src/hooks/useDiary", () => ({
+  useDiary: () => diaryState.value,
+}));
+
+vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () => ({
+  RichTextInlineField: ({ value }: { value: string | null | undefined }) => <div data-testid="diary-content">{value}</div>,
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/useTags", () => ({
@@ -307,6 +316,7 @@ afterEach(() => {
   permissions.clear();
   createNoteMock.mockReset();
   updateTaskMock.mockReset();
+  diaryState.value = { diary: null, loading: false, error: null, reload: vi.fn() };
 });
 
 describe("DashboardWidgetCard", () => {
@@ -567,5 +577,52 @@ describe("DashboardWidgetCard", () => {
     expect(screen.getByText("Gesperrte Aufgabe")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Offen" })).not.toBeInTheDocument();
     expect(updateTaskMock).not.toHaveBeenCalled();
+  });
+
+  it("rendert den Tagebuch-Erzähltext im Projekt-Dashboard", () => {
+    diaryState.value = {
+      diary: { id: 1, projectId: 99, title: "Verlauf", content: "<p>Projektverlauf</p>", coveredUntil: null, sourceCount: 0, version: 1, createdAt: "2026-06-14T00:00:00.000Z", updatedAt: "2026-06-14T00:00:00.000Z" },
+      loading: false,
+      error: null,
+      reload: vi.fn(),
+    };
+
+    renderWithRouter("projectDiary", undefined, { context: "project", owner: { type: "project", id: 99 } });
+
+    expect(screen.getByTestId("diary-content")).toHaveTextContent("Projektverlauf");
+  });
+
+  it("zeigt einen EmptyState, wenn das Projekt noch kein Tagebuch hat", () => {
+    diaryState.value = { diary: null, loading: false, error: null, reload: vi.fn() };
+
+    renderWithRouter("projectDiary", undefined, { context: "project", owner: { type: "project", id: 99 } });
+
+    expect(screen.getByText("Kein Tagebuch vorhanden")).toBeInTheDocument();
+  });
+
+  it("löst über den Aktualisieren-Button ein Refetch aus", () => {
+    const reload = vi.fn();
+    diaryState.value = {
+      diary: { id: 1, projectId: 99, title: "Verlauf", content: "<p>X</p>", coveredUntil: null, sourceCount: 0, version: 1, createdAt: "2026-06-14T00:00:00.000Z", updatedAt: "2026-06-14T00:00:00.000Z" },
+      loading: false,
+      error: null,
+      reload,
+    };
+
+    renderWithRouter("projectDiary", undefined, { context: "project", owner: { type: "project", id: 99 } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Tagebuch aktualisieren" }));
+
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("blendet Inhalt und Aktualisieren-Button ohne diary:read aus", () => {
+    permissions.set("diary:read", false);
+    diaryState.value = { diary: null, loading: false, error: null, reload: vi.fn() };
+
+    renderWithRouter("projectDiary", undefined, { context: "project", owner: { type: "project", id: 99 } });
+
+    expect(screen.getByText("Kein Zugriff")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tagebuch aktualisieren" })).not.toBeInTheDocument();
   });
 });
