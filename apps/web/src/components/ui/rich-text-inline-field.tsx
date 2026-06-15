@@ -686,13 +686,36 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
   );
 }
 
+// posAtDOM(element, offset) treats offset as a child index, not a character offset.
+// When ProseMirror re-renders the DOM selection it often places endpoints on parent
+// element nodes (e.g. <p offset=1>) instead of text nodes. Resolve such containers
+// by walking into the actual text descendant before delegating to posAtDOM.
+function resolveEditorPos(editor: Editor, node: globalThis.Node, offset: number, toEnd: boolean): number {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return editor.view.posAtDOM(node, offset);
+  }
+  const el = node as Element;
+  if (toEnd && offset > 0) {
+    const child = el.childNodes[offset - 1];
+    if (!child) return editor.view.posAtDOM(node, offset);
+    const childEnd = child.nodeType === Node.TEXT_NODE ? (child as Text).length : (child as Element).childNodes.length;
+    return resolveEditorPos(editor, child, childEnd, true);
+  }
+  if (!toEnd && offset < el.childNodes.length) {
+    const child = el.childNodes[offset];
+    if (!child) return editor.view.posAtDOM(node, offset);
+    return resolveEditorPos(editor, child, 0, false);
+  }
+  return editor.view.posAtDOM(node, offset);
+}
+
 function getSelectionRange(editor: Editor): { from: number; to: number } | null {
   const domSel = window.getSelection();
   if (domSel && !domSel.isCollapsed && domSel.rangeCount > 0) {
     const domRange = domSel.getRangeAt(0);
     try {
-      const from = editor.view.posAtDOM(domRange.startContainer, domRange.startOffset);
-      const to = editor.view.posAtDOM(domRange.endContainer, domRange.endOffset);
+      const from = resolveEditorPos(editor, domRange.startContainer, domRange.startOffset, false);
+      const to = resolveEditorPos(editor, domRange.endContainer, domRange.endOffset, true);
       const lo = Math.min(from, to);
       const hi = Math.max(from, to);
       if (hi > lo) return { from: lo, to: hi };
