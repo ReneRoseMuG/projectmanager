@@ -37,6 +37,11 @@ function dateAtHour(date: string, hour: number): string {
   return `${date.slice(0, 10)}T${String(hour).padStart(2, "0")}:00`;
 }
 
+function toLocalDateTimeInput(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function preservedOwners(event: CalendarEvent | null, initialOwners: EventOwner[] | undefined): EventOwner[] {
   return event?.owners ?? initialOwners ?? [];
 }
@@ -78,7 +83,7 @@ export function EventForm({ open, event, initialDate, initialOwners, onSubmit, o
       if (diff > 0) durationMs = diff;
     }
     setStartTime(value);
-    setEndTime(new Date(new Date(value).getTime() + durationMs).toISOString().slice(0, 16));
+    setEndTime(toLocalDateTimeInput(new Date(new Date(value).getTime() + durationMs)));
   };
 
   const handleEndChange = (value: string) => {

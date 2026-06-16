@@ -739,12 +739,13 @@ function InteractiveCalendarWidget() {
 function UpcomingEventsWidget() {
   const canReadEvents = useHasPermission("events", "read");
   const events = useEvents(undefined, canReadEvents);
+  const calendar = useOptionalCalendarDashboard();
 
   if (events.loading) {
     return <WidgetLoading />;
   }
 
-  return <UpcomingEvents events={canReadEvents ? events.events : []} />;
+  return <UpcomingEvents events={canReadEvents ? events.events : []} onOpen={calendar?.openEvent} />;
 }
 
 function TaskBoardWidget({
