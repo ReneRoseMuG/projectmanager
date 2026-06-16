@@ -342,7 +342,7 @@ export function ProjectForm({
   }, [auth.user?.id, open, project]);
 
   useEffect(() => {
-    if (open) {
+    if (open && catalogs.entries.length > 0) {
       setStatus((currentStatus) =>
         workStatusValue(catalogs.entries, currentStatus, "active"),
       );

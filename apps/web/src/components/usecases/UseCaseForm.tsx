@@ -257,7 +257,7 @@ export function UseCaseForm({
   }, [auth.user?.id, currentFeatureId, open, useCase]);
 
   useEffect(() => {
-    if (open) {
+    if (open && catalogs.entries.length > 0) {
       setStatus((currentStatus) =>
         featureStatusValue(catalogs.entries, currentStatus, "draft"),
       );
@@ -767,7 +767,7 @@ function TicketDraftDialog({
   const ticketTypeOptions = useMemo(() => catalogEntriesByKind(catalogs.entries, "ticketType"), [catalogs.entries]);
 
   useEffect(() => {
-    if (open) {
+    if (open && catalogs.entries.length > 0) {
       setType((currentType) => ticketTypeValue(catalogs.entries, currentType));
     }
   }, [catalogs.entries, open]);

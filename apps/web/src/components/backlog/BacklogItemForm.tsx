@@ -87,7 +87,7 @@ export function BacklogItemForm({ open, item, features, onSubmit, onAutoSave, on
   }, [auth.user?.id, open, item]);
 
   useEffect(() => {
-    if (open) {
+    if (open && catalogs.entries.length > 0) {
       setStatus((currentStatus) => resolveCatalogEntryKey(catalogs.entries, "workStatus", currentStatus, "open") ?? "open");
     }
   }, [catalogs.entries, open]);

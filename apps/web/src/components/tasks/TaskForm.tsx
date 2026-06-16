@@ -270,7 +270,7 @@ export function TaskForm({
   }, [auth.user?.id, detail.task, initialStatus, open, task]);
 
   useEffect(() => {
-    if (open) {
+    if (open && catalogs.entries.length > 0) {
       setStatus((currentStatus) =>
         taskStatusValue(catalogs.entries, currentStatus),
       );

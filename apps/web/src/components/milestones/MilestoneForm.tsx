@@ -294,7 +294,7 @@ export function MilestoneForm({
   }, [auth.user?.id, initialProjectId, milestone, open, projects]);
 
   useEffect(() => {
-    if (open) {
+    if (open && catalogs.entries.length > 0) {
       setStatus((currentStatus) =>
         workStatusValue(catalogs.entries, currentStatus, "active"),
       );

@@ -275,7 +275,7 @@ export function TicketForm({
   }, [auth.user?.id, initialStatus, open, ticket]);
 
   useEffect(() => {
-    if (open) {
+    if (open && catalogs.entries.length > 0) {
       setType((currentType) => ticketTypeValue(catalogs.entries, currentType));
       setStatus((currentStatus) => ticketStatusValue(catalogs.entries, currentStatus));
       setPriority((currentPriority) => priorityValue(catalogs.entries, currentPriority));
@@ -776,7 +776,7 @@ function SubTicketDraftDialog({
   const ticketTypeOptions = useMemo(() => catalogEntriesByKind(catalogs.entries, "ticketType"), [catalogs.entries]);
 
   useEffect(() => {
-    if (open) {
+    if (open && catalogs.entries.length > 0) {
       setType((currentType) => ticketTypeValue(catalogs.entries, currentType));
     }
   }, [catalogs.entries, open]);
