@@ -20,6 +20,7 @@ import type {
   MilestoneInput,
   MilestoneUpdate,
   Note,
+  NoteUpdate,
   Project,
   ProjectInput,
   ProjectUpdate,
@@ -224,6 +225,10 @@ const updateTicketSchema = idSchema.extend({
   affectedVersion: z.string().nullable().optional(),
   dueDate: z.string().nullable().optional(),
   resolution: z.enum(TICKET_RESOLUTIONS).nullable().optional()
+});
+const updateNoteSchema = idSchema.extend({
+  title: z.string().optional(),
+  text: z.string().min(1).optional()
 });
 const featureCreateSchema = z.object({
   title: z.string().min(1),
@@ -504,6 +509,11 @@ function withHtmlContent<T extends { content?: string | null }>(input: T): T {
 
 function withoutIdWithHtmlContent<T extends { id: number; content?: string | null }>(input: T): Omit<T, "id"> {
   return withHtmlContent(withoutId(input) as Omit<T, "id"> & { content?: string | null }) as Omit<T, "id">;
+}
+
+function noteUpdateBody(input: z.infer<typeof updateNoteSchema>): Omit<NoteUpdate, "expectedVersion"> {
+  const { id: _id, text, ...rest } = input;
+  return text === undefined ? rest : { ...rest, contentJson: htmlDocument(text) };
 }
 
 function withoutAttachment<T extends { attachment?: unknown }>(input: T): Omit<T, "attachment"> {
@@ -1166,6 +1176,13 @@ export function createToolDefinitions(client: ProjectManagerApiClient): ToolDefi
       description: "Legt mehrere Textnotizen seriell an Projekt, Meilenstein, Task oder Ticket an.",
       inputSchema: noteListInputSchema,
       execute: (input) => createNotesBulk(client, input)
+    }),
+    defineTool({
+      name: "update_note",
+      title: "Notiz aktualisieren",
+      description: "Aktualisiert Titel und/oder Text einer Notiz versionsgeschützt. Die aktuelle Version wird geladen und als expectedVersion gesendet.",
+      inputSchema: updateNoteSchema,
+      execute: (input) => updateVersioned<Note>(client, `notes/${input.id}`, noteUpdateBody(input))
     }),
     defineTool({
       name: "add_attachment_to_parent",

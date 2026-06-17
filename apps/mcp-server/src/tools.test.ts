@@ -4,6 +4,7 @@ import { parseReferenceInput, type ReferenceContext } from "./reference-context.
 import { createToolDefinitions } from "./tools.js";
 import { errorResult } from "./tool-result.js";
 import { buildWorkDossier, type WorkDossier } from "./work-dossier.js";
+import { htmlDocument } from "./rich-text.js";
 
 /**
  * Test Scope:
@@ -118,6 +119,7 @@ describe("MCP tool definitions", () => {
       "update_ticket",
       "update_feature",
       "update_use_case",
+      "update_note",
       "list_wiki_pages",
       "get_wiki_page",
       "create_wiki_page",
@@ -688,6 +690,34 @@ describe("MCP tool definitions", () => {
       responsibleUserId: null,
       dueDate: "2026-06-10",
       expectedVersion: 3
+    });
+  });
+
+  it("updates notes by mapping text to a content document with the current expectedVersion", async () => {
+    const client = createMockClient();
+    client.get.mockResolvedValue({ id: 9, version: 2 });
+    client.patch.mockResolvedValue({ id: 9, title: "Geändert", version: 3 });
+
+    await tool("update_note", client).execute({ id: 9, title: "Geändert", text: "Neuer Text" });
+
+    expect(client.get).toHaveBeenCalledWith("notes/9");
+    expect(client.patch).toHaveBeenCalledWith("notes/9", {
+      title: "Geändert",
+      contentJson: htmlDocument("Neuer Text"),
+      expectedVersion: 2
+    });
+  });
+
+  it("updates a note title only and omits contentJson when no text is given", async () => {
+    const client = createMockClient();
+    client.get.mockResolvedValue({ id: 9, version: 5 });
+    client.patch.mockResolvedValue({ id: 9, title: "Nur Titel", version: 6 });
+
+    await tool("update_note", client).execute({ id: 9, title: "Nur Titel" });
+
+    expect(client.patch).toHaveBeenCalledWith("notes/9", {
+      title: "Nur Titel",
+      expectedVersion: 5
     });
   });
 

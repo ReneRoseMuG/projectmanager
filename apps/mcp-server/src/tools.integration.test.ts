@@ -516,6 +516,13 @@ describe("MCP tools integration", () => {
       description: "<p>Ticketbeschreibung MCP</p>",
       resolution: "fixed"
     });
+    const updatedNote = await callTool<Note>(executedTools, "update_note", { id: note.id, title: "MCP Notiz aktualisiert", text: "Aktualisierter Absatz" });
+    expect(updatedNote).toMatchObject({
+      id: note.id,
+      title: "MCP Notiz aktualisiert",
+      contentJson: { html: "<p>Aktualisierter Absatz</p>" },
+      version: note.version + 1
+    });
 
     const createdFeature = await callTool<Feature>(executedTools, "create_feature", {
       title: "MCP Tool Feature",

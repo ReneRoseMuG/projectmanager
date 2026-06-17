@@ -87,6 +87,7 @@ Die Update-Tools überarbeiten komplette Stammdaten samt Beschreibung beziehungs
 | `update_ticket` | Aktualisiert Ticketstammdaten, Beschreibung und Lösung versionsgeschützt. | `id`, optional `title`, `type`, `description`, `status`, `priority`, `reporterUserId`, `responsibleUserId`, `environment`, `affectedVersion`, `dueDate`, `resolution` | Aktualisiertes Ticket |
 | `update_feature` | Aktualisiert Feature-Stammdaten, Beschreibung und Content versionsgeschützt. | `id`, optional `title`, `status`, `description`, `content`, `sortOrder`, `responsibleUserId` | Aktualisiertes Feature |
 | `update_use_case` | Aktualisiert Use-Case-Stammdaten, Feature-Zuordnung, Beschreibung und Content versionsgeschützt. | `id`, optional `title`, `status`, `description`, `content`, `sortOrder`, `responsibleUserId`, `featureId` | Aktualisierter Use Case |
+| `update_note` | Aktualisiert Titel und/oder Text einer Notiz versionsgeschützt. | `id`, optional `title`, `text` | Aktualisierte Notiz |
 | `update_wiki_page` | Aktualisiert Titel, Inhalt, Hierarchie oder Sortierung einer Wiki-Seite versionsgeschützt. Inhalt als Markdown oder HTML. | `id`, optional `title`, `parentId`, `content`, `sortOrder` | Aktualisierte Wiki-Seite |
 
 ## Verknüpfungen
