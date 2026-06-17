@@ -28,6 +28,8 @@ interface FormModalProps {
   headerMeta?: ReactNode;
   variant?: "modal" | "page";
   onOpenInTab?: () => void;
+  /** When provided a refresh icon button is rendered in the header (e.g. to reload the active collection tab). */
+  onRefresh?: () => void | Promise<void>;
   tabBar?: ReactNode;
   contentLayout?: "default" | "flush";
   contentClassName?: string;
@@ -55,6 +57,7 @@ export function FormModal({
   headerMeta,
   variant = "modal",
   onOpenInTab,
+  onRefresh,
   tabBar,
   contentLayout = "default",
   contentClassName = "",
@@ -93,6 +96,7 @@ export function FormModal({
             tone="onSteel"
             saveStatus={saveStatus}
             objectReference={objectReference}
+            onRefresh={onRefresh}
             onOpenInTab={onOpenInTab}
             onDelete={onDelete}
             onClose={onClose}

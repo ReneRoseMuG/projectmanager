@@ -17858,7 +17858,7 @@
       "source_file": "apps/web/src/api/attachments.ts",
       "source_location": "L4",
       "id": "api_attachments_getprojectattachments",
-      "community": 54,
+      "community": 168,
       "norm_label": "getprojectattachments()"
     },
     {
@@ -17975,7 +17975,7 @@
       "source_file": "apps/web/src/api/attachments.ts",
       "source_location": "L66",
       "id": "api_attachments_getattachmentpreview",
-      "community": 168,
+      "community": 54,
       "norm_label": "getattachmentpreview()"
     },
     {
@@ -19145,7 +19145,7 @@
       "source_file": "apps/web/src/api/projects.ts",
       "source_location": "L1",
       "id": "api_projects",
-      "community": 168,
+      "community": 75,
       "norm_label": "projects.ts"
     },
     {
@@ -19163,7 +19163,7 @@
       "source_file": "apps/web/src/api/projects.ts",
       "source_location": "L8",
       "id": "api_projects_getproject",
-      "community": 168,
+      "community": 75,
       "norm_label": "getproject()"
     },
     {
@@ -19172,7 +19172,7 @@
       "source_file": "apps/web/src/api/projects.ts",
       "source_location": "L12",
       "id": "api_projects_createproject",
-      "community": 168,
+      "community": 75,
       "norm_label": "createproject()"
     },
     {
@@ -19181,7 +19181,7 @@
       "source_file": "apps/web/src/api/projects.ts",
       "source_location": "L16",
       "id": "api_projects_updateproject",
-      "community": 168,
+      "community": 75,
       "norm_label": "updateproject()"
     },
     {
@@ -19190,7 +19190,7 @@
       "source_file": "apps/web/src/api/projects.ts",
       "source_location": "L20",
       "id": "api_projects_deleteproject",
-      "community": 168,
+      "community": 75,
       "norm_label": "deleteproject()"
     },
     {
@@ -19199,7 +19199,7 @@
       "source_file": "apps/web/src/api/projects.ts",
       "source_location": "L24",
       "id": "api_projects_setprojecttags",
-      "community": 168,
+      "community": 75,
       "norm_label": "setprojecttags()"
     },
     {
@@ -19307,7 +19307,7 @@
       "source_file": "apps/web/src/api/tags.ts",
       "source_location": "L1",
       "id": "api_tags",
-      "community": 168,
+      "community": 25,
       "norm_label": "tags.ts"
     },
     {
@@ -19316,7 +19316,7 @@
       "source_file": "apps/web/src/api/tags.ts",
       "source_location": "L4",
       "id": "api_tags_gettags",
-      "community": 168,
+      "community": 25,
       "norm_label": "gettags()"
     },
     {
@@ -19325,7 +19325,7 @@
       "source_file": "apps/web/src/api/tags.ts",
       "source_location": "L8",
       "id": "api_tags_createtag",
-      "community": 168,
+      "community": 25,
       "norm_label": "createtag()"
     },
     {
@@ -19334,7 +19334,7 @@
       "source_file": "apps/web/src/api/tags.ts",
       "source_location": "L12",
       "id": "api_tags_updatetag",
-      "community": 168,
+      "community": 25,
       "norm_label": "updatetag()"
     },
     {
@@ -19343,7 +19343,7 @@
       "source_file": "apps/web/src/api/tags.ts",
       "source_location": "L16",
       "id": "api_tags_deletetag",
-      "community": 168,
+      "community": 25,
       "norm_label": "deletetag()"
     },
     {
@@ -19352,7 +19352,7 @@
       "source_file": "apps/web/src/api/tags.ts",
       "source_location": "L20",
       "id": "api_tags_settasktags",
-      "community": 168,
+      "community": 25,
       "norm_label": "settasktags()"
     },
     {
@@ -19721,7 +19721,7 @@
       "source_file": "apps/web/src/api/use-cases.ts",
       "source_location": "L1",
       "id": "api_use_cases",
-      "community": 869,
+      "community": 75,
       "norm_label": "use-cases.ts"
     },
     {
@@ -19730,7 +19730,7 @@
       "source_file": "apps/web/src/api/use-cases.ts",
       "source_location": "L4",
       "id": "api_use_cases_getusecases",
-      "community": 869,
+      "community": 75,
       "norm_label": "getusecases()"
     },
     {
@@ -19739,7 +19739,7 @@
       "source_file": "apps/web/src/api/use-cases.ts",
       "source_location": "L8",
       "id": "api_use_cases_getusecase",
-      "community": 869,
+      "community": 75,
       "norm_label": "getusecase()"
     },
     {
@@ -19748,7 +19748,7 @@
       "source_file": "apps/web/src/api/use-cases.ts",
       "source_location": "L12",
       "id": "api_use_cases_createusecase",
-      "community": 869,
+      "community": 75,
       "norm_label": "createusecase()"
     },
     {
@@ -19757,7 +19757,7 @@
       "source_file": "apps/web/src/api/use-cases.ts",
       "source_location": "L16",
       "id": "api_use_cases_updateusecase",
-      "community": 869,
+      "community": 75,
       "norm_label": "updateusecase()"
     },
     {
@@ -19766,7 +19766,7 @@
       "source_file": "apps/web/src/api/use-cases.ts",
       "source_location": "L20",
       "id": "api_use_cases_deleteusecase",
-      "community": 869,
+      "community": 75,
       "norm_label": "deleteusecase()"
     },
     {
@@ -21834,7 +21834,7 @@
       "label": "removeDraftByKindIndex()",
       "file_type": "code",
       "source_file": "apps/web/src/components/features/FeatureForm.tsx",
-      "source_location": "L899",
+      "source_location": "L912",
       "id": "features_featureform_removedraftbykindindex",
       "community": 3,
       "norm_label": "removedraftbykindindex()"
@@ -21843,7 +21843,7 @@
       "label": "UseCaseDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/features/FeatureForm.tsx",
-      "source_location": "L914",
+      "source_location": "L927",
       "id": "features_featureform_usecasedraftdialog",
       "community": 9,
       "norm_label": "usecasedraftdialog()"
@@ -21852,7 +21852,7 @@
       "label": "TaskDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/features/FeatureForm.tsx",
-      "source_location": "L981",
+      "source_location": "L994",
       "id": "features_featureform_taskdraftdialog",
       "community": 9,
       "norm_label": "taskdraftdialog()"
@@ -21861,7 +21861,7 @@
       "label": "TicketDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/features/FeatureForm.tsx",
-      "source_location": "L1057",
+      "source_location": "L1070",
       "id": "features_featureform_ticketdraftdialog",
       "community": 9,
       "norm_label": "ticketdraftdialog()"
@@ -23130,7 +23130,7 @@
       "label": "removeDraftByKindIndex()",
       "file_type": "code",
       "source_file": "apps/web/src/components/projects/ProjectForm.tsx",
-      "source_location": "L1251",
+      "source_location": "L1265",
       "id": "projects_projectform_removedraftbykindindex",
       "community": 3,
       "norm_label": "removedraftbykindindex()"
@@ -23139,7 +23139,7 @@
       "label": "FeatureLinkDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/projects/ProjectForm.tsx",
-      "source_location": "L1266",
+      "source_location": "L1280",
       "id": "projects_projectform_featurelinkdialog",
       "community": 3,
       "norm_label": "featurelinkdialog()"
@@ -23148,7 +23148,7 @@
       "label": "TaskDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/projects/ProjectForm.tsx",
-      "source_location": "L1335",
+      "source_location": "L1349",
       "id": "projects_projectform_taskdraftdialog",
       "community": 9,
       "norm_label": "taskdraftdialog()"
@@ -23157,7 +23157,7 @@
       "label": "TicketDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/projects/ProjectForm.tsx",
-      "source_location": "L1411",
+      "source_location": "L1425",
       "id": "projects_projectform_ticketdraftdialog",
       "community": 9,
       "norm_label": "ticketdraftdialog()"
@@ -23733,7 +23733,7 @@
       "label": "removeDraftByKindIndex()",
       "file_type": "code",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L858",
+      "source_location": "L872",
       "id": "tasks_taskform_removedraftbykindindex",
       "community": 3,
       "norm_label": "removedraftbykindindex()"
@@ -23742,7 +23742,7 @@
       "label": "TaskDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L873",
+      "source_location": "L887",
       "id": "tasks_taskform_taskdraftdialog",
       "community": 3,
       "norm_label": "taskdraftdialog()"
@@ -23751,7 +23751,7 @@
       "label": "TicketDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/tasks/TaskForm.tsx",
-      "source_location": "L962",
+      "source_location": "L976",
       "id": "tasks_taskform_ticketdraftdialog",
       "community": 3,
       "norm_label": "ticketdraftdialog()"
@@ -24084,7 +24084,7 @@
       "label": "SubTicketDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/tickets/TicketForm.tsx",
-      "source_location": "L761",
+      "source_location": "L775",
       "id": "tickets_ticketform_subticketdraftdialog",
       "community": 9,
       "norm_label": "subticketdraftdialog()"
@@ -24093,7 +24093,7 @@
       "label": "TicketRelationDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/tickets/TicketForm.tsx",
-      "source_location": "L833",
+      "source_location": "L847",
       "id": "tickets_ticketform_ticketrelationdraftdialog",
       "community": 3,
       "norm_label": "ticketrelationdraftdialog()"
@@ -24984,7 +24984,7 @@
       "label": "iconButtonClass",
       "file_type": "code",
       "source_file": "apps/web/src/components/ui/DetailHeaderActions.tsx",
-      "source_location": "L29",
+      "source_location": "L32",
       "id": "ui_detailheaderactions_iconbuttonclass",
       "community": 855,
       "norm_label": "iconbuttonclass"
@@ -24993,7 +24993,7 @@
       "label": "deleteButtonClass",
       "file_type": "code",
       "source_file": "apps/web/src/components/ui/DetailHeaderActions.tsx",
-      "source_location": "L36",
+      "source_location": "L39",
       "id": "ui_detailheaderactions_deletebuttonclass",
       "community": 855,
       "norm_label": "deletebuttonclass"
@@ -25002,7 +25002,7 @@
       "label": "DetailHeaderActions()",
       "file_type": "code",
       "source_file": "apps/web/src/components/ui/DetailHeaderActions.tsx",
-      "source_location": "L49",
+      "source_location": "L52",
       "id": "ui_detailheaderactions_detailheaderactions",
       "community": 855,
       "norm_label": "detailheaderactions()"
@@ -25227,7 +25227,7 @@
       "label": "FormModal()",
       "file_type": "code",
       "source_file": "apps/web/src/components/ui/FormModal.tsx",
-      "source_location": "L39",
+      "source_location": "L41",
       "id": "ui_formmodal_formmodal",
       "community": 3,
       "norm_label": "formmodal()"
@@ -27801,7 +27801,7 @@
       "label": "removeDraftByKindIndex()",
       "file_type": "code",
       "source_file": "apps/web/src/components/usecases/UseCaseForm.tsx",
-      "source_location": "L661",
+      "source_location": "L673",
       "id": "usecases_usecaseform_removedraftbykindindex",
       "community": 3,
       "norm_label": "removedraftbykindindex()"
@@ -27810,7 +27810,7 @@
       "label": "TaskDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/usecases/UseCaseForm.tsx",
-      "source_location": "L676",
+      "source_location": "L688",
       "id": "usecases_usecaseform_taskdraftdialog",
       "community": 9,
       "norm_label": "taskdraftdialog()"
@@ -27819,7 +27819,7 @@
       "label": "TicketDraftDialog()",
       "file_type": "code",
       "source_file": "apps/web/src/components/usecases/UseCaseForm.tsx",
-      "source_location": "L752",
+      "source_location": "L764",
       "id": "usecases_usecaseform_ticketdraftdialog",
       "community": 9,
       "norm_label": "ticketdraftdialog()"
@@ -28343,7 +28343,7 @@
       "source_file": "apps/web/src/hooks/useAttachmentPreview.ts",
       "source_location": "L1",
       "id": "hooks_useattachmentpreview",
-      "community": 168,
+      "community": 54,
       "norm_label": "useattachmentpreview.ts"
     },
     {
@@ -28478,7 +28478,7 @@
       "source_file": "apps/web/src/hooks/useCalendarTasks.ts",
       "source_location": "L1",
       "id": "hooks_usecalendartasks",
-      "community": 168,
+      "community": 25,
       "norm_label": "usecalendartasks.ts"
     },
     {
@@ -29018,7 +29018,7 @@
       "source_file": "apps/web/src/hooks/useProjectWikiRelation.ts",
       "source_location": "L1",
       "id": "hooks_useprojectwikirelation",
-      "community": 168,
+      "community": 75,
       "norm_label": "useprojectwikirelation.ts"
     },
     {
@@ -29036,7 +29036,7 @@
       "source_file": "apps/web/src/hooks/useProjects.ts",
       "source_location": "L1",
       "id": "hooks_useprojects",
-      "community": 168,
+      "community": 75,
       "norm_label": "useprojects.ts"
     },
     {
@@ -29234,7 +29234,7 @@
       "source_file": "apps/web/src/hooks/useTags.ts",
       "source_location": "L1",
       "id": "hooks_usetags",
-      "community": 168,
+      "community": 25,
       "norm_label": "usetags.ts"
     },
     {
@@ -29369,7 +29369,7 @@
       "source_file": "apps/web/src/hooks/useUseCases.ts",
       "source_location": "L1",
       "id": "hooks_useusecases",
-      "community": 869,
+      "community": 75,
       "norm_label": "useusecases.ts"
     },
     {
@@ -31124,7 +31124,7 @@
       "source_file": "apps/web/src/queries/queryErrors.ts",
       "source_location": "L1",
       "id": "queries_queryerrors",
-      "community": 168,
+      "community": 79,
       "norm_label": "queryerrors.ts"
     },
     {
@@ -31142,7 +31142,7 @@
       "source_file": "apps/web/src/queries/queryKeys.ts",
       "source_location": "L1",
       "id": "queries_querykeys",
-      "community": 168,
+      "community": 75,
       "norm_label": "querykeys.ts"
     },
     {
@@ -31151,7 +31151,7 @@
       "source_file": "apps/web/src/queries/queryKeys.ts",
       "source_location": "L3",
       "id": "queries_querykeys_noteownertype",
-      "community": 168,
+      "community": 75,
       "norm_label": "noteownertype"
     },
     {
@@ -31160,7 +31160,7 @@
       "source_file": "apps/web/src/queries/queryKeys.ts",
       "source_location": "L4",
       "id": "queries_querykeys_queryownertype",
-      "community": 168,
+      "community": 75,
       "norm_label": "queryownertype"
     },
     {
@@ -31169,7 +31169,7 @@
       "source_file": "apps/web/src/queries/queryKeys.ts",
       "source_location": "L5",
       "id": "queries_querykeys_taskownertype",
-      "community": 168,
+      "community": 75,
       "norm_label": "taskownertype"
     },
     {
@@ -31187,7 +31187,7 @@
       "source_file": "apps/web/src/queries/queryKeys.ts",
       "source_location": "L8",
       "id": "queries_querykeys_querykeys",
-      "community": 168,
+      "community": 75,
       "norm_label": "querykeys"
     },
     {
@@ -47043,7 +47043,7 @@
       "label": "12. Ausnahmen (explizit erlaubt)",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L503",
+      "source_location": "L504",
       "id": "docs_design_leitfaden_12_ausnahmen_explizit_erlaubt",
       "community": 98,
       "norm_label": "12. ausnahmen (explizit erlaubt)"
@@ -47052,7 +47052,7 @@
       "label": "13. Bekannte Abweichungen im Ist-Zustand (priorisiert)",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L521",
+      "source_location": "L522",
       "id": "docs_design_leitfaden_13_bekannte_abweichungen_im_ist_zustand_priorisiert",
       "community": 136,
       "norm_label": "13. bekannte abweichungen im ist-zustand (priorisiert)"
@@ -47061,7 +47061,7 @@
       "label": "\u2776 `text-slate-*` \u2014 Priorit\u00e4t: Hoch",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L523",
+      "source_location": "L524",
       "id": "docs_design_leitfaden_\u2776_text_slate_priorit\u00e4t_hoch",
       "community": 136,
       "norm_label": "\u2776 `text-slate-*` \u2014 prioritat: hoch"
@@ -47070,7 +47070,7 @@
       "label": "\u2777 `text-muted` \u2014 Priorit\u00e4t: Hoch",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L526",
+      "source_location": "L527",
       "id": "docs_design_leitfaden_\u2777_text_muted_priorit\u00e4t_hoch",
       "community": 136,
       "norm_label": "\u2777 `text-muted` \u2014 prioritat: hoch"
@@ -47079,7 +47079,7 @@
       "label": "\u2778 `rounded-2xl` und `rounded-t-2xl` \u2014 Priorit\u00e4t: Hoch",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L529",
+      "source_location": "L530",
       "id": "docs_design_leitfaden_\u2778_rounded_2xl_und_rounded_t_2xl_priorit\u00e4t_hoch",
       "community": 136,
       "norm_label": "\u2778 `rounded-2xl` und `rounded-t-2xl` \u2014 prioritat: hoch"
@@ -47088,7 +47088,7 @@
       "label": "\u2779 Badge / Pill `rounded-full` \u2014 Priorit\u00e4t: Hoch",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L532",
+      "source_location": "L533",
       "id": "docs_design_leitfaden_\u2779_badge_pill_rounded_full_priorit\u00e4t_hoch",
       "community": 136,
       "norm_label": "\u2779 badge / pill `rounded-full` \u2014 prioritat: hoch"
@@ -47097,7 +47097,7 @@
       "label": "\u277a Input `rounded-lg` \u2014 Priorit\u00e4t: Mittel",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L535",
+      "source_location": "L536",
       "id": "docs_design_leitfaden_\u277a_input_rounded_lg_priorit\u00e4t_mittel",
       "community": 136,
       "norm_label": "\u277a input `rounded-lg` \u2014 prioritat: mittel"
@@ -47106,7 +47106,7 @@
       "label": "\u277b Raw Schatten-Klassen \u2014 Priorit\u00e4t: Mittel",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L538",
+      "source_location": "L539",
       "id": "docs_design_leitfaden_\u277b_raw_schatten_klassen_priorit\u00e4t_mittel",
       "community": 136,
       "norm_label": "\u277b raw schatten-klassen \u2014 prioritat: mittel"
@@ -47115,7 +47115,7 @@
       "label": "\u277c ViewToggle `border-2 border-ink` \u2014 Priorit\u00e4t: Mittel",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L541",
+      "source_location": "L542",
       "id": "docs_design_leitfaden_\u277c_viewtoggle_border_2_border_ink_priorit\u00e4t_mittel",
       "community": 136,
       "norm_label": "\u277c viewtoggle `border-2 border-ink` \u2014 prioritat: mittel"
@@ -47124,7 +47124,7 @@
       "label": "\u277d `ListBoardView` Add-Button \u2014 Priorit\u00e4t: Hoch",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L544",
+      "source_location": "L545",
       "id": "docs_design_leitfaden_\u277d_listboardview_add_button_priorit\u00e4t_hoch",
       "community": 136,
       "norm_label": "\u277d `listboardview` add-button \u2014 prioritat: hoch"
@@ -47133,7 +47133,7 @@
       "label": "\u277e `ListBoardView` Spalten-Add-Button Icon-Gr\u00f6\u00dfe \u2014 Priorit\u00e4t: Mittel",
       "file_type": "document",
       "source_file": "docs/design-leitfaden.md",
-      "source_location": "L547",
+      "source_location": "L548",
       "id": "docs_design_leitfaden_\u277e_listboardview_spalten_add_button_icon_gr\u00f6sse_priorit\u00e4t_mittel",
       "community": 136,
       "norm_label": "\u277e `listboardview` spalten-add-button icon-gro\u00dfe \u2014 prioritat: mittel"
@@ -277510,9 +277510,9 @@
       "source_file": "logs/2026-06-17-02-50-45-doku-mcp-tools-wiki-21.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21",
-      "target": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_log_mcp_werkzeug_doku_in_wiki_21_ver\u00f6ffentlicht",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_log_mcp_werkzeug_doku_in_wiki_21_ver\u00f6ffentlicht"
     },
     {
       "relation": "contains",
@@ -277520,9 +277520,9 @@
       "source_file": "logs/2026-06-17-02-50-45-doku-mcp-tools-wiki-21.md",
       "source_location": "L16",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_log_mcp_werkzeug_doku_in_wiki_21_ver\u00f6ffentlicht",
-      "target": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_ge\u00e4nderte_angelegte_dateien",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_ge\u00e4nderte_angelegte_dateien"
     },
     {
       "relation": "contains",
@@ -277530,9 +277530,9 @@
       "source_file": "logs/2026-06-17-02-50-45-doku-mcp-tools-wiki-21.md",
       "source_location": "L26",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_log_mcp_werkzeug_doku_in_wiki_21_ver\u00f6ffentlicht",
-      "target": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_offene_punkte_folgeaufgaben",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_offene_punkte_folgeaufgaben"
     },
     {
       "relation": "contains",
@@ -277540,9 +277540,9 @@
       "source_file": "logs/2026-06-17-02-50-45-doku-mcp-tools-wiki-21.md",
       "source_location": "L22",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_log_mcp_werkzeug_doku_in_wiki_21_ver\u00f6ffentlicht",
-      "target": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_probleme_und_abweichungen",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_probleme_und_abweichungen"
     },
     {
       "relation": "contains",
@@ -277550,9 +277550,9 @@
       "source_file": "logs/2026-06-17-02-50-45-doku-mcp-tools-wiki-21.md",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_log_mcp_werkzeug_doku_in_wiki_21_ver\u00f6ffentlicht",
-      "target": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_was_wurde_umgesetzt",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_02_50_45_doku_mcp_tools_wiki_21_was_wurde_umgesetzt"
     },
     {
       "relation": "contains",
@@ -277560,9 +277560,9 @@
       "source_file": "logs/2026-06-17-04-13-58-fix-dashboard-widget-navigation.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation",
-      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_log_dashboard_row_widgets_tab_\u00f6ffnen_und_returnto",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_log_dashboard_row_widgets_tab_\u00f6ffnen_und_returnto"
     },
     {
       "relation": "contains",
@@ -277570,9 +277570,9 @@
       "source_file": "logs/2026-06-17-04-13-58-fix-dashboard-widget-navigation.md",
       "source_location": "L16",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_log_dashboard_row_widgets_tab_\u00f6ffnen_und_returnto",
-      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_ge\u00e4nderte_angelegte_dateien",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_ge\u00e4nderte_angelegte_dateien"
     },
     {
       "relation": "contains",
@@ -277580,9 +277580,9 @@
       "source_file": "logs/2026-06-17-04-13-58-fix-dashboard-widget-navigation.md",
       "source_location": "L34",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_log_dashboard_row_widgets_tab_\u00f6ffnen_und_returnto",
-      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_offene_punkte_folgeaufgaben",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_offene_punkte_folgeaufgaben"
     },
     {
       "relation": "contains",
@@ -277590,9 +277590,9 @@
       "source_file": "logs/2026-06-17-04-13-58-fix-dashboard-widget-navigation.md",
       "source_location": "L23",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_log_dashboard_row_widgets_tab_\u00f6ffnen_und_returnto",
-      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_probleme_und_abweichungen",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_probleme_und_abweichungen"
     },
     {
       "relation": "contains",
@@ -277600,9 +277600,9 @@
       "source_file": "logs/2026-06-17-04-13-58-fix-dashboard-widget-navigation.md",
       "source_location": "L28",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_log_dashboard_row_widgets_tab_\u00f6ffnen_und_returnto",
-      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_verifikation",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_verifikation"
     },
     {
       "relation": "contains",
@@ -277610,9 +277610,9 @@
       "source_file": "logs/2026-06-17-04-13-58-fix-dashboard-widget-navigation.md",
       "source_location": "L8",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_log_dashboard_row_widgets_tab_\u00f6ffnen_und_returnto",
-      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_was_wurde_umgesetzt",
-      "confidence_score": 1.0
+      "target": "logs_2026_06_17_04_13_58_fix_dashboard_widget_navigation_was_wurde_umgesetzt"
     },
     {
       "relation": "contains",
@@ -278666,5 +278666,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "f625d8f2b256e1f1878e0021c5dd9aa78b6657ce"
+  "built_at_commit": "a471e7b37cc3a7bcc9d6d9ac9ccb47c5d0ffdfb9"
 }

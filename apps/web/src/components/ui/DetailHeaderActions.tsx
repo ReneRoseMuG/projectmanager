@@ -1,5 +1,5 @@
-import { ExternalLink, Pencil, Trash2, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { ExternalLink, Pencil, RefreshCw, Trash2, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { CopyReferenceButton } from "./CopyReferenceButton";
 
 type DetailHeaderTone = "onSteel" | "onLight";
@@ -14,6 +14,9 @@ interface DetailHeaderActionsProps {
   editLabel?: string;
   /** Renders the stable object reference (e.g. WIKI-5) with copy-to-clipboard. */
   objectReference?: string;
+  /** Renders a refresh action; awaited while the spinner shows. Used to reload the active collection tab. */
+  onRefresh?: () => void | Promise<void>;
+  refreshLabel?: string;
   /** Renders an "open in new tab" action. */
   onOpenInTab?: () => void;
   /** Renders a delete action. */
@@ -43,7 +46,7 @@ const deleteButtonClass: Record<DetailHeaderTone, string> = {
 /**
  * Shared action cluster for detail headers. Used by FormModal (all entity detail
  * pages) and WikiPageForm so every detail chrome offers the same actions in the
- * same order: save status → edit → copy reference → open in tab → delete → close.
+ * same order: save status → edit → copy reference → refresh → open in tab → delete → close.
  * The cluster renders a fragment; the parent provides the flex container.
  */
 export function DetailHeaderActions({
@@ -52,6 +55,8 @@ export function DetailHeaderActions({
   onEdit,
   editLabel = "Bearbeiten",
   objectReference,
+  onRefresh,
+  refreshLabel = "Aktualisieren",
   onOpenInTab,
   onDelete,
   deleteLabel = "Löschen",
@@ -60,6 +65,19 @@ export function DetailHeaderActions({
   showBackLabel = false,
 }: DetailHeaderActionsProps) {
   const iconSize = tone === "onSteel" ? 18 : 16;
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    if (!onRefresh || refreshing) {
+      return;
+    }
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <>
@@ -97,6 +115,24 @@ export function DetailHeaderActions({
           reference={objectReference}
           variant={tone === "onSteel" ? "hero" : "surface"}
         />
+      ) : null}
+
+      {onRefresh ? (
+        <button
+          type="button"
+          className={iconButtonClass[tone]}
+          aria-label={refreshLabel}
+          title={refreshLabel}
+          onClick={() => {
+            void handleRefresh();
+          }}
+          disabled={refreshing}
+        >
+          <RefreshCw
+            size={iconSize}
+            className={refreshing ? "animate-spin" : undefined}
+          />
+        </button>
       ) : null}
 
       {onOpenInTab ? (

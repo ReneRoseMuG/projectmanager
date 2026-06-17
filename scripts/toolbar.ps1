@@ -72,7 +72,7 @@ $itemUpdate.Add_Click({
         return
     }
     Start-Process powershell.exe -ArgumentList `
-        "-ExecutionPolicy Bypass -NoProfile -File `"$script:updatePs1`" -DeployDir `"$script:deployDir`" -RepoRoot `"$script:repoRoot`""
+        "-NoExit -ExecutionPolicy Bypass -NoProfile -File `"$script:updatePs1`" -DeployDir `"$script:deployDir`" -RepoRoot `"$script:repoRoot`""
 })
 $menu.Items.Add($itemUpdate) | Out-Null
 

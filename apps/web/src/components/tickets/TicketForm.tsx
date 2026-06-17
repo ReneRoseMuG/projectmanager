@@ -377,6 +377,19 @@ export function TicketForm({
     return { ...tab, count: 0 };
   });
 
+  // Reload the active collection tab from the server (e.g. after an external MCP change).
+  // Only for a persisted ticket; in create mode the lists are local drafts.
+  const collectionReload: Partial<Record<TicketFormTab, () => Promise<void>>> = ticket
+    ? {
+        subTickets: detail.reload,
+        relations: detail.reload,
+        notes: notes.reload,
+        comments: detail.reload,
+        attachments: attachments.reload,
+      }
+    : {};
+  const refreshActiveTab = collectionReload[activeTab];
+
   return (
     <>
       <FormModal
@@ -395,6 +408,7 @@ export function TicketForm({
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        onRefresh={refreshActiveTab}
         contentLayout={activeTab === "details" ? "flush" : "default"}
         contentClassName=""
         tabBar={<TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />}

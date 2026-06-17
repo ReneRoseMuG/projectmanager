@@ -9,6 +9,20 @@ $stopPs1   = "$DeployDir\Stop.ps1"
 $startPs1  = "$DeployDir\Start.ps1"
 $deployPs1 = "$RepoRoot\scripts\deploy.ps1"
 
+# Transcript-Log: jede Zeile dieses Updates landet dauerhaft in einer Datei,
+# damit ein Fehler auch dann nachlesbar bleibt, wenn das Fenster schließt.
+$logDir  = "$DeployDir\runtime-logs"
+$logFile = $null
+try {
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    $logFile = Join-Path $logDir ("update-{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
+    Start-Transcript -Path $logFile -Force | Out-Null
+} catch {
+    Write-Host "  Hinweis: Transcript-Log konnte nicht gestartet werden: $($_.Exception.Message)" -ForegroundColor DarkYellow
+}
+
+try {
+
 Write-Host ""
 Write-Host "===============================" -ForegroundColor Cyan
 Write-Host "   Projekt Manager Update      " -ForegroundColor Cyan
@@ -29,11 +43,7 @@ Write-Host "[2/3] Deployment wird ausgeführt..." -ForegroundColor Yellow
 Write-Host ""
 & $deployPs1 -Target $DeployDir
 if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Host "FEHLER: Deployment fehlgeschlagen (Exit $LASTEXITCODE)." -ForegroundColor Red
-    Write-Host ""
-    Read-Host "Fenster schließen? [Enter drücken]"
-    exit 1
+    throw "Deployment fehlgeschlagen (Exit-Code $LASTEXITCODE)."
 }
 
 # Schritt 3: Starten
@@ -51,5 +61,31 @@ Write-Host "===============================" -ForegroundColor Green
 Write-Host "   Update abgeschlossen!       " -ForegroundColor Green
 Write-Host "===============================" -ForegroundColor Green
 Write-Host ""
-Read-Host "Fenster schließen? [Enter drücken]"
+}
+catch {
+    Write-Host ""
+    Write-Host "===============================" -ForegroundColor Red
+    Write-Host "   UPDATE FEHLGESCHLAGEN       " -ForegroundColor Red
+    Write-Host "===============================" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Fehler: $($_.Exception.Message)" -ForegroundColor Red
+    if ($_.InvocationInfo -and $_.InvocationInfo.PositionMessage) {
+        Write-Host ""
+        Write-Host $_.InvocationInfo.PositionMessage -ForegroundColor DarkGray
+    }
+    if ($_.ScriptStackTrace) {
+        Write-Host ""
+        Write-Host "Aufruf-Stack:" -ForegroundColor DarkGray
+        Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
+    }
+    if ($logFile) {
+        Write-Host ""
+        Write-Host "Vollständiges Protokoll: $logFile" -ForegroundColor Yellow
+    }
+}
+finally {
+    try { Stop-Transcript | Out-Null } catch { }
+    Write-Host ""
+    Read-Host "Fenster schließen? [Enter drücken]"
+}
 

@@ -275,6 +275,16 @@ Der Detail-Header (steel-Gradient) ist eine Sonderzone. Hier gelten eigene Regel
 - Dekorations-Blob: `rounded-full` erlaubt (rein dekorativ).
 - Icon-Container im Header: `rounded-xl`.
 - Subtitle-Badge: `rounded-md border border-white/15 bg-white/10`.
+- Aktions-Cluster (geteilt über `DetailHeaderActions`, genutzt von FormModal und
+  WikiPageForm): feste Reihenfolge **Speicherstatus → Bearbeiten → Referenz kopieren
+  → Aktualisieren → In neuem Tab → Löschen → Schließen**. Nur Aktionen mit
+  übergebenem Handler werden gerendert; die Reihenfolge bleibt konstant.
+- Icon-Buttons im Cluster: `h-9 w-9 rounded-full`, Icon-Größe `18` (onSteel) bzw.
+  `16` (onLight) gemäß §8.1.
+- **Aktualisieren** (`RefreshCw`): lädt die aktuell sichtbare Collection neu.
+  Erscheint nur auf Collection-Tabs (Listen wie Aufgaben, Tickets, Notizen,
+  Kommentare, Dateien), nicht auf Übersicht/Details/Journal und nicht im
+  Anlege-Modus. Während des Ladens dreht das Icon (`animate-spin`).
 
 ### 8.14 Section
 

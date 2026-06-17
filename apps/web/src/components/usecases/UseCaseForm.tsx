@@ -365,6 +365,17 @@ export function UseCaseForm({
     return { ...tab, count: 0 };
   });
 
+  // Reload the active collection tab from the server (e.g. after an external MCP change).
+  // Only for a persisted use case; in create mode the lists are local drafts.
+  const collectionReload: Partial<Record<UseCaseFormTab, () => Promise<void>>> = useCase
+    ? {
+        tasks: tasks.reload,
+        tickets: tickets.reload,
+        comments: comments.reload,
+      }
+    : {};
+  const refreshActiveTab = collectionReload[activeTab];
+
   return (
     <>
       <FormModal
@@ -380,6 +391,7 @@ export function UseCaseForm({
         onDelete={useCase && onDelete ? () => { void deleteCurrentUseCase(); } : undefined}
         saveStatus={useCase ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
         onOpenInTab={onOpenInTab}
+        onRefresh={refreshActiveTab}
         headerMeta={<StatusPill kind="featureStatus" value={status} />}
         onClose={onClose}
         variant={variant}

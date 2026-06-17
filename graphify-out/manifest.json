@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   ".claude/settings.local.json": {
-    "mtime": 1781656730.1167064,
-    "ast_hash": "7cbe8cbd453d020c4166a6b59a1eabd9",
+    "mtime": 1781673146.0969765,
+    "ast_hash": "ba34778fde7504135b9e73972780c7f7",
     "semantic_hash": ""
   },
   ".vscode/tasks.json": {
@@ -1070,8 +1070,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/features/FeatureForm.tsx": {
-    "mtime": 1781647953.408755,
-    "ast_hash": "bb9756565b465393fcd33842751e3887",
+    "mtime": 1781673110.1280286,
+    "ast_hash": "115bb094eb046b702fd56ab041900779",
     "semantic_hash": ""
   },
   "apps/web/src/components/features/FeatureListBoardView.tsx": {
@@ -1140,8 +1140,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/milestones/MilestoneForm.tsx": {
-    "mtime": 1781647953.408755,
-    "ast_hash": "dbb23b6adfae156a5537df22901e6aaa",
+    "mtime": 1781673110.1315892,
+    "ast_hash": "2d1df0dfb70a98202c5f96c134f026a7",
     "semantic_hash": ""
   },
   "apps/web/src/components/milestones/MilestoneListBoardView.tsx": {
@@ -1180,8 +1180,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/projects/ProjectForm.tsx": {
-    "mtime": 1781647953.42454,
-    "ast_hash": "1abc345a8fd6c6a2a805699e6e15dca7",
+    "mtime": 1781673110.1336133,
+    "ast_hash": "eff746ad45f81e8c74919efeaac6a597",
     "semantic_hash": ""
   },
   "apps/web/src/components/projects/ProjectListBoardView.tsx": {
@@ -1240,8 +1240,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/tasks/TaskForm.tsx": {
-    "mtime": 1781647953.42454,
-    "ast_hash": "cb57ba3611029899c47e636bc91e7082",
+    "mtime": 1781673110.135364,
+    "ast_hash": "4843fe6c18243d644d0fc95711343c3d",
     "semantic_hash": ""
   },
   "apps/web/src/components/tasks/TaskLinkDialog.tsx": {
@@ -1270,8 +1270,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/tickets/TicketForm.tsx": {
-    "mtime": 1781647953.42454,
-    "ast_hash": "544bcd0cd2ce14da9fd7440e06a0ec43",
+    "mtime": 1781673110.1378746,
+    "ast_hash": "dd239aa8f395aeb9a2d8c9779862ef4a",
     "semantic_hash": ""
   },
   "apps/web/src/components/tickets/TicketLinkDialog.tsx": {
@@ -1400,8 +1400,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/FormModal.tsx": {
-    "mtime": 1781242056.9558597,
-    "ast_hash": "ff7edb07d8cea13a688910e0184bc9c6",
+    "mtime": 1781673110.1424284,
+    "ast_hash": "80a483bd77a7ee75cce66bb65bead956",
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/FormSidebar.tsx": {
@@ -1655,8 +1655,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/usecases/UseCaseForm.tsx": {
-    "mtime": 1781647953.42454,
-    "ast_hash": "af6f21c5bdbb647205207b0777037fed",
+    "mtime": 1781673110.1454296,
+    "ast_hash": "75642775d6fec341ba163e66f3f3ced8",
     "semantic_hash": ""
   },
   "apps/web/src/components/usecases/UseCaseListBoardView.tsx": {
@@ -1685,8 +1685,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/wiki/WikiPageForm.tsx": {
-    "mtime": 1781251413.3317344,
-    "ast_hash": "248047e045455aee339f9814481a9a7b",
+    "mtime": 1781673110.1474452,
+    "ast_hash": "690799261775ec816f8c584b4f96bf80",
     "semantic_hash": ""
   },
   "apps/web/src/components/wiki/WikiTree.tsx": {
@@ -2215,13 +2215,13 @@
     "semantic_hash": ""
   },
   "scripts/toolbar.ps1": {
-    "mtime": 1780753821.7860763,
-    "ast_hash": "81a9196afe0c9942e6744800fd3a9973",
+    "mtime": 1781673110.1489527,
+    "ast_hash": "4042b28fe4c541f42fd0c7f4cb433902",
     "semantic_hash": ""
   },
   "scripts/update.ps1": {
-    "mtime": 1780753821.7860763,
-    "ast_hash": "1c3960d47def42158b160e0aecd9bdb5",
+    "mtime": 1781673110.1509762,
+    "ast_hash": "947e4245d78a8053fb0d6ae9988ac0e8",
     "semantic_hash": ""
   },
   "setup-mcp.ps1": {
@@ -3255,8 +3255,8 @@
     "semantic_hash": ""
   },
   "docs/design-leitfaden.md": {
-    "mtime": 1781325113.7365696,
-    "ast_hash": "7a985d2bb17e4933737eeaf340b3d311",
+    "mtime": 1781662831.022005,
+    "ast_hash": "4d153b93d2305124cdb03d9f1dabb547",
     "semantic_hash": ""
   },
   "docs/skill-documentation/code-discipline.md": {
@@ -6400,8 +6400,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/ui/DetailHeaderActions.tsx": {
-    "mtime": 1781242057.0295131,
-    "ast_hash": "58852cdc5698d99b3373aa2024740b3e",
+    "mtime": 1781673110.1404052,
+    "ast_hash": "c8fa44cb4397086f2186b98a5921ebc7",
     "semantic_hash": ""
   },
   "apps/web/src/hooks/useColorPalette.ts": {
@@ -6415,8 +6415,8 @@
     "semantic_hash": ""
   },
   "tests/unit/web/components/ui/DetailHeaderActions.test.tsx": {
-    "mtime": 1781242057.0295131,
-    "ast_hash": "431b1bad625e635211c48c8280aa91ee",
+    "mtime": 1781673110.1529844,
+    "ast_hash": "fcfda839a109a3aa813bf913267b1ca4",
     "semantic_hash": ""
   },
   "tests/unit/web/hooks/useColorPalette.test.ts": {

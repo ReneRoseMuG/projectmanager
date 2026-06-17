@@ -21,6 +21,8 @@
  * - Nur Aktionen mit übergebenem Handler/Referenz werden gerendert.
  * - Das Delete-Label ist überschreibbar; showBackLabel ergänzt den "Zurück"-Text.
  * - Der onLight-Modus rendert Bearbeiten als Textbutton.
+ * - Die Aktualisieren-Aktion erscheint nur mit onRefresh (zwischen Kopieren und
+ *   In neuem Tab) und ruft beim Klick den übergebenen Handler.
  *
  * Fehlerfälle:
  * - Klicks dürfen nur den jeweils zugehörigen Handler auslösen.
@@ -30,7 +32,7 @@
  * Den einheitlichen Aktions-Cluster absichern, den FormModal und WikiPageForm teilen.
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DetailHeaderActions } from "../../../../../apps/web/src/components/ui/DetailHeaderActions";
 
@@ -108,5 +110,39 @@ describe("DetailHeaderActions", () => {
     render(<DetailHeaderActions tone="onLight" onEdit={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: "Bearbeiten" })).toHaveTextContent("Bearbeiten");
+  });
+
+  it("zeigt die Aktualisieren-Aktion nur mit onRefresh an kanonischer Position", () => {
+    const { rerender } = render(
+      <DetailHeaderActions tone="onSteel" objectReference="WIKI-9" onOpenInTab={vi.fn()} />,
+    );
+    expect(screen.queryByRole("button", { name: "Aktualisieren" })).not.toBeInTheDocument();
+
+    rerender(
+      <DetailHeaderActions
+        tone="onSteel"
+        objectReference="WIKI-9"
+        onRefresh={vi.fn()}
+        onOpenInTab={vi.fn()}
+      />,
+    );
+
+    const names = screen
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label") ?? button.textContent);
+    expect(names).toEqual([
+      "ID WIKI-9 kopieren",
+      "Aktualisieren",
+      "In neuem Tab öffnen",
+    ]);
+  });
+
+  it("ruft onRefresh beim Klick auf Aktualisieren", async () => {
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    render(<DetailHeaderActions onRefresh={onRefresh} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Aktualisieren" }));
+
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1));
   });
 });

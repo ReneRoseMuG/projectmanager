@@ -233,6 +233,17 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
   const showInlineHeader = inline && inlineChrome === "standalone";
   const embeddedActionPage = inline && inlineChrome === "embedded" ? page : null;
 
+  // Reload the active collection tab from the server (e.g. after an external MCP change).
+  // Only for a persisted page; in create mode the lists are local drafts.
+  const collectionReload: Partial<Record<WikiPageFormTab, () => Promise<void>>> = page
+    ? {
+        comments: comments.reload,
+        notes: notes.reload,
+        attachments: attachments.reload,
+      }
+    : {};
+  const refreshActiveTab = collectionReload[activeTab];
+
   const form = (
       <form className={inline ? "flex h-full min-h-0 flex-col bg-shell" : "flex max-h-[calc(100vh-64px)] flex-col bg-shell"} onSubmit={submit}>
         {showInlineHeader ? (
@@ -246,6 +257,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
                 onEdit={!effectiveEditable && onEdit ? onEdit : undefined}
                 saveStatus={page && onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
                 objectReference={page ? objectReference("wikiPage", page.id) : undefined}
+                onRefresh={refreshActiveTab}
                 onDelete={page && onDelete ? () => onDelete(page) : undefined}
                 deleteLabel="Seite löschen"
               />
@@ -262,6 +274,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
                 tone="onSteel"
                 saveStatus={page && onAutoSave ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}
                 objectReference={page ? objectReference("wikiPage", page.id) : undefined}
+                onRefresh={refreshActiveTab}
                 onOpenInTab={onOpenInTab}
                 onClose={() => void requestClose()}
               />

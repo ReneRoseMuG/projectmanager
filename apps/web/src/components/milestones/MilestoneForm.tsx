@@ -448,6 +448,19 @@ export function MilestoneForm({
     );
   };
 
+  // Reload the active collection tab from the server (e.g. after an external MCP change).
+  // Only for a persisted milestone; in create mode the lists are local drafts.
+  const collectionReload: Partial<Record<MilestoneFormTab, () => Promise<void>>> = milestone
+    ? {
+        tasks: tasks.reload,
+        tickets: tickets.reload,
+        notes: notes.reload,
+        comments: comments.reload,
+        attachments: attachments.reload,
+      }
+    : {};
+  const refreshActiveTab = collectionReload[activeTab];
+
   return (
     <>
       <FormModal
@@ -461,6 +474,7 @@ export function MilestoneForm({
         saving={saving}
         submitLabel={saving ? (savingLabel ?? "Speichern...") : "Meilenstein anlegen"}
         onOpenInTab={onOpenInTab}
+        onRefresh={refreshActiveTab}
         hideFooter={!!milestone}
         onDelete={milestone && onDelete ? () => { void deleteCurrentMilestone(); } : undefined}
         saveStatus={milestone ? <SaveStatus status={autoSave.status} errorMessage={autoSave.errorMessage} /> : undefined}

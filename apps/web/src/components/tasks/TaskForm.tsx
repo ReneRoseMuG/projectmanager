@@ -420,6 +420,19 @@ export function TaskForm({
     );
   };
 
+  // Reload the active collection tab from the server (e.g. after an external MCP change).
+  // Only for a persisted task; in create mode the lists are local drafts.
+  const collectionReload: Partial<Record<TaskFormTab, () => Promise<void>>> = task
+    ? {
+        subtasks: detail.reload,
+        tickets: tickets.reload,
+        notes: notes.reload,
+        comments: detail.reload,
+        attachments: attachments.reload,
+      }
+    : {};
+  const refreshActiveTab = collectionReload[activeTab];
+
   return (
     <>
       <FormModal
@@ -438,6 +451,7 @@ export function TaskForm({
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        onRefresh={refreshActiveTab}
         contentLayout={activeTab === "details" ? "flush" : "default"}
         contentClassName={
           activeTab === "overview" ? "w-full max-w-7xl self-center" : ""

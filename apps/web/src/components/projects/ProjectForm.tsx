@@ -775,6 +775,19 @@ export function ProjectForm({
     return { ...tab, count: 0 };
   });
 
+  // Reload the active collection tab from the server (e.g. after an external MCP change).
+  // Only for a persisted project; in create mode the lists are local drafts.
+  const collectionReload: Partial<Record<ProjectFormTab, () => Promise<void>>> = project
+    ? {
+        tasks: tasks.reload,
+        tickets: tickets.reload,
+        notes: notes.reload,
+        comments: comments.reload,
+        attachments: attachments.reload,
+      }
+    : {};
+  const refreshActiveTab = collectionReload[activeTab];
+
   return (
     <>
       <FormModal
@@ -793,6 +806,7 @@ export function ProjectForm({
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        onRefresh={refreshActiveTab}
         contentLayout={activeTab === "details" ? "flush" : "default"}
         contentClassName={
           activeTab === "overview" ? "w-full max-w-7xl self-center" : ""

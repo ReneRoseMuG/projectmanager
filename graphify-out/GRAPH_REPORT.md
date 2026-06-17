@@ -1,16 +1,16 @@
 # Graph Report - Projekt Manager  (2026-06-17)
 
 ## Corpus Check
-- 1321 files · ~651,600 words
+- 1321 files · ~652,422 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 9880 nodes · 17985 edges · 879 communities (830 shown, 49 thin omitted)
+- 9880 nodes · 17985 edges · 878 communities (829 shown, 49 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 80 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f625d8f2`
+- Built from commit: `a471e7b3`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -873,7 +873,6 @@
 - [[_COMMUNITY_Community 866|Community 866]]
 - [[_COMMUNITY_Community 867|Community 867]]
 - [[_COMMUNITY_Community 868|Community 868]]
-- [[_COMMUNITY_Community 869|Community 869]]
 - [[_COMMUNITY_Community 870|Community 870]]
 - [[_COMMUNITY_Community 871|Community 871]]
 - [[_COMMUNITY_Community 872|Community 872]]
@@ -909,13 +908,13 @@
   tests/integration/web/components/ui/CommentThread.integration.test.tsx → apps/web/src/hooks/useEntityComments.ts
 
 ## Import Cycles
-- 3-file cycle: `apps/web/src/components/ui/Badge.tsx -> apps/web/src/utils/catalogs.ts -> apps/web/src/utils/domainLabels.ts -> apps/web/src/components/ui/Badge.tsx`
 - 3-file cycle: `apps/web/src/components/ui/Pill.tsx -> apps/web/src/utils/catalogs.ts -> apps/web/src/utils/domainLabels.ts -> apps/web/src/components/ui/Pill.tsx`
+- 3-file cycle: `apps/web/src/components/ui/Badge.tsx -> apps/web/src/utils/catalogs.ts -> apps/web/src/utils/domainLabels.ts -> apps/web/src/components/ui/Badge.tsx`
 - 4-file cycle: `apps/web/src/components/dashboard/DashboardGrid.tsx -> apps/web/src/components/dashboard/DashboardWidgets.tsx -> apps/web/src/components/tasks/TaskForm.tsx -> apps/web/src/components/dashboard/DashboardView.tsx -> apps/web/src/components/dashboard/DashboardGrid.tsx`
 - 4-file cycle: `apps/web/src/components/ui/Pill.tsx -> apps/web/src/utils/catalogs.ts -> apps/web/src/utils/domainLabels.ts -> apps/web/src/utils/statusTones.ts -> apps/web/src/components/ui/Pill.tsx`
 - 5-file cycle: `apps/web/src/components/calendar/CalendarDashboardProvider.tsx -> apps/web/src/components/tasks/TaskForm.tsx -> apps/web/src/components/dashboard/DashboardView.tsx -> apps/web/src/components/dashboard/DashboardGrid.tsx -> apps/web/src/components/dashboard/DashboardWidgets.tsx -> apps/web/src/components/calendar/CalendarDashboardProvider.tsx`
 
-## Communities (879 total, 49 thin omitted)
+## Communities (878 total, 49 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.24
@@ -1018,8 +1017,8 @@ Cohesion: 0.04
 Nodes (89): featureAttachments, featureComments, journalEntries, journalEntryChanges, journalEntryContexts, useCaseComments, JournalActorRecord, JournalChangeCreateData (+81 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.12
-Nodes (42): invalidateRealtimeScope(), invalidateOwner(), ownerTaskKey(), attachmentOwnerKeys(), commentOwnerKeys(), expectInvalidated(), invalidatedLabels(), KnownQueryLabel (+34 more)
+Cohesion: 0.10
+Nodes (47): createTag(), deleteTag(), getTags(), setTaskTags(), updateTag(), invalidateRealtimeScope(), invalidateOwner(), ownerTaskKey() (+39 more)
 
 ### Community 26 - "Community 26"
 Cohesion: 0.12
@@ -1134,8 +1133,8 @@ Cohesion: 0.15
 Nodes (23): objectReference(), ACTIVE_STATUS_KEYS, buildTaskItem(), buildTicketItem(), buildWorkDossier(), BuildWorkDossierOptions, ClassifiedItem, classify() (+15 more)
 
 ### Community 54 - "Community 54"
-Cohesion: 0.21
-Nodes (15): deleteAttachment(), deleteWikiPageAttachment(), getFeatureAttachments(), getMilestoneAttachments(), getProjectAttachments(), getTaskAttachments(), getWikiPageAttachments(), openAttachment() (+7 more)
+Cohesion: 0.20
+Nodes (15): deleteAttachment(), deleteWikiPageAttachment(), getAttachmentPreview(), getFeatureAttachments(), getMilestoneAttachments(), getTaskAttachments(), getWikiPageAttachments(), openAttachment() (+7 more)
 
 ### Community 55 - "Community 55"
 Cohesion: 0.11
@@ -1218,8 +1217,8 @@ Cohesion: 0.11
 Nodes (19): devDependencies, autoprefixer, eslint, eslint-plugin-react-hooks, jsdom, @playwright/test, postcss, tailwindcss (+11 more)
 
 ### Community 75 - "Community 75"
-Cohesion: 0.09
-Nodes (24): AttachmentSyncPage(), formatDate(), formatDuration(), SyncStatsPanel(), SyncStatusBanner(), createAdminUser(), deleteAdminUser(), getAdminUser() (+16 more)
+Cohesion: 0.07
+Nodes (38): AttachmentSyncPage(), formatDate(), formatDuration(), SyncStatsPanel(), SyncStatusBanner(), createAdminUser(), deleteAdminUser(), getAdminUser() (+30 more)
 
 ### Community 76 - "Community 76"
 Cohesion: 0.11
@@ -1574,8 +1573,8 @@ Cohesion: 0.21
 Nodes (10): defaultPaletteColors, normalizeColor(), parseHexColors(), useColorPalette(), colorInputValue(), ColorPicker(), ColorPickerProps, defaultSwatches (+2 more)
 
 ### Community 168 - "Community 168"
-Cohesion: 0.07
-Nodes (41): getAttachmentPreview(), createFeature(), deleteFeature(), getFeature(), getFeatures(), updateFeature(), getProjectNotes(), createProject() (+33 more)
+Cohesion: 0.11
+Nodes (27): getProjectAttachments(), createFeature(), deleteFeature(), getFeature(), getFeatures(), updateFeature(), getProjectNotes(), getProjects() (+19 more)
 
 ### Community 169 - "Community 169"
 Cohesion: 0.46
@@ -4160,10 +4159,6 @@ Nodes (6): ddl, dialect, id, prevIds, renames, version
 ### Community 868 - "Community 868"
 Cohesion: 0.32
 Nodes (3): buildTicket(), buildTicketItems(), renderTicketList()
-
-### Community 869 - "Community 869"
-Cohesion: 0.52
-Nodes (5): createUseCase(), deleteUseCase(), getUseCase(), getUseCases(), updateUseCase()
 
 ### Community 870 - "Community 870"
 Cohesion: 0.29

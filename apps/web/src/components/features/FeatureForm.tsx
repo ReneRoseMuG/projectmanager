@@ -520,6 +520,18 @@ export function FeatureForm({
     return { ...tab, count: 0 };
   });
 
+  // Reload the active collection tab from the server (e.g. after an external MCP change).
+  // Only for a persisted feature; in create mode the lists are local drafts.
+  const collectionReload: Partial<Record<FeatureFormTab, () => Promise<void>>> = feature
+    ? {
+        tasks: tasks.reload,
+        tickets: tickets.reload,
+        comments: comments.reload,
+        attachments: attachments.reload,
+      }
+    : {};
+  const refreshActiveTab = collectionReload[activeTab];
+
   return (
     <>
       <FormModal
@@ -538,6 +550,7 @@ export function FeatureForm({
         onClose={onClose}
         variant={variant}
         onOpenInTab={onOpenInTab}
+        onRefresh={refreshActiveTab}
         contentLayout={activeTab === "details" ? "flush" : "default"}
         contentClassName={
           activeTab === "details" ? "" : ""
