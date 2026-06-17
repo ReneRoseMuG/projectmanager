@@ -343,7 +343,7 @@ function TaskRows({ tasks, emptyTitle }: { tasks: Task[] | undefined; emptyTitle
   return (
     <div className="grid gap-2">
       {tasks.map((task) => (
-        <Link key={task.id} to={`/tasks/${task.id}`} className="grid gap-2 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
+        <a key={task.id} href={withStandaloneView(`/tasks/${task.id}`)} target="_blank" rel="noopener noreferrer" className="grid gap-2 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <span className="min-w-0 truncate text-sm font-semibold text-ink">{task.title}</span>
             <ExternalLink size={14} className="shrink-0 text-steel-400" />
@@ -353,7 +353,7 @@ function TaskRows({ tasks, emptyTitle }: { tasks: Task[] | undefined; emptyTitle
             <PriorityBadge value={task.priority} />
             {task.dueDate ? <span className="text-xs text-steel-500">Fällig {formatHumanDate(task.dueDate)}</span> : null}
           </div>
-        </Link>
+        </a>
       ))}
     </div>
   );
@@ -367,7 +367,7 @@ function TicketRows({ tickets }: { tickets: Ticket[] | undefined }) {
   return (
     <div className="grid gap-2">
       {tickets.map((ticket) => (
-        <Link key={ticket.id} to={`/tickets/${ticket.id}`} className="grid gap-2 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
+        <a key={ticket.id} href={withStandaloneView(`/tickets/${ticket.id}`)} target="_blank" rel="noopener noreferrer" className="grid gap-2 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex min-w-0 items-start justify-between gap-3">
             <span className="min-w-0 truncate text-sm font-semibold text-ink">{ticket.title}</span>
             <ExternalLink size={14} className="shrink-0 text-steel-400" />
@@ -377,13 +377,13 @@ function TicketRows({ tickets }: { tickets: Ticket[] | undefined }) {
             <StatusPill kind="workStatus" value={ticket.status} />
             <PriorityBadge value={ticket.priority} />
           </div>
-        </Link>
+        </a>
       ))}
     </div>
   );
 }
 
-function JournalRows({ response }: { response: JournalListResponse | undefined }) {
+function JournalRows({ response, returnTo }: { response: JournalListResponse | undefined; returnTo: string }) {
   const entries = response?.entries ?? [];
   if (entries.length === 0) {
     return <EmptyState icon={<Inbox size={20} />} title="Keine Journal-Einträge vorhanden" variant="tinted" />;
@@ -392,7 +392,7 @@ function JournalRows({ response }: { response: JournalListResponse | undefined }
   return (
     <div className="grid gap-2">
       {entries.map((entry: JournalEntry) => (
-        <Link key={entry.id} to={dashboardPath(entry.objectType, entry.objectId)} className="grid gap-1 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
+        <Link key={entry.id} to={dashboardDetailPath(entry.objectType, entry.objectId, returnTo)} className="grid gap-1 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex items-center justify-between gap-3">
             <span className="truncate text-sm font-semibold text-ink">{entry.objectLabel}</span>
             <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(entry.createdAt)}</span>
@@ -405,7 +405,7 @@ function JournalRows({ response }: { response: JournalListResponse | undefined }
   );
 }
 
-function CommentRows({ comments }: { comments: RecentComment[] | undefined }) {
+function CommentRows({ comments, returnTo }: { comments: RecentComment[] | undefined; returnTo: string }) {
   if (!comments || comments.length === 0) {
     return <EmptyState icon={<Inbox size={20} />} title="Keine Kommentare vorhanden" variant="tinted" />;
   }
@@ -413,7 +413,7 @@ function CommentRows({ comments }: { comments: RecentComment[] | undefined }) {
   return (
     <div className="grid gap-2">
       {comments.map((comment) => (
-        <Link key={comment.id} to={dashboardPath(comment.entityType, comment.entityId)} className="grid gap-1 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
+        <Link key={comment.id} to={dashboardDetailPath(comment.entityType, comment.entityId, returnTo)} className="grid gap-1 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex items-center justify-between gap-3">
             <span className="truncate text-sm font-semibold text-ink">{comment.entityLabel}</span>
             <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(comment.updatedAt)}</span>
@@ -426,7 +426,7 @@ function CommentRows({ comments }: { comments: RecentComment[] | undefined }) {
   );
 }
 
-function AttachmentRows({ attachments }: { attachments: RecentAttachment[] | undefined }) {
+function AttachmentRows({ attachments, returnTo }: { attachments: RecentAttachment[] | undefined; returnTo: string }) {
   if (!attachments || attachments.length === 0) {
     return <EmptyState icon={<Inbox size={20} />} title="Keine Dateien vorhanden" variant="tinted" />;
   }
@@ -434,7 +434,7 @@ function AttachmentRows({ attachments }: { attachments: RecentAttachment[] | und
   return (
     <div className="grid gap-2">
       {attachments.map((attachment) => (
-        <Link key={attachment.id} to={dashboardPath(attachment.entityType, attachment.entityId)} className="grid gap-1 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
+        <Link key={attachment.id} to={dashboardDetailPath(attachment.entityType, attachment.entityId, returnTo)} className="grid gap-1 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
           <div className="flex items-center justify-between gap-3">
             <span className="truncate text-sm font-semibold text-ink">{attachment.filename}</span>
             <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(attachment.createdAt)}</span>
@@ -470,7 +470,7 @@ function NoteRows({ notes }: { notes: Note[] | undefined }) {
   );
 }
 
-function MilestoneRows({ milestones }: { milestones: Milestone[] | undefined }) {
+function MilestoneRows({ milestones, returnTo }: { milestones: Milestone[] | undefined; returnTo: string }) {
   if (!milestones || milestones.length === 0) {
     return <EmptyState icon={<Inbox size={20} />} title="Keine Meilensteine vorhanden" variant="tinted" />;
   }
@@ -481,7 +481,7 @@ function MilestoneRows({ milestones }: { milestones: Milestone[] | undefined }) 
         const total = milestone.totalTaskCount || milestone.taskCount || 0;
         const progress = total > 0 ? Math.round((milestone.doneTaskCount / total) * 100) : 0;
         return (
-          <Link key={milestone.id} to={`/milestones/${milestone.id}`} className="grid gap-2 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
+          <Link key={milestone.id} to={dashboardDetailPath("milestone", milestone.id, returnTo)} className="grid gap-2 rounded-md border border-line p-3 transition hover:border-fern hover:bg-fern/5">
             <div className="flex min-w-0 items-start justify-between gap-3">
               <span className="min-w-0 truncate text-sm font-semibold text-ink">{milestone.name}</span>
               <StatusPill kind="workStatus" value={milestone.status} />
@@ -1061,11 +1061,11 @@ export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: Das
       {widget.widgetId === "ticketStatusReport" ? <StatusReport stats={query.data as TicketStats | undefined} kind="workStatus" /> : null}
       {widget.widgetId === "taskJournal" ? <TaskRows tasks={query.data as Task[] | undefined} emptyTitle="Keine Aufgaben vorhanden" /> : null}
       {widget.widgetId === "ticketJournal" ? <TicketRows tickets={query.data as Ticket[] | undefined} /> : null}
-      {widget.widgetId === "globalJournal" ? <JournalRows response={query.data as JournalListResponse | undefined} /> : null}
-      {widget.widgetId === "commentJournal" ? <CommentRows comments={query.data as RecentComment[] | undefined} /> : null}
+      {widget.widgetId === "globalJournal" ? <JournalRows response={query.data as JournalListResponse | undefined} returnTo={returnTo} /> : null}
+      {widget.widgetId === "commentJournal" ? <CommentRows comments={query.data as RecentComment[] | undefined} returnTo={returnTo} /> : null}
       {widget.widgetId === "noteList" ? <NoteRows notes={query.data as Note[] | undefined} /> : null}
-      {widget.widgetId === "attachmentJournal" ? <AttachmentRows attachments={query.data as RecentAttachment[] | undefined} /> : null}
-      {widget.widgetId === "milestoneProgress" ? <MilestoneRows milestones={query.data as Milestone[] | undefined} /> : null}
+      {widget.widgetId === "attachmentJournal" ? <AttachmentRows attachments={query.data as RecentAttachment[] | undefined} returnTo={returnTo} /> : null}
+      {widget.widgetId === "milestoneProgress" ? <MilestoneRows milestones={query.data as Milestone[] | undefined} returnTo={returnTo} /> : null}
       {widget.widgetId === "overdueTasks" ? <TaskRows tasks={query.data as Task[] | undefined} emptyTitle="Keine überfälligen Aufgaben" /> : null}
       {widget.widgetId === "taskBoard" ? (
         isDayPlanContext ? (

@@ -17,6 +17,8 @@
  *
  * Abgedeckte Regeln:
  * - Alle Dashboard-Board/List-Widgets navigieren per Doppelklick zur passenden Detailroute.
+ * - Journal-Row-Widgets mit Im-Tab-Icon (taskJournal, overdueTasks, ticketJournal) öffnen das Ziel in einem neuen Tab in der Standalone-Ansicht.
+ * - In-place-Row-Widgets (commentJournal, milestoneProgress) verlinken mit returnTo auf den aktuellen Übersichtskontext.
  * - Kommentar-Widgets verlinken auch Wiki-, Backlog- und DayPlan-Träger korrekt.
  * - noteList rendert persönliche Notizen read-only mit Vorschau.
  * - Das neue Milestone-Listenwidget ist als „Meilensteinliste“ im Widget-Katalog benannt.
@@ -338,6 +340,41 @@ describe("DashboardWidgetCard", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(`${expectedPath}|/projects/99?tab=overview`);
   });
 
+  it("öffnet taskJournal-Aufgaben in einem neuen Tab in der Standalone-Ansicht", () => {
+    renderWithRouter("taskJournal", [buildTask({ id: 7, title: "Journal Aufgabe" })]);
+
+    const link = screen.getByText("Journal Aufgabe").closest("a");
+    expect(link).toHaveAttribute("href", "/tasks/7?standalone=1");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("öffnet overdueTasks-Aufgaben in einem neuen Tab in der Standalone-Ansicht", () => {
+    renderWithRouter("overdueTasks", [buildTask({ id: 8, title: "Überfällige Aufgabe" })]);
+
+    const link = screen.getByText("Überfällige Aufgabe").closest("a");
+    expect(link).toHaveAttribute("href", "/tasks/8?standalone=1");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("öffnet ticketJournal-Tickets in einem neuen Tab in der Standalone-Ansicht", () => {
+    renderWithRouter("ticketJournal", [buildTicket({ id: 9, title: "Journal Ticket" })]);
+
+    const link = screen.getByText("Journal Ticket").closest("a");
+    expect(link).toHaveAttribute("href", "/tickets/9?standalone=1");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("verlinkt milestoneProgress-Meilensteine in-place mit returnTo auf die Übersicht", () => {
+    renderWithRouter("milestoneProgress", [buildMilestone({ id: 5, name: "Fortschritt Meilenstein" })]);
+
+    const link = screen.getByText("Fortschritt Meilenstein").closest("a");
+    const returnToQuery = new URLSearchParams({ returnTo: "/projects/99?tab=overview" }).toString();
+    expect(link).toHaveAttribute("href", `/milestones/5?${returnToQuery}`);
+    expect(link).not.toHaveAttribute("target");
+  });
+
   it("trennt die bestehende Meilensteinkarte vom neuen Meilensteinlisten-Widget", () => {
     expect(dashboardWidgetRegistry.milestoneList.label).toBe("Meilensteinkarte");
     expect(dashboardWidgetRegistry.milestoneListView.label).toBe("Meilensteinliste");
@@ -390,7 +427,7 @@ describe("DashboardWidgetCard", () => {
     expect(screen.queryByRole("link", { name: /Fokus/i })).not.toBeInTheDocument();
   });
 
-  it("verlinkt Wiki-, Backlog- und DayPlan-Kommentare zur passenden Detailseite", () => {
+  it("verlinkt Wiki-, Backlog- und DayPlan-Kommentare mit returnTo zur passenden Detailseite", () => {
     const comments: RecentComment[] = [
       {
         id: 1,
@@ -426,9 +463,10 @@ describe("DashboardWidgetCard", () => {
 
     renderWithRouter("commentJournal", comments);
 
-    expect(screen.getByText("Wiki Seite").closest("a")).toHaveAttribute("href", "/wiki/51");
-    expect(screen.getByText("Backlog Eintrag").closest("a")).toHaveAttribute("href", "/backlog/61");
-    expect(screen.getByText("Persönliche Planung 2026-05-27").closest("a")).toHaveAttribute("href", "/day-plan");
+    const returnToQuery = new URLSearchParams({ returnTo: "/projects/99?tab=overview" }).toString();
+    expect(screen.getByText("Wiki Seite").closest("a")).toHaveAttribute("href", `/wiki/51?${returnToQuery}`);
+    expect(screen.getByText("Backlog Eintrag").closest("a")).toHaveAttribute("href", `/backlog/61?${returnToQuery}`);
+    expect(screen.getByText("Persönliche Planung 2026-05-27").closest("a")).toHaveAttribute("href", `/day-plan?${returnToQuery}`);
   });
 
   it("rendert Kommentarvorschauen ohne rohe HTML-Tags", () => {

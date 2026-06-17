@@ -497,6 +497,7 @@ Jede Selektor-Komponente verwendet **ein** Aktiv-Signal konsistent.
 | `showGroupedEmptyState={false}` in ListBoardView | Zeigt leere Spalten-Stubs ohne Daten | Prop weglassen (default `true`) |
 | Eigener List/Board-Container statt `ListBoardView<T>` | Drift in Layout und Verhalten | `ListBoardView<T>`-Adapter verwenden |
 | `bg-shell` oder `bg-steel-*` als Hintergrund des View-Panels | Bricht Weiß-Panel-Regel (§8.22) | `bg-white rounded-lg` im Container |
+| `ExternalLink`/↗-Icon auf In-place-Navigation (`<Link>`/`navigate` im selben Tab) | Signalisiert „neuer Tab", navigiert aber in-place — irreführend | Echtes Tab-Öffnen via `<a target="_blank" rel="noopener noreferrer">` + `withStandaloneView(...)`; sonst Icon weglassen und beim In-place-Link `returnTo` mitgeben |
 
 ---
 

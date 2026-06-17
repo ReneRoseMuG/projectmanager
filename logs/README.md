@@ -2,6 +2,9 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 17.06.26 | 04:13:58 | Fix | Dashboard-Row-Widgets: Tab-Öffnen (↗-Icon) + returnTo für korrektes Zurück | ✅ |
+| 17.06.26 | 02:50:45 | Doku | MCP-Werkzeug-Übersicht in WIKI-21 „MCP Server" veröffentlicht | ✅ |
+| 17.06.26 | 02:41:55 | Feature | update_note MCP-Tool (Code+Unit grün; Integrationstest vorbestehend blockiert) | ⚠️ |
 | 13.06.26 | 06:10:11 | Fix | TKT-125 Timepicker bedienbar + TKT-121 Aufgabe-Draft (Beschreibung, „Anlegen") | ✅ |
 | 13.06.26 | 06:04:20 | Doku | Karpathy-Grundhaltung in agents.md + code-discipline/planungsleitplanken | ✅ |
 | 12.06.26 | 11:14:41 | Doku | Benutzerhandbuch in WIKI-19 veröffentlicht (alle 64 Werkzeuge) | ✅ |
