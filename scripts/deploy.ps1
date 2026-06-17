@@ -204,18 +204,6 @@ $mcpApiKey   = if ($localEnv.ContainsKey("PROJECT_MANAGER_API_KEY")) { $localEnv
 $mcpAuthMode = if ($localEnv.ContainsKey("MCP_HTTP_AUTH_MODE")) { $localEnv["MCP_HTTP_AUTH_MODE"] } else { "none" }
 $mcpPort     = if ($localEnv.ContainsKey("MCP_HTTP_PORT"))     { $localEnv["MCP_HTTP_PORT"] }     else { "3010" }
 $mcpPath     = if ($localEnv.ContainsKey("MCP_HTTP_PATH"))     { $localEnv["MCP_HTTP_PATH"] }     else { "/mcp" }
-$ngrokDomain = "motivator-sizably-rind.ngrok-free.dev"
-
-$ngrokCmd = Get-Command ngrok -ErrorAction SilentlyContinue
-if ($ngrokCmd) {
-    $ngrokExe = $ngrokCmd.Source
-} else {
-    $wingetNgrok = "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\Ngrok.Ngrok_Microsoft.Winget.Source_8wekyb3d8bbwe\ngrok.exe"
-    if (Test-Path $wingetNgrok) { $ngrokExe = $wingetNgrok }
-    else { throw "ngrok nicht gefunden. Bitte 'winget install ngrok.ngrok' ausfuehren." }
-}
-Write-Host "  ngrok : $ngrokExe" -ForegroundColor Gray
-Write-Host "  domain: $ngrokDomain" -ForegroundColor Gray
 
 $startPs1Path = "$Target\Start.ps1"
 # Statischer Teil 1: Hilfsfunktionen und API/Web-Start
@@ -277,7 +265,7 @@ $web = Start-Process -FilePath "node" `
 
 '@
 
-# Dynamischer Teil: MCP-Server und ngrok mit zur Deploy-Zeit aufgeloesten Werten
+# Dynamischer Teil: MCP-Server mit zur Deploy-Zeit aufgeloesten Werten
 $startPs1Content += @"
 
 # MCP-Server starten
@@ -294,19 +282,12 @@ Write-StartLog "starting mcp"
     -WindowStyle Hidden ``
     -PassThru
 
-# ngrok-Tunnel starten
-Write-StartLog "starting ngrok"
-`$tunnel = Start-Process -FilePath "$ngrokExe" ``
-    -ArgumentList "http", "--domain=$ngrokDomain", "$mcpPort" ``
-    -WindowStyle Hidden ``
-    -PassThru
-
 "@
 
 # Statischer Teil 2: PID-Datei, Warten, Browser oeffnen
 $startPs1Content += @'
-"$($api.Id) $($web.Id) $($mcp.Id) $($tunnel.Id)" | Set-Content $pidFile -Encoding UTF8
-Write-StartLog "pid file written: $($api.Id) $($web.Id) $($mcp.Id) $($tunnel.Id)"
+"$($api.Id) $($web.Id) $($mcp.Id)" | Set-Content $pidFile -Encoding UTF8
+Write-StartLog "pid file written: $($api.Id) $($web.Id) $($mcp.Id)"
 
 Wait-HttpReady "API" "http://127.0.0.1:3001/api/health" $api
 Write-StartLog "api ready"
@@ -354,11 +335,6 @@ if ($targetPids.Count -eq 0) {
             Write-Host "Prozess $p ($($proc.Name)) beendet." -ForegroundColor Green
         }
     }
-}
-
-Get-Process -Name "ngrok" -ErrorAction SilentlyContinue | ForEach-Object {
-    Stop-Process -Id $_.Id -Force
-    Write-Host "Ngrok-Tunnel beendet (Prozess $($_.Id))." -ForegroundColor Green
 }
 
 if (Test-Path $pidFile) { Remove-Item $pidFile -Force }
