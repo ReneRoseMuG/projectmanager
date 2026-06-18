@@ -52,14 +52,21 @@ nichts erfinden.
     `resolve_reference` bzw. `get_reference_context` der Gruppen-Referenz auflösen
     (die `parentContexts` nennen das Projekt). Auflösungen cachen, um MCP-Aufrufe zu sparen.
 - Ereignisse **ohne** auflösbares Projekt überspringen (Randfall: kein Projektbezug → kein Tagebuch).
-- Je `projectId` alle Ereignisse chronologisch (nach `createdAt`) sammeln. Projekte nie vermischen.
+- Je `projectId` alle Ereignisse nach `createdAt` ordnen — **absteigend, neueste zuerst** (umgekehrt chronologisch). Projekte nie vermischen.
 
 ### 3. Pro betroffenem Projekt erzählen
 - `get_project_diary(projectId)` laden → bestehende Erzählung, `version`, `coveredUntil`.
+- Das Tagebuch ist **umgekehrt chronologisch** aufgebaut: datierte Abschnitte, der **neueste oben**.
+  Jeder Abschnitt beginnt mit einer kurzen Datums-Überschrift (`dd.MM.yy`), darunter zusammenhängender
+  Fließtext (keine lose Stichpunktliste), neutral und sachlich.
 - Claude bekommt **nur** „bestehende Erzählung + neue Ereignisse dieses Projekts". Aufgabe:
-  die Erzählung fortschreiben; betrifft ein neues Ereignis etwas bereits Beschriebenes, die
-  **vorhandene Stelle anpassen** statt eine widersprüchliche Wiederholung anzufügen. Ergebnis als
-  **HTML**, zusammenhängender Fließtext (keine lose Stichpunktliste), neutral und sachlich.
+  für die neuen Vorgänge die datierten Abschnitte bilden und **oben voranstellen** (jüngstes Datum
+  zuoberst). Betrifft ein neues Ereignis etwas bereits in einem älteren Abschnitt Beschriebenes, die
+  **vorhandene Stelle anpassen** statt eine widersprüchliche Wiederholung anzufügen — der ältere
+  Abschnitt bleibt an seiner Position. Ergebnis als **HTML**.
+- **Bestandsumstellung:** Liegt noch ein alter, nach unten gewachsener Fließtext vor, den neuen
+  Abschnitt schlicht **oben** anfügen; Alttext nicht erzwungenermaßen umbauen — er wird nur dort in
+  datierte Abschnitte überführt, wo er ohnehin angepasst wird.
 
 ### 4. Versioniert zurückschreiben
 - Kein Eintrag vorhanden → `create_diary_entry(projectId, title, content, coveredUntil, sourceCount)`.
@@ -81,6 +88,7 @@ Aktivität, nicht mit der Größe des Archivs.
   keine Rückkopplung in die eigene Quelle.
 - Nur lesen und erzählend verdichten; keine fachlichen Daten ändern.
 - Pro Projekt genau ein lebender Eintrag.
+- Tagebuch **umgekehrt chronologisch**: datierte Abschnitte (`dd.MM.yy`), neuester oben.
 
 ## Abschluss
 
