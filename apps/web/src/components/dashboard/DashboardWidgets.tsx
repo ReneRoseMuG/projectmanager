@@ -16,11 +16,11 @@ import type {
   Ticket,
   TicketStats,
 } from "@taskmanager/shared-types";
-import { AlertTriangle, BookOpen, ExternalLink, Inbox, Library, Plus, RefreshCw, StickyNote } from "lucide-react";
+import { AlertTriangle, BookOpen, Edit3, ExternalLink, Inbox, Library, Plus, RefreshCw, StickyNote, Trash2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useCalendarTasks } from "../../hooks/useCalendarTasks";
-import { useDayPlan, useDayPlanEvents } from "../../hooks/useDayPlan";
+import { useDayPlan, useDayPlanEvents, useDayPlanTasks } from "../../hooks/useDayPlan";
 import { useEvents } from "../../hooks/useEvents";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useDashboardWidgetData } from "../../hooks/useDashboards";
@@ -29,6 +29,7 @@ import { useNotes } from "../../hooks/useNotes";
 import { errorMessage } from "../../hooks/errors";
 import { catalogColor, catalogLabel } from "../../utils/catalogs";
 import { withStandaloneView } from "../../utils/standalone";
+import { objectReference } from "../../lib/references";
 import { formatHumanDate } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { EventForm } from "../calendar/EventForm";
@@ -41,6 +42,7 @@ import { ProjectListBoardView } from "../projects/ProjectListBoardView";
 import { TaskForm, type TaskFormInput } from "../tasks/TaskForm";
 import { TaskListBoardView } from "../tasks/TaskListBoardView";
 import { TicketListBoardView } from "../tickets/TicketListBoardView";
+import { ActionMenu } from "../ui/ActionMenu";
 import { Button } from "../ui/Button";
 import { CommentBodyModal } from "../ui/CommentBodyModal";
 import { EmptyState } from "../ui/EmptyState";
@@ -447,26 +449,80 @@ function AttachmentRows({ attachments, returnTo }: { attachments: RecentAttachme
   );
 }
 
-function NoteRows({ notes }: { notes: Note[] | undefined }) {
+function NoteRows({ notes, onEdit, onDelete }: { notes: Note[] | undefined; onEdit?: (note: Note) => void; onDelete?: (note: Note) => void }) {
   if (!notes || notes.length === 0) {
     return <EmptyState icon={<StickyNote size={20} />} title="Keine Notizen vorhanden" variant="tinted" />;
   }
+
+  const showMenu = Boolean(onEdit || onDelete);
 
   return (
     <div className="grid gap-2">
       {notes.map((note) => {
         const preview = noteContentToPreviewText(note.contentJson);
         return (
-          <div key={note.id} className="grid gap-1 rounded-md border border-line p-3">
+          <div
+            key={note.id}
+            className={`grid gap-1 rounded-md border border-line p-3${onEdit ? " cursor-pointer transition hover:border-fern hover:bg-fern/5" : ""}`}
+            onDoubleClick={onEdit ? () => onEdit(note) : undefined}
+          >
             <div className="flex items-center justify-between gap-3">
               <span className="truncate text-sm font-semibold text-ink">{note.title}</span>
-              <span className="shrink-0 text-xs text-steel-500">{formatHumanDate(note.updatedAt)}</span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="text-xs text-steel-500">{formatHumanDate(note.updatedAt)}</span>
+                {showMenu ? (
+                  <div onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
+                    <ActionMenu
+                      objectReference={objectReference("note", note.id)}
+                      items={[
+                        ...(onEdit ? [{ label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onEdit(note) }] : []),
+                        ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(note), danger: true }] : [])
+                      ]}
+                    />
+                  </div>
+                ) : null}
+              </div>
             </div>
             <p className="line-clamp-2 text-xs text-steel-600">{preview || "Kein Inhalt"}</p>
           </div>
         );
       })}
     </div>
+  );
+}
+
+/** Day-Plan-Variante des Notiz-Widgets: Karten per Doppelklick bearbeiten, löschen und ID kopieren. */
+function DayPlanNoteListWidget({ notes, owner }: { notes: Note[] | undefined; owner: { type: "dayPlan"; id: number } }) {
+  const { showToast } = useToast();
+  const canWriteNotes = useHasPermission("notes", "write");
+  const canDeleteNotes = useHasPermission("notes", "delete");
+  const noteController = useNotes(owner);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+
+  const handleDelete = canDeleteNotes
+    ? (note: Note) => {
+        void noteController
+          .removeNote(note.id)
+          .then(() => showToast({ tone: "success", title: "Notiz aus Persönlicher Planung gelöst" }))
+          .catch((noteError: unknown) => showToast({ tone: "error", title: "Notiz konnte nicht gelöst werden", message: errorMessage(noteError) }));
+      }
+    : undefined;
+
+  return (
+    <>
+      <NoteRows notes={notes} onEdit={canWriteNotes ? setEditingNote : undefined} onDelete={handleDelete} />
+      <NoteEditor
+        note={editingNote}
+        open={editingNote !== null}
+        onClose={() => setEditingNote(null)}
+        onSave={async (id, input) => {
+          const updated = await noteController.updateNote(id, input);
+          if (updated) {
+            setEditingNote(updated);
+          }
+        }}
+      />
+    </>
   );
 }
 
@@ -753,11 +809,13 @@ function TaskBoardWidget({
   mode,
   onOpen,
   onStatusChange,
+  onDelete,
 }: {
   tasks: Task[] | undefined;
   mode: "kanban" | "list";
   onOpen: (task: Task) => void;
   onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>;
+  onDelete?: (task: Task) => void | Promise<unknown>;
 }) {
   return (
     <TaskListBoardView
@@ -766,9 +824,10 @@ function TaskBoardWidget({
       onViewModeChange={() => undefined}
       onAdd={() => undefined}
       onOpen={onOpen}
-      onDelete={() => undefined}
+      onDelete={onDelete ?? (() => undefined)}
       onStatusChange={onStatusChange}
       readOnly
+      allowDeleteInReadOnly={Boolean(onDelete)}
     />
   );
 }
@@ -788,7 +847,9 @@ function DayPlanTaskBoardWidget({
   const { showToast } = useToast();
   const canWriteTasks = useHasPermission("tasks", "write");
   const canWriteDayPlans = useHasPermission("dayPlans", "write");
+  const canDeleteDayPlans = useHasPermission("dayPlans", "delete");
   const dayPlan = useDayPlan(dayPlanDate ?? "", Boolean(dayPlanDate));
+  const dayPlanTasks = useDayPlanTasks();
   const canEditStatus = canWriteTasks && canWriteDayPlans && Boolean(dayPlanDate);
 
   const handleStatusChange = canEditStatus
@@ -803,7 +864,19 @@ function DayPlanTaskBoardWidget({
       }
     : undefined;
 
-  return <TaskBoardWidget tasks={tasks} mode={mode} onOpen={onOpen} onStatusChange={handleStatusChange} />;
+  const handleDelete = canDeleteDayPlans
+    ? async (task: Task) => {
+        try {
+          await dayPlanTasks.unlinkTask(task.id);
+          showToast({ tone: "success", title: "Aufgabe aus Persönlicher Planung gelöst" });
+        } catch (taskError) {
+          showToast({ tone: "error", title: "Aufgabe konnte nicht gelöst werden", message: errorMessage(taskError) });
+          throw taskError;
+        }
+      }
+    : undefined;
+
+  return <TaskBoardWidget tasks={tasks} mode={mode} onOpen={onOpen} onStatusChange={handleStatusChange} onDelete={handleDelete} />;
 }
 
 function TicketBoardWidget({
@@ -1063,7 +1136,13 @@ export function DashboardWidgetCard({ widget, owner, context, dayPlanDate }: Das
       {widget.widgetId === "ticketJournal" ? <TicketRows tickets={query.data as Ticket[] | undefined} /> : null}
       {widget.widgetId === "globalJournal" ? <JournalRows response={query.data as JournalListResponse | undefined} returnTo={returnTo} /> : null}
       {widget.widgetId === "commentJournal" ? <CommentRows comments={query.data as RecentComment[] | undefined} returnTo={returnTo} /> : null}
-      {widget.widgetId === "noteList" ? <NoteRows notes={query.data as Note[] | undefined} /> : null}
+      {widget.widgetId === "noteList" ? (
+        isDayPlanContext && owner?.type === "dayPlan" ? (
+          <DayPlanNoteListWidget notes={query.data as Note[] | undefined} owner={{ type: "dayPlan", id: owner.id }} />
+        ) : (
+          <NoteRows notes={query.data as Note[] | undefined} />
+        )
+      ) : null}
       {widget.widgetId === "attachmentJournal" ? <AttachmentRows attachments={query.data as RecentAttachment[] | undefined} returnTo={returnTo} /> : null}
       {widget.widgetId === "milestoneProgress" ? <MilestoneRows milestones={query.data as Milestone[] | undefined} returnTo={returnTo} /> : null}
       {widget.widgetId === "overdueTasks" ? <TaskRows tasks={query.data as Task[] | undefined} emptyTitle="Keine überfälligen Aufgaben" /> : null}

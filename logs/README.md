@@ -2,6 +2,9 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 18.06.26 | 16:14:28 | Fix | Dashboard Persönliche Planung: Notizkarten bearbeitbar + Löschen bei Aufgaben | ✅ |
+| 18.06.26 | 16:12:19 | Fix | TKT-138 Wiki-Tree Scrollposition bleibt nach Navigation erhalten | ✅ |
+| 18.06.26 | 16:12:19 | Fix | TKT-136 Wiki-Tree Breite ignoriert eingeklappte Seitennamen | ✅ |
 | 17.06.26 | 04:13:58 | Fix | Dashboard-Row-Widgets: Tab-Öffnen (↗-Icon) + returnTo für korrektes Zurück | ✅ |
 | 17.06.26 | 02:50:45 | Doku | MCP-Werkzeug-Übersicht in WIKI-21 „MCP Server" veröffentlicht | ✅ |
 | 17.06.26 | 02:41:55 | Feature | update_note MCP-Tool (Code+Unit grün; Integrationstest vorbestehend blockiert) | ⚠️ |

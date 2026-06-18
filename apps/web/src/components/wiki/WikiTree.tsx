@@ -2,7 +2,7 @@ import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, use
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronRight, ExternalLink, FileText, GripVertical, Plus } from "lucide-react";
 import type { CSSProperties, MouseEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { WikiTreeNode } from "../../hooks/useWiki";
 import { withStandaloneView } from "../../utils/standalone";
@@ -22,6 +22,8 @@ interface WikiNodeProps {
   onCreate: (parent: WikiTreeNode) => void;
   onNavigate?: (page: WikiTreeNode) => Promise<boolean> | boolean;
   canMove: boolean;
+  collapsedIds: Set<number>;
+  onToggleCollapse: (id: number) => void;
 }
 
 const TOGGLE_WIDTH = 16;
@@ -36,6 +38,9 @@ const WIDTH_BUFFER = 16;
 const WIKI_ROOT_DROP_ID = "wiki-root";
 const WIKI_PAGE_DROP_PREFIX = "wiki-page-";
 
+// Persists the tree scroll position across remounts triggered by page navigation (TKT-138).
+let treeScrollTop = 0;
+
 function measureTextWidth(text: string): number {
   try {
     const canvas = document.createElement("canvas");
@@ -48,13 +53,16 @@ function measureTextWidth(text: string): number {
   }
 }
 
-function computeIdealWidth(nodes: WikiTreeNode[], canMove: boolean, level = 0): number {
+function computeIdealWidth(nodes: WikiTreeNode[], canMove: boolean, collapsedIds: Set<number>, level = 0): number {
   let max = 0;
   for (const node of nodes) {
     const w = Math.ceil(measureTextWidth(node.title)) + level * LEVEL_INDENT + FIXED_OVERHEAD + (canMove ? MOVE_HANDLE_OVERHEAD : 0);
     if (w > max) max = w;
-    const childMax = computeIdealWidth(node.children, canMove, level + 1);
-    if (childMax > max) max = childMax;
+    // Collapsed nodes hide their children, so those titles must not widen the tree (TKT-136).
+    if (!collapsedIds.has(node.id)) {
+      const childMax = computeIdealWidth(node.children, canMove, collapsedIds, level + 1);
+      if (childMax > max) max = childMax;
+    }
   }
   return max;
 }
@@ -122,8 +130,8 @@ function WikiRootDropZone({ canMove }: { canMove: boolean }) {
   );
 }
 
-function WikiNode({ node, activeId, level, onCreate, onNavigate, canMove }: WikiNodeProps) {
-  const [expanded, setExpanded] = useState(true);
+function WikiNode({ node, activeId, level, onCreate, onNavigate, canMove, collapsedIds, onToggleCollapse }: WikiNodeProps) {
+  const expanded = !collapsedIds.has(node.id);
   const navigate = useNavigate();
   const hasChildren = node.children.length > 0;
   const pagePath = `/wiki/${node.id}`;
@@ -180,7 +188,7 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate, canMove }: Wiki
         <button
           type="button"
           className="wiki-tree-expand-btn flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
-          onClick={() => setExpanded((current) => !current)}
+          onClick={() => onToggleCollapse(node.id)}
           disabled={!hasChildren}
           aria-label={expanded ? "Einklappen" : "Ausklappen"}
           title={expanded ? "Einklappen" : "Ausklappen"}
@@ -228,6 +236,8 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate, canMove }: Wiki
               onCreate={onCreate}
               onNavigate={onNavigate}
               canMove={canMove}
+              collapsedIds={collapsedIds}
+              onToggleCollapse={onToggleCollapse}
             />
           ))}
         </div>
@@ -241,8 +251,35 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove }
   const activeId = Number.isFinite(Number(params.id)) ? Number(params.id) : null;
   const [collapsed, setCollapsed] = useState(() => readStoredBoolean("wiki-tree-collapsed", false));
   const [contentWidth, setContentWidth] = useState(MIN_WIDTH);
+  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(() => new Set());
   const [activeDragPage, setActiveDragPage] = useState<WikiTreeNode | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+  const toggleCollapse = (id: number) => {
+    setCollapsedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleTreeScroll = () => {
+    if (scrollRef.current) {
+      treeScrollTop = scrollRef.current.scrollTop;
+    }
+  };
+
+  // Restore the saved scroll position after the tree remounts on navigation (TKT-138).
+  useLayoutEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = treeScrollTop;
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -257,12 +294,12 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove }
     let cancelled = false;
     const run = () => {
       if (cancelled) return;
-      const ideal = computeIdealWidth(tree, canMove) + WIDTH_BUFFER;
+      const ideal = computeIdealWidth(tree, canMove, collapsedIds) + WIDTH_BUFFER;
       setContentWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, ideal)));
     };
     void (document.fonts?.ready ?? Promise.resolve()).then(run).catch(run);
     return () => { cancelled = true; };
-  }, [canMove, tree]);
+  }, [canMove, tree, collapsedIds]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragPage(getDragPage(event.active.data.current));
@@ -295,6 +332,8 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove }
     >
       {/* Scrollable content — right margin reserves space for the toggle strip */}
       <div
+        ref={scrollRef}
+        onScroll={handleTreeScroll}
         className="flex h-full flex-col gap-1 overflow-y-auto py-4 pl-3 transition-opacity duration-150"
         style={{
           paddingRight: TOGGLE_WIDTH + 4,
@@ -334,6 +373,8 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove }
               onCreate={onCreate}
               onNavigate={onNavigate}
               canMove={canMove}
+              collapsedIds={collapsedIds}
+              onToggleCollapse={toggleCollapse}
             />
           ))}
           <DragOverlay>

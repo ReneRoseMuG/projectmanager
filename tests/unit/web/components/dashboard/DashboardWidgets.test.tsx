@@ -46,6 +46,8 @@ const calendarEvents = vi.hoisted(() => ({ value: [] as CalendarEvent[] }));
 const permissions = vi.hoisted(() => new Map<string, boolean>());
 const createNoteMock = vi.hoisted(() => vi.fn());
 const updateTaskMock = vi.hoisted(() => vi.fn());
+const removeNoteMock = vi.hoisted(() => vi.fn());
+const unlinkTaskMock = vi.hoisted(() => vi.fn());
 const diaryState = vi.hoisted(() => ({ value: { diary: null as DiaryEntry | null, loading: false, error: null as string | null, reload: vi.fn() } }));
 const allDiariesState = vi.hoisted(() => ({ value: { diaries: [] as DiaryEntry[], loading: false, error: null as string | null, reload: vi.fn() } }));
 const projectsState = vi.hoisted(() => ({ value: [] as Array<{ id: number; name: string }> }));
@@ -67,12 +69,18 @@ vi.mock("../../../../../apps/web/src/hooks/useDayPlan", () => ({
     createEvent: vi.fn(),
     updateTask: updateTaskMock,
   }),
+  useDayPlanTasks: () => ({
+    tasks: [],
+    loading: false,
+    unlinkTask: unlinkTaskMock,
+  }),
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/useNotes", () => ({
   useNotes: () => ({
     createNote: createNoteMock,
     updateNote: vi.fn(),
+    removeNote: removeNoteMock,
   }),
 }));
 
@@ -325,6 +333,8 @@ afterEach(() => {
   permissions.clear();
   createNoteMock.mockReset();
   updateTaskMock.mockReset();
+  removeNoteMock.mockReset();
+  unlinkTaskMock.mockReset();
   diaryState.value = { diary: null, loading: false, error: null, reload: vi.fn() };
   allDiariesState.value = { diaries: [], loading: false, error: null, reload: vi.fn() };
   projectsState.value = [];
@@ -425,6 +435,7 @@ describe("DashboardWidgetCard", () => {
     expect(screen.getByText("Heute Review abschließen")).toBeInTheDocument();
     expect(screen.queryByText(/\*\*Heute\*\*/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Fokus/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Aktionen" })).not.toBeInTheDocument();
   });
 
   it("verlinkt Wiki-, Backlog- und DayPlan-Kommentare mit returnTo zur passenden Detailseite", () => {
@@ -565,6 +576,66 @@ describe("DashboardWidgetCard", () => {
 
     await waitFor(() => expect(screen.getByTestId("note-editor")).toBeInTheDocument());
     expect(createNoteMock).toHaveBeenCalledWith({ title: "Neue Notiz", contentJson: {} });
+  });
+
+  it("öffnet im DayPlan-Kontext den Notiz-Editor per Doppelklick auf die Karte", () => {
+    const notes: Note[] = [
+      { id: 5, title: "Tagesfokus", contentJson: { markdown: "Inhalt" }, version: 1, createdAt: "2026-05-31T08:00:00.000Z", updatedAt: "2026-05-31T08:00:00.000Z" },
+    ];
+
+    renderWithRouter("noteList", notes, {
+      context: "dayPlan",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    fireEvent.doubleClick(screen.getByText("Tagesfokus"));
+
+    expect(screen.getByTestId("note-editor")).toBeInTheDocument();
+  });
+
+  it("löst im DayPlan-Kontext eine Notiz über das Karten-Menü", async () => {
+    removeNoteMock.mockResolvedValue(undefined);
+    const notes: Note[] = [
+      { id: 5, title: "Tagesfokus", contentJson: {}, version: 1, createdAt: "2026-05-31T08:00:00.000Z", updatedAt: "2026-05-31T08:00:00.000Z" },
+    ];
+
+    renderWithRouter("noteList", notes, {
+      context: "dayPlan",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Löschen" }));
+
+    await waitFor(() => expect(removeNoteMock).toHaveBeenCalledWith(5));
+  });
+
+  it("löst im DayPlan-Kontext eine Aufgabe über das Karten-Menü", async () => {
+    unlinkTaskMock.mockResolvedValue(undefined);
+
+    renderWithRouter("taskBoard", [buildTask({ id: 11, title: "Board Aufgabe", status: "todo", version: 4 })], {
+      context: "dayPlan",
+      owner: { type: "dayPlan", id: 7 },
+      dayPlanDate: "2026-05-31",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Aktionen" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Löschen" }));
+
+    await waitFor(() => expect(unlinkTaskMock).toHaveBeenCalledWith(11));
+  });
+
+  it("bietet im Projekt-Kontext kein Löschen auf der read-only Aufgaben-Widget-Karte", () => {
+    renderWithRouter("taskBoard", [buildTask({ id: 12, title: "Projekt Aufgabe", status: "todo" })], {
+      context: "project",
+      owner: { type: "project", id: 99 },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Aktionen" }));
+
+    expect(screen.queryByRole("menuitem", { name: "Löschen" })).not.toBeInTheDocument();
   });
 
   it("blendet Widget-Create-Aktionen außerhalb des DayPlan-Kontexts und ohne Berechtigung aus", () => {
