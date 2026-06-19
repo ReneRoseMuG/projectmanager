@@ -19,9 +19,10 @@ interface NoteEditorProps {
   onClose: () => void;
   variant?: "modal" | "page";
   onOpenInTab?: () => void;
+  objectReference?: string;
 }
 
-export function NoteEditor({ note, open, onSave, onCreateNote, onClose, variant = "modal", onOpenInTab }: NoteEditorProps) {
+export function NoteEditor({ note, open, onSave, onCreateNote, onClose, variant = "modal", onOpenInTab, objectReference }: NoteEditorProps) {
   const { confirm } = useConfirm();
   const [title, setTitle] = useState("Ohne Titel");
   const [content, setContent] = useState("");
@@ -142,6 +143,7 @@ export function NoteEditor({ note, open, onSave, onCreateNote, onClose, variant 
       cancelLabel="Schließen"
       variant={variant}
       onOpenInTab={isCreateMode ? undefined : onOpenInTab}
+      objectReference={isCreateMode ? undefined : objectReference}
       footerStart={
         !isCreateMode && note ? (
           <div className="flex flex-wrap items-center gap-2">

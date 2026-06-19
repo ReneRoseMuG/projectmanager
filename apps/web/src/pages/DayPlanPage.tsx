@@ -18,6 +18,7 @@ import { NoteList } from "../components/notes/NoteList";
 import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
 import { TaskListBoardView } from "../components/tasks/TaskListBoardView";
 import { errorMessage } from "../hooks/errors";
+import { objectReference } from "../lib/references";
 import { useCatalogs } from "../hooks/useCatalogs";
 import { useDayPlan, useDayPlanTasks } from "../hooks/useDayPlan";
 import { useEntityComments } from "../hooks/useEntityComments";
@@ -188,6 +189,7 @@ function DayPlanNotes({ dayPlanId }: { dayPlanId: number }) {
         note={editingNote}
         open={editingNote !== null}
         onClose={() => setEditingNote(null)}
+        objectReference={editingNote ? objectReference("note", editingNote.id) : undefined}
         onSave={async (id, input) => {
           const updated = await notes.updateNote(id, input);
           if (updated) {

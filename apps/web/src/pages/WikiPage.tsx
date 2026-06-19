@@ -118,7 +118,7 @@ export function WikiPage() {
     }
   };
 
-  const autoSaveInlineForm = async (input: WikiPageInput, relatedPageIds: number[]) => {
+  const autoSaveInlineForm = async (input: WikiPageInput, relatedPageIds: number[], baseVersion: number): Promise<{ version: number } | void> => {
     if (!wiki.page) return;
     const p = wiki.page;
     const currentRelatedPageIds = p.relatedPages.map((rp) => rp.id).sort((a, b) => a - b);
@@ -133,11 +133,18 @@ export function WikiPage() {
 
     if (!fieldsChanged && !relationsChanged) return;
 
-    await wiki.updateWikiPage(p.id, { ...input, expectedVersion: p.version });
+    // Use baseVersion (the version the editor content is based on) so that external writes
+    // produce a 409 instead of being silently overwritten (TKT-129).
+    const updated = await wiki.updateWikiPage(p.id, { ...input, expectedVersion: baseVersion });
     if (relationsChanged) {
       await wiki.syncWikiPageRelations(p.id, currentRelatedPageIds, relatedPageIds);
     }
+    return { version: updated.version };
   };
+
+  const handleReloadRequest = useCallback(async () => {
+    await wiki.reload();
+  }, [wiki]);
 
   const postCreatePage = async (
     pageId: number,
@@ -193,6 +200,27 @@ export function WikiPage() {
       showToast({
         tone: "error",
         title: "Wiki-Seite konnte nicht verschoben werden",
+        message: errorMessage(wikiError),
+      });
+    }
+  };
+
+  const reorderWikiPage = async (page: WikiTreeNode, nextParentId: number | null, newOrder: WikiTreeNode[]) => {
+    try {
+      const parentChanged = page.parentId !== nextParentId;
+      await Promise.all(
+        newOrder.map((sibling, index) =>
+          wiki.updateWikiPage(sibling.id, {
+            sortOrder: index * 1000,
+            ...(sibling.id === page.id && parentChanged ? { parentId: nextParentId } : {}),
+            expectedVersion: sibling.version,
+          })
+        )
+      );
+    } catch (wikiError) {
+      showToast({
+        tone: "error",
+        title: "Reihenfolge konnte nicht geändert werden",
         message: errorMessage(wikiError),
       });
     }
@@ -263,7 +291,7 @@ export function WikiPage() {
           </>
         ) : (
           <>
-            <WikiTree tree={wiki.tree} onCreate={openCreate} canMove={canWrite} onMove={moveWikiPage} />
+            <WikiTree tree={wiki.tree} onCreate={openCreate} canMove={canWrite} onMove={moveWikiPage} onReorder={reorderWikiPage} />
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               {wiki.error ? (
                 <div className="px-5 pt-5">
@@ -284,6 +312,7 @@ export function WikiPage() {
                   projects={projects}
                   onSubmit={submitInlineForm}
                   onAutoSave={wiki.page ? autoSaveInlineForm : undefined}
+                  onReloadRequested={wiki.page ? handleReloadRequest : undefined}
                   onAutoSaveStatusChange={handleInlineSaveStatus}
                   onDelete={canWrite ? deletePage : undefined}
                   editable={editing}

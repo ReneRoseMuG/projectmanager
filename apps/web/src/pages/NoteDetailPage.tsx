@@ -1,4 +1,5 @@
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { objectReference } from "../lib/references";
 import { NoteEditor } from "../components/notes/NoteEditor";
 import { DetailPageSkeleton } from "../components/ui/Skeleton";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
@@ -59,6 +60,7 @@ export function NoteDetailPage() {
         onSave={detail.updateNote}
         onClose={closePage}
         onOpenInTab={openInTab}
+        objectReference={objectReference("note", detail.note.id)}
       />
     </div>
   );

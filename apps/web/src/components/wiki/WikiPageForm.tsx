@@ -38,12 +38,14 @@ interface WikiPageFormProps {
   tree: WikiTreeNode[];
   projects: Project[];
   onSubmit: (input: WikiPageInput, relatedPageIds: number[]) => Promise<WikiPage | void>;
-  onAutoSave?: (input: WikiPageInput, relatedPageIds: number[]) => Promise<void>;
+  onAutoSave?: (input: WikiPageInput, relatedPageIds: number[], baseVersion: number) => Promise<{ version: number } | void>;
   onPostCreate?: (pageId: number, pending: { comments: DraftComment[]; relatedPageIds: number[] }) => Promise<void>;
   onClose: () => void;
   onOpenInTab?: () => void;
   /** Surfaces the inline auto-save status to a parent that owns the detail header (Wiki tab). */
   onAutoSaveStatusChange?: (status: AutoSaveStatus, errorMessage?: string | null) => void;
+  /** Called when user requests a reload after a conflict. Parent should refetch the page before returning. */
+  onReloadRequested?: () => Promise<void>;
   inline?: boolean;
   inlineChrome?: "embedded" | "standalone";
   onDelete?: (page: WikiPage) => void;
@@ -58,6 +60,14 @@ function flattenTree(nodes: WikiTreeNode[]): WikiPage[] {
   return nodes.flatMap((node) => [node, ...flattenTree(node.children)]);
 }
 
+function isConflictError(error: unknown): boolean {
+  const response =
+    error instanceof Error && "response" in error
+      ? (error as { response?: { status?: number } }).response
+      : undefined;
+  return response?.status === 409;
+}
+
 type WikiPageFormTab = "details" | "comments" | "notes" | "attachments" | "journal";
 
 const tabs: Array<Tab<WikiPageFormTab>> = [
@@ -68,7 +78,7 @@ const tabs: Array<Tab<WikiPageFormTab>> = [
   { value: "journal", label: "Journal" }
 ];
 
-export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onAutoSave, onPostCreate, onClose, onOpenInTab, onAutoSaveStatusChange, inline = false, inlineChrome = "standalone", onDelete, editable, onEdit, onNavigateToWikiPage }: WikiPageFormProps) {
+export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onAutoSave, onPostCreate, onClose, onOpenInTab, onAutoSaveStatusChange, onReloadRequested, inline = false, inlineChrome = "standalone", onDelete, editable, onEdit, onNavigateToWikiPage }: WikiPageFormProps) {
   const { confirm } = useConfirm();
   const { showToast } = useToast();
   const pageId = page?.id ?? null;
@@ -83,18 +93,38 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
   const [relatedPages, setRelatedPages] = useState<WikiPageRelationSummary[]>([]);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [conflictDetected, setConflictDetected] = useState(false);
+  const [resetCount, setResetCount] = useState(0);
   const formStateRef = useRef({ title, parentId, content, relatedPages });
   formStateRef.current = { title, parentId, content, relatedPages };
+  // Tracks the page version the current editor content is based on. Used as expectedVersion
+  // in autosave to ensure external changes are detected via 409 (TKT-129).
+  const baseVersionRef = useRef<number>(page?.version ?? 0);
+
   const autoSave = useAutoSave({
     enabled: !!page && !!onAutoSave,
     save: async () => {
       if (!onAutoSave) return;
       const s = formStateRef.current;
-      await onAutoSave(
-        { title: s.title, parentId: s.parentId, content: s.content },
-        s.relatedPages.map((p) => p.id),
-      );
-      setDirty(false);
+      try {
+        const result = await onAutoSave(
+          { title: s.title, parentId: s.parentId, content: s.content },
+          s.relatedPages.map((p) => p.id),
+          baseVersionRef.current,
+        );
+        if (result?.version !== undefined) {
+          baseVersionRef.current = result.version;
+        }
+        setConflictDetected(false);
+        setDirty(false);
+      } catch (err) {
+        if (isConflictError(err)) {
+          // External change detected: show conflict banner instead of propagating as a generic error.
+          setConflictDetected(true);
+          return;
+        }
+        throw err;
+      }
     },
   });
   const af = page ? autoSave.flush : undefined;
@@ -137,15 +167,18 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
     setContent(page?.content ?? "");
     setRelatedPages(page?.relatedPages ?? []);
     setDirty(false);
+    setConflictDetected(false);
     setActiveTab("details");
     setEditingNote(null);
+    baseVersionRef.current = page?.version ?? 0;
     if (!page) {
       setPendingComments([]);
     }
   // Depend on identities (ids), not object references: a refetch of the same page
   // (e.g. after uploading an attachment) must not reset the active tab or form fields. TKT-98.
+  // resetCount is incremented when the user explicitly requests a reload after a conflict (TKT-129).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, page?.id, parent?.id]);
+  }, [open, page?.id, parent?.id, resetCount]);
 
   const createNote = async () => {
     try {
@@ -209,6 +242,20 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
         void flushPendingSave().then(() => onNavigateToWikiPage(pageId));
       }
     : undefined;
+
+  // Conflict resolution: save current editor content over the external version.
+  const handleForceOverwrite = () => {
+    baseVersionRef.current = page?.version ?? 0;
+    setConflictDetected(false);
+    void autoSave.flush();
+  };
+
+  // Conflict resolution: reload form from the externally changed page content.
+  const handleReload = async () => {
+    if (onReloadRequested) await onReloadRequested();
+    setConflictDetected(false);
+    setResetCount((c) => c + 1);
+  };
 
   const visibleTabs = page
     ? tabs.filter((tab) => tab.value !== "journal" || canReadJournal)
@@ -284,6 +331,15 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
         {embeddedActionPage && !effectiveEditable && onEdit ? (
           <div className="flex min-h-[40px] items-center justify-end gap-3 border-b border-line bg-shell px-5 py-2">
             <DetailHeaderActions tone="onLight" onEdit={onEdit} />
+          </div>
+        ) : null}
+        {conflictDetected ? (
+          <div className="flex flex-wrap items-center gap-3 border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm">
+            <span className="flex-1 text-amber-800">
+              Diese Seite wurde extern geändert. Deine Änderungen wurden noch nicht gespeichert.
+            </span>
+            <Button onClick={() => void handleReload()}>Neu laden</Button>
+            <Button variant="primary" onClick={handleForceOverwrite}>Trotzdem speichern</Button>
           </div>
         ) : null}
         <TabBar tabs={tabItems} active={activeTab} onChange={setActiveTab} />
@@ -403,7 +459,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
                   });
                 }}
               />
-              <NoteEditor note={editingNote} open={Boolean(editingNote)} onSave={notes.updateNote} onClose={() => setEditingNote(null)} />
+              <NoteEditor note={editingNote} open={Boolean(editingNote)} onSave={notes.updateNote} onClose={() => setEditingNote(null)} objectReference={editingNote ? objectReference("note", editingNote.id) : undefined} />
             </Section>
             </div>
           ) : null}

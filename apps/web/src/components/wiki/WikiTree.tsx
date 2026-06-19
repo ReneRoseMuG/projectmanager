@@ -13,11 +13,16 @@ interface WikiTreeProps {
   onNavigate?: (page: WikiTreeNode) => Promise<boolean> | boolean;
   canMove?: boolean;
   onMove?: (page: WikiTreeNode, nextParentId: number | null) => Promise<void>;
+  onReorder?: (page: WikiTreeNode, nextParentId: number | null, newOrder: WikiTreeNode[]) => Promise<void>;
 }
 
 interface WikiNodeProps {
   node: WikiTreeNode;
+  nodeIndex: number;
+  siblings: WikiTreeNode[];
+  parentId: number | null;
   activeId: number | null;
+  activeDragPage: WikiTreeNode | null;
   level: number;
   onCreate: (parent: WikiTreeNode) => void;
   onNavigate?: (page: WikiTreeNode) => Promise<boolean> | boolean;
@@ -37,6 +42,7 @@ const LEVEL_INDENT = 14;
 const WIDTH_BUFFER = 16;
 const WIKI_ROOT_DROP_ID = "wiki-root";
 const WIKI_PAGE_DROP_PREFIX = "wiki-page-";
+const WIKI_INSERT_PREFIX = "wiki-insert:";
 
 // Persists the tree scroll position across remounts triggered by page navigation (TKT-138).
 let treeScrollTop = 0;
@@ -82,6 +88,10 @@ function pageDropId(pageId: number): string {
   return `${WIKI_PAGE_DROP_PREFIX}${pageId}`;
 }
 
+function insertSlotId(parentId: number | null, index: number): string {
+  return `${WIKI_INSERT_PREFIX}${parentId ?? "root"}:${index}`;
+}
+
 function getDragPage(data: unknown): WikiTreeNode | null {
   if (!data || typeof data !== "object" || !("page" in data)) {
     return null;
@@ -108,6 +118,20 @@ function containsPage(node: WikiTreeNode, pageId: number): boolean {
   return node.children.some((child) => child.id === pageId || containsPage(child, pageId));
 }
 
+interface InsertSlotDropData {
+  isInsertSlot: true;
+  parentId: number | null;
+  insertIndex: number;
+  siblings: WikiTreeNode[];
+}
+
+function getInsertSlotData(data: unknown): InsertSlotDropData | null {
+  if (!data || typeof data !== "object" || !("isInsertSlot" in data)) return null;
+  const d = data as Partial<InsertSlotDropData>;
+  if (d.isInsertSlot !== true) return null;
+  return d as InsertSlotDropData;
+}
+
 function WikiRootDropZone({ canMove }: { canMove: boolean }) {
   const drop = useDroppable({
     id: WIKI_ROOT_DROP_ID,
@@ -130,7 +154,31 @@ function WikiRootDropZone({ canMove }: { canMove: boolean }) {
   );
 }
 
-function WikiNode({ node, activeId, level, onCreate, onNavigate, canMove, collapsedIds, onToggleCollapse }: WikiNodeProps) {
+function WikiInsertSlot({ parentId, insertIndex, siblings, level, isDragging }: {
+  parentId: number | null;
+  insertIndex: number;
+  siblings: WikiTreeNode[];
+  level: number;
+  isDragging: boolean;
+}) {
+  const drop = useDroppable({
+    id: insertSlotId(parentId, insertIndex),
+    disabled: !isDragging,
+    data: { isInsertSlot: true, parentId, insertIndex, siblings },
+  });
+
+  if (!isDragging) return null;
+
+  return (
+    <div
+      ref={drop.setNodeRef}
+      style={{ paddingLeft: level * LEVEL_INDENT }}
+      className={`h-2 rounded transition-colors ${drop.isOver ? "bg-teal/25 ring-1 ring-inset ring-teal/50" : ""}`}
+    />
+  );
+}
+
+function WikiNode({ node, nodeIndex, siblings, parentId, activeId, activeDragPage, level, onCreate, onNavigate, canMove, collapsedIds, onToggleCollapse }: WikiNodeProps) {
   const expanded = !collapsedIds.has(node.id);
   const navigate = useNavigate();
   const hasChildren = node.children.length > 0;
@@ -167,6 +215,13 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate, canMove, collap
 
   return (
     <div className="grid gap-1">
+      <WikiInsertSlot
+        parentId={parentId}
+        insertIndex={nodeIndex}
+        siblings={siblings}
+        level={level}
+        isDragging={activeDragPage !== null}
+      />
       <div
         ref={setRowRef}
         className={`wiki-tree-nav-row flex items-center gap-1${activeId === node.id ? " wiki-tree-nav-row-active" : ""}${drop.isOver ? " ring-1 ring-white/35" : ""}${drag.isDragging ? " opacity-60" : ""}`}
@@ -227,11 +282,15 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate, canMove, collap
       </div>
       {expanded && hasChildren ? (
         <div className="grid gap-1">
-          {node.children.map((child) => (
+          {node.children.map((child, childIndex) => (
             <WikiNode
               key={child.id}
               node={child}
+              nodeIndex={childIndex}
+              siblings={node.children}
+              parentId={node.id}
               activeId={activeId}
+              activeDragPage={activeDragPage}
               level={level + 1}
               onCreate={onCreate}
               onNavigate={onNavigate}
@@ -240,13 +299,20 @@ function WikiNode({ node, activeId, level, onCreate, onNavigate, canMove, collap
               onToggleCollapse={onToggleCollapse}
             />
           ))}
+          <WikiInsertSlot
+            parentId={node.id}
+            insertIndex={node.children.length}
+            siblings={node.children}
+            level={level + 1}
+            isDragging={activeDragPage !== null}
+          />
         </div>
       ) : null}
     </div>
   );
 }
 
-export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove }: WikiTreeProps) {
+export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove, onReorder }: WikiTreeProps) {
   const params = useParams();
   const activeId = Number.isFinite(Number(params.id)) ? Number(params.id) : null;
   const [collapsed, setCollapsed] = useState(() => readStoredBoolean("wiki-tree-collapsed", false));
@@ -307,18 +373,29 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove }
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveDragPage(null);
-    if (!onMove) {
-      return;
-    }
     const page = getDragPage(event.active.data.current);
-    const nextParentId = getDropParentId(event.over?.id);
-    if (!page || nextParentId === undefined || page.id === nextParentId || page.parentId === nextParentId) {
-      return;
-    }
-    if (nextParentId !== null && containsPage(page, nextParentId)) {
+    if (!page) return;
+
+    const overId = event.over?.id;
+
+    if (typeof overId === "string" && overId.startsWith(WIKI_INSERT_PREFIX)) {
+      if (!onReorder) return;
+      const slotData = getInsertSlotData(event.over!.data.current);
+      if (!slotData) return;
+      const siblingsWithoutDrag = slotData.siblings.filter((s) => s.id !== page.id);
+      const newOrder: WikiTreeNode[] = [
+        ...siblingsWithoutDrag.slice(0, slotData.insertIndex),
+        page,
+        ...siblingsWithoutDrag.slice(slotData.insertIndex),
+      ];
+      void Promise.resolve(onReorder(page, slotData.parentId, newOrder)).catch(() => undefined);
       return;
     }
 
+    if (!onMove) return;
+    const nextParentId = getDropParentId(overId);
+    if (nextParentId === undefined || page.id === nextParentId || page.parentId === nextParentId) return;
+    if (nextParentId !== null && containsPage(page, nextParentId)) return;
     void Promise.resolve(onMove(page, nextParentId)).catch(() => undefined);
   };
 
@@ -364,11 +441,15 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove }
               <p className="mt-0.5 text-xs text-white/40">Starte mit einer Root-Seite.</p>
             </div>
           ) : null}
-          {tree.map((node) => (
+          {tree.map((node, nodeIndex) => (
             <WikiNode
               key={node.id}
               node={node}
+              nodeIndex={nodeIndex}
+              siblings={tree}
+              parentId={null}
               activeId={activeId}
+              activeDragPage={activeDragPage}
               level={0}
               onCreate={onCreate}
               onNavigate={onNavigate}
@@ -377,6 +458,13 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove }
               onToggleCollapse={toggleCollapse}
             />
           ))}
+          <WikiInsertSlot
+            parentId={null}
+            insertIndex={tree.length}
+            siblings={tree}
+            level={0}
+            isDragging={activeDragPage !== null}
+          />
           <DragOverlay>
             {activeDragPage ? (
               <div className="rounded-md border border-white/20 bg-steel-700 px-3 py-2 text-sm font-semibold text-white shadow-lg">
@@ -390,7 +478,7 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove }
       {/* Toggle strip — absolute on right edge, always reachable */}
       <button
         type="button"
-        className="absolute bottom-0 right-0 top-0 flex cursor-col-resize flex-col items-center justify-center gap-[3px] border-l border-white/20 bg-white/[0.04] transition-colors hover:bg-white/[0.10] focus:outline-none"
+        className="absolute bottom-0 right-0 top-0 flex cursor-col-resize flex-col items-center justify-center gap-[3px] border-l border-white/20 bg-steel-800 transition-colors hover:bg-steel-700 focus:outline-none"
         style={{ width: TOGGLE_WIDTH }}
         aria-label={collapsed ? "Seitenbaum öffnen" : "Seitenbaum schließen"}
         title={collapsed ? "Seitenbaum öffnen" : "Seitenbaum schließen"}

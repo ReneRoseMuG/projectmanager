@@ -2,6 +2,11 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 19.06.26 | 10:35:00 | Fix | Task-Relation Unlink (TKT-65): ×-Button im ParentContextField | ✅ |
+| 19.06.26 | 09:36:00 | Fix | Wiki Autosave Lost Update (TKT-129): baseVersion + Konflikt-Banner | ✅ |
+| 19.06.26 | 07:42:22 | Feat | Wiki D&D Sort Order (TKT-139): Insert-Slots zwischen Geschwistern | ✅ |
+| 19.06.26 | 07:16:37 | Fix | Wiki Tree Grip Handle (TKT-141) + Befund TKT-136/138 bereits gefixt | ✅ |
+| 19.06.26 | 07:12:43 | Fix | Note-Editor Copy-Reference-Button | ✅ |
 | 18.06.26 | 16:14:28 | Fix | Dashboard Persönliche Planung: Notizkarten bearbeitbar + Löschen bei Aufgaben | ✅ |
 | 18.06.26 | 16:12:19 | Fix | TKT-138 Wiki-Tree Scrollposition bleibt nach Navigation erhalten | ✅ |
 | 18.06.26 | 16:12:19 | Fix | TKT-136 Wiki-Tree Breite ignoriert eingeklappte Seitennamen | ✅ |

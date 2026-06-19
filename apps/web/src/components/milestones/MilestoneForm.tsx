@@ -662,6 +662,7 @@ export function MilestoneForm({
                   onSave={notes.updateNote}
                   onCreateNote={handleCreateNote}
                   onClose={() => { setEditingNote(null); setIsCreatingNote(false); }}
+                  objectReference={editingNote ? objectReference("note", editingNote.id) : undefined}
                 />
               </>
             ) : (

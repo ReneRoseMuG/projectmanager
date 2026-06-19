@@ -196,6 +196,20 @@ describe("NoteEditor", () => {
     expect(screen.queryByText("Änderungen verwerfen?")).not.toBeInTheDocument();
   });
 
+  it("zeigt Copy-Reference-Button im Edit-Mode wenn objectReference übergeben wird", () => {
+    renderWithProviders(<NoteEditor open note={note} onSave={vi.fn()} onClose={vi.fn()} objectReference="NOTE-7" />);
+
+    expect(screen.getByRole("button", { name: "ID NOTE-7 kopieren" })).toBeInTheDocument();
+  });
+
+  it("zeigt keinen Copy-Reference-Button im Create-Mode auch wenn objectReference übergeben wird", () => {
+    renderWithProviders(
+      <NoteEditor open note={null} onSave={vi.fn()} onCreateNote={vi.fn()} onClose={vi.fn()} objectReference="NOTE-7" />
+    );
+
+    expect(screen.queryByRole("button", { name: "ID NOTE-7 kopieren" })).not.toBeInTheDocument();
+  });
+
   it("behält im Create-Mode den Verwerfen-Dialog bei ungespeicherten Änderungen", async () => {
     const onCreateNote = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();

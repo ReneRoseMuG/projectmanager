@@ -22,6 +22,9 @@
  * - Der Standalone-Inline-Modus bietet die WIKI-Kopieraktion im Hero; embedded überlässt den Kopf der Seite.
  * - Inline-Speichern einer bestehenden Seite lässt die Seite geöffnet.
  * - Bei aktivem Auto-Save schließt das Formular nach erfolgreichem Save ohne Verwerfen-Dialog (TKT-95).
+ * - Autosave sendet baseVersion (Version des geladenen Inhalts) als expectedVersion, nicht die Cache-Version.
+ * - Bei 409-Konflikt erscheint Konflikt-Banner; kein stiller Retry; Nutzerinhalt bleibt erhalten (TKT-129).
+ * - Konflikt-Banner verschwindet nach „Trotzdem speichern"; Autosave wird mit aktualisierter baseVersion erneut ausgelöst.
  *
  * Fehlerfälle:
  * - Aktualisierter Inhalt muss im Submit-Payload landen.
@@ -138,6 +141,12 @@ vi.mock("../../../../../apps/web/src/components/ui/ToastProvider", () => ({
     return { showToast: vi.fn() };
   },
 }));
+
+function makeConflictError(): Error & { response: { status: number } } {
+  const err = new Error("Conflict") as Error & { response: { status: number } };
+  err.response = { status: 409 };
+  return err;
+}
 
 const wikiPage: WikiPage = {
   id: 5,
@@ -358,5 +367,57 @@ describe("WikiPageForm", () => {
     expect(onAutoSave).toHaveBeenCalled();
     expect(screen.queryByText("Änderungen verwerfen?")).not.toBeInTheDocument();
     expect(screen.queryByText("Speichern fehlgeschlagen")).not.toBeInTheDocument();
+  });
+
+  it("sendet baseVersion des Editor-Inhalts als expectedVersion beim Autosave (TKT-129)", async () => {
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(
+      <WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />,
+    );
+
+    fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: "<p>geändert</p>" } });
+
+    await waitFor(() => expect(onAutoSave).toHaveBeenCalled());
+    expect(onAutoSave).toHaveBeenCalledWith(
+      expect.objectContaining({ content: "<p>geändert</p>" }),
+      expect.any(Array),
+      wikiPage.version,
+    );
+  });
+
+  it("zeigt Konflikt-Banner wenn Autosave mit 409 scheitert und behält Nutzerinhalt (TKT-129)", async () => {
+    const onAutoSave = vi.fn().mockRejectedValue(makeConflictError());
+    renderWithProviders(
+      <WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />,
+    );
+
+    fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: "<p>Eigener Inhalt</p>" } });
+
+    await waitFor(() =>
+      expect(screen.getByText("Diese Seite wurde extern geändert. Deine Änderungen wurden noch nicht gespeichert.")).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("wiki-page-form-content-view")).toHaveValue("<p>Eigener Inhalt</p>");
+    expect(onAutoSave).toHaveBeenCalledTimes(1);
+  });
+
+  it("löscht Konflikt-Banner nach 'Trotzdem speichern' und sendet erneuten Autosave (TKT-129)", async () => {
+    const onAutoSave = vi.fn()
+      .mockRejectedValueOnce(makeConflictError())
+      .mockResolvedValue(undefined);
+    renderWithProviders(
+      <WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />,
+    );
+
+    fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: "<p>Eigener Inhalt</p>" } });
+    await waitFor(() =>
+      expect(screen.getByText("Diese Seite wurde extern geändert. Deine Änderungen wurden noch nicht gespeichert.")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Trotzdem speichern" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText("Diese Seite wurde extern geändert. Deine Änderungen wurden noch nicht gespeichert.")).not.toBeInTheDocument(),
+    );
+    expect(onAutoSave).toHaveBeenCalledTimes(2);
   });
 });

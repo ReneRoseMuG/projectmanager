@@ -11,6 +11,7 @@ import type {
   TaskStatus,
   TicketStatus,
   TicketType,
+  VisibleParentContext,
 } from "@taskmanager/shared-types";
 import { Bug, Flag, Link2, ListChecks, ListTodo, Users } from "lucide-react";
 import type { FormEvent } from "react";
@@ -42,7 +43,7 @@ import { TaskDashboard } from "../dashboard/DashboardView";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { JournalPanel } from "../journal/JournalPanel";
-import type { TaskOwner } from "../../api/tasks";
+import { unlinkOwnerTask as unlinkOwnerTaskRequest, type TaskOwner } from "../../api/tasks";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import type { TicketOwner } from "../../api/tickets";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
@@ -412,6 +413,22 @@ export function TaskForm({
   const loadedTask = detail.task;
   const currentTask = detail.task ?? task;
   const showParentContexts = !owner && (currentTask?.parentContexts?.length ?? 0) > 0;
+
+  const handleUnlinkParent = taskId !== null
+    ? async (parent: VisibleParentContext) => {
+        const type = parent.type;
+        if (type === "task" || type === "ticket") return;
+        try {
+          await unlinkOwnerTaskRequest({ type, id: parent.id }, taskId);
+          await detail.reload();
+          await onChanged?.();
+          showToast({ tone: "success", title: "Verknüpfung aufgehoben" });
+        } catch (unlinkError) {
+          showToast({ tone: "error", title: "Verknüpfung konnte nicht aufgehoben werden", message: errorMessage(unlinkError) });
+        }
+      }
+    : undefined;
+
   const pendingTicketItems = pendingTickets.map(draftTicketItem);
 
   const removePendingTicket = (ticketId: number) => {
@@ -514,7 +531,7 @@ export function TaskForm({
               </div>
             </div>
             <FormSidebar storageKey="task-form-sidebar">
-              {showParentContexts ? <ParentContextField parents={currentTask?.parentContexts} /> : null}
+              {showParentContexts ? <ParentContextField parents={currentTask?.parentContexts} onUnlink={handleUnlinkParent} /> : null}
               <CatalogSelect label="Status" icon={<ListChecks size={14} />} variant="panel" kind="workStatus" value={status} onChange={(v) => { setStatus(v); formStateRef.current = { ...formStateRef.current, status: v }; af?.(); }} />
               <CatalogSelect label="Priorität" icon={<Flag size={14} />} variant="panel" kind="priority" value={priority} onChange={(v) => { setPriority(v); formStateRef.current = { ...formStateRef.current, priority: v }; af?.(); }} />
               <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => { const v = event.target.value; setDueDate(v); formStateRef.current = { ...formStateRef.current, dueDate: v }; af?.(); }} />
@@ -752,6 +769,7 @@ export function TaskForm({
                   onSave={notes.updateNote}
                   onCreateNote={handleCreateNote}
                   onClose={() => { setEditingNote(null); setIsCreatingNote(false); }}
+                  objectReference={editingNote ? objectReference("note", editingNote.id) : undefined}
                 />
               </>
             ) : (

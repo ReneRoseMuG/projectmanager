@@ -272,6 +272,7 @@ function DayPlanWidgetAction({
         note={editingNote}
         open={editingNote !== null}
         onClose={() => setEditingNote(null)}
+        objectReference={editingNote ? objectReference("note", editingNote.id) : undefined}
         onSave={async (id, input) => {
           const updated = await notes.updateNote(id, input);
           if (updated) {
@@ -515,6 +516,7 @@ function DayPlanNoteListWidget({ notes, owner }: { notes: Note[] | undefined; ow
         note={editingNote}
         open={editingNote !== null}
         onClose={() => setEditingNote(null)}
+        objectReference={editingNote ? objectReference("note", editingNote.id) : undefined}
         onSave={async (id, input) => {
           const updated = await noteController.updateNote(id, input);
           if (updated) {
