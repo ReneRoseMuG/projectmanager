@@ -249,11 +249,19 @@ function Wait-HttpReady([string]$Name, [string]$Uri, [System.Diagnostics.Process
     throw "$Name ist nicht erreichbar: $Uri. Siehe runtime-logs."
 }
 
+# Vorher aufraeumen, damit Mehrfachstarts keine Prozesse stapeln oder Ports blockieren
+if (Test-Path "$root\Stop.ps1") {
+    Write-StartLog "cleanup: stopping previous instances"
+    try { & "$root\Stop.ps1" | Out-Null } catch { Write-StartLog "cleanup failed: $_" }
+}
+
 Write-StartLog "starting api"
 $api = Start-Process -FilePath "node" `
     -ArgumentList "dist\index.js" `
     -WorkingDirectory "$root\apps\api" `
     -WindowStyle Hidden `
+    -RedirectStandardOutput "$logDir\api.out.log" `
+    -RedirectStandardError "$logDir\api.err.log" `
     -PassThru
 
 Write-StartLog "starting web"
@@ -261,6 +269,8 @@ $web = Start-Process -FilePath "node" `
     -ArgumentList "scripts\serve-static.mjs", "apps\web\dist" `
     -WorkingDirectory $root `
     -WindowStyle Hidden `
+    -RedirectStandardOutput "$logDir\web.out.log" `
+    -RedirectStandardError "$logDir\web.err.log" `
     -PassThru
 
 '@
@@ -280,6 +290,8 @@ Write-StartLog "starting mcp"
     -ArgumentList "apps\mcp-server\dist\http.js" ``
     -WorkingDirectory `$root ``
     -WindowStyle Hidden ``
+    -RedirectStandardOutput "`$logDir\mcp.out.log" ``
+    -RedirectStandardError "`$logDir\mcp.err.log" ``
     -PassThru
 
 "@

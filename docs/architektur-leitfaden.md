@@ -116,7 +116,7 @@ Jede Tabelle der Klassen Fachobjekte und Support-Objekte trägt einheitlich folg
 
 ### Stack
 ```
-Fastify Routes → Services → Repositories → Drizzle ORM → SQLite
+Fastify Routes → Services → Repositories → Drizzle ORM → MySQL
 ```
 
 ### Repository-Layer
@@ -269,7 +269,7 @@ Codex liest alle betroffenen Dateien (Schema, Repositories, Services, Routes, Te
 
 ## 7. Test-Regime
 
-### Integration-Tests (Vitest + supertest, echte SQLite-DB)
+### Integration-Tests (Vitest + supertest, echte MySQL-DB)
 Für jede neue oder geänderte Beziehung:
 
 **CRUD:**

@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 23.06.26 | 11:44:28 | Fix | Architektur-Leitfaden: MySQL als Ist-Zustand (§4 Stack, §7 Tests) | ✅ |
+| 23.06.26 | 11:07:22 | Fix | DB-Resilienz Aiven-Disconnect + Crash-Logging + Start-Cleanup | ✅ |
 | 19.06.26 | 10:35:00 | Fix | Task-Relation Unlink (TKT-65): ×-Button im ParentContextField | ✅ |
 | 19.06.26 | 09:36:00 | Fix | Wiki Autosave Lost Update (TKT-129): baseVersion + Konflikt-Banner | ✅ |
 | 19.06.26 | 07:42:22 | Feat | Wiki D&D Sort Order (TKT-139): Insert-Slots zwischen Geschwistern | ✅ |

@@ -29,6 +29,19 @@ export const mysqlPool = mysql.createPool({
   queueLimit: 50
 });
 
+// The mysql2 promise pool does not forward the underlying pool's "error" event
+// (it only forwards acquire/connection/enqueue/release). Without a listener on the
+// core pool, a dropped connection — e.g. the remote database closing an idle
+// connection — surfaces as an unhandled "error" event and terminates the process.
+// Listening here keeps the process alive; mysql2 discards the broken connection and
+// the next query transparently opens a fresh one.
+mysqlPool.pool.on("error", (err: unknown) => {
+  console.error(
+    "[db] MySQL pool connection error; connection was dropped and will be re-established on the next query:",
+    err
+  );
+});
+
 export const db = drizzle({ client: mysqlPool, logger: process.env.NODE_ENV === "development" });
 
 export type DbClient = Omit<typeof db, "$client">;
