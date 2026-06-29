@@ -1,7 +1,7 @@
 ﻿import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { JsonValue, WikiPageRelationSummary } from "@taskmanager/shared-types";
+import type { JsonValue, WikiPageRelationSummary, WikiTreeMoveRequest } from "@taskmanager/shared-types";
 import { and, eq, inArray, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { wikiPageAttachments, wikiPageRelations, wikiPageTasks, wikiPageTickets } from "../db/schema.js";
@@ -63,6 +63,7 @@ const wikiJournalFields: Array<JournalFieldDefinition<WikiPageRecord>> = [
   { key: "title", label: "Titel" },
   { key: "sortOrder", label: "Sortierung" }
 ];
+const wikiSortOrderStep = 1000;
 
 interface WikiPageSupportCounts {
   attachmentCount: number;
@@ -166,6 +167,65 @@ async function ensureParentExists(database: DbClient, parentId: number | null | 
     visited.add(current.id);
     current = current.parentId === null ? undefined : await getWikiPageRecord(database, current.parentId);
   }
+}
+
+function assertUniqueMoveSiblings(input: WikiTreeMoveRequest): void {
+  if (!Number.isInteger(input.pageId) || input.pageId < 1) {
+    throw badRequest("pageId must be a positive integer");
+  }
+  if (input.parentId !== null && (!Number.isInteger(input.parentId) || input.parentId < 1)) {
+    throw badRequest("parentId must be null or a positive integer");
+  }
+  if (input.siblings.length === 0) {
+    throw badRequest("Sibling order must not be empty");
+  }
+  const seen = new Set<number>();
+  for (const sibling of input.siblings) {
+    if (!Number.isInteger(sibling.id) || sibling.id < 1) {
+      throw badRequest("Sibling id must be a positive integer");
+    }
+    if (!Number.isInteger(sibling.expectedVersion) || sibling.expectedVersion < 1) {
+      throw badRequest("Sibling expectedVersion must be a positive integer");
+    }
+    if (seen.has(sibling.id)) {
+      throw badRequest("Sibling order contains duplicate wiki pages");
+    }
+    seen.add(sibling.id);
+  }
+  if (!seen.has(input.pageId)) {
+    throw badRequest("Sibling order must include the moved wiki page");
+  }
+}
+
+function sameNumberSet(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const rightSet = new Set(right);
+  return left.every((value) => rightSet.has(value));
+}
+
+async function assertCompleteTargetSiblingOrder(database: DbClient, input: WikiTreeMoveRequest): Promise<void> {
+  const currentTargetSiblings = input.parentId === null
+    ? await wikiPageRepository.findRootPages(database)
+    : await wikiPageRepository.findChildren(database, input.parentId);
+  const currentTargetIds = currentTargetSiblings.map((page) => page.id).filter((id) => id !== input.pageId);
+  const requestedTargetIds = input.siblings.map((page) => page.id).filter((id) => id !== input.pageId);
+  if (!sameNumberSet(currentTargetIds, requestedTargetIds)) {
+    throw badRequest("Sibling order must include every current wiki page in the target parent");
+  }
+}
+
+async function readMoveSiblingRecords(database: DbClient, input: WikiTreeMoveRequest): Promise<Array<{ expectedVersion: number; record: WikiPageRecord }>> {
+  const records: Array<{ expectedVersion: number; record: WikiPageRecord }> = [];
+  for (const sibling of input.siblings) {
+    const record = await getWikiPageRecord(database, sibling.id);
+    if (record.id !== input.pageId && record.parentId !== input.parentId) {
+      throw badRequest("Sibling order contains a wiki page outside the target parent");
+    }
+    records.push({ expectedVersion: sibling.expectedVersion, record });
+  }
+  return records;
 }
 
 async function readWikiContent(database: DbClient, record: WikiPageRecord): Promise<string> {
@@ -366,6 +426,63 @@ export async function updateWikiPage(database: DbClient, id: number, input: Wiki
     readWikiPageRelations(database, id)
   ]);
   return mapWikiPage(updated, cnt, content, supportCounts, relatedPages);
+}
+
+export async function moveWikiPage(database: DbClient, input: WikiTreeMoveRequest, actor?: JournalActor | null): Promise<WikiPageDto> {
+  assertUniqueMoveSiblings(input);
+  const current = await getWikiPageRecord(database, input.pageId);
+  await ensureParentExists(database, input.parentId, input.pageId);
+  await assertCompleteTargetSiblingOrder(database, input);
+  const siblings = await readMoveSiblingRecords(database, input);
+
+  const moved = await database.transaction(async (tx) => {
+    let movedPage: WikiPageRecord | undefined;
+    for (const [index, sibling] of siblings.entries()) {
+      const values: WikiPageUpdateData = {
+        sortOrder: index * wikiSortOrderStep
+      };
+      if (sibling.record.id === input.pageId) {
+        values.parentId = input.parentId;
+      }
+      const updated = await wikiPageRepository.update(tx, sibling.record.id, sibling.expectedVersion, values, actor?.actorUserId ?? undefined);
+      if (!updated) {
+        throw notFound(`Wiki page with id ${sibling.record.id} not found`);
+      }
+      if (updated.id === input.pageId) {
+        movedPage = updated;
+      }
+    }
+    if (!movedPage) {
+      throw notFound(`Wiki page with id ${input.pageId} not found`);
+    }
+
+    const relationFields: Array<JournalFieldDefinition<WikiPageRecord>> = [
+      {
+        key: "parentId",
+        label: "Übergeordnete Wiki-Seite",
+        format: (value) => (typeof value === "number" ? `Wiki-Seite ${value}` : null)
+      }
+    ];
+    const journalObject = wikiJournalObject(movedPage);
+    const changes = buildJournalChanges(current, movedPage, [...relationFields, ...wikiJournalFields]);
+    await recordJournalEntry(tx, {
+      operation: "update",
+      object: journalObject,
+      summary: buildUpdateSummary(journalObject, changes),
+      actor,
+      changes,
+      contexts: await wikiContexts(database, movedPage)
+    });
+    return movedPage;
+  });
+
+  const [cnt, supportCounts, content, relatedPages] = await Promise.all([
+    childCount(database, input.pageId),
+    getWikiPageSupportCounts(database, [input.pageId]).then((m) => m.get(input.pageId) ?? emptyWikiPageSupportCounts),
+    readWikiContent(database, moved),
+    readWikiPageRelations(database, input.pageId)
+  ]);
+  return mapWikiPage(moved, cnt, content, supportCounts, relatedPages);
 }
 
 export async function deleteWikiPage(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {

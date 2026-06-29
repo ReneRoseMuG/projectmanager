@@ -1,4 +1,4 @@
-import type { WikiBreadcrumb, WikiPage, WikiPageInput, WikiPageUpdate } from "@taskmanager/shared-types";
+import type { WikiBreadcrumb, WikiPage, WikiPageInput, WikiPageUpdate, WikiTreeMoveRequest } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
@@ -9,6 +9,7 @@ import {
   getWikiBreadcrumb,
   getWikiChildren,
   getWikiPage,
+  moveWikiPage as moveWikiPageRequest,
   removeWikiPageRelation,
   updateWikiPage as updateWikiPageRequest
 } from "../api/wiki";
@@ -72,6 +73,13 @@ export function useWiki(pageId?: number) {
     }
   });
 
+  const moveWikiPageMutation = useMutation({
+    mutationFn: moveWikiPageRequest,
+    onSuccess: async () => {
+      await invalidateWiki(queryClient);
+    }
+  });
+
   const removeWikiPageMutation = useMutation({
     mutationFn: deleteWikiPageRequest,
     onSuccess: async () => {
@@ -91,6 +99,13 @@ export function useWiki(pageId?: number) {
       return updateWikiPageMutation.mutateAsync({ id, input });
     },
     [updateWikiPageMutation]
+  );
+
+  const moveWikiPage = useCallback(
+    async (input: WikiTreeMoveRequest) => {
+      return moveWikiPageMutation.mutateAsync(input);
+    },
+    [moveWikiPageMutation]
   );
 
   const removeWikiPage = useCallback(
@@ -125,6 +140,7 @@ export function useWiki(pageId?: number) {
     reload,
     createWikiPage,
     updateWikiPage,
+    moveWikiPage,
     syncWikiPageRelations,
     removeWikiPage
   };

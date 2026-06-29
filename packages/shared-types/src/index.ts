@@ -63,6 +63,25 @@ export interface SettingDefinition<Value extends JsonValue = JsonValue> {
   validate: (value: unknown) => value is Value;
 }
 
+export type WikiTreeState = {
+  [key: string]: JsonValue;
+  sidebarCollapsed: boolean;
+  collapsedPageIds: number[];
+};
+
+function isWikiTreeState(value: unknown): value is WikiTreeState {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Partial<WikiTreeState>;
+  return (
+    typeof candidate.sidebarCollapsed === "boolean" &&
+    Array.isArray(candidate.collapsedPageIds) &&
+    candidate.collapsedPageIds.every((id) => Number.isInteger(id) && id > 0) &&
+    new Set(candidate.collapsedPageIds).size === candidate.collapsedPageIds.length
+  );
+}
+
 export const settingsRegistry = {
   "taskBoard.viewMode": {
     key: "taskBoard.viewMode",
@@ -101,6 +120,15 @@ export const settingsRegistry = {
       }
     },
     validate: (value): value is ToastPosition => typeof value === "string" && (TOAST_POSITIONS as readonly string[]).includes(value)
+  },
+  "wiki.treeState": {
+    key: "wiki.treeState",
+    label: "Wiki-Seitenbaum",
+    description: "Speichert den benutzerbezogenen Anzeigezustand des Wiki-Seitenbaums.",
+    valueType: "json",
+    defaultValue: { sidebarCollapsed: false, collapsedPageIds: [] } as WikiTreeState,
+    allowedScopes: ["USER"],
+    validate: isWikiTreeState
   }
 } as const satisfies Record<string, SettingDefinition>;
 
@@ -1096,6 +1124,17 @@ export interface WikiPageInput {
 }
 
 export type WikiPageUpdate = WithExpectedVersion<Partial<WikiPageInput>>;
+
+export interface WikiTreeMoveSibling {
+  id: number;
+  expectedVersion: number;
+}
+
+export interface WikiTreeMoveRequest {
+  pageId: number;
+  parentId: number | null;
+  siblings: WikiTreeMoveSibling[];
+}
 
 export interface DiaryEntry {
   id: number;

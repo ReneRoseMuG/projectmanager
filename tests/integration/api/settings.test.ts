@@ -13,7 +13,7 @@
  * Das Settings-System gegen Lost Updates, fehlerhafte Scope-Auflösung und Berechtigungsumgehungen absichern.
  */
 
-import type { ResolvedSetting, Role } from "@taskmanager/shared-types";
+import type { ResolvedSetting, Role, WikiTreeState } from "@taskmanager/shared-types";
 import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -159,6 +159,45 @@ describe("Settings API", () => {
     expect(taskSetting).toMatchObject({ resolvedValue: "kanban", resolvedScope: "GLOBAL", resolvedVersion: 1 });
     expect(taskSetting.values.GLOBAL?.value).toBe("kanban");
   });
+  it("persistiert Wiki-Tree-State als getrenntes USER-Setting", async () => {
+    const reader = await createUser(app, "reader", "settings-wiki-tree@example.test");
+    const otherReader = await createUser(app, "reader", "settings-wiki-tree-other@example.test");
+    const treeState: WikiTreeState = { sidebarCollapsed: true, collapsedPageIds: [1, 3, 7] };
+
+    const initialResponse = await reader.get("/api/settings/resolved").expect(200);
+    const initialTreeSetting = settingByKey(initialResponse.body.settings as ResolvedSetting[], "wiki.treeState");
+    expect(initialTreeSetting).toMatchObject({
+      resolvedValue: { sidebarCollapsed: false, collapsedPageIds: [] },
+      resolvedScope: "DEFAULT",
+      resolvedVersion: null,
+    });
+
+    const savedResponse = await reader
+      .put("/api/settings/values")
+      .send({ key: "wiki.treeState", scopeType: "USER", value: treeState, expectedVersion: 0 })
+      .expect(200);
+    const savedTreeSetting = settingByKey(savedResponse.body.settings as ResolvedSetting[], "wiki.treeState");
+    expect(savedTreeSetting.resolvedValue).toEqual(treeState);
+    expect(savedTreeSetting.resolvedScope).toBe("USER");
+    expect(savedTreeSetting.values.USER?.version).toBe(1);
+
+    const reloadedResponse = await reader.get("/api/settings/resolved").expect(200);
+    expect(settingByKey(reloadedResponse.body.settings as ResolvedSetting[], "wiki.treeState").resolvedValue).toEqual(treeState);
+
+    const otherResponse = await otherReader.get("/api/settings/resolved").expect(200);
+    expect(settingByKey(otherResponse.body.settings as ResolvedSetting[], "wiki.treeState")).toMatchObject({
+      resolvedValue: { sidebarCollapsed: false, collapsedPageIds: [] },
+      resolvedScope: "DEFAULT",
+      resolvedVersion: null,
+    });
+
+    const invalid = await reader
+      .put("/api/settings/values")
+      .send({ key: "wiki.treeState", scopeType: "USER", value: { sidebarCollapsed: true, collapsedPageIds: [1, 1] }, expectedVersion: 1 })
+      .expect(400);
+    expect(invalid.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
+  });
+
   it("persistiert Toast-Position global und fällt bei ungültigem gespeicherten Wert zurück", async () => {
     const admin = await loginAdmin(app);
 

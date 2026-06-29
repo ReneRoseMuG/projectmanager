@@ -1,8 +1,9 @@
 import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import type { WikiTreeState } from "@taskmanager/shared-types";
 import { ChevronDown, ChevronRight, ExternalLink, FileText, GripVertical, Plus } from "lucide-react";
 import type { CSSProperties, MouseEvent } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { WikiTreeNode } from "../../hooks/useWiki";
 import { withStandaloneView } from "../../utils/standalone";
@@ -12,8 +13,9 @@ interface WikiTreeProps {
   onCreate: (parent: WikiTreeNode | null) => void;
   onNavigate?: (page: WikiTreeNode) => Promise<boolean> | boolean;
   canMove?: boolean;
-  onMove?: (page: WikiTreeNode, nextParentId: number | null) => Promise<void>;
-  onReorder?: (page: WikiTreeNode, nextParentId: number | null, newOrder: WikiTreeNode[]) => Promise<void>;
+  treeState: WikiTreeState;
+  onTreeStateChange: (treeState: WikiTreeState) => void;
+  onMove?: (page: WikiTreeNode, nextParentId: number | null, newOrder: WikiTreeNode[]) => Promise<void>;
 }
 
 interface WikiNodeProps {
@@ -73,17 +75,6 @@ function computeIdealWidth(nodes: WikiTreeNode[], canMove: boolean, collapsedIds
   return max;
 }
 
-function readStoredBoolean(key: string, fallback: boolean): boolean {
-  try {
-    const stored = window.localStorage.getItem(key);
-    if (stored === "true") return true;
-    if (stored === "false") return false;
-    return fallback;
-  } catch {
-    return fallback;
-  }
-}
-
 function pageDropId(pageId: number): string {
   return `${WIKI_PAGE_DROP_PREFIX}${pageId}`;
 }
@@ -116,6 +107,19 @@ function getDropParentId(overId: string | number | undefined): number | null | u
 
 function containsPage(node: WikiTreeNode, pageId: number): boolean {
   return node.children.some((child) => child.id === pageId || containsPage(child, pageId));
+}
+
+function findPage(nodes: WikiTreeNode[], pageId: number): WikiTreeNode | null {
+  for (const node of nodes) {
+    if (node.id === pageId) return node;
+    const child = findPage(node.children, pageId);
+    if (child) return child;
+  }
+  return null;
+}
+
+function appendDraggedPage(siblings: WikiTreeNode[], page: WikiTreeNode): WikiTreeNode[] {
+  return [...siblings.filter((sibling) => sibling.id !== page.id), page];
 }
 
 interface InsertSlotDropData {
@@ -312,26 +316,28 @@ function WikiNode({ node, nodeIndex, siblings, parentId, activeId, activeDragPag
   );
 }
 
-export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove, onReorder }: WikiTreeProps) {
+export function WikiTree({ tree, onCreate, onNavigate, canMove = false, treeState, onTreeStateChange, onMove }: WikiTreeProps) {
   const params = useParams();
   const activeId = Number.isFinite(Number(params.id)) ? Number(params.id) : null;
-  const [collapsed, setCollapsed] = useState(() => readStoredBoolean("wiki-tree-collapsed", false));
+  const collapsed = treeState.sidebarCollapsed;
   const [contentWidth, setContentWidth] = useState(MIN_WIDTH);
-  const [collapsedIds, setCollapsedIds] = useState<Set<number>>(() => new Set());
+  const collapsedIds = useMemo(() => new Set(treeState.collapsedPageIds), [treeState.collapsedPageIds]);
   const [activeDragPage, setActiveDragPage] = useState<WikiTreeNode | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  const updateSidebarCollapsed = (nextCollapsed: boolean) => {
+    onTreeStateChange({ ...treeState, sidebarCollapsed: nextCollapsed });
+  };
+
   const toggleCollapse = (id: number) => {
-    setCollapsedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    const next = new Set(collapsedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    onTreeStateChange({ ...treeState, collapsedPageIds: [...next].sort((a, b) => a - b) });
   };
 
   const handleTreeScroll = () => {
@@ -346,14 +352,6 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove, 
       scrollRef.current.scrollTop = treeScrollTop;
     }
   }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("wiki-tree-collapsed", String(collapsed));
-    } catch {
-      // localStorage unavailable in privacy mode
-    }
-  }, [collapsed]);
 
   useEffect(() => {
     if (tree.length === 0) return;
@@ -379,7 +377,7 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove, 
     const overId = event.over?.id;
 
     if (typeof overId === "string" && overId.startsWith(WIKI_INSERT_PREFIX)) {
-      if (!onReorder) return;
+      if (!onMove) return;
       const slotData = getInsertSlotData(event.over!.data.current);
       if (!slotData) return;
       const siblingsWithoutDrag = slotData.siblings.filter((s) => s.id !== page.id);
@@ -388,7 +386,7 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove, 
         page,
         ...siblingsWithoutDrag.slice(slotData.insertIndex),
       ];
-      void Promise.resolve(onReorder(page, slotData.parentId, newOrder)).catch(() => undefined);
+      void Promise.resolve(onMove(page, slotData.parentId, newOrder)).catch(() => undefined);
       return;
     }
 
@@ -396,7 +394,9 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove, 
     const nextParentId = getDropParentId(overId);
     if (nextParentId === undefined || page.id === nextParentId || page.parentId === nextParentId) return;
     if (nextParentId !== null && containsPage(page, nextParentId)) return;
-    void Promise.resolve(onMove(page, nextParentId)).catch(() => undefined);
+    const targetSiblings = nextParentId === null ? tree : findPage(tree, nextParentId)?.children;
+    if (!targetSiblings) return;
+    void Promise.resolve(onMove(page, nextParentId, appendDraggedPage(targetSiblings, page))).catch(() => undefined);
   };
 
   const totalWidth = collapsed ? TOGGLE_WIDTH : contentWidth + TOGGLE_WIDTH;
@@ -405,7 +405,7 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove, 
     <aside
       className="relative h-full shrink-0 overflow-hidden bg-gradient-to-b from-steel-800 to-steel-900 text-white transition-[width] duration-150"
       style={{ width: totalWidth, cursor: collapsed ? "col-resize" : undefined }}
-      onClick={collapsed ? () => setCollapsed(false) : undefined}
+      onClick={collapsed ? () => updateSidebarCollapsed(false) : undefined}
     >
       {/* Scrollable content — right margin reserves space for the toggle strip */}
       <div
@@ -482,7 +482,7 @@ export function WikiTree({ tree, onCreate, onNavigate, canMove = false, onMove, 
         style={{ width: TOGGLE_WIDTH }}
         aria-label={collapsed ? "Seitenbaum öffnen" : "Seitenbaum schließen"}
         title={collapsed ? "Seitenbaum öffnen" : "Seitenbaum schließen"}
-        onClick={(e) => { e.stopPropagation(); setCollapsed((c) => !c); }}
+        onClick={(e) => { e.stopPropagation(); updateSidebarCollapsed(!collapsed); }}
       >
         <span
           className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wide text-white/60"

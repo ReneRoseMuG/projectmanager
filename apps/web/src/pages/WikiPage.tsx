@@ -23,6 +23,7 @@ import { useHasPermission } from "../hooks/usePermissions";
 import { useStandaloneView } from "../hooks/useStandaloneView";
 import { useProjects } from "../hooks/useProjects";
 import { useWiki, type WikiTreeNode } from "../hooks/useWiki";
+import { useWikiTreeState } from "../hooks/useWikiTreeState";
 import type { AutoSaveStatus } from "../hooks/useAutoSave";
 import { objectReference } from "../lib/references";
 import { withStandaloneView } from "../utils/standalone";
@@ -40,6 +41,7 @@ export function WikiPage() {
   const pageId = Number(params.id);
   const activePageId = Number.isFinite(pageId) ? pageId : undefined;
   const wiki = useWiki(activePageId);
+  const { treeState, treeStateLoading, setTreeState } = useWikiTreeState();
   const { projects } = useProjects();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -190,37 +192,20 @@ export function WikiPage() {
     }
   };
 
-  const moveWikiPage = async (page: WikiTreeNode, nextParentId: number | null) => {
+  const moveWikiPage = async (page: WikiTreeNode, nextParentId: number | null, newOrder: WikiTreeNode[]) => {
     try {
-      await wiki.updateWikiPage(page.id, {
+      await wiki.moveWikiPage({
+        pageId: page.id,
         parentId: nextParentId,
-        expectedVersion: page.version,
+        siblings: newOrder.map((sibling) => ({
+          id: sibling.id,
+          expectedVersion: sibling.version,
+        })),
       });
     } catch (wikiError) {
       showToast({
         tone: "error",
         title: "Wiki-Seite konnte nicht verschoben werden",
-        message: errorMessage(wikiError),
-      });
-    }
-  };
-
-  const reorderWikiPage = async (page: WikiTreeNode, nextParentId: number | null, newOrder: WikiTreeNode[]) => {
-    try {
-      const parentChanged = page.parentId !== nextParentId;
-      await Promise.all(
-        newOrder.map((sibling, index) =>
-          wiki.updateWikiPage(sibling.id, {
-            sortOrder: index * 1000,
-            ...(sibling.id === page.id && parentChanged ? { parentId: nextParentId } : {}),
-            expectedVersion: sibling.version,
-          })
-        )
-      );
-    } catch (wikiError) {
-      showToast({
-        tone: "error",
-        title: "Reihenfolge konnte nicht geändert werden",
         message: errorMessage(wikiError),
       });
     }
@@ -282,7 +267,7 @@ export function WikiPage() {
       )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {wiki.loading ? (
+        {wiki.loading || treeStateLoading ? (
           <>
             <div className="w-[256px] shrink-0 bg-gradient-to-b from-steel-800 to-steel-900" />
             <div className="flex-1 p-5">
@@ -291,7 +276,14 @@ export function WikiPage() {
           </>
         ) : (
           <>
-            <WikiTree tree={wiki.tree} onCreate={openCreate} canMove={canWrite} onMove={moveWikiPage} onReorder={reorderWikiPage} />
+            <WikiTree
+              tree={wiki.tree}
+              onCreate={openCreate}
+              canMove={canWrite}
+              treeState={treeState}
+              onTreeStateChange={setTreeState}
+              onMove={moveWikiPage}
+            />
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               {wiki.error ? (
                 <div className="px-5 pt-5">

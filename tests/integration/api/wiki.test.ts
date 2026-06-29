@@ -181,6 +181,65 @@ describe("Wiki API", () => {
     expect(rejected.body.error).toBe("BAD_REQUEST");
   });
 
+  it("POST tree move verschiebt eine Seite und sortiert Zielgeschwister atomar", async () => {
+    const oldParent = await createWikiPage(app, { title: "Old Parent" });
+    const targetParent = await createWikiPage(app, { title: "Target Parent" });
+    const movedPage = await createWikiPage(app, { title: "Moved Page", parentId: oldParent.id });
+    const firstTargetChild = await createWikiPage(app, { title: "First Target Child", parentId: targetParent.id, sortOrder: 0 });
+    const lastTargetChild = await createWikiPage(app, { title: "Last Target Child", parentId: targetParent.id, sortOrder: 1000 });
+
+    const moved = await supertest(app.server)
+      .post("/api/wiki/tree/move")
+      .send({
+        pageId: movedPage.id,
+        parentId: targetParent.id,
+        siblings: [
+          { id: firstTargetChild.id, expectedVersion: firstTargetChild.version },
+          { id: movedPage.id, expectedVersion: movedPage.version },
+          { id: lastTargetChild.id, expectedVersion: lastTargetChild.version },
+        ],
+      })
+      .expect(200);
+
+    expect(moved.body).toMatchObject({ id: movedPage.id, parentId: targetParent.id, sortOrder: 1000, version: movedPage.version + 1 });
+
+    const targetChildren = await supertest(app.server).get(`/api/wiki/${targetParent.id}/children`).expect(200);
+    expect(targetChildren.body.map((page: { id: number }) => page.id)).toEqual([firstTargetChild.id, movedPage.id, lastTargetChild.id]);
+
+    const oldParentChildren = await supertest(app.server).get(`/api/wiki/${oldParent.id}/children`).expect(200);
+    expect(oldParentChildren.body).toEqual([]);
+  });
+
+  it("POST tree move rollt bei Versionskonflikt vollständig zurück", async () => {
+    const parent = await createWikiPage(app, { title: "Atomic Parent" });
+    const first = await createWikiPage(app, { title: "Atomic First", parentId: parent.id, sortOrder: 0 });
+    const second = await createWikiPage(app, { title: "Atomic Second", parentId: parent.id, sortOrder: 1000 });
+
+    await supertest(app.server)
+      .patch(`/api/wiki/${second.id}`)
+      .send({ title: "Atomic Second Updated", expectedVersion: second.version })
+      .expect(200);
+
+    const conflict = await supertest(app.server)
+      .post("/api/wiki/tree/move")
+      .send({
+        pageId: first.id,
+        parentId: parent.id,
+        siblings: [
+          { id: first.id, expectedVersion: first.version },
+          { id: second.id, expectedVersion: second.version },
+        ],
+      })
+      .expect(409);
+    expect(conflict.body).toMatchObject({ error: "CONFLICT", statusCode: 409 });
+
+    const children = await supertest(app.server).get(`/api/wiki/${parent.id}/children`).expect(200);
+    expect(children.body.map((page: { id: number; sortOrder: number; version: number }) => ({ id: page.id, sortOrder: page.sortOrder, version: page.version }))).toEqual([
+      { id: first.id, sortOrder: 0, version: first.version },
+      { id: second.id, sortOrder: 1000, version: second.version + 1 },
+    ]);
+  });
+
   it("GET /api/wiki gibt Root-Seiten und ChildCount zurück", async () => {
     const root = await createWikiPage(app, { title: "Root List" });
     await createWikiPage(app, { title: "Child List", parentId: root.id });

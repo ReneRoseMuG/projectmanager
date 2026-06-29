@@ -1,4 +1,5 @@
 ﻿import type { FastifyInstance, FastifyReply, FastifyRequest, HookHandlerDoneFunction } from "fastify";
+import type { WikiTreeMoveRequest } from "@taskmanager/shared-types";
 import {
   addWikiPageRelation,
   createWikiPage,
@@ -9,6 +10,7 @@ import {
   listRootWikiPages,
   listWikiChildren,
   listWikiPageRelations,
+  moveWikiPage,
   removeWikiPageRelation,
   updateWikiPage,
   type WikiPageInput
@@ -45,6 +47,29 @@ const wikiRelationBodySchema = {
   additionalProperties: false,
   properties: {
     targetWikiPageId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+const wikiTreeMoveBodySchema = {
+  type: "object",
+  required: ["pageId", "parentId", "siblings"],
+  additionalProperties: false,
+  properties: {
+    pageId: { type: "integer", minimum: 1 },
+    parentId: { type: ["integer", "null"], minimum: 1 },
+    siblings: {
+      type: "array",
+      minItems: 1,
+      items: {
+        type: "object",
+        required: ["id", "expectedVersion"],
+        additionalProperties: false,
+        properties: {
+          id: { type: "integer", minimum: 1 },
+          ...expectedVersionPropertySchema
+        }
+      }
+    }
   }
 } as const;
 
@@ -85,6 +110,12 @@ export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
     "/wiki/:id/breadcrumb",
     { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
     async (request) => getWikiBreadcrumb(app.db, request.params.id)
+  );
+
+  app.post<{ Body: WikiTreeMoveRequest }>(
+    "/wiki/tree/move",
+    { schema: { body: wikiTreeMoveBodySchema, response: { 200: objectResponseSchema } } },
+    async (request) => moveWikiPage(app.db, request.body, createJournalActor(request.currentUser))
   );
 
   app.post<{ Body: WikiPageInput }>(

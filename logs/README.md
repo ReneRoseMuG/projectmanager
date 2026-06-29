@@ -2,6 +2,9 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 29.06.26 | 06:40:42 | 3 | Wiki Tree Tests Verifikation | ✅ |
+| 29.06.26 | 06:40:41 | 2 | Wiki Tree Frontend State | ✅ |
+| 29.06.26 | 06:40:40 | 1 | Wiki Tree Backend Persistenz | ✅ |
 | 23.06.26 | 11:44:28 | Fix | Architektur-Leitfaden: MySQL als Ist-Zustand (§4 Stack, §7 Tests) | ✅ |
 | 23.06.26 | 11:07:22 | Fix | DB-Resilienz Aiven-Disconnect + Crash-Logging + Start-Cleanup | ✅ |
 | 19.06.26 | 10:35:00 | Fix | Task-Relation Unlink (TKT-65): ×-Button im ParentContextField | ✅ |

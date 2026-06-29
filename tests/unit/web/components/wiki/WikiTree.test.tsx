@@ -31,7 +31,9 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, screen } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
+import type { WikiTreeState } from "@taskmanager/shared-types";
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WikiTree } from "../../../../../apps/web/src/components/wiki/WikiTree";
@@ -107,12 +109,36 @@ const targetRootPage: WikiTreeNode = {
 
 function renderTree(
   onCreate = vi.fn(),
-  options: { tree?: WikiTreeNode[]; canMove?: boolean; onMove?: (page: WikiTreeNode, nextParentId: number | null) => Promise<void> } = {}
+  options: {
+    tree?: WikiTreeNode[];
+    canMove?: boolean;
+    treeState?: WikiTreeState;
+    onTreeStateChange?: (treeState: WikiTreeState) => void;
+    onMove?: (page: WikiTreeNode, nextParentId: number | null, newOrder: WikiTreeNode[]) => Promise<void>;
+  } = {}
 ) {
+  function WikiTreeHarness() {
+    const [treeState, setTreeState] = useState<WikiTreeState>(options.treeState ?? { sidebarCollapsed: false, collapsedPageIds: [] });
+    const handleTreeStateChange = (nextTreeState: WikiTreeState) => {
+      options.onTreeStateChange?.(nextTreeState);
+      setTreeState(nextTreeState);
+    };
+    return (
+      <WikiTree
+        tree={options.tree ?? [rootPage]}
+        onCreate={onCreate}
+        canMove={options.canMove}
+        treeState={treeState}
+        onTreeStateChange={handleTreeStateChange}
+        onMove={options.onMove}
+      />
+    );
+  }
+
   return render(
     <MemoryRouter initialEntries={["/wiki/2"]}>
       <Routes>
-        <Route path="/wiki/:id" element={<WikiTree tree={options.tree ?? [rootPage]} onCreate={onCreate} canMove={options.canMove} onMove={options.onMove} />} />
+        <Route path="/wiki/:id" element={<WikiTreeHarness />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -177,6 +203,15 @@ describe("WikiTree", () => {
     expect(screen.getByRole("button", { name: "Ausklappen" })).toBeInTheDocument();
   });
 
+  it("meldet den kontrollierten Collapse-State nach außen", () => {
+    const onTreeStateChange = vi.fn();
+    renderTree(vi.fn(), { onTreeStateChange });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Einklappen" })[0]);
+
+    expect(onTreeStateChange).toHaveBeenCalledWith({ sidebarCollapsed: false, collapsedPageIds: [1] });
+  });
+
   it("zeigt Griphandles bei canMove und verschiebt auf eine Zielseite", () => {
     const onMove = vi.fn().mockResolvedValue(undefined);
     renderTree(vi.fn(), { tree: [rootPage, targetRootPage], canMove: true, onMove });
@@ -185,7 +220,7 @@ describe("WikiTree", () => {
 
     triggerDragEnd(childPage, "wiki-page-3");
 
-    expect(onMove).toHaveBeenCalledWith(childPage, 3);
+    expect(onMove).toHaveBeenCalledWith(childPage, 3, [childPage]);
   });
 
   it("verschiebt Seiten über die Root-Zone auf Root-Ebene", () => {
@@ -196,7 +231,7 @@ describe("WikiTree", () => {
 
     triggerDragEnd(childPage, "wiki-root");
 
-    expect(onMove).toHaveBeenCalledWith(childPage, null);
+    expect(onMove).toHaveBeenCalledWith(childPage, null, [rootPage, childPage]);
   });
 
   it("ignoriert Drops auf sich selbst oder ohne Ziel", () => {
