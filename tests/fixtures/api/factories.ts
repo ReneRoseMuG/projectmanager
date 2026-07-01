@@ -104,6 +104,7 @@ export interface TestTicket {
   attachmentCount: number;
   noteCount: number;
   commentCount: number;
+  visibleParent?: { type: string; id: number; label: string; origin: string } | null;
 }
 
 export interface TestTag {

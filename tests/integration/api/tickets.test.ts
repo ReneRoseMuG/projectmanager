@@ -387,6 +387,13 @@ describe("Tickets API", () => {
 
     expect((res.body as TestTicket[]).map((ticket) => ticket.id)).toEqual(expect.arrayContaining([ownerTicket.id, globalTicket.id]));
     expect((res.body as TestTicket[]).map((ticket) => ticket.id)).not.toContain(subTicket.id);
+    expect((res.body as TestTicket[]).find((ticket) => ticket.id === ownerTicket.id)?.visibleParent).toMatchObject({
+      type: "project",
+      id: owners[0].id,
+      label: "Testprojekt",
+      origin: "direct"
+    });
+    expect((res.body as TestTicket[]).find((ticket) => ticket.id === globalTicket.id)?.visibleParent).toBeNull();
   });
 
   it("GET /api/tickets liefert Support-Counter fuer Tickets", async () => {

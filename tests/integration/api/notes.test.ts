@@ -184,6 +184,23 @@ describe("Notes API", () => {
     expect(res.body[0]).not.toHaveProperty("status");
   });
 
+  it("GET /api/notes laedt Parent-Kontexte ohne Pool-Queue-Ueberlauf", async () => {
+    const project = await createProject(app, { name: "Projekt Alpha" });
+    for (let index = 0; index < 70; index += 1) {
+      await createNoteForProject(app, project.id, { title: `Globale Notiz ${index}` });
+    }
+
+    const res = await supertest(app.server).get("/api/notes").expect(200);
+
+    expect(res.body).toHaveLength(70);
+    expect(res.body[0]).toEqual(
+      expect.objectContaining({
+        title: expect.stringMatching(/^Globale Notiz/),
+        parentContexts: [expect.objectContaining({ type: "project", id: project.id, label: "Projekt Alpha", origin: "direct" })]
+      })
+    );
+  });
+
   it("GET /api/notes/:id gibt die Notiz zurueck", async () => {
     const project = await createProject(app);
     const note = await createNoteForProject(app, project.id, { title: "Einzelnotiz" });

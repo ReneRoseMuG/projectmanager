@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 01.07.26 | 17:12:47 | Fix | Notizen API Pool Queue | ✅ |
+| 01.07.26 | 17:09:26 | Fix | Ticket-Navigation Parent-Kontext | ✅ |
 | 01.07.26 | 16:46:20 | Fix | Meilenstein-Listen-Skalierung | ✅ |
 | 01.07.26 | 11:29:00 | Feature | Owner-Kontext in Sidebar-Listen | ⚠️ |
 | 01.07.26 | 11:11:23 | Feature | Notizen Hauptnavigation | ✅ |

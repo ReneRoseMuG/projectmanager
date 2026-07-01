@@ -552,7 +552,18 @@ export async function listTickets(database: DbClient): Promise<Ticket[]> {
     getTicketSupportCounts(database, ids)
   ]);
 
-  return Promise.all(rows.map((ticket) => mapTicket(database, ticket, Promise.resolve(tagsByTicket.get(ticket.id) ?? []), Promise.resolve(subTicketCounts.get(ticket.id) ?? 0), ticket.position, undefined, Promise.resolve(supportCountsMap.get(ticket.id) ?? emptySupportCounts))));
+  return Promise.all(rows.map(async (ticket) => {
+    const visibleParent = (await ticketParentContexts(database, ticket))[0] ?? null;
+    return mapTicket(
+      database,
+      ticket,
+      Promise.resolve(tagsByTicket.get(ticket.id) ?? []),
+      Promise.resolve(subTicketCounts.get(ticket.id) ?? 0),
+      ticket.position,
+      visibleParent,
+      Promise.resolve(supportCountsMap.get(ticket.id) ?? emptySupportCounts)
+    );
+  }));
 }
 
 export async function listTicketLinkCandidates(database: DbClient, owner: TicketOwner | null, contextOwner?: TicketOwner | null): Promise<Ticket[]> {

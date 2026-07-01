@@ -150,6 +150,75 @@ async function listNoteOwners(database: DbSession, noteId: number): Promise<Note
   ];
 }
 
+function addParentContext(
+  contextsByNoteId: Map<number, VisibleParentContext[]>,
+  noteId: number,
+  context: VisibleParentContext
+): void {
+  const contexts = contextsByNoteId.get(noteId) ?? [];
+  contexts.push(context);
+  contextsByNoteId.set(noteId, contexts);
+}
+
+async function listParentContextsByNoteId(database: DbSession, noteIds: number[]): Promise<Map<number, VisibleParentContext[]>> {
+  const uniqueNoteIds = [...new Set(noteIds)];
+  const contextsByNoteId = new Map<number, VisibleParentContext[]>();
+  if (uniqueNoteIds.length === 0) {
+    return contextsByNoteId;
+  }
+
+  const projectRows = await database
+    .select({ noteId: projectNotes.noteId, id: projectNotes.projectId, label: projects.name })
+    .from(projectNotes)
+    .innerJoin(projects, eq(projectNotes.projectId, projects.id))
+    .where(inArray(projectNotes.noteId, uniqueNoteIds));
+  projectRows.forEach((row) => addParentContext(contextsByNoteId, row.noteId, { type: "project", id: row.id, label: row.label, origin: "direct" }));
+
+  const milestoneRows = await database
+    .select({ noteId: milestoneNotes.noteId, id: milestoneNotes.milestoneId, label: milestones.name })
+    .from(milestoneNotes)
+    .innerJoin(milestones, eq(milestoneNotes.milestoneId, milestones.id))
+    .where(inArray(milestoneNotes.noteId, uniqueNoteIds));
+  milestoneRows.forEach((row) => addParentContext(contextsByNoteId, row.noteId, { type: "milestone", id: row.id, label: row.label, origin: "direct" }));
+
+  const taskRows = await database
+    .select({ noteId: taskNotes.noteId, id: taskNotes.taskId, label: tasks.title })
+    .from(taskNotes)
+    .innerJoin(tasks, eq(taskNotes.taskId, tasks.id))
+    .where(inArray(taskNotes.noteId, uniqueNoteIds));
+  taskRows.forEach((row) => addParentContext(contextsByNoteId, row.noteId, { type: "task", id: row.id, label: row.label, origin: "direct" }));
+
+  const dayPlanRows = await database
+    .select({ noteId: dayPlanNotes.noteId, id: dayPlanNotes.dayPlanId, date: dayPlans.date })
+    .from(dayPlanNotes)
+    .innerJoin(dayPlans, eq(dayPlanNotes.dayPlanId, dayPlans.id))
+    .where(inArray(dayPlanNotes.noteId, uniqueNoteIds));
+  dayPlanRows.forEach((row) =>
+    addParentContext(contextsByNoteId, row.noteId, {
+      type: "dayPlan",
+      id: row.id,
+      label: row.date ? `Persönliche Planung ${row.date}` : `Persönliche Planung ${row.id}`,
+      origin: "direct"
+    })
+  );
+
+  const ticketRows = await database
+    .select({ noteId: ticketNotes.noteId, id: ticketNotes.ticketId, label: tickets.title })
+    .from(ticketNotes)
+    .innerJoin(tickets, eq(ticketNotes.ticketId, tickets.id))
+    .where(inArray(ticketNotes.noteId, uniqueNoteIds));
+  ticketRows.forEach((row) => addParentContext(contextsByNoteId, row.noteId, { type: "ticket", id: row.id, label: row.label, origin: "direct" }));
+
+  const wikiPageRows = await database
+    .select({ noteId: wikiPageNotes.noteId, id: wikiPageNotes.wikiPageId, label: wikiPages.title })
+    .from(wikiPageNotes)
+    .innerJoin(wikiPages, eq(wikiPageNotes.wikiPageId, wikiPages.id))
+    .where(inArray(wikiPageNotes.noteId, uniqueNoteIds));
+  wikiPageRows.forEach((row) => addParentContext(contextsByNoteId, row.noteId, { type: "wikiPage", id: row.id, label: row.label, origin: "direct" }));
+
+  return contextsByNoteId;
+}
+
 export async function listProjectNotes(database: DbClient, projectId: number): Promise<Note[]> {
   await ensureProjectExists(database, projectId);
   const rows = await database
@@ -263,10 +332,9 @@ export async function listNotes(database: DbClient): Promise<Note[]> {
     .from(notes)
     .orderBy(...recencyOrder(notes));
 
-  return Promise.all(rows.map(async (row) => {
-    const parentContexts = await Promise.all((await listNoteOwners(database, row.id)).map((owner) => noteParentContext(database, owner)));
-    return mapNote(row, parentContexts);
-  }));
+  const parentContextsByNoteId = await listParentContextsByNoteId(database, rows.map((row) => row.id));
+
+  return rows.map((row) => mapNote(row, parentContextsByNoteId.get(row.id) ?? []));
 }
 
 export async function createProjectNote(database: DbClient, projectId: number, input: NoteInput, actor?: JournalActor | null): Promise<Note> {
