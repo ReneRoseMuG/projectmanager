@@ -231,7 +231,13 @@ describe("TicketListBoardView", () => {
   });
 
   it("rendert geschlossene Tickets als ClosedItemRow mit childCount und onOpen", () => {
-    const closedTicket = buildTicket({ id: 99, title: "Abgeschlossenes Ticket", status: "done", subTicketCount: 3 });
+    const closedTicket = buildTicket({
+      id: 99,
+      title: "Abgeschlossenes Ticket",
+      status: "done",
+      subTicketCount: 3,
+      visibleParent: { type: "task", id: 4, label: "Aufgabe Alpha", origin: "direct" },
+    });
     const onOpen = vi.fn();
     const { container } = renderTicketList({ tickets: [closedTicket], onOpen });
 
@@ -241,6 +247,7 @@ describe("TicketListBoardView", () => {
 
     // childCount-Footer mit subTicketCount=3
     expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Aufgabe: Aufgabe Alpha")).toBeInTheDocument();
 
     // Klick öffnet das Ticket
     fireEvent.click(closedCard!);

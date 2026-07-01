@@ -18,6 +18,7 @@ import { MilestoneDetailPage } from "./pages/MilestoneDetailPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { MilestonesPage } from "./pages/MilestonesPage";
 import { NoteDetailPage } from "./pages/NoteDetailPage";
+import { NotesPage } from "./pages/NotesPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SetupPasswordPage } from "./pages/SetupPasswordPage";
@@ -96,6 +97,7 @@ export default function App() {
   const adminAccess = hasAdminAccess(auth.user);
   const dashboardAccess = hasPermission(auth.user, "dashboards", "read");
   const dayPlanAccess = hasPermission(auth.user, "dayPlans", "read");
+  const notesAccess = hasPermission(auth.user, "notes", "read");
   const fullBleedRoute = isFullBleedRoute(location.pathname);
   const standaloneView = isStandaloneSearch(location.search);
   const mainClass = `flex min-h-0 min-w-0 flex-1 flex-col ${fullBleedRoute ? "overflow-hidden p-0" : "overflow-auto p-4 md:p-6"}`;
@@ -121,6 +123,7 @@ export default function App() {
       <Route path="/use-cases/:id" element={<UseCaseDetailPage />} />
       <Route path="/backlog/new" element={<BacklogItemDetailPage />} />
       <Route path="/backlog/:id" element={<BacklogItemDetailPage />} />
+      <Route path="/notes" element={notesAccess ? <NotesPage /> : <ForbiddenPage />} />
       <Route path="/notes/:id" element={<NoteDetailPage />} />
       <Route path="/wiki" element={<WikiPage />} />
       <Route path="/wiki/:id" element={<WikiPage />} />

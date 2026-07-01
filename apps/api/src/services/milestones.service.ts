@@ -1,4 +1,4 @@
-import type { Milestone, MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
+import type { Milestone, MilestoneInput, MilestoneUpdate, Tag, UserOption, VisibleParentContext } from "@taskmanager/shared-types";
 import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { firstRow, recencyOrder } from "../db/query-utils.js";
@@ -23,7 +23,7 @@ import {
 import { deleteMilestoneCommentsForIds } from "./comments.service.js";
 import { deleteMilestoneNotesForIds } from "./notes.service.js";
 import { getMilestoneTags, getMilestoneTagsMap } from "./tags.service.js";
-import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
+import { getUserOption, getUserOptionsMap, normalizeAssignableUserId } from "./users.service.js";
 
 interface MilestoneCounts {
   taskCount: number;
@@ -35,6 +35,13 @@ interface MilestoneCounts {
   attachmentCount: number;
   noteCount: number;
   commentCount: number;
+}
+
+interface MilestoneMapData {
+  counts?: MilestoneCounts;
+  tags?: Tag[];
+  visibleParent?: VisibleParentContext;
+  responsibleUser?: UserOption | null;
 }
 
 const milestoneJournalFields: Array<JournalFieldDefinition<MilestoneRecord>> = [
@@ -61,8 +68,11 @@ function emptyMilestoneCounts(): MilestoneCounts {
   };
 }
 
-async function mapMilestone(database: DbClient, record: MilestoneRecord, counts: MilestoneCounts = emptyMilestoneCounts(), tags?: Awaited<ReturnType<typeof getMilestoneTags>>): Promise<Milestone> {
-  const resolvedTags = tags ?? await getMilestoneTags(database, record.id);
+async function mapMilestone(database: DbClient, record: MilestoneRecord, data: MilestoneMapData = {}): Promise<Milestone> {
+  const counts = data.counts ?? emptyMilestoneCounts();
+  const resolvedTags = data.tags ?? await getMilestoneTags(database, record.id);
+  const visibleParent = data.visibleParent ?? await getProjectParentContext(database, record.projectId);
+  const responsibleUser = data.responsibleUser !== undefined ? data.responsibleUser : await getUserOption(database, record.responsibleUserId);
   return {
     id: record.id,
     projectId: record.projectId,
@@ -73,7 +83,7 @@ async function mapMilestone(database: DbClient, record: MilestoneRecord, counts:
     startDate: record.startDate,
     dueDate: record.dueDate,
     responsibleUserId: record.responsibleUserId,
-    responsibleUser: await getUserOption(database, record.responsibleUserId),
+    responsibleUser,
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -86,7 +96,8 @@ async function mapMilestone(database: DbClient, record: MilestoneRecord, counts:
     attachmentCount: counts.attachmentCount,
     noteCount: counts.noteCount,
     commentCount: counts.commentCount,
-    tags: resolvedTags
+    tags: resolvedTags,
+    visibleParent
   };
 }
 
@@ -103,6 +114,47 @@ async function getProjectJournalObject(database: DbClient, projectId: number): P
     throw notFound(`Project with id ${projectId} not found`);
   }
   return makeJournalObject("project", project.id, project.name);
+}
+
+async function getProjectParentContext(database: DbClient, projectId: number): Promise<VisibleParentContext> {
+  const project = firstRow(await database.select({ id: projects.id, name: projects.name }).from(projects).where(eq(projects.id, projectId)));
+  return {
+    type: "project",
+    id: projectId,
+    label: project?.name ?? `Projekt ${projectId}`,
+    origin: "direct"
+  };
+}
+
+async function getProjectParentContextMap(database: DbClient, projectIds: number[]): Promise<Map<number, VisibleParentContext>> {
+  const contexts = new Map<number, VisibleParentContext>();
+  const uniqueIds = [...new Set(projectIds)];
+  if (uniqueIds.length === 0) {
+    return contexts;
+  }
+
+  const rows = await database.select({ id: projects.id, name: projects.name }).from(projects).where(inArray(projects.id, uniqueIds));
+  for (const row of rows) {
+    contexts.set(row.id, {
+      type: "project",
+      id: row.id,
+      label: row.name,
+      origin: "direct"
+    });
+  }
+
+  for (const projectId of uniqueIds) {
+    if (!contexts.has(projectId)) {
+      contexts.set(projectId, {
+        type: "project",
+        id: projectId,
+        label: `Projekt ${projectId}`,
+        origin: "direct"
+      });
+    }
+  }
+
+  return contexts;
 }
 
 function milestoneJournalObject(record: MilestoneRecord): JournalObjectRef {
@@ -175,9 +227,18 @@ async function getMilestoneCounts(database: DbClient, milestoneIds: number[]): P
 
 async function mapMilestoneList(database: DbClient, rows: MilestoneRecord[]): Promise<Milestone[]> {
   const ids = rows.map((row) => row.id);
-  const counts = await getMilestoneCounts(database, ids);
-  const tagsByMilestone = await getMilestoneTagsMap(database, ids);
-  return Promise.all(rows.map((row) => mapMilestone(database, row, counts.get(row.id), tagsByMilestone.get(row.id) ?? [])));
+  const [counts, tagsByMilestone, parentContexts, responsibleUsers] = await Promise.all([
+    getMilestoneCounts(database, ids),
+    getMilestoneTagsMap(database, ids),
+    getProjectParentContextMap(database, rows.map((row) => row.projectId)),
+    getUserOptionsMap(database, rows.map((row) => row.responsibleUserId))
+  ]);
+  return Promise.all(rows.map((row) => mapMilestone(database, row, {
+    counts: counts.get(row.id),
+    tags: tagsByMilestone.get(row.id) ?? [],
+    visibleParent: parentContexts.get(row.projectId),
+    responsibleUser: row.responsibleUserId ? responsibleUsers.get(row.responsibleUserId) ?? null : null
+  })));
 }
 
 export async function listMilestones(database: DbClient): Promise<Milestone[]> {
@@ -198,7 +259,7 @@ export async function getMilestone(database: DbClient, id: number): Promise<Mile
   }
 
   const counts = await getMilestoneCounts(database, [id]);
-  return mapMilestone(database, milestone, counts.get(id));
+  return mapMilestone(database, milestone, { counts: counts.get(id) });
 }
 
 export async function createMilestone(database: DbClient, input: MilestoneInput, actor?: JournalActor | null): Promise<Milestone> {
@@ -232,7 +293,7 @@ export async function createMilestone(database: DbClient, input: MilestoneInput,
     return milestone;
   });
 
-  return mapMilestone(database, created, emptyMilestoneCounts(), []);
+  return mapMilestone(database, created, { counts: emptyMilestoneCounts(), tags: [] });
 }
 
 export async function updateMilestone(database: DbClient, id: number, input: MilestoneUpdate, actor?: JournalActor | null): Promise<Milestone> {
@@ -303,7 +364,7 @@ export async function updateMilestone(database: DbClient, id: number, input: Mil
     getMilestoneCounts(database, [id]),
     getMilestoneTags(database, id)
   ]);
-  return mapMilestone(database, updated, counts.get(id), tags);
+  return mapMilestone(database, updated, { counts: counts.get(id), tags });
 }
 
 export async function deleteMilestone(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {

@@ -98,6 +98,7 @@ describe("MilestoneListBoardView", () => {
       within(activeColumn).getByText("2 / 5 erledigt"),
     ).toBeInTheDocument();
     expect(within(activeColumn).getByText("3 offen")).toBeInTheDocument();
+    expect(within(activeColumn).getByText("Projekt: Projekt Alpha")).toBeInTheDocument();
     expect(
       within(activeColumn).getByText("Aufgaben").compareDocumentPosition(within(activeColumn).getByLabelText("0 Anhänge")) &
         Node.DOCUMENT_POSITION_FOLLOWING,
@@ -187,6 +188,7 @@ describe("MilestoneListBoardView", () => {
     const firstRow = rows[0] as HTMLElement;
     const firstMilestone = milestones[0] as Milestone;
     expect(within(firstRow).getByText(firstMilestone.name)).toBeInTheDocument();
+    expect(within(firstRow).getByText("Projekt: Projekt Alpha")).toBeInTheDocument();
     expect(within(firstRow).getByText("Aufgaben")).toBeInTheDocument();
     expect(within(firstRow).getByText("3 offen")).toBeInTheDocument();
 

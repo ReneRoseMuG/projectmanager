@@ -19,6 +19,7 @@ import {
   Search,
   ShieldCheck,
   SlidersHorizontal,
+  StickyNote,
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -58,6 +59,7 @@ const projectManagementItems: NavigationItem[] = [
   },
   { to: "/tasks", label: "Aufgaben", icon: ListTodo, resource: "tasks" },
   { to: "/tickets", label: "Tickets", icon: Bug, resource: "tickets" },
+  { to: "/notes", label: "Notizen", icon: StickyNote, resource: "notes" },
 ];
 
 const homeItems: NavigationItem[] = [

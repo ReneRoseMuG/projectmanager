@@ -6,6 +6,7 @@ import { withStandaloneView } from "../../utils/standalone";
 import { EmptyState } from "../ui/EmptyState";
 import { ListBoardView, type ListBoardMode } from "../ui/ListBoardView";
 import { NoteCard } from "./NoteCard";
+import { noteContentToPreviewText } from "./noteContent";
 import { NoteListViewItem } from "./NoteListViewItem";
 
 interface NoteListProps {
@@ -16,6 +17,9 @@ interface NoteListProps {
   owner?: NoteOwner;
   canCreate?: boolean;
   canDelete?: boolean;
+  loading?: boolean;
+  emptyTitle?: string;
+  emptyBody?: string;
 }
 
 function matchesSearch(note: Note, searchValue: string) {
@@ -24,7 +28,8 @@ function matchesSearch(note: Note, searchValue: string) {
     return true;
   }
 
-  return note.title.toLocaleLowerCase("de-DE").includes(normalized);
+  const preview = noteContentToPreviewText(note.contentJson).toLocaleLowerCase("de-DE");
+  return note.title.toLocaleLowerCase("de-DE").includes(normalized) || preview.includes(normalized);
 }
 
 function noteOwnerReturnPath(owner: NoteOwner): string {
@@ -54,7 +59,18 @@ function noteDetailPath(owner: NoteOwner, noteId: number): string {
   return `/notes/${noteId}?${params.toString()}`;
 }
 
-export function NoteList({ notes, onCreate, onEdit, onDelete, owner, canCreate = true, canDelete = true }: NoteListProps) {
+export function NoteList({
+  notes,
+  onCreate,
+  onEdit,
+  onDelete,
+  owner,
+  canCreate = true,
+  canDelete = true,
+  loading = false,
+  emptyTitle = "Keine Notizen",
+  emptyBody = "Erstelle eine Notiz, um Kontext und Entscheidungen festzuhalten."
+}: NoteListProps) {
   const [mode, setMode] = useState<ListBoardMode>("board");
   const [searchValue, setSearchValue] = useState("");
   const visibleNotes = useMemo(
@@ -77,11 +93,12 @@ export function NoteList({ notes, onCreate, onEdit, onDelete, owner, canCreate =
       showToolbarAdd={canCreate}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
+      loading={loading}
       emptyState={
         <EmptyState
           icon={<StickyNote size={22} />}
-          title="Keine Notizen"
-          body="Erstelle eine Notiz, um Kontext und Entscheidungen festzuhalten."
+          title={emptyTitle}
+          body={emptyBody}
           tone="fern"
           variant="tinted"
         />

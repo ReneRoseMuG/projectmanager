@@ -2,6 +2,10 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 01.07.26 | 16:46:20 | Fix | Meilenstein-Listen-Skalierung | ✅ |
+| 01.07.26 | 11:29:00 | Feature | Owner-Kontext in Sidebar-Listen | ⚠️ |
+| 01.07.26 | 11:11:23 | Feature | Notizen Hauptnavigation | ✅ |
+| 01.07.26 | 11:00:27 | Feature | Subtask ListBoardView | ✅ |
 | 29.06.26 | 06:40:42 | 3 | Wiki Tree Tests Verifikation | ✅ |
 | 29.06.26 | 06:40:41 | 2 | Wiki Tree Frontend State | ✅ |
 | 29.06.26 | 06:40:40 | 1 | Wiki Tree Backend Persistenz | ✅ |

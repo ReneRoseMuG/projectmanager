@@ -1,6 +1,8 @@
 import type { AdminUser, AdminUserInput, AdminUserUpdate, Role, UserOption } from "@taskmanager/shared-types";
 import bcrypt from "bcryptjs";
+import { inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
+import { users } from "../db/schema.js";
 import { roleRepository } from "../repositories/role.repository.js";
 import { userRepository, type UserRecord, type UserUpdateData } from "../repositories/user.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
@@ -119,6 +121,34 @@ export async function getUserOption(database: DbClient, id: number | null | unde
     setCachedUserOption(id, option);
   }
   return option;
+}
+
+export async function getUserOptionsMap(database: DbClient, ids: Array<number | null | undefined>): Promise<Map<number, UserOption>> {
+  const result = new Map<number, UserOption>();
+  const uniqueIds = [...new Set(ids.filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0))];
+  const missingIds: number[] = [];
+
+  for (const id of uniqueIds) {
+    const cached = getCachedUserOption(id);
+    if (cached) {
+      result.set(id, cached);
+    } else {
+      missingIds.push(id);
+    }
+  }
+
+  if (missingIds.length === 0) {
+    return result;
+  }
+
+  const rows = await database.select().from(users).where(inArray(users.id, missingIds));
+  for (const row of rows) {
+    const option = mapUserOption(row);
+    setCachedUserOption(row.id, option);
+    result.set(row.id, option);
+  }
+
+  return result;
 }
 
 export async function normalizeAssignableUserId(database: DbClient, value: number | null | undefined, field: string): Promise<number | null> {

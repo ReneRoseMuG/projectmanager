@@ -141,6 +141,7 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
           title={milestone.name}
           objectReference={objectReference("milestone", milestone.id)}
           accentColor={statusColumns.find((c) => c.value === milestone.status)?.color}
+          parent={milestone.visibleParent}
           onOpenInTab={onOpenInTab ? () => onOpenInTab(milestone) : undefined}
         />
       )}

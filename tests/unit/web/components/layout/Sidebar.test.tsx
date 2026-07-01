@@ -169,6 +169,7 @@ describe("Sidebar", () => {
       "Meilensteine",
       "Aufgaben",
       "Tickets",
+      "Notizen",
       "Features",
       "Wiki",
       "Kalender",
@@ -235,6 +236,7 @@ describe("Sidebar", () => {
     renderSidebar(projectReaderUser);
 
     expect(screen.queryByText("Startseite")).not.toBeInTheDocument();
+    expect(screen.queryByText("Notizen")).not.toBeInTheDocument();
     expect(screen.getByText("Projekte")).toBeInTheDocument();
   });
 

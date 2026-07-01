@@ -44,6 +44,7 @@ import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { JournalPanel } from "../journal/JournalPanel";
 import { unlinkOwnerTask as unlinkOwnerTaskRequest, type TaskOwner } from "../../api/tasks";
+import { setTaskTags } from "../../api/tags";
 import { OwnerTicketBoard } from "../tickets/OwnerTicketBoard";
 import type { TicketOwner } from "../../api/tickets";
 import { TicketLinkDialog } from "../tickets/TicketLinkDialog";
@@ -76,6 +77,7 @@ import { UserSelectField } from "../users/UserSelectField";
 import { SubtaskList } from "./SubtaskList";
 import { useHasPermission } from "../../hooks/usePermissions";
 import { draftTicketItem } from "../../utils/draftRelations";
+import { withStandaloneView } from "../../utils/standalone";
 
 interface TaskFormProps {
   open: boolean;
@@ -91,6 +93,7 @@ interface TaskFormProps {
   variant?: "modal" | "page";
   closeOnSubmit?: boolean;
   onOpenInTab?: () => void;
+  onOpenTask?: (task: Task) => void;
 }
 
 export interface TaskFormInput extends TaskInput {
@@ -169,6 +172,7 @@ export function TaskForm({
   variant = "modal",
   closeOnSubmit = true,
   onOpenInTab,
+  onOpenTask,
 }: TaskFormProps) {
   const taskId = task?.id ?? null;
   const detail = useTaskDetail(open && taskId ? taskId : null);
@@ -201,8 +205,10 @@ export function TaskForm({
   const [pendingNotes, setPendingNotes] = useState<DraftNote[]>([]);
   const [pendingFiles, setPendingFiles] = useState<DraftFile[]>([]);
   const [subtaskDraftOpen, setSubtaskDraftOpen] = useState(false);
+  const [subtaskInitialStatus, setSubtaskInitialStatus] = useState<TaskStatus | undefined>();
   const [ticketLinkOpen, setTicketLinkOpen] = useState(false);
   const [ticketDraftOpen, setTicketDraftOpen] = useState(false);
+  const [subtaskViewMode, setSubtaskViewMode] = useState<ViewMode>("list");
   const [pendingTicketViewMode, setPendingTicketViewMode] = useState<ViewMode>("kanban");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
@@ -243,8 +249,10 @@ export function TaskForm({
       setPendingNotes([]);
       setPendingFiles([]);
       setSubtaskDraftOpen(false);
+      setSubtaskInitialStatus(undefined);
       setTicketLinkOpen(false);
       setTicketDraftOpen(false);
+      setSubtaskViewMode("list");
       setPendingTicketViewMode("kanban");
       setEditingNote(null);
       prevOpenRef.current = false;
@@ -352,9 +360,10 @@ export function TaskForm({
     }
   };
 
-  const canShowOverview = Boolean(task && ((detail.task?.subtasks.length ?? task.subtaskCount) > 0));
+  const canManageSubtasks = !task || task.parentId === null;
+  const canShowOverview = Boolean(canManageSubtasks && task && ((detail.task?.subtasks.length ?? task.subtaskCount) > 0));
   const visibleTabs = task
-    ? tabs.filter((tab) => (tab.value !== "overview" || canShowOverview) && (tab.value !== "journal" || canReadJournal))
+    ? tabs.filter((tab) => (tab.value !== "overview" || canShowOverview) && (tab.value !== "subtasks" || canManageSubtasks) && (tab.value !== "journal" || canReadJournal))
     : tabs.filter((tab) => tab.value !== "overview" && tab.value !== "journal");
   const tabItems = visibleTabs.map((tab) => {
     if (tab.value === "details") {
@@ -414,10 +423,16 @@ export function TaskForm({
   const currentTask = detail.task ?? task;
   const showParentContexts = !owner && (currentTask?.parentContexts?.length ?? 0) > 0;
 
+  useEffect(() => {
+    if (activeTab === "subtasks" && !canManageSubtasks) {
+      setActiveTab("details");
+    }
+  }, [activeTab, canManageSubtasks]);
+
   const handleUnlinkParent = taskId !== null
     ? async (parent: VisibleParentContext) => {
         const type = parent.type;
-        if (type === "task" || type === "ticket") return;
+        if (type === "task" || type === "ticket" || type === "dayPlan") return;
         try {
           await unlinkOwnerTaskRequest({ type, id: parent.id }, taskId);
           await detail.reload();
@@ -435,6 +450,56 @@ export function TaskForm({
     setPendingTickets((items) =>
       items.filter((item, index) => draftTicketItem(item, index).id !== ticketId),
     );
+  };
+
+  const openSubtaskDraft = (initialSubtaskStatus?: TaskStatus) => {
+    setSubtaskInitialStatus(initialSubtaskStatus);
+    setSubtaskDraftOpen(true);
+  };
+
+  const openSubtask = (subtask: Task) => {
+    if (onOpenTask) {
+      onOpenTask(subtask);
+      return;
+    }
+    window.open(withStandaloneView(`/tasks/${subtask.id}`), "_blank");
+  };
+
+  const createSubtaskFromDialog = async (subtask: DraftSubtask) => {
+    if (!task) {
+      setPendingSubtasks((items) => [...items, subtask]);
+      return;
+    }
+
+    try {
+      await detail.createSubtask(subtask);
+      await detail.reload();
+      await onChanged?.();
+      showToast({ tone: "success", title: "Unteraufgabe erstellt" });
+    } catch (taskError) {
+      showToast({
+        tone: "error",
+        title: "Unteraufgabe konnte nicht erstellt werden",
+        message: errorMessage(taskError),
+      });
+      throw taskError;
+    }
+  };
+
+  const updateSubtaskTags = async (taskId: number, tagIds: number[]) => {
+    try {
+      await setTaskTags(taskId, tagIds);
+      await detail.reload();
+      await onChanged?.();
+      showToast({ tone: "success", title: "Aufgabentags aktualisiert" });
+    } catch (taskError) {
+      showToast({
+        tone: "error",
+        title: "Aufgabentags konnten nicht geändert werden",
+        message: errorMessage(taskError),
+      });
+      throw taskError;
+    }
   };
 
   // Reload the active collection tab from the server (e.g. after an external MCP change).
@@ -548,26 +613,15 @@ export function TaskForm({
           </div>
         ) : null}
 
-        {activeTab === "subtasks" ? (
-          <Section>
-            {task && loadedTask ? (
+        {activeTab === "subtasks" && canManageSubtasks ? (
+          task && loadedTask ? (
               <SubtaskList
                 subtasks={loadedTask.subtasks}
-                onCreate={async (input) => {
-                  try {
-                    await detail.createSubtask(input);
-                    await detail.reload();
-                    await onChanged?.();
-                    showToast({ tone: "success", title: "Aufgabe erstellt" });
-                  } catch (taskError) {
-                    showToast({
-                      tone: "error",
-                      title: "Aufgabe konnte nicht erstellt werden",
-                      message: errorMessage(taskError),
-                    });
-                    throw taskError;
-                  }
-                }}
+                viewMode={subtaskViewMode}
+                onViewModeChange={setSubtaskViewMode}
+                onCreate={openSubtaskDraft}
+                onOpen={openSubtask}
+                onOpenInTab={(subtask) => window.open(withStandaloneView(`/tasks/${subtask.id}`), "_blank")}
                 onUpdate={async (id, input) => {
                   try {
                     await detail.updateSubtask(id, input);
@@ -601,8 +655,10 @@ export function TaskForm({
                     throw taskError;
                   }
                 }}
+                onTagsChange={updateSubtaskTags}
               />
             ) : (
+              <Section>
               <PendingRelationList
                 existingItems={[]}
                 draftItems={pendingSubtasks.map((subtask) => ({
@@ -612,7 +668,7 @@ export function TaskForm({
                 emptyIcon={<ListTodo size={22} />}
                 emptyTitle="Keine Subtasks vorgemerkt"
                 showLinkExisting={false}
-                onCreateNew={() => setSubtaskDraftOpen(true)}
+                onCreateNew={() => openSubtaskDraft()}
                 onRemoveExisting={() => undefined}
                 onRemoveDraft={(index) =>
                   setPendingSubtasks((items) =>
@@ -620,8 +676,8 @@ export function TaskForm({
                   )
                 }
               />
-            )}
-          </Section>
+              </Section>
+            )
         ) : null}
 
         {activeTab === "tickets" ? (
@@ -868,9 +924,8 @@ export function TaskForm({
       />
       <TaskDraftDialog
         open={subtaskDraftOpen}
-        onCreate={(subtask) =>
-          setPendingSubtasks((items) => [...items, subtask])
-        }
+        initialStatus={subtaskInitialStatus}
+        onCreate={createSubtaskFromDialog}
         onClose={() => setSubtaskDraftOpen(false)}
       />
       <TicketDraftDialog
@@ -906,12 +961,14 @@ export function TaskDraftDialog({
   open,
   onCreate,
   onClose,
+  initialStatus,
   title: dialogTitle = "Subtask anlegen",
   breadcrumb = ["Aufgaben", "Subtask"],
 }: {
   open: boolean;
-  onCreate: (subtask: DraftSubtask) => void;
+  onCreate: (subtask: DraftSubtask) => void | Promise<void>;
   onClose: () => void;
+  initialStatus?: TaskStatus;
   title?: string;
   breadcrumb?: string[];
 }) {
@@ -922,7 +979,14 @@ export function TaskDraftDialog({
   const [priority, setPriority] = useState<Priority>("medium");
   const trimmedTitle = title.trim();
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (open) {
+      setStatus(taskStatusValue(catalogs.entries, initialStatus ?? "active"));
+      setPriority(priorityValue(catalogs.entries, "medium"));
+    }
+  }, [catalogs.entries, initialStatus, open]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.stopPropagation();
     event.preventDefault();
     if (!trimmedTitle) {
@@ -930,12 +994,16 @@ export function TaskDraftDialog({
     }
     const nextStatus = taskStatusValue(catalogs.entries, status);
     const nextPriority = priorityValue(catalogs.entries, priority);
-    onCreate({
-      title: trimmedTitle,
-      description: description || null,
-      status: nextStatus,
-      priority: nextPriority,
-    });
+    try {
+      await onCreate({
+        title: trimmedTitle,
+        description: description || null,
+        status: nextStatus,
+        priority: nextPriority,
+      });
+    } catch {
+      return;
+    }
     setTitle("");
     setDescription("");
     setStatus(taskStatusValue(catalogs.entries, "active"));

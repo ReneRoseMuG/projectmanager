@@ -62,6 +62,17 @@ describe("ClosedItemRow", () => {
     expect(card).toHaveClass("cursor-pointer");
   });
 
+  it("zeigt Parent-Kontext als Badge", () => {
+    render(
+      <ClosedItemRow
+        title="Aufgabe Alpha"
+        parent={{ type: "milestone", id: 7, label: "Launch", origin: "direct" }}
+      />,
+    );
+
+    expect(screen.getByText("Meilenstein: Launch")).toBeInTheDocument();
+  });
+
   it("setzt kein cursor-pointer ohne onOpen", () => {
     render(<ClosedItemRow title="Aufgabe Alpha" />);
 

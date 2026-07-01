@@ -269,17 +269,24 @@ describe("TaskListBoardView", () => {
   });
 
   it("rendert geschlossene Tasks als ClosedItemRow mit childCount und onOpen", () => {
-    const closedTask = buildTask({ id: 99, title: "Abgeschlossene Aufgabe", status: "done", subtaskCount: 5 });
+    const closedTask = buildTask({
+      id: 99,
+      title: "Abgeschlossene Aufgabe",
+      status: "done",
+      subtaskCount: 5,
+      visibleParent: { type: "milestone", id: 7, label: "Launch", origin: "direct" },
+    });
     const onOpen = vi.fn();
     const { container } = renderTaskList({ tasks: [closedTask], onOpen });
 
     // ClosedItemRow verwendet border-l-[3px] (im Gegensatz zu ItemCard/ItemRow mit border-l-[4px])
     const closedCard = screen.getByRole("heading", { name: "Abgeschlossene Aufgabe" }).closest("article");
     expect(closedCard).not.toBeNull();
-    expect(closedCard).toHaveClass("line-clamp-2".split(" ")[0]); // Titel hat line-clamp-2
+    expect(screen.getByRole("heading", { name: "Abgeschlossene Aufgabe" })).toHaveClass("line-clamp-2");
 
     // childCount-Footer mit subtaskCount=5
     expect(screen.getByText("5")).toBeInTheDocument();
+    expect(screen.getByText("Meilenstein: Launch")).toBeInTheDocument();
 
     // Klick auf Karte öffnet die Aufgabe
     fireEvent.click(closedCard!);

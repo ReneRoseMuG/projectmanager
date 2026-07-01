@@ -43,7 +43,8 @@ const notes: Note[] = [
     contentJson: { html: "<p>Board Preview</p>" },
     version: 1,
     createdAt: "2026-05-19T08:00:00.000Z",
-    updatedAt: "2026-05-19T09:00:00.000Z"
+    updatedAt: "2026-05-19T09:00:00.000Z",
+    parentContexts: [{ type: "project", id: 10, label: "Projekt Alpha", origin: "direct" }]
   },
   {
     id: 2,
@@ -51,7 +52,8 @@ const notes: Note[] = [
     contentJson: { html: "<p>Listen Preview</p>" },
     version: 1,
     createdAt: "2026-05-20T08:00:00.000Z",
-    updatedAt: "2026-05-20T09:00:00.000Z"
+    updatedAt: "2026-05-20T09:00:00.000Z",
+    parentContexts: [{ type: "task", id: 5, label: "Aufgabe Beta", origin: "direct" }]
   }
 ];
 
@@ -79,6 +81,7 @@ describe("NoteList", () => {
     expect(screen.getByTestId("list-board-view")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Kanban" })).toHaveClass("bg-steel-900");
     expect(screen.getByText("Board Preview")).toBeInTheDocument();
+    expect(screen.getByText("Projekt: Projekt Alpha")).toBeInTheDocument();
 
     fireEvent.click(articleFor("Entscheidung Alpha"));
     expect(onEdit).not.toHaveBeenCalled();
@@ -108,6 +111,7 @@ describe("NoteList", () => {
 
     expect(screen.getByRole("button", { name: "Liste" })).toHaveClass("bg-steel-900");
     expect(screen.getByText("Listen Preview")).toBeInTheDocument();
+    expect(screen.getByText("Aufgabe: Aufgabe Beta")).toBeInTheDocument();
 
     fireEvent.doubleClick(articleFor("Konzept Beta"));
     expect(onEdit).toHaveBeenCalledWith(notes[1]);

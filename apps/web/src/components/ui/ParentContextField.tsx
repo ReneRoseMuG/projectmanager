@@ -1,5 +1,5 @@
 import type { VisibleParentContext, VisibleParentType } from "@taskmanager/shared-types";
-import { BookOpen, Bug, FileText, Flag, FolderKanban, Layers3, ListTodo, X, type LucideIcon } from "lucide-react";
+import { BookOpen, Bug, CalendarDays, FileText, Flag, FolderKanban, Layers3, ListTodo, X, type LucideIcon } from "lucide-react";
 import { SidebarPanel } from "./SidebarPanel";
 
 const UNLINKABLE_PARENT_TYPES = new Set<VisibleParentType>(["project", "milestone", "feature", "useCase", "wikiPage"]);
@@ -17,6 +17,7 @@ const parentTypeLabels: Record<VisibleParentType, string> = {
   feature: "Feature",
   useCase: "Use Case",
   wikiPage: "Wiki",
+  dayPlan: "Planung",
 };
 
 const parentReferencePrefixes: Record<VisibleParentType, string> = {
@@ -27,6 +28,7 @@ const parentReferencePrefixes: Record<VisibleParentType, string> = {
   feature: "FEAT",
   useCase: "UC",
   wikiPage: "WIKI",
+  dayPlan: "PLAN",
 };
 
 const parentIcons = {
@@ -37,6 +39,7 @@ const parentIcons = {
   feature: BookOpen,
   useCase: Layers3,
   wikiPage: FileText,
+  dayPlan: CalendarDays,
 } satisfies Record<VisibleParentType, LucideIcon>;
 
 export function ParentContextField({ parents, onUnlink }: ParentContextFieldProps) {

@@ -111,6 +111,7 @@ export function buildMilestone(overrides: Partial<Milestone> = {}): Milestone {
     noteCount: 0,
     commentCount: 0,
     tags: [buildTag()],
+    visibleParent: { type: "project", id: 1, label: "Projekt Alpha", origin: "direct" },
     ...overrides
   };
 }

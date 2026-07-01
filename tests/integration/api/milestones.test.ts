@@ -1,16 +1,29 @@
 ﻿/**
  * Test Scope:
  *
+ * Test-Ebene:
+ * - Integration
+ *
+ * Realitätsgrad:
+ * - Echte Fastify-App, echte MySQL-Testdatenbank, echte Routen, echte Services und echtes Dateisystem für Uploads.
+ *
+ * Mock-Entscheidung:
+ * - Keine Mocks.
+ *
+ * Isolation:
+ * - Dedizierte temporäre MySQL-Datenbank pro Suite; Upload- und Preview-Verzeichnisse unter os.tmpdir().
+ *
  * Abgedeckte Regeln:
  * - Meilensteine sind projektgebundene, versionierte Projektmanagement-Objekte mit CRUD und expectedVersion.
  * - Meilensteine können Tasks, Tickets, Features, Tags, Notes, Comments, Attachments und Events zugeordnet werden.
  * - Löschregeln entfernen Join-Zeilen und meilenstein-eigene Support-Objekte, ohne unabhängige Fachobjekte zu löschen.
+ * - Meilenstein-Listen skalieren ohne Pool-Queue-Überlauf auf mindestens 500 Einträge.
  *
  * Fehlerfälle:
  * - Fehlende oder veraltete expectedVersion, unbekannte Projekte und unbekannte Meilensteine.
  *
  * Ziel:
- * Milestone-Repository, Service, Routen und Owner-Relationen mit echter SQLite-Testdatenbank absichern.
+ * Milestone-Repository, Service, Routen und Owner-Relationen mit echter MySQL-Testdatenbank absichern.
  */
 
 import type { FastifyInstance } from "fastify";
@@ -38,6 +51,29 @@ const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-milestone-previe
 async function countRows(testDb: TestDb, table: string, where: string, value: number): Promise<number> {
   const [rows] = await testDb.pool.execute(`SELECT COUNT(*) AS count FROM \`${table}\` WHERE \`${where}\` = ?`, [value]);
   return Number((rows as Array<{ count: bigint | number }>)[0].count);
+}
+
+async function insertMilestonesDirectly(testDb: TestDb, projectId: number, amount: number, namePrefix: string): Promise<void> {
+  if (amount === 0) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const rows = Array.from({ length: amount }, (_, index) => [
+    projectId,
+    `${namePrefix} ${index.toString().padStart(3, "0")}`,
+    "active",
+    "#14b8a6",
+    1,
+    1,
+    now,
+    now
+  ]);
+  const placeholders = rows.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+  await testDb.pool.query(
+    `INSERT INTO milestones (project_id, name, status, color, responsible_user_id, version, created_at, updated_at) VALUES ${placeholders}`,
+    rows.flat()
+  );
 }
 
 describe("Milestones API", () => {
@@ -118,6 +154,30 @@ describe("Milestones API", () => {
     await supertest(app.server).post("/api/milestones").send({ projectId: 9999, name: "Ohne Projekt" }).expect(404);
     await supertest(app.server).get("/api/milestones/9999").expect(404);
     await supertest(app.server).delete("/api/milestones/9999").expect(404);
+  });
+
+  it("listet 500 Meilensteine ohne Pool-Queue-Überlauf", async () => {
+    const project = await createProject(app, { name: "Skalierungsprojekt" });
+    const otherProject = await createProject(app, { name: "Anderes Projekt" });
+    await insertMilestonesDirectly(testDb, project.id, 500, "Scale");
+    await insertMilestonesDirectly(testDb, otherProject.id, 5, "Other");
+
+    const projectList = await supertest(app.server).get(`/api/projects/${project.id}/milestones`).expect(200);
+    expect(projectList.body).toHaveLength(500);
+    expect(projectList.body.every((item: { projectId: number }) => item.projectId === project.id)).toBe(true);
+    expect(projectList.body.find((item: { name: string }) => item.name === "Scale 123")).toMatchObject({
+      projectId: project.id,
+      responsibleUserId: 1,
+      responsibleUser: { id: 1, email: "admin@local" },
+      visibleParent: { type: "project", id: project.id, label: "Skalierungsprojekt", origin: "direct" },
+      taskCount: 0,
+      ticketCount: 0,
+      tags: []
+    });
+
+    const globalList = await supertest(app.server).get("/api/milestones").expect(200);
+    expect(globalList.body).toHaveLength(505);
+    expect(globalList.body.filter((item: { projectId: number }) => item.projectId === otherProject.id)).toHaveLength(5);
   });
 
   it("verwaltet alle Milestone-Relationen mit echten Daten", async () => {
@@ -278,13 +338,20 @@ describe("Milestones API", () => {
     await supertest(app.server).post(`/api/milestones/${milestone.id}/tasks`).send({ title: "Geschlossen 3", status: closedStatus.body.key, priority: "medium" }).expect(201);
 
     const detail = await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(200);
-    expect(detail.body).toMatchObject({ taskCount: 3, openTaskCount: 0, doneTaskCount: 3, totalTaskCount: 3 });
+    expect(detail.body).toMatchObject({
+      taskCount: 3,
+      openTaskCount: 0,
+      doneTaskCount: 3,
+      totalTaskCount: 3,
+      visibleParent: { type: "project", id: project.id, label: "Testprojekt", origin: "direct" }
+    });
 
     const projectMilestones = await supertest(app.server).get(`/api/projects/${project.id}/milestones`).expect(200);
     expect(projectMilestones.body.find((item: { id: number }) => item.id === milestone.id)).toMatchObject({
       openTaskCount: 0,
       doneTaskCount: 3,
-      totalTaskCount: 3
+      totalTaskCount: 3,
+      visibleParent: { type: "project", id: project.id, label: "Testprojekt", origin: "direct" }
     });
   });
 });

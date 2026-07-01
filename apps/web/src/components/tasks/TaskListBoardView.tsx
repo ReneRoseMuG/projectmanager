@@ -28,6 +28,8 @@ interface TaskListBoardViewProps {
   onTagsChange?: (taskId: number, tagIds: number[]) => void | Promise<void>;
   linkAction?: ReactNode;
   filters?: ReactNode;
+  addLabel?: string;
+  emptyState?: ReactNode;
   showCreateActions?: boolean;
   canDelete?: boolean;
   readOnly?: boolean;
@@ -55,7 +57,7 @@ function matchesSearch(task: Task, searchValue: string) {
 }
 
 /** Task-specific ListBoardView adapter with status Kanban columns. */
-export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange, linkAction, filters, showCreateActions = true, canDelete = true, readOnly = false, allowDeleteInReadOnly = false, loading = false, boardId }: TaskListBoardViewProps) {
+export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, onAddStatus, onOpen, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange, linkAction, filters, addLabel = "Neue Aufgabe", emptyState, showCreateActions = true, canDelete = true, readOnly = false, allowDeleteInReadOnly = false, loading = false, boardId }: TaskListBoardViewProps) {
   const catalogs = useCatalogs();
   const canReadTags = useHasPermission("tags", "read");
   const canWriteTasks = useHasPermission("tasks", "write");
@@ -90,7 +92,7 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
       }}
       onAdd={onAdd}
       onAddToColumn={!readOnly && showCreateActions ? (columnStatus) => (onAddStatus ? onAddStatus(columnStatus as Task["status"]) : onAdd()) : undefined}
-      addLabel="Neue Aufgabe"
+      addLabel={addLabel}
       showToolbar={!readOnly}
       showToolbarAdd={!readOnly && showCreateActions}
       secondaryAction={readOnly ? undefined : linkAction}
@@ -103,7 +105,7 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
       toolbarFilters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={tasks.length} />}
       filters={readOnly ? undefined : filters}
       loading={loading}
-      emptyState={<EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben" body="Für diesen Kontext sind noch keine Aufgaben vorhanden." tone="fern" variant="tinted" />}
+      emptyState={emptyState ?? <EmptyState icon={<ListTodo size={22} />} title="Keine Aufgaben" body="Für diesen Kontext sind noch keine Aufgaben vorhanden." tone="fern" variant="tinted" />}
       renderCard={(task) => <TaskCard task={task} allTags={editableTags} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={(readOnly && !allowDeleteInReadOnly) || !canDelete || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
       renderRow={(task) => <TaskCard task={task} allTags={editableTags} variant="row" onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={(readOnly && !allowDeleteInReadOnly) || !canDelete || task.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />}
       renderClosedRow={(task) => (
@@ -112,6 +114,7 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
           objectReference={objectReference("task", task.id)}
           accentColor={statusColumns.find((c) => c.value === task.status)?.color}
           childCount={task.subtaskCount}
+          parent={task.visibleParent}
           onOpen={() => onOpen(task)}
           onOpenInTab={onOpenInTab ? () => onOpenInTab(task) : undefined}
         />

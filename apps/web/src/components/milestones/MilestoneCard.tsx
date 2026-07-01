@@ -7,6 +7,7 @@ import { richTextToPlainText } from "../../utils/richText";
 import { InlineDateField } from "../ui/InlineDateField";
 import type { ActionMenuItem } from "../ui/ActionMenu";
 import { CardFooterBar } from "../ui/CardFooterBar";
+import { ParentBadge } from "../ui/ParentBadge";
 import { PlanningItemCard } from "../ui/PlanningItemCard";
 import { StatusPill } from "../ui/StatusPill";
 
@@ -50,19 +51,24 @@ export function MilestoneCard({ milestone, variant = "card", onEdit, onOpenInTab
       subtitle={<InlineDateField value={milestone.dueDate} emptyLabel="Ohne Fälligkeit" onChange={onDueDateChange ? (dueDate) => onDueDateChange(milestone, dueDate) : undefined} />}
       pills={<StatusPill kind="workStatus" value={milestone.status} onChange={onStatusChange ? (status) => onStatusChange(milestone, status) : undefined} />}
       footerMeta={
-        <CardFooterBar
-          tags={milestone.tags}
-          allTags={allTags}
-          onTagsChange={onTagsChange ? (tagIds) => onTagsChange(milestone.id, tagIds) : undefined}
-          leadingCounters={[
-            { icon: <ListTodo size={14} aria-hidden="true" />, value: milestone.totalTaskCount, label: "Aufgaben" },
-            { icon: <Bug size={14} aria-hidden="true" />, value: milestone.ticketCount, label: "Tickets" }
-          ]}
-          attachmentCount={milestone.attachmentCount}
-          noteCount={milestone.noteCount}
-          commentCount={milestone.commentCount}
-          bordered={variant !== "row"}
-        />
+        <div className="grid min-w-0 gap-2">
+          <div className="flex flex-wrap gap-2">
+            <ParentBadge parent={milestone.visibleParent} />
+          </div>
+          <CardFooterBar
+            tags={milestone.tags}
+            allTags={allTags}
+            onTagsChange={onTagsChange ? (tagIds) => onTagsChange(milestone.id, tagIds) : undefined}
+            leadingCounters={[
+              { icon: <ListTodo size={14} aria-hidden="true" />, value: milestone.totalTaskCount, label: "Aufgaben" },
+              { icon: <Bug size={14} aria-hidden="true" />, value: milestone.ticketCount, label: "Tickets" }
+            ]}
+            attachmentCount={milestone.attachmentCount}
+            noteCount={milestone.noteCount}
+            commentCount={milestone.commentCount}
+            bordered={variant !== "row"}
+          />
+        </div>
       }
       taskStats={{
         openTasks: milestone.openTaskCount,

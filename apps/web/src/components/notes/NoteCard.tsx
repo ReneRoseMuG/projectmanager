@@ -3,6 +3,7 @@ import { ExternalLink, StickyNote } from "lucide-react";
 import { objectReference } from "../../lib/references";
 import { formatHumanDate } from "../../utils/date";
 import { ItemCard } from "../ui/ItemCard";
+import { ParentBadges } from "../ui/ParentBadge";
 import { noteContentToPreviewText } from "./noteContent";
 
 interface NoteCardProps {
@@ -26,6 +27,18 @@ function NoteHeader({ note }: { note: Note }) {
   );
 }
 
+function NoteFooter({ note }: { note: Note }) {
+  if ((note.parentContexts?.length ?? 0) === 0) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <ParentBadges parents={note.parentContexts} />
+    </div>
+  );
+}
+
 export function NoteCard({ note, onEdit, onOpenInTab, onDelete }: NoteCardProps) {
   const preview = noteContentToPreviewText(note.contentJson);
 
@@ -34,6 +47,7 @@ export function NoteCard({ note, onEdit, onOpenInTab, onDelete }: NoteCardProps)
       objectReference={objectReference("note", note.id)}
       header={<NoteHeader note={note} />}
       body={preview ? <p className="line-clamp-4 text-sm text-steel-600">{preview}</p> : <p className="text-sm italic text-steel-500">Kein Inhalt</p>}
+      footer={<NoteFooter note={note} />}
       onOpen={() => onEdit(note)}
       onEdit={() => onEdit(note)}
       extraMenuItems={onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(note) }] : []}

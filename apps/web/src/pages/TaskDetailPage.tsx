@@ -241,6 +241,7 @@ export function TaskDetailPage() {
         onClose={closePage}
         onChanged={detail.reload}
         onOpenInTab={openInTab}
+        onOpenTask={(nextTask) => navigate(`/tasks/${nextTask.id}?returnTo=${encodeURIComponent(returnTo)}`)}
       />
     </div>
   );

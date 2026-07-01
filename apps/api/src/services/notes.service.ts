@@ -1,4 +1,4 @@
-import type { Note, NoteInput, NoteUpdate } from "@taskmanager/shared-types";
+import type { Note, NoteInput, NoteUpdate, VisibleParentContext } from "@taskmanager/shared-types";
 import { and, eq, inArray } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
 import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
@@ -31,14 +31,15 @@ const noteJournalFields: Array<JournalFieldDefinition<NoteRecord>> = [
   { key: "contentJson", label: "Inhalt", format: () => "geändert" }
 ];
 
-function mapNote(record: MappableNoteRecord): Note {
+function mapNote(record: MappableNoteRecord, parentContexts?: VisibleParentContext[]): Note {
   return {
     id: record.id,
     title: record.title,
     contentJson: parseJsonObject(record.contentJson),
     version: record.version,
     createdAt: record.createdAt,
-    updatedAt: record.updatedAt
+    updatedAt: record.updatedAt,
+    ...(parentContexts ? { parentContexts } : {})
   };
 }
 
@@ -122,6 +123,16 @@ async function ownerContext(database: DbSession, owner: NoteOwner) {
   return makeJournalContext(await getOwnerJournalObject(database, owner), "owner");
 }
 
+async function noteParentContext(database: DbSession, owner: NoteOwner): Promise<VisibleParentContext> {
+  const object = await getOwnerJournalObject(database, owner);
+  return {
+    type: owner.type,
+    id: owner.id,
+    label: object.label,
+    origin: "direct"
+  };
+}
+
 async function listNoteOwners(database: DbSession, noteId: number): Promise<NoteOwner[]> {
   const projectRows = await database.select({ id: projectNotes.projectId }).from(projectNotes).where(eq(projectNotes.noteId, noteId));
   const milestoneRows = await database.select({ id: milestoneNotes.milestoneId }).from(milestoneNotes).where(eq(milestoneNotes.noteId, noteId));
@@ -155,7 +166,7 @@ export async function listProjectNotes(database: DbClient, projectId: number): P
     .where(eq(projectNotes.projectId, projectId))
     .orderBy(...recencyOrder(notes));
 
-  return rows.map(mapNote);
+  return rows.map((row) => mapNote(row));
 }
 
 export async function listTaskNotes(database: DbClient, taskId: number): Promise<Note[]> {
@@ -174,7 +185,7 @@ export async function listTaskNotes(database: DbClient, taskId: number): Promise
     .where(eq(taskNotes.taskId, taskId))
     .orderBy(...recencyOrder(notes));
 
-  return rows.map(mapNote);
+  return rows.map((row) => mapNote(row));
 }
 
 export async function listMilestoneNotes(database: DbClient, milestoneId: number): Promise<Note[]> {
@@ -193,7 +204,7 @@ export async function listMilestoneNotes(database: DbClient, milestoneId: number
     .where(eq(milestoneNotes.milestoneId, milestoneId))
     .orderBy(...recencyOrder(notes));
 
-  return rows.map(mapNote);
+  return rows.map((row) => mapNote(row));
 }
 
 export async function listTicketNotes(database: DbClient, ticketId: number): Promise<Note[]> {
@@ -212,12 +223,12 @@ export async function listTicketNotes(database: DbClient, ticketId: number): Pro
     .where(eq(ticketNotes.ticketId, ticketId))
     .orderBy(...recencyOrder(notes));
 
-  return rows.map(mapNote);
+  return rows.map((row) => mapNote(row));
 }
 
 export async function listDayPlanNotes(database: DbClient, dayPlanId: number, userId: number): Promise<Note[]> {
   await ensureDayPlanOwnedByUser(database, dayPlanId, userId);
-  return (await dayPlanRepository.listNotes(database, dayPlanId)).map(mapNote);
+  return (await dayPlanRepository.listNotes(database, dayPlanId)).map((row) => mapNote(row));
 }
 
 export async function listWikiPageNotes(database: DbClient, wikiPageId: number): Promise<Note[]> {
@@ -236,7 +247,26 @@ export async function listWikiPageNotes(database: DbClient, wikiPageId: number):
     .where(eq(wikiPageNotes.wikiPageId, wikiPageId))
     .orderBy(...recencyOrder(notes));
 
-  return rows.map(mapNote);
+  return rows.map((row) => mapNote(row));
+}
+
+export async function listNotes(database: DbClient): Promise<Note[]> {
+  const rows = await database
+    .select({
+      id: notes.id,
+      title: notes.title,
+      contentJson: notes.contentJson,
+      version: notes.version,
+      createdAt: notes.createdAt,
+      updatedAt: notes.updatedAt
+    })
+    .from(notes)
+    .orderBy(...recencyOrder(notes));
+
+  return Promise.all(rows.map(async (row) => {
+    const parentContexts = await Promise.all((await listNoteOwners(database, row.id)).map((owner) => noteParentContext(database, owner)));
+    return mapNote(row, parentContexts);
+  }));
 }
 
 export async function createProjectNote(database: DbClient, projectId: number, input: NoteInput, actor?: JournalActor | null): Promise<Note> {
@@ -356,7 +386,8 @@ export async function getNote(database: DbClient, id: number): Promise<Note> {
     throw notFound(`Note with id ${id} not found`);
   }
 
-  return mapNote(note);
+  const parentContexts = await Promise.all((await listNoteOwners(database, id)).map((owner) => noteParentContext(database, owner)));
+  return mapNote(note, parentContexts);
 }
 
 export async function updateNote(database: DbClient, id: number, input: NoteUpdate, actor?: JournalActor | null): Promise<Note> {

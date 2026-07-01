@@ -11,6 +11,7 @@ import {
   deleteNote,
   getNote,
   linkDayPlanNote,
+  listNotes,
   listDayPlanNotes,
   listMilestoneNotes,
   listProjectNotes,
@@ -51,6 +52,12 @@ const dayPlanNoteParamSchema = {
 } as const;
 
 export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
+  app.get(
+    "/notes",
+    { schema: { response: { 200: arrayResponseSchema } } },
+    async () => listNotes(app.db)
+  );
+
   app.get<{ Params: { id: number } }>(
     "/projects/:id/notes",
     { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },

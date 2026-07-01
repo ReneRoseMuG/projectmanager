@@ -4,6 +4,7 @@ import { objectReference } from "../../lib/references";
 import { formatHumanDate } from "../../utils/date";
 import { ActionMenu } from "../ui/ActionMenu";
 import { ItemRow } from "../ui/ItemRow";
+import { ParentBadges } from "../ui/ParentBadge";
 import { noteContentToPreviewText } from "./noteContent";
 
 interface NoteListViewItemProps {
@@ -15,6 +16,7 @@ interface NoteListViewItemProps {
 
 export function NoteListViewItem({ note, onEdit, onOpenInTab, onDelete }: NoteListViewItemProps) {
   const preview = noteContentToPreviewText(note.contentJson);
+  const footer = (note.parentContexts?.length ?? 0) > 0 ? <ParentBadges parents={note.parentContexts} /> : undefined;
 
   return (
     <ItemRow
@@ -41,6 +43,7 @@ export function NoteListViewItem({ note, onEdit, onOpenInTab, onDelete }: NoteLi
           ]}
         />
       }
+      footer={footer}
       onOpen={() => onEdit(note)}
     />
   );

@@ -144,8 +144,8 @@ describe("Notes API", () => {
   });
 
   it("GET /api/tasks/:id/notes gibt alle Task-Notizen zurueck", async () => {
-    const project = await createProject(app);
-    const task = await createTask(app, project.id);
+    const project = await createProject(app, { name: "Projekt Alpha" });
+    const task = await createTask(app, project.id, { title: "Aufgabe Beta" });
     const note1 = await createNoteForTask(app, task.id, { title: "A" });
     const note2 = await createNoteForTask(app, task.id, { title: "B" });
 
@@ -154,6 +154,34 @@ describe("Notes API", () => {
 
     expect(ids).toContain(note1.id);
     expect(ids).toContain(note2.id);
+  });
+
+  it("GET /api/notes gibt alle Notizen ohne Statusgruppierung zurueck", async () => {
+    const project = await createProject(app, { name: "Projekt Alpha" });
+    const task = await createTask(app, project.id, { title: "Aufgabe Beta" });
+    const projectNote = await createNoteForProject(app, project.id, { title: "Projektliste" });
+    const taskNote = await createNoteForTask(app, task.id, { title: "Aufgabenliste" });
+
+    const res = await supertest(app.server).get("/api/notes").expect(200);
+    const ids = res.body.map((note: { id: number }) => note.id);
+
+    expect(ids).toContain(projectNote.id);
+    expect(ids).toContain(taskNote.id);
+    expect(res.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: projectNote.id,
+          title: "Projektliste",
+          parentContexts: [expect.objectContaining({ type: "project", id: project.id, label: "Projekt Alpha", origin: "direct" })]
+        }),
+        expect.objectContaining({
+          id: taskNote.id,
+          title: "Aufgabenliste",
+          parentContexts: [expect.objectContaining({ type: "task", id: task.id, label: "Aufgabe Beta", origin: "direct" })]
+        })
+      ])
+    );
+    expect(res.body[0]).not.toHaveProperty("status");
   });
 
   it("GET /api/notes/:id gibt die Notiz zurueck", async () => {

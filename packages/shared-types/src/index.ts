@@ -688,6 +688,7 @@ export interface Milestone {
   noteCount: number;
   commentCount: number;
   tags: Tag[];
+  visibleParent?: VisibleParentContext | null;
 }
 
 export interface MilestoneInput {
@@ -703,7 +704,7 @@ export interface MilestoneInput {
 
 export type MilestoneUpdate = WithExpectedVersion<Partial<MilestoneInput>>;
 
-export type VisibleParentType = "project" | "milestone" | "task" | "ticket" | "feature" | "useCase" | "wikiPage";
+export type VisibleParentType = "project" | "milestone" | "task" | "ticket" | "feature" | "useCase" | "wikiPage" | "dayPlan";
 
 export interface VisibleParentContext {
   type: VisibleParentType;
@@ -858,6 +859,7 @@ export interface Note {
   version: number;
   createdAt: string;
   updatedAt: string;
+  parentContexts?: VisibleParentContext[];
 }
 
 export interface NoteInput {

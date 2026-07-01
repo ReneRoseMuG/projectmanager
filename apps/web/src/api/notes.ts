@@ -5,6 +5,10 @@ export async function getNote(id: number): Promise<Note> {
   return api.get(`notes/${id}`).json<Note>();
 }
 
+export async function getNotes(): Promise<Note[]> {
+  return api.get("notes").json<Note[]>();
+}
+
 export async function getProjectNotes(projectId: number): Promise<Note[]> {
   return api.get(`projects/${projectId}/notes`).json<Note[]>();
 }
