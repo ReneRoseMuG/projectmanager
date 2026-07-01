@@ -9,6 +9,8 @@
   TicketRelationType,
   TicketStats,
   TicketUpdate,
+  Tag,
+  UserOption,
   VisibleParentContext
 } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
@@ -38,16 +40,27 @@ import {
 import { deleteTicketNotesForIds, listTicketNotes } from "./notes.service.js";
 import { assertCompatibleProjectContexts, projectContextsAreCompatible, ticketOwnerProjectContext, ticketProjectContext } from "./project-context.service.js";
 import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
-import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
+import { getUserOption, getUserOptionsMap, normalizeAssignableUserId } from "./users.service.js";
 
 export type { TicketOwner };
 export type DashboardTicketOwner = { type: "project" | "milestone"; id: number };
 
 type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
+type TicketListRecord = TicketRecord & { boardPosition?: number; visibleParent?: VisibleParentContext | null };
 interface SupportCounts {
   attachmentCount: number;
   noteCount: number;
   commentCount: number;
+}
+
+interface TicketMapData {
+  tags?: Tag[];
+  subTicketCount?: number;
+  position?: number;
+  visibleParent?: VisibleParentContext | null;
+  supportCounts?: SupportCounts;
+  reporterUser?: UserOption | null;
+  responsibleUser?: UserOption | null;
 }
 
 const emptySupportCounts: SupportCounts = {
@@ -513,6 +526,20 @@ export async function mapTicket(
   visibleParent?: VisibleParentContext | null,
   supportCounts = getTicketSupportCounts(database, [record.id]).then((m) => m.get(record.id) ?? emptySupportCounts)
 ): Promise<Ticket> {
+  return mapTicketWithData(database, record, {
+    tags: await tags,
+    subTicketCount: await subTicketCount,
+    position,
+    visibleParent,
+    supportCounts: await supportCounts
+  });
+}
+
+async function mapTicketWithData(database: DbClient, record: TicketRecord, data: TicketMapData = {}): Promise<Ticket> {
+  const supportCounts = data.supportCounts ?? (await getTicketSupportCounts(database, [record.id])).get(record.id) ?? emptySupportCounts;
+  const reporterUser = data.reporterUser !== undefined ? data.reporterUser : await getUserOption(database, record.reporterUserId);
+  const responsibleUser = data.responsibleUser !== undefined ? data.responsibleUser : await getUserOption(database, record.responsibleUserId);
+
   return {
     id: record.id,
     parentId: record.parentId,
@@ -523,47 +550,118 @@ export async function mapTicket(
     priority: record.priority,
     resolution: record.resolution,
     reporterUserId: record.reporterUserId,
-    reporterUser: await getUserOption(database, record.reporterUserId),
+    reporterUser,
     responsibleUserId: record.responsibleUserId,
-    responsibleUser: await getUserOption(database, record.responsibleUserId),
+    responsibleUser,
     environment: record.environment,
     affectedVersion: record.affectedVersion,
     dueDate: record.dueDate,
     resolvedAt: record.resolvedAt,
-    position,
+    position: data.position ?? record.position,
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
-    tags: await tags,
-    subTicketCount: await subTicketCount,
-    attachmentCount: (await supportCounts).attachmentCount,
-    noteCount: (await supportCounts).noteCount,
-    commentCount: (await supportCounts).commentCount,
-    visibleParent
+    tags: data.tags ?? await getTicketTags(database, record.id),
+    subTicketCount: data.subTicketCount ?? await getSubTicketCounts(database, [record.id]).then((m) => m.get(record.id) ?? 0),
+    attachmentCount: supportCounts.attachmentCount,
+    noteCount: supportCounts.noteCount,
+    commentCount: supportCounts.commentCount,
+    visibleParent: data.visibleParent
   };
+}
+
+function setPrimaryParentContext(map: Map<number, VisibleParentContext>, ticketId: number, context: VisibleParentContext): void {
+  if (!map.has(ticketId)) {
+    map.set(ticketId, context);
+  }
+}
+
+async function getPrimaryTicketParentContextMap(database: DbClient, ticketIds: number[]): Promise<Map<number, VisibleParentContext>> {
+  const contexts = new Map<number, VisibleParentContext>();
+  if (ticketIds.length === 0) {
+    return contexts;
+  }
+
+  const [projectRows, milestoneRows, taskRows, featureRows, useCaseRows, wikiRows] = await Promise.all([
+    database
+      .select({ ticketId: projectTickets.ticketId, id: projects.id, label: projects.name })
+      .from(projectTickets)
+      .innerJoin(projects, eq(projectTickets.ownerId, projects.id))
+      .where(inArray(projectTickets.ticketId, ticketIds)),
+    database
+      .select({ ticketId: milestoneTickets.ticketId, id: milestones.id, label: milestones.name })
+      .from(milestoneTickets)
+      .innerJoin(milestones, eq(milestoneTickets.ownerId, milestones.id))
+      .where(inArray(milestoneTickets.ticketId, ticketIds)),
+    database
+      .select({ ticketId: taskTickets.ticketId, id: tasks.id, label: tasks.title })
+      .from(taskTickets)
+      .innerJoin(tasks, eq(taskTickets.ownerId, tasks.id))
+      .where(inArray(taskTickets.ticketId, ticketIds)),
+    database
+      .select({ ticketId: featureTickets.ticketId, id: features.id, label: features.title })
+      .from(featureTickets)
+      .innerJoin(features, eq(featureTickets.ownerId, features.id))
+      .where(inArray(featureTickets.ticketId, ticketIds)),
+    database
+      .select({ ticketId: useCaseTickets.ticketId, id: useCases.id, label: useCases.title })
+      .from(useCaseTickets)
+      .innerJoin(useCases, eq(useCaseTickets.ownerId, useCases.id))
+      .where(inArray(useCaseTickets.ticketId, ticketIds)),
+    database
+      .select({ ticketId: wikiPageTickets.ticketId, id: wikiPages.id, label: wikiPages.title })
+      .from(wikiPageTickets)
+      .innerJoin(wikiPages, eq(wikiPageTickets.ownerId, wikiPages.id))
+      .where(inArray(wikiPageTickets.ticketId, ticketIds))
+  ]);
+
+  for (const row of projectRows) {
+    setPrimaryParentContext(contexts, row.ticketId, { type: "project", id: row.id, label: row.label, origin: "direct" });
+  }
+  for (const row of milestoneRows) {
+    setPrimaryParentContext(contexts, row.ticketId, { type: "milestone", id: row.id, label: row.label, origin: "direct" });
+  }
+  for (const row of taskRows) {
+    setPrimaryParentContext(contexts, row.ticketId, { type: "task", id: row.id, label: row.label, origin: "direct" });
+  }
+  for (const row of featureRows) {
+    setPrimaryParentContext(contexts, row.ticketId, { type: "feature", id: row.id, label: row.label, origin: "direct" });
+  }
+  for (const row of useCaseRows) {
+    setPrimaryParentContext(contexts, row.ticketId, { type: "useCase", id: row.id, label: row.label, origin: "direct" });
+  }
+  for (const row of wikiRows) {
+    setPrimaryParentContext(contexts, row.ticketId, { type: "wikiPage", id: row.id, label: row.label, origin: "direct" });
+  }
+
+  return contexts;
+}
+
+async function mapTicketListRows(database: DbClient, rows: TicketListRecord[]): Promise<Ticket[]> {
+  const ids = rows.map((ticket) => ticket.id);
+  const [tagsByTicket, subTicketCounts, supportCountsMap, usersById] = await Promise.all([
+    getTicketTagsMap(database, ids),
+    getSubTicketCounts(database, ids),
+    getTicketSupportCounts(database, ids),
+    getUserOptionsMap(database, rows.flatMap((ticket) => [ticket.reporterUserId, ticket.responsibleUserId]))
+  ]);
+
+  return Promise.all(rows.map((ticket) => mapTicketWithData(database, ticket, {
+    tags: tagsByTicket.get(ticket.id) ?? [],
+    subTicketCount: subTicketCounts.get(ticket.id) ?? 0,
+    position: ticket.boardPosition ?? ticket.position,
+    visibleParent: ticket.visibleParent,
+    supportCounts: supportCountsMap.get(ticket.id) ?? emptySupportCounts,
+    reporterUser: ticket.reporterUserId ? usersById.get(ticket.reporterUserId) ?? null : null,
+    responsibleUser: ticket.responsibleUserId ? usersById.get(ticket.responsibleUserId) ?? null : null
+  })));
 }
 
 export async function listTickets(database: DbClient): Promise<Ticket[]> {
   const rows = await ticketRepository.findRootTickets(database);
   const ids = rows.map((ticket) => ticket.id);
-  const [tagsByTicket, subTicketCounts, supportCountsMap] = await Promise.all([
-    getTicketTagsMap(database, ids),
-    getSubTicketCounts(database, ids),
-    getTicketSupportCounts(database, ids)
-  ]);
-
-  return Promise.all(rows.map(async (ticket) => {
-    const visibleParent = (await ticketParentContexts(database, ticket))[0] ?? null;
-    return mapTicket(
-      database,
-      ticket,
-      Promise.resolve(tagsByTicket.get(ticket.id) ?? []),
-      Promise.resolve(subTicketCounts.get(ticket.id) ?? 0),
-      ticket.position,
-      visibleParent,
-      Promise.resolve(supportCountsMap.get(ticket.id) ?? emptySupportCounts)
-    );
-  }));
+  const parentContexts = await getPrimaryTicketParentContextMap(database, ids);
+  return mapTicketListRows(database, rows.map((ticket) => ({ ...ticket, visibleParent: parentContexts.get(ticket.id) ?? null })));
 }
 
 export async function listTicketLinkCandidates(database: DbClient, owner: TicketOwner | null, contextOwner?: TicketOwner | null): Promise<Ticket[]> {
@@ -609,14 +707,7 @@ export async function listTicketLinkCandidates(database: DbClient, owner: Ticket
 export async function listOwnerTickets(database: DbClient, owner: TicketOwner): Promise<Ticket[]> {
   await ensureOwnerExists(database, owner);
   const rows = await selectVisibleOwnerTicketRows(database, owner);
-  const ids = rows.map((ticket) => ticket.id);
-  const [tagsByTicket, subTicketCounts, supportCountsMap] = await Promise.all([
-    getTicketTagsMap(database, ids),
-    getSubTicketCounts(database, ids),
-    getTicketSupportCounts(database, ids)
-  ]);
-
-  return Promise.all(rows.map((ticket) => mapTicket(database, ticket, Promise.resolve(tagsByTicket.get(ticket.id) ?? []), Promise.resolve(subTicketCounts.get(ticket.id) ?? 0), ticket.boardPosition, ticket.visibleParent, Promise.resolve(supportCountsMap.get(ticket.id) ?? emptySupportCounts))));
+  return mapTicketListRows(database, rows);
 }
 
 export async function listProjectTickets(database: DbClient, projectId: number): Promise<Ticket[]> {
@@ -626,14 +717,7 @@ export async function listProjectTickets(database: DbClient, projectId: number):
 export async function listSubTickets(database: DbClient, parentId: number): Promise<Ticket[]> {
   await getTicketRecord(database, parentId);
   const rows = await ticketRepository.findChildren(database, parentId);
-  const ids = rows.map((ticket) => ticket.id);
-  const [tagsByTicket, subTicketCounts, supportCountsMap] = await Promise.all([
-    getTicketTagsMap(database, ids),
-    getSubTicketCounts(database, ids),
-    getTicketSupportCounts(database, ids)
-  ]);
-
-  return Promise.all(rows.map((ticket) => mapTicket(database, ticket, Promise.resolve(tagsByTicket.get(ticket.id) ?? []), Promise.resolve(subTicketCounts.get(ticket.id) ?? 0), undefined, undefined, Promise.resolve(supportCountsMap.get(ticket.id) ?? emptySupportCounts))));
+  return mapTicketListRows(database, rows);
 }
 
 async function listDashboardTickets(database: DbClient, owner?: DashboardTicketOwner): Promise<Ticket[]> {

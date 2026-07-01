@@ -2,13 +2,19 @@
  * Test Scope: Tickets API
  *
  * Covered rules:
- * - CRUD, owner links for projects/tasks/features/use cases, sub-tickets, relations, tags, notes, comments, attachments and validation.
+ * - CRUD, owner links for projects/tasks/features/use cases, sub-tickets, relations, tags, notes, comments, attachments, validation and list scaling.
  *
  * Failure cases:
  * - Missing title, invalid enum values, unknown owners, duplicate relations and self-relations.
  *
+ * Test level:
+ * - Integration with real Fastify app and migrated MySQL test database.
+ *
+ * Real data and isolation:
+ * - Per-test database truncation plus process-local temp upload and preview directories; no mocks.
+ *
  * Goal:
- * Ensure tickets are owner-independent domain objects that can be linked to multiple owner domains safely.
+ * Ensure tickets are owner-independent domain objects that can be linked to multiple owner domains safely and listed in large sets.
  */
 
 import type { FastifyInstance } from "fastify";
@@ -38,6 +44,33 @@ const uploadDir = path.join(os.tmpdir(), `taskmanager-api-ticket-attachments-${p
 const previewCacheDir = path.join(os.tmpdir(), `taskmanager-api-ticket-previews-${process.pid}`);
 
 type TicketOwner = { type: "project" | "task" | "feature" | "useCase"; id: number; path: string };
+
+async function insertTicketsDirectly(testDb: TestDb, amount: number, titlePrefix: string): Promise<void> {
+  if (amount === 0) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const rows = Array.from({ length: amount }, (_, index) => [
+    null,
+    "bug",
+    `${titlePrefix} ${index.toString().padStart(3, "0")}`,
+    "open",
+    "medium",
+    1,
+    1,
+    index + 1,
+    1,
+    now,
+    now
+  ]);
+  const placeholders = rows.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+
+  await testDb.pool.query(
+    `INSERT INTO tickets (parent_id, type, title, status, priority, reporter_user_id, responsible_user_id, position, version, created_at, updated_at) VALUES ${placeholders}`,
+    rows.flat()
+  );
+}
 
 describe("Tickets API", () => {
   let testDb: TestDb;
@@ -394,6 +427,43 @@ describe("Tickets API", () => {
       origin: "direct"
     });
     expect((res.body as TestTicket[]).find((ticket) => ticket.id === globalTicket.id)?.visibleParent).toBeNull();
+  });
+
+  it("GET /api/tickets listet 500 Tickets ohne Pool-Queue-Überlauf", async () => {
+    const project = await createProject(app, { name: "Ticket-Skalierungsprojekt" });
+    await insertTicketsDirectly(testDb, 500, "Scale Ticket");
+
+    const [linkedRows] = await testDb.pool.query("SELECT id FROM tickets WHERE title = ?", ["Scale Ticket 123"]);
+    const linkedTicketId = Number((linkedRows as Array<{ id: number }>)[0].id);
+    await testDb.pool.query("INSERT INTO project_tickets (owner_id, ticket_id, position) VALUES (?, ?, ?)", [
+      project.id,
+      linkedTicketId,
+      1024
+    ]);
+
+    const res = await supertest(app.server).get("/api/tickets").expect(200);
+    const tickets = res.body as TestTicket[];
+    const linkedTicket = tickets.find((ticket) => ticket.id === linkedTicketId);
+
+    expect(tickets).toHaveLength(500);
+    expect(linkedTicket).toMatchObject({
+      id: linkedTicketId,
+      reporterUserId: 1,
+      reporterUser: { id: 1, email: "admin@local" },
+      responsibleUserId: 1,
+      responsibleUser: { id: 1, email: "admin@local" },
+      visibleParent: {
+        type: "project",
+        id: project.id,
+        label: "Ticket-Skalierungsprojekt",
+        origin: "direct"
+      },
+      tags: [],
+      subTicketCount: 0,
+      attachmentCount: 0,
+      noteCount: 0,
+      commentCount: 0
+    });
   });
 
   it("GET /api/tickets liefert Support-Counter fuer Tickets", async () => {
