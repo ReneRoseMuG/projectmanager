@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 02.07.26 | 15:35:35 | Fix | DayPlan Aufgaben-Tab | ✅ |
 | 02.07.26 | 14:09:25 | Feature | Kontextbaum Verschieben | ⚠️ |
 | 01.07.26 | 17:26:50 | Fix | Ticket-Listen-Skalierung | ✅ |
 | 01.07.26 | 17:12:47 | Fix | Notizen API Pool Queue | ✅ |

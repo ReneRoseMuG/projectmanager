@@ -51,6 +51,7 @@ function DayPlanTasks({
   dayPlanDate,
   tasks,
   loading,
+  error,
   createTask,
   unlinkTask,
   updateTask,
@@ -58,6 +59,7 @@ function DayPlanTasks({
   dayPlanDate: string;
   tasks: TaskBoardItem[];
   loading: boolean;
+  error: string | null;
   createTask: ReturnType<typeof useDayPlan>["createTask"];
   unlinkTask: (taskId: number) => Promise<void>;
   updateTask: ReturnType<typeof useDayPlan>["updateTask"];
@@ -128,6 +130,7 @@ function DayPlanTasks({
 
   return (
     <>
+      {error ? <div className="rounded-md border border-crimson/30 bg-crimson/10 p-3 text-sm text-crimson">{error}</div> : null}
       <TaskListBoardView
         boardId="dayplan-tasks"
         tasks={tasks}
@@ -254,6 +257,7 @@ export function DayPlanPage() {
                   dayPlanDate={date}
                   tasks={dayPlanTasks.tasks}
                   loading={dayPlanTasks.loading}
+                  error={dayPlanTasks.error}
                   createTask={createTask}
                   unlinkTask={dayPlanTasks.unlinkTask}
                   updateTask={updateTask}

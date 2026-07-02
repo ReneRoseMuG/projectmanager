@@ -21,7 +21,7 @@ import {
   type JournalFieldDefinition,
   type JournalObjectRef
 } from "./journal.service.js";
-import { mapTask } from "./tasks.service.js";
+import { mapTask, mapTaskBoardItems } from "./tasks.service.js";
 import { normalizeAssignableUserId } from "./users.service.js";
 
 type TaskRecord = typeof tasks.$inferSelect;
@@ -245,7 +245,7 @@ export async function listDayPlanTasksForUser(database: DbClient, userId: number
       unique.push(row);
     }
   }
-  return Promise.all(unique.map((row) => mapDayPlanTask(database, row)));
+  return mapTaskBoardItems(database, unique);
 }
 
 export async function listDayPlanEventsForUser(database: DbClient, userId: number): Promise<CalendarEvent[]> {

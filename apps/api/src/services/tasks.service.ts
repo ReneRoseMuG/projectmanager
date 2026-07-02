@@ -36,7 +36,7 @@ export type DashboardTaskOwner = { type: "project" | "milestone" | "task" | "day
 export type DashboardOverdueTaskOwner = { type: "project" | "milestone" | "dayPlan"; id: number };
 
 type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "responsibleUserId" | "dueDate" | "version" | "createdAt" | "updatedAt">;
-type OwnerTaskRecord = MappableTaskRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
+export type OwnerTaskRecord = MappableTaskRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
 interface SupportCounts {
   attachmentCount: number;
   noteCount: number;
@@ -107,6 +107,17 @@ async function mapTaskBoardItem(database: DbClient, record: OwnerTaskRecord, tag
     ...(await mapTask(database, record, Promise.resolve(tags ?? []), Promise.resolve(subtaskCount ?? 0), record.visibleParent, Promise.resolve(supportCounts ?? emptySupportCounts))),
     boardPosition: record.boardPosition
   };
+}
+
+export async function mapTaskBoardItems(database: DbClient, rows: OwnerTaskRecord[]): Promise<TaskBoardItem[]> {
+  const ids = rows.map((task) => task.id);
+  const [tagsByTask, subtaskCounts, supportCountsMap] = await Promise.all([
+    getTaskTagsMap(database, ids),
+    getSubtaskCounts(database, ids),
+    getTaskSupportCounts(database, ids)
+  ]);
+
+  return Promise.all(rows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, supportCountsMap.get(task.id) ?? emptySupportCounts)));
 }
 
 async function ensureProjectExists(database: DbClient, projectId: number): Promise<void> {

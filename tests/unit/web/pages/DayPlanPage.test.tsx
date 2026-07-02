@@ -19,9 +19,11 @@
  * - Der Kalender-Tab rendert den Dashboard-Kontext dayPlanCalendar.
  * - Der Aufgaben-Tab verwendet TaskListBoardView und keinen Verknüpfen-Button.
  * - Der Aufgaben-Create-Flow öffnet das TaskForm-Modal.
+ * - Fehler beim Laden der datumsübergreifenden Aufgaben werden sichtbar angezeigt.
  *
  * Fehlerfälle:
  * - Rückfall auf alte Aufgaben-UI oder falschen Dashboard-Kontext.
+ * - Fehlgeschlagene Aufgabenabfrage darf nicht still als leere Liste erscheinen.
  *
  * Ziel:
  * Die persönliche Planung gegen Regressionen in Tab-Reihenfolge, Aufgabenansicht und Create-Flow absichern.
@@ -37,6 +39,7 @@ import { DayPlanPage } from "../../../../apps/web/src/pages/DayPlanPage";
 const createTaskMock = vi.hoisted(() => vi.fn());
 const unlinkTaskMock = vi.hoisted(() => vi.fn());
 const updateTaskMock = vi.hoisted(() => vi.fn());
+const dayPlanTasksState = vi.hoisted(() => ({ error: null as string | null }));
 
 const tasks: TaskBoardItem[] = [
   {
@@ -74,7 +77,7 @@ vi.mock("../../../../apps/web/src/hooks/useDayPlan", () => ({
   useDayPlanTasks: () => ({
     tasks,
     loading: false,
-    error: null,
+    error: dayPlanTasksState.error,
     unlinkTask: unlinkTaskMock,
   }),
 }));
@@ -164,6 +167,7 @@ afterEach(() => {
   createTaskMock.mockReset();
   unlinkTaskMock.mockReset();
   updateTaskMock.mockReset();
+  dayPlanTasksState.error = null;
 });
 
 function renderPage() {
@@ -206,6 +210,15 @@ describe("DayPlanPage", () => {
     const tabLabels = screen.getAllByRole("button").map((button) => button.textContent?.trim() ?? "");
     // tasks-Fixture hat genau 1 Eintrag; dayPlan.tasks ist leer → Zähler (1) muss aus useDayPlanTasks stammen.
     expect(tabLabels.some((label) => label.startsWith("Aufgaben") && label.includes("1"))).toBe(true);
+  });
+
+  it("zeigt Fehler beim Laden der datumsübergreifenden Aufgaben im Aufgaben-Tab", () => {
+    dayPlanTasksState.error = "Aufgaben konnten nicht geladen werden";
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Aufgaben/ }));
+
+    expect(screen.getByText("Aufgaben konnten nicht geladen werden")).toBeInTheDocument();
   });
 
   it("Übersicht-Tab zeigt DashboardView mit dayPlan-Kontext", () => {
