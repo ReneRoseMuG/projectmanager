@@ -13,6 +13,7 @@
   UserOption,
   VisibleParentContext
 } from "@taskmanager/shared-types";
+import type { TicketMoveInput } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureTickets, features, milestoneTickets, milestones, projectTickets, projects, taskTickets, tasks, ticketAttachments, ticketComments, ticketNotes, ticketRelations, tickets, useCases, useCaseTickets, wikiPageTickets, wikiPages } from "../db/schema.js";
@@ -929,6 +930,116 @@ export async function createSubTicket(database: DbClient, parentId: number, inpu
     return ticket;
   });
   return mapTicket(database, created, Promise.resolve([]), Promise.resolve(0));
+}
+
+type TicketMoveSource = TicketMoveInput["source"];
+type TicketMoveTarget = TicketMoveInput["target"];
+
+function ticketMoveOwner(owner: TicketMoveSource | TicketMoveTarget): TicketOwner {
+  if (owner.type === "project") {
+    return { type: "project", id: owner.id };
+  }
+  if (owner.type === "milestone") {
+    return { type: "milestone", id: owner.id };
+  }
+  if (owner.type === "task") {
+    return { type: "task", id: owner.id };
+  }
+  throw badRequest("Tickets können in diesem Kontext nicht als Board-Zuordnung verschoben werden");
+}
+
+async function ensureTicketHasNoChildren(database: DbClient, ticketId: number): Promise<void> {
+  const child = firstRow(await database.select({ id: tickets.id }).from(tickets).where(eq(tickets.parentId, ticketId)));
+  if (child) {
+    throw badRequest("Tickets mit Sub-Tickets können nicht unter ein anderes Ticket verschoben werden");
+  }
+}
+
+async function deleteAllOwnerTicketLinks(database: DbClient, ticketId: number): Promise<void> {
+  await database.delete(projectTickets).where(eq(projectTickets.ticketId, ticketId));
+  await database.delete(milestoneTickets).where(eq(milestoneTickets.ticketId, ticketId));
+  await database.delete(taskTickets).where(eq(taskTickets.ticketId, ticketId));
+  await database.delete(featureTickets).where(eq(featureTickets.ticketId, ticketId));
+  await database.delete(useCaseTickets).where(eq(useCaseTickets.ticketId, ticketId));
+  await database.delete(wikiPageTickets).where(eq(wikiPageTickets.ticketId, ticketId));
+}
+
+async function assertTicketMoveSource(database: DbClient, ticket: TicketRecord, source: TicketMoveSource): Promise<void> {
+  if (source.type === "ticket") {
+    if (ticket.parentId !== source.id) {
+      throw notFound(`Ticket ${ticket.id} is not linked to ticket ${source.id}`);
+    }
+    return;
+  }
+  const linked = getOwnerTicketRow(await selectOwnerTicketRows(database, ticketMoveOwner(source)), ticket.id);
+  if (!linked) {
+    throw notFound(`Ticket ${ticket.id} is not linked to ${source.type} ${source.id}`);
+  }
+}
+
+function sameTicketMoveOwner(a: TicketMoveSource | TicketMoveTarget, b: TicketMoveSource | TicketMoveTarget): boolean {
+  return a.type === b.type && a.id === b.id;
+}
+
+async function moveTicketTargetContext(database: DbClient, target: TicketMoveTarget) {
+  if (target.type === "ticket") {
+    return makeJournalContext(ticketJournalObject(await getTicketRecord(database, target.id)), "parent");
+  }
+  return makeJournalContext(await getOwnerJournalObject(database, ticketMoveOwner(target)), "owner");
+}
+
+export async function moveTicket(database: DbClient, ticketId: number, input: TicketMoveInput, actor?: JournalActor | null): Promise<Ticket> {
+  if (sameTicketMoveOwner(input.source, input.target)) {
+    throw badRequest("Quelle und Ziel dürfen nicht identisch sein");
+  }
+
+  const ticket = await getTicketRecord(database, ticketId);
+  await assertTicketMoveSource(database, ticket, input.source);
+
+  const updated = await database.transaction(async (tx) => {
+    const txDb = tx as unknown as DbClient;
+    const current = await getTicketRecord(txDb, ticketId);
+    await assertTicketMoveSource(txDb, current, input.source);
+
+    const values: Partial<Pick<TicketRecord, "parentId" | "position">> = {};
+    if (input.target.type === "ticket") {
+      if (input.target.id === ticketId) {
+        throw badRequest("Ein Ticket kann nicht unter sich selbst verschoben werden");
+      }
+      const targetTicket = await getTicketRecord(txDb, input.target.id);
+      if (targetTicket.parentId !== null) {
+        throw badRequest("Sub-Tickets können keine weiteren Sub-Tickets erhalten");
+      }
+      await ensureTicketHasNoChildren(txDb, ticketId);
+      await deleteAllOwnerTicketLinks(txDb, ticketId);
+      values.parentId = input.target.id;
+      values.position = await nextPosition(txDb, current.status, input.target.id);
+    } else {
+      const owner = ticketMoveOwner(input.target);
+      await ensureOwnerExists(txDb, owner);
+      if (input.source.type !== "ticket") {
+        await deleteOwnerTicketLink(txDb, ticketMoveOwner(input.source), ticketId);
+      }
+      await insertOwnerTicket(txDb, owner, ticketId, await nextOwnerPosition(txDb, owner, current.status));
+      values.parentId = null;
+    }
+
+    const moved = await ticketRepository.update(txDb, ticketId, input.expectedVersion, values, actor?.actorUserId ?? undefined);
+    if (!moved) {
+      throw notFound(`Ticket with id ${ticketId} not found`);
+    }
+    const ticketObject = ticketJournalObject(moved);
+    await recordJournalEntry(txDb, {
+      operation: "update",
+      object: ticketObject,
+      summary: `Ticket "${moved.title}" verschoben`,
+      actor,
+      contexts: [await moveTicketTargetContext(txDb, input.target)]
+    });
+    return moved;
+  });
+
+  return mapTicket(database, updated);
 }
 
 export async function updateTicket(database: DbClient, id: number, input: TicketUpdate, actor?: JournalActor | null): Promise<Ticket> {

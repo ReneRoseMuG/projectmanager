@@ -1,5 +1,6 @@
 ﻿import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { CommentInput, NoteInput, TicketInput, TicketPositionInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
+import type { TicketMoveInput } from "@taskmanager/shared-types";
 import { TICKET_RELATION_TYPES, TICKET_RESOLUTIONS } from "../db/schema.js";
 import { createTicketAttachment, deleteAttachment, listTicketAttachments } from "../services/attachments.service.js";
 import { createEntityComment, deleteEntityComment, listEntityComments } from "../services/comments.service.js";
@@ -23,6 +24,7 @@ import {
   listSubTickets,
   listTicketRelations,
   listTickets,
+  moveTicket,
   removeTicketRelation,
   unlinkOwnerTicket,
   updateTicket,
@@ -79,6 +81,33 @@ const ticketPositionSchema = {
   properties: {
     status: { type: "string", minLength: 1 },
     position: { type: "number" },
+    ...expectedVersionPropertySchema
+  }
+} as const;
+
+const ticketMoveSchema = {
+  type: "object",
+  required: ["source", "target", "expectedVersion"],
+  additionalProperties: false,
+  properties: {
+    source: {
+      type: "object",
+      required: ["type", "id"],
+      additionalProperties: false,
+      properties: {
+        type: { type: "string", enum: ["project", "milestone", "task", "ticket"] },
+        id: { type: "integer", minimum: 1 }
+      }
+    },
+    target: {
+      type: "object",
+      required: ["type", "id"],
+      additionalProperties: false,
+      properties: {
+        type: { type: "string", enum: ["project", "milestone", "task", "ticket"] },
+        id: { type: "integer", minimum: 1 }
+      }
+    },
     ...expectedVersionPropertySchema
   }
 } as const;
@@ -321,6 +350,12 @@ export async function registerTicketsRoutes(app: FastifyInstance): Promise<void>
     "/tickets/:id",
     { schema: { params: idParamSchema, body: ticketPatchSchema, response: { 200: objectResponseSchema } } },
     async (request) => updateTicket(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
+  );
+
+  app.patch<{ Params: { id: number }; Body: TicketMoveInput }>(
+    "/tickets/:id/location",
+    { schema: { params: idParamSchema, body: ticketMoveSchema, response: { 200: objectResponseSchema } } },
+    async (request) => moveTicket(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.patch<{ Params: { id: number }; Body: TicketPositionInput }>(

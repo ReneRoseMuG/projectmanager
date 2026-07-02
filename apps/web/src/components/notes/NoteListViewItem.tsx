@@ -1,5 +1,5 @@
 import type { Note } from "@taskmanager/shared-types";
-import { Edit3, ExternalLink, StickyNote, Trash2 } from "lucide-react";
+import { Edit3, ExternalLink, MoveRight, StickyNote, Trash2 } from "lucide-react";
 import { objectReference } from "../../lib/references";
 import { formatHumanDate } from "../../utils/date";
 import { ActionMenu } from "../ui/ActionMenu";
@@ -11,10 +11,11 @@ interface NoteListViewItemProps {
   note: Note;
   onEdit: (note: Note) => void;
   onOpenInTab?: (note: Note) => void;
+  onMove?: (note: Note) => void;
   onDelete?: (note: Note) => void;
 }
 
-export function NoteListViewItem({ note, onEdit, onOpenInTab, onDelete }: NoteListViewItemProps) {
+export function NoteListViewItem({ note, onEdit, onOpenInTab, onMove, onDelete }: NoteListViewItemProps) {
   const preview = noteContentToPreviewText(note.contentJson);
   const footer = (note.parentContexts?.length ?? 0) > 0 ? <ParentBadges parents={note.parentContexts} /> : undefined;
 
@@ -39,6 +40,7 @@ export function NoteListViewItem({ note, onEdit, onOpenInTab, onDelete }: NoteLi
           items={[
             { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onEdit(note) },
             ...(onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(note) }] : []),
+            ...(onMove ? [{ label: "Verschieben", icon: <MoveRight size={16} />, onClick: () => onMove(note) }] : []),
             ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(note), danger: true }] : []),
           ]}
         />

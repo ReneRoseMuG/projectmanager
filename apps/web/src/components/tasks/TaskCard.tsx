@@ -1,5 +1,5 @@
 import type { Tag, Task } from "@taskmanager/shared-types";
-import { CheckCircle2, Edit3, ExternalLink, Trash2 } from "lucide-react";
+import { CheckCircle2, Edit3, ExternalLink, MoveRight, Trash2 } from "lucide-react";
 import { useCatalogs } from "../../hooks/useCatalogs";
 import { objectReference } from "../../lib/references";
 import { catalogColor, isCatalogStatusClosed } from "../../utils/catalogs";
@@ -21,13 +21,14 @@ interface TaskCardProps {
   variant?: "card" | "row";
   onOpen: (task: Task) => void;
   onOpenInTab?: (task: Task) => void;
+  onMove?: (task: Task) => void;
   onDelete?: (task: Task) => void;
   onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>;
   onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>;
   onTagsChange?: (taskId: number, tagIds: number[]) => void | Promise<void>;
 }
 
-export function TaskCard({ task, allTags, compact = false, variant = "card", onOpen, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange }: TaskCardProps) {
+export function TaskCard({ task, allTags, compact = false, variant = "card", onOpen, onOpenInTab, onMove, onDelete, onStatusChange, onDueDateChange, onTagsChange }: TaskCardProps) {
   const catalogs = useCatalogs();
   const description = richTextToPlainText(task.description);
   const statusColor = catalogColor(catalogs.entries, "workStatus", task.status);
@@ -37,9 +38,9 @@ export function TaskCard({ task, allTags, compact = false, variant = "card", onO
     return (
       <>
         <div className="md:hidden">
-          <TaskCard task={task} allTags={allTags} compact={compact} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
+          <TaskCard task={task} allTags={allTags} compact={compact} onOpen={onOpen} onOpenInTab={onOpenInTab} onMove={onMove} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
         </div>
-        <TaskRow task={task} allTags={allTags} description={description} statusColor={statusColor} taskClosed={taskClosed} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
+        <TaskRow task={task} allTags={allTags} description={description} statusColor={statusColor} taskClosed={taskClosed} onOpen={onOpen} onOpenInTab={onOpenInTab} onMove={onMove} onDelete={onDelete} onStatusChange={onStatusChange} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />
       </>
     );
   }
@@ -53,7 +54,10 @@ export function TaskCard({ task, allTags, compact = false, variant = "card", onO
       footer={<TaskCardFooter task={task} allTags={allTags} taskClosed={taskClosed} onDueDateChange={onDueDateChange} onTagsChange={onTagsChange} />}
       onOpen={() => onOpen(task)}
       onEdit={() => onOpen(task)}
-      extraMenuItems={onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(task) }] : []}
+      extraMenuItems={[
+        ...(onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(task) }] : []),
+        ...(onMove ? [{ label: "Verschieben", icon: <MoveRight size={16} />, onClick: () => onMove(task) }] : [])
+      ]}
       onDelete={onDelete ? () => onDelete(task) : undefined}
       className={compact ? "p-4" : ""}
     />
@@ -128,7 +132,7 @@ function TaskSupportFooter({ task, allTags, onTagsChange, bordered = true }: { t
   );
 }
 
-function TaskRow({ task, allTags, description, statusColor, taskClosed, onOpen, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange }: { task: Task; allTags?: Tag[]; description: string; statusColor: string; taskClosed: boolean; onOpen: (task: Task) => void; onOpenInTab?: (task: Task) => void; onDelete?: (task: Task) => void; onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (taskId: number, tagIds: number[]) => void | Promise<void> }) {
+function TaskRow({ task, allTags, description, statusColor, taskClosed, onOpen, onOpenInTab, onMove, onDelete, onStatusChange, onDueDateChange, onTagsChange }: { task: Task; allTags?: Tag[]; description: string; statusColor: string; taskClosed: boolean; onOpen: (task: Task) => void; onOpenInTab?: (task: Task) => void; onMove?: (task: Task) => void; onDelete?: (task: Task) => void; onStatusChange?: (task: Task, status: Task["status"]) => void | Promise<unknown>; onDueDateChange?: (task: Task, dueDate: string | null) => void | Promise<unknown>; onTagsChange?: (taskId: number, tagIds: number[]) => void | Promise<void> }) {
   const overdue = !taskClosed && isOverdue(task.dueDate);
   const closedDate = taskClosed ? task.updatedAt : null;
 
@@ -161,6 +165,7 @@ function TaskRow({ task, allTags, description, statusColor, taskClosed, onOpen, 
             items={[
               { label: "Bearbeiten", icon: <Edit3 size={16} />, onClick: () => onOpen(task) },
               ...(onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(task) }] : []),
+              ...(onMove ? [{ label: "Verschieben", icon: <MoveRight size={16} />, onClick: () => onMove(task) }] : []),
               ...(onDelete ? [{ label: "Löschen", icon: <Trash2 size={16} />, onClick: () => onDelete(task), danger: true }] : [])
             ]}
           />

@@ -1,4 +1,4 @@
-import type { TaskBoardItem, TaskBoardPositionInput, TaskInput, TaskStatus, TaskUpdate } from "@taskmanager/shared-types";
+import type { TaskBoardItem, TaskBoardPositionInput, TaskInput, TaskMoveInput, TaskStatus, TaskUpdate } from "@taskmanager/shared-types";
 import type { QueryClient } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
@@ -8,6 +8,7 @@ import {
   getOwnerTasks,
   getTasks,
   linkOwnerTask as linkOwnerTaskRequest,
+  moveTaskLocation as moveTaskLocationRequest,
   type TaskOwner,
   unlinkOwnerTask as unlinkOwnerTaskRequest,
   updateOwnerTaskBoard as updateOwnerTaskBoardRequest,
@@ -163,6 +164,14 @@ export function useTasks(owner?: TaskOwner | null) {
     }
   });
 
+  const moveTaskMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: TaskMoveInput }) => moveTaskLocationRequest(id, input),
+    onSuccess: (updated) => {
+      void invalidateOwner(queryClient, validOwner, updated.id);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.root });
+    }
+  });
+
   const updateTaskTagsMutation = useMutation({
     mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTaskTags(id, tagIds),
     onSuccess: (_tags, { id }) => {
@@ -249,6 +258,13 @@ export function useTasks(owner?: TaskOwner | null) {
     [updateTaskMutation]
   );
 
+  const moveTask = useCallback(
+    async (id: number, input: TaskMoveInput) => {
+      return moveTaskMutation.mutateAsync({ id, input });
+    },
+    [moveTaskMutation]
+  );
+
   const updateTaskStatus = useCallback(
     async (id: number, status: TaskStatus, expectedVersion: number) => {
       return updateTaskStatusMutation.mutateAsync({ id, status, expectedVersion });
@@ -286,6 +302,7 @@ export function useTasks(owner?: TaskOwner | null) {
     linkTask,
     unlinkTask,
     updateTask,
+    moveTask,
     updateTaskStatus,
     updateTaskTags,
     updateTaskBoard,

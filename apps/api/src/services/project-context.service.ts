@@ -9,6 +9,7 @@ import {
   milestoneTickets,
   milestones,
   projectFeatures,
+  projects,
   projectTasks,
   projectTickets,
   taskTickets,

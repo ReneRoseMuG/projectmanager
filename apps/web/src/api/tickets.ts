@@ -6,6 +6,7 @@ import type {
   Ticket,
   TicketDetail,
   TicketInput,
+  TicketMoveInput,
   TicketOwner,
   TicketPositionInput,
   TicketRelationEntry,
@@ -88,6 +89,10 @@ export async function unlinkOwnerTicket(owner: TicketOwner, ticketId: number): P
 
 export async function updateTicket(id: number, input: TicketUpdate): Promise<Ticket> {
   return api.patch(`tickets/${id}`, { json: input }).json<Ticket>();
+}
+
+export async function moveTicketLocation(id: number, input: TicketMoveInput): Promise<Ticket> {
+  return api.patch(`tickets/${id}/location`, { json: input }).json<Ticket>();
 }
 
 export async function updateTicketPosition(id: number, input: TicketPositionInput): Promise<Ticket> {

@@ -1,6 +1,7 @@
 ﻿import type { FastifyInstance } from "fastify";
 import type { ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { createProject, deleteProject, getProject, listProjects, updateProject } from "../services/projects.service.js";
+import { getProjectContextTree, resolveProjectIdForMoveOwner } from "../services/project-context-tree.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
@@ -30,8 +31,24 @@ const projectPatchSchema = {
   }
 } as const;
 
+const contextTreeQuerySchema = {
+  type: "object",
+  required: ["ownerType", "ownerId"],
+  additionalProperties: false,
+  properties: {
+    ownerType: { type: "string", enum: ["project", "milestone", "task", "ticket"] },
+    ownerId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
 export async function registerProjectsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/projects", { schema: { response: { 200: arrayResponseSchema } } }, async () => listProjects(app.db));
+
+  app.get<{ Querystring: { ownerType: "project" | "milestone" | "task" | "ticket"; ownerId: number } }>(
+    "/projects/context-tree",
+    { schema: { querystring: contextTreeQuerySchema, response: { 200: objectResponseSchema } } },
+    async (request) => getProjectContextTree(app.db, await resolveProjectIdForMoveOwner(app.db, { type: request.query.ownerType, id: request.query.ownerId }))
+  );
 
   app.post<{ Body: ProjectInput }>(
     "/projects",
@@ -46,6 +63,12 @@ export async function registerProjectsRoutes(app: FastifyInstance): Promise<void
     "/projects/:id",
     { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => getProject(app.db, request.params.id)
+  );
+
+  app.get<{ Params: { id: number } }>(
+    "/projects/:id/context-tree",
+    { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
+    async (request) => getProjectContextTree(app.db, request.params.id)
   );
 
   app.patch<{ Params: { id: number }; Body: ProjectUpdate }>(

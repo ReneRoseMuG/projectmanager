@@ -12,6 +12,7 @@ interface SubtaskListProps {
   onCreate: (status?: Task["status"]) => void;
   onOpen: (task: Task) => void;
   onOpenInTab?: (task: Task) => void;
+  onMove?: (task: Task) => void;
   onUpdate: (id: number, input: TaskUpdate) => Promise<unknown>;
   onDelete: (id: number) => Promise<void>;
   onTagsChange?: (taskId: number, tagIds: number[]) => Promise<void>;
@@ -24,6 +25,7 @@ export function SubtaskList({
   onCreate,
   onOpen,
   onOpenInTab,
+  onMove,
   onUpdate,
   onDelete,
   onTagsChange,
@@ -39,6 +41,7 @@ export function SubtaskList({
         onAddStatus={(status) => onCreate(status)}
         onOpen={onOpen}
         onOpenInTab={onOpenInTab}
+        onMove={onMove}
         onDelete={(subtask) => void onDelete(subtask.id).catch(() => undefined)}
         onStatusChange={(subtask, status) =>
           onUpdate(subtask.id, { status, expectedVersion: subtask.version })

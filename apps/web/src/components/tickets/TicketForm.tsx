@@ -63,6 +63,7 @@ import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { Pill } from "../ui/Pill";
+import { ProjectContextTreeDialog, type MoveTarget } from "../ui/ProjectContextTreeDialog";
 import { CatalogSelect } from "../ui/CatalogSelect";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
@@ -200,6 +201,7 @@ export function TicketForm({
   const [pendingNotes, setPendingNotes] = useState<DraftNote[]>([]);
   const [pendingFiles, setPendingFiles] = useState<DraftFile[]>([]);
   const [subTicketDraftOpen, setSubTicketDraftOpen] = useState(false);
+  const [movingSubTicket, setMovingSubTicket] = useState<Ticket | null>(null);
   const [relationDraftOpen, setRelationDraftOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
@@ -507,6 +509,7 @@ export function TicketForm({
                         ticket={subTicket}
                         variant="row"
                         onOpen={(item) => onOpenTicket?.(item)}
+                        onMove={setMovingSubTicket}
                         onDelete={async (item) => {
                           try {
                             await detail.removeSubTicket(item.id);
@@ -656,6 +659,7 @@ export function TicketForm({
                   owner={{ type: "ticket", id: ticket.id }}
                   onCreate={createNote}
                   onEdit={setEditingNote}
+                  onMove={(note, target) => notes.moveNote(note.id, { source: { type: "ticket", id: ticket.id }, target })}
                   onDelete={(note) => {
                     void confirm({
                       title: "Notiz löschen?",
@@ -743,6 +747,27 @@ export function TicketForm({
           </Section>
         ) : null}
       </FormModal>
+
+      <ProjectContextTreeDialog
+        open={Boolean(movingSubTicket && ticket)}
+        source={ticket ? { type: "ticket", id: ticket.id } : null}
+        itemType="ticket"
+        itemId={movingSubTicket?.id ?? null}
+        onSelect={async (target: MoveTarget) => {
+          if (!movingSubTicket || !ticket) return;
+          try {
+            await detail.moveSubTicket(movingSubTicket.id, { source: { type: "ticket", id: ticket.id }, target, expectedVersion: movingSubTicket.version });
+            await detail.reload();
+            await onChanged?.();
+            showToast({ tone: "success", title: "Ticket verschoben" });
+            setMovingSubTicket(null);
+          } catch (ticketError) {
+            showToast({ tone: "error", title: "Ticket konnte nicht verschoben werden", message: errorMessage(ticketError) });
+            throw ticketError;
+          }
+        }}
+        onClose={() => setMovingSubTicket(null)}
+      />
 
       <SubTicketDraftDialog
         open={subTicketDraftOpen}

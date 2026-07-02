@@ -22,6 +22,7 @@ interface TicketListBoardViewProps {
   onAddStatus?: (status: Ticket["status"]) => void;
   onOpen: (ticket: Ticket) => void;
   onOpenInTab?: (ticket: Ticket) => void;
+  onMove?: (ticket: Ticket) => void;
   onDelete: (ticket: Ticket) => void;
   onStatusChange?: (ticket: Ticket, status: Ticket["status"]) => void | Promise<unknown>;
   onDueDateChange?: (ticket: Ticket, dueDate: string | null) => void | Promise<unknown>;
@@ -58,6 +59,7 @@ export function TicketListBoardView({
   onAddStatus,
   onOpen,
   onOpenInTab,
+  onMove,
   onDelete,
   onStatusChange,
   onDueDateChange,
@@ -132,7 +134,7 @@ export function TicketListBoardView({
         />
       }
       renderCard={(ticket) => (
-        <TicketCard ticket={ticket} allTags={editableTags} onOpen={onOpen} onOpenInTab={onOpenInTab} onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />
+        <TicketCard ticket={ticket} allTags={editableTags} onOpen={onOpen} onOpenInTab={onOpenInTab} onMove={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onMove} onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete} onStatusChange={readOnly ? undefined : onStatusChange} onDueDateChange={readOnly ? undefined : onDueDateChange} onTagsChange={handleTagsChange} />
       )}
       renderRow={(ticket) => (
         <TicketCard
@@ -141,6 +143,7 @@ export function TicketListBoardView({
           variant="row"
           onOpen={onOpen}
           onOpenInTab={onOpenInTab}
+          onMove={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onMove}
           onDelete={readOnly || ticket.visibleParent?.origin === "inherited" ? undefined : onDelete}
           onStatusChange={readOnly ? undefined : onStatusChange}
           onDueDateChange={readOnly ? undefined : onDueDateChange}

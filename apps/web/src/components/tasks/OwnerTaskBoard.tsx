@@ -1,4 +1,4 @@
-import type { TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
+import type { MoveOwner, TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { withStandaloneView } from "../../utils/standalone";
@@ -9,6 +9,7 @@ import { useTasks } from "../../hooks/useTasks";
 import { useViewMode } from "../../hooks/useViewMode";
 import { resolveCatalogEntryKey } from "../../utils/catalogs";
 import { OwnerRelationBoard } from "../ui/OwnerRelationBoard";
+import { ProjectContextTreeDialog, type MoveTarget } from "../ui/ProjectContextTreeDialog";
 import { useToast } from "../ui/ToastProvider";
 import { TaskLinkDialog } from "./TaskLinkDialog";
 import { TaskListBoardView } from "./TaskListBoardView";
@@ -25,6 +26,13 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
   const catalogs = useCatalogs();
   const { viewMode, setViewMode } = useViewMode();
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [moveTask, setMoveTask] = useState<TaskBoardItem | null>(null);
+  const movableOwner: MoveOwner<"project" | "milestone"> | null =
+    owner.type === "project"
+      ? { type: "project", id: owner.id }
+      : owner.type === "milestone"
+        ? { type: "milestone", id: owner.id }
+        : null;
 
   const returnTo = `${location.pathname}${location.search}`;
   const defaultStatus = resolveCatalogEntryKey(catalogs.entries, "workStatus", "active", "active") ?? "active";
@@ -82,6 +90,7 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
             onAddStatus={(status) => props.onAddStatus?.(status)}
             onOpen={(task) => props.onOpen(task as TaskBoardItem)}
             onOpenInTab={(task) => window.open(withStandaloneView(`/tasks/${task.id}`), "_blank")}
+            onMove={movableOwner ? (task) => setMoveTask(task as TaskBoardItem) : undefined}
             onDelete={(task) => props.onDelete(task as TaskBoardItem)}
             onStatusChange={(task, status) => updateTaskStatus(task as TaskBoardItem, status)}
             onDueDateChange={(task, dueDate) => updateTaskDueDate(task as TaskBoardItem, dueDate)}
@@ -105,6 +114,27 @@ export function OwnerTaskBoard({ owner }: OwnerTaskBoardProps) {
           }
         }}
         onClose={() => setLinkDialogOpen(false)}
+      />
+
+      <ProjectContextTreeDialog
+        open={Boolean(moveTask && movableOwner)}
+        source={movableOwner}
+        itemType="task"
+        itemId={moveTask?.id ?? null}
+        onSelect={async (target: MoveTarget) => {
+          if (!moveTask || !movableOwner) return;
+          if (target.type === "ticket") return;
+          const taskTarget: MoveOwner<"project" | "milestone" | "task"> = { type: target.type, id: target.id };
+          try {
+            await taskController.moveTask(moveTask.id, { source: movableOwner, target: taskTarget, expectedVersion: moveTask.version });
+            showToast({ tone: "success", title: "Aufgabe verschoben" });
+            setMoveTask(null);
+          } catch (taskError) {
+            showToast({ tone: "error", title: "Aufgabe konnte nicht verschoben werden", message: errorMessage(taskError) });
+            throw taskError;
+          }
+        }}
+        onClose={() => setMoveTask(null)}
       />
     </>
   );

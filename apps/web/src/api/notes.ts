@@ -1,4 +1,4 @@
-import type { Note, NoteInput, NoteUpdate } from "@taskmanager/shared-types";
+import type { Note, NoteInput, NoteMoveInput, NoteUpdate } from "@taskmanager/shared-types";
 import { api } from "./client";
 
 export async function getNote(id: number): Promise<Note> {
@@ -59,6 +59,10 @@ export async function unlinkDayPlanNote(dayPlanId: number, noteId: number): Prom
 
 export async function updateNote(id: number, input: NoteUpdate): Promise<Note> {
   return api.patch(`notes/${id}`, { json: input }).json<Note>();
+}
+
+export async function moveNoteLocation(id: number, input: NoteMoveInput): Promise<Note> {
+  return api.patch(`notes/${id}/location`, { json: input }).json<Note>();
 }
 
 export async function deleteNote(id: number): Promise<void> {

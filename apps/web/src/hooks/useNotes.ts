@@ -1,4 +1,4 @@
-import type { NoteInput, NoteUpdate } from "@taskmanager/shared-types";
+import type { NoteInput, NoteMoveInput, NoteUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
@@ -12,6 +12,7 @@ import {
   getProjectNotes,
   getTaskNotes,
   getWikiPageNotes,
+  moveNoteLocation as moveNoteLocationRequest,
   unlinkDayPlanNote,
   updateNote as updateNoteRequest,
   createWikiPageNote
@@ -102,6 +103,15 @@ export function useNotes(owner: NoteOwner | null) {
     }
   });
 
+  const moveNoteMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: NoteMoveInput }) => moveNoteLocationRequest(id, input),
+    onSuccess: (_updated, { input }) => {
+      void invalidateNotes(queryClient, input.source.type, input.source.id);
+      void invalidateNotes(queryClient, input.target.type, input.target.id);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.root });
+    }
+  });
+
   const removeNoteMutation = useMutation({
     mutationFn: (id: number) => (ownerType === "dayPlan" && ownerId !== undefined ? unlinkDayPlanNote(ownerId, id) : deleteNoteRequest(id)),
     onSuccess: () => {
@@ -125,6 +135,13 @@ export function useNotes(owner: NoteOwner | null) {
     [updateNoteMutation]
   );
 
+  const moveNote = useCallback(
+    async (id: number, input: NoteMoveInput) => {
+      return moveNoteMutation.mutateAsync({ id, input });
+    },
+    [moveNoteMutation]
+  );
+
   const removeNote = useCallback(
     async (id: number) => {
       await removeNoteMutation.mutateAsync(id);
@@ -139,6 +156,7 @@ export function useNotes(owner: NoteOwner | null) {
     reload,
     createNote,
     updateNote,
+    moveNote,
     removeNote
   };
 }

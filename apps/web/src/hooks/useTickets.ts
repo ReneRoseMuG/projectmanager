@@ -1,4 +1,4 @@
-import type { TicketInput, TicketPositionInput, TicketUpdate } from "@taskmanager/shared-types";
+import type { TicketInput, TicketMoveInput, TicketPositionInput, TicketUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
@@ -8,6 +8,7 @@ import {
   getOwnerTickets,
   getTickets,
   linkOwnerTicket as linkOwnerTicketRequest,
+  moveTicketLocation as moveTicketLocationRequest,
   setTicketTags,
   type TicketOwner,
   unlinkOwnerTicket as unlinkOwnerTicketRequest,
@@ -95,6 +96,14 @@ export function useTickets(owner?: TicketOwner | null) {
     }
   });
 
+  const moveTicketMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: TicketMoveInput }) => moveTicketLocationRequest(id, input),
+    onSuccess: (updated) => {
+      void invalidateTicketScope(queryClient, validOwner, updated.id);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.root });
+    }
+  });
+
   const updateTicketTagsMutation = useMutation({
     mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) => setTicketTags(id, tagIds),
     onSuccess: (_tags, { id }) => {
@@ -144,6 +153,13 @@ export function useTickets(owner?: TicketOwner | null) {
     [updateTicketMutation]
   );
 
+  const moveTicket = useCallback(
+    async (id: number, input: TicketMoveInput) => {
+      return moveTicketMutation.mutateAsync({ id, input });
+    },
+    [moveTicketMutation]
+  );
+
   const updateTicketPosition = useCallback(
     async (id: number, input: TicketPositionInput) => {
       return updateTicketPositionMutation.mutateAsync({ id, input });
@@ -174,6 +190,7 @@ export function useTickets(owner?: TicketOwner | null) {
     linkTicket,
     unlinkTicket,
     updateTicket,
+    moveTicket,
     updateTicketPosition,
     updateTicketTags,
     removeTicket

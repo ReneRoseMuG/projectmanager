@@ -1,10 +1,10 @@
-import type { CommentInput, CommentUpdate, Tag, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+import type { CommentInput, CommentUpdate, Tag, TaskInput, TaskMoveInput, TaskUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import { createComment as createCommentRequest, deleteComment as deleteCommentRequest, updateComment as updateCommentRequest } from "../api/comments";
 import { createSubtask as createSubtaskRequest } from "../api/subtasks";
 import { setTaskTags } from "../api/tags";
-import { deleteTask, getTask, updateTask as updateTaskRequest } from "../api/tasks";
+import { deleteTask, getTask, moveTaskLocation, updateTask as updateTaskRequest } from "../api/tasks";
 import { invalidateComments, invalidateTags, invalidateTaskScope } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
@@ -71,6 +71,15 @@ export function useTaskDetail(taskId: number | null) {
     onSuccess: async (updated) => {
       await invalidateTaskScope(queryClient, updated.id);
       await invalidateTaskScope(queryClient, validTaskId);
+    }
+  });
+
+  const moveSubtaskMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: TaskMoveInput }) => moveTaskLocation(id, input),
+    onSuccess: async (updated) => {
+      await invalidateTaskScope(queryClient, updated.id);
+      await invalidateTaskScope(queryClient, validTaskId);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects.root });
     }
   });
 
@@ -156,6 +165,13 @@ export function useTaskDetail(taskId: number | null) {
     [removeSubtaskMutation]
   );
 
+  const moveSubtask = useCallback(
+    async (id: number, input: TaskMoveInput) => {
+      return moveSubtaskMutation.mutateAsync({ id, input });
+    },
+    [moveSubtaskMutation]
+  );
+
   const createComment = useCallback(
     async (input: CommentInput) => {
       return createCommentMutation.mutateAsync(input);
@@ -186,6 +202,7 @@ export function useTaskDetail(taskId: number | null) {
     updateTags,
     createSubtask,
     updateSubtask,
+    moveSubtask,
     removeSubtask,
     createComment,
     updateComment,

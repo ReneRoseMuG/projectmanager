@@ -1,4 +1,5 @@
 ﻿import type { TaskBoardPositionInput, TaskInput, TaskUpdate } from "@taskmanager/shared-types";
+import type { TaskMoveInput } from "@taskmanager/shared-types";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requireCurrentUser } from "../plugins/auth.js";
 import {
@@ -12,6 +13,7 @@ import {
   listTaskLinkCandidates,
   listOwnerTasks,
   listTasks,
+  moveTask,
   unlinkOwnerTask,
   updateOwnerTaskBoard,
   updateTask
@@ -53,6 +55,33 @@ const taskBoardPositionSchema = {
   properties: {
     status: { type: "string", minLength: 1 },
     position: { type: "number" },
+    ...expectedVersionPropertySchema
+  }
+} as const;
+
+const taskMoveSchema = {
+  type: "object",
+  required: ["source", "target", "expectedVersion"],
+  additionalProperties: false,
+  properties: {
+    source: {
+      type: "object",
+      required: ["type", "id"],
+      additionalProperties: false,
+      properties: {
+        type: { type: "string", enum: ["project", "milestone", "task", "ticket"] },
+        id: { type: "integer", minimum: 1 }
+      }
+    },
+    target: {
+      type: "object",
+      required: ["type", "id"],
+      additionalProperties: false,
+      properties: {
+        type: { type: "string", enum: ["project", "milestone", "task"] },
+        id: { type: "integer", minimum: 1 }
+      }
+    },
     ...expectedVersionPropertySchema
   }
 } as const;
@@ -361,6 +390,12 @@ export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
     "/tasks/:id",
     { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => getTaskDetail(app.db, request.params.id)
+  );
+
+  app.patch<{ Params: { id: number }; Body: TaskMoveInput }>(
+    "/tasks/:id/location",
+    { schema: { params: idParamSchema, body: taskMoveSchema, response: { 200: objectResponseSchema } } },
+    async (request) => moveTask(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.patch<{ Params: { id: number }; Body: TaskUpdate }>(

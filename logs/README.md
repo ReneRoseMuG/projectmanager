@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 02.07.26 | 14:09:25 | Feature | Kontextbaum Verschieben | ⚠️ |
 | 01.07.26 | 17:26:50 | Fix | Ticket-Listen-Skalierung | ✅ |
 | 01.07.26 | 17:12:47 | Fix | Notizen API Pool Queue | ✅ |
 | 01.07.26 | 17:09:26 | Fix | Ticket-Navigation Parent-Kontext | ✅ |

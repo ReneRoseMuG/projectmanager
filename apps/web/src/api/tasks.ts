@@ -1,4 +1,4 @@
-import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskUpdate } from "@taskmanager/shared-types";
+import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskMoveInput, TaskOwner, TaskUpdate } from "@taskmanager/shared-types";
 import { api } from "./client";
 
 export type { TaskOwner };
@@ -83,6 +83,10 @@ export async function createSubtask(taskId: number, input: TaskInput): Promise<T
 
 export async function updateTask(id: number, input: TaskUpdate): Promise<Task> {
   return api.patch(`tasks/${id}`, { json: input }).json<Task>();
+}
+
+export async function moveTaskLocation(id: number, input: TaskMoveInput): Promise<Task> {
+  return api.patch(`tasks/${id}/location`, { json: input }).json<Task>();
 }
 
 export async function deleteTask(id: number): Promise<void> {

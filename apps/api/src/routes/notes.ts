@@ -1,5 +1,5 @@
 ﻿import type { FastifyInstance } from "fastify";
-import type { NoteInput, NoteUpdate } from "@taskmanager/shared-types";
+import type { NoteInput, NoteMoveInput, NoteUpdate } from "@taskmanager/shared-types";
 import { requireCurrentUser } from "../plugins/auth.js";
 import {
   createDayPlanNote,
@@ -17,6 +17,7 @@ import {
   listProjectNotes,
   listTaskNotes,
   listWikiPageNotes,
+  moveNote,
   updateNote
 } from "../services/notes.service.js";
 import { createJournalActor } from "../services/journal.service.js";
@@ -38,6 +39,32 @@ const notePatchSchema = {
   properties: {
     ...noteBodySchema.properties,
     ...expectedVersionPropertySchema
+  }
+} as const;
+
+const noteMoveSchema = {
+  type: "object",
+  required: ["source", "target"],
+  additionalProperties: false,
+  properties: {
+    source: {
+      type: "object",
+      required: ["type", "id"],
+      additionalProperties: false,
+      properties: {
+        type: { type: "string", enum: ["project", "milestone", "task", "ticket"] },
+        id: { type: "integer", minimum: 1 }
+      }
+    },
+    target: {
+      type: "object",
+      required: ["type", "id"],
+      additionalProperties: false,
+      properties: {
+        type: { type: "string", enum: ["project", "milestone", "task", "ticket"] },
+        id: { type: "integer", minimum: 1 }
+      }
+    }
   }
 } as const;
 
@@ -137,6 +164,12 @@ export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
     "/notes/:id",
     { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => getNote(app.db, request.params.id)
+  );
+
+  app.patch<{ Params: { id: number }; Body: NoteMoveInput }>(
+    "/notes/:id/location",
+    { schema: { params: idParamSchema, body: noteMoveSchema, response: { 200: objectResponseSchema } } },
+    async (request) => moveNote(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
   app.patch<{ Params: { id: number }; Body: NoteUpdate }>(

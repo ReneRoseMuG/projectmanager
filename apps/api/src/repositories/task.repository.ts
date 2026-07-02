@@ -6,7 +6,7 @@ import { assertVersion } from "./base.repository.js";
 
 export type TaskRecord = typeof tasks.$inferSelect;
 export type TaskCreateData = Omit<typeof tasks.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
-export type TaskUpdateData = Partial<Pick<TaskCreateData, "title" | "description" | "status" | "priority" | "responsibleUserId" | "dueDate">>;
+export type TaskUpdateData = Partial<Pick<TaskCreateData, "parentId" | "title" | "description" | "status" | "priority" | "responsibleUserId" | "dueDate">>;
 
 function nowIso(): string {
   return new Date().toISOString();

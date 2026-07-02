@@ -1,4 +1,4 @@
-import type { CommentInput, CommentUpdate, Tag, TicketInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
+import type { CommentInput, CommentUpdate, Tag, TicketInput, TicketMoveInput, TicketRelationInput, TicketUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
@@ -11,6 +11,7 @@ import {
   createSubTicket as createSubTicketRequest,
   deleteTicket,
   getTicket,
+  moveTicketLocation,
   removeTicketRelation as removeTicketRelationRequest,
   setTicketTags,
   updateTicket as updateTicketRequest
@@ -81,6 +82,15 @@ export function useTicketDetail(ticketId: number | null) {
     onSuccess: (updated) => {
       void invalidateTicketScope(queryClient, undefined, updated.id);
       void invalidateTicketScope(queryClient, undefined, validTicketId);
+    }
+  });
+
+  const moveSubTicketMutation = useMutation({
+    mutationFn: ({ id, input }: { id: number; input: TicketMoveInput }) => moveTicketLocation(id, input),
+    onSuccess: (updated) => {
+      void invalidateTicketScope(queryClient, undefined, updated.id);
+      void invalidateTicketScope(queryClient, undefined, validTicketId);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projects.root });
     }
   });
 
@@ -195,6 +205,13 @@ export function useTicketDetail(ticketId: number | null) {
     [removeSubTicketMutation]
   );
 
+  const moveSubTicket = useCallback(
+    async (id: number, input: TicketMoveInput) => {
+      return moveSubTicketMutation.mutateAsync({ id, input });
+    },
+    [moveSubTicketMutation]
+  );
+
   const addRelation = useCallback(
     async (input: TicketRelationInput) => {
       await addRelationMutation.mutateAsync(input);
@@ -239,6 +256,7 @@ export function useTicketDetail(ticketId: number | null) {
     updateTags,
     createSubTicket,
     updateSubTicket,
+    moveSubTicket,
     removeSubTicket,
     addRelation,
     removeRelation,

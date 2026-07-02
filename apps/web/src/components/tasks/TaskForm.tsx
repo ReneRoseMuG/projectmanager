@@ -12,6 +12,7 @@ import type {
   TicketStatus,
   TicketType,
   VisibleParentContext,
+  MoveOwner,
 } from "@taskmanager/shared-types";
 import { Bug, Flag, Link2, ListChecks, ListTodo, Users } from "lucide-react";
 import type { FormEvent } from "react";
@@ -63,6 +64,7 @@ import { PendingFileList } from "../ui/PendingFileList";
 import { PendingNoteList } from "../ui/PendingNoteList";
 import { PendingRelationList } from "../ui/PendingRelationList";
 import { Pill } from "../ui/Pill";
+import { ProjectContextTreeDialog, type MoveTarget } from "../ui/ProjectContextTreeDialog";
 import { CatalogSelect } from "../ui/CatalogSelect";
 import { PrioritySelect } from "../ui/PrioritySelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
@@ -203,6 +205,7 @@ export function TaskForm({
   const [pendingTickets, setPendingTickets] = useState<DraftTicket[]>([]);
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
   const [pendingNotes, setPendingNotes] = useState<DraftNote[]>([]);
+  const [movingSubtask, setMovingSubtask] = useState<Task | null>(null);
   const [pendingFiles, setPendingFiles] = useState<DraftFile[]>([]);
   const [subtaskDraftOpen, setSubtaskDraftOpen] = useState(false);
   const [subtaskInitialStatus, setSubtaskInitialStatus] = useState<TaskStatus | undefined>();
@@ -622,6 +625,7 @@ export function TaskForm({
                 onCreate={openSubtaskDraft}
                 onOpen={openSubtask}
                 onOpenInTab={(subtask) => window.open(withStandaloneView(`/tasks/${subtask.id}`), "_blank")}
+                onMove={setMovingSubtask}
                 onUpdate={async (id, input) => {
                   try {
                     await detail.updateSubtask(id, input);
@@ -792,6 +796,7 @@ export function TaskForm({
                   owner={{ type: "task", id: task.id }}
                   onCreate={createNote}
                   onEdit={setEditingNote}
+                  onMove={(note, target) => notes.moveNote(note.id, { source: { type: "task", id: task.id }, target })}
                   onDelete={(note) => {
                     void confirm({
                       title: "Notiz löschen?",
@@ -921,6 +926,28 @@ export function TaskForm({
           setTicketLinkOpen(false);
         }}
         onClose={() => setTicketLinkOpen(false)}
+      />
+      <ProjectContextTreeDialog
+        open={Boolean(movingSubtask && task)}
+        source={task ? { type: "task", id: task.id } : null}
+        itemType="task"
+        itemId={movingSubtask?.id ?? null}
+        onSelect={async (target: MoveTarget) => {
+          if (!movingSubtask || !task) return;
+          if (target.type === "ticket") return;
+          const taskTarget: MoveOwner<"project" | "milestone" | "task"> = { type: target.type, id: target.id };
+          try {
+            await detail.moveSubtask(movingSubtask.id, { source: { type: "task", id: task.id }, target: taskTarget, expectedVersion: movingSubtask.version });
+            await detail.reload();
+            await onChanged?.();
+            showToast({ tone: "success", title: "Aufgabe verschoben" });
+            setMovingSubtask(null);
+          } catch (taskError) {
+            showToast({ tone: "error", title: "Aufgabe konnte nicht verschoben werden", message: errorMessage(taskError) });
+            throw taskError;
+          }
+        }}
+        onClose={() => setMovingSubtask(null)}
       />
       <TaskDraftDialog
         open={subtaskDraftOpen}

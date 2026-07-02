@@ -869,6 +869,40 @@ export interface NoteInput {
 
 export type NoteUpdate = WithExpectedVersion<NoteInput>;
 
+export type ProjectContextTreeNodeType = "project" | "milestone" | "task" | "ticket" | "note";
+
+export interface ProjectContextTreeNode {
+  type: ProjectContextTreeNodeType;
+  id: number;
+  label: string;
+  children: ProjectContextTreeNode[];
+}
+
+export type MovableOwnerType = "project" | "milestone" | "task" | "ticket";
+export type TaskMoveTargetType = "project" | "milestone" | "task";
+export type TicketMoveTargetType = "project" | "milestone" | "task" | "ticket";
+export type NoteMoveTargetType = "project" | "milestone" | "task" | "ticket";
+
+export type MoveOwner<TType extends string = MovableOwnerType> = {
+  type: TType;
+  id: number;
+};
+
+export type TaskMoveInput = WithExpectedVersion<{
+  source: MoveOwner<MovableOwnerType>;
+  target: MoveOwner<TaskMoveTargetType>;
+}>;
+
+export type TicketMoveInput = WithExpectedVersion<{
+  source: MoveOwner<MovableOwnerType>;
+  target: MoveOwner<TicketMoveTargetType>;
+}>;
+
+export interface NoteMoveInput {
+  source: MoveOwner<MovableOwnerType>;
+  target: MoveOwner<NoteMoveTargetType>;
+}
+
 export interface Attachment {
   id: number;
   owners: AttachmentOwner[];

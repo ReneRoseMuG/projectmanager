@@ -1,5 +1,5 @@
 import type { Note } from "@taskmanager/shared-types";
-import { ExternalLink, StickyNote } from "lucide-react";
+import { ExternalLink, MoveRight, StickyNote } from "lucide-react";
 import { objectReference } from "../../lib/references";
 import { formatHumanDate } from "../../utils/date";
 import { ItemCard } from "../ui/ItemCard";
@@ -10,6 +10,7 @@ interface NoteCardProps {
   note: Note;
   onEdit: (note: Note) => void;
   onOpenInTab?: (note: Note) => void;
+  onMove?: (note: Note) => void;
   onDelete?: (note: Note) => void;
 }
 
@@ -39,7 +40,7 @@ function NoteFooter({ note }: { note: Note }) {
   );
 }
 
-export function NoteCard({ note, onEdit, onOpenInTab, onDelete }: NoteCardProps) {
+export function NoteCard({ note, onEdit, onOpenInTab, onMove, onDelete }: NoteCardProps) {
   const preview = noteContentToPreviewText(note.contentJson);
 
   return (
@@ -50,7 +51,10 @@ export function NoteCard({ note, onEdit, onOpenInTab, onDelete }: NoteCardProps)
       footer={<NoteFooter note={note} />}
       onOpen={() => onEdit(note)}
       onEdit={() => onEdit(note)}
-      extraMenuItems={onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(note) }] : []}
+      extraMenuItems={[
+        ...(onOpenInTab ? [{ label: "In Tab öffnen", icon: <ExternalLink size={16} />, onClick: () => onOpenInTab(note) }] : []),
+        ...(onMove ? [{ label: "Verschieben", icon: <MoveRight size={16} />, onClick: () => onMove(note) }] : [])
+      ]}
       onDelete={onDelete ? () => onDelete(note) : undefined}
       className="min-h-56"
     />

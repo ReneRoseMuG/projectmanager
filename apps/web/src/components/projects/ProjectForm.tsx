@@ -1098,6 +1098,7 @@ export function ProjectForm({
                   owner={{ type: "project", id: project.id }}
                   onCreate={createNote}
                   onEdit={setEditingNote}
+                  onMove={(note, target) => notes.moveNote(note.id, { source: { type: "project", id: project.id }, target })}
                   onDelete={(note) => void notes.removeNote(note.id)}
                 />
                 <NoteEditor

@@ -1,4 +1,4 @@
-import type { Note, NoteInput, NoteUpdate, VisibleParentContext } from "@taskmanager/shared-types";
+import type { MoveOwner, Note, NoteInput, NoteMoveInput, NoteUpdate, VisibleParentContext } from "@taskmanager/shared-types";
 import { and, eq, inArray } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
 import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
@@ -446,6 +446,108 @@ export async function linkDayPlanNote(database: DbClient, dayPlanId: number, not
     await recordJournalEntry(tx, { operation: "link", object: noteObject, summary: buildLinkSummary(ownerObject, noteObject), actor, contexts: [makeJournalContext(ownerObject, "owner")] });
   });
   return mapNote(note);
+}
+
+type MovableNoteOwner = MoveOwner<"project" | "milestone" | "task" | "ticket">;
+
+function sameNoteOwner(a: MovableNoteOwner, b: MovableNoteOwner): boolean {
+  return a.type === b.type && a.id === b.id;
+}
+
+async function ensureMovableNoteOwnerExists(database: DbClient, owner: MovableNoteOwner): Promise<void> {
+  if (owner.type === "project") {
+    await ensureProjectExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "milestone") {
+    await ensureMilestoneExists(database, owner.id);
+    return;
+  }
+  if (owner.type === "task") {
+    await ensureTaskExists(database, owner.id);
+    return;
+  }
+  await ensureTicketExists(database, owner.id);
+}
+
+async function hasNoteOwner(database: DbSession, owner: MovableNoteOwner, noteId: number): Promise<boolean> {
+  if (owner.type === "project") {
+    return Boolean(firstRow(await database.select({ noteId: projectNotes.noteId }).from(projectNotes).where(and(eq(projectNotes.projectId, owner.id), eq(projectNotes.noteId, noteId)))));
+  }
+  if (owner.type === "milestone") {
+    return Boolean(firstRow(await database.select({ noteId: milestoneNotes.noteId }).from(milestoneNotes).where(and(eq(milestoneNotes.milestoneId, owner.id), eq(milestoneNotes.noteId, noteId)))));
+  }
+  if (owner.type === "task") {
+    return Boolean(firstRow(await database.select({ noteId: taskNotes.noteId }).from(taskNotes).where(and(eq(taskNotes.taskId, owner.id), eq(taskNotes.noteId, noteId)))));
+  }
+  return Boolean(firstRow(await database.select({ noteId: ticketNotes.noteId }).from(ticketNotes).where(and(eq(ticketNotes.ticketId, owner.id), eq(ticketNotes.noteId, noteId)))));
+}
+
+async function insertNoteOwner(database: DbSession, owner: MovableNoteOwner, noteId: number): Promise<void> {
+  if (await hasNoteOwner(database, owner, noteId)) {
+    return;
+  }
+  if (owner.type === "project") {
+    await database.insert(projectNotes).values({ projectId: owner.id, noteId });
+    return;
+  }
+  if (owner.type === "milestone") {
+    await database.insert(milestoneNotes).values({ milestoneId: owner.id, noteId });
+    return;
+  }
+  if (owner.type === "task") {
+    await database.insert(taskNotes).values({ taskId: owner.id, noteId });
+    return;
+  }
+  await database.insert(ticketNotes).values({ ticketId: owner.id, noteId });
+}
+
+async function deleteNoteOwner(database: DbSession, owner: MovableNoteOwner, noteId: number): Promise<number> {
+  if (owner.type === "project") {
+    return mutationAffectedRows(await database.delete(projectNotes).where(and(eq(projectNotes.projectId, owner.id), eq(projectNotes.noteId, noteId))));
+  }
+  if (owner.type === "milestone") {
+    return mutationAffectedRows(await database.delete(milestoneNotes).where(and(eq(milestoneNotes.milestoneId, owner.id), eq(milestoneNotes.noteId, noteId))));
+  }
+  if (owner.type === "task") {
+    return mutationAffectedRows(await database.delete(taskNotes).where(and(eq(taskNotes.taskId, owner.id), eq(taskNotes.noteId, noteId))));
+  }
+  return mutationAffectedRows(await database.delete(ticketNotes).where(and(eq(ticketNotes.ticketId, owner.id), eq(ticketNotes.noteId, noteId))));
+}
+
+export async function moveNote(database: DbClient, id: number, input: NoteMoveInput, actor?: JournalActor | null): Promise<Note> {
+  if (sameNoteOwner(input.source, input.target)) {
+    throw badRequest("Quelle und Ziel dürfen nicht identisch sein");
+  }
+  await ensureMovableNoteOwnerExists(database, input.source);
+  await ensureMovableNoteOwnerExists(database, input.target);
+  const note = await noteRepository.findById(database, id);
+  if (!note) {
+    throw notFound(`Note with id ${id} not found`);
+  }
+  if (!(await hasNoteOwner(database, input.source, id))) {
+    throw notFound(`Note ${id} is not linked to ${input.source.type} ${input.source.id}`);
+  }
+
+  await database.transaction(async (tx) => {
+    const deleted = await deleteNoteOwner(tx, input.source, id);
+    if (deleted === 0) {
+      throw notFound(`Note ${id} is not linked to ${input.source.type} ${input.source.id}`);
+    }
+    await insertNoteOwner(tx, input.target, id);
+    const noteObject = noteJournalObject(note);
+    const sourceObject = await getOwnerJournalObject(tx, input.source);
+    const targetObject = await getOwnerJournalObject(tx, input.target);
+    await recordJournalEntry(tx, {
+      operation: "update",
+      object: noteObject,
+      summary: `Notiz "${note.title}" verschoben`,
+      actor,
+      contexts: [makeJournalContext(sourceObject, "owner"), makeJournalContext(targetObject, "owner")]
+    });
+  });
+
+  return getNote(database, id);
 }
 
 export async function getNote(database: DbClient, id: number): Promise<Note> {

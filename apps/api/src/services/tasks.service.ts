@@ -1,4 +1,5 @@
 ﻿import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskStats, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
+import type { TaskMoveInput } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { dayPlans, dayPlanTasks, featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks, wikiPageTasks, wikiPages } from "../db/schema.js";
@@ -821,6 +822,113 @@ export async function unlinkOwnerTask(database: DbClient, owner: TaskOwner, task
       contexts: [makeJournalContext(ownerObject, "owner")]
     });
   });
+}
+
+type TaskMoveSource = TaskMoveInput["source"];
+type TaskMoveTarget = TaskMoveInput["target"];
+
+function taskMoveOwner(owner: TaskMoveSource | TaskMoveTarget): TaskOwner {
+  if (owner.type === "project") {
+    return { type: "project", id: owner.id };
+  }
+  if (owner.type === "milestone") {
+    return { type: "milestone", id: owner.id };
+  }
+  throw badRequest("Aufgaben können in diesem Kontext nicht als Board-Zuordnung verschoben werden");
+}
+
+async function ensureTaskHasNoChildren(database: DbClient, taskId: number): Promise<void> {
+  const child = firstRow(await database.select({ id: tasks.id }).from(tasks).where(eq(tasks.parentId, taskId)));
+  if (child) {
+    throw badRequest("Aufgaben mit Unteraufgaben können nicht unter eine andere Aufgabe verschoben werden");
+  }
+}
+
+async function deleteAllOwnerTaskLinks(database: DbClient, taskId: number): Promise<void> {
+  await database.delete(projectTasks).where(eq(projectTasks.taskId, taskId));
+  await database.delete(milestoneTasks).where(eq(milestoneTasks.taskId, taskId));
+  await database.delete(featureTasks).where(eq(featureTasks.taskId, taskId));
+  await database.delete(useCaseTasks).where(eq(useCaseTasks.taskId, taskId));
+  await database.delete(wikiPageTasks).where(eq(wikiPageTasks.taskId, taskId));
+}
+
+async function assertTaskMoveSource(database: DbClient, task: TaskRecord, source: TaskMoveSource): Promise<void> {
+  if (source.type === "task") {
+    if (task.parentId !== source.id) {
+      throw notFound(`Task ${task.id} is not linked to task ${source.id}`);
+    }
+    return;
+  }
+  if (source.type === "ticket") {
+    throw badRequest("Aufgaben können nicht aus Tickets verschoben werden");
+  }
+  const linked = getOwnerTaskRow(await selectOwnerTaskRows(database, taskMoveOwner(source)), task.id);
+  if (!linked) {
+    throw notFound(`Task ${task.id} is not linked to ${source.type} ${source.id}`);
+  }
+}
+
+function sameTaskMoveOwner(a: TaskMoveSource | TaskMoveTarget, b: TaskMoveSource | TaskMoveTarget): boolean {
+  return a.type === b.type && a.id === b.id;
+}
+
+async function moveTaskTargetContext(database: DbClient, target: TaskMoveTarget) {
+  if (target.type === "task") {
+    return makeJournalContext(taskJournalObject(await getTaskRecord(database, target.id)), "parent");
+  }
+  return makeJournalContext(await getOwnerJournalObject(database, taskMoveOwner(target)), "owner");
+}
+
+export async function moveTask(database: DbClient, taskId: number, input: TaskMoveInput, actor?: JournalActor | null): Promise<Task> {
+  if (sameTaskMoveOwner(input.source, input.target)) {
+    throw badRequest("Quelle und Ziel dürfen nicht identisch sein");
+  }
+
+  const task = await getTaskRecord(database, taskId);
+  await assertTaskMoveSource(database, task, input.source);
+
+  const updated = await database.transaction(async (tx) => {
+    const txDb = tx as unknown as DbClient;
+    const current = await getTaskRecord(txDb, taskId);
+    await assertTaskMoveSource(txDb, current, input.source);
+
+    let nextParentId: number | null = null;
+    if (input.target.type === "task") {
+      if (input.target.id === taskId) {
+        throw badRequest("Eine Aufgabe kann nicht unter sich selbst verschoben werden");
+      }
+      const targetTask = await getTaskRecord(txDb, input.target.id);
+      if (targetTask.parentId !== null) {
+        throw badRequest("Unteraufgaben können keine weiteren Unteraufgaben erhalten");
+      }
+      await ensureTaskHasNoChildren(txDb, taskId);
+      await deleteAllOwnerTaskLinks(txDb, taskId);
+      nextParentId = input.target.id;
+    } else {
+      const owner = taskMoveOwner(input.target);
+      await ensureOwnerExists(txDb, owner);
+      if (input.source.type !== "task" && input.source.type !== "ticket") {
+        await deleteOwnerTaskLink(txDb, taskMoveOwner(input.source), taskId);
+      }
+      await insertOwnerTask(txDb, owner, taskId, await nextOwnerPosition(txDb, owner, current.status));
+    }
+
+    const moved = await taskRepository.update(txDb, taskId, input.expectedVersion, { parentId: nextParentId }, actor?.actorUserId ?? undefined);
+    if (!moved) {
+      throw notFound(`Task with id ${taskId} not found`);
+    }
+    const taskObject = taskJournalObject(moved);
+    await recordJournalEntry(txDb, {
+      operation: "update",
+      object: taskObject,
+      summary: `Aufgabe "${moved.title}" verschoben`,
+      actor,
+      contexts: [await moveTaskTargetContext(txDb, input.target)]
+    });
+    return moved;
+  });
+
+  return mapTask(database, updated);
 }
 
 export async function updateOwnerTaskBoard(database: DbClient, owner: TaskOwner, taskId: number, input: TaskBoardPositionInput, actor?: JournalActor | null): Promise<TaskBoardItem> {

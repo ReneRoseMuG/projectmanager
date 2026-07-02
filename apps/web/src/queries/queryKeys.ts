@@ -2,6 +2,7 @@ import type { CommentEntityType, DashboardContext, DashboardWidgetId, DashboardW
 
 export type NoteOwnerType = "project" | "milestone" | "task" | "ticket" | "dayPlan" | "wikiPage";
 export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket" | "wikiPage";
+export type MoveOwnerType = "project" | "milestone" | "task" | "ticket";
 export type TaskOwnerType = "project" | "milestone" | "feature" | "useCase" | "wikiPage";
 export type TicketOwnerType = "project" | "milestone" | "task" | "feature" | "useCase" | "wikiPage";
 
@@ -36,6 +37,7 @@ export const queryKeys = {
     root: ["projects"] as const,
     list: () => [...queryKeys.projects.root, "list"] as const,
     detail: (projectId: number) => [...queryKeys.projects.root, "detail", projectId] as const,
+    contextTree: (ownerType: MoveOwnerType, ownerId: number) => [...queryKeys.projects.root, "contextTree", ownerType, ownerId] as const,
     tasks: (projectId: number) => [...queryKeys.projects.detail(projectId), "tasks"] as const,
     tickets: (projectId: number) => [...queryKeys.projects.detail(projectId), "tickets"] as const,
     backlog: (projectId: number) => [...queryKeys.projects.detail(projectId), "backlog"] as const,

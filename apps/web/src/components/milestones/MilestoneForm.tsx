@@ -654,6 +654,7 @@ export function MilestoneForm({
                   owner={{ type: "milestone", id: milestone.id }}
                   onCreate={createNote}
                   onEdit={setEditingNote}
+                  onMove={(note, target) => notes.moveNote(note.id, { source: { type: "milestone", id: milestone.id }, target })}
                   onDelete={(note) => void notes.removeNote(note.id)}
                 />
                 <NoteEditor

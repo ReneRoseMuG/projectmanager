@@ -10,6 +10,7 @@ export type TicketUpdateData = Partial<
   Pick<
     TicketCreateData,
     | "type"
+    | "parentId"
     | "title"
     | "description"
     | "status"
