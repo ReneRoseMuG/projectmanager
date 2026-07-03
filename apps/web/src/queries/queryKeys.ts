@@ -121,6 +121,13 @@ export const queryKeys = {
     tasks: (pageId: number) => [...queryKeys.wiki.detail(pageId), "tasks"] as const,
     tickets: (pageId: number) => [...queryKeys.wiki.detail(pageId), "tickets"] as const
   },
+  documents: {
+    root: ["documents"] as const,
+    library: (filter: object = {}) => [...queryKeys.documents.root, "library", filter] as const,
+    detail: (id: number) => [...queryKeys.documents.root, "detail", id] as const,
+    categories: () => [...queryKeys.documents.root, "categories"] as const,
+    folders: () => [...queryKeys.documents.root, "folders"] as const
+  },
   events: {
     root: ["events"] as const,
     list: (rangeKey: string) => [...queryKeys.events.root, "list", rangeKey] as const

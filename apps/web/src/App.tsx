@@ -9,6 +9,7 @@ import { ToastProvider } from "./components/ui/ToastProvider";
 import { CalendarPage } from "./pages/CalendarPage";
 import { BacklogItemDetailPage } from "./pages/BacklogItemDetailPage";
 import { DayPlanPage } from "./pages/DayPlanPage";
+import { DocumentsPage } from "./pages/DocumentsPage";
 import { FeatureDetailPage } from "./pages/FeatureDetailPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
@@ -126,6 +127,7 @@ export default function App() {
       <Route path="/notes/:id" element={<NoteDetailPage />} />
       <Route path="/wiki" element={<WikiPage />} />
       <Route path="/wiki/:id" element={<WikiPage />} />
+      <Route path="/documents" element={<DocumentsPage />} />
       <Route path="/calendar" element={<CalendarPage />} />
       <Route path="/day-plan" element={dayPlanAccess ? <DayPlanPage /> : <ForbiddenPage />} />
       <Route path="/journal" element={<JournalPage />} />
