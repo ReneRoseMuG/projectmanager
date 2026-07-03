@@ -30,7 +30,6 @@ import { attachmentRepository, type AttachmentRecord } from "../repositories/att
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
 import { badRequest, internalError, notFound } from "../utils/errors.js";
 import { removeAttachmentPreviews } from "./attachment-preview.service.js";
-import { pushAttachmentToRemote, removeAttachmentFromRemote } from "./attachment-sync.service.js";
 import { watchAttachmentForChanges } from "./attachment-watcher.service.js";
 import type { FileOpener } from "./file-opener.service.js";
 import {
@@ -273,7 +272,6 @@ async function removeAttachmentFiles(records: AttachmentCleanupRecord[]): Promis
     const diskPath = path.join(config.uploadDir, record.filename);
     await fs.rm(diskPath, { force: true });
     await removeAttachmentPreviews(record.id);
-    removeAttachmentFromRemote(record.filename).catch(() => {});
   }
 }
 
@@ -337,7 +335,6 @@ async function persistAttachment(values: {
   const filename = makeFilename(values.upload.originalName);
   const diskPath = path.join(config.uploadDir, filename);
   await fs.writeFile(diskPath, values.upload.buffer);
-  pushAttachmentToRemote(filename, values.upload.buffer).catch(() => {});
 
   const created = await values.database.transaction(async (tx) => {
     const attachment = await attachmentRepository.create(tx, {

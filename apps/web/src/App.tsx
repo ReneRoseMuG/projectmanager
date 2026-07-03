@@ -22,7 +22,6 @@ import { NotesPage } from "./pages/NotesPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SetupPasswordPage } from "./pages/SetupPasswordPage";
-import { AttachmentSyncPage } from "./pages/admin/AttachmentSyncPage";
 import { SettingsCatalogsPage } from "./pages/SettingsCatalogsPage";
 import { SettingsPreferencesPage } from "./pages/SettingsPreferencesPage";
 import { SettingsTagsPage } from "./pages/SettingsTagsPage";
@@ -133,11 +132,9 @@ export default function App() {
       <Route path="/settings/preferences" element={<SettingsPreferencesPage />} />
       <Route path="/settings/catalogs" element={adminAccess ? <Navigate to="/admin/catalogs" replace /> : <ForbiddenPage />} />
       <Route path="/settings/tags" element={adminAccess ? <Navigate to="/admin/tags" replace /> : <ForbiddenPage />} />
-      <Route path="/settings/backup" element={adminAccess ? <Navigate to="/admin/sync" replace /> : <ForbiddenPage />} />
       <Route path="/admin" element={adminAccess ? <Navigate to="/admin/catalogs" replace /> : <ForbiddenPage />} />
       <Route path="/admin/catalogs" element={adminAccess ? <AdminLayout><SettingsCatalogsPage /></AdminLayout> : <ForbiddenPage />} />
       <Route path="/admin/tags" element={adminAccess ? <AdminLayout><SettingsTagsPage /></AdminLayout> : <ForbiddenPage />} />
-      <Route path="/admin/sync" element={adminAccess ? <AdminLayout><AttachmentSyncPage /></AdminLayout> : <ForbiddenPage />} />
       <Route path="/admin/users" element={adminAccess ? <AdminLayout><UsersPage /></AdminLayout> : <ForbiddenPage />} />
       <Route path="/admin/users/new" element={adminAccess ? <Navigate to="/admin/users" replace /> : <ForbiddenPage />} />
       <Route path="/admin/users/:id" element={adminAccess ? <Navigate to="/admin/users" replace /> : <ForbiddenPage />} />

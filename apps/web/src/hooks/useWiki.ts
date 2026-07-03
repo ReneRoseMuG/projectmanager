@@ -1,63 +1,48 @@
-import type { WikiBreadcrumb, WikiPage, WikiPageInput, WikiPageUpdate, WikiTreeMoveRequest } from "@taskmanager/shared-types";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { WikiPageInput, WikiPageUpdate, WikiTreeMoveRequest } from "@taskmanager/shared-types";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
   addWikiPageRelation,
   createWikiPage as createWikiPageRequest,
   deleteWikiPage as deleteWikiPageRequest,
-  getRootWikiPages,
-  getWikiBreadcrumb,
-  getWikiChildren,
   getWikiPage,
+  getWikiTree,
   moveWikiPage as moveWikiPageRequest,
   removeWikiPageRelation,
   updateWikiPage as updateWikiPageRequest
 } from "../api/wiki";
-import { invalidateWiki } from "../queries/invalidation";
+import { invalidateWiki, invalidateWikiDetail } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
-export interface WikiTreeNode extends WikiPage {
-  children: WikiTreeNode[];
-}
-
-interface WikiData {
-  tree: WikiTreeNode[];
-  page: WikiPage | null;
-  breadcrumb: WikiBreadcrumb[];
-}
-
-async function loadNode(page: WikiPage): Promise<WikiTreeNode> {
-  const children = page.childCount > 0 ? await getWikiChildren(page.id) : [];
-  return {
-    ...page,
-    children: await Promise.all(children.map(loadNode))
-  };
-}
-
-async function loadWikiData(pageId?: number): Promise<WikiData> {
-  const roots = await getRootWikiPages();
-  const tree = await Promise.all(roots.map(loadNode));
-  if (!pageId) {
-    return { tree, page: null, breadcrumb: [] };
-  }
-
-  const [page, breadcrumb] = await Promise.all([getWikiPage(pageId), getWikiBreadcrumb(pageId)]);
-  return { tree, page, breadcrumb };
-}
+export type { WikiTreeNode } from "@taskmanager/shared-types";
 
 export function useWiki(pageId?: number) {
   const queryClient = useQueryClient();
   const validPageId = pageId !== undefined && Number.isFinite(pageId) ? pageId : undefined;
 
-  const wikiQuery = useQuery({
-    queryKey: validPageId !== undefined ? queryKeys.wiki.detail(validPageId) : queryKeys.wiki.tree(),
-    queryFn: () => loadWikiData(validPageId)
+  // Der Navigationsbaum ist seitenunabhängig und wird unter einem eigenen Query-Key gehalten,
+  // damit er nur einmal geladen und beim Wechsel zwischen Seiten wiederverwendet wird.
+  const treeQuery = useQuery({
+    queryKey: queryKeys.wiki.tree(),
+    queryFn: getWikiTree
+  });
+
+  // Nur der Inhalt der aktiven Seite hängt an der pageId. keepPreviousData hält die vorige
+  // Seite sichtbar, bis die neue geladen ist — beim Wechsel kein Skeleton-/Header-Flackern.
+  const pageQuery = useQuery({
+    queryKey: queryKeys.wiki.detail(validPageId ?? -1),
+    queryFn: () => getWikiPage(validPageId!),
+    enabled: validPageId !== undefined,
+    placeholderData: keepPreviousData
   });
 
   const reload = useCallback(async () => {
-    await wikiQuery.refetch();
-  }, [wikiQuery]);
+    await Promise.all([
+      treeQuery.refetch(),
+      validPageId !== undefined ? pageQuery.refetch() : Promise.resolve()
+    ]);
+  }, [treeQuery, pageQuery, validPageId]);
 
   const createWikiPageMutation = useMutation({
     mutationFn: createWikiPageRequest,
@@ -67,9 +52,15 @@ export function useWiki(pageId?: number) {
   });
 
   const updateWikiPageMutation = useMutation({
-    mutationFn: ({ id, input }: { id: number; input: WikiPageUpdate }) => updateWikiPageRequest(id, input),
-    onSuccess: async () => {
-      await invalidateWiki(queryClient);
+    mutationFn: ({ id, input }: { id: number; input: WikiPageUpdate; affectsTree?: boolean }) => updateWikiPageRequest(id, input),
+    onSuccess: async (_data, variables) => {
+      // Reine Inhaltsänderungen berühren den Baum nicht (er zeigt nur Titel/Hierarchie),
+      // daher nur die Detailabfrage invalidieren und den Baum stehen lassen.
+      if (variables.affectsTree === false) {
+        await invalidateWikiDetail(queryClient, variables.id);
+      } else {
+        await invalidateWiki(queryClient);
+      }
     }
   });
 
@@ -95,8 +86,8 @@ export function useWiki(pageId?: number) {
   );
 
   const updateWikiPage = useCallback(
-    async (id: number, input: WikiPageUpdate) => {
-      return updateWikiPageMutation.mutateAsync({ id, input });
+    async (id: number, input: WikiPageUpdate, options?: { affectsTree?: boolean }) => {
+      return updateWikiPageMutation.mutateAsync({ id, input, affectsTree: options?.affectsTree });
     },
     [updateWikiPageMutation]
   );
@@ -132,11 +123,12 @@ export function useWiki(pageId?: number) {
   );
 
   return {
-    tree: wikiQuery.data?.tree ?? [],
-    page: wikiQuery.data?.page ?? null,
-    breadcrumb: wikiQuery.data?.breadcrumb ?? [],
-    loading: wikiQuery.isLoading,
-    error: toQueryError(wikiQuery.error),
+    tree: treeQuery.data ?? [],
+    // In der Listenansicht (keine pageId) nie eine – via keepPreviousData gehaltene – Seite durchreichen.
+    page: validPageId !== undefined ? pageQuery.data ?? null : null,
+    loading: treeQuery.isLoading,
+    pageLoading: validPageId !== undefined && pageQuery.isLoading,
+    error: toQueryError(treeQuery.error ?? pageQuery.error),
     reload,
     createWikiPage,
     updateWikiPage,

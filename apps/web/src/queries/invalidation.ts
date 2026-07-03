@@ -272,6 +272,12 @@ export async function invalidateWiki(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.wiki.root, queryKeys.globalSearch.root]);
 }
 
+// Reine Inhaltsänderung einer Seite: nur deren Detailabfrage, nicht der Baum und nicht die
+// (titelbasierte) globale Suche.
+export async function invalidateWikiDetail(queryClient: QueryClient, pageId: number): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.wiki.detail(pageId)]);
+}
+
 export async function invalidateEvents(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.events.root, queryKeys.dayPlans.root, queryKeys.dashboards.root]);
 }
@@ -306,7 +312,6 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.tickets.root,
     queryKeys.dashboards.root,
     queryKeys.settings.root,
-    queryKeys.attachmentSync.root,
     queryKeys.pushNotifications.root,
     queryKeys.journal.root,
     queryKeys.auth.root,
@@ -315,8 +320,4 @@ export async function invalidateWikiImportData(queryClient: QueryClient): Promis
     queryKeys.adminRoles.root,
     queryKeys.globalSearch.root
   ]);
-}
-
-export async function invalidateAttachmentSync(queryClient: QueryClient): Promise<void> {
-  await invalidateMany(queryClient, [queryKeys.attachmentSync.root]);
 }

@@ -16,7 +16,6 @@ import { registerCatalogRoutes } from "./routes/catalogs.js";
 import { registerDayPlanRoutes } from "./routes/day-plans.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
 import { registerDocLinksRoutes } from "./routes/doc-links.js";
-import { registerAttachmentSyncRoutes } from "./routes/attachment-sync.js";
 import { registerEventsRoutes } from "./routes/events.js";
 import { registerFeaturesRoutes } from "./routes/features.js";
 import { registerHealthRoutes } from "./routes/health.js";
@@ -43,7 +42,6 @@ import { createRealtimeEventBus } from "./services/realtime-event-bus.service.js
 import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
 import { seedAuthData } from "./services/auth.service.js";
 import { seedDefaultCatalogEntries } from "./services/catalogs.service.js";
-import { syncAttachmentsOnStartup } from "./services/attachment-sync.service.js";
 import { errorHandler } from "./utils/errors.js";
 
 export async function buildApp(
@@ -68,9 +66,6 @@ export async function buildApp(
   await registerRealtimePublisher(app);
   await seedAuthData(injectedDb);
   await seedDefaultCatalogEntries(injectedDb);
-  syncAttachmentsOnStartup().catch((err: unknown) => {
-    app.log.warn({ err }, "Attachment-Sync beim Start fehlgeschlagen");
-  });
 
   app.get("/health", async () => ({ ok: true }));
 
@@ -105,7 +100,6 @@ export async function buildApp(
   await app.register(registerDocLinksRoutes, { prefix: "/api" });
   await app.register(registerImportsRoutes, { prefix: "/api" });
   await app.register(registerJournalRoutes, { prefix: "/api" });
-  await app.register(registerAttachmentSyncRoutes, { prefix: "/api" });
 
   return app;
 }

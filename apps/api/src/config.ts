@@ -20,12 +20,6 @@ export interface AppConfig {
   previewConversionTimeoutMs: number;
   libreOfficePath: string;
   contentDir: string;
-  sftpHost: string;
-  sftpPort: number;
-  sftpUser: string;
-  sftpPassword: string;
-  attachmentSyncEnabled: boolean;
-  attachmentSyncRemoteDir: string;
   notificationsEnabled: boolean;
   notificationCron: string;
   smtpEnabled: boolean;
@@ -84,12 +78,6 @@ export const config: AppConfig = {
   previewConversionTimeoutMs: numberFromEnv(process.env.PREVIEW_CONVERSION_TIMEOUT_MS, 15000),
   libreOfficePath: process.env.LIBREOFFICE_PATH ?? "soffice",
   contentDir: resolveFromApiRoot(process.env.CONTENT_DIR ?? "./content"),
-  sftpHost: process.env.SFTP_HOST?.trim() ?? "",
-  sftpPort: numberFromEnv(process.env.SFTP_PORT, 22),
-  sftpUser: process.env.SFTP_USER?.trim() ?? "",
-  sftpPassword: process.env.SFTP_PASSWORD ?? "",
-  attachmentSyncEnabled: booleanFromEnv(process.env.ATTACHMENT_SYNC_ENABLED),
-  attachmentSyncRemoteDir: process.env.ATTACHMENT_SYNC_REMOTE_DIR?.trim() ?? "",
   notificationsEnabled: booleanFromEnv(process.env.NOTIFICATIONS_ENABLED),
   notificationCron: process.env.NOTIFICATION_CRON?.trim() || "* * * * *",
   smtpEnabled: booleanFromEnv(process.env.SMTP_ENABLED),

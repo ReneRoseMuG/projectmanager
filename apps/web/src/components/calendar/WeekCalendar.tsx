@@ -6,6 +6,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
 import { sortCalendarTasks } from "../../lib/task-calendar";
 import { resolveTaskStatusColor } from "../../lib/task-status-color";
+import { formatEventTimeRange } from "../../utils/date";
 import { Button } from "../ui/Button";
 import { CalendarHolidayBadge, getCalendarHolidayNames } from "./CalendarHolidayBadge";
 import { WeekEventTile, type EventContext } from "./WeekEventTile";
@@ -151,10 +152,7 @@ export function resolveEventContext(event: CalendarEvent, projects: Project[] = 
 }
 
 function calendarTimeLabel(event: CalendarEvent): string {
-  if (event.isAllDay) {
-    return "Ganztägig";
-  }
-  return `${format(parseISO(event.startTime), "HH:mm")} - ${format(parseISO(event.endTime), "HH:mm")}`;
+  return formatEventTimeRange(event.startTime, event.endTime, event.isAllDay);
 }
 
 function tasksByDueDate(tasks: Task[], weekStart: Date): Record<string, Task[]> {

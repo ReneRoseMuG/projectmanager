@@ -181,8 +181,8 @@ vi.mock("../../../../apps/web/src/hooks/useWiki", () => ({
   useWiki: () => ({
     page: router.params.id ? wikiFixtures.wikiAlpha : null,
     tree: wikiFixtures.wikiTree,
-    breadcrumb: [],
     loading: false,
+    pageLoading: false,
     error: null,
     createWikiPage: vi.fn(),
     updateWikiPage: vi.fn(),

@@ -135,9 +135,14 @@ export function WikiPage() {
 
     if (!fieldsChanged && !relationsChanged) return;
 
+    // Nur Titel-/Elternwechsel verändern den Navigationsbaum; reines Tippen im Inhalt nicht.
+    const affectsTree =
+      input.title !== p.title ||
+      (input.parentId ?? null) !== (p.parentId ?? null);
+
     // Use baseVersion (the version the editor content is based on) so that external writes
     // produce a 409 instead of being silently overwritten (TKT-129).
-    const updated = await wiki.updateWikiPage(p.id, { ...input, expectedVersion: baseVersion });
+    const updated = await wiki.updateWikiPage(p.id, { ...input, expectedVersion: baseVersion }, { affectsTree });
     if (relationsChanged) {
       await wiki.syncWikiPageRelations(p.id, currentRelatedPageIds, relatedPageIds);
     }
@@ -293,7 +298,9 @@ export function WikiPage() {
                 </div>
               ) : null}
               <div className={wiki.page ? "flex min-h-0 flex-1 flex-col" : "p-5"}>
-              {wiki.page ? (
+              {wiki.pageLoading ? (
+                <TaskListSkeleton />
+              ) : wiki.page ? (
                 <WikiPageForm
                   inline
                   inlineChrome={standalone ? "standalone" : "embedded"}

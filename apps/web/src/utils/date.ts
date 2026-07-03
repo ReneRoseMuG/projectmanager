@@ -7,6 +7,32 @@ export function formatHumanDate(value: string | null | undefined): string {
   return format(parseISO(value), "dd.MM.yy");
 }
 
+export function formatHumanTime(value: string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+  return format(parseISO(value), "HH:mm");
+}
+
+export function formatHumanDateTime(value: string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+  return format(parseISO(value), "dd.MM.yy HH:mm");
+}
+
+/**
+ * Menschenlesbare Zeitspanne eines Termins. Kapselt die isAllDay-Regel an
+ * einer Stelle, damit alle Terminansichten (Widget, Wochen-/Monatsansicht)
+ * dieselbe Darstellung nutzen.
+ */
+export function formatEventTimeRange(startTime: string, endTime: string, isAllDay: boolean): string {
+  if (isAllDay) {
+    return "Ganztägig";
+  }
+  return `${format(parseISO(startTime), "HH:mm")} - ${format(parseISO(endTime), "HH:mm")}`;
+}
+
 export function isOverdue(value: string | null | undefined): boolean {
   if (!value) {
     return false;

@@ -1,7 +1,7 @@
 import type { JournalContextRelation, JournalEntry, JournalObjectType, JournalOperation } from "@taskmanager/shared-types";
-import { format, parseISO } from "date-fns";
 import { Activity, Clock3, GitCommitHorizontal, UserRound } from "lucide-react";
 import { useObjectJournalEntries } from "../../hooks/useJournal";
+import { formatHumanDateTime } from "../../utils/date";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { Spinner } from "../ui/Spinner";
@@ -38,10 +38,6 @@ const relationLabels: Record<JournalContextRelation, string> = {
   related: "Bezug"
 };
 
-function formatDateTime(value: string): string {
-  return format(parseISO(value), "dd.MM.yy HH:mm");
-}
-
 function OperationPill({ operation }: { operation: JournalOperation }) {
   return <span className="inline-flex h-6 items-center rounded-md bg-steel-100 px-2 text-xs font-semibold text-steel-700">{journalOperationLabels[operation]}</span>;
 }
@@ -77,7 +73,7 @@ function JournalEntryRow({ entry }: { entry: JournalEntry }) {
         <div className="flex shrink-0 flex-col items-end gap-1 text-xs text-steel-500">
           <span className="inline-flex items-center gap-1">
             <Clock3 size={13} />
-            {formatDateTime(entry.createdAt)}
+            {formatHumanDateTime(entry.createdAt)}
           </span>
           <span className="inline-flex items-center gap-1">
             <UserRound size={13} />

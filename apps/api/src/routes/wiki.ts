@@ -7,6 +7,7 @@ import {
   exportAllWikiPages,
   getWikiBreadcrumb,
   getWikiPage,
+  getWikiTree,
   listRootWikiPages,
   listWikiChildren,
   listWikiPageRelations,
@@ -93,6 +94,8 @@ const wikiExportBodySchema = {
 
 export async function registerWikiRoutes(app: FastifyInstance): Promise<void> {
   app.get("/wiki", { schema: { response: { 200: arrayResponseSchema } } }, async () => listRootWikiPages(app.db));
+
+  app.get("/wiki/tree", { schema: { response: { 200: arrayResponseSchema } } }, async () => getWikiTree(app.db));
 
   app.post<{ Body: { exportPath: string } }>(
     "/wiki/export",

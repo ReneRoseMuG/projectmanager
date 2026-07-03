@@ -5,6 +5,7 @@ import { de } from "date-fns/locale";
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
 import { sortCalendarTasks } from "../../lib/task-calendar";
+import { formatHumanTime } from "../../utils/date";
 import { Button } from "../ui/Button";
 import { CalendarHolidayBadge, getCalendarHolidayNames } from "./CalendarHolidayBadge";
 import { MonthTaskBar } from "./MonthTaskBar";
@@ -139,6 +140,7 @@ function MonthDayCell({
             onClick={() => onEventClick?.(event)}
             data-testid={`month-event-${event.id}`}
           >
+            {event.isAllDay ? null : <span className="mr-1 font-normal text-steel-500">{formatHumanTime(event.startTime)}</span>}
             {event.title}
           </button>
         ))}

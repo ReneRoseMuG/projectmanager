@@ -252,6 +252,29 @@ describe("Wiki API", () => {
     expect(res.body[0]).not.toHaveProperty("projectId");
   });
 
+  it("GET /api/wiki/tree liefert die verschachtelte Hierarchie mit ChildCount", async () => {
+    const root = await createWikiPage(app, { title: "Baum Root" });
+    const child = await createWikiPage(app, { title: "Baum Kind", parentId: root.id });
+    const grandchild = await createWikiPage(app, { title: "Baum Enkel", parentId: child.id });
+    const secondRoot = await createWikiPage(app, { title: "Baum Root 2" });
+
+    const res = await supertest(app.server).get("/api/wiki/tree").expect(200);
+
+    expect(res.body).toHaveLength(2);
+    const rootNode = res.body.find((node: { id: number }) => node.id === root.id);
+    expect(rootNode.childCount).toBe(1);
+    expect(rootNode.content).toBeUndefined();
+    expect(rootNode.children).toHaveLength(1);
+    expect(rootNode.children[0].id).toBe(child.id);
+    expect(rootNode.children[0].childCount).toBe(1);
+    expect(rootNode.children[0].children[0].id).toBe(grandchild.id);
+    expect(rootNode.children[0].children[0].children).toEqual([]);
+
+    const secondRootNode = res.body.find((node: { id: number }) => node.id === secondRoot.id);
+    expect(secondRootNode.childCount).toBe(0);
+    expect(secondRootNode.children).toEqual([]);
+  });
+
   it("Relationen werden bidirektional gelesen und validiert", async () => {
     const source = await createWikiPage(app, { title: "Source" });
     const target = await createWikiPage(app, { title: "Target" });

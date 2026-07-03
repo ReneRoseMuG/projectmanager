@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 03.07.26 | 06:32:32 | Feature | Termin-Uhrzeit + zentrale Zeitformatierung | ✅ |
+| 03.07.26 | 06:19:50 | Feature | Attachments auf Nextcloud | ✅ |
 | 02.07.26 | 15:35:35 | Fix | DayPlan Aufgaben-Tab | ✅ |
 | 02.07.26 | 14:09:25 | Feature | Kontextbaum Verschieben | ⚠️ |
 | 01.07.26 | 17:26:50 | Fix | Ticket-Listen-Skalierung | ✅ |

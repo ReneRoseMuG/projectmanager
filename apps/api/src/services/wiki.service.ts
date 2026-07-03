@@ -1,7 +1,7 @@
 ﻿import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { JsonValue, WikiPageRelationSummary, WikiTreeMoveRequest } from "@taskmanager/shared-types";
+import type { JsonValue, WikiPageRelationSummary, WikiTreeMoveRequest, WikiTreeNode } from "@taskmanager/shared-types";
 import { and, eq, inArray, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { wikiPageAttachments, wikiPageRelations, wikiPageTasks, wikiPageTickets } from "../db/schema.js";
@@ -324,6 +324,44 @@ export async function listWikiChildren(database: DbClient, id: number): Promise<
   const pages = await wikiPageRepository.findChildren(database, id);
   const supportCounts = await getWikiPageSupportCounts(database, pages.map((page) => page.id));
   return Promise.all(pages.map(async (page) => mapWikiPage(page, await childCount(database, page.id), undefined, supportCounts.get(page.id) ?? emptyWikiPageSupportCounts)));
+}
+
+export async function getWikiTree(database: DbClient): Promise<WikiTreeNode[]> {
+  const pages = await wikiPageRepository.findAll(database);
+  const supportCounts = await getWikiPageSupportCounts(database, pages.map((page) => page.id));
+
+  // Kinderzahl je Seite aus der Elternbeziehung ableiten statt findChildren pro Knoten (kein N+1).
+  const childCounts = new Map<number, number>();
+  for (const page of pages) {
+    if (page.parentId !== null) {
+      childCounts.set(page.parentId, (childCounts.get(page.parentId) ?? 0) + 1);
+    }
+  }
+
+  // findAll liefert bereits nach sortOrder/title sortiert — die Einfügereihenfolge der children bleibt damit korrekt.
+  const nodes = new Map<number, WikiTreeNode>();
+  for (const page of pages) {
+    nodes.set(page.id, {
+      ...mapWikiPage(page, childCounts.get(page.id) ?? 0, undefined, supportCounts.get(page.id) ?? emptyWikiPageSupportCounts),
+      children: []
+    });
+  }
+
+  const roots: WikiTreeNode[] = [];
+  for (const page of pages) {
+    const node = nodes.get(page.id);
+    if (!node) {
+      continue;
+    }
+    const parent = page.parentId !== null ? nodes.get(page.parentId) : undefined;
+    if (parent) {
+      parent.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  return roots;
 }
 
 export async function getWikiPage(database: DbClient, id: number): Promise<WikiPageDto> {

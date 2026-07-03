@@ -1,10 +1,9 @@
-import { ArrowDownUp, ListChecks, Monitor, ShieldCheck, Tag, Users } from "lucide-react";
+import { ListChecks, Monitor, ShieldCheck, Tag, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const adminItems = [
   { to: "/admin/catalogs", label: "Kataloge", icon: ListChecks },
   { to: "/admin/tags", label: "Tags", icon: Tag },
-  { to: "/admin/sync", label: "Sync", icon: ArrowDownUp },
   { to: "/admin/users", label: "Benutzer", icon: Users },
   { to: "/admin/roles", label: "Rollen", icon: ShieldCheck },
   { to: "/admin/ui", label: "User Interface", icon: Monitor },

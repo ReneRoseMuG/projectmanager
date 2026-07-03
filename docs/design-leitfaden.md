@@ -441,6 +441,23 @@ Der Wrapper `<label>` ist hier als semantischer Wrapper erlaubt — nicht als Fo
 
 ---
 
+### 8.23 Datums- und Zeitdarstellung
+
+Menschenlesbare Datums- und Zeitangaben von Datensätzen werden ausschließlich über die zentralen Helfer in `apps/web/src/utils/date.ts` erzeugt. Kein Inline-`format()` von date-fns und kein `toLocaleString()` in Komponenten für fachliche Anzeigen.
+
+| Helfer | Ausgabe | Verwendung |
+|---|---|---|
+| `formatHumanDate` | `03.07.26` | Reines Datum (Fälligkeit, Erstellt/Geändert) |
+| `formatHumanTime` | `14:30` | Reine Uhrzeit |
+| `formatHumanDateTime` | `03.07.26 14:30` | Datum + Uhrzeit (z. B. Journal-Zeitstempel) |
+| `formatEventTimeRange` | `Ganztägig` / `09:00 - 10:30` | Termin-Zeitspanne; kapselt die `isAllDay`-Regel |
+
+**Termine:** Die Uhrzeit-Darstellung läuft immer über `formatEventTimeRange` — die `isAllDay`-Unterscheidung wird nicht in der Komponente wiederholt.
+
+**Nicht betroffen:** Navigations-Beschriftungen des Kalenders (aktueller Monat, sichtbare Woche) und rein technische Zeitstempel (z. B. sekundengenauer Sync-Zeitpunkt) bleiben lokal bei ihrer Komponente.
+
+---
+
 ## 9. Navigations-Sidebar
 
 Hintergrund: `bg-gradient-to-b from-steel-700 to-steel-800`.  

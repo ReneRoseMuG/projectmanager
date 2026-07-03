@@ -1152,6 +1152,10 @@ export interface WikiBreadcrumb {
   title: string;
 }
 
+export interface WikiTreeNode extends WikiPage {
+  children: WikiTreeNode[];
+}
+
 export interface WikiPageInput {
   title: string;
   parentId?: number | null;
@@ -1268,27 +1272,5 @@ export interface WikiImportReport {
 
 export interface ContentImageUploadResponse {
   url: string;
-}
-
-export interface AttachmentSyncReadiness {
-  configured: boolean;
-  ready: boolean;
-  remoteDir: string;
-  blockingIssues: string[];
-}
-
-export interface AttachmentSyncStats {
-  pulled: number;
-  pushed: number;
-  deleted: number;
-  errors: string[];
-  durationMs: number;
-  syncedAt: string;
-}
-
-export interface AttachmentSyncStatus {
-  readiness: AttachmentSyncReadiness;
-  inProgress: boolean;
-  lastSync: AttachmentSyncStats | null;
 }
 

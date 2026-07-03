@@ -1,7 +1,7 @@
 import type { CalendarEvent } from "@taskmanager/shared-types";
 import { CalendarClock } from "lucide-react";
 import { useMemo } from "react";
-import { formatHumanDate } from "../../utils/date";
+import { formatEventTimeRange, formatHumanDate } from "../../utils/date";
 import { richTextToPlainText } from "../../utils/richText";
 import { ItemRow } from "../ui/ItemRow";
 
@@ -38,7 +38,7 @@ export function UpcomingEvents({ events, onOpen }: UpcomingEventsProps) {
                 statusIndicator={<span className="flex h-9 w-9 items-center justify-center rounded-lg bg-fern/10 text-fern"><CalendarClock size={16} /></span>}
                 title={event.title}
                 description={description}
-                meta={<span className="text-xs font-semibold text-steel-600">{formatHumanDate(event.startTime)}</span>}
+                meta={<span className="whitespace-nowrap text-xs font-semibold text-steel-600">{formatHumanDate(event.startTime)} · {formatEventTimeRange(event.startTime, event.endTime, event.isAllDay)}</span>}
                 onOpen={onOpen ? () => onOpen(event) : undefined}
               />
             );
