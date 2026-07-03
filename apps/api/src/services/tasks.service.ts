@@ -6,7 +6,7 @@ import { dayPlans, dayPlanTasks, featureTasks, features, milestoneTasks, milesto
 import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
-import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
+import { listTaskAttachments } from "./attachments.service.js";
 import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { listComments } from "./comments.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
@@ -1077,7 +1077,6 @@ export async function deleteTask(database: DbClient, id: number, actor?: Journal
     throw conflict(`Aufgabe kann nicht gelöscht werden, solange Beziehungen bestehen: ${blockers.join(", ")}.`);
   }
 
-  await deleteTaskAttachmentsForIds(database, taskIds);
   await deleteTaskNotesForIds(database, taskIds);
   await deleteTaskCommentsForIds(database, taskIds);
 

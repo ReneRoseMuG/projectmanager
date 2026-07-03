@@ -58,6 +58,8 @@ const attachmentSelect = {
   filename: attachments.filename,
   mimetype: attachments.mimetype,
   size: attachments.size,
+  displayName: attachments.displayName,
+  description: attachments.description,
   version: attachments.version,
   createdBy: attachments.createdBy,
   updatedBy: attachments.updatedBy,
@@ -73,6 +75,8 @@ async function mapAttachment(database: DbClient, record: AttachmentRecord): Prom
     filename: record.filename,
     mimetype: record.mimetype,
     size: record.size,
+    displayName: record.displayName,
+    description: record.description,
     url: `/uploads/${record.filename}`,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -224,7 +228,7 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function listAttachmentOwners(database: DbClient, attachmentId: number): Promise<AttachmentOwner[]> {
+export async function listAttachmentOwners(database: DbClient, attachmentId: number): Promise<AttachmentOwner[]> {
   const projectRows = await database.select({ id: projectAttachments.projectId }).from(projectAttachments).where(eq(projectAttachments.attachmentId, attachmentId));
   const taskRows = await database.select({ id: taskAttachments.taskId }).from(taskAttachments).where(eq(taskAttachments.attachmentId, attachmentId));
   const milestoneRows = await database.select({ id: milestoneAttachments.milestoneId }).from(milestoneAttachments).where(eq(milestoneAttachments.attachmentId, attachmentId));
@@ -275,53 +279,11 @@ async function removeAttachmentFiles(records: AttachmentCleanupRecord[]): Promis
   }
 }
 
-async function deleteAttachmentRecords(database: DbClient, records: AttachmentCleanupRecord[]): Promise<void> {
-  if (records.length === 0) {
-    return;
-  }
-
-  await attachmentRepository.deleteByIds(database, records.map((record) => record.id));
-  await removeAttachmentFiles(records);
-}
-
-async function attachmentOnlyOwnedBy(database: DbClient, attachmentId: number, ownerType: AttachmentOwner["type"], ownerIds: Set<number>): Promise<boolean> {
-  const owners = await listAttachmentOwners(database, attachmentId);
-  return owners.length > 0 && owners.every((owner) => owner.type === ownerType && ownerIds.has(owner.id));
-}
-
-async function deleteAttachmentsOwnedOnlyBy(database: DbClient, ownerType: AttachmentOwner["type"], ownerIds: number[]): Promise<void> {
-  const uniqueIds = [...new Set(ownerIds)];
-  if (uniqueIds.length === 0) {
-    return;
-  }
-
-  const idSet = new Set(uniqueIds);
-  const candidateRows =
-    ownerType === "project"
-      ? await database.select({ id: projectAttachments.attachmentId }).from(projectAttachments).where(inArray(projectAttachments.projectId, uniqueIds))
-      : ownerType === "task"
-        ? await database.select({ id: taskAttachments.attachmentId }).from(taskAttachments).where(inArray(taskAttachments.taskId, uniqueIds))
-        : ownerType === "milestone"
-          ? await database.select({ id: milestoneAttachments.attachmentId }).from(milestoneAttachments).where(inArray(milestoneAttachments.milestoneId, uniqueIds))
-          : ownerType === "feature"
-            ? await database.select({ id: featureAttachments.attachmentId }).from(featureAttachments).where(inArray(featureAttachments.featureId, uniqueIds))
-            : ownerType === "wikiPage"
-              ? await database.select({ id: wikiPageAttachments.attachmentId }).from(wikiPageAttachments).where(inArray(wikiPageAttachments.wikiPageId, uniqueIds))
-              : await database.select({ id: ticketAttachments.attachmentId }).from(ticketAttachments).where(inArray(ticketAttachments.ticketId, uniqueIds));
-
-  const attachmentIds: number[] = [];
-  for (const attachmentId of [...new Set(candidateRows.map((row) => row.id))]) {
-    if (await attachmentOnlyOwnedBy(database, attachmentId, ownerType, idSet)) {
-      attachmentIds.push(attachmentId);
-    }
-  }
-  if (attachmentIds.length === 0) {
-    return;
-  }
-
-  const records = await attachmentRepository.findCleanupRecords(database, attachmentIds);
-  await deleteAttachmentRecords(database, records);
-}
+// MS-75 (DMS): Der frühere Owner-basierte Auto-Cleanup von Anhängen entfällt. Beim
+// Löschen eines Fachobjekts entfernt die FK-Cascade der Junction-Tabellen nur die
+// Verknüpfung; das Dokument selbst bleibt bestehen und wird im DMS als "Nicht
+// einsortiert" geführt, solange es keine weitere Bindung (Fachobjekt oder Sammlung)
+// besitzt. Endgültiges Löschen erfolgt nur noch explizit über deleteAttachment.
 
 async function persistAttachment(values: {
   database: DbClient;
@@ -357,6 +319,30 @@ async function persistAttachment(values: {
   });
 
   return mapAttachment(values.database, created);
+}
+
+// MS-75 (DMS): Direktupload in die Dokumentenbibliothek ohne Bindung an ein Fachobjekt.
+// Das Dokument existiert danach über seine DMS-Zugehörigkeit (Sammlung) bzw. wird unter
+// "Nicht einsortiert" geführt.
+export async function createUnboundAttachment(database: DbClient, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
+  assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
+  await fs.mkdir(config.uploadDir, { recursive: true });
+
+  const filename = makeFilename(upload.originalName);
+  const diskPath = path.join(config.uploadDir, filename);
+  await fs.writeFile(diskPath, upload.buffer);
+
+  const created = await attachmentRepository.create(
+    database,
+    {
+      originalName: upload.originalName,
+      filename,
+      mimetype: upload.mimetype,
+      size: upload.buffer.byteLength
+    },
+    actor?.actorUserId ?? undefined
+  );
+  return mapAttachment(database, created);
 }
 
 async function selectOwnerAttachments(database: DbClient, owner: AttachmentOwner): Promise<AttachmentRecord[]> {
@@ -761,30 +747,6 @@ export async function listWikiPageAttachments(database: DbClient, wikiPageId: nu
   return listOwnerAttachments(database, { type: "wikiPage", id: wikiPageId });
 }
 
-export async function deleteProjectAttachmentsForIds(database: DbClient, projectIds: number[]): Promise<void> {
-  await deleteAttachmentsOwnedOnlyBy(database, "project", projectIds);
-}
-
-export async function deleteTaskAttachmentsForIds(database: DbClient, taskIds: number[]): Promise<void> {
-  await deleteAttachmentsOwnedOnlyBy(database, "task", taskIds);
-}
-
-export async function deleteMilestoneAttachmentsForIds(database: DbClient, milestoneIds: number[]): Promise<void> {
-  await deleteAttachmentsOwnedOnlyBy(database, "milestone", milestoneIds);
-}
-
-export async function deleteFeatureAttachmentsForIds(database: DbClient, featureIds: number[]): Promise<void> {
-  await deleteAttachmentsOwnedOnlyBy(database, "feature", featureIds);
-}
-
-export async function deleteTicketAttachmentsForIds(database: DbClient, ticketIds: number[]): Promise<void> {
-  await deleteAttachmentsOwnedOnlyBy(database, "ticket", ticketIds);
-}
-
-export async function deleteWikiPageAttachmentsForIds(database: DbClient, wikiPageIds: number[]): Promise<void> {
-  await deleteAttachmentsOwnedOnlyBy(database, "wikiPage", wikiPageIds);
-}
-
 export async function createProjectAttachment(database: DbClient, projectId: number, upload: AttachmentUpload, actor?: JournalActor | null): Promise<Attachment> {
   const owner = { type: "project" as const, id: projectId };
   await ensureOwnerExists(database, owner);
@@ -871,10 +833,6 @@ export async function deleteWikiPageAttachment(database: DbClient, wikiPageId: n
       contexts: [makeJournalContext(ownerObject, "owner")]
     });
   });
-
-  if ((await listAttachmentOwners(database, attachmentId)).length === 0) {
-    await deleteAttachmentRecords(database, [record]);
-  }
 }
 
 export async function deleteAttachment(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {

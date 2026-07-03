@@ -485,6 +485,7 @@ export const tags = mysqlTable("tags", {
   id: int("id").autoincrement().primaryKey(),
   name: shortText("name").notNull().unique(),
   color: shortText("color").notNull().default("#94a3b8"),
+  isSystem: boolean("is_system").notNull().default(false),
   version: int("version").notNull().default(1),
   createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
   updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -595,6 +596,8 @@ export const attachments = mysqlTable(
     filename: shortText("filename").notNull(),
     mimetype: shortText("mimetype").notNull(),
     size: int("size").notNull(),
+    displayName: shortText("display_name"),
+    description: longtext("description"),
     version: int("version").notNull().default(1),
     createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
     updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -675,6 +678,81 @@ export const ticketAttachments = mysqlTable(
   },
   (table) => ({
     ticketAttachmentUnique: uniqueIndex("ticket_attachments_parent_attachment_unique").on(table.ticketId, table.attachmentId)
+  })
+);
+
+// Dokumentenverwaltung (MS-75 / FT(16)): Organisations- und Sichtungsebene über
+// den bestehenden Anhängen. Kategorien und Sammlungen sind eigene Entitäten; die
+// Zuordnung von Dokumenten zu Kategorien, Labels (bestehende tags) und Sammlungen
+// läuft über dedizierte Junction-Tabellen mit Cascade — keine polymorphen Felder.
+export const attachmentCategories = mysqlTable("attachment_categories", {
+  id: int("id").autoincrement().primaryKey(),
+  name: shortText("name").notNull().unique(),
+  color: shortText("color").notNull().default("#94a3b8"),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
+});
+
+// Virtuelle Sammlung ("Ordner"): hierarchisch (Selbst-FK parent_id, restrict — kein
+// DB-Kaskadenlöschen, der Service steuert die Löschung mit Bestätigung), optional an
+// ein Projekt gebunden (project_id nullable, set null — Sammlung bleibt als globale).
+export const attachmentFolders = mysqlTable("attachment_folders", {
+  id: int("id").autoincrement().primaryKey(),
+  parentId: int("parent_id").references((): AnyMySqlColumn => attachmentFolders.id, { onDelete: "restrict" }),
+  projectId: int("project_id").references(() => projects.id, { onDelete: "set null" }),
+  name: shortText("name").notNull(),
+  version: int("version").notNull().default(1),
+  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestampText("created_at"),
+  updatedAt: timestampText("updated_at")
+});
+
+export const attachmentCategoryLinks = mysqlTable(
+  "attachment_category_links",
+  {
+    categoryId: int("category_id")
+      .notNull()
+      .references(() => attachmentCategories.id, { onDelete: "cascade" }),
+    attachmentId: int("attachment_id")
+      .notNull()
+      .references(() => attachments.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    attachmentCategoryLinkUnique: uniqueIndex("attachment_category_links_category_attachment_unique").on(table.categoryId, table.attachmentId)
+  })
+);
+
+export const attachmentTags = mysqlTable(
+  "attachment_tags",
+  {
+    attachmentId: int("attachment_id")
+      .notNull()
+      .references(() => attachments.id, { onDelete: "cascade" }),
+    tagId: int("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    attachmentTagUnique: uniqueIndex("attachment_tags_attachment_tag_unique").on(table.attachmentId, table.tagId)
+  })
+);
+
+export const folderAttachments = mysqlTable(
+  "folder_attachments",
+  {
+    folderId: int("folder_id")
+      .notNull()
+      .references(() => attachmentFolders.id, { onDelete: "cascade" }),
+    attachmentId: int("attachment_id")
+      .notNull()
+      .references(() => attachments.id, { onDelete: "cascade" })
+  },
+  (table) => ({
+    folderAttachmentUnique: uniqueIndex("folder_attachments_folder_attachment_unique").on(table.folderId, table.attachmentId)
   })
 );
 

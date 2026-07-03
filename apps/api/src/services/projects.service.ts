@@ -4,9 +4,7 @@ import type { DbClient } from "../db/client.js";
 import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { backlogItems, milestones, projectAttachments, projectComments, projectNotes, projects, projectTasks, projectTickets, tasks, wikiPages } from "../db/schema.js";
 import { projectRepository, type ProjectRecord } from "../repositories/project.repository.js";
-import { badRequest, notFound } from "../utils/errors.js";
-import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
-import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
+import { badRequest, notFound } from "../utils/errors.js";import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import {
   buildCreateSummary,
@@ -286,7 +284,6 @@ export async function deleteProject(database: DbClient, id: number, actor?: Jour
     throw notFound(`Project with id ${id} not found`);
   }
 
-  await deleteProjectAttachmentsForIds(database, [id]);
   await deleteMilestoneOwnedSupportForProjectIds(database, [id]);
 
   await deleteProjectNotesForIds(database, [id]);

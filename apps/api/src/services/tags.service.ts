@@ -19,7 +19,7 @@ import {
   type JournalObjectRef
 } from "./journal.service.js";
 
-type MappableTagRecord = Pick<TagRecord, "id" | "name" | "color" | "version">;
+type MappableTagRecord = Pick<TagRecord, "id" | "name" | "color" | "isSystem" | "version">;
 
 const tagJournalFields: Array<JournalFieldDefinition<TagRecord>> = [
   { key: "name", label: "Name" },
@@ -31,6 +31,7 @@ function mapTag(record: MappableTagRecord): Tag {
     id: record.id,
     name: record.name,
     color: record.color,
+    isSystem: record.isSystem,
     version: record.version
   };
 }
@@ -136,6 +137,7 @@ export async function listTags(database: DbClient): Promise<Tag[]> {
       id: tags.id,
       name: tags.name,
       color: tags.color,
+      isSystem: tags.isSystem,
       version: tags.version,
       projectCount: sql<number>`(SELECT COUNT(*) FROM ${projectTags} WHERE ${projectTags.tagId} = ${tags.id})`,
       milestoneCount: sql<number>`(SELECT COUNT(*) FROM ${milestoneTags} WHERE ${milestoneTags.tagId} = ${tags.id})`,
@@ -148,6 +150,7 @@ export async function listTags(database: DbClient): Promise<Tag[]> {
     id: row.id,
     name: row.name,
     color: row.color,
+    isSystem: row.isSystem,
     version: row.version,
     usageCounts: {
       projects: Number(row.projectCount),
@@ -164,6 +167,7 @@ export async function getProjectTags(database: DbClient, projectId: number): Pro
       id: tags.id,
       name: tags.name,
       color: tags.color,
+      isSystem: tags.isSystem,
       version: tags.version
     })
     .from(projectTags)
@@ -179,6 +183,7 @@ export async function getTaskTags(database: DbClient, taskId: number): Promise<T
       id: tags.id,
       name: tags.name,
       color: tags.color,
+      isSystem: tags.isSystem,
       version: tags.version
     })
     .from(taskTags)
@@ -194,6 +199,7 @@ export async function getMilestoneTags(database: DbClient, milestoneId: number):
       id: tags.id,
       name: tags.name,
       color: tags.color,
+      isSystem: tags.isSystem,
       version: tags.version
     })
     .from(milestoneTags)
@@ -209,6 +215,7 @@ export async function getTicketTags(database: DbClient, ticketId: number): Promi
       id: tags.id,
       name: tags.name,
       color: tags.color,
+      isSystem: tags.isSystem,
       version: tags.version
     })
     .from(ticketTags)
@@ -230,6 +237,7 @@ export async function getProjectTagsMap(database: DbClient, projectIds: number[]
       id: tags.id,
       name: tags.name,
       color: tags.color,
+      isSystem: tags.isSystem,
       version: tags.version
     })
     .from(projectTags)
@@ -238,7 +246,7 @@ export async function getProjectTagsMap(database: DbClient, projectIds: number[]
 
   for (const row of rows) {
     const current = map.get(row.projectId) ?? [];
-    current.push({ id: row.id, name: row.name, color: row.color, version: row.version });
+    current.push({ id: row.id, name: row.name, color: row.color, isSystem: row.isSystem, version: row.version });
     map.set(row.projectId, current);
   }
 
@@ -257,6 +265,7 @@ export async function getTaskTagsMap(database: DbClient, taskIds: number[]): Pro
       id: tags.id,
       name: tags.name,
       color: tags.color,
+      isSystem: tags.isSystem,
       version: tags.version
     })
     .from(taskTags)
@@ -265,7 +274,7 @@ export async function getTaskTagsMap(database: DbClient, taskIds: number[]): Pro
 
   for (const row of rows) {
     const current = map.get(row.taskId) ?? [];
-    current.push({ id: row.id, name: row.name, color: row.color, version: row.version });
+    current.push({ id: row.id, name: row.name, color: row.color, isSystem: row.isSystem, version: row.version });
     map.set(row.taskId, current);
   }
 
@@ -284,6 +293,7 @@ export async function getMilestoneTagsMap(database: DbClient, milestoneIds: numb
       id: tags.id,
       name: tags.name,
       color: tags.color,
+      isSystem: tags.isSystem,
       version: tags.version
     })
     .from(milestoneTags)
@@ -292,7 +302,7 @@ export async function getMilestoneTagsMap(database: DbClient, milestoneIds: numb
 
   for (const row of rows) {
     const current = map.get(row.milestoneId) ?? [];
-    current.push({ id: row.id, name: row.name, color: row.color, version: row.version });
+    current.push({ id: row.id, name: row.name, color: row.color, isSystem: row.isSystem, version: row.version });
     map.set(row.milestoneId, current);
   }
 
@@ -311,6 +321,7 @@ export async function getTicketTagsMap(database: DbClient, ticketIds: number[]):
       id: tags.id,
       name: tags.name,
       color: tags.color,
+      isSystem: tags.isSystem,
       version: tags.version
     })
     .from(ticketTags)
@@ -319,7 +330,7 @@ export async function getTicketTagsMap(database: DbClient, ticketIds: number[]):
 
   for (const row of rows) {
     const current = map.get(row.ticketId) ?? [];
-    current.push({ id: row.id, name: row.name, color: row.color, version: row.version });
+    current.push({ id: row.id, name: row.name, color: row.color, isSystem: row.isSystem, version: row.version });
     map.set(row.ticketId, current);
   }
 

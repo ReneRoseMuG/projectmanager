@@ -6,9 +6,7 @@ import { assertVersion } from "../repositories/base.repository.js";
 import { featureRepository, type FeatureRecord, type FeatureUpdateData } from "../repositories/feature.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import { deleteFeatureCommentsForIds, deleteUseCaseCommentsForIds } from "./comments.service.js";
-import { deleteFeatureAttachmentsForIds } from "./attachments.service.js";
-import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
+import { deleteFeatureCommentsForIds, deleteUseCaseCommentsForIds } from "./comments.service.js";import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { readContentFromDb } from "./content.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import {
@@ -311,7 +309,6 @@ export async function updateFeature(database: DbClient, id: number, input: Featu
 export async function deleteFeature(database: DbClient, id: number, actor?: JournalActor | null): Promise<void> {
   const feature = await getFeatureRecord(database, id);
 
-  await deleteFeatureAttachmentsForIds(database, [id]);
   await deleteFeatureCommentsForIds(database, [id]);
   // Also delete use case comments since use cases are cascade-deleted with the feature
   const ucRows = await database.select({ id: useCases.id }).from(useCases).where(eq(useCases.featureId, id));

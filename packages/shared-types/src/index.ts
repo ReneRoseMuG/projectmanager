@@ -623,6 +623,7 @@ export interface Tag {
   id: number;
   name: string;
   color: string;
+  isSystem: boolean;
   version: number;
   usageCounts?: TagUsageCounts;
 }
@@ -903,14 +904,34 @@ export interface NoteMoveInput {
   target: MoveOwner<NoteMoveTargetType>;
 }
 
+export interface AttachmentCategory {
+  id: number;
+  name: string;
+  color: string;
+  version: number;
+}
+
+export interface AttachmentFolder {
+  id: number;
+  parentId: number | null;
+  projectId: number | null;
+  name: string;
+  version: number;
+}
+
 export interface Attachment {
   id: number;
   owners: AttachmentOwner[];
   originalName: string;
+  displayName: string | null;
+  description: string | null;
   filename: string;
   mimetype: string;
   size: number;
   url: string;
+  categories?: AttachmentCategory[];
+  tags?: Tag[];
+  folders?: AttachmentFolder[];
   createdAt: string;
   updatedAt: string;
   version: number;

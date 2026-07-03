@@ -107,6 +107,8 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
     const { registerAttachmentsRoutes } = await import("../../../apps/api/src/routes/attachments.js");
     await app.register(registerAttachmentsRoutes, { prefix: "/api" });
   }
+  const { registerDmsRoutes } = await import("../../../apps/api/src/routes/dms.js");
+  await app.register(registerDmsRoutes, { prefix: "/api" });
   await app.register(registerTicketsRoutes, { prefix: "/api" });
   await app.register(registerUserRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });

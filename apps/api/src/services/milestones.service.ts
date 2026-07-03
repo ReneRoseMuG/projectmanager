@@ -5,9 +5,7 @@ import { firstRow, recencyOrder } from "../db/query-utils.js";
 import { milestoneAttachments, milestoneComments, milestoneFeatures, milestoneNotes, milestones, milestoneTasks, milestoneTickets, projects, tasks } from "../db/schema.js";
 import { milestoneRepository, type MilestoneRecord } from "../repositories/milestone.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import { cleanNullable, requireNonEmpty } from "./helpers.js";
-import { deleteMilestoneAttachmentsForIds } from "./attachments.service.js";
-import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
+import { cleanNullable, requireNonEmpty } from "./helpers.js";import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import {
   buildCreateSummary,
   buildDeleteSummary,
@@ -374,7 +372,6 @@ export async function deleteMilestone(database: DbClient, id: number, actor?: Jo
   }
   const projectObject = await getProjectJournalObject(database, milestone.projectId);
 
-  await deleteMilestoneAttachmentsForIds(database, [id]);
   await deleteMilestoneNotesForIds(database, [id]);
   await deleteMilestoneCommentsForIds(database, [id]);
 
@@ -396,7 +393,6 @@ export async function deleteMilestone(database: DbClient, id: number, actor?: Jo
 export async function deleteMilestoneOwnedSupportForProjectIds(database: DbClient, projectIds: number[]): Promise<void> {
   const rows = await milestoneRepository.findByProjectIds(database, [...new Set(projectIds)]);
   const milestoneIds = rows.map((row) => row.id);
-  await deleteMilestoneAttachmentsForIds(database, milestoneIds);
   await deleteMilestoneNotesForIds(database, milestoneIds);
   await deleteMilestoneCommentsForIds(database, milestoneIds);
 }
