@@ -10,8 +10,8 @@
     "semantic_hash": ""
   },
   ".claude/settings.local.json": {
-    "mtime": 1781847736.1606562,
-    "ast_hash": "b73b39d3473291dc76de00a138951adb",
+    "mtime": 1783070655.0844584,
+    "ast_hash": "50456e2521bd8b6ed7ecb737a9e61998",
     "semantic_hash": ""
   },
   ".vscode/tasks.json": {
@@ -50,8 +50,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/app.ts": {
-    "mtime": 1783051992.376466,
-    "ast_hash": "4d26df93d096eaaa08b1237192aa9711",
+    "mtime": 1783072131.0853224,
+    "ast_hash": "a1a4f81cd470dcecb5b42485ee4f9f35",
     "semantic_hash": ""
   },
   "apps/api/src/config.ts": {
@@ -100,8 +100,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/db/schema.ts": {
-    "mtime": 1781401713.289734,
-    "ast_hash": "4bdf43a5519b9c63cc21dd8f9f7e15d7",
+    "mtime": 1783068933.8246078,
+    "ast_hash": "c1a10dfb7e3ce09438e5776a2fa6abfa",
     "semantic_hash": ""
   },
   "apps/api/src/index.ts": {
@@ -135,8 +135,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/repositories/attachment.repository.ts": {
-    "mtime": 1780128360.2545438,
-    "ast_hash": "28326a587dae29b16ba907e27316df9e",
+    "mtime": 1783070957.170195,
+    "ast_hash": "c36e115de6b168e9b751a55ef72c11f8",
     "semantic_hash": ""
   },
   "apps/api/src/repositories/backlog-item.repository.ts": {
@@ -410,8 +410,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/attachments.service.ts": {
-    "mtime": 1783051984.3905747,
-    "ast_hash": "e089cc3b9fed62aaed197953c4e0972f",
+    "mtime": 1783071991.133598,
+    "ast_hash": "0512ba8424027a009485d71e9cc18a86",
     "semantic_hash": ""
   },
   "apps/api/src/services/auth.service.ts": {
@@ -465,8 +465,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/features.service.ts": {
-    "mtime": 1780720017.3968587,
-    "ast_hash": "2a3aca808492f40dd0083ead6f508d53",
+    "mtime": 1783071467.3297355,
+    "ast_hash": "62cbf6e8fb7f9b84e80718b7f11a990b",
     "semantic_hash": ""
   },
   "apps/api/src/services/file-opener.service.ts": {
@@ -485,8 +485,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/milestones.service.ts": {
-    "mtime": 1783010132.0090866,
-    "ast_hash": "d7e98ff2a3e2f942459389c84c220b22",
+    "mtime": 1783071472.3281603,
+    "ast_hash": "d1a8849a06df22ae66685964855adfc3",
     "semantic_hash": ""
   },
   "apps/api/src/services/notes.service.ts": {
@@ -510,8 +510,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/projects.service.ts": {
-    "mtime": 1781153675.7393827,
-    "ast_hash": "29a36995147fdf2c983b29eb179b227e",
+    "mtime": 1783071475.8280573,
+    "ast_hash": "d479e2e222d12f2ed7a3cec813fef6a5",
     "semantic_hash": ""
   },
   "apps/api/src/services/push-notification.service.ts": {
@@ -540,18 +540,18 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/tags.service.ts": {
-    "mtime": 1780753821.6599095,
-    "ast_hash": "dcd5acb994f76c1ca0b7163eff73d65e",
+    "mtime": 1783069414.8325725,
+    "ast_hash": "52817980be7b1e6de51240b8c9990ba6",
     "semantic_hash": ""
   },
   "apps/api/src/services/tasks.service.ts": {
-    "mtime": 1783010132.0126588,
-    "ast_hash": "a602d559c1d4a5fc52d2f3a782041d9e",
+    "mtime": 1783071479.4809957,
+    "ast_hash": "1c5852689383d12045fa5e60de295c63",
     "semantic_hash": ""
   },
   "apps/api/src/services/tickets.service.ts": {
-    "mtime": 1783010132.0146582,
-    "ast_hash": "58f537130d8851ca24af835cd9cbc293",
+    "mtime": 1783071482.442537,
+    "ast_hash": "c8b970ba7614ef4b2642b4381cc3f696",
     "semantic_hash": ""
   },
   "apps/api/src/services/use-cases.service.ts": {
@@ -740,8 +740,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/App.tsx": {
-    "mtime": 1783052128.9543655,
-    "ast_hash": "444e4a94bbdd4fd8338cf144e2223859",
+    "mtime": 1783072608.9003055,
+    "ast_hash": "2d44d316109dd4688b75240d97633242",
     "semantic_hash": ""
   },
   "apps/web/src/api/admin-roles.ts": {
@@ -1110,8 +1110,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/layout/Sidebar.tsx": {
-    "mtime": 1783010132.0216577,
-    "ast_hash": "a1fe5f9a4253fff05c7d5681f0480288",
+    "mtime": 1783072605.26925,
+    "ast_hash": "2792287967dde5c6e5340758edf00aa5",
     "semantic_hash": ""
   },
   "apps/web/src/components/layout/TopBar.tsx": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/queries/invalidation.ts": {
-    "mtime": 1783052097.470234,
-    "ast_hash": "465668f56de0a003e4f8aab1d51784b4",
+    "mtime": 1783072356.4058583,
+    "ast_hash": "221056843651c3fafd1349dfc86e14b9",
     "semantic_hash": ""
   },
   "apps/web/src/queries/queryClient.ts": {
@@ -2085,8 +2085,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/queries/queryKeys.ts": {
-    "mtime": 1783052094.2407506,
-    "ast_hash": "d01b20d70e1683eb015fb84aa86ce43f",
+    "mtime": 1783072352.8359709,
+    "ast_hash": "f7d2069d6436352e46b4601157572dda",
     "semantic_hash": ""
   },
   "apps/web/src/types.ts": {
@@ -2170,8 +2170,8 @@
     "semantic_hash": ""
   },
   "packages/shared-types/src/index.ts": {
-    "mtime": 1783052192.7849104,
-    "ast_hash": "e7c4765b3ddb2580af261986b321a7a3",
+    "mtime": 1783069054.799429,
+    "ast_hash": "a9d6bcba5873c9fc764e9f629069f342",
     "semantic_hash": ""
   },
   "packages/shared-types/tsconfig.json": {
@@ -2365,13 +2365,13 @@
     "semantic_hash": ""
   },
   "tests/fixtures/api/app.ts": {
-    "mtime": 1783052197.3176403,
-    "ast_hash": "3db952454fa9a2d3e506d3333d791cbf",
+    "mtime": 1783072131.4918666,
+    "ast_hash": "755e25c2abf397c78e4f11d65fd1877f",
     "semantic_hash": ""
   },
   "tests/fixtures/api/db.ts": {
-    "mtime": 1781401730.5489564,
-    "ast_hash": "35f8dc25e6f109584e5c88fe981b49fc",
+    "mtime": 1783069186.839187,
+    "ast_hash": "c70d71858d9b9bb00f7f18a670b4f382",
     "semantic_hash": ""
   },
   "tests/fixtures/api/factories.ts": {
@@ -6155,8 +6155,8 @@
     "semantic_hash": ""
   },
   "logs/README.md": {
-    "mtime": 1783052493.9856002,
-    "ast_hash": "50d3a318dcd480510760280ccc7e0343",
+    "mtime": 1783053226.3075063,
+    "ast_hash": "78d6cf4cb9fdc82f83dc302a9b7a05d2",
     "semantic_hash": ""
   },
   "logs/ms26-api-build-latest.txt": {
@@ -6772,6 +6772,66 @@
   "logs/2026-07-03-06-19-50-umstellung-attachments-nextcloud.md": {
     "mtime": 1783052457.4646747,
     "ast_hash": "1dbe1263dd08cd2974f9e1f279729ea7",
+    "semantic_hash": ""
+  },
+  "apps/api/src/db/migrations/20260703085813_parched_unus/migration.sql": {
+    "mtime": 1783069093.8682125,
+    "ast_hash": "a8e4c043ba67e9ff4784586947801854",
+    "semantic_hash": ""
+  },
+  "apps/api/src/db/migrations/20260703085813_parched_unus/snapshot.json": {
+    "mtime": 1783069093.8677063,
+    "ast_hash": "90c9fc5984a1f33afd28c1fe28edbafb",
+    "semantic_hash": ""
+  },
+  "apps/api/src/repositories/attachment-category.repository.ts": {
+    "mtime": 1783070932.9966574,
+    "ast_hash": "83708e481d6a978a2d35ceac29866dcd",
+    "semantic_hash": ""
+  },
+  "apps/api/src/repositories/attachment-folder.repository.ts": {
+    "mtime": 1783070944.9957533,
+    "ast_hash": "66a6d2dac9cfeae7201e2221f23e5612",
+    "semantic_hash": ""
+  },
+  "apps/api/src/routes/dms.ts": {
+    "mtime": 1783072074.1786332,
+    "ast_hash": "2c2e2a528dd1997440506c37032aab6d",
+    "semantic_hash": ""
+  },
+  "apps/api/src/services/attachment-category.service.ts": {
+    "mtime": 1783071615.3533268,
+    "ast_hash": "446af6f89abf6aad5049355fc2d12a14",
+    "semantic_hash": ""
+  },
+  "apps/api/src/services/attachment-folder.service.ts": {
+    "mtime": 1783071686.3474596,
+    "ast_hash": "306aa6c1c3cc0bb231b65debb5717f69",
+    "semantic_hash": ""
+  },
+  "apps/api/src/services/document.service.ts": {
+    "mtime": 1783071833.023901,
+    "ast_hash": "8d12e5fce727de502c3d188d64b49d89",
+    "semantic_hash": ""
+  },
+  "apps/web/src/api/documents.ts": {
+    "mtime": 1783072345.6432705,
+    "ast_hash": "5291cedcf1f3780a3bb687db8b01334c",
+    "semantic_hash": ""
+  },
+  "apps/web/src/hooks/useDocuments.ts": {
+    "mtime": 1783072379.6510127,
+    "ast_hash": "caf5d3c19a1bf11397653ea9b92e8327",
+    "semantic_hash": ""
+  },
+  "apps/web/src/pages/DocumentsPage.tsx": {
+    "mtime": 1783072798.0591302,
+    "ast_hash": "ecff82fd9cc87f7d636782be228c3996",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-03-06-32-32-feature-termin-uhrzeit-zentrale-formatierung.md": {
+    "mtime": 1783053224.0241342,
+    "ast_hash": "1ef1288b562c9ef2a9c1fc249653beb9",
     "semantic_hash": ""
   }
 }
