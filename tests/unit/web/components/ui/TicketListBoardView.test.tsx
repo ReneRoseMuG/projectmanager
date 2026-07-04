@@ -21,7 +21,11 @@ import { TicketListBoardView } from "../../../../../apps/web/src/components/tick
 import type { ViewMode } from "../../../../../apps/web/src/types";
 import { buildTag, buildTicket } from "../../../../fixtures/web/components/ui/factories";
 
-const workStatusColumnCount = 12;
+// Board-Redesign: Nur die offenen workStatus-Spalten erscheinen im Board als
+// `section.rounded-lg`. Die geschlossenen (completed, archived, done, resolved, closed,
+// rejected) wandern in die ClosedBoardSidebar. Von den 12 workStatus-Werten sind 6 offen.
+const openStatusColumnCount = 6;
+const closedStatusValues = new Set<string>(["completed", "archived", "done", "resolved", "closed", "rejected"]);
 
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
@@ -139,14 +143,25 @@ describe("TicketListBoardView", () => {
 
     expectToolbar();
     expect(container.querySelector("[data-list-board-layout='board']")).toBeInTheDocument();
-    expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(workStatusColumnCount);
+    // Nur die offenen Statusspalten sind reguläre Board-Sections; die geschlossenen
+    // erscheinen in der ClosedBoardSidebar.
+    expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(openStatusColumnCount);
     expect(screen.getByRole("button", { name: /^In Arbeit\s*1$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Erledigt\s*1$/ })).toBeInTheDocument();
 
+    // Board-Karten (article.p-5) gibt es nur für die offenen Tickets; das geschlossene
+    // Ticket "Erledigt" (done) erscheint stattdessen als ClosedItemRow in der Sidebar.
+    const openTickets = tickets.filter((ticket) => !closedStatusValues.has(ticket.status));
     const cards = container.querySelectorAll("article.p-5");
-    expect(cards).toHaveLength(tickets.length);
+    expect(cards).toHaveLength(openTickets.length);
     expectItemCardClasses(cards);
+    // Aktionen-Menüs erscheinen an allen Tickets: an den offenen Karten und ebenso an der
+    // ClosedItemRow des geschlossenen Tickets in der Sidebar.
     expect(screen.getAllByRole("button", { name: "Aktionen" })).toHaveLength(tickets.length);
+
+    const closedSidebar = container.querySelector("aside") as HTMLElement;
+    expect(closedSidebar).toBeInTheDocument();
+    expect(within(closedSidebar).getByText("Ticket Erledigt")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "In Arbeit hinzufügen" }));
     expect(onAddStatus).toHaveBeenCalledWith("in_progress");

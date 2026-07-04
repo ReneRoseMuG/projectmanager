@@ -1,16 +1,20 @@
+import type { Note } from "@taskmanager/shared-types";
 import { useCallback } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { deleteNote as deleteNoteRequest, getNotes } from "../api/notes";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { deleteNote as deleteNoteRequest, getNotesPage, type NotesListFilter } from "../api/notes";
 import { invalidateNoteDetail } from "../queries/invalidation";
 import { queryKeys } from "../queries/queryKeys";
-import { toQueryError } from "../queries/queryErrors";
+import { useProgressiveList } from "./useProgressiveList";
 
-export function useAllNotes() {
+// Notizen-Hauptliste (global) mit progressivem Nachladen (MS-75 Muster). Filter/Suche laufen
+// serverseitig je Chunk; `total` ist die Gesamtzahl nach Filter. Der Hook lädt den ersten Block
+// sofort und hängt weitere Blöcke sequenziell an, bis alle Notizen geladen sind.
+export function useAllNotes(filter: NotesListFilter) {
   const queryClient = useQueryClient();
-  const notesQuery = useQuery({
-    queryKey: queryKeys.notes.list(),
-    queryFn: getNotes
-  });
+  const notesQuery = useProgressiveList<Note>(
+    queryKeys.notes.list(filter as object),
+    (page, pageSize) => getNotesPage(filter, { page, pageSize })
+  );
 
   const deleteNoteMutation = useMutation({
     mutationFn: deleteNoteRequest,
@@ -18,10 +22,6 @@ export function useAllNotes() {
       await invalidateNoteDetail(queryClient, noteId);
     }
   });
-
-  const reload = useCallback(async () => {
-    await notesQuery.refetch();
-  }, [notesQuery]);
 
   const removeNote = useCallback(
     async (id: number) => {
@@ -31,10 +31,12 @@ export function useAllNotes() {
   );
 
   return {
-    notes: notesQuery.data ?? [],
-    loading: notesQuery.isLoading,
-    error: toQueryError(notesQuery.error),
-    reload,
+    notes: notesQuery.items,
+    total: notesQuery.total,
+    loadedCount: notesQuery.loadedCount,
+    loading: notesQuery.loading,
+    loadingMore: notesQuery.loadingMore,
+    error: notesQuery.error,
     removeNote
   };
 }

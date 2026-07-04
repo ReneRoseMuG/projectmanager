@@ -23,7 +23,7 @@ import {
   type JournalFieldDefinition,
   type JournalObjectRef
 } from "./journal.service.js";
-import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
+import { getUserOption, getUserOptionsMap, normalizeAssignableUserId } from "./users.service.js";
 
 type UseCaseStatus = UseCaseRecord["status"];
 
@@ -77,7 +77,7 @@ const useCaseJournalFields: Array<JournalFieldDefinition<UseCaseRecord>> = [
   { key: "responsibleUserId", label: "Verantwortlich" }
 ];
 
-async function mapUseCase(database: DbClient, record: UseCaseRecord, content?: string, supportCounts = emptyUseCaseSupportCounts, parentContexts?: VisibleParentContext[]): Promise<UseCaseDto> {
+async function mapUseCase(database: DbClient, record: UseCaseRecord, content?: string, supportCounts = emptyUseCaseSupportCounts, parentContexts?: VisibleParentContext[], responsibleUser?: UserSummary | null): Promise<UseCaseDto> {
   return {
     id: record.id,
     featureId: record.featureId,
@@ -87,7 +87,8 @@ async function mapUseCase(database: DbClient, record: UseCaseRecord, content?: s
     content,
     sortOrder: record.sortOrder,
     responsibleUserId: record.responsibleUserId,
-    responsibleUser: await getUserOption(database, record.responsibleUserId),
+    // Vorab geladene User-Option nutzen (Listen-Pfad); sonst pro Zeile abfragen (Einzelabruf-Pfade)
+    responsibleUser: responsibleUser !== undefined ? responsibleUser : await getUserOption(database, record.responsibleUserId),
     attachmentCount: supportCounts.attachmentCount,
     noteCount: supportCounts.noteCount,
     commentCount: supportCounts.commentCount,
@@ -190,7 +191,9 @@ export async function listUseCases(database: DbClient, featureId: number): Promi
   const rows = await useCaseRepository.findByFeatureId(database, featureId);
   const ids = rows.map((useCase) => useCase.id);
   const supportCounts = await getUseCaseSupportCounts(database, ids);
-  return Promise.all(rows.map((useCase) => mapUseCase(database, useCase, undefined, supportCounts.get(useCase.id) ?? emptyUseCaseSupportCounts)));
+  // Alle Verantwortlichen gebündelt vorab laden statt pro Use Case eine User-Query
+  const userOptions = await getUserOptionsMap(database, rows.map((useCase) => useCase.responsibleUserId));
+  return Promise.all(rows.map((useCase) => mapUseCase(database, useCase, undefined, supportCounts.get(useCase.id) ?? emptyUseCaseSupportCounts, undefined, useCase.responsibleUserId !== null ? userOptions.get(useCase.responsibleUserId) ?? null : null)));
 }
 
 export async function getUseCase(database: DbClient, id: number): Promise<UseCaseDto> {

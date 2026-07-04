@@ -1,6 +1,6 @@
 import type { Milestone } from "@taskmanager/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { uploadTaskAttachment } from "../api/attachments";
 import { createEntityComment } from "../api/comments";
@@ -11,12 +11,15 @@ import { addTicketRelation, createOwnerTicket, createSubTicket, createTicketNote
 import { MilestoneListBoardView } from "../components/milestones/MilestoneListBoardView";
 import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
 import { TicketForm, type TicketFormInput } from "../components/tickets/TicketForm";
+import { FilterChips } from "../components/ui/FilterChips";
+import { LoadMoreIndicator } from "../components/ui/LoadMoreIndicator";
 import { PageHero } from "../components/ui/PageHero";
 import { ProjectMilestoneFilterBar } from "../components/ui/ProjectMilestoneFilterBar";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage, errorMessageAsync } from "../hooks/errors";
-import { useMilestones } from "../hooks/useMilestones";
+import { useCatalogs } from "../hooks/useCatalogs";
+import { useMilestoneLibrary, useMilestones } from "../hooks/useMilestones";
 import { useHasPermission } from "../hooks/usePermissions";
 import { useProjects } from "../hooks/useProjects";
 import { useStandaloneView } from "../hooks/useStandaloneView";
@@ -24,7 +27,9 @@ import { useStatusCascadeWorkflow } from "../hooks/useStatusCascadeWorkflow";
 import { useTasks } from "../hooks/useTasks";
 import { useTickets } from "../hooks/useTickets";
 import { invalidateTags } from "../queries/invalidation";
+import type { MilestoneListFilter } from "../api/milestones";
 import type { ViewMode } from "../types";
+import { catalogEntriesByKind } from "../utils/catalogs";
 import { withStandaloneView } from "../utils/standalone";
 
 function parseId(value: string | null): number | null {
@@ -51,9 +56,67 @@ export function MilestonesPage() {
   const statusCascade = useStatusCascadeWorkflow();
   const canCreateTasks = useHasPermission("tasks", "write");
   const canCreateTickets = useHasPermission("tickets", "write");
+  const catalogs = useCatalogs();
   const projects = useProjects();
   const projectId = parseId(searchParams.get("projectId"));
+  // `useMilestones` liefert Mutationen und – bei gewähltem Projekt – die projektgebundene
+  // Liste (byProject, unpaginiert wie bisher). Ohne Projektwahl zeigt die Seite die globale,
+  // serverseitig gefilterte/paginierte Liste aus `useMilestoneLibrary`.
   const milestones = useMilestones(null, projectId);
+  const usePaginatedList = projectId === null;
+  const [statusFilter, setStatusFilter] = useState<Milestone["status"] | "all">("all");
+  const [search, setSearch] = useState<string>("");
+
+  // Serverseitiger Filter der globalen Liste: Status (Gleichheit, wie bisher clientseitig)
+  // + Freitextsuche `q` (Name). Bildet die bisher clientseitige Filterung der Hauptseite nach.
+  const libraryFilter = useMemo<MilestoneListFilter>(() => {
+    const next: MilestoneListFilter = {};
+    if (statusFilter !== "all") {
+      next.status = statusFilter;
+    }
+    if (search.trim()) {
+      next.q = search.trim();
+    }
+    return next;
+  }, [statusFilter, search]);
+
+  // Globale Liste lädt progressiv nach: der erste Block erscheint sofort, weitere Blöcke werden
+  // sequenziell angehängt (kein Seitenzahl-Blättern mehr). Status/Suche wirken serverseitig je
+  // Block; ein Filterwechsel startet das Nachladen über den geänderten queryKey neu.
+  const library = useMilestoneLibrary(libraryFilter);
+
+  // Angezeigte Liste: global paginiert (ohne Projektwahl, Server filtert) oder byProject
+  // (mit Projektwahl, unpaginiert). Da die BoardView im kontrollierten Modus läuft, wird der
+  // byProject-Pfad hier clientseitig mit denselben Filtern (Status/Suche) nachgefiltert, damit
+  // Status und Suche in beiden Modi identisch wirken.
+  const displayedMilestones = useMemo(() => {
+    if (usePaginatedList) {
+      return library.milestones;
+    }
+    const normalized = search.trim().toLocaleLowerCase("de-DE");
+    return milestones.milestones.filter(
+      (milestone) =>
+        (statusFilter === "all" || milestone.status === statusFilter) &&
+        (normalized === "" || milestone.name.toLocaleLowerCase("de-DE").includes(normalized)),
+    );
+  }, [usePaginatedList, library.milestones, milestones.milestones, statusFilter, search]);
+  const listLoading = usePaginatedList ? library.loading : milestones.loading;
+  const listError = usePaginatedList ? library.error : milestones.error;
+
+  // Status-Chip-Counts über die volle (globale bzw. byProject) Liste aus `useMilestones` —
+  // analog ProjectsPage, das die Counts aus der vollen `useProjects()`-Liste zieht. Diese
+  // Liste ist unabhängig von Server-Filter/Pagination und liefert stabile Gesamtzahlen.
+  const statusOptions = useMemo(
+    () =>
+      catalogEntriesByKind(catalogs.entries, "workStatus").map((entry) => ({
+        value: entry.key as Milestone["status"],
+        label: entry.label,
+        color: entry.color,
+        count: milestones.milestones.filter((milestone) => milestone.status === entry.key).length,
+      })),
+    [catalogs.entries, milestones.milestones],
+  );
+
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [createTaskForMilestone, setCreateTaskForMilestone] = useState<Milestone | null>(null);
   const [createTicketForMilestone, setCreateTicketForMilestone] = useState<Milestone | null>(null);
@@ -248,19 +311,19 @@ export function MilestonesPage() {
       <PageHero
         variant="list"
         title="Meilensteine"
-        subtitle={`${milestones.milestones.length} Einträge`}
+        subtitle={`${usePaginatedList ? library.total : milestones.milestones.length} Einträge`}
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
-        {milestones.error || projects.error ? (
+        {listError || projects.error ? (
           <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
-            {milestones.error ?? projects.error}
+            {listError ?? projects.error}
           </div>
         ) : null}
 
         <MilestoneListBoardView
-          milestones={milestones.milestones}
-          loading={milestones.loading || projects.loading}
+          milestones={displayedMilestones}
+          loading={listLoading || projects.loading}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onCreate={openCreate}
@@ -272,14 +335,29 @@ export function MilestonesPage() {
           onTagsChange={changeMilestoneTags}
           onCreateTask={canCreateTasks ? (milestone) => setCreateTaskForMilestone(milestone) : undefined}
           onCreateTicket={canCreateTickets ? (milestone) => setCreateTicketForMilestone(milestone) : undefined}
+          searchValue={search}
+          onSearchChange={setSearch}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
           filters={
-            <ProjectMilestoneFilterBar
-              projects={projects.projects}
-              projectId={projectId}
-              onProjectChange={updateProjectFilter}
-            />
+            <div className="flex flex-wrap items-end gap-3">
+              <ProjectMilestoneFilterBar
+                projects={projects.projects}
+                projectId={projectId}
+                onProjectChange={updateProjectFilter}
+              />
+              <FilterChips
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={statusOptions}
+                allCount={milestones.milestones.length}
+              />
+            </div>
           }
         />
+        {usePaginatedList ? (
+          <LoadMoreIndicator loadedCount={library.loadedCount} total={library.total} loadingMore={library.loadingMore} />
+        ) : null}
       </div>
       <TaskForm
         open={createTaskForMilestone !== null}

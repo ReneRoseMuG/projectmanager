@@ -12,6 +12,7 @@ import {
   getNote,
   linkDayPlanNote,
   listNotes,
+  listNotesPaginated,
   listDayPlanNotes,
   listMilestoneNotes,
   listProjectNotes,
@@ -21,7 +22,7 @@ import {
   updateNote
 } from "../services/notes.service.js";
 import { createJournalActor } from "../services/journal.service.js";
-import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema } from "../utils/route-schemas.js";
 
 const noteBodySchema = {
   type: "object",
@@ -78,11 +79,29 @@ const dayPlanNoteParamSchema = {
   }
 } as const;
 
+const notesListQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    q: { type: "string" },
+    // Opt-in-Pagination: ist `page` gesetzt, liefert die Route Paginated<Note>, sonst
+    // weiterhin das nackte Array (Rückwärtskompatibilität für bestehende Aufrufer).
+    ...paginationQuerySchema
+  }
+} as const;
+
 export async function registerNotesRoutes(app: FastifyInstance): Promise<void> {
-  app.get(
+  app.get<{ Querystring: { q?: string; page?: number; pageSize?: number } }>(
     "/notes",
-    { schema: { response: { 200: arrayResponseSchema } } },
-    async () => listNotes(app.db)
+    { schema: { querystring: notesListQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
+    async (request) => {
+      const { q, page, pageSize } = request.query;
+      // Opt-in: nur wenn `page` gesetzt ist, paginiert antworten — sonst Array-Alt-Verhalten.
+      if (page !== undefined) {
+        return listNotesPaginated(app.db, { q }, page, pageSize ?? 25);
+      }
+      return listNotes(app.db);
+    }
   );
 
   app.get<{ Params: { id: number } }>(

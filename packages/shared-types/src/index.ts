@@ -527,6 +527,15 @@ export interface VersionedUpdate {
 
 export type WithExpectedVersion<T> = T & VersionedUpdate;
 
+// Generische Hülle für seitenbasierte Pagination (page/pageSize + Gesamtzahl).
+// `total` ist die Gesamtzahl NACH Filter/Suche, aber vor dem Zuschnitt auf die Seite.
+export interface Paginated<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface CatalogEntry {
   id: number;
   kind: CatalogKind;
@@ -619,11 +628,14 @@ export interface TagUsageCounts {
   tickets: number;
 }
 
+export type TagDomain = "pm" | "dms";
+
 export interface Tag {
   id: number;
   name: string;
   color: string;
   isSystem: boolean;
+  domain: TagDomain;
   version: number;
   usageCounts?: TagUsageCounts;
 }

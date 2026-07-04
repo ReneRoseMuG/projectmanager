@@ -78,8 +78,8 @@ const knownQueries = {
   wikiDetail: queryKeys.wiki.detail(wikiPageId),
   eventsList: queryKeys.events.list("2026-05"),
   calendarTasks: queryKeys.calendarTasks.list(),
-  localBackupStatus: queryKeys.dumps.localStatus(),
-  remoteBackupStatus: queryKeys.dumps.remoteStatus(),
+  // Das frühere Backup-/dumps-Feature (queryKeys.dumps) existiert nicht mehr — weder im Frontend
+  // noch im API-Backend. Die zugehörigen Cache-Keys wurden hier entfernt (kein reales Ziel mehr).
   settingsResolved: queryKeys.settings.resolved(),
   globalSearch: queryKeys.globalSearch.data()
 } satisfies Record<string, QueryKey>;
@@ -130,7 +130,6 @@ describe("Query invalidation integration", () => {
     expect(queryKeys.features.projects(featureId)).toEqual(["features", "detail", featureId, "projects"]);
     expect(queryKeys.notes.detail(noteId)).toEqual(["notes", "detail", noteId]);
     expect(queryKeys.settings.resolved()).toEqual(["settings", "resolved"]);
-    expect(queryKeys.dumps.remoteStatus()).toEqual(["dumps", "remoteStatus"]);
     expect(queryKeys.globalSearch.data()).toEqual(["globalSearch", "data"]);
   });
 
@@ -382,8 +381,6 @@ describe("Query invalidation integration", () => {
       "wikiTree",
       "wikiDetail",
       "calendarTasks",
-      "localBackupStatus",
-      "remoteBackupStatus",
       "settingsResolved",
       "globalSearch"
     ]);

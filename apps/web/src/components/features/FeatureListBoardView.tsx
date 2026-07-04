@@ -19,6 +19,11 @@ interface FeatureListBoardViewProps {
   toolbarFilters?: React.ReactNode;
   filters?: React.ReactNode;
   showToolbarAdd?: boolean;
+  // Optional kontrollierte Suche: sind beide gesetzt, wird das Suchfeld von außen gesteuert
+  // (serverseitige `q`-Suche der Feature-Liste) und die interne Titel-Filterung entfällt.
+  // Ohne diese Props bleibt das bisherige clientseitige Verhalten unverändert.
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 function matchesSearch(feature: Feature, searchValue: string) {
@@ -40,6 +45,8 @@ export function FeatureListBoardView({
   toolbarFilters,
   filters,
   showToolbarAdd = true,
+  searchValue: controlledSearchValue,
+  onSearchChange: controlledOnSearchChange,
 }: FeatureListBoardViewProps) {
   const catalogs = useCatalogs();
   const statusColumns = useMemo(
@@ -47,10 +54,15 @@ export function FeatureListBoardView({
     [catalogs.entries],
   );
   const [mode, setMode] = useState<ListBoardMode>("board");
-  const [searchValue, setSearchValue] = useState("");
+  const [internalSearchValue, setInternalSearchValue] = useState("");
+  // Kontrollierte Suche (serverseitig) hat Vorrang: dann keine interne Titel-Filterung,
+  // weil die Liste bereits gefiltert vom Server kommt. Sonst wie bisher clientseitig.
+  const searchControlled = controlledOnSearchChange !== undefined;
+  const searchValue = searchControlled ? controlledSearchValue ?? "" : internalSearchValue;
+  const setSearchValue = searchControlled ? controlledOnSearchChange : setInternalSearchValue;
   const visibleFeatures = useMemo(
-    () => features.filter((feature) => matchesSearch(feature, searchValue)),
-    [features, searchValue],
+    () => (searchControlled ? features : features.filter((feature) => matchesSearch(feature, searchValue))),
+    [features, searchValue, searchControlled],
   );
 
   return (

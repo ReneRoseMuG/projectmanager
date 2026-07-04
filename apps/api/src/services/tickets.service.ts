@@ -10,6 +10,7 @@
   TicketStats,
   TicketUpdate,
   Tag,
+  Paginated,
   UserOption,
   VisibleParentContext
 } from "@taskmanager/shared-types";
@@ -18,7 +19,7 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureTickets, features, milestoneTickets, milestones, projectTickets, projects, taskTickets, tasks, ticketAttachments, ticketComments, ticketNotes, ticketRelations, tickets, useCases, useCaseTickets, wikiPageTickets, wikiPages } from "../db/schema.js";
 import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
-import { ticketRepository, type TicketRecord } from "../repositories/ticket.repository.js";
+import { ticketRepository, type TicketListFilter, type TicketRecord } from "../repositories/ticket.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 import { listTicketAttachments } from "./attachments.service.js";
 import { ensureCatalogEntryExists, isCatalogEntryClosed, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
@@ -39,7 +40,7 @@ import {
   type JournalObjectRef
 } from "./journal.service.js";
 import { deleteTicketNotesForIds, listTicketNotes } from "./notes.service.js";
-import { assertCompatibleProjectContexts, projectContextsAreCompatible, ticketOwnerProjectContext, ticketProjectContext } from "./project-context.service.js";
+import { assertCompatibleProjectContexts, buildTicketProjectContextMap, projectContextsAreCompatible, ticketOwnerProjectContext, ticketProjectContext } from "./project-context.service.js";
 import { getTicketTags, getTicketTagsMap } from "./tags.service.js";
 import { getUserOption, getUserOptionsMap, normalizeAssignableUserId } from "./users.service.js";
 
@@ -48,6 +49,9 @@ export type DashboardTicketOwner = { type: "project" | "milestone"; id: number }
 
 type TicketRecordWithBoardPosition = TicketRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
 type TicketListRecord = TicketRecord & { boardPosition?: number; visibleParent?: VisibleParentContext | null };
+// Dashboard-Rohzeile für Statistik/Auswahl — deckt sowohl Root-Tickets (ohne
+// boardPosition) als auch Owner-Zeilen (mit boardPosition/visibleParent) ab.
+type TicketDashboardRow = TicketListRecord;
 interface SupportCounts {
   attachmentCount: number;
   noteCount: number;
@@ -665,6 +669,29 @@ export async function listTickets(database: DbClient): Promise<Ticket[]> {
   return mapTicketListRows(database, rows.map((ticket) => ({ ...ticket, visibleParent: parentContexts.get(ticket.id) ?? null })));
 }
 
+// Seitenbasierte Variante der Root-Ticket-Liste (MS-DMS-Pagination-Referenz, opt-in
+// über den Query-Parameter `page`). Filter/Suche und Sortierung liegen SERVERSEITIG im
+// Repository (echte SQL-Pagination: WHERE + ORDER BY + LIMIT/OFFSET + separater COUNT).
+// `total` ist die gefilterte Gesamtzahl VOR der Pagination. Nur die Seiten-Zeilen werden
+// über den bestehenden Batch-Mapper angereichert — das DTO je Ticket ist mit listTickets
+// identisch (gleiche Anreicherung: Tags, Sub-Counts, Support-Counts, User, visibleParent).
+export async function listTicketsPaginated(
+  database: DbClient,
+  filter: TicketListFilter,
+  page: number,
+  pageSize: number
+): Promise<Paginated<Ticket>> {
+  const offset = (page - 1) * pageSize;
+  const [total, rows] = await Promise.all([
+    ticketRepository.countRootTickets(database, filter),
+    ticketRepository.findRootTicketsPage(database, filter, pageSize, offset)
+  ]);
+  const ids = rows.map((ticket) => ticket.id);
+  const parentContexts = await getPrimaryTicketParentContextMap(database, ids);
+  const data = await mapTicketListRows(database, rows.map((ticket) => ({ ...ticket, visibleParent: parentContexts.get(ticket.id) ?? null })));
+  return { data, total, page, pageSize };
+}
+
 export async function listTicketLinkCandidates(database: DbClient, owner: TicketOwner | null, contextOwner?: TicketOwner | null): Promise<Ticket[]> {
   if (!owner && !contextOwner) {
     throw badRequest("Ticket link candidates require an owner or context owner");
@@ -697,12 +724,11 @@ export async function listTicketLinkCandidates(database: DbClient, owner: Ticket
 
   const ownerContext = await ticketOwnerProjectContext(database, compatibilityOwner);
 
-  const candidatePairs = await Promise.all(
-    allTickets
-      .filter((ticket) => !linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status))
-      .map(async (ticket) => ({ ticket, context: await ticketProjectContext(database, ticket.id) }))
-  );
-  return candidatePairs.filter(({ context }) => projectContextsAreCompatible(ownerContext, context)).map(({ ticket }) => ticket);
+  // Kontext aller Kandidaten gebündelt auflösen statt pro Ticket rekursiv —
+  // gleiche Kandidaten, gleiche Kontextmenge pro Ticket.
+  const candidates = allTickets.filter((ticket) => !linkedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status));
+  const contextByTicketId = await buildTicketProjectContextMap(database, candidates.map((ticket) => ticket.id));
+  return candidates.filter((ticket) => projectContextsAreCompatible(ownerContext, contextByTicketId.get(ticket.id) ?? new Set<number>()));
 }
 
 export async function listOwnerTickets(database: DbClient, owner: TicketOwner): Promise<Ticket[]> {
@@ -721,13 +747,24 @@ export async function listSubTickets(database: DbClient, parentId: number): Prom
   return mapTicketListRows(database, rows);
 }
 
-async function listDashboardTickets(database: DbClient, owner?: DashboardTicketOwner): Promise<Ticket[]> {
+/**
+ * Rohzeilen-Variante von listDashboardTickets für die Dashboard-Statistiken.
+ *
+ * Liefert dieselbe sichtbare Zeilenmenge in EXAKT derselben Reihenfolge wie
+ * listDashboardTickets, aber ohne teures Voll-Mapping (keine Tags/Counts/User pro
+ * Zeile). Die Owner-Sichtbarkeits- und Dedup-Logik (inherited-Milestone-Merge,
+ * Projekt-Dedup) bleibt zeichengleich erhalten, damit Status-Counts und
+ * recent-Auswahl unverändert bleiben. Erst die aufrufende Funktion mappt bei
+ * Bedarf die ≤limit ausgewählten Einträge voll.
+ */
+async function listDashboardTicketRows(database: DbClient, owner?: DashboardTicketOwner): Promise<TicketDashboardRow[]> {
   if (!owner) {
-    return listTickets(database);
+    return ticketRepository.findRootTickets(database);
   }
   if (owner.type === "project") {
+    await ensureOwnerExists(database, owner);
     const seen = new Set<number>();
-    return (await listOwnerTickets(database, owner)).filter((ticket) => {
+    return (await selectVisibleOwnerTicketRows(database, owner)).filter((ticket) => {
       if (seen.has(ticket.id)) {
         return false;
       }
@@ -735,7 +772,12 @@ async function listDashboardTickets(database: DbClient, owner?: DashboardTicketO
       return true;
     });
   }
-  return listOwnerTickets(database, owner);
+  await ensureOwnerExists(database, owner);
+  return selectVisibleOwnerTicketRows(database, owner);
+}
+
+async function mapDashboardTicketRows(database: DbClient, rows: TicketDashboardRow[]): Promise<Ticket[]> {
+  return mapTicketListRows(database, rows);
 }
 
 function dateKey(value: string): number {
@@ -745,7 +787,9 @@ function dateKey(value: string): number {
 
 export async function getTicketStats(database: DbClient, owner?: DashboardTicketOwner): Promise<TicketStats> {
   const statusCounts: Record<string, number> = {};
-  for (const ticket of await listDashboardTickets(database, owner)) {
+  // Nur die sichtbaren Rohzeilen zählen — kein Voll-Mapping (Tags/Counts/User) nötig,
+  // da ausschließlich der Status je Zeile relevant ist.
+  for (const ticket of await listDashboardTicketRows(database, owner)) {
     statusCounts[ticket.status] = (statusCounts[ticket.status] ?? 0) + 1;
   }
   return {
@@ -761,10 +805,14 @@ export async function listRecentTickets(
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
   const sort = options.sort ?? "updatedAt";
   const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
-  return [...(await listDashboardTickets(database, options.owner))]
+  // Auf Rohzeilen filtern/sortieren/schneiden — der Sort-Vergleich nutzt nur
+  // id sowie createdAt/updatedAt und hat einen eindeutigen id-Tiebreak;
+  // erst die ≤limit ausgewählten Zeilen werden voll gemappt.
+  const selected = [...(await listDashboardTicketRows(database, options.owner))]
     .filter((ticket) => !closedStatusKeys.has(ticket.status))
     .sort((left, right) => dateKey(right[sort]) - dateKey(left[sort]) || right.id - left.id)
     .slice(0, limit);
+  return mapDashboardTicketRows(database, selected);
 }
 
 async function ticketParentContexts(database: DbClient, ticket: TicketRecord): Promise<VisibleParentContext[]> {
@@ -1243,12 +1291,10 @@ export async function listTicketRelationCandidates(database: DbClient, ticketId:
   }
 
   const allTickets = await listTickets(database);
-  const candidatePairs = await Promise.all(
-    allTickets
-      .filter((ticket) => ticket.id !== ticketId && !relatedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status))
-      .map(async (ticket) => ({ ticket, context: await ticketProjectContext(database, ticket.id) }))
-  );
-  return candidatePairs.filter(({ context }) => projectContextsAreCompatible(sourceContext, context)).map(({ ticket }) => ticket);
+  // Kontext aller Kandidaten gebündelt auflösen statt pro Ticket rekursiv.
+  const candidates = allTickets.filter((ticket) => ticket.id !== ticketId && !relatedTicketIds.has(ticket.id) && !closedStatusKeys.has(ticket.status));
+  const contextByTicketId = await buildTicketProjectContextMap(database, candidates.map((ticket) => ticket.id));
+  return candidates.filter((ticket) => projectContextsAreCompatible(sourceContext, contextByTicketId.get(ticket.id) ?? new Set<number>()));
 }
 
 export async function addTicketRelation(database: DbClient, ticketId: number, input: TicketRelationInput, actor?: JournalActor | null): Promise<void> {

@@ -17,10 +17,10 @@ import {
   removeAttachmentFromFolder,
   updateAttachmentFolder
 } from "../services/attachment-folder.service.js";
-import { getDocument, listDocumentLibrary, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
+import { getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { badRequest } from "../utils/errors.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema, tagIdsBodySchema } from "../utils/route-schemas.js";
 
 // MS-75 (DMS): Alle Routen laufen unter der bestehenden Ressource "attachments" (kein
 // eigener Auth-Katalogeintrag). Da die Pfade (/documents, /attachment-categories,
@@ -115,7 +115,10 @@ const documentLibraryQuerySchema = {
     category: { type: "integer", minimum: 1 },
     tag: { type: "integer", minimum: 1 },
     type: { type: "string" },
-    q: { type: "string" }
+    q: { type: "string" },
+    // Opt-in-Pagination: ist `page` gesetzt, liefert die Route Paginated<Attachment>,
+    // sonst weiterhin das nackte Array (Rückwärtskompatibilität für MCP/interne Aufrufer).
+    ...paginationQuerySchema
   }
 } as const;
 
@@ -262,11 +265,11 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // --- Dokumentenbibliothek ---
-  app.get<{ Querystring: { folder?: string; category?: number; tag?: number; type?: string; q?: string } }>(
+  app.get<{ Querystring: { folder?: string; category?: number; tag?: number; type?: string; q?: string; page?: number; pageSize?: number } }>(
     "/documents",
-    { config: attachmentsAuth("read"), schema: { querystring: documentLibraryQuerySchema, response: { 200: arrayResponseSchema } } },
+    { config: attachmentsAuth("read"), schema: { querystring: documentLibraryQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
     async (request) => {
-      const { folder: folderParam, category, tag, type, q } = request.query;
+      const { folder: folderParam, category, tag, type, q, page, pageSize } = request.query;
       let folder: number | "unsorted" | undefined;
       if (folderParam === "unsorted") {
         folder = "unsorted";
@@ -277,7 +280,12 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
         }
         folder = parsed;
       }
-      return listDocumentLibrary(app.db, { folder, category, tag, type, q });
+      const documentFilter = { folder, category, tag, type, q };
+      // Opt-in: nur wenn `page` gesetzt ist, paginiert antworten — sonst Array-Alt-Verhalten.
+      if (page !== undefined) {
+        return listDocumentLibraryPaginated(app.db, documentFilter, page, pageSize ?? 25);
+      }
+      return listDocumentLibrary(app.db, documentFilter);
     }
   );
 

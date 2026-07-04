@@ -27,7 +27,7 @@ import {
   Users,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { DraftFile, ViewMode } from "../../types";
 import { uploadTaskAttachment } from "../../api/attachments";
@@ -41,7 +41,8 @@ import { errorMessage, errorMessageAsync } from "../../hooks/errors";
 import { useAttachments } from "../../hooks/useAttachments";
 import { useAuth } from "../../hooks/useAuth";
 import { useAutoSave } from "../../hooks/useAutoSave";
-import { useBacklog } from "../../hooks/useBacklog";
+import { useBacklog, useBacklogPaginated } from "../../hooks/useBacklog";
+import type { BacklogFilters } from "../../api/backlog";
 import { useEntityComments } from "../../hooks/useEntityComments";
 import { useFeatures } from "../../hooks/useFeatures";
 import { useMilestones } from "../../hooks/useMilestones";
@@ -86,6 +87,7 @@ import { FormModal } from "../ui/FormModal";
 import { SaveStatus } from "../ui/SaveStatus";
 import { FormSidebar } from "../ui/FormSidebar";
 import { Input } from "../ui/Input";
+import { LoadMoreIndicator } from "../ui/LoadMoreIndicator";
 import { Modal } from "../ui/Modal";
 import { PendingCommentList } from "../ui/PendingCommentList";
 import { PendingFileList } from "../ui/PendingFileList";
@@ -221,6 +223,11 @@ export function ProjectForm({
     projectId ? { type: "project", id: projectId } : null,
   );
   const backlog = useBacklog(projectId);
+  // Progressives Nachladen der Backlog-Liste fürs Board (statt Alt-Array auf einmal). Filter/
+  // Suche laufen weiterhin clientseitig im Board, daher keine serverseitigen Filter hier; die
+  // Chip-Counts und der Offene-Aufgaben-Zähler bleiben über die geladene Menge (backlog.items).
+  const backlogFilters = useMemo<BacklogFilters>(() => ({}), []);
+  const backlogList = useBacklogPaginated(projectId, backlogFilters);
   const catalogs = useCatalogs();
   const notes = useNotes(projectId ? { type: "project", id: projectId } : null);
   const projectWikiRelation = useProjectWikiRelation(project);
@@ -860,7 +867,7 @@ export function ProjectForm({
               />
               <DatePicker label="Start" variant="panel" value={startDate} onChange={(event) => { const v = event.target.value; setStartDate(v); formStateRef.current = { ...formStateRef.current, startDate: v }; af?.(); }} />
               <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(event) => { const v = event.target.value; setDueDate(v); formStateRef.current = { ...formStateRef.current, dueDate: v }; af?.(); }} />
-              <TagPicker selected={selectedTags} onChange={(v) => { setSelectedTags(v); formStateRef.current = { ...formStateRef.current, selectedTags: v }; af?.(); }} variant="panel" />
+              <TagPicker selected={selectedTags} onChange={(v) => { setSelectedTags(v); formStateRef.current = { ...formStateRef.current, selectedTags: v }; af?.(); }} domain="pm" variant="panel" />
               {project ? (
                 <ProjectWikiPanel
                   wikiPageId={projectWikiRelation.wikiPageId}
@@ -1157,27 +1164,31 @@ export function ProjectForm({
         {activeTab === "backlog" ? (
           <DetailBoardShell>
             {project ? (
-              backlog.loading || allFeatures.loading ? (
+              backlogList.loading || allFeatures.loading ? (
                 <TaskListSkeleton />
               ) : (
-                <BacklogListBoardView
-                  items={backlog.items}
-                  features={allFeatures.features}
-                  statusFilter={backlog.statusFilter}
-                  onStatusFilterChange={backlog.setStatusFilter}
-                  onCreate={() =>
-                    navigate(
-                      `/backlog/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
-                    )
-                  }
-                  onEdit={(item) =>
-                    navigate(
-                      `/backlog/${item.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
-                    )
-                  }
-                  onDelete={(item) => void deleteBacklogItem(item)}
-                  onStatusChange={(item, status) => backlog.updateItem(item.id, { status, expectedVersion: item.version })}
-                />
+                <>
+                  <BacklogListBoardView
+                    items={backlogList.items}
+                    features={allFeatures.features}
+                    statusFilter={backlog.statusFilter}
+                    onStatusFilterChange={backlog.setStatusFilter}
+                    onCreate={() =>
+                      navigate(
+                        `/backlog/new?projectId=${project.id}&returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                      )
+                    }
+                    onEdit={(item) =>
+                      navigate(
+                        `/backlog/${item.id}?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`,
+                      )
+                    }
+                    onDelete={(item) => void deleteBacklogItem(item)}
+                    onStatusChange={(item, status) => backlog.updateItem(item.id, { status, expectedVersion: item.version })}
+                  />
+                  {/* Fortschrittshinweis für das progressive Nachladen; blendet sich aus, sobald alle Blöcke da sind. */}
+                  <LoadMoreIndicator loadedCount={backlogList.loadedCount} total={backlogList.total} loadingMore={backlogList.loadingMore} />
+                </>
               )
             ) : (
               <EmptyState

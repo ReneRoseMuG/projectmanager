@@ -28,6 +28,23 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
 import { addPendingComment, changeInput, clickTab, feature, formTestMocks, getFileInput, project, renderWithProviders, wikiPage } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { ProjectForm } from "../../../../../apps/web/src/components/projects/ProjectForm";
+import * as useBacklogModule from "../../../../../apps/web/src/hooks/useBacklog";
+
+// Der Listen-Skalierungs-Umbau (MS-75) trennt Backlog in useBacklog (Mutationen/Chip-Counts, von der
+// Fixture ownerFormTestUtils gemockt) und das neue useBacklogPaginated (progressiv nachgeladenes
+// Board). ProjectForm konsumiert beide. Der Fixture-Mock von useBacklog gewinnt gegenüber einem
+// zweiten vi.mock hier (Registrierungsreihenfolge), deckt aber useBacklogPaginated nicht ab. Statt
+// die geteilte Fixture zu ändern, wird der fehlende Export zur Laufzeit auf dem gemockten Modul
+// ergänzt — mit einer Rückgabe analog zum echten useBacklogPaginated (items/total/loadedCount/
+// loading/loadingMore/error).
+(useBacklogModule as unknown as { useBacklogPaginated: unknown }).useBacklogPaginated = () => ({
+  items: [],
+  total: 0,
+  loadedCount: 0,
+  loading: false,
+  loadingMore: false,
+  error: null,
+});
 
 function changeTitleInForm(heading: string, value: string) {
   const form = screen.getByRole("heading", { name: heading }).closest("form");

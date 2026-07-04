@@ -6856,43 +6856,21 @@
     },
     {
       "columns": [
-        {
-          "value": "category_id",
-          "isExpression": false
-        },
-        {
-          "value": "attachment_id",
-          "isExpression": false
-        }
+        "category_id",
+        "attachment_id"
       ],
-      "isUnique": true,
-      "using": null,
-      "algorithm": null,
-      "lock": null,
-      "nameExplicit": true,
-      "name": "attachment_category_links_category_attachment_unique",
-      "entityType": "indexes",
-      "table": "attachment_category_links"
+      "name": "PRIMARY",
+      "table": "attachment_category_links",
+      "entityType": "pks"
     },
     {
       "columns": [
-        {
-          "value": "attachment_id",
-          "isExpression": false
-        },
-        {
-          "value": "tag_id",
-          "isExpression": false
-        }
+        "attachment_id",
+        "tag_id"
       ],
-      "isUnique": true,
-      "using": null,
-      "algorithm": null,
-      "lock": null,
-      "nameExplicit": true,
-      "name": "attachment_tags_attachment_tag_unique",
-      "entityType": "indexes",
-      "table": "attachment_tags"
+      "name": "PRIMARY",
+      "table": "attachment_tags",
+      "entityType": "pks"
     },
     {
       "columns": [
@@ -7360,23 +7338,12 @@
     },
     {
       "columns": [
-        {
-          "value": "folder_id",
-          "isExpression": false
-        },
-        {
-          "value": "attachment_id",
-          "isExpression": false
-        }
+        "folder_id",
+        "attachment_id"
       ],
-      "isUnique": true,
-      "using": null,
-      "algorithm": null,
-      "lock": null,
-      "nameExplicit": true,
-      "name": "folder_attachments_folder_attachment_unique",
-      "entityType": "indexes",
-      "table": "folder_attachments"
+      "name": "PRIMARY",
+      "table": "folder_attachments",
+      "entityType": "pks"
     },
     {
       "columns": [

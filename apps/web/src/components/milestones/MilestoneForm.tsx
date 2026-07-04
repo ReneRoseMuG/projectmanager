@@ -555,7 +555,7 @@ export function MilestoneForm({
               />
               <DatePicker label="Start" variant="panel" value={startDate} onChange={(inputEvent) => { const v = inputEvent.target.value; setStartDate(v); formStateRef.current = { ...formStateRef.current, startDate: v }; af?.(); }} />
               <DatePicker label="Fällig" variant="panel" value={dueDate} onChange={(inputEvent) => { const v = inputEvent.target.value; setDueDate(v); formStateRef.current = { ...formStateRef.current, dueDate: v }; af?.(); }} />
-              <TagPicker selected={selectedTags} onChange={(v) => { setSelectedTags(v); formStateRef.current = { ...formStateRef.current, selectedTags: v }; af?.(); }} variant="panel" />
+              <TagPicker selected={selectedTags} onChange={(v) => { setSelectedTags(v); formStateRef.current = { ...formStateRef.current, selectedTags: v }; af?.(); }} domain="pm" variant="panel" />
             </FormSidebar>
           </div>
         ) : null}

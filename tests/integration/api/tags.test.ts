@@ -2,7 +2,8 @@
  * Test Scope: Tags API
  *
  * Covers global tag CRUD, project/task/milestone/ticket assignments, replacement semantics,
- * uniqueness, cascades, usageCounts, and error cases (404, 409 version conflict).
+ * uniqueness, cascades, usageCounts, tag domains (pm/dms visibility filter + default backfill),
+ * and error cases (404, 409 version conflict, 400 invalid domain).
  */
 
 import type { FastifyInstance } from "fastify";
@@ -282,6 +283,63 @@ describe("Tags API", () => {
       .patch(`/api/tags/${tag.id}`)
       .send({ name: "veraltet", expectedVersion: tag.version })
       .expect(409);
+  });
+
+  describe("Tag-Domänen (PM/DMS)", () => {
+    it("POST /api/tags ordnet ohne domain der PM-Domäne zu (Default-Backfill)", async () => {
+      const res = await supertest(app.server).post("/api/tags").send({ name: "pm-default", color: "#3b82f6" }).expect(201);
+      expect(res.body.domain).toBe("pm");
+    });
+
+    it("POST /api/tags legt ein DMS-Tag mit domain='dms' an und persistiert es", async () => {
+      const res = await supertest(app.server).post("/api/tags").send({ name: "dms-tag", color: "#7c3aed", domain: "dms" }).expect(201);
+      expect(res.body.domain).toBe("dms");
+
+      const all = await supertest(app.server).get("/api/tags").expect(200);
+      const persisted = (all.body as Array<{ id: number; domain: string }>).find((tag) => tag.id === res.body.id);
+      expect(persisted?.domain).toBe("dms");
+    });
+
+    it("POST /api/tags mit ungültiger domain gibt 400 zurueck", async () => {
+      await supertest(app.server).post("/api/tags").send({ name: "bad-domain", color: "#000000", domain: "xyz" }).expect(400);
+    });
+
+    it("GET /api/tags?domain=pm liefert ausschliesslich PM-Tags (DMS ausgeschlossen)", async () => {
+      const pmTag = (await supertest(app.server).post("/api/tags").send({ name: "pm-only", domain: "pm" }).expect(201)).body as { id: number };
+      const dmsTag = (await supertest(app.server).post("/api/tags").send({ name: "dms-only", domain: "dms" }).expect(201)).body as { id: number };
+
+      const res = await supertest(app.server).get("/api/tags?domain=pm").expect(200);
+      const rows = res.body as Array<{ id: number; domain: string }>;
+      const ids = rows.map((tag) => tag.id);
+
+      expect(ids).toContain(pmTag.id);
+      expect(ids).not.toContain(dmsTag.id);
+      expect(rows.every((tag) => tag.domain === "pm")).toBe(true);
+    });
+
+    it("GET /api/tags?domain=dms liefert ausschliesslich DMS-Tags (PM ausgeschlossen)", async () => {
+      const pmTag = (await supertest(app.server).post("/api/tags").send({ name: "pm-x", domain: "pm" }).expect(201)).body as { id: number };
+      const dmsTag = (await supertest(app.server).post("/api/tags").send({ name: "dms-x", domain: "dms" }).expect(201)).body as { id: number };
+
+      const res = await supertest(app.server).get("/api/tags?domain=dms").expect(200);
+      const rows = res.body as Array<{ id: number; domain: string }>;
+      const ids = rows.map((tag) => tag.id);
+
+      expect(ids).toContain(dmsTag.id);
+      expect(ids).not.toContain(pmTag.id);
+      expect(rows.every((tag) => tag.domain === "dms")).toBe(true);
+    });
+
+    it("GET /api/tags ohne Filter liefert beide Domänen", async () => {
+      const pmTag = (await supertest(app.server).post("/api/tags").send({ name: "pm-both", domain: "pm" }).expect(201)).body as { id: number };
+      const dmsTag = (await supertest(app.server).post("/api/tags").send({ name: "dms-both", domain: "dms" }).expect(201)).body as { id: number };
+
+      const res = await supertest(app.server).get("/api/tags").expect(200);
+      const ids = (res.body as Array<{ id: number }>).map((tag) => tag.id);
+
+      expect(ids).toContain(pmTag.id);
+      expect(ids).toContain(dmsTag.id);
+    });
   });
 
   describe("Auth-Schutz: Reader-Negativfall", () => {

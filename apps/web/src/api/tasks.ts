@@ -1,7 +1,37 @@
-import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskMoveInput, TaskOwner, TaskUpdate } from "@taskmanager/shared-types";
+import type { Paginated, Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskMoveInput, TaskOwner, TaskUpdate } from "@taskmanager/shared-types";
 import { api } from "./client";
 
 export type { TaskOwner };
+
+// Serverseitige Filter/Suche der globalen Aufgabenliste (Status, Suchtext).
+export interface TaskListFilter {
+  status?: string;
+  q?: string;
+}
+
+// Optionale Seiten-Pagination. Ist `page` gesetzt, liefert das Backend Paginated<Task>;
+// ohne `page` weiterhin das nackte Array (Rückwärtskompatibilität für Alt-Aufrufer).
+export interface TaskListPagination {
+  page?: number;
+  pageSize?: number;
+}
+
+function buildTasksQuery(filter: TaskListFilter, pagination?: TaskListPagination): Record<string, string | number> {
+  const searchParams: Record<string, string | number> = {};
+  if (filter.status) {
+    searchParams.status = filter.status;
+  }
+  if (filter.q) {
+    searchParams.q = filter.q;
+  }
+  if (pagination?.page !== undefined) {
+    searchParams.page = pagination.page;
+  }
+  if (pagination?.pageSize !== undefined) {
+    searchParams.pageSize = pagination.pageSize;
+  }
+  return searchParams;
+}
 
 function ownerPath(owner: TaskOwner): string {
   if (owner.type === "project") {
@@ -29,6 +59,13 @@ export async function getProjectTasks(projectId: number): Promise<TaskBoardItem[
 
 export async function getTasks(): Promise<Task[]> {
   return api.get("tasks").json<Task[]>();
+}
+
+// Paginierter Abruf der globalen Aufgabenliste: liefert Paginated<Task> (data + total + page
+// + pageSize). Filter/Suche werden serverseitig angewandt.
+export async function getTasksPage(filter: TaskListFilter, pagination: TaskListPagination): Promise<Paginated<Task>> {
+  const page = pagination.page ?? 1;
+  return api.get("tasks", { searchParams: buildTasksQuery(filter, { ...pagination, page }) }).json<Paginated<Task>>();
 }
 
 export async function getTaskLinkCandidates(owner: TaskOwner | null, contextOwner?: TaskOwner | null): Promise<Task[]> {

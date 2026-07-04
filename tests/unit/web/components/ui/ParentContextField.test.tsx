@@ -5,7 +5,7 @@
  * ParentContextField
  *
  * Abgedeckte Regeln:
- * - Sichtbare Parent-Kontexte werden als read-only Badges mit Referenz gerendert.
+ * - Sichtbare Parent-Kontexte werden als read-only Chips mit Typ-Präfix, Icon und Label gerendert.
  * - Leere oder fehlende Parent-Kontexte erzeugen keine UI.
  * - Bei onUnlink erscheint ein ×-Button nur für direct-Einträge mit unlinkbarem Typ (TKT-65).
  * - inherited-Einträge und nicht-unlinkbare Typen (task, ticket) erhalten keinen ×-Button.
@@ -38,13 +38,14 @@ describe("ParentContextField", () => {
     );
 
     expect(screen.getByTestId("parent-context-field")).toBeInTheDocument();
-    expect(screen.getByText("PROJ-7")).toBeInTheDocument();
+    // Die Chip-Darstellung zeigt das Typ-Präfix (ohne ID) und daneben das Label.
+    expect(screen.getByText("PROJ")).toBeInTheDocument();
     expect(screen.getByText("Apollo")).toBeInTheDocument();
-    expect(screen.getByText("TASK-11")).toBeInTheDocument();
+    expect(screen.getByText("TASK")).toBeInTheDocument();
     expect(screen.getByText("Checkliste")).toBeInTheDocument();
-    expect(screen.getByText("TKT-25")).toBeInTheDocument();
+    expect(screen.getByText("TKT")).toBeInTheDocument();
     expect(screen.getByText("Login Bug")).toBeInTheDocument();
-    expect(screen.getByText("UC-3")).toBeInTheDocument();
+    expect(screen.getByText("UC")).toBeInTheDocument();
     expect(screen.getByText("Anmelden")).toBeInTheDocument();
     expect(document.querySelector(".lucide-list-todo")).toBeInTheDocument();
     expect(document.querySelector(".lucide-bug")).toBeInTheDocument();

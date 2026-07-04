@@ -66,6 +66,21 @@ const statusColumns = [
   { value: "rejected", label: "Verworfen" },
 ] as const;
 
+// Board-Redesign: Geschlossene Statusspalten (isClosed im workStatus-Katalog) sind im
+// Board-Modus keine regulären `section.rounded-lg` mehr, sondern wandern in die
+// ClosedBoardSidebar (ein `aside`). Nur die offenen Spalten bleiben Board-Sections.
+const closedStatusValues = new Set<string>([
+  "completed",
+  "archived",
+  "done",
+  "resolved",
+  "closed",
+  "rejected",
+]);
+const openStatusColumns = statusColumns.filter(
+  (column) => !closedStatusValues.has(column.value),
+);
+
 function LocationProbe() {
   const location = useLocation();
   return <span data-testid="location">{location.pathname}</span>;
@@ -152,12 +167,15 @@ describe("ProjectListBoardView", () => {
     expectToolbar();
     expect(container.querySelector("[data-list-board-layout='board']")).toBeInTheDocument();
 
+    // Nur die offenen Statusspalten sind reguläre Board-Sections; die geschlossenen
+    // (Abgeschlossen, Archiviert, Erledigt, Gelöst, Geschlossen, Verworfen) erscheinen
+    // in der ClosedBoardSidebar.
     const columns = container.querySelectorAll("section.rounded-lg");
-    expect(columns.length).toBe(statusColumns.length);
+    expect(columns.length).toBe(openStatusColumns.length);
     columns.forEach((column) => {
       expect(column).toHaveClass("min-w-0");
     });
-    statusColumns.forEach((column, index) => {
+    openStatusColumns.forEach((column, index) => {
       expect(
         within(columns[index] as HTMLElement).getByRole("heading", {
           name: column.label,
@@ -169,12 +187,13 @@ describe("ProjectListBoardView", () => {
       .getByRole("heading", { name: "Aktiv" })
       .closest("section");
     expect(activeColumn).toContainElement(screen.getByText("Projekt Aktiv"));
-    const archivedColumn = screen
-      .getByRole("heading", { name: "Archiviert" })
-      .closest("section");
-    expect(archivedColumn).toContainElement(
-      screen.getByText("Projekt Archiviert"),
-    );
+
+    // Das geschlossene Projekt "Archiviert" wandert in die Sidebar (aside), nicht in eine Board-Section.
+    const closedSidebar = container.querySelector("aside") as HTMLElement;
+    expect(closedSidebar).toBeInTheDocument();
+    expect(
+      within(closedSidebar).getByText("Projekt Archiviert"),
+    ).toBeInTheDocument();
 
     expectItemCardClasses(container.querySelectorAll("article.p-5"));
     expect(
@@ -202,8 +221,10 @@ describe("ProjectListBoardView", () => {
       projects.length,
     );
 
+    // Spalten-Add-Buttons erscheinen nur an den offenen Board-Sections; die
+    // ClosedBoardSidebar rendert keine "hinzufügen"-Buttons.
     const addButtons = screen.getAllByRole("button", { name: /hinzufügen/ });
-    expect(addButtons).toHaveLength(statusColumns.length);
+    expect(addButtons).toHaveLength(openStatusColumns.length);
     fireEvent.click(screen.getByRole("button", { name: "Aktiv hinzufügen" }));
     expect(onCreate).toHaveBeenCalledWith("active");
 

@@ -67,6 +67,12 @@ const statusColumns = [
   { value: "rejected", label: "Verworfen" }
 ] as const;
 
+// Board-Redesign: Geschlossene Statusspalten (isClosed im workStatus-Katalog) sind im
+// Board keine regulären `section.rounded-lg` mehr, sondern erscheinen in der
+// ClosedBoardSidebar. Nur die offenen Spalten bleiben Board-Sections.
+const closedStatusValues = new Set<string>(["completed", "archived", "done", "resolved", "closed", "rejected"]);
+const openStatusColumns = statusColumns.filter((column) => !closedStatusValues.has(column.value));
+
 function renderTaskList({
   tasks = buildTaskSet(),
   viewMode = "kanban",
@@ -166,19 +172,28 @@ describe("TaskListBoardView", () => {
     expectToolbar();
     expect(container.querySelector("[data-list-board-layout='board']")).toBeInTheDocument();
 
+    // Nur die offenen Statusspalten sind reguläre Board-Sections; die geschlossenen
+    // (Abgeschlossen, Archiviert, Erledigt, Gelöst, Geschlossen, Verworfen) wandern in
+    // die ClosedBoardSidebar.
     const columns = container.querySelectorAll("section.rounded-lg");
-    expect(columns.length).toBe(statusColumns.length);
+    expect(columns.length).toBe(openStatusColumns.length);
     columns.forEach((column) => {
       expect(column).toHaveClass("min-w-0");
     });
-    statusColumns.forEach((column, index) => {
+    openStatusColumns.forEach((column, index) => {
       expect(within(columns[index] as HTMLElement).getByRole("heading", { name: column.label })).toBeInTheDocument();
     });
 
-    const todoColumn = columns[4] as HTMLElement;
+    // In den offenen Spalten steht "todo" an Index 2 (active, on_hold, todo, ...). Das
+    // Label "Offen" gibt es doppelt (todo und open), daher Zugriff über den Index statt
+    // über das Heading.
+    const todoColumn = columns[2] as HTMLElement;
     expect(todoColumn).toContainElement(screen.getByText("Aufgabe Offen"));
-    const doneColumn = screen.getByRole("heading", { name: "Erledigt" }).closest("section");
-    expect(doneColumn).toContainElement(screen.getByText("Aufgabe Erledigt"));
+
+    // Die geschlossene Aufgabe "Erledigt" erscheint als ClosedItemRow in der Sidebar (aside).
+    const closedSidebar = container.querySelector("aside") as HTMLElement;
+    expect(closedSidebar).toBeInTheDocument();
+    expect(within(closedSidebar).getByText("Aufgabe Erledigt")).toBeInTheDocument();
 
     expectItemCardClasses(container.querySelectorAll("article.p-5"));
     const actionButtons = screen.getAllByRole("button", { name: "Aktionen" });
@@ -197,6 +212,9 @@ describe("TaskListBoardView", () => {
 
   it("aktiviert DnD nur bei vorhandenem onStatusChange", () => {
     const tasks = buildTaskSet();
+    // Draggable sind nur Karten in den offenen Board-Spalten; geschlossene Aufgaben
+    // liegen als ClosedItemRow in der Sidebar und sind nicht ziehbar.
+    const openTasks = tasks.filter((task) => !closedStatusValues.has(task.status));
     const withoutStatusChange = renderTaskList({ tasks });
 
     expect(withoutStatusChange.container.querySelector("[data-dnd-enabled='true']")).not.toBeInTheDocument();
@@ -209,7 +227,7 @@ describe("TaskListBoardView", () => {
     });
 
     expect(withStatusChange.container.querySelector("[data-dnd-enabled='true']")).toBeInTheDocument();
-    expect(withStatusChange.container.querySelectorAll("[data-dnd-draggable='true']")).toHaveLength(tasks.length);
+    expect(withStatusChange.container.querySelectorAll("[data-dnd-draggable='true']")).toHaveLength(openTasks.length);
   });
 
   it("rendert Listen-Modus mit ItemRows und Row-Controls", () => {
@@ -253,17 +271,17 @@ describe("TaskListBoardView", () => {
     expect(overdueMeta).toHaveClass("text-crimson");
   });
 
-  it("zeigt leere Statusspalten wenn keine Aufgaben vorhanden sind", () => {
+  it("zeigt den EmptyState wenn keine Aufgaben vorhanden sind", () => {
+    // Design-Entscheidung (design-leitfaden.md): showGroupedEmptyState bleibt true, das
+    // frühere Anzeigen leerer Spalten-Stubs bei 0 Items gilt als Anti-Pattern. Bei leeren
+    // Aufgaben zeigt das Board daher den EmptyState statt kollabierter Statusspalten.
     const { container } = renderTaskList({ tasks: [] });
 
-    expect(screen.queryByText("Keine Aufgaben")).not.toBeInTheDocument();
-    const columns = container.querySelectorAll("section.rounded-lg");
-    expect(columns).toHaveLength(statusColumns.length);
-    statusColumns.forEach((column, index) => {
-      const section = columns[index] as HTMLElement;
-      expect(within(section).getByRole("heading", { name: column.label })).toBeInTheDocument();
-      expect(section).toHaveAttribute("data-status-collapsed", "true");
-    });
+    expect(screen.getByText("Keine Aufgaben")).toBeInTheDocument();
+    // Keine Status-Board-Spalten (der EmptyState selbst ist zwar ein section.rounded-lg,
+    // trägt aber kein data-status-column).
+    expect(container.querySelectorAll("section[data-status-column]")).toHaveLength(0);
+    expect(container.querySelector("[data-list-board-layout='board']")).not.toBeInTheDocument();
     expect(container.querySelector("article.p-5")).not.toBeInTheDocument();
     expect(container.querySelector("article[class*='border-l-[4px]']")).not.toBeInTheDocument();
   });

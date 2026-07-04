@@ -29,6 +29,8 @@ Objekte ohne eigenen fachlichen Lebenszyklus, die an beliebig viele Fachobjekte 
 | Note | `notes` | n:m — eine Note kann an mehreren Parents hängen |
 | Tag | `tags` | n:m — ein Tag kann an mehreren Parents hängen |
 
+**Bereichsbindung von Tags.** Das Support-Objekt `Tag` trägt seit der DMS-Erweiterung eine Spalte `domain` (`'pm'` = Projektmanagement, `'dms'` = Dokumentenmanagement, `NOT NULL DEFAULT 'pm'`). Sie partitioniert den zuvor global geteilten Tag-Pool fachlich in zwei Sichtbarkeitsbereiche: Der Tag-Picker eines Bereichs zeigt und erzeugt ausschließlich Tags seiner Domäne (server-seitiger Filter `GET /tags?domain=…` plus defensiver Client-Filter). Die n:m-Junction-Struktur bleibt unberührt — `domain` ist ein fachliches Attribut des Tags, keine Beziehungsänderung.
+
 ### Projektgebundene Begleitobjekte
 Objekte mit eigenem versioniertem Lebenszyklus, die in strikter 1:1-Bindung zu genau einem Fachobjekt stehen. Sie werden über einen direkten `notNull`-FK auf den Parent mit `onDelete: "cascade"` plus Unique-Index auf der Parent-Spalte angebunden — **kein** Junction (da nicht n:m) und **kein** polymorpher Owner.
 
@@ -108,7 +110,7 @@ Jede Tabelle der Klassen Fachobjekte und Support-Objekte trägt einheitlich folg
 
 **Junction-Tabellen** bekommen diese Spalten **nicht** — eine Verknüpfung wird gesetzt oder entfernt, nicht versioniert.
 
-**Hinweis zum aktuellen Ist-Zustand:** `tags` hat weder `created_at` noch `updated_at`. `comments` hat kein `updated_at`. `attachments` hat kein `updated_at`. Keines der Objekte hat bisher `version`, `created_by` oder `updated_by`. Alle fehlenden Spalten sind durch Codex zu ergänzen und per Drizzle-Migration einzuspielen.
+**Hinweis zum aktuellen Ist-Zustand:** `tags`, `comments` und `attachments` tragen inzwischen alle hier genannten Querschnittsfelder (`version`, `created_by`, `updated_by`, `created_at`, `updated_at`); der frühere Nachrüstbedarf ist erledigt.
 
 ---
 
@@ -198,8 +200,6 @@ Codex führt vor jeder Refactoring-Aufgabe eine Bestandsaufnahme durch und dokum
 **Schema (`apps/api/src/db/schema.ts`):**
 - `users`-Tabelle fehlt vollständig — anlegen
 - `version`, `created_by`, `updated_by` fehlen auf allen Entity-Tabellen — ergänzen
-- `updated_at` fehlt auf `comments`, `tags`, `attachments` — ergänzen
-- `created_at` fehlt auf `tags` — ergänzen
 - `comments`: Felder `entityType`, `entityId`, `taskId` müssen durch Junction-Tabellen ersetzt werden
 - `attachments`: Felder `projectId?`, `taskId?`, `featureId?`, `ticketId?` + CHECK-Constraint müssen durch Junction-Tabellen ersetzt werden
 

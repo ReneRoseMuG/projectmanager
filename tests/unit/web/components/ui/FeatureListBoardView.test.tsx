@@ -13,7 +13,7 @@
  * Die featurespezifische ListBoardView-Integration gegen Layout-, Control- und Modusregressionen absichern.
  */
 import type { Feature } from "@taskmanager/shared-types";
-import { fireEvent, screen } from "@testing-library/dom";
+import { fireEvent, screen, within } from "@testing-library/dom";
 import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -43,6 +43,10 @@ const statusColumns = [
   { value: "done", label: "Erledigt" },
   { value: "archived", label: "Archiviert" },
 ] as const;
+
+// Feature-Status-Katalog: `done` und `archived` sind geschlossen (isClosed) und
+// wandern im Board in die ClosedBoardSidebar statt in reguläre Board-Spalten.
+const closedStatusValues = new Set<string>(["done", "archived"]);
 
 function LocationProbe() {
   const location = useLocation();
@@ -110,12 +114,15 @@ describe("FeatureListBoardView", () => {
     expectToolbar();
     expect(container.querySelector("[data-list-board-layout='board']")).toBeInTheDocument();
 
+    // Board-Redesign: nur die OFFENEN Statusspalten sind reguläre `section.rounded-lg`.
+    // Geschlossene Spalten (done, archived) werden in der ClosedBoardSidebar dargestellt.
+    const openColumns = statusColumns.filter((column) => !closedStatusValues.has(column.value));
     const columns = container.querySelectorAll("section.rounded-lg");
-    expect(columns.length).toBe(statusColumns.length);
+    expect(columns.length).toBe(openColumns.length);
     columns.forEach((column) => {
       expect(column).toHaveClass("min-w-0");
     });
-    statusColumns.forEach((column) => {
+    openColumns.forEach((column) => {
       expect(
         screen.getByRole("heading", { name: column.label }),
       ).toBeInTheDocument();
@@ -125,12 +132,12 @@ describe("FeatureListBoardView", () => {
       .getByRole("heading", { name: "Aktiv" })
       .closest("section");
     expect(activeColumn).toContainElement(screen.getByText("Feature Aktiv"));
-    const archivedColumn = screen
-      .getByRole("heading", { name: "Archiviert" })
-      .closest("section");
-    expect(archivedColumn).toContainElement(
-      screen.getByText("Feature Archiviert"),
-    );
+
+    // Geschlossene Features erscheinen in der Sidebar (aside), nicht als Board-Section.
+    const closedSidebar = container.querySelector("aside") as HTMLElement;
+    expect(closedSidebar).toBeInTheDocument();
+    expect(within(closedSidebar).getByText("Feature Archiviert")).toBeInTheDocument();
+    expect(within(closedSidebar).getByText("Feature Erledigt")).toBeInTheDocument();
 
     expectItemCardClasses(container.querySelectorAll("article.p-5"));
     const useCaseCounter = screen.getAllByText(/Use Cases/)[0].closest("span");

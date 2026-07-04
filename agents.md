@@ -31,6 +31,14 @@ Diese Grundhaltung gilt für jeden Auftrag, der Code oder Konfiguration ändert.
 - Bestehenden Stil im berührten Code übernehmen, auch wenn man es selbst anders machen würde.
 - Verwaiste Imports, Variablen oder Funktionen entfernen, die **erst durch die eigene Änderung** ungenutzt wurden. Schon vorher vorhandenen toten Code nicht löschen, sondern als Beobachtung **melden** — Löschung nur auf Auftrag. Detail-Gate: Skill `code-discipline`.
 
+### Skalierung und Zugriffsmuster mitdenken
+
+- Jede Liste, Sammel-Query und Detailabfrage gegen reale Datenmengen bewerten, nicht gegen 0–3 Beispieldatensätze. Vorab beantworten: Was passiert bei 100, 1.000, mehreren Tausend Zeilen?
+- Kein N+1: keine Query pro Element in Schleife oder `map`, keine unbegrenzten `Promise.all`-Fluten. Verwandte Daten je Relation in **einer** gebündelten Abfrage laden (z. B. `inArray`) und im Speicher zuordnen.
+- Roundtrips gegen die zentrale Aiven-DB begrenzt halten — der Pool ist klein (`connectionLimit 10`, `queueLimit 50`). Eine einzelne Anfrage darf nicht Dutzende oder Hunderte gleichzeitige Queries auslösen, sonst bricht sie unter Last mit `500` ab.
+- „Kompiliert grün" ist kein Erfolgskriterium und beweist nichts über Laufzeit oder Last.
+- Bekannte Skalierungsschwächen werden dem Nutzer als Risiko/Blocker in den Plan gelegt — nie als stiller Code-Kommentar oder TODO vergraben.
+
 ### Zielgetrieben ausführen
 
 - Auftrag vorab in überprüfbare Erfolgskriterien übersetzen: „Validierung hinzufügen" → Tests für ungültige Eingaben, dann grün; „Bug fixen" → Test, der ihn reproduziert, dann grün; „X refactoren" → Tests vorher und nachher grün.
@@ -470,6 +478,7 @@ Jede Aufgabendatei enthält einen Abschnitt **Testhinweise** mit:
 - `drizzle-kit push` ist für reguläre Arbeit nicht zulässig
 - Commits bei Schemaänderungen müssen immer `schema.ts`, neue Migrationsdatei und `migrations/meta/*` gemeinsam enthalten
 - Bereits versionierte Migrationsdateien dürfen nicht umgeschrieben werden — Korrekturen über neue Folge-Migrationen
+- **Abbruchsicherheit (Pflicht):** Da die produktive Datenbank zentral liegt und MySQL Strukturänderungen nicht zurückrollen kann, muss jede Migration mit mehr als einem Statement wiederanlaufsicher sein: Tabellen mit `CREATE TABLE IF NOT EXISTS`, Spalten- und Fremdschlüssel-Ergänzungen mit Vorher-Prüfung gegen `information_schema`. Eine Migration muss aus jedem Teilzustand sauber durchlaufen können.
 
 ### Pflichtablauf bei DB-Änderungen
 

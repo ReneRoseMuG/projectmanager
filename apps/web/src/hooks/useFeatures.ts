@@ -6,11 +6,34 @@ import {
   deleteFeature as deleteFeatureRequest,
   getFeature,
   getFeatures,
-  updateFeature as updateFeatureRequest
+  getFeaturesPage,
+  updateFeature as updateFeatureRequest,
+  type FeatureListFilter
 } from "../api/features";
 import { invalidateFeatureScope } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
+import { useProgressiveList } from "./useProgressiveList";
+
+// Progressiv nachgeladene Feature-Liste (MS-75, analog useDocumentLibrary). Statt
+// Seitenzahl-Blättern lädt useProgressiveList die Blöcke sequenziell nach und hängt sie
+// an, bis alle Datensätze da sind. `total` ist die Gesamtzahl nach Filter/Suche;
+// `loadedCount` die bereits geladene Menge. Der bestehende useFeatures-Hook bleibt für
+// Detail/Board-Ansicht und Chip-Counts unberührt.
+export function useFeatureLibrary(filter: FeatureListFilter) {
+  const list = useProgressiveList(
+    queryKeys.features.list(filter as object),
+    (page, pageSize) => getFeaturesPage(filter, { page, pageSize })
+  );
+  return {
+    features: list.items,
+    total: list.total,
+    loadedCount: list.loadedCount,
+    loading: list.loading,
+    loadingMore: list.loadingMore,
+    error: list.error
+  };
+}
 
 export function useFeatures(featureId?: number) {
   const queryClient = useQueryClient();
@@ -77,7 +100,9 @@ export function useFeatures(featureId?: number) {
   );
 
   return {
-    features: featuresQuery.data ?? [],
+    // Array-Guard: schützt die Status-Chip-Counts (features.filter(...)) selbst dann, wenn der
+    // Cache-Eintrag versehentlich mit einer Nicht-Array-Form belegt würde (siehe useProgressiveList).
+    features: Array.isArray(featuresQuery.data) ? featuresQuery.data : [],
     feature: featureQuery.data ?? null,
     loading: featuresQuery.isLoading || featureQuery.isLoading,
     error: toQueryError(featuresQuery.error ?? featureQuery.error),

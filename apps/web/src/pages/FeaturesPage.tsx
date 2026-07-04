@@ -7,15 +7,17 @@ import { FeatureCardSkeleton } from "../components/features/FeatureCardSkeleton"
 import { FeatureListBoardView } from "../components/features/FeatureListBoardView";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
+import { LoadMoreIndicator } from "../components/ui/LoadMoreIndicator";
 import { PageHero } from "../components/ui/PageHero";
 import { ProjectMilestoneFilterBar } from "../components/ui/ProjectMilestoneFilterBar";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage } from "../hooks/errors";
 import { useCatalogs } from "../hooks/useCatalogs";
-import { useFeatures } from "../hooks/useFeatures";
+import { useFeatureLibrary, useFeatures } from "../hooks/useFeatures";
 import { useProjects } from "../hooks/useProjects";
 import { useStandaloneView } from "../hooks/useStandaloneView";
 import { queryKeys } from "../queries/queryKeys";
+import type { FeatureListFilter } from "../api/features";
 import { catalogEntriesByKind } from "../utils/catalogs";
 import { withStandaloneView } from "../utils/standalone";
 
@@ -25,6 +27,8 @@ export function FeaturesPage() {
   const standalone = useStandaloneView();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  // Volle Liste (ungefiltert) nur für Mutationen und die Status-Chip-Counts; die angezeigte
+  // Liste kommt serverseitig gefiltert/paginiert aus useFeatureLibrary.
   const features = useFeatures();
   const projects = useProjects();
   const catalogs = useCatalogs();
@@ -32,6 +36,7 @@ export function FeaturesPage() {
     "all",
   );
   const [projectFilter, setProjectFilter] = useState<number | null>(null);
+  const [search, setSearch] = useState<string>("");
   const currentReturnTo = `${location.pathname}${location.search}`;
   const targetForMode = (to: string) => (standalone ? withStandaloneView(to) : to);
   const featureTarget = (path: string) => {
@@ -81,15 +86,39 @@ export function FeaturesPage() {
     );
   }, [projectFilter, selectedProjectFeatureQuery?.data]);
 
+  // Serverseitiger Filter: Status (Gleichheit) + Freitextsuche `q` (Feature-Titel). Beides
+  // wird serverseitig angewandt; der Projektfilter bleibt clientseitiger Nachfilter (siehe unten).
+  const filter = useMemo<FeatureListFilter>(() => {
+    const next: FeatureListFilter = {};
+    if (statusFilter !== "all") {
+      next.status = statusFilter;
+    }
+    if (search.trim()) {
+      next.q = search.trim();
+    }
+    return next;
+  }, [statusFilter, search]);
+
+  const {
+    features: pageFeatures,
+    total,
+    loadedCount,
+    loadingMore,
+    loading: libraryLoading,
+    error: libraryError
+  } = useFeatureLibrary(filter);
+
+  // Projektfilter ist nicht serverseitig abbildbar (Cross-Query über Projekt-Zuordnungen)
+  // und bleibt daher clientseitiger Nachfilter über der progressiv geladenen Menge. Ohne
+  // Projektfilter wird die progressiv geladene Liste unverändert angezeigt.
   const filteredFeatures = useMemo(
     () =>
-      features.features.filter(
+      pageFeatures.filter(
         (feature) =>
-          (statusFilter === "all" || feature.status === statusFilter) &&
-          (selectedProjectFeatureIds === null ||
-            selectedProjectFeatureIds.has(feature.id)),
+          selectedProjectFeatureIds === null ||
+          selectedProjectFeatureIds.has(feature.id),
       ),
-    [features.features, selectedProjectFeatureIds, statusFilter],
+    [pageFeatures, selectedProjectFeatureIds],
   );
 
   const deleteFeature = async (feature: Feature) => {
@@ -137,36 +166,44 @@ export function FeaturesPage() {
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
-        {features.loading || projects.loading || (projectFilter !== null && selectedProjectFeatureQuery?.isLoading) ? (
+        {libraryLoading || projects.loading || (projectFilter !== null && selectedProjectFeatureQuery?.isLoading) ? (
           <FeatureCardSkeleton />
-        ) : features.error || projects.error || projectFeatureError ? (
+        ) : libraryError || projects.error || projectFeatureError ? (
           <div className="rounded-lg border border-line bg-white p-8 text-center text-sm text-crimson">
-            {features.error ?? projects.error ?? projectFeatureError}
+            {libraryError ?? projects.error ?? projectFeatureError}
           </div>
         ) : (
-          <FeatureListBoardView
-            features={filteredFeatures}
-            onCreate={() => navigate(featureTarget("/features/new"))}
-            onOpen={(feature) => navigate(featureTarget(`/features/${feature.id}`))}
-            onOpenInTab={(feature) => window.open(withStandaloneView(`/features/${feature.id}`), "_blank")}
-            onStatusChange={updateFeatureStatus}
-            toolbarFilters={
-              <FilterChips
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={statusOptions}
-                allCount={features.features.length}
-              />
-            }
-            filters={
-              <ProjectMilestoneFilterBar
-                projects={projects.projects}
-                projectId={projectFilter}
-                onProjectChange={setProjectFilter}
-              />
-            }
-            onDelete={(feature) => void deleteFeature(feature)}
-          />
+          <>
+            <FeatureListBoardView
+              features={filteredFeatures}
+              onCreate={() => navigate(featureTarget("/features/new"))}
+              onOpen={(feature) => navigate(featureTarget(`/features/${feature.id}`))}
+              onOpenInTab={(feature) => window.open(withStandaloneView(`/features/${feature.id}`), "_blank")}
+              onStatusChange={updateFeatureStatus}
+              searchValue={search}
+              onSearchChange={setSearch}
+              toolbarFilters={
+                <FilterChips
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  options={statusOptions}
+                  allCount={features.features.length}
+                />
+              }
+              filters={
+                <ProjectMilestoneFilterBar
+                  projects={projects.projects}
+                  projectId={projectFilter}
+                  onProjectChange={setProjectFilter}
+                />
+              }
+              onDelete={(feature) => void deleteFeature(feature)}
+            />
+            {/* Fortschrittshinweis für das progressive Nachladen. Bezieht sich auf die serverseitig
+                geladene Gesamtmenge (loadedCount/total), unabhängig vom clientseitigen Projekt-
+                Nachfilter; blendet sich selbst aus, sobald alle Blöcke geladen sind. */}
+            <LoadMoreIndicator loadedCount={loadedCount} total={total} loadingMore={loadingMore} />
+          </>
         )}
       </div>
     </div>

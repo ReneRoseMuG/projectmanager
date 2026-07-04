@@ -46,6 +46,7 @@ UI-Themen: `docs/design-leitfaden.md` lädt nur die relevanten Abschnitte.
 **Komponenten:** `ItemCard`, `FormModal`, `ItemRow` bevorzugen
 **Labels:** `domainLabels.ts` — keine deutschen Strings inline
 **Design:** `docs/design-leitfaden.md` ist verbindlich für `apps/web`
+**Skalierung:** Sammel-Queries gebündelt (`inArray`), kein N+1/Pro-Element-Query, keine unbegrenzten `Promise.all`-Fluten gegen den kleinen DB-Pool — gegen reale Datenmengen (bis in die Tausende) denken, nicht Happy Path
 
 Vorhandener Code ist keine verbindliche Regel — er kann Drift sein.
 

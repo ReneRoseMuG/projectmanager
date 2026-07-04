@@ -1,7 +1,10 @@
 import type { Note } from "@taskmanager/shared-types";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import type { NotesListFilter } from "../api/notes";
 import { NoteList } from "../components/notes/NoteList";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
+import { LoadMoreIndicator } from "../components/ui/LoadMoreIndicator";
 import { PageHero } from "../components/ui/PageHero";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessageAsync } from "../hooks/errors";
@@ -12,7 +15,18 @@ import { useStandaloneView } from "../hooks/useStandaloneView";
 import { withStandaloneView } from "../utils/standalone";
 
 export function NotesPage() {
-  const notes = useAllNotes();
+  const [search, setSearch] = useState("");
+  const filter = useMemo<NotesListFilter>(() => {
+    const next: NotesListFilter = {};
+    if (search.trim()) {
+      next.q = search.trim();
+    }
+    return next;
+  }, [search]);
+
+  // Progressives Nachladen: Der queryKey enthält den Filter, ein Filterwechsel startet die
+  // Liste automatisch neu — kein manueller Reset nötig.
+  const notes = useAllNotes(filter);
   const navigate = useNavigate();
   const location = useLocation();
   const standalone = useStandaloneView();
@@ -57,7 +71,7 @@ export function NotesPage() {
       <PageHero
         variant="list"
         title="Notizen"
-        subtitle={`${notes.notes.length} Einträge`}
+        subtitle={`${notes.total} Einträge`}
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
@@ -75,8 +89,11 @@ export function NotesPage() {
           onDelete={deleteNote}
           canCreate={false}
           canDelete={canDeleteNotes}
+          search={search}
+          onSearchChange={setSearch}
           emptyTitle="Keine Notizen"
           emptyBody="Notizen erscheinen hier, sobald sie an Projekten, Aufgaben, Tickets, Wiki-Seiten oder der persönlichen Planung angelegt wurden."
+          footer={<LoadMoreIndicator loadedCount={notes.loadedCount} total={notes.total} loadingMore={notes.loadingMore} />}
         />
       </div>
     </div>

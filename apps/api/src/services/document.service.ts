@@ -1,4 +1,4 @@
-import type { Attachment, AttachmentCategory, AttachmentFolder, Tag } from "@taskmanager/shared-types";
+import type { Attachment, AttachmentCategory, AttachmentFolder, AttachmentOwner, Paginated, Tag, TagDomain } from "@taskmanager/shared-types";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import {
@@ -13,12 +13,15 @@ import {
 import { attachmentRepository, type AttachmentRecord } from "../repositories/attachment.repository.js";
 import { tagRepository } from "../repositories/tag.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import { listAttachmentOwners } from "./attachments.service.js";
+import { listAttachmentOwners, listAttachmentOwnersForIds } from "./attachments.service.js";
 
 // MS-75 (DMS): Dokument-Sicht auf Anhänge — Bibliotheks-Abfrage, Metadaten und Labels.
-// Anreicherung (owners/categories/tags/folders) erfolgt je Dokument; die Filter für
-// Typ/Suche/„Nicht einsortiert" werden nach dem Laden angewandt. Für sehr große
-// Bestände ist eine reine SQL-Filterung ein Folgeschritt.
+// Anreicherung (owners/categories/tags/folders) erfolgt für die Bibliotheks-Liste
+// GEBÜNDELT über alle Dokumente (je Relation eine inArray-Query), damit die Query-Zahl
+// unabhängig von der Dokumentanzahl konstant bleibt. Die Filter für Typ/Suche/„Nicht
+// einsortiert" werden nach dem Laden im Speicher angewandt (SQL-seitige Filterung ist ein
+// Folgeschritt). Seitenbasierte Pagination liefert listDocumentLibraryPaginated (opt-in
+// über den Query-Parameter `page`); listDocumentLibrary bleibt der Array-Alt-Pfad.
 
 export interface DocumentLibraryFilter {
   folder?: number | "unsorted";
@@ -38,12 +41,13 @@ async function loadCategories(database: DbClient, attachmentId: number): Promise
 }
 
 async function loadTags(database: DbClient, attachmentId: number): Promise<Tag[]> {
-  return database
-    .select({ id: tags.id, name: tags.name, color: tags.color, isSystem: tags.isSystem, version: tags.version })
+  const rows = await database
+    .select({ id: tags.id, name: tags.name, color: tags.color, isSystem: tags.isSystem, domain: tags.domain, version: tags.version })
     .from(attachmentTags)
     .innerJoin(tags, eq(attachmentTags.tagId, tags.id))
     .where(eq(attachmentTags.attachmentId, attachmentId))
     .orderBy(tags.name);
+  return rows.map((row) => ({ ...row, domain: row.domain as TagDomain }));
 }
 
 async function loadFolders(database: DbClient, attachmentId: number): Promise<AttachmentFolder[]> {
@@ -55,13 +59,83 @@ async function loadFolders(database: DbClient, attachmentId: number): Promise<At
     .orderBy(attachmentFolders.name);
 }
 
-async function mapDocument(database: DbClient, record: AttachmentRecord): Promise<Attachment> {
-  const [owners, categories, documentTags, folders] = await Promise.all([
-    listAttachmentOwners(database, record.id),
-    loadCategories(database, record.id),
-    loadTags(database, record.id),
-    loadFolders(database, record.id)
-  ]);
+// Gebündelte Batch-Loader für die Bibliotheks-Liste: je Relation EINE Query über alle
+// Attachment-IDs; Ergebnis als Map<attachmentId, X[]> zur In-Memory-Zuordnung.
+async function loadCategoriesForIds(database: DbClient, attachmentIds: number[]): Promise<Map<number, AttachmentCategory[]>> {
+  const result = new Map<number, AttachmentCategory[]>();
+  if (attachmentIds.length === 0) {
+    return result;
+  }
+  const rows = await database
+    .select({ attachmentId: attachmentCategoryLinks.attachmentId, id: attachmentCategories.id, name: attachmentCategories.name, color: attachmentCategories.color, version: attachmentCategories.version })
+    .from(attachmentCategoryLinks)
+    .innerJoin(attachmentCategories, eq(attachmentCategoryLinks.categoryId, attachmentCategories.id))
+    .where(inArray(attachmentCategoryLinks.attachmentId, attachmentIds))
+    .orderBy(attachmentCategories.name);
+  for (const { attachmentId, ...category } of rows) {
+    const existing = result.get(attachmentId);
+    if (existing) {
+      existing.push(category);
+    } else {
+      result.set(attachmentId, [category]);
+    }
+  }
+  return result;
+}
+
+async function loadTagsForIds(database: DbClient, attachmentIds: number[]): Promise<Map<number, Tag[]>> {
+  const result = new Map<number, Tag[]>();
+  if (attachmentIds.length === 0) {
+    return result;
+  }
+  const rows = await database
+    .select({ attachmentId: attachmentTags.attachmentId, id: tags.id, name: tags.name, color: tags.color, isSystem: tags.isSystem, domain: tags.domain, version: tags.version })
+    .from(attachmentTags)
+    .innerJoin(tags, eq(attachmentTags.tagId, tags.id))
+    .where(inArray(attachmentTags.attachmentId, attachmentIds))
+    .orderBy(tags.name);
+  for (const { attachmentId, ...tag } of rows) {
+    const typedTag: Tag = { ...tag, domain: tag.domain as TagDomain };
+    const existing = result.get(attachmentId);
+    if (existing) {
+      existing.push(typedTag);
+    } else {
+      result.set(attachmentId, [typedTag]);
+    }
+  }
+  return result;
+}
+
+async function loadFoldersForIds(database: DbClient, attachmentIds: number[]): Promise<Map<number, AttachmentFolder[]>> {
+  const result = new Map<number, AttachmentFolder[]>();
+  if (attachmentIds.length === 0) {
+    return result;
+  }
+  const rows = await database
+    .select({ attachmentId: folderAttachments.attachmentId, id: attachmentFolders.id, parentId: attachmentFolders.parentId, projectId: attachmentFolders.projectId, name: attachmentFolders.name, version: attachmentFolders.version })
+    .from(folderAttachments)
+    .innerJoin(attachmentFolders, eq(folderAttachments.folderId, attachmentFolders.id))
+    .where(inArray(folderAttachments.attachmentId, attachmentIds))
+    .orderBy(attachmentFolders.name);
+  for (const { attachmentId, ...folder } of rows) {
+    const existing = result.get(attachmentId);
+    if (existing) {
+      existing.push(folder);
+    } else {
+      result.set(attachmentId, [folder]);
+    }
+  }
+  return result;
+}
+
+// Baut das Attachment-DTO synchron aus bereits geladenen Teilen (kein DB-Zugriff).
+function buildDocument(
+  record: AttachmentRecord,
+  owners: AttachmentOwner[],
+  categories: AttachmentCategory[],
+  documentTags: Tag[],
+  folders: AttachmentFolder[]
+): Attachment {
   return {
     id: record.id,
     owners,
@@ -79,6 +153,17 @@ async function mapDocument(database: DbClient, record: AttachmentRecord): Promis
     updatedAt: record.updatedAt,
     version: record.version
   };
+}
+
+// Einzelabruf-Variante (getDocument/Metadaten/Labels): fixer Fan-out für EIN Dokument.
+async function mapDocument(database: DbClient, record: AttachmentRecord): Promise<Attachment> {
+  const [owners, categories, documentTags, folders] = await Promise.all([
+    listAttachmentOwners(database, record.id),
+    loadCategories(database, record.id),
+    loadTags(database, record.id),
+    loadFolders(database, record.id)
+  ]);
+  return buildDocument(record, owners, categories, documentTags, folders);
 }
 
 export async function getDocument(database: DbClient, id: number): Promise<Attachment> {
@@ -103,28 +188,106 @@ export async function listDocumentLibrary(database: DbClient, filter: DocumentLi
     records = await database.select().from(attachments).orderBy(desc(attachments.createdAt));
   }
 
-  let documents = await Promise.all(records.map((record) => mapDocument(database, record)));
+  // Anreicherung GEBÜNDELT: konstant 4 Queries (owners + categories + tags + folders)
+  // über alle Dokument-IDs — unabhängig von der Anzahl der Dokumente. Vorher: N×9 Queries,
+  // die bei wenigen Dutzend Dokumenten den Pool (limit 10 / queue 50) sprengten.
+  const ids = records.map((record) => record.id);
+  const [ownersMap, categoriesMap, tagsMap, foldersMap] = await Promise.all([
+    listAttachmentOwnersForIds(database, ids),
+    loadCategoriesForIds(database, ids),
+    loadTagsForIds(database, ids),
+    loadFoldersForIds(database, ids)
+  ]);
+  let documents = records.map((record) =>
+    buildDocument(
+      record,
+      ownersMap.get(record.id) ?? [],
+      categoriesMap.get(record.id) ?? [],
+      tagsMap.get(record.id) ?? [],
+      foldersMap.get(record.id) ?? []
+    )
+  );
 
+  return applyLibraryFilters(documents, filter);
+}
+
+// Wendet die In-Memory-Filter (unsorted/category/tag/type/q) auf bereits angereicherte
+// Dokumente an. Geteilt zwischen Array- und paginiertem Pfad, damit die Filter-Semantik
+// GARANTIERT identisch bleibt. `folder` als Zahl wird bereits SQL-seitig aufgelöst.
+function applyLibraryFilters(documents: Attachment[], filter: DocumentLibraryFilter): Attachment[] {
+  let result = documents;
   if (filter.folder === "unsorted") {
-    documents = documents.filter((document) => document.owners.length === 0 && (document.folders?.length ?? 0) === 0);
+    result = result.filter((document) => document.owners.length === 0 && (document.folders?.length ?? 0) === 0);
   }
   if (filter.category !== undefined) {
-    documents = documents.filter((document) => (document.categories ?? []).some((category) => category.id === filter.category));
+    result = result.filter((document) => (document.categories ?? []).some((category) => category.id === filter.category));
   }
   if (filter.tag !== undefined) {
-    documents = documents.filter((document) => (document.tags ?? []).some((tag) => tag.id === filter.tag));
+    result = result.filter((document) => (document.tags ?? []).some((tag) => tag.id === filter.tag));
   }
   if (filter.type) {
     const type = filter.type.toLowerCase();
-    documents = documents.filter((document) => document.mimetype.toLowerCase().startsWith(type));
+    result = result.filter((document) => document.mimetype.toLowerCase().startsWith(type));
   }
   if (filter.q) {
     const q = filter.q.toLowerCase();
-    documents = documents.filter(
+    result = result.filter(
       (document) => document.originalName.toLowerCase().includes(q) || (document.displayName ?? "").toLowerCase().includes(q)
     );
   }
-  return documents;
+  return result;
+}
+
+// Seitenbasierte Variante der Bibliotheks-Abfrage (MS-75 Pagination-Referenz).
+// Ablauf: (1) Kandidaten-Records laden (folder-by-number SQL-seitig wie im Alt-Pfad).
+// (2) Für die filterrelevanten Relationen (owners/folders/categories/tags) über ALLE
+// Kandidaten je EINE gebündelte Query — nötig, weil unsorted/category/tag nur mit diesen
+// Relationen entschieden werden können und `total` VOR der Pagination korrekt sein muss.
+// (3) Filter anwenden → `total` = gefilterte Länge. (4) Nur die Seite zuschneiden; die
+// finale DTO-Anreicherung erfolgt so ohnehin für alle Kandidaten (Relationen sind bereits
+// geladen), aber der teure Fan-out bleibt auf die 4 Batch-Queries begrenzt — unabhängig
+// von der Dokumentanzahl, exakt wie im Array-Pfad.
+export async function listDocumentLibraryPaginated(
+  database: DbClient,
+  filter: DocumentLibraryFilter,
+  page: number,
+  pageSize: number
+): Promise<Paginated<Attachment>> {
+  let records: AttachmentRecord[];
+  if (typeof filter.folder === "number") {
+    const rows = await database
+      .select({ record: attachments })
+      .from(folderAttachments)
+      .innerJoin(attachments, eq(folderAttachments.attachmentId, attachments.id))
+      .where(eq(folderAttachments.folderId, filter.folder))
+      .orderBy(desc(attachments.createdAt));
+    records = rows.map((row) => row.record);
+  } else {
+    records = await database.select().from(attachments).orderBy(desc(attachments.createdAt));
+  }
+
+  const ids = records.map((record) => record.id);
+  const [ownersMap, categoriesMap, tagsMap, foldersMap] = await Promise.all([
+    listAttachmentOwnersForIds(database, ids),
+    loadCategoriesForIds(database, ids),
+    loadTagsForIds(database, ids),
+    loadFoldersForIds(database, ids)
+  ]);
+  const enriched = records.map((record) =>
+    buildDocument(
+      record,
+      ownersMap.get(record.id) ?? [],
+      categoriesMap.get(record.id) ?? [],
+      tagsMap.get(record.id) ?? [],
+      foldersMap.get(record.id) ?? []
+    )
+  );
+
+  const filtered = applyLibraryFilters(enriched, filter);
+  const total = filtered.length;
+  const start = (page - 1) * pageSize;
+  const data = filtered.slice(start, start + pageSize);
+  return { data, total, page, pageSize };
 }
 
 export async function updateDocumentMetadata(

@@ -245,6 +245,44 @@ export async function listAttachmentOwners(database: DbClient, attachmentId: num
   ];
 }
 
+// Batch-Variante von listAttachmentOwners: lädt die Owner ALLER übergebenen Anhänge in
+// 6 gebündelten Queries (statt 6 sequenziellen Queries pro Anhang) und ordnet sie im
+// Speicher zu. Für Listen-Pfade wie die Dokumentenbibliothek (MS-75), damit die Query-Zahl
+// unabhängig von der Anzahl der Dokumente konstant bleibt. Owner-Reihenfolge je Anhang
+// identisch zu listAttachmentOwners (project, task, milestone, feature, wikiPage, ticket).
+export async function listAttachmentOwnersForIds(
+  database: DbClient,
+  attachmentIds: number[]
+): Promise<Map<number, AttachmentOwner[]>> {
+  const result = new Map<number, AttachmentOwner[]>();
+  if (attachmentIds.length === 0) {
+    return result;
+  }
+  const push = (attachmentId: number, owner: AttachmentOwner): void => {
+    const existing = result.get(attachmentId);
+    if (existing) {
+      existing.push(owner);
+    } else {
+      result.set(attachmentId, [owner]);
+    }
+  };
+  const [projectRows, taskRows, milestoneRows, featureRows, wikiPageRows, ticketRows] = await Promise.all([
+    database.select({ attachmentId: projectAttachments.attachmentId, id: projectAttachments.projectId }).from(projectAttachments).where(inArray(projectAttachments.attachmentId, attachmentIds)),
+    database.select({ attachmentId: taskAttachments.attachmentId, id: taskAttachments.taskId }).from(taskAttachments).where(inArray(taskAttachments.attachmentId, attachmentIds)),
+    database.select({ attachmentId: milestoneAttachments.attachmentId, id: milestoneAttachments.milestoneId }).from(milestoneAttachments).where(inArray(milestoneAttachments.attachmentId, attachmentIds)),
+    database.select({ attachmentId: featureAttachments.attachmentId, id: featureAttachments.featureId }).from(featureAttachments).where(inArray(featureAttachments.attachmentId, attachmentIds)),
+    database.select({ attachmentId: wikiPageAttachments.attachmentId, id: wikiPageAttachments.wikiPageId }).from(wikiPageAttachments).where(inArray(wikiPageAttachments.attachmentId, attachmentIds)),
+    database.select({ attachmentId: ticketAttachments.attachmentId, id: ticketAttachments.ticketId }).from(ticketAttachments).where(inArray(ticketAttachments.attachmentId, attachmentIds))
+  ]);
+  for (const row of projectRows) push(row.attachmentId, { type: "project", id: row.id });
+  for (const row of taskRows) push(row.attachmentId, { type: "task", id: row.id });
+  for (const row of milestoneRows) push(row.attachmentId, { type: "milestone", id: row.id });
+  for (const row of featureRows) push(row.attachmentId, { type: "feature", id: row.id });
+  for (const row of wikiPageRows) push(row.attachmentId, { type: "wikiPage", id: row.id });
+  for (const row of ticketRows) push(row.attachmentId, { type: "ticket", id: row.id });
+  return result;
+}
+
 async function insertAttachmentLink(database: DbSession, owner: AttachmentOwner, attachmentId: number): Promise<void> {
   if (owner.type === "project") {
     await database.insert(projectAttachments).ignore().values({ projectId: owner.id, attachmentId });

@@ -487,7 +487,7 @@ export function TicketForm({
                   </FormField>
                 </>
               ) : null}
-              <TagPicker selected={selectedTags} onChange={(v) => { setSelectedTags(v); formStateRef.current = { ...formStateRef.current, selectedTags: v }; af?.(); }} variant="panel" />
+              <TagPicker selected={selectedTags} onChange={(v) => { setSelectedTags(v); formStateRef.current = { ...formStateRef.current, selectedTags: v }; af?.(); }} domain="pm" variant="panel" />
             </FormSidebar>
           </div>
         ) : null}

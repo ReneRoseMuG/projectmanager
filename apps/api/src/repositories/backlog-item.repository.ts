@@ -1,4 +1,4 @@
-﻿import { and, eq } from "drizzle-orm";
+﻿import { and, eq, like, sql, type SQL } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { backlogItems } from "../db/schema.js";
@@ -11,10 +11,32 @@ export interface BacklogItemFilters {
   featureId?: number;
   useCaseId?: number;
   status?: BacklogItemRecord["status"];
+  // Case-insensitive Titelsuche (MySQL-LIKE), bildet die bisherige clientseitige Suche nach.
+  q?: string;
 }
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+// Baut die WHERE-Klausel aus Projektbindung und aktiven Filtern; wird von Roh-Query und
+// Count geteilt, damit `total` (Anzahl nach Filter, vor Pagination) und die Seite garantiert
+// konsistent sind.
+function buildProjectWhere(projectId: number, filters: BacklogItemFilters): SQL {
+  const conditions: SQL[] = [eq(backlogItems.projectId, projectId)];
+  if (filters.featureId !== undefined) {
+    conditions.push(eq(backlogItems.featureId, filters.featureId));
+  }
+  if (filters.useCaseId !== undefined) {
+    conditions.push(eq(backlogItems.useCaseId, filters.useCaseId));
+  }
+  if (filters.status !== undefined) {
+    conditions.push(eq(backlogItems.status, filters.status));
+  }
+  if (filters.q) {
+    conditions.push(like(backlogItems.title, `%${filters.q}%`));
+  }
+  return and(...conditions) as SQL;
 }
 
 export const backlogItemRepository = {
@@ -23,18 +45,28 @@ export const backlogItemRepository = {
   },
 
   async findByProject(database: DbSession, projectId: number, filters: BacklogItemFilters): Promise<BacklogItemRecord[]> {
-    const conditions = [eq(backlogItems.projectId, projectId)];
-    if (filters.featureId !== undefined) {
-      conditions.push(eq(backlogItems.featureId, filters.featureId));
-    }
-    if (filters.useCaseId !== undefined) {
-      conditions.push(eq(backlogItems.useCaseId, filters.useCaseId));
-    }
-    if (filters.status !== undefined) {
-      conditions.push(eq(backlogItems.status, filters.status));
-    }
+    return database.select().from(backlogItems).where(buildProjectWhere(projectId, filters)).orderBy(backlogItems.sortOrder, backlogItems.createdAt);
+  },
 
-    return database.select().from(backlogItems).where(and(...conditions)).orderBy(backlogItems.sortOrder, backlogItems.createdAt);
+  // Eine Seite gefilterter Backlog-Records (WHERE + ORDER BY + LIMIT/OFFSET). Reihenfolge
+  // wie im Alt-Pfad (sortOrder, createdAt). Anreicherung (User/Parent-Labels) erfolgt im Service.
+  async findPage(database: DbSession, projectId: number, filters: BacklogItemFilters, page: number, pageSize: number): Promise<BacklogItemRecord[]> {
+    const offset = (page - 1) * pageSize;
+    return database
+      .select()
+      .from(backlogItems)
+      .where(buildProjectWhere(projectId, filters))
+      .orderBy(backlogItems.sortOrder, backlogItems.createdAt)
+      .limit(pageSize)
+      .offset(offset);
+  },
+
+  // Gesamtzahl der Backlog-Items nach Filter (vor Pagination) für `total`.
+  async countFiltered(database: DbSession, projectId: number, filters: BacklogItemFilters): Promise<number> {
+    const row = firstRow(
+      await database.select({ count: sql<number>`count(*)` }).from(backlogItems).where(buildProjectWhere(projectId, filters))
+    );
+    return Number(row?.count ?? 0);
   },
 
   async create(database: DbSession, data: BacklogItemCreateData, userId?: number): Promise<BacklogItemRecord> {

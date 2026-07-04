@@ -1,9 +1,9 @@
 ﻿import { eq, inArray } from "drizzle-orm";
-import type { JsonValue, UserSummary, VisibleParentContext } from "@taskmanager/shared-types";
+import type { JsonValue, Paginated, UserSummary, VisibleParentContext } from "@taskmanager/shared-types";
 import type { DbClient } from "../db/client.js";
 import { featureAttachments, featureComments, milestoneFeatures, milestones, projectFeatures, projects, useCases } from "../db/schema.js";
 import { assertVersion } from "../repositories/base.repository.js";
-import { featureRepository, type FeatureRecord, type FeatureUpdateData } from "../repositories/feature.repository.js";
+import { featureRepository, type FeatureListFilter, type FeatureRecord, type FeatureUpdateData } from "../repositories/feature.repository.js";
 import type { JournalChangeCreateData } from "../repositories/journal.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { deleteFeatureCommentsForIds, deleteUseCaseCommentsForIds } from "./comments.service.js";import { ensureCatalogEntryExists, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
@@ -20,7 +20,7 @@ import {
   type JournalFieldDefinition,
   type JournalObjectRef
 } from "./journal.service.js";
-import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
+import { getUserOption, getUserOptionsMap, normalizeAssignableUserId } from "./users.service.js";
 
 type FeatureStatus = FeatureRecord["status"];
 
@@ -73,7 +73,7 @@ const featureJournalFields: Array<JournalFieldDefinition<FeatureRecord>> = [
   { key: "responsibleUserId", label: "Verantwortlich" }
 ];
 
-async function mapFeature(database: DbClient, record: FeatureRecord, useCaseCount: number, content?: string, supportCounts = emptyFeatureSupportCounts, parentContexts?: VisibleParentContext[]): Promise<FeatureDto> {
+async function mapFeature(database: DbClient, record: FeatureRecord, useCaseCount: number, content?: string, supportCounts = emptyFeatureSupportCounts, parentContexts?: VisibleParentContext[], responsibleUser?: UserSummary | null): Promise<FeatureDto> {
   return {
     id: record.id,
     title: record.title,
@@ -82,7 +82,8 @@ async function mapFeature(database: DbClient, record: FeatureRecord, useCaseCoun
     content,
     sortOrder: record.sortOrder,
     responsibleUserId: record.responsibleUserId,
-    responsibleUser: await getUserOption(database, record.responsibleUserId),
+    // Vorab geladene User-Option nutzen (Listen-Pfad); sonst pro Zeile abfragen (Einzelabruf-Pfade)
+    responsibleUser: responsibleUser !== undefined ? responsibleUser : await getUserOption(database, record.responsibleUserId),
     version: record.version,
     useCaseCount,
     attachmentCount: supportCounts.attachmentCount,
@@ -205,8 +206,48 @@ export async function listFeatures(database: DbClient): Promise<FeatureDto[]> {
   const counts = await getUseCaseCounts(database);
   const ids = rows.map((feature) => feature.id);
   const supportCounts = await getFeatureSupportCounts(database, ids);
+  // Alle Verantwortlichen gebündelt vorab laden statt pro Feature eine User-Query
+  const userOptions = await getUserOptionsMap(database, rows.map((feature) => feature.responsibleUserId));
 
-  return Promise.all(rows.map((feature) => mapFeature(database, feature, counts.get(feature.id) ?? 0, undefined, supportCounts.get(feature.id) ?? emptyFeatureSupportCounts)));
+  return Promise.all(rows.map((feature) => mapFeature(database, feature, counts.get(feature.id) ?? 0, undefined, supportCounts.get(feature.id) ?? emptyFeatureSupportCounts, undefined, feature.responsibleUserId !== null ? userOptions.get(feature.responsibleUserId) ?? null : null)));
+}
+
+// Reichert eine bereits geladene Zeilenmenge gebündelt zu FeatureDtos an (Support-Counts +
+// Verantwortliche je EINE Query über alle IDs). Geteilt vom paginierten Pfad, damit die
+// Anreicherung identisch zum Alt-Pfad bleibt. Für die Use-Case-Zahl reicht ein gezielter
+// Count über genau diese IDs (statt der Projektweite Vollscan aus getUseCaseCounts).
+async function enrichFeatureRows(database: DbClient, rows: FeatureRecord[]): Promise<FeatureDto[]> {
+  const ids = rows.map((feature) => feature.id);
+  const useCaseCounts = new Map<number, number>();
+  if (ids.length > 0) {
+    const ucRows = await database.select({ featureId: useCases.featureId }).from(useCases).where(inArray(useCases.featureId, ids));
+    for (const row of ucRows) {
+      useCaseCounts.set(row.featureId, (useCaseCounts.get(row.featureId) ?? 0) + 1);
+    }
+  }
+  const supportCounts = await getFeatureSupportCounts(database, ids);
+  const userOptions = await getUserOptionsMap(database, rows.map((feature) => feature.responsibleUserId));
+
+  return Promise.all(rows.map((feature) => mapFeature(database, feature, useCaseCounts.get(feature.id) ?? 0, undefined, supportCounts.get(feature.id) ?? emptyFeatureSupportCounts, undefined, feature.responsibleUserId !== null ? userOptions.get(feature.responsibleUserId) ?? null : null)));
+}
+
+// Seitenbasierte Variante der Feature-Liste (MS-75 Pagination-Muster, wie Projekte).
+// ECHTE SQL-Pagination: das Repository liefert bereits nur die Seiten-Records
+// (WHERE + ORDER BY + LIMIT/OFFSET) plus die Gesamtzahl nach Filter. Nur diese
+// Seiten-Zeilen werden anschließend gebündelt angereichert. Der Filter (status/q) bildet
+// den bisher clientseitigen Status- und Titel-Suchfilter serverseitig nach.
+export async function listFeaturesPaginated(
+  database: DbClient,
+  filter: FeatureListFilter,
+  page: number,
+  pageSize: number
+): Promise<Paginated<FeatureDto>> {
+  const [rows, total] = await Promise.all([
+    featureRepository.findPage(database, filter, page, pageSize),
+    featureRepository.countFiltered(database, filter)
+  ]);
+  const data = await enrichFeatureRows(database, rows);
+  return { data, total, page, pageSize };
 }
 
 export async function getFeature(database: DbClient, id: number): Promise<FeatureDto> {

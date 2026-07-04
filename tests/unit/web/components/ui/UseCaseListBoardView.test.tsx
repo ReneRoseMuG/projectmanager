@@ -22,7 +22,10 @@ import type { ViewMode } from "../../../../../apps/web/src/types";
 import { UseCaseListBoardView } from "../../../../../apps/web/src/components/usecases/UseCaseListBoardView";
 import { buildUseCase } from "../../../../fixtures/web/components/ui/factories";
 
-const featureStatusColumnCount = 4;
+// Feature-Status-Katalog: draft/active sind offen, done/archived sind geschlossen
+// (isClosed). Nach dem Board-Redesign sind nur die OFFENEN Status reguläre
+// `section.rounded-lg`; geschlossene Spalten wandern in die ClosedBoardSidebar (<aside>).
+const openFeatureStatusColumnCount = 2;
 
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
@@ -156,19 +159,25 @@ describe("UseCaseListBoardView", () => {
     expect(
       container.querySelector(".lg\\:grid-cols-3"),
     ).not.toBeInTheDocument();
+    // Nur die offenen Feature-Status (Entwurf, Aktiv) sind reguläre Board-Spalten.
     expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(
-      featureStatusColumnCount,
+      openFeatureStatusColumnCount,
     );
     expect(
       screen.getByRole("heading", { name: "Entwurf" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Aktiv" })).toBeInTheDocument();
+    // Geschlossene Feature-Status (Erledigt, Archiviert) sind keine Board-Spalten mehr;
+    // sie erscheinen nicht als Section-Überschrift.
     expect(
-      screen.getByRole("heading", { name: "Erledigt" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: "Erledigt" }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Archiviert" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: "Archiviert" }),
+    ).not.toBeInTheDocument();
+    // Die ClosedBoardSidebar ist vorhanden (für geschlossene Status), hier ohne Items,
+    // da beide Use Cases den offenen Status "active" tragen.
+    expect(container.querySelector("aside")).toBeInTheDocument();
     expect(
       container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3"),
     ).not.toBeInTheDocument();

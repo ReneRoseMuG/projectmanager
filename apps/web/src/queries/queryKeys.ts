@@ -1,4 +1,4 @@
-import type { CommentEntityType, DashboardContext, DashboardWidgetId, DashboardWidgetParams, JournalObjectType } from "@taskmanager/shared-types";
+import type { CommentEntityType, DashboardContext, DashboardWidgetId, DashboardWidgetParams, JournalObjectType, TagDomain } from "@taskmanager/shared-types";
 
 export type NoteOwnerType = "project" | "milestone" | "task" | "ticket" | "dayPlan" | "wikiPage";
 export type QueryOwnerType = "project" | "milestone" | "task" | "feature" | "ticket" | "wikiPage";
@@ -35,12 +35,12 @@ export const queryKeys = {
   },
   projects: {
     root: ["projects"] as const,
-    list: () => [...queryKeys.projects.root, "list"] as const,
+    list: (filter: object = {}, pagination: object = {}) => [...queryKeys.projects.root, "list", filter, pagination] as const,
     detail: (projectId: number) => [...queryKeys.projects.root, "detail", projectId] as const,
     contextTree: (ownerType: MoveOwnerType, ownerId: number) => [...queryKeys.projects.root, "contextTree", ownerType, ownerId] as const,
     tasks: (projectId: number) => [...queryKeys.projects.detail(projectId), "tasks"] as const,
     tickets: (projectId: number) => [...queryKeys.projects.detail(projectId), "tickets"] as const,
-    backlog: (projectId: number) => [...queryKeys.projects.detail(projectId), "backlog"] as const,
+    backlog: (projectId: number, filter: object = {}, pagination: object = {}) => [...queryKeys.projects.detail(projectId), "backlog", filter, pagination] as const,
     features: (projectId: number) => [...queryKeys.projects.detail(projectId), "features"] as const,
     diary: (projectId: number) => [...queryKeys.projects.detail(projectId), "diary"] as const
   },
@@ -50,7 +50,7 @@ export const queryKeys = {
   },
   milestones: {
     root: ["milestones"] as const,
-    list: () => [...queryKeys.milestones.root, "list"] as const,
+    list: (filter: object = {}, pagination: object = {}) => [...queryKeys.milestones.root, "list", filter, pagination] as const,
     byProject: (projectId: number) => [...queryKeys.projects.detail(projectId), "milestones"] as const,
     detail: (milestoneId: number) => [...queryKeys.milestones.root, "detail", milestoneId] as const,
     tasks: (milestoneId: number) => [...queryKeys.milestones.detail(milestoneId), "tasks"] as const,
@@ -59,7 +59,7 @@ export const queryKeys = {
   },
   tasks: {
     root: ["tasks"] as const,
-    list: () => [...queryKeys.tasks.root, "list"] as const,
+    list: (filter: object = {}, pagination: object = {}) => [...queryKeys.tasks.root, "list", filter, pagination] as const,
     detail: (taskId: number) => [...queryKeys.tasks.root, "detail", taskId] as const,
     linkCandidates: (ownerType: TaskOwnerType, ownerId: number) => [...queryKeys.tasks.root, "linkCandidates", ownerType, ownerId] as const,
     tickets: (taskId: number) => [...queryKeys.tasks.detail(taskId), "tickets"] as const,
@@ -68,7 +68,7 @@ export const queryKeys = {
   },
   features: {
     root: ["features"] as const,
-    list: () => [...queryKeys.features.root, "list"] as const,
+    list: (filter: object = {}, pagination: object = {}) => [...queryKeys.features.root, "list", filter, pagination] as const,
     detail: (featureId: number) => [...queryKeys.features.root, "detail", featureId] as const,
     useCases: (featureId: number) => [...queryKeys.features.detail(featureId), "useCases"] as const,
     projects: (featureId: number) => [...queryKeys.features.detail(featureId), "projects"] as const,
@@ -87,7 +87,7 @@ export const queryKeys = {
   },
   notes: {
     root: ["notes"] as const,
-    list: () => [...queryKeys.notes.root, "list"] as const,
+    list: (filter: object = {}, pagination: object = {}) => [...queryKeys.notes.root, "list", filter, pagination] as const,
     detail: (noteId: number) => [...queryKeys.notes.root, "detail", noteId] as const,
     owner: (ownerType: NoteOwnerType, ownerId: number) => [...queryKeys.notes.root, ownerType, ownerId] as const
   },
@@ -98,7 +98,7 @@ export const queryKeys = {
   },
   tags: {
     root: ["tags"] as const,
-    list: () => [...queryKeys.tags.root, "list"] as const
+    list: (domain?: TagDomain) => domain ? ([...queryKeys.tags.root, "list", domain] as const) : ([...queryKeys.tags.root, "list"] as const)
   },
   catalogs: {
     root: ["catalogs"] as const,
@@ -123,7 +123,7 @@ export const queryKeys = {
   },
   documents: {
     root: ["documents"] as const,
-    library: (filter: object = {}) => [...queryKeys.documents.root, "library", filter] as const,
+    library: (filter: object = {}, pagination: object = {}) => [...queryKeys.documents.root, "library", filter, pagination] as const,
     detail: (id: number) => [...queryKeys.documents.root, "detail", id] as const,
     categories: () => [...queryKeys.documents.root, "categories"] as const,
     folders: () => [...queryKeys.documents.root, "folders"] as const
@@ -149,7 +149,7 @@ export const queryKeys = {
   },
   tickets: {
     root: ["tickets"] as const,
-    list: () => [...queryKeys.tickets.root, "list"] as const,
+    list: (filter: object = {}, pagination: object = {}) => [...queryKeys.tickets.root, "list", filter, pagination] as const,
     detail: (ticketId: number) => [...queryKeys.tickets.root, "detail", ticketId] as const,
     byOwner: (ownerType: TicketOwnerType, ownerId: number) => [...queryKeys.tickets.root, ownerType, ownerId] as const,
     linkCandidates: (ownerType: TicketOwnerType, ownerId: number) => [...queryKeys.tickets.root, "linkCandidates", ownerType, ownerId] as const,

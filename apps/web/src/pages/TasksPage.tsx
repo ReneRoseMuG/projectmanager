@@ -1,6 +1,7 @@
 import type { Task, TaskBoardItem, TaskStatus } from "@taskmanager/shared-types";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { TaskListBoardView } from "../components/tasks/TaskListBoardView";
+import { LoadMoreIndicator } from "../components/ui/LoadMoreIndicator";
 import { PageHero } from "../components/ui/PageHero";
 import { ProjectMilestoneFilterBar } from "../components/ui/ProjectMilestoneFilterBar";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
@@ -194,6 +195,15 @@ export function TasksPage() {
             />
           }
         />
+
+        {/* Nur im globalen Modus: Fortschrittshinweis für das progressive Nachladen. */}
+        {owner === null ? (
+          <LoadMoreIndicator
+            loadedCount={globalTasks.loadedCount}
+            total={globalTasks.total}
+            loadingMore={globalTasks.loadingMore}
+          />
+        ) : null}
       </div>
     </div>
   );

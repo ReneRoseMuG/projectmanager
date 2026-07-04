@@ -5,11 +5,14 @@ import {
   createBacklogItem as createBacklogItemRequest,
   deleteBacklogItem as deleteBacklogItemRequest,
   getBacklogItems,
-  updateBacklogItem as updateBacklogItemRequest
+  getBacklogItemsPage,
+  updateBacklogItem as updateBacklogItemRequest,
+  type BacklogFilters
 } from "../api/backlog";
 import { invalidateBacklogScope } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
+import { useProgressiveList } from "./useProgressiveList";
 
 export function useBacklog(projectId?: number) {
   const [statusFilter, setStatusFilter] = useState<BacklogStatus | "all">("all");
@@ -91,5 +94,28 @@ export function useBacklog(projectId?: number) {
     createItem,
     updateItem,
     removeItem
+  };
+}
+
+// Progressiv nachgeladene Backlog-Liste (MS-75, analog useFeatureLibrary). Statt Seitenzahl-
+// Blättern lädt useProgressiveList die Blöcke sequenziell nach und hängt sie an, bis alle
+// Datensätze da sind. `total` ist die Gesamtzahl nach Filter/Suche, `loadedCount` die bereits
+// geladene Menge. Der alte useBacklog-Hook bleibt für Mutationen und die Chip-Counts unberührt.
+export function useBacklogPaginated(projectId: number | undefined, filters: BacklogFilters) {
+  const validProjectId = projectId !== undefined && Number.isFinite(projectId) ? projectId : undefined;
+
+  const list = useProgressiveList(
+    queryKeys.projects.backlog(validProjectId ?? 0, filters as object),
+    (page, pageSize) => getBacklogItemsPage(validProjectId as number, filters, { page, pageSize }),
+    { enabled: validProjectId !== undefined }
+  );
+
+  return {
+    items: list.items,
+    total: list.total,
+    loadedCount: list.loadedCount,
+    loading: list.loading,
+    loadingMore: list.loadingMore,
+    error: list.error
   };
 }

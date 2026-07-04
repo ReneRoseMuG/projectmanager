@@ -1,5 +1,32 @@
-import type { Note, NoteInput, NoteMoveInput, NoteUpdate } from "@taskmanager/shared-types";
+import type { Note, NoteInput, NoteMoveInput, NoteUpdate, Paginated } from "@taskmanager/shared-types";
 import { api } from "./client";
+
+// Filter/Suche der Notizen-Hauptliste. Heute nur Freitextsuche (`q`).
+export interface NotesListFilter {
+  q?: string;
+}
+
+// Optionale Seiten-Pagination. Ist `page` gesetzt, liefert das Backend Paginated<Note>;
+// ohne `page` weiterhin das nackte Array (Rückwärtskompatibilität).
+export interface NotesListPagination {
+  page?: number;
+  pageSize?: number;
+}
+
+function buildNotesQuery(filter: NotesListFilter, pagination?: NotesListPagination): string {
+  const params = new URLSearchParams();
+  if (filter.q) {
+    params.set("q", filter.q);
+  }
+  if (pagination?.page !== undefined) {
+    params.set("page", String(pagination.page));
+  }
+  if (pagination?.pageSize !== undefined) {
+    params.set("pageSize", String(pagination.pageSize));
+  }
+  const queryString = params.toString();
+  return queryString ? `notes?${queryString}` : "notes";
+}
 
 export async function getNote(id: number): Promise<Note> {
   return api.get(`notes/${id}`).json<Note>();
@@ -7,6 +34,12 @@ export async function getNote(id: number): Promise<Note> {
 
 export async function getNotes(): Promise<Note[]> {
   return api.get("notes").json<Note[]>();
+}
+
+// Paginierter Abruf der Notizen-Hauptliste: liefert Paginated<Note> (data + total + page + pageSize).
+export async function getNotesPage(filter: NotesListFilter, pagination: NotesListPagination): Promise<Paginated<Note>> {
+  const page = pagination.page ?? 1;
+  return api.get(buildNotesQuery(filter, { ...pagination, page })).json<Paginated<Note>>();
 }
 
 export async function getProjectNotes(projectId: number): Promise<Note[]> {

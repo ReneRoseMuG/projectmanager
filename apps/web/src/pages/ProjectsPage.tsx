@@ -14,18 +14,20 @@ import { TaskForm, type TaskFormInput } from "../components/tasks/TaskForm";
 import { TicketForm, type TicketFormInput } from "../components/tickets/TicketForm";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { FilterChips } from "../components/ui/FilterChips";
+import { LoadMoreIndicator } from "../components/ui/LoadMoreIndicator";
 import { PageHero } from "../components/ui/PageHero";
 import { useToast } from "../components/ui/ToastProvider";
 import { errorMessage, errorMessageAsync } from "../hooks/errors";
 import { useCatalogs } from "../hooks/useCatalogs";
 import { useHasPermission } from "../hooks/usePermissions";
 import { useMilestones } from "../hooks/useMilestones";
-import { useProjects } from "../hooks/useProjects";
+import { useProjectLibrary, useProjects } from "../hooks/useProjects";
 import { useStandaloneView } from "../hooks/useStandaloneView";
 import { useStatusCascadeWorkflow } from "../hooks/useStatusCascadeWorkflow";
 import { useTasks } from "../hooks/useTasks";
 import { useTickets } from "../hooks/useTickets";
 import { invalidateTags } from "../queries/invalidation";
+import type { ProjectListFilter } from "../api/projects";
 import type { DraftFile } from "../types";
 import { catalogEntriesByKind } from "../utils/catalogs";
 import { withStandaloneView } from "../utils/standalone";
@@ -34,7 +36,9 @@ export function ProjectsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { projects, loading, error, updateProject, updateProjectTags, removeProject } = useProjects();
+  // Volle Liste (ungefiltert) nur für Mutationen und die Status-Chip-Counts; die angezeigte
+  // Liste kommt serverseitig gefiltert/paginiert aus useProjectLibrary.
+  const { projects, updateProject, updateProjectTags, removeProject } = useProjects();
   const catalogs = useCatalogs();
   const standalone = useStandaloneView();
   const { showToast } = useToast();
@@ -46,6 +50,7 @@ export function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">(
     "all",
   );
+  const [search, setSearch] = useState<string>("");
   const [createMilestoneForProject, setCreateMilestoneForProject] = useState<Project | null>(null);
   const [createTaskForProject, setCreateTaskForProject] = useState<Project | null>(null);
   const [createTicketForProject, setCreateTicketForProject] = useState<Project | null>(null);
@@ -74,11 +79,23 @@ export function ProjectsPage() {
     [catalogs.entries, projects],
   );
 
-  const filteredProjects = useMemo(() => {
-    return projects.filter(
-      (project) => statusFilter === "all" || project.status === statusFilter,
-    );
-  }, [projects, statusFilter]);
+  // Serverseitiger Filter: Status (wie bisher clientseitig, Gleichheit) + Freitextsuche `q`
+  // (Name/Beschreibung). Ersetzt die frühere clientseitige projects.filter(...)-Logik.
+  const filter = useMemo<ProjectListFilter>(() => {
+    const next: ProjectListFilter = {};
+    if (statusFilter !== "all") {
+      next.status = statusFilter;
+    }
+    if (search.trim()) {
+      next.q = search.trim();
+    }
+    return next;
+  }, [statusFilter, search]);
+
+  // Progressives Nachladen statt Seitenzahl-Blättern: der erste Block erscheint sofort,
+  // weitere werden sequenziell angehängt. Status/Suche gehen serverseitig je Block mit
+  // (Filterwechsel startet automatisch neu über den Query-Key).
+  const { projects: filteredProjects, total, loadedCount, loading, loadingMore, error } = useProjectLibrary(filter);
 
   const deleteProject = async (project: Project) => {
     const approved = await confirm({
@@ -291,6 +308,8 @@ export function ProjectsPage() {
         <ProjectListBoardView
           projects={filteredProjects}
           loading={loading}
+          searchValue={search}
+          onSearchChange={setSearch}
           onCreate={() => navigate(projectTarget("/projects/new"))}
           onEdit={(project) => navigate(projectTarget(`/projects/${project.id}`))}
           onOpenInTab={(project) => window.open(withStandaloneView(`/projects/${project.id}`), "_blank")}
@@ -311,6 +330,7 @@ export function ProjectsPage() {
             ) : null
           }
         />
+        <LoadMoreIndicator loadedCount={loadedCount} total={total} loadingMore={loadingMore} />
       </div>
       <MilestoneForm
         open={createMilestoneForProject !== null}

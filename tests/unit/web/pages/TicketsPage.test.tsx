@@ -25,6 +25,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const hookMocks = vi.hoisted(() => ({
   useTickets: vi.fn(),
+  useTicketsLibrary: vi.fn(),
   useProjects: vi.fn(),
   useMilestones: vi.fn(),
   useStandaloneView: vi.fn(),
@@ -34,7 +35,8 @@ const hookMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useTickets", () => ({
-  useTickets: hookMocks.useTickets
+  useTickets: hookMocks.useTickets,
+  useTicketsLibrary: hookMocks.useTicketsLibrary
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useProjects", () => ({
@@ -143,6 +145,16 @@ beforeEach(() => {
     removeTicket: vi.fn(),
     updateTicket: vi.fn()
   });
+  // Progressive Hauptlisten-Bibliothek (globaler Scope) — nach dem Skalierungs-Umbau die
+  // Datenquelle der ungefilterten Ticketübersicht (useTickets bleibt für Owner-Scopes).
+  hookMocks.useTicketsLibrary.mockReturnValue({
+    tickets: [],
+    total: 0,
+    loadedCount: 0,
+    loading: false,
+    loadingMore: false,
+    error: null
+  });
   hookMocks.useProjects.mockReturnValue({
     projects,
     loading: false,
@@ -169,7 +181,10 @@ describe("TicketsPage", () => {
   it("lädt ohne Filter die globale Ticketliste", () => {
     renderTicketsPage("/tickets");
 
+    // useTickets bleibt (owner-Scope-Hook) mit undefined aktiv, darf also nicht deaktiviert sein …
     expect(hookMocks.useTickets).toHaveBeenCalledWith(undefined);
+    // … und die angezeigte globale Liste stammt aus der progressiv nachladenden Bibliothek.
+    expect(hookMocks.useTicketsLibrary).toHaveBeenCalled();
   });
 
   it("lädt mit Meilensteinfilter den Meilenstein-Scope", () => {

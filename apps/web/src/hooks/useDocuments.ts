@@ -1,26 +1,33 @@
-import type { Attachment, AttachmentCategory, AttachmentFolder } from "@taskmanager/shared-types";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AttachmentCategory, AttachmentFolder } from "@taskmanager/shared-types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import * as documentsApi from "../api/documents";
 import type { DocumentLibraryFilter } from "../api/documents";
+import { useProgressiveList } from "./useProgressiveList";
 import { invalidateDocuments } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
+// Progressive Bibliotheks-Abfrage (MS-75): statt Seitenzahl-Blättern wird der erste Block
+// sofort geladen und die weiteren Blöcke sequenziell automatisch nachgeladen. Server-Filter/
+// Suche (`filter`) gehen in jeden Chunk-Abruf. Filterwechsel ändert den queryKey und startet
+// das progressive Laden von vorne. `total` ist die Gesamtzahl nach Filter/Suche.
 export function useDocumentLibrary(filter: DocumentLibraryFilter) {
   const queryClient = useQueryClient();
-  const query = useQuery({
-    queryKey: queryKeys.documents.library(filter as object),
-    queryFn: () => documentsApi.getDocumentLibrary(filter),
-    placeholderData: keepPreviousData
-  });
+  const list = useProgressiveList(
+    queryKeys.documents.library(filter as object),
+    (page, pageSize) => documentsApi.getDocumentLibraryPage(filter, { page, pageSize })
+  );
   const reload = useCallback(async () => {
     await invalidateDocuments(queryClient);
   }, [queryClient]);
   return {
-    documents: query.data ?? ([] as Attachment[]),
-    loading: query.isLoading,
-    error: toQueryError(query.error),
+    documents: list.items,
+    total: list.total,
+    loadedCount: list.loadedCount,
+    loading: list.loading,
+    loadingMore: list.loadingMore,
+    error: list.error,
     reload
   };
 }

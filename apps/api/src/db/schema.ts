@@ -1,6 +1,6 @@
 ﻿import { sql } from "drizzle-orm";
 import type { AnyMySqlColumn } from "drizzle-orm/mysql-core";
-import { boolean, check, double, index, int, longblob, longtext, mysqlTable, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, check, double, index, int, longblob, longtext, mysqlTable, primaryKey, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 function shortText<TEnum extends readonly [string, ...string[]]>(
   name: string,
@@ -486,6 +486,7 @@ export const tags = mysqlTable("tags", {
   name: shortText("name").notNull().unique(),
   color: shortText("color").notNull().default("#94a3b8"),
   isSystem: boolean("is_system").notNull().default(false),
+  domain: shortText("domain").notNull().default("pm"),
   version: int("version").notNull().default(1),
   createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
   updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -722,7 +723,7 @@ export const attachmentCategoryLinks = mysqlTable(
       .references(() => attachments.id, { onDelete: "cascade" })
   },
   (table) => ({
-    attachmentCategoryLinkUnique: uniqueIndex("attachment_category_links_category_attachment_unique").on(table.categoryId, table.attachmentId)
+    pk: primaryKey({ columns: [table.categoryId, table.attachmentId] })
   })
 );
 
@@ -737,7 +738,7 @@ export const attachmentTags = mysqlTable(
       .references(() => tags.id, { onDelete: "cascade" })
   },
   (table) => ({
-    attachmentTagUnique: uniqueIndex("attachment_tags_attachment_tag_unique").on(table.attachmentId, table.tagId)
+    pk: primaryKey({ columns: [table.attachmentId, table.tagId] })
   })
 );
 
@@ -752,7 +753,7 @@ export const folderAttachments = mysqlTable(
       .references(() => attachments.id, { onDelete: "cascade" })
   },
   (table) => ({
-    folderAttachmentUnique: uniqueIndex("folder_attachments_folder_attachment_unique").on(table.folderId, table.attachmentId)
+    pk: primaryKey({ columns: [table.folderId, table.attachmentId] })
   })
 );
 

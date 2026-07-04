@@ -1,4 +1,4 @@
-﻿import { and, desc, eq } from "drizzle-orm";
+﻿import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { pushSubscriptions } from "../db/schema.js";
@@ -62,6 +62,30 @@ export const pushSubscriptionRepository = {
 
   async findByUser(database: DbSession, userId: number): Promise<PushSubscriptionRecord[]> {
     return database.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId)).orderBy(desc(pushSubscriptions.updatedAt));
+  },
+
+  // Lädt gebündelt die Subscriptions mehrerer User (inArray statt Query pro User) und
+  // liefert eine userId → Records Map. Reihenfolge pro User identisch zu findByUser
+  // (updatedAt absteigend), damit die Auswahl/Verarbeitung fachlich gleich bleibt.
+  async findByUsers(database: DbSession, userIds: number[]): Promise<Map<number, PushSubscriptionRecord[]>> {
+    const map = new Map<number, PushSubscriptionRecord[]>();
+    if (userIds.length === 0) {
+      return map;
+    }
+    const rows = await database
+      .select()
+      .from(pushSubscriptions)
+      .where(inArray(pushSubscriptions.userId, userIds))
+      .orderBy(desc(pushSubscriptions.updatedAt));
+    for (const row of rows) {
+      const existing = map.get(row.userId);
+      if (existing) {
+        existing.push(row);
+      } else {
+        map.set(row.userId, [row]);
+      }
+    }
+    return map;
   }
 };
 

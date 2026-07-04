@@ -86,29 +86,36 @@ describe("ProjectFeaturePanel", () => {
     expect(addButton).toBeInTheDocument();
     expect(addButton).toHaveTextContent("");
 
+    // Board-Redesign: Nur die offenen Feature-Status (Entwurf, Aktiv) sind reguläre
+    // `section.rounded-lg`; die geschlossenen (Erledigt, Archiviert) wandern in die
+    // ClosedBoardSidebar (<aside>) und haben keine Section-Überschrift mehr.
     const columns = container.querySelectorAll("section.rounded-lg");
-    expect(columns).toHaveLength(4);
+    expect(columns).toHaveLength(2);
     expect(
       screen.getByRole("heading", { name: "Entwurf" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Aktiv" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Erledigt" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: "Erledigt" }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Archiviert" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: "Archiviert" }),
+    ).not.toBeInTheDocument();
 
     const activeColumn = screen
       .getByRole("heading", { name: "Aktiv" })
       .closest("section");
     expect(activeColumn).toContainElement(screen.getByText("Feature Aktiv"));
-    const archivedColumn = screen
-      .getByRole("heading", { name: "Archiviert" })
-      .closest("section");
-    expect(archivedColumn).toContainElement(
-      screen.getByText("Feature Archiviert"),
-    );
+
+    // Geschlossene Features erscheinen in der Sidebar, nicht in einer Board-Spalte.
+    const closedSidebar = container.querySelector("aside") as HTMLElement;
+    expect(closedSidebar).toBeInTheDocument();
+    expect(
+      within(closedSidebar).getByText("Feature Erledigt"),
+    ).toBeInTheDocument();
+    expect(
+      within(closedSidebar).getByText("Feature Archiviert"),
+    ).toBeInTheDocument();
   });
 
   it("begrenzt Board-Karten auf die Breite ihrer Statusspalten", () => {
@@ -119,8 +126,10 @@ describe("ProjectFeaturePanel", () => {
       expect(column).toHaveClass("min-w-0");
     });
 
+    // Nur die offenen Features (Entwurf, Aktiv) werden als Board-Karten (article.p-5)
+    // gerendert; die geschlossenen liegen als Zeilen in der ClosedBoardSidebar.
     const cards = container.querySelectorAll("article.p-5");
-    expect(cards).toHaveLength(4);
+    expect(cards).toHaveLength(2);
     cards.forEach((card) => {
       expect(card).toHaveClass("min-w-0");
       expect(card).toHaveClass("max-w-full");
@@ -203,8 +212,14 @@ describe("ProjectFeaturePanel", () => {
     const { container } = renderProjectFeaturePanel({ onStatusChange });
 
     expect(container.querySelector("[data-dnd-enabled='true']")).toBeInTheDocument();
+    // Nur Karten in offenen Board-Spalten sind draggable; geschlossene Features liegen
+    // in der ClosedBoardSidebar und nehmen nicht am Drag-and-Drop teil. Von den vier
+    // Features (buildFeatureSet) sind zwei offen (Entwurf, Aktiv).
+    const openFeatureCount = buildFeatureSet().filter(
+      (feature) => feature.status === "draft" || feature.status === "active",
+    ).length;
     expect(container.querySelectorAll("[data-dnd-draggable='true']")).toHaveLength(
-      buildFeatureSet().length,
+      openFeatureCount,
     );
   });
 

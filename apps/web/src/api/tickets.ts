@@ -2,6 +2,7 @@ import type {
   Attachment,
   Note,
   NoteInput,
+  Paginated,
   Tag,
   Ticket,
   TicketDetail,
@@ -16,6 +17,41 @@ import type {
 import { api } from "./client";
 
 export type { TicketOwner };
+
+// Serverseitige Filter/Suche der Ticket-Hauptliste (Status, Typ, Suchtext). Bildet ab,
+// was die Hauptseite bisher clientseitig filtert/sucht.
+export interface TicketListFilter {
+  status?: string;
+  type?: string;
+  q?: string;
+}
+
+// Optionale Seiten-Pagination. Ist `page` gesetzt, liefert das Backend Paginated<Ticket>;
+// ohne `page` weiterhin das nackte Array (Rückwärtskompatibilität für MCP/interne Aufrufer).
+export interface TicketListPagination {
+  page?: number;
+  pageSize?: number;
+}
+
+function buildTicketsQuery(filter: TicketListFilter, pagination?: TicketListPagination): Record<string, string | number> {
+  const searchParams: Record<string, string | number> = {};
+  if (filter.status) {
+    searchParams.status = filter.status;
+  }
+  if (filter.type) {
+    searchParams.type = filter.type;
+  }
+  if (filter.q) {
+    searchParams.q = filter.q;
+  }
+  if (pagination?.page !== undefined) {
+    searchParams.page = pagination.page;
+  }
+  if (pagination?.pageSize !== undefined) {
+    searchParams.pageSize = pagination.pageSize;
+  }
+  return searchParams;
+}
 
 function ownerPath(owner: TicketOwner): string {
   if (owner.type === "project") {
@@ -38,6 +74,13 @@ function ownerPath(owner: TicketOwner): string {
 
 export async function getTickets(): Promise<Ticket[]> {
   return api.get("tickets").json<Ticket[]>();
+}
+
+// Paginierter Abruf der Ticket-Hauptliste: liefert Paginated<Ticket> (data + total + page
+// + pageSize). Filter/Suche werden serverseitig angewandt.
+export async function getTicketsPage(filter: TicketListFilter, pagination: TicketListPagination): Promise<Paginated<Ticket>> {
+  const page = pagination.page ?? 1;
+  return api.get("tickets", { searchParams: buildTicketsQuery(filter, { ...pagination, page }) }).json<Paginated<Ticket>>();
 }
 
 export async function getTicketLinkCandidates(owner: TicketOwner | null, contextOwner?: TicketOwner | null): Promise<Ticket[]> {

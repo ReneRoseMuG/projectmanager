@@ -1,4 +1,4 @@
-import type { Attachment, AttachmentCategory, AttachmentFolder } from "@taskmanager/shared-types";
+import type { Attachment, AttachmentCategory, AttachmentFolder, Paginated } from "@taskmanager/shared-types";
 import { api } from "./client";
 
 export interface DocumentLibraryFilter {
@@ -9,7 +9,14 @@ export interface DocumentLibraryFilter {
   q?: string;
 }
 
-function buildLibraryQuery(filter: DocumentLibraryFilter): string {
+// Optionale Seiten-Pagination. Ist `page` gesetzt, liefert das Backend Paginated<Attachment>;
+// ohne `page` weiterhin das nackte Array (Rückwärtskompatibilität).
+export interface DocumentLibraryPagination {
+  page?: number;
+  pageSize?: number;
+}
+
+function buildLibraryQuery(filter: DocumentLibraryFilter, pagination?: DocumentLibraryPagination): string {
   const params = new URLSearchParams();
   if (filter.folder !== undefined) {
     params.set("folder", String(filter.folder));
@@ -26,12 +33,27 @@ function buildLibraryQuery(filter: DocumentLibraryFilter): string {
   if (filter.q) {
     params.set("q", filter.q);
   }
+  if (pagination?.page !== undefined) {
+    params.set("page", String(pagination.page));
+  }
+  if (pagination?.pageSize !== undefined) {
+    params.set("pageSize", String(pagination.pageSize));
+  }
   const queryString = params.toString();
   return queryString ? `documents?${queryString}` : "documents";
 }
 
 export async function getDocumentLibrary(filter: DocumentLibraryFilter): Promise<Attachment[]> {
   return api.get(buildLibraryQuery(filter)).json<Attachment[]>();
+}
+
+// Paginierter Abruf: liefert Paginated<Attachment> (data + total + page + pageSize).
+export async function getDocumentLibraryPage(
+  filter: DocumentLibraryFilter,
+  pagination: DocumentLibraryPagination
+): Promise<Paginated<Attachment>> {
+  const page = pagination.page ?? 1;
+  return api.get(buildLibraryQuery(filter, { ...pagination, page })).json<Paginated<Attachment>>();
 }
 
 export async function getDocument(id: number): Promise<Attachment> {

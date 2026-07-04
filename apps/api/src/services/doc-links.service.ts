@@ -1,4 +1,4 @@
-import type { FeatureRelation, FeatureRelationInput, JsonValue } from "@taskmanager/shared-types";
+import type { FeatureRelation, FeatureRelationInput, JsonValue, UserOption } from "@taskmanager/shared-types";
 import { eq, inArray, or } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { featureRelations, features, milestoneFeatures, milestones, projectFeatures, projects, useCases } from "../db/schema.js";
@@ -14,7 +14,7 @@ import {
   type JournalActor,
   type JournalObjectRef
 } from "./journal.service.js";
-import { getUserOption } from "./users.service.js";
+import { getUserOptionsMap } from "./users.service.js";
 
 type MappableFeatureRecord = Pick<
   typeof features.$inferSelect,
@@ -23,7 +23,8 @@ type MappableFeatureRecord = Pick<
 
 type FeatureReference = Pick<typeof features.$inferSelect, "id" | "title">;
 
-async function mapFeature(database: DbClient, row: MappableFeatureRecord, useCaseCount = 0): Promise<FeatureDto> {
+// Zieht die User-Option aus der vorgeladenen Map (gebündelt geladen), statt pro Feature einzeln abzufragen.
+function mapFeature(row: MappableFeatureRecord, userOptions: Map<number, UserOption>, useCaseCount = 0): FeatureDto {
   return {
     id: row.id,
     title: row.title,
@@ -31,7 +32,7 @@ async function mapFeature(database: DbClient, row: MappableFeatureRecord, useCas
     description: row.description,
     sortOrder: row.sortOrder,
     responsibleUserId: row.responsibleUserId,
-    responsibleUser: await getUserOption(database, row.responsibleUserId),
+    responsibleUser: row.responsibleUserId !== null ? userOptions.get(row.responsibleUserId) ?? null : null,
     version: row.version,
     useCaseCount,
     attachmentCount: 0,
@@ -243,8 +244,10 @@ export async function listProjectFeatures(database: DbClient, projectId: number)
     .innerJoin(features, eq(projectFeatures.featureId, features.id))
     .where(eq(projectFeatures.projectId, projectId));
   const counts = await getUseCaseCountMap(database, rows.map((row) => row.id));
+  // User-Optionen für alle Features gebündelt vorladen — vermeidet eine Query pro Feature.
+  const userOptions = await getUserOptionsMap(database, rows.map((row) => row.responsibleUserId));
 
-  return Promise.all(rows.map((row) => mapFeature(database, row, counts.get(row.id) ?? 0)));
+  return rows.map((row) => mapFeature(row, userOptions, counts.get(row.id) ?? 0));
 }
 
 export async function setProjectFeatures(database: DbClient, projectId: number, featureIds: number[], actor?: JournalActor | null): Promise<FeatureDto[]> {
@@ -290,8 +293,10 @@ export async function listMilestoneFeatures(database: DbClient, milestoneId: num
     .innerJoin(features, eq(milestoneFeatures.featureId, features.id))
     .where(eq(milestoneFeatures.milestoneId, milestoneId));
   const counts = await getUseCaseCountMap(database, rows.map((row) => row.id));
+  // User-Optionen für alle Features gebündelt vorladen — vermeidet eine Query pro Feature.
+  const userOptions = await getUserOptionsMap(database, rows.map((row) => row.responsibleUserId));
 
-  return Promise.all(rows.map((row) => mapFeature(database, row, counts.get(row.id) ?? 0)));
+  return rows.map((row) => mapFeature(row, userOptions, counts.get(row.id) ?? 0));
 }
 
 export async function setMilestoneFeatures(database: DbClient, milestoneId: number, featureIds: number[], actor?: JournalActor | null): Promise<FeatureDto[]> {
@@ -346,16 +351,17 @@ export async function listFeatureRelations(database: DbClient, featureId: number
     database,
     rows.map((row) => row.targetId)
   );
+  // User-Optionen für alle Ziel-Features gebündelt vorladen — vermeidet eine Query pro Beziehung.
+  const userOptions = await getUserOptionsMap(database, rows.map((row) => row.targetResponsibleUserId));
 
-  return Promise.all(rows.map(async (row) => ({
+  return rows.map((row) => ({
     sourceFeatureId: row.sourceFeatureId,
     targetFeatureId: row.targetFeatureId,
     relationType: row.relationType,
     description: row.description,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    targetFeature: await mapFeature(
-      database,
+    targetFeature: mapFeature(
       {
         id: row.targetId,
         title: row.targetTitle,
@@ -367,9 +373,10 @@ export async function listFeatureRelations(database: DbClient, featureId: number
         createdAt: row.targetCreatedAt,
         updatedAt: row.targetUpdatedAt
       },
+      userOptions,
       counts.get(row.targetId) ?? 0
     )
-  })));
+  }));
 }
 
 export async function setFeatureRelations(database: DbClient, featureId: number, relations: FeatureRelationInput[], actor?: JournalActor | null): Promise<FeatureRelation[]> {

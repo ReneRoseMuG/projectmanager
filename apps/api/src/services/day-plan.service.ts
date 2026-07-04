@@ -1,6 +1,7 @@
 import type { CalendarEvent, DayPlan, DayPlanStatus, DayPlanUpdate, EventInput, EventOwner, TaskBoardItem, TaskInput } from "@taskmanager/shared-types";
+import { inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { DAY_PLAN_STATUSES } from "../db/schema.js";
+import { DAY_PLAN_STATUSES, dayPlanEvents, events, milestoneEvents, projectEvents, taskEvents } from "../db/schema.js";
 import type { tasks } from "../db/schema.js";
 import { dayPlanRepository, type DayPlanEventRow, type DayPlanRecord, type DayPlanTaskRow } from "../repositories/day-plan.repository.js";
 import { taskRepository } from "../repositories/task.repository.js";
@@ -22,7 +23,7 @@ import {
   type JournalObjectRef
 } from "./journal.service.js";
 import { mapTask, mapTaskBoardItems } from "./tasks.service.js";
-import { normalizeAssignableUserId } from "./users.service.js";
+import { getUserOptionsMap, normalizeAssignableUserId } from "./users.service.js";
 
 type TaskRecord = typeof tasks.$inferSelect;
 
@@ -62,14 +63,81 @@ function taskJournalObject(task: Pick<TaskRecord, "id" | "title">): JournalObjec
 }
 
 async function mapDayPlanTask(database: DbClient, row: DayPlanTaskRow): Promise<TaskBoardItem> {
-  return {
-    ...(await mapTask(database, row)),
-    boardPosition: row.boardPosition
-  };
+  const [item] = await mapTaskBoardItems(database, [row]);
+  return item!;
 }
 
-async function mapDayPlanEvent(database: DbClient, row: DayPlanEventRow): Promise<CalendarEvent> {
-  return getEvent(database, row.id);
+// Minimale Event-Feldmenge, die mapEvent (events.service.ts) fürs DTO liest.
+// DayPlanEventRow liefert genau diese Felder bereits mit; ein Nachladen per getEvent entfällt.
+type MappableEventRow = Pick<
+  DayPlanEventRow,
+  "id" | "title" | "description" | "startTime" | "endTime" | "isAllDay" | "color" | "reminderMinutes" | "responsibleUserId" | "version" | "createdAt" | "updatedAt"
+>;
+
+// Lädt für ALLE Event-IDs die Owner gebündelt (je Owner-Typ eine inArray-Query) und
+// gruppiert sie je Event. Reihenfolge identisch zu listEventOwners: project, task, milestone, dayPlan.
+async function getEventOwnersMap(database: DbClient, eventIds: number[]): Promise<Map<number, EventOwner[]>> {
+  const owners = new Map<number, EventOwner[]>();
+  if (eventIds.length === 0) {
+    return owners;
+  }
+
+  const append = (eventId: number, owner: EventOwner): void => {
+    const list = owners.get(eventId);
+    if (list) {
+      list.push(owner);
+    } else {
+      owners.set(eventId, [owner]);
+    }
+  };
+
+  const [projectRows, taskRows, milestoneRows, dayPlanRows] = await Promise.all([
+    database.select({ eventId: projectEvents.eventId, id: projectEvents.projectId }).from(projectEvents).where(inArray(projectEvents.eventId, eventIds)),
+    database.select({ eventId: taskEvents.eventId, id: taskEvents.taskId }).from(taskEvents).where(inArray(taskEvents.eventId, eventIds)),
+    database.select({ eventId: milestoneEvents.eventId, id: milestoneEvents.milestoneId }).from(milestoneEvents).where(inArray(milestoneEvents.eventId, eventIds)),
+    database.select({ eventId: dayPlanEvents.eventId, id: dayPlanEvents.ownerId }).from(dayPlanEvents).where(inArray(dayPlanEvents.eventId, eventIds))
+  ]);
+
+  for (const row of projectRows) {
+    append(row.eventId, { type: "project", id: row.id });
+  }
+  for (const row of taskRows) {
+    append(row.eventId, { type: "task", id: row.id });
+  }
+  for (const row of milestoneRows) {
+    append(row.eventId, { type: "milestone", id: row.id });
+  }
+  for (const row of dayPlanRows) {
+    append(row.eventId, { type: "dayPlan", id: row.id });
+  }
+
+  return owners;
+}
+
+// Mappt Event-Zeilen ins DTO wie mapEvent, lädt Owner + verantwortliche User aber gebündelt
+// statt pro Event (getEvent → listEventOwners + getUserOption).
+async function mapDayPlanEvents(database: DbClient, rows: MappableEventRow[]): Promise<CalendarEvent[]> {
+  const [ownersByEvent, usersById] = await Promise.all([
+    getEventOwnersMap(database, rows.map((row) => row.id)),
+    getUserOptionsMap(database, rows.map((row) => row.responsibleUserId))
+  ]);
+
+  return rows.map((row) => ({
+    id: row.id,
+    owners: ownersByEvent.get(row.id) ?? [],
+    title: row.title,
+    description: row.description,
+    startTime: row.startTime,
+    endTime: row.endTime,
+    isAllDay: row.isAllDay,
+    color: row.color,
+    reminderMinutes: row.reminderMinutes,
+    responsibleUserId: row.responsibleUserId,
+    responsibleUser: row.responsibleUserId !== null ? usersById.get(row.responsibleUserId) ?? null : null,
+    version: row.version,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  }));
 }
 
 async function mapDayPlan(database: DbClient, record: DayPlanRecord): Promise<DayPlan> {
@@ -83,8 +151,8 @@ async function mapDayPlan(database: DbClient, record: DayPlanRecord): Promise<Da
     version: record.version,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
-    tasks: await Promise.all(taskRows.map((row) => mapDayPlanTask(database, row))),
-    events: await Promise.all(eventRows.map((row) => mapDayPlanEvent(database, row)))
+    tasks: await mapTaskBoardItems(database, taskRows),
+    events: await mapDayPlanEvents(database, eventRows)
   };
 }
 
@@ -251,7 +319,15 @@ export async function listDayPlanTasksForUser(database: DbClient, userId: number
 export async function listDayPlanEventsForUser(database: DbClient, userId: number): Promise<CalendarEvent[]> {
   const eventIds = await dayPlanRepository.listEventIdsForUser(database, userId);
   const uniqueIds = [...new Set(eventIds)];
-  return Promise.all(uniqueIds.map((eventId) => getEvent(database, eventId)));
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  // Events gebündelt laden statt getEvent pro Event; Rückgabereihenfolge = uniqueIds (wie zuvor).
+  const rows = await database.select().from(events).where(inArray(events.id, uniqueIds));
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  const orderedRows = uniqueIds.map((eventId) => rowById.get(eventId)).filter((row): row is (typeof rows)[number] => row !== undefined);
+  return mapDayPlanEvents(database, orderedRows);
 }
 
 export async function unlinkDayPlanTaskForUser(database: DbClient, userId: number, taskId: number, actor?: JournalActor | null): Promise<void> {

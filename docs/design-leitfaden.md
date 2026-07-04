@@ -458,6 +458,17 @@ Menschenlesbare Datums- und Zeitangaben von Datensätzen werden ausschließlich 
 
 ---
 
+### 8.24 Progressives Nachladen großer Listen (LoadMoreIndicator)
+
+Große Listen und Board-Ansichten laden **nicht** per Seitenzahl-Pagination, sondern progressiv/sequenziell über den Hook `useProgressiveList` (`apps/web/src/hooks/useProgressiveList.ts`): erster Block sofort, weitere Blöcke automatisch einer nach dem anderen (nächster Abruf erst nach Abschluss des vorigen), Default 50 pro Block mit kleiner Rendering-Pause.
+
+- Fortschrittsanzeige ausschließlich über `components/ui/LoadMoreIndicator` (`loadedCount`/`total`/`loadingMore`), unter der Liste bzw. dem Board gerendert; blendet sich selbst aus, sobald alles geladen ist.
+- Serverseitige Filter und Suche gehen in **jeden** Block-Abruf; ein Filter- oder Suchwechsel startet das Laden automatisch neu (queryKey-Wechsel).
+- Datenquelle ist die opt-in-paginierte API (`Paginated<T>` über den Query-Parameter `page`); der Alt-Pfad ohne `page` (nacktes Array) bleibt für interne und owner-gebundene Nutzungen bestehen.
+- Keine eigene Seitenzahl-Leiste und kein „Mehr laden"-Button — das Nachladen läuft automatisch.
+
+---
+
 ## 9. Navigations-Sidebar
 
 Hintergrund: `bg-gradient-to-b from-steel-700 to-steel-800`.  

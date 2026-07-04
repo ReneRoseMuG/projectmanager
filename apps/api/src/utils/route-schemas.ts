@@ -74,3 +74,30 @@ export const arrayResponseSchema = {
     additionalProperties: true
   }
 } as const;
+
+// Seitenbasierte Pagination (MS-75 Fundament): opt-in über `page`. `pageSize` 1..100,
+// Default 25. Diese Felder werden je Liste in deren bestehendes Query-Schema gemischt.
+export const paginationQuerySchema = {
+  page: { type: "integer", minimum: 1 },
+  pageSize: { type: "integer", minimum: 1, maximum: 100, default: 25 }
+} as const;
+
+// Antwort-Hülle für den paginierten Pfad (Paginated<T>): `data` ist die Seite,
+// `total` die Gesamtzahl nach Filter/Suche.
+export const paginatedResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data", "total", "page", "pageSize"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: true
+      }
+    },
+    total: { type: "integer", minimum: 0 },
+    page: { type: "integer", minimum: 1 },
+    pageSize: { type: "integer", minimum: 1 }
+  }
+} as const;

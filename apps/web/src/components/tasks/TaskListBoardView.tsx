@@ -74,7 +74,7 @@ export function TaskListBoardView({ tasks, viewMode, onViewModeChange, onAdd, on
     count: tasks.filter((task) => task.status === column.value).length
   }));
   const tagEditingEnabled = !readOnly && canReadTags && canWriteTasks && Boolean(onTagsChange);
-  const tagController = useTags(tagEditingEnabled);
+  const tagController = useTags("pm", tagEditingEnabled);
   const editableTags = tagEditingEnabled ? tagController.tags : undefined;
   const handleTagsChange = tagEditingEnabled ? onTagsChange : undefined;
 

@@ -9,7 +9,10 @@ import {
   updateTag
 } from "../services/tags.service.js";
 import { createJournalActor } from "../services/journal.service.js";
+import type { TagDomain } from "@taskmanager/shared-types";
 import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
+
+const tagDomainPropertySchema = { type: "string", enum: ["pm", "dms"] } as const;
 
 const tagBodySchema = {
   type: "object",
@@ -17,7 +20,16 @@ const tagBodySchema = {
   additionalProperties: false,
   properties: {
     name: { type: "string", minLength: 1 },
-    color: { type: "string" }
+    color: { type: "string" },
+    domain: tagDomainPropertySchema
+  }
+} as const;
+
+const tagListQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    domain: tagDomainPropertySchema
   }
 } as const;
 
@@ -26,15 +38,20 @@ const tagPatchSchema = {
   required: ["expectedVersion"],
   additionalProperties: false,
   properties: {
-    ...tagBodySchema.properties,
+    name: { type: "string", minLength: 1 },
+    color: { type: "string" },
     ...expectedVersionPropertySchema
   }
 } as const;
 
 export async function registerTagsRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/tags", { schema: { response: { 200: arrayResponseSchema } } }, async () => listTags(app.db));
+  app.get<{ Querystring: { domain?: TagDomain } }>(
+    "/tags",
+    { schema: { querystring: tagListQuerySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => listTags(app.db, request.query.domain)
+  );
 
-  app.post<{ Body: { name?: string; color?: string } }>(
+  app.post<{ Body: { name?: string; color?: string; domain?: TagDomain } }>(
     "/tags",
     { schema: { body: tagBodySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => reply.status(201).send(await createTag(app.db, request.body, createJournalActor(request.currentUser)))
