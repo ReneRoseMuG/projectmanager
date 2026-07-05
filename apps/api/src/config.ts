@@ -43,6 +43,10 @@ export interface AppConfig {
   // Symmetrischer Schlüssel (beliebiger Secret-String, via SHA-256 auf 32 Byte abgeleitet) für die
   // verschlüsselte Ablage von Kalender-Zugangsdaten (MS-79 AP-0.2). Nie im Repo — nur aus der Umgebung.
   calendarEncryptionKey: string | null;
+  // Google OAuth (MS-79 AP-2.1): Client-Credentials + Redirect-URI aus der Umgebung.
+  googleClientId: string | null;
+  googleClientSecret: string | null;
+  googleRedirectUri: string;
 }
 
 function resolveFromApiRoot(value: string): string {
@@ -101,5 +105,8 @@ export const config: AppConfig = {
   apiKey: configuredApiKey || null,
   sessionSecret: configuredSessionSecret || "taskmanager-local-dev-session-secret-change-me",
   sessionSecretIsFallback: !configuredSessionSecret,
-  calendarEncryptionKey: process.env.CALENDAR_ENCRYPTION_KEY?.trim() || null
+  calendarEncryptionKey: process.env.CALENDAR_ENCRYPTION_KEY?.trim() || null,
+  googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || null,
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || null,
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI?.trim() || "http://localhost:3001/api/calendar-connections/google/callback"
 };

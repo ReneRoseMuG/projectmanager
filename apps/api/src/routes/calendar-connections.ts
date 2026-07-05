@@ -2,6 +2,8 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { deleteCalendarConnection, listCalendarConnections } from "../services/calendar-connection.service.js";
 import { syncCalendarConnection } from "../services/calendar-sync.service.js";
 import { connectNextCloud, type ConnectNextCloudInput } from "../services/nextcloud-connection.service.js";
+import { buildGoogleAuthUrl, handleGoogleCallback } from "../services/google/google-oauth.service.js";
+import { config } from "../config.js";
 import { unauthorized } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
@@ -37,6 +39,25 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
     { schema: { body: nextCloudConnectSchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => reply.status(201).send(await connectNextCloud(app.db, requireUserId(request), request.body))
   );
+
+  app.get("/calendar-connections/google/auth-url", { schema: { response: { 200: objectResponseSchema } } }, async (request) => ({
+    url: buildGoogleAuthUrl(requireUserId(request))
+  }));
+
+  // OAuth-Rücksprung von Google (offen, da vom Browser-Redirect aufgerufen — der signierte State schützt).
+  app.get<{ Querystring: { code?: string; state?: string; error?: string } }>("/calendar-connections/google/callback", async (request, reply) => {
+    const target = `${config.corsOrigin}/settings/calendar-connections`;
+    const { code, state, error } = request.query;
+    if (error || !code || !state) {
+      return reply.redirect(`${target}?google=error`);
+    }
+    try {
+      await handleGoogleCallback(app.db, code, state);
+      return reply.redirect(`${target}?google=connected`);
+    } catch {
+      return reply.redirect(`${target}?google=error`);
+    }
+  });
 
   app.post<{ Params: { id: number } }>(
     "/calendar-connections/:id/sync",
