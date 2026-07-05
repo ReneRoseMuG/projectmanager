@@ -71,7 +71,7 @@ async function mapDayPlanTask(database: DbClient, row: DayPlanTaskRow): Promise<
 // DayPlanEventRow liefert genau diese Felder bereits mit; ein Nachladen per getEvent entfällt.
 type MappableEventRow = Pick<
   DayPlanEventRow,
-  "id" | "title" | "description" | "startTime" | "endTime" | "isAllDay" | "color" | "reminderMinutes" | "responsibleUserId" | "version" | "createdAt" | "updatedAt"
+  "id" | "title" | "description" | "startTime" | "endTime" | "isAllDay" | "color" | "reminderMinutes" | "responsibleUserId" | "version" | "createdAt" | "updatedAt" | "origin" | "readonly"
 >;
 
 // Lädt für ALLE Event-IDs die Owner gebündelt (je Owner-Typ eine inArray-Query) und
@@ -136,7 +136,9 @@ async function mapDayPlanEvents(database: DbClient, rows: MappableEventRow[]): P
     responsibleUser: row.responsibleUserId !== null ? usersById.get(row.responsibleUserId) ?? null : null,
     version: row.version,
     createdAt: row.createdAt,
-    updatedAt: row.updatedAt
+    updatedAt: row.updatedAt,
+    origin: row.origin,
+    readonly: row.readonly
   }));
 }
 

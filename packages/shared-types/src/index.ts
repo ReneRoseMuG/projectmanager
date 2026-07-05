@@ -997,6 +997,8 @@ export interface AttachmentPreviewInfo {
   generatedAt: string | null;
 }
 
+export type EventOrigin = "local" | "google" | "nextcloud";
+
 export interface Event {
   id: number;
   owners: EventOwner[];
@@ -1012,6 +1014,10 @@ export interface Event {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /** Herkunft des Termins: lokal erstellt oder aus einem externen Kalender importiert. */
+  origin: EventOrigin;
+  /** true bei importierten Terminen — sie sind schreibgeschützt. */
+  readonly: boolean;
 }
 
 export type CalendarEvent = Event;

@@ -4,7 +4,7 @@ import type { DbClient } from "../db/client.js";
 import { dayPlanEvents, dayPlans, events, milestoneEvents, milestones, projectEvents, projects, taskEvents, tasks } from "../db/schema.js";
 import { firstRow, insertId } from "../db/query-utils.js";
 import { assertVersion } from "../repositories/base.repository.js";
-import { badRequest, notFound } from "../utils/errors.js";
+import { badRequest, forbidden, notFound } from "../utils/errors.js";
 import { cleanNullable, nowIso, requireNonEmpty } from "./helpers.js";
 import {
   buildCreateSummary,
@@ -76,7 +76,9 @@ async function mapEvent(database: DbClient, record: EventRecord): Promise<Event>
     responsibleUser: await getUserOption(database, record.responsibleUserId),
     version: record.version,
     createdAt: record.createdAt,
-    updatedAt: record.updatedAt
+    updatedAt: record.updatedAt,
+    origin: record.origin,
+    readonly: record.readonly
   };
 }
 
@@ -292,6 +294,9 @@ export async function updateEvent(database: DbClient, id: number, input: EventUp
   if (!current) {
     throw notFound(`Event with id ${id} not found`);
   }
+  if (current.readonly) {
+    throw forbidden("Importierte Kalender-Termine sind schreibgeschützt und können nicht bearbeitet werden.");
+  }
 
   assertVersion(current.version, input.expectedVersion);
 
@@ -381,6 +386,9 @@ export async function deleteEvent(database: DbClient, id: number, actor?: Journa
   const current = firstRow(await database.select().from(events).where(eq(events.id, id)));
   if (!current) {
     throw notFound(`Event with id ${id} not found`);
+  }
+  if (current.readonly) {
+    throw forbidden("Importierte Kalender-Termine sind schreibgeschützt und können nicht gelöscht werden.");
   }
   const currentOwners = await listEventOwners(database, id);
   await database.transaction(async (tx) => {
