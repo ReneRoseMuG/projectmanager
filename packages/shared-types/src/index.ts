@@ -385,7 +385,26 @@ export interface ApiErrorPayload {
   statusCode: number;
 }
 
-export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "diary", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "settings", "realtime", "users", "roles"] as const;
+export const CALENDAR_PROVIDERS = ["google", "nextcloud"] as const;
+export type CalendarProvider = (typeof CALENDAR_PROVIDERS)[number];
+export const CALENDAR_CONNECTION_STATUSES = ["active", "syncing", "error", "reauth_required"] as const;
+export type CalendarConnectionStatus = (typeof CALENDAR_CONNECTION_STATUSES)[number];
+
+/** API-Vertrag einer Kalenderverbindung — enthält bewusst NIE das verschlüsselte Credential-Feld. */
+export interface CalendarConnection {
+  id: number;
+  userId: number;
+  provider: CalendarProvider;
+  displayName: string;
+  status: CalendarConnectionStatus;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "diary", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "settings", "realtime", "users", "roles", "calendarConnections"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 
 export type AuthResource = (typeof AUTH_RESOURCES)[number] | "*";

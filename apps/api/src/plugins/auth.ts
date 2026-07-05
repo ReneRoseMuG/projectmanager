@@ -56,6 +56,7 @@ function resourceForPath(path: string): AuthResource {
     ["/use-cases", "useCases"],
     ["/wiki", "wiki"],
     ["/backlog", "backlog"],
+    ["/calendar-connections", "calendarConnections"],
     ["/events", "events"],
     ["/push", "notifications"],
     ["/catalogs", "catalogs"],

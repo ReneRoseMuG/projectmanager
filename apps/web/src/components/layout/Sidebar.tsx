@@ -544,6 +544,12 @@ export function Sidebar({ currentUser, onLogout }: SidebarProps = {}) {
           resource: "settings",
         },
       ];
+  settingsItems.push({
+    to: "/settings/calendar-connections",
+    label: "Kalenderverbindungen",
+    icon: CalendarDays,
+    resource: "calendarConnections",
+  });
   const navigationSections: NavigationSectionConfig[] = [
     {
       label: "Start",

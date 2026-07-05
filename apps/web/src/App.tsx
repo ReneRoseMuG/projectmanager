@@ -23,6 +23,7 @@ import { NotesPage } from "./pages/NotesPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { SetupPasswordPage } from "./pages/SetupPasswordPage";
+import { SettingsCalendarConnectionsPage } from "./pages/SettingsCalendarConnectionsPage";
 import { SettingsCatalogsPage } from "./pages/SettingsCatalogsPage";
 import { SettingsPreferencesPage } from "./pages/SettingsPreferencesPage";
 import { SettingsTagsPage } from "./pages/SettingsTagsPage";
@@ -51,7 +52,7 @@ function isFullBleedRoute(pathname: string): boolean {
     pathname === "/" ||
     /^\/(?:projects|milestones|tasks|tickets|features|use-cases|backlog|notes)(?:\/|$)/.test(pathname) ||
     /^\/(?:wiki|calendar|day-plan|journal)(?:\/|$)/.test(pathname) ||
-    /^\/settings\/preferences\/?$/.test(pathname) ||
+    /^\/settings\/(?:preferences|calendar-connections)\/?$/.test(pathname) ||
     /^\/admin(?:\/|$)/.test(pathname)
   );
 }
@@ -132,6 +133,7 @@ export default function App() {
       <Route path="/day-plan" element={dayPlanAccess ? <DayPlanPage /> : <ForbiddenPage />} />
       <Route path="/journal" element={<JournalPage />} />
       <Route path="/settings/preferences" element={<SettingsPreferencesPage />} />
+      <Route path="/settings/calendar-connections" element={<SettingsCalendarConnectionsPage />} />
       <Route path="/settings/catalogs" element={adminAccess ? <Navigate to="/admin/catalogs" replace /> : <ForbiddenPage />} />
       <Route path="/settings/tags" element={adminAccess ? <Navigate to="/admin/tags" replace /> : <ForbiddenPage />} />
       <Route path="/admin" element={adminAccess ? <Navigate to="/admin/catalogs" replace /> : <ForbiddenPage />} />

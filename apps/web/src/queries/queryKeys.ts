@@ -108,6 +108,10 @@ export const queryKeys = {
     root: ["settings"] as const,
     resolved: () => [...queryKeys.settings.root, "resolved"] as const
   },
+  calendarConnections: {
+    root: ["calendarConnections"] as const,
+    list: () => [...queryKeys.calendarConnections.root, "list"] as const
+  },
   pushNotifications: {
     root: ["pushNotifications"] as const,
     vapidKey: () => [...queryKeys.pushNotifications.root, "vapidKey"] as const,

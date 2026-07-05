@@ -56,6 +56,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   const { registerUserRoutes } = await import("../../../apps/api/src/routes/users.js");
   const { registerMultipart } = await import("../../../apps/api/src/plugins/multipart.js");
   const { registerEventsRoutes } = await import("../../../apps/api/src/routes/events.js");
+  const { registerCalendarConnectionRoutes } = await import("../../../apps/api/src/routes/calendar-connections.js");
   const { registerPushRoutes } = await import("../../../apps/api/src/routes/push.js");
   const { registerFeaturesRoutes } = await import("../../../apps/api/src/routes/features.js");
   const { registerHealthRoutes } = await import("../../../apps/api/src/routes/health.js");
@@ -112,6 +113,7 @@ export async function buildTestApp(testDb: TestDb, options: BuildTestAppOptions 
   await app.register(registerTicketsRoutes, { prefix: "/api" });
   await app.register(registerUserRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
+  await app.register(registerCalendarConnectionRoutes, { prefix: "/api" });
   await app.register(registerPushRoutes, { prefix: "/api" });
   if (!options.enableAuth) {
     await app.register(registerHealthRoutes, { prefix: "/api" });

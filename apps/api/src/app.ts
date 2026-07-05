@@ -11,6 +11,7 @@ import { registerAttachmentsRoutes } from "./routes/attachments.js";
 import { registerDmsRoutes } from "./routes/dms.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerBacklogRoutes } from "./routes/backlog.js";
+import { registerCalendarConnectionRoutes } from "./routes/calendar-connections.js";
 import { registerCommentsRoutes } from "./routes/comments.js";
 import { registerContentImageRoutes } from "./routes/content-images.js";
 import { registerCatalogRoutes } from "./routes/catalogs.js";
@@ -93,6 +94,7 @@ export async function buildApp(
   await app.register(registerAttachmentsRoutes, { prefix: "/api" });
   await app.register(registerDmsRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
+  await app.register(registerCalendarConnectionRoutes, { prefix: "/api" });
   await app.register(registerPushRoutes, { prefix: "/api" });
   await app.register(registerFeaturesRoutes, { prefix: "/api" });
   await app.register(registerUseCasesRoutes, { prefix: "/api" });
