@@ -31,15 +31,17 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import type { CalendarConnection } from "@taskmanager/shared-types";
+import type { CalendarConnection, CalendarJournalEntry } from "@taskmanager/shared-types";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsCalendarConnectionsPage } from "../../../../apps/web/src/pages/SettingsCalendarConnectionsPage";
 
 const mocks = vi.hoisted(() => ({
   connections: [] as CalendarConnection[],
+  journal: [] as CalendarJournalEntry[],
   syncConnection: vi.fn(),
   deleteConnection: vi.fn(),
+  connectGoogle: vi.fn(),
   showToast: vi.fn(),
   permissions: [{ resource: "*", action: "*" }] as Array<{ resource: string; action: string }>
 }));
@@ -47,10 +49,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../../../../apps/web/src/hooks/useCalendarConnections", () => ({
   useCalendarConnections: () => ({
     connections: mocks.connections,
+    journal: mocks.journal,
     loading: false,
     error: null,
     syncConnection: mocks.syncConnection,
     deleteConnection: mocks.deleteConnection,
+    connectGoogle: mocks.connectGoogle,
     isSyncing: false,
     isDeleting: false
   })
@@ -71,6 +75,7 @@ const CONNECTIONS: CalendarConnection[] = [
 
 beforeEach(() => {
   mocks.connections = CONNECTIONS;
+  mocks.journal = [];
   mocks.permissions = [{ resource: "*", action: "*" }];
 });
 
@@ -78,6 +83,7 @@ afterEach(() => {
   cleanup();
   mocks.syncConnection.mockReset();
   mocks.deleteConnection.mockReset();
+  mocks.connectGoogle.mockReset();
   mocks.showToast.mockReset();
 });
 
@@ -134,5 +140,45 @@ describe("SettingsCalendarConnectionsPage (AP-0.3)", () => {
     await waitFor(() =>
       expect(mocks.showToast).toHaveBeenCalledWith(expect.objectContaining({ tone: "error", title: "Aktion fehlgeschlagen" }))
     );
+  });
+
+  // AP-4.3: Re-Auth, Journal, Google-Flow
+  it("startet den Google-OAuth-Flow über den Verbinden-Button", () => {
+    render(<SettingsCalendarConnectionsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /Google verbinden/ }));
+    expect(mocks.connectGoogle).toHaveBeenCalledTimes(1);
+  });
+
+  it("bietet den Re-Auth-Button bei reauth_required und startet den Google-Flow", () => {
+    mocks.connections = [{ ...CONNECTIONS[0], status: "reauth_required" }];
+    render(<SettingsCalendarConnectionsPage />);
+    expect(screen.getAllByText("Neu anmelden").length).toBeGreaterThanOrEqual(2); // Badge + Button
+    fireEvent.click(screen.getByRole("button", { name: "Neu anmelden" }));
+    expect(mocks.connectGoogle).toHaveBeenCalledTimes(1);
+  });
+
+  it("zeigt keinen Re-Auth-Button bei aktiver oder fehlerhafter Verbindung", () => {
+    render(<SettingsCalendarConnectionsPage />); // active + error, kein reauth_required
+    expect(screen.queryByRole("button", { name: "Neu anmelden" })).not.toBeInTheDocument();
+  });
+
+  it("bietet Re-Auth NICHT für einen NextCloud-Kalender (nur Google)", () => {
+    mocks.connections = [{ ...CONNECTIONS[1], status: "reauth_required" }];
+    render(<SettingsCalendarConnectionsPage />);
+    expect(screen.queryByRole("button", { name: "Neu anmelden" })).not.toBeInTheDocument();
+  });
+
+  it("zeigt den Journal-Verlauf mit Ereignis-Labels und Nachricht", () => {
+    mocks.journal = [
+      { id: 1, connectionId: 1, connectionLabel: "Mein Google", eventType: "sync_error", message: "Token widerrufen", createdAt: "2026-07-05T12:00:00Z" },
+      { id: 2, connectionId: 1, connectionLabel: "Mein Google", eventType: "conflict", message: null, createdAt: "2026-07-05T11:00:00Z" },
+      { id: 3, connectionId: null, connectionLabel: "Alt-Verbindung", eventType: "disconnected", message: null, createdAt: "2026-07-05T10:00:00Z" }
+    ];
+    render(<SettingsCalendarConnectionsPage />);
+    expect(screen.getByText("Sync-Fehler")).toBeInTheDocument();
+    expect(screen.getByText("Token widerrufen")).toBeInTheDocument();
+    expect(screen.getByText("Konflikt gelöst")).toBeInTheDocument();
+    expect(screen.getByText("Getrennt")).toBeInTheDocument();
+    expect(screen.getByText("Alt-Verbindung")).toBeInTheDocument();
   });
 });

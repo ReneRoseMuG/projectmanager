@@ -3,6 +3,7 @@ import type { DbClient, DbSession } from "../db/client.js";
 import { calendarConnectionRepository, type CalendarConnectionRecord } from "../repositories/calendar.repository.js";
 import { notFound } from "../utils/errors.js";
 import { calendarCredentialService } from "./calendar-credential.service.js";
+import { recordJournal } from "./calendar-journal.service.js";
 
 /**
  * Mappt einen DB-Record auf das API-DTO. Das Feld encrypted_credentials wird bewusst
@@ -43,10 +44,13 @@ export async function getCalendarConnection(database: DbClient, id: number, user
 
 /** Trennt eine Verbindung: entfernt zuerst die Zugangsdaten, dann die Verbindung (Kaskade räumt Rest). */
 export async function deleteCalendarConnection(database: DbClient, id: number, userId: number): Promise<void> {
-  await requireOwnedConnection(database, id, userId);
+  const connection = await requireOwnedConnection(database, id, userId);
   await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbSession;
     await calendarCredentialService.clear(txDb, id);
     await calendarConnectionRepository.delete(txDb, id);
   });
+  // Nach erfolgreicher Trennung protokollieren; connectionId=null, da die Verbindung nun entfernt ist
+  // (das Label hält die Historie unabhängig fest).
+  await recordJournal(database, { userId: connection.userId, connectionId: null, connectionLabel: connection.displayName, eventType: "disconnected" });
 }

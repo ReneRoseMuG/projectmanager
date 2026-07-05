@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { deleteCalendarConnection, listCalendarConnections, requireOwnedConnection } from "../services/calendar-connection.service.js";
+import { listCalendarJournal } from "../services/calendar-journal.service.js";
 import { listGoogleCalendars, selectGoogleCalendar } from "../services/google/google-calendar.service.js";
 import { syncCalendarConnection } from "../services/calendar-sync.service.js";
 import { connectNextCloud, type ConnectNextCloudInput } from "../services/nextcloud-connection.service.js";
@@ -41,6 +42,11 @@ function requireUserId(request: FastifyRequest): number {
 export async function registerCalendarConnectionRoutes(app: FastifyInstance): Promise<void> {
   app.get("/calendar-connections", { schema: { response: { 200: arrayResponseSchema } } }, async (request) =>
     listCalendarConnections(app.db, requireUserId(request))
+  );
+
+  // Sync-Journal des Nutzers (AP-4.3): Anlage/Trennung, Sync, Fehler, Konflikte — neueste zuerst.
+  app.get("/calendar-connections/journal", { schema: { response: { 200: arrayResponseSchema } } }, async (request) =>
+    listCalendarJournal(app.db, requireUserId(request))
   );
 
   app.post<{ Body: ConnectNextCloudInput }>(

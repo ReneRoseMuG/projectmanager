@@ -404,6 +404,19 @@ export interface CalendarConnection {
   updatedAt: string;
 }
 
+export const CALENDAR_JOURNAL_EVENT_TYPES = ["connected", "disconnected", "sync_success", "sync_error", "conflict"] as const;
+export type CalendarJournalEventType = (typeof CALENDAR_JOURNAL_EVENT_TYPES)[number];
+
+/** Ein Eintrag im Sync-Journal (AP-4.3): protokolliert Anlage/Trennung, Sync, Fehler, Konflikte. */
+export interface CalendarJournalEntry {
+  id: number;
+  connectionId: number | null;
+  connectionLabel: string;
+  eventType: CalendarJournalEventType;
+  message: string | null;
+  createdAt: string;
+}
+
 export const AUTH_RESOURCES = ["projects", "milestones", "tasks", "features", "useCases", "wiki", "diary", "backlog", "tickets", "comments", "notes", "attachments", "contentImages", "events", "dayPlans", "notifications", "catalogs", "tags", "journal", "dashboards", "settings", "realtime", "users", "roles", "calendarConnections"] as const;
 export const AUTH_ACTIONS = ["read", "write", "delete", "admin"] as const;
 

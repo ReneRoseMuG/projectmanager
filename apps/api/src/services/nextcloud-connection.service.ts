@@ -5,6 +5,7 @@ import { badRequest } from "../utils/errors.js";
 import { CalDavError, discoverCalendars, type CalDavFetch } from "./caldav/caldav-client.js";
 import { mapCalendarConnection } from "./calendar-connection.service.js";
 import { calendarCredentialService } from "./calendar-credential.service.js";
+import { recordConnectionJournal } from "./calendar-journal.service.js";
 
 export interface ConnectNextCloudInput {
   displayName: string;
@@ -59,5 +60,6 @@ export async function connectNextCloud(
     return created;
   });
 
+  await recordConnectionJournal(database, connection, "connected", `NextCloud-Konto verbunden (${calendars.length} Kalender gefunden).`);
   return mapCalendarConnection(connection);
 }

@@ -4,6 +4,7 @@ import { events } from "../../db/schema.js";
 import { insertId } from "../../db/query-utils.js";
 import { calendarSyncStateRepository, eventMappingRepository } from "../../repositories/calendar.repository.js";
 import { registerCalendarSyncHandler } from "../calendar-sync.service.js";
+import { recordConnectionJournal } from "../calendar-journal.service.js";
 import { wallTimeIso } from "../ical-import.service.js";
 import { exportDirtyMappedEvents, exportPendingLocalEvents, isLocallyModified, loadLocalEvent, versionOf } from "./google-export.service.js";
 import { ensureGoogleTargetCalendar } from "./google-calendar.service.js";
@@ -103,11 +104,14 @@ async function deleteByExternalId(database: DbClient, connectionId: number, exte
   return 1;
 }
 
-type UpsertOutcome = "created" | "updated" | "skipped";
+interface UpsertResult {
+  outcome: "created" | "updated" | "skipped";
+  conflict: boolean;
+}
 
-async function upsertGoogleEvent(database: DbClient, connectionId: number, externalCalendarId: number, event: GoogleEvent): Promise<UpsertOutcome> {
+async function upsertGoogleEvent(database: DbClient, connectionId: number, externalCalendarId: number, event: GoogleEvent): Promise<UpsertResult> {
   if (!event.id || !event.start || !event.end) {
-    return "skipped";
+    return { outcome: "skipped", conflict: false };
   }
   const incomingEtag = event.etag ?? null;
   const now = nowIso();
@@ -116,14 +120,16 @@ async function upsertGoogleEvent(database: DbClient, connectionId: number, exter
   if (existing) {
     // Echo-Vermeidung: identisches etag → seit unserem letzten Sync/Export unverändert, kein Rückschreiben.
     if (incomingEtag !== null && existing.etag === incomingEtag) {
-      return "skipped";
+      return { outcome: "skipped", conflict: false };
     }
     const local = await loadLocalEvent(database, existing.localEventId);
-    if (local && isLocallyModified(local, existing.seenVersion) && !googleIsNewer(event.updated, local.updatedAt)) {
+    // Konflikt = beide Seiten seit dem letzten Sync geändert (lokal dirty + abweichendes etag).
+    const conflict = local ? isLocallyModified(local, existing.seenVersion) : false;
+    if (conflict && local && !googleIsNewer(event.updated, local.updatedAt)) {
       // Konflikt und die App-Version ist neuer → lokal behalten; nur das gesehene etag merken.
       // Der anschließende Push (AP-3.2 Orchestrator) trägt die App-Version zu Google.
       await eventMappingRepository.update(database, existing.id, { etag: incomingEtag });
-      return "skipped";
+      return { outcome: "skipped", conflict: true };
     }
     // Kein Konflikt oder Google gewinnt → Google-Version übernehmen, Sync-Stand festhalten.
     const start = mapGoogleTime(event.start);
@@ -133,7 +139,7 @@ async function upsertGoogleEvent(database: DbClient, connectionId: number, exter
       .set({ title: event.summary ?? "(ohne Titel)", description: event.description ?? null, startTime: start.iso, endTime: end.iso, isAllDay: start.isAllDay, updatedAt: now })
       .where(eq(events.id, existing.localEventId));
     await eventMappingRepository.update(database, existing.id, { etag: incomingEtag, iCalUid: event.iCalUID ?? null, seenVersion: versionOf(now) });
-    return "updated";
+    return { outcome: "updated", conflict };
   }
 
   const start = mapGoogleTime(event.start);
@@ -160,7 +166,7 @@ async function upsertGoogleEvent(database: DbClient, connectionId: number, exter
     origin: "google",
     direction: "both"
   });
-  return "created";
+  return { outcome: "created", conflict: false };
 }
 
 async function deleteAllOfCalendar(database: DbClient, externalCalendarId: number): Promise<void> {
@@ -173,6 +179,7 @@ export interface GoogleImportResult {
   changed: number;
   deleted: number;
   resynced: boolean;
+  conflicts: number;
 }
 
 /** Führt den (initialen oder inkrementellen) Import des Google-Zielkalenders aus. */
@@ -187,6 +194,7 @@ export async function importGoogleCalendar(database: DbClient, connectionId: num
   let changed = 0;
   let deleted = 0;
   let resynced = false;
+  let conflicts = 0;
 
   for (let guard = 0; guard < 1000; guard += 1) {
     const params = syncToken ? { syncToken, pageToken } : { pageToken, timeMin: "2000-01-01T00:00:00Z" };
@@ -211,9 +219,12 @@ export async function importGoogleCalendar(database: DbClient, connectionId: num
       if (item.status === "cancelled") {
         deleted += await deleteByExternalId(database, connectionId, item.id);
       } else {
-        const outcome = await upsertGoogleEvent(database, connectionId, target.id, item);
-        if (outcome !== "skipped") {
+        const result = await upsertGoogleEvent(database, connectionId, target.id, item);
+        if (result.outcome !== "skipped") {
           changed += 1;
+        }
+        if (result.conflict) {
+          conflicts += 1;
         }
       }
     }
@@ -226,7 +237,7 @@ export async function importGoogleCalendar(database: DbClient, connectionId: num
   }
 
   await calendarSyncStateRepository.upsert(database, { connectionId, externalCalendarId: target.id, syncToken: newSyncToken ?? undefined, lastSuccessAt: nowIso() });
-  return { changed, deleted, resynced };
+  return { changed, deleted, resynced, conflicts };
 }
 
 /**
@@ -236,7 +247,10 @@ export async function importGoogleCalendar(database: DbClient, connectionId: num
  */
 export function registerGoogleSyncHandler(fetchImpl?: GoogleTokenFetch): void {
   registerCalendarSyncHandler("google", async (database, connection) => {
-    await importGoogleCalendar(database, connection.id, fetchImpl);
+    const importResult = await importGoogleCalendar(database, connection.id, fetchImpl);
+    if (importResult.conflicts > 0) {
+      await recordConnectionJournal(database, connection, "conflict", `${importResult.conflicts} Konflikt(e) per Last-Write-Wins aufgelöst.`);
+    }
     await exportPendingLocalEvents(database, connection.id, fetchImpl);
     await exportDirtyMappedEvents(database, connection.id, fetchImpl);
   });

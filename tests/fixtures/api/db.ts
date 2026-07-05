@@ -199,6 +199,7 @@ const truncateTables = [
   "day_plan_events",
   "task_events",
   "project_events",
+  "calendar_sync_journal",
   "event_mappings",
   "calendar_sync_states",
   "external_calendars",

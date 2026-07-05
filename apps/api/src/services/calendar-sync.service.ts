@@ -3,6 +3,7 @@ import type { DbClient } from "../db/client.js";
 import { calendarConnectionRepository, type CalendarConnectionRecord, type RecordSyncResultInput } from "../repositories/calendar.repository.js";
 import { notFound } from "../utils/errors.js";
 import { mapCalendarConnection } from "./calendar-connection.service.js";
+import { recordConnectionJournal } from "./calendar-journal.service.js";
 
 /**
  * Ein provider-spezifischer Sync-Handler führt den eigentlichen Abgleich einer Verbindung durch.
@@ -48,19 +49,23 @@ export async function syncCalendarConnection(database: DbClient, id: number, use
 export async function runConnectionSync(database: DbClient, connection: CalendarConnectionRecord): Promise<CalendarConnection> {
   const handler = syncHandlers.get(connection.provider);
   if (!handler) {
-    return applyResult(database, connection, {
-      status: "error",
-      lastError: `Kein Sync-Handler für Anbieter "${connection.provider}" verfügbar`
-    });
+    const message = `Kein Sync-Handler für Anbieter "${connection.provider}" verfügbar`;
+    await recordConnectionJournal(database, connection, "sync_error", message);
+    return applyResult(database, connection, { status: "error", lastError: message });
   }
 
   await calendarConnectionRepository.recordSyncResult(database, connection.id, { status: "syncing", lastError: null });
   try {
     await handler(database, connection);
+    await recordConnectionJournal(database, connection, "sync_success", null);
     return applyResult(database, connection, { status: "active", lastError: null });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Sync fehlgeschlagen";
-    return applyResult(database, connection, { status: "error", lastError: message });
+    // Widerrufenes Google-Token (invalid_grant) → Re-Auth statt generischem Fehler (der Status wurde
+    // ggf. schon in ensureGoogleAccessToken gesetzt; hier nicht mit "error" überschreiben).
+    const reauthRequired = error instanceof Error && (error as { reason?: unknown }).reason === "invalid_grant";
+    await recordConnectionJournal(database, connection, "sync_error", message);
+    return applyResult(database, connection, { status: reauthRequired ? "reauth_required" : "error", lastError: message });
   }
 }
 

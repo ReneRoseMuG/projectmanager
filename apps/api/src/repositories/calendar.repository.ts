@@ -1,7 +1,7 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
-import { calendarConnections, calendarSyncStates, eventMappings, externalCalendars } from "../db/schema.js";
+import { calendarConnections, calendarSyncJournal, calendarSyncStates, eventMappings, externalCalendars } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
 
 export type CalendarConnectionRecord = typeof calendarConnections.$inferSelect;
@@ -28,6 +28,11 @@ export type UpsertSyncStateInput = Pick<CalendarSyncStateInsert, "connectionId" 
 export type CreateEventMappingInput = Pick<EventMappingInsert, "connectionId" | "externalCalendarId" | "localEventId" | "externalId" | "origin"> &
   Partial<Pick<EventMappingInsert, "iCalUid" | "etag" | "seenVersion" | "direction">>;
 export type UpdateEventMappingInput = Partial<Pick<EventMappingInsert, "externalId" | "iCalUid" | "etag" | "seenVersion" | "direction" | "externalCalendarId">>;
+
+export type CalendarJournalRecord = typeof calendarSyncJournal.$inferSelect;
+type CalendarJournalInsert = typeof calendarSyncJournal.$inferInsert;
+export type CreateCalendarJournalInput = Pick<CalendarJournalInsert, "userId" | "connectionLabel" | "eventType"> &
+  Partial<Pick<CalendarJournalInsert, "connectionId" | "message">>;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -304,5 +309,31 @@ export const eventMappingRepository = {
 
   async delete(database: DbSession, id: number): Promise<number> {
     return mutationAffectedRows(await database.delete(eventMappings).where(eq(eventMappings.id, id)));
+  }
+};
+
+export const calendarSyncJournalRepository = {
+  async create(database: DbSession, input: CreateCalendarJournalInput): Promise<CalendarJournalRecord> {
+    const result = await database.insert(calendarSyncJournal).values({
+      userId: input.userId,
+      connectionId: input.connectionId ?? null,
+      connectionLabel: input.connectionLabel,
+      eventType: input.eventType,
+      message: input.message ?? null,
+      createdAt: nowIso()
+    });
+    const created = firstRow(await database.select().from(calendarSyncJournal).where(eq(calendarSyncJournal.id, insertId(result))));
+    if (!created) {
+      throw new Error("Created calendar journal entry could not be loaded");
+    }
+    return created;
+  },
+
+  async listByUser(database: DbSession, userId: number, limit = 100): Promise<CalendarJournalRecord[]> {
+    return database.select().from(calendarSyncJournal).where(eq(calendarSyncJournal.userId, userId)).orderBy(desc(calendarSyncJournal.id)).limit(limit);
+  },
+
+  async listByConnection(database: DbSession, connectionId: number, limit = 100): Promise<CalendarJournalRecord[]> {
+    return database.select().from(calendarSyncJournal).where(eq(calendarSyncJournal.connectionId, connectionId)).orderBy(desc(calendarSyncJournal.id)).limit(limit);
   }
 };

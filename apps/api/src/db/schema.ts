@@ -54,6 +54,7 @@ export const CALENDAR_PROVIDERS = ["google", "nextcloud"] as const;
 export const CALENDAR_CONNECTION_STATUSES = ["active", "syncing", "error", "reauth_required"] as const;
 export const EVENT_ORIGINS = ["local", "google", "nextcloud"] as const;
 export const EVENT_MAPPING_DIRECTIONS = ["import", "export", "both"] as const;
+export const CALENDAR_JOURNAL_EVENT_TYPES = ["connected", "disconnected", "sync_success", "sync_error", "conflict"] as const;
 
 export const appSettings = mysqlTable("app_settings", {
   key: shortText("key").primaryKey(),
@@ -986,6 +987,30 @@ export const eventMappings = mysqlTable(
     eventMappingsConnectionExternalUnique: uniqueIndex("event_mappings_connection_external_unique").on(table.connectionId, table.externalId),
     eventMappingsLocalEventIdx: index("event_mappings_local_event_idx").on(table.localEventId),
     eventMappingsExternalCalendarIdx: index("event_mappings_external_calendar_idx").on(table.externalCalendarId)
+  })
+);
+
+/**
+ * Sync-Journal (MS-79 AP-4.3, FT(10)): protokolliert Verbindungs-Anlage/-Trennung, Sync-Läufe,
+ * Fehler und Konflikte. connectionId ist ON DELETE SET NULL, damit die Historie eine Trennung
+ * überlebt; connectionLabel hält den Verbindungsnamen für die Anzeige unabhängig fest.
+ */
+export const calendarSyncJournal = mysqlTable(
+  "calendar_sync_journal",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    connectionId: int("connection_id").references(() => calendarConnections.id, { onDelete: "set null" }),
+    connectionLabel: shortText("connection_label").notNull(),
+    eventType: shortText("event_type", { enum: CALENDAR_JOURNAL_EVENT_TYPES }).notNull(),
+    message: longtext("message"),
+    createdAt: timestampText("created_at")
+  },
+  (table) => ({
+    calendarSyncJournalUserIdx: index("calendar_sync_journal_user_idx").on(table.userId, table.id),
+    calendarSyncJournalConnectionIdx: index("calendar_sync_journal_connection_idx").on(table.connectionId)
   })
 );
 

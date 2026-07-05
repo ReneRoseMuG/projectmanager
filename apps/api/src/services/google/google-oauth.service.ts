@@ -2,9 +2,10 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { CalendarConnection } from "@taskmanager/shared-types";
 import { config } from "../../config.js";
 import type { DbClient, DbSession } from "../../db/client.js";
-import { calendarConnectionRepository } from "../../repositories/calendar.repository.js";
+import { calendarConnectionRepository, type CalendarConnectionRecord } from "../../repositories/calendar.repository.js";
 import { calendarCredentialService } from "../calendar-credential.service.js";
 import { mapCalendarConnection } from "../calendar-connection.service.js";
+import { recordConnectionJournal } from "../calendar-journal.service.js";
 
 /**
  * Google OAuth 2.0 Authorization Code Flow (AP-2.1), serverseitig. Refresh-Token liegen
@@ -133,16 +134,25 @@ async function refresh(refreshToken: string, fetchImpl: GoogleTokenFetch): Promi
 export async function handleGoogleCallback(database: DbClient, code: string, state: string, fetchImpl: GoogleTokenFetch = defaultGoogleFetch): Promise<CalendarConnection> {
   const userId = verifyState(state);
   const tokens = await exchangeCode(code, fetchImpl);
+  // Re-Auth (AP-4.3): eine bestehende Google-Verbindung des Nutzers wird wiederverwendet — Zielkalender
+  // und Event-Mappings bleiben erhalten, es entsteht keine Dublette. Sonst wird neu angelegt.
+  const existing = (await calendarConnectionRepository.listByUser(database, userId)).find((entry) => entry.provider === "google");
   const connection = await database.transaction(async (tx) => {
     const txDb = tx as unknown as DbSession;
-    const created = await calendarConnectionRepository.create(txDb, { userId, provider: "google", displayName: "Google Kalender", status: "active" }, userId);
-    await calendarCredentialService.store(txDb, created.id, {
+    let record: CalendarConnectionRecord;
+    if (existing) {
+      record = (await calendarConnectionRepository.recordSyncResult(txDb, existing.id, { status: "active", lastError: null })) ?? existing;
+    } else {
+      record = await calendarConnectionRepository.create(txDb, { userId, provider: "google", displayName: "Google Kalender", status: "active" }, userId);
+    }
+    await calendarCredentialService.store(txDb, record.id, {
       refreshToken: tokens.refreshToken,
       accessToken: tokens.accessToken,
       expiresAt: String(tokens.expiresAt)
     });
-    return created;
+    return record;
   });
+  await recordConnectionJournal(database, connection, "connected", existing ? "Google-Autorisierung erneuert." : "Google-Konto verbunden.");
   return mapCalendarConnection(connection);
 }
 

@@ -110,7 +110,8 @@ export const queryKeys = {
   },
   calendarConnections: {
     root: ["calendarConnections"] as const,
-    list: () => [...queryKeys.calendarConnections.root, "list"] as const
+    list: () => [...queryKeys.calendarConnections.root, "list"] as const,
+    journal: () => [...queryKeys.calendarConnections.root, "journal"] as const
   },
   pushNotifications: {
     root: ["pushNotifications"] as const,
