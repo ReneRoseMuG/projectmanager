@@ -35,6 +35,8 @@ const eventSelect = {
   startTime: events.startTime,
   endTime: events.endTime,
   isAllDay: events.isAllDay,
+  origin: events.origin,
+  readonly: events.readonly,
   color: events.color,
   reminderMinutes: events.reminderMinutes,
   responsibleUserId: events.responsibleUserId,

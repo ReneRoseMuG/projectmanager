@@ -50,6 +50,10 @@ export const JOURNAL_OBJECT_TYPES = [
 ] as const;
 export const JOURNAL_OPERATIONS = ["create", "update", "delete", "link", "unlink"] as const;
 export const JOURNAL_CONTEXT_RELATIONS = ["self", "owner", "parent", "related"] as const;
+export const CALENDAR_PROVIDERS = ["google", "nextcloud"] as const;
+export const CALENDAR_CONNECTION_STATUSES = ["active", "syncing", "error", "reauth_required"] as const;
+export const EVENT_ORIGINS = ["local", "google", "nextcloud"] as const;
+export const EVENT_MAPPING_DIRECTIONS = ["import", "export", "both"] as const;
 
 export const appSettings = mysqlTable("app_settings", {
   key: shortText("key").primaryKey(),
@@ -764,6 +768,8 @@ export const events = mysqlTable("events", {
   startTime: shortText("start_time").notNull(),
   endTime: shortText("end_time").notNull(),
   isAllDay: boolean("is_all_day").notNull().default(false),
+  origin: shortText("origin", { enum: EVENT_ORIGINS }).notNull().default("local"),
+  readonly: boolean("readonly").notNull().default(false),
   color: shortText("color").default("#6366f1"),
   reminderMinutes: int("reminder_minutes").notNull().default(60),
   responsibleUserId: int("responsible_user_id").references(() => users.id, { onDelete: "set null" }),
@@ -872,6 +878,114 @@ export const dayPlanEvents = mysqlTable(
   },
   (table) => ({
     dayPlanEventUnique: uniqueIndex("day_plan_events_owner_event_unique").on(table.ownerId, table.eventId)
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Kalender-Synchronisation (MS-79): Verbindungen zu externen Kalenderdiensten
+// (Google bidirektional, NextCloud read-only via CalDAV), deren Sync-Zustand,
+// die ausgewaehlten externen Kalender und das Mapping lokaler Termine auf
+// externe Ereignisse. Credentials liegen verschluesselt in
+// calendar_connections.encrypted_credentials (Krypto-Service in AP-0.2).
+// ---------------------------------------------------------------------------
+export const calendarConnections = mysqlTable(
+  "calendar_connections",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: shortText("provider", { enum: CALENDAR_PROVIDERS }).notNull(),
+    displayName: shortText("display_name").notNull(),
+    // Chiffrat der Zugangsdaten (Google Refresh Token bzw. NextCloud App-Passwort + URL/User);
+    // nur ueber den Krypto-Service (AP-0.2) les-/schreibbar, nie im Klartext.
+    encryptedCredentials: longtext("encrypted_credentials"),
+    status: shortText("status", { enum: CALENDAR_CONNECTION_STATUSES }).notNull().default("active"),
+    lastSyncAt: varchar("last_sync_at", { length: 32 }),
+    lastError: longtext("last_error"),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  },
+  (table) => ({
+    calendarConnectionsUserIdx: index("calendar_connections_user_idx").on(table.userId)
+  })
+);
+
+export const externalCalendars = mysqlTable(
+  "external_calendars",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    connectionId: int("connection_id")
+      .notNull()
+      .references(() => calendarConnections.id, { onDelete: "cascade" }),
+    // Google: calendarId; NextCloud: CalDAV-href des Kalenders.
+    externalId: shortText("external_id", { length: 512 }).notNull(),
+    name: shortText("name"),
+    color: shortText("color"),
+    imported: boolean("imported").notNull().default(false),
+    readonly: boolean("readonly").notNull().default(false),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  },
+  (table) => ({
+    externalCalendarsConnectionExternalUnique: uniqueIndex("external_calendars_connection_external_unique").on(table.connectionId, table.externalId),
+    externalCalendarsConnectionIdx: index("external_calendars_connection_idx").on(table.connectionId)
+  })
+);
+
+export const calendarSyncStates = mysqlTable(
+  "calendar_sync_states",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    connectionId: int("connection_id")
+      .notNull()
+      .references(() => calendarConnections.id, { onDelete: "cascade" }),
+    externalCalendarId: int("external_calendar_id")
+      .notNull()
+      .references(() => externalCalendars.id, { onDelete: "cascade" }),
+    // Google nextSyncToken bzw. NextCloud sync-token (RFC 6578) – kann lang werden.
+    syncToken: longtext("sync_token"),
+    ctag: shortText("ctag"),
+    lastSuccessAt: varchar("last_success_at", { length: 32 }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  },
+  (table) => ({
+    calendarSyncStatesConnectionCalendarUnique: uniqueIndex("calendar_sync_states_connection_calendar_unique").on(table.connectionId, table.externalCalendarId)
+  })
+);
+
+export const eventMappings = mysqlTable(
+  "event_mappings",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    connectionId: int("connection_id")
+      .notNull()
+      .references(() => calendarConnections.id, { onDelete: "cascade" }),
+    externalCalendarId: int("external_calendar_id")
+      .notNull()
+      .references(() => externalCalendars.id, { onDelete: "cascade" }),
+    localEventId: int("local_event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    // Google: event.id; NextCloud: CalDAV-href des Ereignisses.
+    externalId: shortText("external_id", { length: 512 }).notNull(),
+    iCalUid: shortText("ical_uid", { length: 512 }),
+    etag: shortText("etag", { length: 255 }),
+    // Zuletzt nach extern synchronisierte lokale version – Basis fuer Echo-/Konflikterkennung (AP-3.2).
+    seenVersion: int("seen_version"),
+    origin: shortText("origin", { enum: EVENT_ORIGINS }).notNull(),
+    direction: shortText("direction", { enum: EVENT_MAPPING_DIRECTIONS }).notNull().default("import"),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  },
+  (table) => ({
+    eventMappingsConnectionExternalUnique: uniqueIndex("event_mappings_connection_external_unique").on(table.connectionId, table.externalId),
+    eventMappingsLocalEventIdx: index("event_mappings_local_event_idx").on(table.localEventId),
+    eventMappingsExternalCalendarIdx: index("event_mappings_external_calendar_idx").on(table.externalCalendarId)
   })
 );
 

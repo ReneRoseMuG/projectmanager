@@ -40,6 +40,9 @@ export interface AppConfig {
   apiKey: string | null;
   sessionSecret: string;
   sessionSecretIsFallback: boolean;
+  // Symmetrischer Schlüssel (beliebiger Secret-String, via SHA-256 auf 32 Byte abgeleitet) für die
+  // verschlüsselte Ablage von Kalender-Zugangsdaten (MS-79 AP-0.2). Nie im Repo — nur aus der Umgebung.
+  calendarEncryptionKey: string | null;
 }
 
 function resolveFromApiRoot(value: string): string {
@@ -97,5 +100,6 @@ export const config: AppConfig = {
   authBypassAdmin: booleanFromEnv(process.env.AUTH_BYPASS_ADMIN),
   apiKey: configuredApiKey || null,
   sessionSecret: configuredSessionSecret || "taskmanager-local-dev-session-secret-change-me",
-  sessionSecretIsFallback: !configuredSessionSecret
+  sessionSecretIsFallback: !configuredSessionSecret,
+  calendarEncryptionKey: process.env.CALENDAR_ENCRYPTION_KEY?.trim() || null
 };
