@@ -37,7 +37,7 @@ function pad(value: number): string {
 }
 
 /** Wandzeit eines absoluten Zeitpunkts in der gegebenen IANA-Zeitzone als "YYYY-MM-DDTHH:mm:ss". */
-function wallTimeIso(date: Date, timeZone: string): string {
+export function wallTimeIso(date: Date, timeZone: string): string {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
