@@ -28,7 +28,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { CalDavError, discoverCalendars, parseCalendarsFromMultistatus, type CalDavFetch } from "../../../apps/api/src/services/caldav/caldav-client.js";
+import { CalDavError, discoverCalendars, fetchCalendarEvents, parseCalendarsFromMultistatus, type CalDavFetch } from "../../../apps/api/src/services/caldav/caldav-client.js";
 
 const MULTISTATUS =
   '<?xml version="1.0" encoding="utf-8"?>' +
@@ -124,6 +124,27 @@ describe("CalDAV Client (AP-1.1)", () => {
       expect(captured?.method).toBe("PROPFIND");
       expect(captured?.headers.Authorization).toBe("Basic " + Buffer.from("rene:app-pw", "utf8").toString("base64"));
       expect(captured?.headers.Depth).toBe("1");
+    });
+  });
+
+  describe("fetchCalendarEvents", () => {
+    const EVENTS_MULTISTATUS =
+      '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">' +
+      "<d:response><d:href>/e/1.ics</d:href><d:propstat><d:prop>" +
+      '<d:getetag>"etag-1"</d:getetag><c:calendar-data>BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:x\nEND:VEVENT\nEND:VCALENDAR</c:calendar-data>' +
+      "</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>";
+
+    it("parst VEVENT-Rohdaten (href, etag, ics) aus der calendar-query-Antwort", async () => {
+      const events = await fetchCalendarEvents(CREDS, "/remote.php/dav/calendars/rene/personal/", jsonFetch(207, EVENTS_MULTISTATUS));
+      expect(events).toHaveLength(1);
+      expect(events[0].href).toBe("/e/1.ics");
+      expect(events[0].ics).toContain("BEGIN:VEVENT");
+    });
+
+    it("unterscheidet Fehler (401 auth, 404 not_found, 5xx network)", async () => {
+      await expect(fetchCalendarEvents(CREDS, "/cal/", jsonFetch(401))).rejects.toMatchObject({ kind: "auth" });
+      await expect(fetchCalendarEvents(CREDS, "/cal/", jsonFetch(404))).rejects.toMatchObject({ kind: "not_found" });
+      await expect(fetchCalendarEvents(CREDS, "/cal/", jsonFetch(500))).rejects.toMatchObject({ kind: "network" });
     });
   });
 });

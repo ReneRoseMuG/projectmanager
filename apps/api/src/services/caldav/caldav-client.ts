@@ -176,3 +176,83 @@ export async function discoverCalendars(credentials: NextCloudCredentials, fetch
 
   return parseCalendarsFromMultistatus(await response.text());
 }
+
+export interface RawCalendarEvent {
+  /** href des einzelnen VEVENT-Objekts (nicht des Kalenders). */
+  href: string;
+  etag: string | null;
+  ics: string;
+}
+
+const CALENDAR_QUERY_BODY =
+  '<?xml version="1.0" encoding="utf-8"?>' +
+  '<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">' +
+  "<d:prop><d:getetag/><c:calendar-data/></d:prop>" +
+  '<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT"/></c:comp-filter></c:filter>' +
+  "</c:calendar-query>";
+
+function assertResponseOk(status: number): void {
+  if (status === 401 || status === 403) {
+    throw new CalDavError("auth", "Anmeldung bei NextCloud fehlgeschlagen.");
+  }
+  if (status === 404) {
+    throw new CalDavError("not_found", "Kalender nicht gefunden.");
+  }
+  if (status < 200 || status >= 300) {
+    throw new CalDavError("network", `NextCloud antwortete mit HTTP ${status}.`);
+  }
+}
+
+/** Parst eine calendar-query-`multistatus`-Antwort in rohe VEVENT-Objekte (href, etag, iCal-Daten). */
+export function parseEventsFromMultistatus(xml: string): RawCalendarEvent[] {
+  const parser = new XMLParser({ removeNSPrefix: true, ignoreAttributes: true, trimValues: true });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = parser.parse(xml) as Record<string, unknown>;
+  } catch {
+    throw new CalDavError("parse", "Die CalDAV-Antwort konnte nicht gelesen werden.");
+  }
+  const multistatus = (parsed.multistatus ?? {}) as Record<string, unknown>;
+  const events: RawCalendarEvent[] = [];
+  for (const response of toArray(multistatus.response as unknown)) {
+    const entry = response as Record<string, unknown>;
+    const href = coerceText(entry.href);
+    if (!href) {
+      continue;
+    }
+    for (const propstat of toArray(entry.propstat as unknown)) {
+      const prop = (propstat as Record<string, unknown>).prop as Record<string, unknown> | undefined;
+      const ics = coerceText(prop?.["calendar-data"]);
+      if (ics) {
+        events.push({ href, etag: coerceText(prop?.getetag), ics });
+      }
+    }
+  }
+  return events;
+}
+
+/** Ruft alle VEVENTs eines Kalenders per calendar-query REPORT ab. */
+export async function fetchCalendarEvents(
+  credentials: NextCloudCredentials,
+  calendarHref: string,
+  fetchImpl: CalDavFetch = defaultFetch,
+  timeoutMs = 30000
+): Promise<RawCalendarEvent[]> {
+  const url = new URL(calendarHref, normalizeBaseUrl(credentials.baseUrl)).toString();
+  const response = await fetchWithTimeout(
+    fetchImpl,
+    url,
+    {
+      method: "REPORT",
+      headers: {
+        Authorization: basicAuthHeader(credentials.username, credentials.appPassword),
+        Depth: "1",
+        "Content-Type": "application/xml; charset=utf-8"
+      },
+      body: CALENDAR_QUERY_BODY
+    },
+    timeoutMs
+  );
+  assertResponseOk(response.status);
+  return parseEventsFromMultistatus(await response.text());
+}
