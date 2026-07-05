@@ -119,12 +119,8 @@ textarea {
   margin: 0.65rem 0;
 }
 
-.rich-text-surface p:has(> strong:only-child) {
-  margin: 1rem 0 0.4rem;
-  color: theme("colors.ink");
-  font-size: 1.02rem;
+.rich-text-surface strong {
   font-weight: 700;
-  line-height: 1.35;
 }
 
 .rich-text-surface ul,

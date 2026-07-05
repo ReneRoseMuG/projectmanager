@@ -25,6 +25,7 @@
  * - Autosave sendet baseVersion (Version des geladenen Inhalts) als expectedVersion, nicht die Cache-Version.
  * - Bei 409-Konflikt erscheint Konflikt-Banner; kein stiller Retry; Nutzerinhalt bleibt erhalten (TKT-129).
  * - Konflikt-Banner verschwindet nach „Trotzdem speichern"; Autosave wird mit aktualisierter baseVersion erneut ausgelöst.
+ * - Der Wiki-Seitentitel wird als Exporttitel an die Editor-Toolbar übergeben.
  *
  * Fehlerfälle:
  * - Aktualisierter Inhalt muss im Submit-Payload landen.
@@ -58,6 +59,7 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
     className,
     fill,
     editable,
+    exportTitle,
   }: {
     value: string | null | undefined;
     onChange: (value: string) => void;
@@ -66,6 +68,7 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
     className?: string;
     fill?: boolean;
     editable?: boolean;
+    exportTitle?: string;
   }) {
     return (
       <textarea
@@ -73,6 +76,7 @@ vi.mock("../../../../../apps/web/src/components/ui/rich-text-inline-field", () =
         className={className}
         data-fill={fill ? "true" : undefined}
         data-editable={editable === false ? "false" : "true"}
+        data-export-title={exportTitle}
         data-testid={testIdPrefix ? `${testIdPrefix}-view` : undefined}
         value={value ?? ""}
         onChange={(event) => onChange(event.currentTarget.value)}
@@ -187,6 +191,12 @@ describe("WikiPageForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ content: "<p>Wiki aktualisiert</p>" }), []));
+  });
+
+  it("reicht den Seitentitel als Exporttitel an die Editor-Toolbar weiter", () => {
+    renderWithProviders(<WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onClose={vi.fn()} />);
+
+    expect(screen.getByTestId("wiki-page-form-content-view")).toHaveAttribute("data-export-title", "Wiki Alpha");
   });
 
   it("zeigt im Modal-Edit-Modus den 'In neuem Tab öffnen'-Button, wenn onOpenInTab übergeben wird", () => {

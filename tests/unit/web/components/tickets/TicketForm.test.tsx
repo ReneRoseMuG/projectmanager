@@ -194,9 +194,11 @@ describe("TicketForm", () => {
   it("Details-Tab nutzt Flex-Fill-Layout unabhängig von der Variante", () => {
     renderWithProviders(<TicketForm open ticket={ticket} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
-    const contentWrapper = screen.getByDisplayValue(ticket.title).closest("section")?.parentElement?.parentElement;
-    expect(contentWrapper).toHaveClass("overflow-hidden");
-    expect(contentWrapper).not.toHaveClass("overflow-auto");
+    const fillContainer = screen.getByDisplayValue(ticket.title).closest("section")?.parentElement;
+    expect(fillContainer).toHaveClass("flex", "min-h-full", "flex-col");
+    const contentWrapper = fillContainer?.parentElement;
+    expect(contentWrapper).toHaveClass("flex-1", "overflow-auto");
+    expect(contentWrapper).not.toHaveClass("overflow-hidden");
 
     const descriptionField = screen.getByTestId("ticket-description-view").parentElement;
     expect(descriptionField).toHaveClass("flex");

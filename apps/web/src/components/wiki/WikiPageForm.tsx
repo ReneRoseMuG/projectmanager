@@ -390,6 +390,7 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
                   onImageUpload={uploadContentImage}
                   wikiPages={pages}
                   editable={effectiveEditable}
+                  exportTitle={title || page?.title || "Wiki-Seite"}
                   commitOnBlur={effectiveEditable}
                   onBeforeNavigate={flushPendingSave}
                   className="min-h-[400px]"

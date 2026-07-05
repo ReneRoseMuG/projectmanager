@@ -29,6 +29,7 @@ import {
   dayPlanNotes,
   dayPlanTasks,
   dayPlans,
+  featureAttachments,
   featureRelations,
   featureTasks,
   featureTickets,
@@ -664,14 +665,16 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining[0].featureId).toBeNull();
     });
 
-    it("löscht Attachment-Datensatz wenn Feature alleiniger Owner ist", async () => {
+    it("entfernt feature_attachments-Join und behält Attachment-Datensatz", async () => {
       const feature = await createFeature(app);
       const attachmentId = await insertAttachmentFor(testDb, "feature_attachments", "feature_id", feature.id);
 
       await supertest(app.server).delete(`/api/features/${feature.id}`).expect(204);
 
+      const remainingLinks = (await testDb.db.select().from(featureAttachments).where(eq(featureAttachments.featureId, feature.id)));
+      expect(remainingLinks).toHaveLength(0);
       const remaining = (await testDb.db.select().from(attachments).where(eq(attachments.id, attachmentId)));
-      expect(remaining).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
     });
 
     it("entfernt feature_tickets-Einträge (Ticket bleibt erhalten)", async () => {
@@ -836,14 +839,16 @@ describe("Delete-Cascade: vollständige Bereinigung aller abhängigen Objekte", 
       expect(remaining).toHaveLength(0);
     });
 
-    it("löscht Attachment-Datensatz wenn Ticket alleiniger Owner ist", async () => {
+    it("entfernt ticket_attachments-Join und behält Attachment-Datensatz", async () => {
       const ticket = await createTicket(app, null);
       const attachmentId = await insertAttachmentFor(testDb, "ticket_attachments", "ticket_id", ticket.id);
 
       await supertest(app.server).delete(`/api/tickets/${ticket.id}`).expect(204);
 
+      const remainingLinks = (await testDb.db.select().from(ticketAttachments).where(eq(ticketAttachments.ticketId, ticket.id)));
+      expect(remainingLinks).toHaveLength(0);
       const remaining = (await testDb.db.select().from(attachments).where(eq(attachments.id, attachmentId)));
-      expect(remaining).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
     });
 
     it("bereinigt ticket_attachments-Join-Einträge vollständig", async () => {

@@ -65,16 +65,18 @@ describe("ProjectForm", () => {
     expect(detailsBody).toHaveClass("w-full");
     expect(detailsBody).not.toHaveClass("max-w-5xl");
 
-    // Details-Tab: Flex-Fill-Kette — overflow-hidden statt overflow-auto damit der Editor wächst
+    // Details-Tab: Der scrollende Content-Wrapper hält die Höhe,
+    // das innere min-h-full-flex-col-Div reicht sie an die fill-Section weiter.
     const contentWrapper = detailsBody?.parentElement;
-    expect(contentWrapper).toHaveClass("overflow-hidden");
-    expect(contentWrapper).not.toHaveClass("overflow-auto");
-    expect(contentWrapper).toHaveClass("flex", "flex-col");
+    expect(detailsBody).toHaveClass("flex", "min-h-full", "flex-col");
+    expect(contentWrapper).toHaveClass("flex-1", "overflow-auto");
+    expect(contentWrapper).not.toHaveClass("overflow-hidden");
 
     clickTab("Aufgaben");
 
-    const boardBody = screen.getByTestId("owner-task-board").closest("section")?.parentElement;
-    expect(boardBody).not.toHaveClass("max-w-5xl");
+    const boardShell = screen.getByTestId("owner-task-board").parentElement;
+    expect(boardShell).toHaveClass("flex", "min-h-full", "flex-col");
+    expect(boardShell).not.toHaveClass("max-w-5xl");
     expect(screen.queryByTestId("form-sidebar")).not.toBeInTheDocument();
   });
 

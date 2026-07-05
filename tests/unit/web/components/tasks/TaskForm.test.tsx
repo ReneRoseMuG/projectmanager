@@ -54,7 +54,7 @@ describe("TaskForm", () => {
     const sidebar = screen.getByTestId("form-sidebar");
     const sidebarSelects = within(sidebar).getAllByRole("combobox");
     const parentContext = screen.getByTestId("parent-context-field");
-    expect(parentContext).toHaveTextContent("PROJ");
+    expect(parentContext).toHaveTextContent("PROJ-30");
     expect(parentContext).toHaveTextContent("Projekt Alpha");
     expect(screen.getByDisplayValue(task.title)).toBeInTheDocument();
     expect(screen.getByTestId("task-description-view")).toHaveValue(task.description);

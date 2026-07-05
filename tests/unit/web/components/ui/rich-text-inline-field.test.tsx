@@ -11,6 +11,7 @@
  * - Bilder können nur über einen expliziten Upload-Handler eingefügt werden.
  * - Im Edit-Zustand wird nur die feste Toolbar gerendert, keine zusätzliche Auswahl- oder Floating-Bar.
  * - Wiki-Seiten-Links behalten eine navigierbare App-Route und eine auslesbare Datenbank-ID.
+ * - Die Editor-Toolbar exportiert den aktuellen Inhalt als Datei.
  * - TipTap wird im Test gemockt, die Leseansicht wird real gerendert.
  *
  * Fehlerfälle:
@@ -256,7 +257,7 @@ vi.mock("@tiptap/react", () => ({
     tiptapMock.config = config;
     return editor;
   }),
-  EditorContent: ({ editor }: { editor: MockEditor }) => <div data-testid="tiptap-editor-content" tabIndex={0} onFocus={() => tiptapMock.config?.onFocus?.({ editor })} onBlur={() => tiptapMock.config?.onBlur?.({ editor })} />
+  EditorContent: ({ editor, className }: { editor: MockEditor; className?: string }) => <div data-testid="tiptap-editor-content" className={className} tabIndex={0} onFocus={() => tiptapMock.config?.onFocus?.({ editor })} onBlur={() => tiptapMock.config?.onBlur?.({ editor })} />
 }));
 
 vi.mock("../../../../../apps/web/src/components/ui/tldraw-node", () => ({
@@ -489,6 +490,34 @@ describe("RichTextInlineField", () => {
     fireEvent.click(screen.getByRole("button", { name: "HTML kopieren" }));
 
     expect(writeText).toHaveBeenCalledWith("<p></p>");
+  });
+
+  it("T-28 exportiert aktuelles Editor-HTML als Markdown-Datei", async () => {
+    const createObjectUrl = vi.fn(() => "blob:rich-text-export");
+    Object.defineProperty(URL, "createObjectURL", { value: createObjectUrl, configurable: true });
+    Object.defineProperty(URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+    let clickedDownload = "";
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function click(this: HTMLAnchorElement) {
+      clickedDownload = this.download;
+    });
+    tiptapMock.html = "<h2>Abschnitt</h2><p><strong>Fett</strong> und Link</p>";
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} exportTitle="Wiki Alpha" testIdPrefix="field" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Als Datei exportieren" }));
+    fireEvent.click(screen.getByRole("button", { name: "Markdown" }));
+
+    await waitFor(() => expect(createObjectUrl).toHaveBeenCalledTimes(1));
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    expect(clickedDownload).toBe("Wiki Alpha.md");
+    const blob = createObjectUrl.mock.calls[0]?.[0] as Blob;
+    await expect(blob.text()).resolves.toContain("# Wiki Alpha");
+    await expect(blob.text()).resolves.toContain("**Fett**");
+  });
+
+  it("T-28b zeigt den Dateiexport auch in der minimalistischen Toolbar", () => {
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} toolbar="minimal" testIdPrefix="field" />);
+
+    expect(screen.getByRole("button", { name: "Als Datei exportieren" })).toBeInTheDocument();
   });
 
   it("T-14b wendet Highlight per Dispatch nur auf die aktuelle Selektion an", () => {
@@ -800,17 +829,19 @@ describe("RichTextInlineField", () => {
     expect(navigateMock).toHaveBeenCalledWith("/wiki/99");
   });
 
-  it("T-27 setzt Flex-Fill-Klassen wenn fill=true", () => {
+  it("T-27 setzt Flex-Fill-Klassen und scrollt nur den Editor-Inhalt wenn fill=true", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} fill testIdPrefix="field" />);
 
     // Äußerer Container (field-view) streckt sich als Flex-Spalte über den Parent.
     const outerDiv = screen.getByTestId("field-view");
     expect(outerDiv).toHaveClass("flex", "flex-1", "flex-col");
 
-    // Editor-Wrapper (field-editor) scrollt via overflow-y-auto statt zu clippen.
+    // The editor wrapper keeps toolbar and content together without scrolling itself.
+    // Only EditorContent scrolls, so the toolbar remains visible in fill layouts.
     const editorDiv = screen.getByTestId("field-editor");
-    expect(editorDiv).toHaveClass("flex", "flex-1", "flex-col", "overflow-y-auto");
+    expect(editorDiv).toHaveClass("flex", "min-h-0", "flex-1", "flex-col", "overflow-hidden");
     expect(editorDiv).not.toHaveClass("overflow-clip");
+    expect(screen.getByTestId("tiptap-editor-content")).toHaveClass("flex", "min-h-0", "flex-1", "flex-col", "overflow-y-auto");
   });
 
   it("T-EN6 ignoriert Klicks auf externe https://-Links", () => {

@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  */
 
 const trackedEnvKeys = [
+  "DOTENV_CONFIG_PATH",
   "API_KEY",
   "NOTIFICATIONS_ENABLED",
   "NOTIFICATION_CRON",
@@ -43,6 +44,7 @@ afterEach(() => {
 
 async function loadConfigWithEnv(values: Partial<Record<(typeof trackedEnvKeys)[number], string | undefined>>) {
   vi.resetModules();
+  process.env.DOTENV_CONFIG_PATH = "tests/.runtime/config-test-empty.env";
   for (const [key, value] of Object.entries(values)) {
     if (value === undefined) {
       delete process.env[key];
