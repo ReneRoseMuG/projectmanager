@@ -361,16 +361,23 @@ describe("ListBoardView", () => {
     expect(boardRoot).not.toHaveClass("grid-flow-col");
     expect(boardRoot).not.toHaveClass("auto-cols-[minmax(17rem,1fr)]");
 
+    // Nur die offene Spalte ("Offen") ist eine reguläre Board-Section; die
+    // geschlossene Spalte ("Erledigt", isClosed) wandert in die ClosedBoardSidebar.
     const sections = container.querySelectorAll("section.rounded-lg");
-    expect(sections).toHaveLength(2);
+    expect(sections).toHaveLength(1);
     sections.forEach((section) => {
       expect(section).toHaveClass("h-fit", "min-h-full", "content-start");
       expect(section).not.toHaveClass("h-full");
     });
+    expect(within(sections[0] as HTMLElement).getByRole("heading", { name: "Offen" })).toBeInTheDocument();
     container.querySelectorAll("[data-status-column-wrapper]").forEach((wrapper) => {
       expect(wrapper).toHaveClass("min-w-[17rem]", "max-w-[calc((100%-2rem)/3)]", "flex-1");
       expect(wrapper).toHaveStyle({ minHeight: "max(30rem, 100%)" });
     });
+    // Die geschlossene Statusspalte erscheint als Karte in der Sidebar (aside), nicht als Board-Section.
+    const closedSidebar = container.querySelector("aside") as HTMLElement;
+    expect(closedSidebar).toBeInTheDocument();
+    expect(within(closedSidebar).getByText("Row Beta")).toBeInTheDocument();
   });
 
   it("kollabiert leere bekannte Board-Spalten und behält Add-Button und DnD-Ziel", () => {
@@ -386,7 +393,9 @@ describe("ListBoardView", () => {
         statusKey="status"
         statusColumns={[
           { value: "todo", label: "Offen" },
-          { value: "done", label: "Erledigt", isClosed: true },
+          // Leere, aber OFFENE bekannte Spalte: sie kollabiert zum schmalen Strip.
+          // (Geschlossene Spalten wandern stattdessen in die ClosedBoardSidebar.)
+          { value: "in_review", label: "In Prüfung" },
         ]}
         renderCard={(item) => (
           <ItemCard
@@ -401,25 +410,25 @@ describe("ListBoardView", () => {
     );
 
     const filledWrapper = container.querySelector("[data-status-column-wrapper='todo']") as HTMLElement;
-    const collapsedWrapper = container.querySelector("[data-status-column-wrapper='done']") as HTMLElement;
+    const collapsedWrapper = container.querySelector("[data-status-column-wrapper='in_review']") as HTMLElement;
     expect(filledWrapper).toHaveClass("min-w-[17rem]", "max-w-[calc((100%-2rem)/3)]", "flex-1");
     expect(collapsedWrapper).toHaveClass("w-12", "shrink-0", "self-stretch");
     expect(collapsedWrapper).toHaveAttribute("data-status-collapsed-wrapper", "true");
 
-    const collapsedSection = container.querySelector("section[data-status-column='done']") as HTMLElement;
+    const collapsedSection = container.querySelector("section[data-status-column='in_review']") as HTMLElement;
     expect(collapsedSection).toHaveAttribute("data-status-collapsed", "true");
     expect(collapsedSection).toHaveAttribute("data-dnd-droppable", "true");
     expect(collapsedSection).toHaveClass("h-full", "w-full", "flex-col");
     expect(collapsedSection.firstElementChild).toContainElement(
-      within(collapsedSection).getByRole("button", { name: "Erledigt hinzufügen" }),
+      within(collapsedSection).getByRole("button", { name: "In Prüfung hinzufügen" }),
     );
-    expect(within(collapsedSection).getByText("Erledigt").parentElement).toHaveStyle({
+    expect(within(collapsedSection).getByText("In Prüfung").parentElement).toHaveStyle({
       writingMode: "vertical-rl",
       transform: "rotate(180deg)",
     });
 
-    fireEvent.click(within(collapsedSection).getByRole("button", { name: "Erledigt hinzufügen" }));
-    expect(onAddToColumn).toHaveBeenCalledWith("done");
+    fireEvent.click(within(collapsedSection).getByRole("button", { name: "In Prüfung hinzufügen" }));
+    expect(onAddToColumn).toHaveBeenCalledWith("in_review");
 
     const filledSection = container.querySelector("section[data-status-column='todo']") as HTMLElement;
     expect(filledSection).not.toHaveAttribute("data-status-collapsed");

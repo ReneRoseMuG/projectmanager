@@ -1,11 +1,11 @@
-import type { Tag } from "@taskmanager/shared-types";
+import type { Tag, TagDomain } from "@taskmanager/shared-types";
 import { api } from "./client";
 
-export async function getTags(): Promise<Tag[]> {
-  return api.get("tags").json<Tag[]>();
+export async function getTags(domain?: TagDomain): Promise<Tag[]> {
+  return api.get(domain ? `tags?domain=${domain}` : "tags").json<Tag[]>();
 }
 
-export async function createTag(input: { name: string; color: string }): Promise<Tag> {
+export async function createTag(input: { name: string; color: string; domain?: TagDomain }): Promise<Tag> {
   return api.post("tags", { json: input }).json<Tag>();
 }
 

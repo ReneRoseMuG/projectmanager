@@ -486,7 +486,7 @@ async function ticketIdsForOwner(database: DbClient, owner: RecentCommentOwner):
   return [...new Set(direct)];
 }
 
-async function recentProjectCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
+async function recentProjectCommentRows(database: DbClient, ids: number[], limit: number, mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
@@ -506,11 +506,13 @@ async function recentProjectCommentRows(database: DbClient, ids: number[], mineU
     .innerJoin(projects, eq(projectComments.projectId, projects.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(projectComments.projectId, ids) : and(inArray(projectComments.projectId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id)))
+    // Begrenzung bereits in SQL: je Typ hoechstens `limit` Kandidaten statt aller Zeilen
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .limit(limit))
     .map((row) => ({ ...row, entityType: "project" as const }));
 }
 
-async function recentMilestoneCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
+async function recentMilestoneCommentRows(database: DbClient, ids: number[], limit: number, mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
@@ -530,11 +532,13 @@ async function recentMilestoneCommentRows(database: DbClient, ids: number[], min
     .innerJoin(milestones, eq(milestoneComments.milestoneId, milestones.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(milestoneComments.milestoneId, ids) : and(inArray(milestoneComments.milestoneId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id)))
+    // Begrenzung bereits in SQL: je Typ hoechstens `limit` Kandidaten statt aller Zeilen
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .limit(limit))
     .map((row) => ({ ...row, entityType: "milestone" as const }));
 }
 
-async function recentFeatureCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
+async function recentFeatureCommentRows(database: DbClient, ids: number[], limit: number, mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
@@ -554,11 +558,13 @@ async function recentFeatureCommentRows(database: DbClient, ids: number[], mineU
     .innerJoin(features, eq(featureComments.featureId, features.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(featureComments.featureId, ids) : and(inArray(featureComments.featureId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id)))
+    // Begrenzung bereits in SQL: je Typ hoechstens `limit` Kandidaten statt aller Zeilen
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .limit(limit))
     .map((row) => ({ ...row, entityType: "feature" as const }));
 }
 
-async function recentUseCaseCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
+async function recentUseCaseCommentRows(database: DbClient, ids: number[], limit: number, mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
@@ -578,11 +584,13 @@ async function recentUseCaseCommentRows(database: DbClient, ids: number[], mineU
     .innerJoin(useCases, eq(useCaseComments.useCaseId, useCases.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(useCaseComments.useCaseId, ids) : and(inArray(useCaseComments.useCaseId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id)))
+    // Begrenzung bereits in SQL: je Typ hoechstens `limit` Kandidaten statt aller Zeilen
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .limit(limit))
     .map((row) => ({ ...row, entityType: "useCase" as const }));
 }
 
-async function recentBacklogItemCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
+async function recentBacklogItemCommentRows(database: DbClient, ids: number[], limit: number, mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
@@ -602,11 +610,13 @@ async function recentBacklogItemCommentRows(database: DbClient, ids: number[], m
     .innerJoin(backlogItems, eq(backlogItemComments.backlogItemId, backlogItems.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(backlogItemComments.backlogItemId, ids) : and(inArray(backlogItemComments.backlogItemId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id)))
+    // Begrenzung bereits in SQL: je Typ hoechstens `limit` Kandidaten statt aller Zeilen
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .limit(limit))
     .map((row) => ({ ...row, entityType: "backlogItem" as const }));
 }
 
-async function recentWikiPageCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
+async function recentWikiPageCommentRows(database: DbClient, ids: number[], limit: number, mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
@@ -626,11 +636,13 @@ async function recentWikiPageCommentRows(database: DbClient, ids: number[], mine
     .innerJoin(wikiPages, eq(wikiPageComments.wikiPageId, wikiPages.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(wikiPageComments.wikiPageId, ids) : and(inArray(wikiPageComments.wikiPageId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id)))
+    // Begrenzung bereits in SQL: je Typ hoechstens `limit` Kandidaten statt aller Zeilen
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .limit(limit))
     .map((row) => ({ ...row, entityType: "wikiPage" as const }));
 }
 
-async function recentDayPlanCommentRows(database: DbClient, ids: number[], mineUserId?: number, ownerUserId?: number): Promise<RecentCommentRow[]> {
+async function recentDayPlanCommentRows(database: DbClient, ids: number[], limit: number, mineUserId?: number, ownerUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
@@ -657,11 +669,13 @@ async function recentDayPlanCommentRows(database: DbClient, ids: number[], mineU
     .innerJoin(dayPlans, eq(dayPlanComments.dayPlanId, dayPlans.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(and(...conditions))
-    .orderBy(desc(comments.updatedAt), desc(comments.id)))
+    // Begrenzung bereits in SQL: je Typ hoechstens `limit` Kandidaten statt aller Zeilen
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .limit(limit))
     .map((row) => ({ ...row, entityType: "dayPlan" as const, entityLabel: `Persönliche Planung ${row.entityLabel}` }));
 }
 
-async function recentTaskCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
+async function recentTaskCommentRows(database: DbClient, ids: number[], limit: number, mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
@@ -681,11 +695,13 @@ async function recentTaskCommentRows(database: DbClient, ids: number[], mineUser
     .innerJoin(tasks, eq(taskComments.taskId, tasks.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(taskComments.taskId, ids) : and(inArray(taskComments.taskId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id)))
+    // Begrenzung bereits in SQL: je Typ hoechstens `limit` Kandidaten statt aller Zeilen
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .limit(limit))
     .map((row) => ({ ...row, entityType: "task" as const }));
 }
 
-async function recentTicketCommentRows(database: DbClient, ids: number[], mineUserId?: number): Promise<RecentCommentRow[]> {
+async function recentTicketCommentRows(database: DbClient, ids: number[], limit: number, mineUserId?: number): Promise<RecentCommentRow[]> {
   if (ids.length === 0) {
     return [];
   }
@@ -705,36 +721,38 @@ async function recentTicketCommentRows(database: DbClient, ids: number[], mineUs
     .innerJoin(tickets, eq(ticketComments.ticketId, tickets.id))
     .leftJoin(users, eq(comments.createdBy, users.id))
     .where(mineUserId === undefined ? inArray(ticketComments.ticketId, ids) : and(inArray(ticketComments.ticketId, ids), eq(comments.createdBy, mineUserId)))
-    .orderBy(desc(comments.updatedAt), desc(comments.id)))
+    // Begrenzung bereits in SQL: je Typ hoechstens `limit` Kandidaten statt aller Zeilen
+    .orderBy(desc(comments.updatedAt), desc(comments.id))
+    .limit(limit))
     .map((row) => ({ ...row, entityType: "ticket" as const }));
 }
 
-async function recentCommentRowsForOwner(database: DbClient, owner: RecentCommentOwner): Promise<RecentCommentRow[]> {
+async function recentCommentRowsForOwner(database: DbClient, owner: RecentCommentOwner, limit: number): Promise<RecentCommentRow[]> {
   if (owner.type === "project") {
     const milestoneIds = await projectMilestoneIds(database, owner.id);
     const [projectRows, milestoneRows, taskRows, ticketRows] = await Promise.all([
-      recentProjectCommentRows(database, [owner.id]),
-      recentMilestoneCommentRows(database, milestoneIds),
-      taskIdsForOwner(database, owner).then((ids) => recentTaskCommentRows(database, ids)),
-      ticketIdsForOwner(database, owner).then((ids) => recentTicketCommentRows(database, ids))
+      recentProjectCommentRows(database, [owner.id], limit),
+      recentMilestoneCommentRows(database, milestoneIds, limit),
+      taskIdsForOwner(database, owner).then((ids) => recentTaskCommentRows(database, ids, limit)),
+      ticketIdsForOwner(database, owner).then((ids) => recentTicketCommentRows(database, ids, limit))
     ]);
     return [...projectRows, ...milestoneRows, ...taskRows, ...ticketRows];
   }
   if (owner.type === "milestone") {
     const [milestoneRows, taskRows, ticketRows] = await Promise.all([
-      recentMilestoneCommentRows(database, [owner.id]),
-      taskIdsForOwner(database, owner).then((ids) => recentTaskCommentRows(database, ids)),
-      ticketIdsForOwner(database, owner).then((ids) => recentTicketCommentRows(database, ids))
+      recentMilestoneCommentRows(database, [owner.id], limit),
+      taskIdsForOwner(database, owner).then((ids) => recentTaskCommentRows(database, ids, limit)),
+      ticketIdsForOwner(database, owner).then((ids) => recentTicketCommentRows(database, ids, limit))
     ]);
     return [...milestoneRows, ...taskRows, ...ticketRows];
   }
   if (owner.type === "dayPlan") {
-    return recentDayPlanCommentRows(database, [owner.id]);
+    return recentDayPlanCommentRows(database, [owner.id], limit);
   }
-  return recentTaskCommentRows(database, [owner.id]);
+  return recentTaskCommentRows(database, [owner.id], limit);
 }
 
-async function recentOwnCommentRows(database: DbClient, userId: number): Promise<RecentCommentRow[]> {
+async function recentOwnCommentRows(database: DbClient, userId: number, limit: number): Promise<RecentCommentRow[]> {
   const [allProjectIds, allMilestoneIds, allFeatureIds, allUseCaseIds, allBacklogIds, allWikiIds, allDayPlanIds, allTaskIds, allTicketIds] = await Promise.all([
     database.select({ id: projects.id }).from(projects).then((rows) => rows.map((r) => r.id)),
     database.select({ id: milestones.id }).from(milestones).then((rows) => rows.map((r) => r.id)),
@@ -748,21 +766,21 @@ async function recentOwnCommentRows(database: DbClient, userId: number): Promise
   ]);
 
   const results = await Promise.all([
-    recentProjectCommentRows(database, allProjectIds, userId),
-    recentMilestoneCommentRows(database, allMilestoneIds, userId),
-    recentFeatureCommentRows(database, allFeatureIds, userId),
-    recentUseCaseCommentRows(database, allUseCaseIds, userId),
-    recentBacklogItemCommentRows(database, allBacklogIds, userId),
-    recentWikiPageCommentRows(database, allWikiIds, userId),
-    recentDayPlanCommentRows(database, allDayPlanIds, userId, userId),
-    recentTaskCommentRows(database, allTaskIds, userId),
-    recentTicketCommentRows(database, allTicketIds, userId)
+    recentProjectCommentRows(database, allProjectIds, limit, userId),
+    recentMilestoneCommentRows(database, allMilestoneIds, limit, userId),
+    recentFeatureCommentRows(database, allFeatureIds, limit, userId),
+    recentUseCaseCommentRows(database, allUseCaseIds, limit, userId),
+    recentBacklogItemCommentRows(database, allBacklogIds, limit, userId),
+    recentWikiPageCommentRows(database, allWikiIds, limit, userId),
+    recentDayPlanCommentRows(database, allDayPlanIds, limit, userId, userId),
+    recentTaskCommentRows(database, allTaskIds, limit, userId),
+    recentTicketCommentRows(database, allTicketIds, limit, userId)
   ]);
 
   return results.flat();
 }
 
-async function recentAllCommentRows(database: DbClient, userId: number): Promise<RecentCommentRow[]> {
+async function recentAllCommentRows(database: DbClient, userId: number, limit: number): Promise<RecentCommentRow[]> {
   const [allProjectIds, allMilestoneIds, allFeatureIds, allUseCaseIds, allBacklogIds, allWikiIds, allDayPlanIds, allTaskIds, allTicketIds] = await Promise.all([
     database.select({ id: projects.id }).from(projects).then((rows) => rows.map((r) => r.id)),
     database.select({ id: milestones.id }).from(milestones).then((rows) => rows.map((r) => r.id)),
@@ -776,15 +794,15 @@ async function recentAllCommentRows(database: DbClient, userId: number): Promise
   ]);
 
   const results = await Promise.all([
-    recentProjectCommentRows(database, allProjectIds),
-    recentMilestoneCommentRows(database, allMilestoneIds),
-    recentFeatureCommentRows(database, allFeatureIds),
-    recentUseCaseCommentRows(database, allUseCaseIds),
-    recentBacklogItemCommentRows(database, allBacklogIds),
-    recentWikiPageCommentRows(database, allWikiIds),
-    recentDayPlanCommentRows(database, allDayPlanIds, undefined, userId),
-    recentTaskCommentRows(database, allTaskIds),
-    recentTicketCommentRows(database, allTicketIds)
+    recentProjectCommentRows(database, allProjectIds, limit),
+    recentMilestoneCommentRows(database, allMilestoneIds, limit),
+    recentFeatureCommentRows(database, allFeatureIds, limit),
+    recentUseCaseCommentRows(database, allUseCaseIds, limit),
+    recentBacklogItemCommentRows(database, allBacklogIds, limit),
+    recentWikiPageCommentRows(database, allWikiIds, limit),
+    recentDayPlanCommentRows(database, allDayPlanIds, limit, undefined, userId),
+    recentTaskCommentRows(database, allTaskIds, limit),
+    recentTicketCommentRows(database, allTicketIds, limit)
   ]);
 
   return results.flat();
@@ -792,7 +810,7 @@ async function recentAllCommentRows(database: DbClient, userId: number): Promise
 
 export async function listRecentComments(database: DbClient, options: { owner?: RecentCommentOwner; currentUserId: number; limit?: number; mine?: boolean }): Promise<RecentComment[]> {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
-  const rows = options.owner ? await recentCommentRowsForOwner(database, options.owner) : options.mine === true ? await recentOwnCommentRows(database, options.currentUserId) : await recentAllCommentRows(database, options.currentUserId);
+  const rows = options.owner ? await recentCommentRowsForOwner(database, options.owner, limit) : options.mine === true ? await recentOwnCommentRows(database, options.currentUserId, limit) : await recentAllCommentRows(database, options.currentUserId, limit);
   return rows
     .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime() || right.id - left.id)
     .slice(0, limit)

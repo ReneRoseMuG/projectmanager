@@ -423,13 +423,14 @@ describe("MilestoneForm", () => {
   it("Details-Tab nutzt Flex-Fill-Layout damit der Editor die verfügbare Höhe ausfüllt", () => {
     renderWithProviders(<MilestoneForm open milestone={milestone} projects={[project]} onSubmit={vi.fn()} onClose={vi.fn()} variant="page" />);
 
-    // Der Content-Wrapper neben der FormSidebar muss overflow-hidden haben (nicht overflow-auto),
-    // damit die Flex-Fill-Kette zum Editor nicht unterbrochen wird.
-    const contentWrapper = screen.getByDisplayValue(milestone.name)
-      .closest("section")?.parentElement?.parentElement;
-    expect(contentWrapper).toHaveClass("overflow-hidden");
-    expect(contentWrapper).not.toHaveClass("overflow-auto");
-    expect(contentWrapper).toHaveClass("flex", "flex-col");
+    // Der scrollende Content-Wrapper neben der FormSidebar hält die Höhe,
+    // das innere min-h-full-flex-col-Div reicht sie an die fill-Section weiter.
+    const fillContainer = screen.getByDisplayValue(milestone.name)
+      .closest("section")?.parentElement;
+    expect(fillContainer).toHaveClass("flex", "min-h-full", "flex-col");
+    const contentWrapper = fillContainer?.parentElement;
+    expect(contentWrapper).toHaveClass("flex-1", "overflow-auto");
+    expect(contentWrapper).not.toHaveClass("overflow-hidden");
 
     // FormField für Beschreibung hat flex-Layout (fill=true), nicht grid
     const descriptionTextarea = screen.getByTestId("milestone-description-view");

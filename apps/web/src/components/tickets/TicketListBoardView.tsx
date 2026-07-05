@@ -32,6 +32,14 @@ interface TicketListBoardViewProps {
   loading?: boolean;
   showToolbarAdd?: boolean;
   readOnly?: boolean;
+  // Optional kontrollierte Suche/Status: sind sie gesetzt, werden Suchfeld bzw. Status-Chips
+  // von außen gesteuert (z. B. serverseitige `q`/`status`-Filterung in der Ticket-Hauptliste)
+  // und die interne clientseitige Filterung entfällt. Ohne diese Props bleibt das bisherige
+  // clientseitige Verhalten unverändert. Die Chip-Counts stammen weiter aus `tickets`.
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  statusFilter?: Ticket["status"] | "all";
+  onStatusFilterChange?: (value: Ticket["status"] | "all") => void;
 }
 
 function toListBoardMode(viewMode: ViewMode): ListBoardMode {
@@ -69,23 +77,35 @@ export function TicketListBoardView({
   loading = false,
   showToolbarAdd = true,
   readOnly = false,
+  searchValue: controlledSearchValue,
+  onSearchChange: controlledOnSearchChange,
+  statusFilter: controlledStatusFilter,
+  onStatusFilterChange: controlledOnStatusFilterChange,
 }: TicketListBoardViewProps) {
   const catalogs = useCatalogs();
   const canReadTags = useHasPermission("tags", "read");
   const canWriteTickets = useHasPermission("tickets", "write");
-  const [searchValue, setSearchValue] = useState("");
-  const [statusFilter, setStatusFilter] = useState<Ticket["status"] | "all">("all");
+  const [internalSearchValue, setInternalSearchValue] = useState("");
+  const [internalStatusFilter, setInternalStatusFilter] = useState<Ticket["status"] | "all">("all");
+  // Kontrollierte Suche/Status (serverseitig) haben Vorrang: dann keine interne Filterung,
+  // weil die Liste bereits gefiltert vom Server kommt. Sonst wie bisher clientseitig.
+  const searchControlled = controlledOnSearchChange !== undefined;
+  const statusControlled = controlledOnStatusFilterChange !== undefined;
+  const searchValue = searchControlled ? controlledSearchValue ?? "" : internalSearchValue;
+  const setSearchValue = searchControlled ? controlledOnSearchChange : setInternalSearchValue;
+  const statusFilter = statusControlled ? controlledStatusFilter ?? "all" : internalStatusFilter;
+  const setStatusFilter = statusControlled ? controlledOnStatusFilterChange : setInternalStatusFilter;
   const statusColumns = useMemo(
     () => catalogEntriesByKind(catalogs.entries, "workStatus").map((entry) => ({ value: entry.key, label: entry.label, sortOrder: entry.sortOrder, isClosed: entry.isClosed, color: entry.color })),
     [catalogs.entries],
   );
   const filteredTickets = useMemo(
-    () => tickets.filter((ticket) => statusFilter === "all" || ticket.status === statusFilter),
-    [statusFilter, tickets],
+    () => (statusControlled ? tickets : tickets.filter((ticket) => statusFilter === "all" || ticket.status === statusFilter)),
+    [statusControlled, statusFilter, tickets],
   );
   const visibleTickets = useMemo(
-    () => filteredTickets.filter((ticket) => matchesSearch(ticket, searchValue)),
-    [filteredTickets, searchValue],
+    () => (searchControlled ? filteredTickets : filteredTickets.filter((ticket) => matchesSearch(ticket, searchValue))),
+    [searchControlled, filteredTickets, searchValue],
   );
   const filterOptions = statusColumns.map((column) => ({
     value: column.value as Ticket["status"],
@@ -94,7 +114,7 @@ export function TicketListBoardView({
     count: tickets.filter((ticket) => ticket.status === column.value).length,
   }));
   const tagEditingEnabled = !readOnly && canReadTags && canWriteTickets && Boolean(onTagsChange);
-  const tagController = useTags(tagEditingEnabled);
+  const tagController = useTags("pm", tagEditingEnabled);
   const editableTags = tagEditingEnabled ? tagController.tags : undefined;
   const handleTagsChange = tagEditingEnabled ? onTagsChange : undefined;
 

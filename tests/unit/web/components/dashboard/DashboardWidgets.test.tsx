@@ -43,6 +43,11 @@ import { buildMilestone, buildProject, buildTask, buildTicket } from "../../../.
 
 const widgetData = vi.hoisted(() => new Map<string, unknown>());
 const calendarEvents = vi.hoisted(() => ({ value: [] as CalendarEvent[] }));
+// Persönliche (datumsübergreifende) Tagesplan-Termine kommen jetzt aus useDayPlanEvents statt
+// aus dem allgemeinen useEvents-Kalender. Der Server-Endpunkt day-plans/events liefert bereits
+// nur die an Tagespläne des Users gebundenen Termine; das DayPlanCalendarWidget filtert nicht
+// mehr clientseitig nach. Dieser steuerbare State bildet die Hook-Rückgabe im Test nach.
+const dayPlanEvents = vi.hoisted(() => ({ value: [] as CalendarEvent[] }));
 const permissions = vi.hoisted(() => new Map<string, boolean>());
 const createNoteMock = vi.hoisted(() => vi.fn());
 const updateTaskMock = vi.hoisted(() => vi.fn());
@@ -73,6 +78,11 @@ vi.mock("../../../../../apps/web/src/hooks/useDayPlan", () => ({
     tasks: [],
     loading: false,
     unlinkTask: unlinkTaskMock,
+  }),
+  useDayPlanEvents: () => ({
+    events: dayPlanEvents.value,
+    loading: false,
+    error: null,
   }),
 }));
 
@@ -330,6 +340,7 @@ afterEach(() => {
   cleanup();
   widgetData.clear();
   calendarEvents.value = [];
+  dayPlanEvents.value = [];
   permissions.clear();
   createNoteMock.mockReset();
   updateTaskMock.mockReset();
@@ -397,12 +408,17 @@ describe("DashboardWidgetCard", () => {
     expect(screen.getByTestId("calendar-widget-view")).toHaveAttribute("data-compact", "false");
   });
 
-  it("filtert das Kalender-Widget im DayPlan-Kalender strikt auf Termine des DayPlan-Kontexts", () => {
-    calendarEvents.value = [
+  it("speist das DayPlan-Kalender-Widget aus den persönlichen Tagesplan-Terminen statt aus dem allgemeinen Kalender", () => {
+    // useDayPlanEvents liefert die (serverseitig auf Tagespläne des Users beschränkten) Termine.
+    // Die persönliche Planung ist bewusst datumsübergreifend, daher zählen auch Termine anderer
+    // Tage (dayPlan 8) dazu. Ein rein projektgebundener Termin käme nur über den allgemeinen
+    // useEvents-Kalender und darf hier NICHT erscheinen — das Widget zieht ausschließlich aus der
+    // DayPlan-Events-Quelle.
+    dayPlanEvents.value = [
       buildCalendarEvent(1, "Persönlicher Termin", [{ type: "dayPlan", id: 7 }]),
-      buildCalendarEvent(2, "Globaler Termin", [{ type: "project", id: 99 }]),
       buildCalendarEvent(3, "Anderer Tagesplan", [{ type: "dayPlan", id: 8 }]),
     ];
+    calendarEvents.value = [buildCalendarEvent(2, "Globaler Termin", [{ type: "project", id: 99 }])];
 
     renderWithRouter("calendar", undefined, {
       context: "dayPlanCalendar",
@@ -411,10 +427,14 @@ describe("DashboardWidgetCard", () => {
     });
 
     expect(screen.getByTestId("calendar-widget-view")).toHaveAttribute("data-mode", "interactive");
-    expect(screen.getByTestId("calendar-widget-view")).toHaveAttribute("data-compact", "true");
+    // Der dayPlanCalendar-Kontext rendert die eigenständige DayPlanCalendarWidget (Wochenansicht),
+    // die die Kalenderkomponente nicht im compact-Modus einbindet — anders als das generische
+    // CalendarWidget. Entscheidend für diesen Test ist die Event-Quelle (useDayPlanEvents), nicht
+    // die Darstellungsdichte.
+    expect(screen.getByTestId("calendar-widget-view")).toHaveAttribute("data-compact", "false");
     expect(screen.getByTestId("calendar-widget-view")).toHaveTextContent("Persönlicher Termin");
+    expect(screen.getByTestId("calendar-widget-view")).toHaveTextContent("Anderer Tagesplan");
     expect(screen.getByTestId("calendar-widget-view")).not.toHaveTextContent("Globaler Termin");
-    expect(screen.getByTestId("calendar-widget-view")).not.toHaveTextContent("Anderer Tagesplan");
   });
 
   it("rendert noteList als read-only Notizvorschau", () => {

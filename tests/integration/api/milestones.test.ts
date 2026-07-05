@@ -16,7 +16,7 @@
  * Abgedeckte Regeln:
  * - Meilensteine sind projektgebundene, versionierte Projektmanagement-Objekte mit CRUD und expectedVersion.
  * - Meilensteine können Tasks, Tickets, Features, Tags, Notes, Comments, Attachments und Events zugeordnet werden.
- * - Löschregeln entfernen Join-Zeilen und meilenstein-eigene Support-Objekte, ohne unabhängige Fachobjekte zu löschen.
+ * - Löschregeln entfernen Join-Zeilen und meilenstein-eigene Notes/Comments, behalten Attachments als DMS-Dokumente und löschen keine unabhängigen Fachobjekte.
  * - Meilenstein-Listen skalieren ohne Pool-Queue-Überlauf auf mindestens 500 Einträge.
  *
  * Fehlerfälle:
@@ -268,7 +268,7 @@ describe("Milestones API", () => {
     });
   });
 
-  it("löscht Milestone-Supportobjekte, aber keine unabhängigen Fachobjekte", async () => {
+  it("löscht Milestone-Supportobjekte, behält Attachments als DMS-Dokumente und löscht keine unabhängigen Fachobjekte", async () => {
     const project = await createProject(app);
     const milestone = await createMilestone(app, project.id);
     const task = await createTask(app, project.id);
@@ -297,10 +297,11 @@ describe("Milestones API", () => {
 
     expect(await countRows(testDb, "notes", "id", note.body.id)).toBe(0);
     expect(await countRows(testDb, "comments", "id", comment.body.id)).toBe(0);
-    expect(await countRows(testDb, "attachments", "id", attachment.body.id)).toBe(0);
+    expect(await countRows(testDb, "attachments", "id", attachment.body.id)).toBe(1);
     expect(await countRows(testDb, "milestone_tasks", "owner_id", milestone.id)).toBe(0);
     expect(await countRows(testDb, "milestone_tickets", "owner_id", milestone.id)).toBe(0);
     expect(await countRows(testDb, "milestone_features", "milestone_id", milestone.id)).toBe(0);
+    expect(await countRows(testDb, "milestone_attachments", "milestone_id", milestone.id)).toBe(0);
     expect(await countRows(testDb, "milestone_events", "milestone_id", milestone.id)).toBe(0);
 
     const events = await supertest(app.server).get("/api/events").expect(200);
@@ -309,7 +310,7 @@ describe("Milestones API", () => {
     expect(remainingEvent.owners).toEqual([]);
   });
 
-  it("bereinigt Milestone-Supportobjekte bei Projektlöschung", async () => {
+  it("bereinigt Milestone-Supportobjekte bei Projektlöschung und behält Attachments als DMS-Dokumente", async () => {
     const project = await createProject(app);
     const milestone = await createMilestone(app, project.id);
     const note = await supertest(app.server).post(`/api/milestones/${milestone.id}/notes`).send({ title: "Projekt Delete Note", contentJson: { type: "doc" } }).expect(201);
@@ -322,7 +323,8 @@ describe("Milestones API", () => {
 
     await supertest(app.server).get(`/api/milestones/${milestone.id}`).expect(404);
     expect(await countRows(testDb, "notes", "id", note.body.id)).toBe(0);
-    expect(await countRows(testDb, "attachments", "id", attachment.body.id)).toBe(0);
+    expect(await countRows(testDb, "attachments", "id", attachment.body.id)).toBe(1);
+    expect(await countRows(testDb, "milestone_attachments", "milestone_id", milestone.id)).toBe(0);
   });
 
   it("zählt beliebige per Katalog geschlossene Aufgaben als erledigt", async () => {

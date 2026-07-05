@@ -1,7 +1,19 @@
 ﻿import type { FastifyInstance } from "fastify";
-import { createFeature, deleteFeature, getFeature, listFeatures, updateFeature, type FeatureInput } from "../services/features.service.js";
+import { createFeature, deleteFeature, getFeature, listFeatures, listFeaturesPaginated, updateFeature, type FeatureInput } from "../services/features.service.js";
 import { createJournalActor } from "../services/journal.service.js";
-import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema } from "../utils/route-schemas.js";
+
+const featureListQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    status: { type: "string", minLength: 1 },
+    q: { type: "string" },
+    // Opt-in-Pagination: ist `page` gesetzt, liefert die Route Paginated<Feature>, sonst
+    // weiterhin das nackte Array (Rückwärtskompatibilität für MCP/interne Aufrufer).
+    ...paginationQuerySchema
+  }
+} as const;
 
 const featureBodySchema = {
   type: "object",
@@ -28,7 +40,18 @@ const featurePatchSchema = {
 } as const;
 
 export async function registerFeaturesRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/features", { schema: { response: { 200: arrayResponseSchema } } }, async () => listFeatures(app.db));
+  app.get<{ Querystring: { status?: string; q?: string; page?: number; pageSize?: number } }>(
+    "/features",
+    { schema: { querystring: featureListQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
+    async (request) => {
+      const { status, q, page, pageSize } = request.query;
+      // Opt-in: nur wenn `page` gesetzt ist, paginiert antworten — sonst Array-Alt-Verhalten.
+      if (page !== undefined) {
+        return listFeaturesPaginated(app.db, { status, q }, page, pageSize ?? 25);
+      }
+      return listFeatures(app.db);
+    }
+  );
 
   app.post<{ Body: FeatureInput }>(
     "/features",

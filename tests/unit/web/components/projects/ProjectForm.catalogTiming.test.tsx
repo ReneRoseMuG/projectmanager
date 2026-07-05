@@ -98,6 +98,7 @@ vi.mock("../../../../../apps/web/src/hooks/useMilestones", () => ({
 
 vi.mock("../../../../../apps/web/src/hooks/useBacklog", () => ({
   useBacklog: () => ({ items: [], loading: false }),
+  useBacklogPaginated: () => ({ items: [], total: 0, loadedCount: 0, loading: false, loadingMore: false, error: null }),
 }));
 
 vi.mock("../../../../../apps/web/src/hooks/useDocLinks", () => ({

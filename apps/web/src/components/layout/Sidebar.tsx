@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ExternalLink,
   Flag,
+  FolderArchive,
   FolderKanban,
   History,
   Home,
@@ -86,6 +87,7 @@ const homeItems: NavigationItem[] = [
 const documentationItems: NavigationItem[] = [
   { to: "/features", label: "Features", icon: BookOpen, resource: "features" },
   { to: "/wiki", label: "Wiki", icon: Library, resource: "wiki" },
+  { to: "/documents", label: "Dokumente", icon: FolderArchive, resource: "attachments" },
 ];
 
 const informationItems: NavigationItem[] = [

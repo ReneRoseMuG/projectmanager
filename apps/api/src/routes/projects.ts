@@ -1,9 +1,9 @@
 ﻿import type { FastifyInstance } from "fastify";
 import type { ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
-import { createProject, deleteProject, getProject, listProjects, updateProject } from "../services/projects.service.js";
+import { createProject, deleteProject, getProject, listProjects, listProjectsPaginated, updateProject } from "../services/projects.service.js";
 import { getProjectContextTree, resolveProjectIdForMoveOwner } from "../services/project-context-tree.service.js";
 import { createJournalActor } from "../services/journal.service.js";
-import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema } from "../utils/route-schemas.js";
 
 const projectBodySchema = {
   type: "object",
@@ -31,6 +31,18 @@ const projectPatchSchema = {
   }
 } as const;
 
+const projectListQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    status: { type: "string", minLength: 1 },
+    q: { type: "string" },
+    // Opt-in-Pagination: ist `page` gesetzt, liefert die Route Paginated<Project>, sonst
+    // weiterhin das nackte Array (Rückwärtskompatibilität für MCP/interne Aufrufer).
+    ...paginationQuerySchema
+  }
+} as const;
+
 const contextTreeQuerySchema = {
   type: "object",
   required: ["ownerType", "ownerId"],
@@ -42,7 +54,18 @@ const contextTreeQuerySchema = {
 } as const;
 
 export async function registerProjectsRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/projects", { schema: { response: { 200: arrayResponseSchema } } }, async () => listProjects(app.db));
+  app.get<{ Querystring: { status?: string; q?: string; page?: number; pageSize?: number } }>(
+    "/projects",
+    { schema: { querystring: projectListQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
+    async (request) => {
+      const { status, q, page, pageSize } = request.query;
+      // Opt-in: nur wenn `page` gesetzt ist, paginiert antworten — sonst Array-Alt-Verhalten.
+      if (page !== undefined) {
+        return listProjectsPaginated(app.db, { status, q }, page, pageSize ?? 25);
+      }
+      return listProjects(app.db);
+    }
+  );
 
   app.get<{ Querystring: { ownerType: "project" | "milestone" | "task" | "ticket"; ownerId: number } }>(
     "/projects/context-tree",

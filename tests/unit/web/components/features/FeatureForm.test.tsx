@@ -27,13 +27,14 @@ import { addPendingComment, changeInput, clickTab, feature, formTestMocks, getFi
 import { FeatureForm } from "../../../../../apps/web/src/components/features/FeatureForm";
 
 describe("FeatureForm", () => {
-  it("verdrahtet Body, Parent-Kontext und Sidebar-Felder ohne entfernte Felder", async () => {
+  it("verdrahtet Body, Parent-Auswahl und Sidebar-Felder ohne entfernte Felder", async () => {
     const onAutoSave = vi.fn().mockResolvedValue(undefined);
     renderWithProviders(<FeatureForm open feature={feature} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />);
 
     const sidebar = screen.getByTestId("form-sidebar");
     const sidebarSelects = within(sidebar).getAllByRole("combobox");
-    expect(screen.getByTestId("parent-context-field")).toHaveTextContent("PROJ-30");
+    expect(screen.queryByTestId("parent-context-field")).not.toBeInTheDocument();
+    expect(within(sidebar).getByRole("button", { name: "Projekt Alpha" })).toBeInTheDocument();
     expect(screen.getByDisplayValue(feature.title)).toBeInTheDocument();
     expect(screen.getByTestId("feature-form-content-view")).toHaveValue(feature.content);
     expect(screen.queryByTestId("feature-form-description-view")).not.toBeInTheDocument();

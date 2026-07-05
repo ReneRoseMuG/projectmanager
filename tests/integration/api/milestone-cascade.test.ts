@@ -2,7 +2,7 @@
  * Test Scope: Milestone-Kaskade
  *
  * Abgedeckte Regeln:
- * - Meilenstein-Löschung entfernt eigene Notes, Comments und Attachments vollständig (hard delete).
+ * - Meilenstein-Löschung entfernt eigene Notes und Comments vollständig; Attachments bleiben als DMS-Dokumente erhalten.
  * - Meilenstein-Löschung bereinigt alle Join-Tabellen: Tasks, Tickets, Features, Tags, Events.
  * - Projekt-Löschung löscht Meilensteine (DB-Kaskade) und deren Support-Objekte transitiv.
  *
@@ -179,20 +179,26 @@ describe("Milestone-Cascade: vollständige Bereinigung aller Meilenstein-Abhäng
     });
   });
 
-  describe("deleteMilestone – Attachments werden vollständig gelöscht", () => {
-    it("löscht Attachment-Datensatz wenn Meilenstein alleiniger Owner ist", async () => {
+  describe("deleteMilestone – Attachment-Verknüpfungen werden bereinigt", () => {
+    it("entfernt milestone_attachments-Join und behält Attachment-Datensatz", async () => {
       const project = await createProject(app);
       const milestone = await createMilestone(app, project.id);
       const attachmentId = await insertAttachmentForMilestone(testDb, milestone.id);
 
       await supertest(app.server).delete(`/api/milestones/${milestone.id}`).expect(204);
 
+      const remainingLinks = await testDb.db
+        .select()
+        .from(milestoneAttachments)
+        .where(eq(milestoneAttachments.milestoneId, milestone.id));
+      expect(remainingLinks).toHaveLength(0);
+
       const remaining = await testDb.db
         .select()
         .from(attachments)
         .where(eq(attachments.id, attachmentId));
 
-      expect(remaining).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
     });
 
     it("bereinigt alle milestone_attachments-Join-Einträge", async () => {
@@ -367,18 +373,24 @@ describe("Milestone-Cascade: vollständige Bereinigung aller Meilenstein-Abhäng
       expect(remaining).toHaveLength(0);
     });
 
-    it("löscht Meilenstein-Attachments transitiv beim Löschen des Projekts", async () => {
+    it("entfernt Meilenstein-Attachment-Joins transitiv beim Löschen des Projekts und behält Attachment-Datensatz", async () => {
       const project = await createProject(app);
       const milestone = await createMilestone(app, project.id);
       const attachmentId = await insertAttachmentForMilestone(testDb, milestone.id);
 
       await supertest(app.server).delete(`/api/projects/${project.id}`).expect(204);
 
+      const remainingLinks = await testDb.db
+        .select()
+        .from(milestoneAttachments)
+        .where(eq(milestoneAttachments.milestoneId, milestone.id));
+      expect(remainingLinks).toHaveLength(0);
+
       const remaining = await testDb.db
         .select()
         .from(attachments)
         .where(eq(attachments.id, attachmentId));
-      expect(remaining).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
     });
 
     it("Löschen von Projekt A beeinflusst Meilensteine von Projekt B nicht", async () => {

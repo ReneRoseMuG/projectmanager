@@ -1,13 +1,11 @@
-import type { Milestone, MilestoneInput, MilestoneUpdate, Tag, UserOption, VisibleParentContext } from "@taskmanager/shared-types";
+import type { Milestone, MilestoneInput, MilestoneUpdate, Paginated, Tag, UserOption, VisibleParentContext } from "@taskmanager/shared-types";
 import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { firstRow, recencyOrder } from "../db/query-utils.js";
 import { milestoneAttachments, milestoneComments, milestoneFeatures, milestoneNotes, milestones, milestoneTasks, milestoneTickets, projects, tasks } from "../db/schema.js";
-import { milestoneRepository, type MilestoneRecord } from "../repositories/milestone.repository.js";
+import { milestoneRepository, type MilestoneListFilter, type MilestoneRecord } from "../repositories/milestone.repository.js";
 import { badRequest, notFound } from "../utils/errors.js";
-import { cleanNullable, requireNonEmpty } from "./helpers.js";
-import { deleteMilestoneAttachmentsForIds } from "./attachments.service.js";
-import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
+import { cleanNullable, requireNonEmpty } from "./helpers.js";import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import {
   buildCreateSummary,
   buildDeleteSummary,
@@ -246,6 +244,26 @@ export async function listMilestones(database: DbClient): Promise<Milestone[]> {
   return mapMilestoneList(database, rows);
 }
 
+// Seitenbasierte Variante der globalen Meilensteinliste (MS-75 Pagination-Muster, analog
+// listProjectsPaginated). ECHT SQL-seitig paginiert: das Repository liefert bereits nur die
+// Seiten-Records (WHERE + ORDER BY + LIMIT/OFFSET) plus die Gesamtzahl nach Filter. Nur diese
+// Seiten-Zeilen werden anschließend über das vorhandene Batch-Mapping (mapMilestoneList)
+// angereichert. Der Filter (status/q) bildet den bisher clientseitigen Status- und Suchfilter
+// serverseitig nach; `q` sucht im Namen.
+export async function listMilestonesPaginated(
+  database: DbClient,
+  filter: MilestoneListFilter,
+  page: number,
+  pageSize: number
+): Promise<Paginated<Milestone>> {
+  const [rows, total] = await Promise.all([
+    milestoneRepository.findPage(database, filter, page, pageSize),
+    milestoneRepository.countFiltered(database, filter)
+  ]);
+  const data = await mapMilestoneList(database, rows);
+  return { data, total, page, pageSize };
+}
+
 export async function listProjectMilestones(database: DbClient, projectId: number): Promise<Milestone[]> {
   await ensureProjectExists(database, projectId);
   const rows = await database.select().from(milestones).where(eq(milestones.projectId, projectId)).orderBy(...recencyOrder(milestones));
@@ -374,7 +392,6 @@ export async function deleteMilestone(database: DbClient, id: number, actor?: Jo
   }
   const projectObject = await getProjectJournalObject(database, milestone.projectId);
 
-  await deleteMilestoneAttachmentsForIds(database, [id]);
   await deleteMilestoneNotesForIds(database, [id]);
   await deleteMilestoneCommentsForIds(database, [id]);
 
@@ -396,7 +413,6 @@ export async function deleteMilestone(database: DbClient, id: number, actor?: Jo
 export async function deleteMilestoneOwnedSupportForProjectIds(database: DbClient, projectIds: number[]): Promise<void> {
   const rows = await milestoneRepository.findByProjectIds(database, [...new Set(projectIds)]);
   const milestoneIds = rows.map((row) => row.id);
-  await deleteMilestoneAttachmentsForIds(database, milestoneIds);
   await deleteMilestoneNotesForIds(database, milestoneIds);
   await deleteMilestoneCommentsForIds(database, milestoneIds);
 }

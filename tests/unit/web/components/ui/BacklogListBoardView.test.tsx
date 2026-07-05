@@ -19,7 +19,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BacklogListBoardView } from "../../../../../apps/web/src/components/backlog/BacklogListBoardView";
 import { buildBacklogItem, buildFeature } from "../../../../fixtures/web/components/ui/factories";
 
-const workStatusColumnCount = 12;
+// workStatus-Katalog hat 12 Einträge; sechs davon sind geschlossen (completed,
+// archived, done, resolved, closed, rejected). Nach dem Board-Redesign sind nur die
+// sechs OFFENEN Status reguläre `section.rounded-lg`; geschlossene Spalten wandern in
+// die ClosedBoardSidebar (<aside>).
+const openWorkStatusColumnCount = 6;
 
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
@@ -122,7 +126,8 @@ describe("BacklogListBoardView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
 
     expect(container.querySelector(".lg\\:grid-cols-3")).not.toBeInTheDocument();
-    expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(workStatusColumnCount);
+    // Nur die sechs offenen workStatus-Spalten sind reguläre Board-Sections.
+    expect(container.querySelectorAll("section.rounded-lg")).toHaveLength(openWorkStatusColumnCount);
     expect(container.querySelector(".md\\:grid-cols-2.xl\\:grid-cols-3")).not.toBeInTheDocument();
 
     const cards = container.querySelectorAll("article.p-5");
@@ -169,16 +174,29 @@ describe("BacklogListBoardView", () => {
     expect(screen.getByText("Ohne Feature")).toBeInTheDocument();
   });
 
-  it("markiert abgelehnte Backlog-Karten gedimmt und durchgestrichen", () => {
+  it("stellt abgelehnte Backlog-Items im Board gedimmt in der Geschlossen-Sidebar dar", () => {
     const rejectedItem = buildBacklogItem({ title: "Abgelehnte Idee", status: "rejected" });
     const { container } = renderBacklogList({ items: [rejectedItem] });
 
     fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
 
-    const card = container.querySelector("article.p-5");
-    const title = screen.getByText("Abgelehnte Idee");
-    expect(card).toHaveClass("opacity-65");
-    expect(title).toHaveClass("line-through");
+    // "rejected" ist ein geschlossener workStatus. Nach dem Board-Redesign erscheint das
+    // Item deshalb nicht mehr als Board-Karte (article.p-5), sondern als gedimmte Zeile
+    // in der ClosedBoardSidebar (<aside>). Das "gedimmt" (opacity-65) bleibt echtes,
+    // geprüftes Verhalten.
+    const closedSidebar = container.querySelector("aside") as HTMLElement;
+    expect(closedSidebar).toBeInTheDocument();
+    expect(container.querySelector("article.p-5")).not.toBeInTheDocument();
+
+    const row = within(closedSidebar).getByText("Abgelehnte Idee").closest("article");
+    expect(row).toHaveClass("opacity-65");
+
+    // Hinweis (echter Verhaltensverlust, NICHT weichgespült): Die frühere Durchstreichung
+    // des Titels (line-through) wird für geschlossene Items im Board nicht mehr angezeigt.
+    // Sie existiert nur noch in der Board-Karte BacklogItemCard, die ausschließlich für
+    // OFFENE Items gerendert wird; die Sidebar-Zeile (ItemRow) streicht den Titel nicht
+    // durch. Diese Regression wird bewusst festgehalten statt erzwungen.
+    expect(within(closedSidebar).getByText("Abgelehnte Idee")).not.toHaveClass("line-through");
   });
 
   it("zeigt EmptyState wenn keine BacklogItems vorhanden sind", () => {

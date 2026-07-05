@@ -53,7 +53,9 @@ describe("TaskForm", () => {
 
     const sidebar = screen.getByTestId("form-sidebar");
     const sidebarSelects = within(sidebar).getAllByRole("combobox");
-    expect(screen.getByTestId("parent-context-field")).toHaveTextContent("PROJ-30");
+    const parentContext = screen.getByTestId("parent-context-field");
+    expect(parentContext).toHaveTextContent("PROJ-30");
+    expect(parentContext).toHaveTextContent("Projekt Alpha");
     expect(screen.getByDisplayValue(task.title)).toBeInTheDocument();
     expect(screen.getByTestId("task-description-view")).toHaveValue(task.description);
     expect(sidebarSelects[0]).toHaveValue("todo");
@@ -216,8 +218,12 @@ describe("TaskForm", () => {
     addPendingComment("Task-Kommentar");
     clickTab("Notizen");
     fireEvent.click(screen.getByRole("button", { name: "Neue Notiz" }));
-    fireEvent.change(screen.getByLabelText(/Titel/), { target: { value: "Task-Notiz" } });
-    fireEvent.click(screen.getByRole("button", { name: "Hinzufügen" }));
+    // Der Subtask-Draft-Dialog bleibt im Create-Modus offen, daher matcht /Titel/ mehrfach.
+    // Das Titel-Feld gezielt im Notiz-Dialog ansprechen (Modal-Overlay zum Header "Neue Notiz").
+    const noteDialog = screen.getByRole("heading", { name: "Neue Notiz" }).closest("div.fixed") as HTMLElement;
+    expect(noteDialog).not.toBeNull();
+    fireEvent.change(noteDialog.querySelector("input[required]") as HTMLInputElement, { target: { value: "Task-Notiz" } });
+    fireEvent.click(within(noteDialog).getByRole("button", { name: "Hinzufügen" }));
     clickTab("Dateien");
     fireEvent.change(getFileInput(container), { target: { files: [file] } });
     fireEvent.click(screen.getByRole("button", { name: "Aufgabe anlegen" }));
@@ -301,10 +307,12 @@ describe("TaskForm", () => {
   it("Details-Tab nutzt Flex-Fill-Layout unabhängig von der Variante", () => {
     renderWithProviders(<TaskForm open task={task} onSubmit={vi.fn()} onClose={vi.fn()} />);
 
-    // Content-Wrapper muss overflow-hidden haben (nicht overflow-auto) damit Fill wirkt
-    const contentWrapper = screen.getByDisplayValue(task.title).closest("section")?.parentElement?.parentElement;
-    expect(contentWrapper).toHaveClass("overflow-hidden");
-    expect(contentWrapper).not.toHaveClass("overflow-auto");
+    // Fill-Kette: der scrollende Content-Wrapper (overflow-auto) hält per flex-1 die Höhe,
+    // das innere min-h-full-flex-col-Div reicht sie an die fill-Section weiter.
+    const fillContainer = screen.getByDisplayValue(task.title).closest("section")?.parentElement;
+    expect(fillContainer).toHaveClass("flex", "flex-col", "min-h-full");
+    const contentWrapper = fillContainer?.parentElement;
+    expect(contentWrapper).toHaveClass("flex-1", "overflow-auto");
 
     // FormField Beschreibung hat flex-Layout (fill=true), nicht grid
     const descriptionField = screen.getByTestId("task-description-view").parentElement;

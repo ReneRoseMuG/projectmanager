@@ -24,6 +24,7 @@ import {
   listSubTickets,
   listTicketRelations,
   listTickets,
+  listTicketsPaginated,
   moveTicket,
   removeTicketRelation,
   unlinkOwnerTicket,
@@ -32,7 +33,7 @@ import {
 } from "../services/tickets.service.js";
 import type { DashboardTicketOwner, TicketOwner } from "../services/tickets.service.js";
 import { badRequest } from "../utils/errors.js";
-import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, projectIdParamSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema, projectIdParamSchema, tagIdsBodySchema } from "../utils/route-schemas.js";
 
 interface MultipartFileField {
   filename?: string;
@@ -224,8 +225,36 @@ async function readUpload(request: FastifyRequest) {
   };
 }
 
+// Query-Schema der Ticket-Hauptliste. Filter (status/type) und Suche (q) bilden ab, was
+// die Ticket-Hauptseite bisher clientseitig filtert/sucht; sie werden im paginierten Pfad
+// serverseitig angewandt. Opt-in-Pagination: ist `page` gesetzt, liefert die Route
+// Paginated<Ticket>, sonst weiterhin das nackte Array (Rückwärtskompatibilität für
+// MCP-Server/interne Aufrufer).
+const ticketListQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    status: { type: "string", minLength: 1 },
+    type: { type: "string", minLength: 1 },
+    q: { type: "string" },
+    ...paginationQuerySchema
+  }
+} as const;
+
 export async function registerTicketsRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/tickets", { schema: { response: { 200: arrayResponseSchema } } }, async () => listTickets(app.db));
+  app.get<{ Querystring: { status?: string; type?: string; q?: string; page?: number; pageSize?: number } }>(
+    "/tickets",
+    { schema: { querystring: ticketListQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
+    async (request) => {
+      const { status, type, q, page, pageSize } = request.query;
+      const filter = { status, type, q: q?.trim() ? q.trim() : undefined };
+      // Opt-in: nur wenn `page` gesetzt ist, paginiert antworten — sonst Array-Alt-Verhalten.
+      if (page !== undefined) {
+        return listTicketsPaginated(app.db, filter, page, pageSize ?? 25);
+      }
+      return listTickets(app.db);
+    }
+  );
 
   app.get<{ Querystring: { ownerType?: DashboardTicketOwner["type"]; ownerId?: number } }>(
     "/tickets/stats",

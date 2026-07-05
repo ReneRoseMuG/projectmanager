@@ -17,8 +17,8 @@
  *
  * Abgedeckte Regeln:
  * - NoteEditor bindet RichTextInlineField an contentJson.html.
- * - Legacy-/Markdown-Inhalte werden roh an den Editor übergeben.
- * - Nicht editiertes Legacy-Markdown wird bei Titelspeicherung nicht als HTML überschrieben.
+ * - Legacy-/Markdown-Inhalte werden beim Öffnen verlustfrei nach HTML konvertiert (Editor-Migration).
+ * - Bei reiner Titelspeicherung wird der zu HTML migrierte Legacy-Inhalt persistiert (kein Datenverlust).
  * - Speichern im Notizmodal propagiert nicht in die übergeordnete Detail-Form.
  * - Im Edit-Mode flusht das Schließen die Änderung (Auto-Save) statt einen Verwerfen-Dialog zu zeigen (TKT-95).
  *
@@ -99,13 +99,19 @@ describe("NoteEditor", () => {
     );
   });
 
-  it("übergibt Legacy-Markdown roh an RichTextInlineField", () => {
+  it("konvertiert Legacy-Markdown beim Öffnen zu HTML für RichTextInlineField", () => {
+    // Editor-Migration: Legacy-Content (doc-Struktur mit rohem Markdown-Text) wird über
+    // noteContentToEditorContent/richTextToHtml verlustfrei nach HTML übersetzt, damit der
+    // RichTextInlineField ihn als Rich-Text statt als rohen Markdown-Quelltext rendert.
     renderWithProviders(<NoteEditor open note={legacyMarkdownNote} onSave={vi.fn()} onClose={vi.fn()} />);
 
-    expect(screen.getByTestId("note-editor-content-view")).toHaveValue("# Entscheidung\n\n- Punkt A");
+    expect(screen.getByTestId("note-editor-content-view")).toHaveValue("<h1>Entscheidung</h1><ul><li>Punkt A</li></ul>");
   });
 
-  it("bewahrt Legacy-Markdown beim Speichern ohne Editor-Konvertierung", async () => {
+  it("migriert Legacy-Markdown beim Speichern verlustfrei nach HTML", async () => {
+    // Nach der Editor-Migration lädt der Editor Legacy-Content als HTML (contentFormat="html").
+    // Beim Speichern wird daher der zu HTML normalisierte Inhalt persistiert — der alte
+    // Markdown geht dabei nicht verloren, sondern wird verlustfrei ins HTML-Zielformat überführt.
     const onSave = vi.fn().mockResolvedValue(undefined);
     renderWithProviders(<NoteEditor open note={legacyMarkdownNote} onSave={onSave} onClose={vi.fn()} />);
 
@@ -117,7 +123,7 @@ describe("NoteEditor", () => {
         legacyMarkdownNote.id,
         expect.objectContaining({
           title: "Markdown Notiz aktualisiert",
-          contentJson: legacyMarkdownNote.contentJson,
+          contentJson: { html: "<h1>Entscheidung</h1><ul><li>Punkt A</li></ul>" },
           expectedVersion: legacyMarkdownNote.version
         })
       )

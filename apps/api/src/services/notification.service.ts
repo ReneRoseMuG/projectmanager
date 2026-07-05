@@ -1,12 +1,12 @@
 import type { Role } from "@taskmanager/shared-types";
-import { gte } from "drizzle-orm";
+import { gte, inArray } from "drizzle-orm";
 import nodemailer, { type Transporter } from "nodemailer";
 import type { AppConfig } from "../config.js";
 import type { DbClient } from "../db/client.js";
-import { events } from "../db/schema.js";
-import { notificationRepository } from "../repositories/notification.repository.js";
+import { events, roles } from "../db/schema.js";
+import { notificationRepository, sentNotificationKey } from "../repositories/notification.repository.js";
 import { roleRepository } from "../repositories/role.repository.js";
-import { userRepository, type UserRecord } from "../repositories/user.repository.js";
+import { userRepository } from "../repositories/user.repository.js";
 import { hasPermission, mapRole } from "./roles.service.js";
 
 export interface NotificationLogger {
@@ -36,19 +36,24 @@ function nowIso(now: Date): string {
   return now.toISOString();
 }
 
-async function roleForUser(database: DbClient, user: UserRecord): Promise<Role | null> {
-  const role = await roleRepository.findById(database, user.roleId);
-  if (!role) {
-    return null;
-  }
-  return mapRole(role, await roleRepository.findPermissionsByRoleId(database, role.id));
-}
-
 export async function listNotificationRecipients(database: DbClient): Promise<NotificationRecipient[]> {
   const users = await userRepository.findActive(database);
+  if (users.length === 0) {
+    return [];
+  }
+  // Rollen + Permissions der aktiven User gebündelt laden (2 Queries statt 2 pro User).
+  // Zuordnung im Speicher — identische Auswahl wie zuvor über roleForUser + hasPermission.
+  const roleIds = [...new Set(users.map((user) => user.roleId))];
+  const roleRecords = await database.select().from(roles).where(inArray(roles.id, roleIds));
+  const permissionRecords = await roleRepository.findPermissionsByRoleIds(database, roleIds);
+  const roleMap = new Map<number, Role>();
+  for (const roleRecord of roleRecords) {
+    roleMap.set(roleRecord.id, mapRole(roleRecord, permissionRecords));
+  }
   const result: NotificationRecipient[] = [];
   for (const user of users) {
-    const role = await roleForUser(database, user);
+    // Fehlende Rolle == zuvor null aus roleForUser: User wird ausgelassen.
+    const role = roleMap.get(user.roleId);
     if (role && hasPermission(role, "events", "read")) {
       result.push({ id: user.id, email: user.email });
     }
@@ -106,10 +111,24 @@ export async function sendPendingEmailNotifications(database: DbClient, appConfi
   const now = options.now ?? new Date();
   const dueEvents = await listDueNotificationEvents(database, now);
   const recipients = await listNotificationRecipients(database);
+  if (dueEvents.length === 0 || recipients.length === 0) {
+    return;
+  }
+
+  // Pro Tick EINMAL alle bereits gesendeten (event,user,channel,reminder)-Kombinationen laden
+  // statt wasSent pro Kombination. Prüfung im Speicher — identische "bereits gesendet"-Logik.
+  const sentKeys = await notificationRepository.findSentKeys(database, {
+    eventIds: dueEvents.map((event) => event.id),
+    userIds: recipients.map((recipient) => recipient.id),
+    channel: "email"
+  });
+  // Neue "gesendet"-Einträge sammeln und am Ende als Batch-Insert schreiben.
+  const recorded: Array<{ eventId: number; userId: number; channel: "email"; reminderMinutes: number; sentAt: string }> = [];
 
   for (const event of dueEvents) {
     for (const recipient of recipients) {
-      if (await notificationRepository.wasSent(database, { eventId: event.id, userId: recipient.id, channel: "email", reminderMinutes: event.reminderMinutes })) {
+      const key = sentNotificationKey({ eventId: event.id, userId: recipient.id, channel: "email", reminderMinutes: event.reminderMinutes });
+      if (sentKeys.has(key)) {
         continue;
       }
       try {
@@ -119,7 +138,9 @@ export async function sendPendingEmailNotifications(database: DbClient, appConfi
           subject: emailSubject(event),
           text: emailText(event)
         });
-        await notificationRepository.recordSent(database, {
+        // Innerhalb desselben Ticks Doppelversand vermeiden, falls dieselbe Kombination erneut auftritt.
+        sentKeys.add(key);
+        recorded.push({
           eventId: event.id,
           userId: recipient.id,
           channel: "email",
@@ -131,4 +152,6 @@ export async function sendPendingEmailNotifications(database: DbClient, appConfi
       }
     }
   }
+
+  await notificationRepository.recordSentMany(database, recorded);
 }

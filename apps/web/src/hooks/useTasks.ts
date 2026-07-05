@@ -6,9 +6,10 @@ import {
   createOwnerTask as createOwnerTaskRequest,
   deleteTask as deleteTaskRequest,
   getOwnerTasks,
-  getTasks,
+  getTasksPage,
   linkOwnerTask as linkOwnerTaskRequest,
   moveTaskLocation as moveTaskLocationRequest,
+  type TaskListFilter,
   type TaskOwner,
   unlinkOwnerTask as unlinkOwnerTaskRequest,
   updateOwnerTaskBoard as updateOwnerTaskBoardRequest,
@@ -18,6 +19,7 @@ import { setTaskTags } from "../api/tags";
 import { invalidateFeatureScope, invalidateMilestoneScope, invalidateProjectScope, invalidateTaskScope, invalidateUseCaseScope, invalidateWiki } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
+import { useProgressiveList } from "./useProgressiveList";
 
 function ownerTaskKey(owner?: TaskOwner) {
   if (!owner) {
@@ -63,15 +65,20 @@ function toGlobalTaskBoardItems(tasks: TaskBoardItem[]): TaskBoardItem[] {
 export function useGlobalTasks(enabled = true) {
   const queryClient = useQueryClient();
 
-  const tasksQuery = useQuery({
-    queryKey: queryKeys.tasks.list(),
-    queryFn: async () => toGlobalTaskBoardItems((await getTasks()) as TaskBoardItem[]),
-    enabled
-  });
+  // Globale Aufgabenliste: progressives, sequenzielles Nachladen statt Alt-Array auf einmal.
+  // Serverseitige Filter bleiben leer (Verhalten unverändert); clientseitige Filter/Suche
+  // greifen weiter über der progressiv wachsenden Menge in der Seite.
+  const filter: TaskListFilter = {};
+  const progressive = useProgressiveList(
+    queryKeys.tasks.list(filter),
+    (page, pageSize) => getTasksPage(filter, { page, pageSize }),
+    { enabled }
+  );
+  const tasks = toGlobalTaskBoardItems(progressive.items as TaskBoardItem[]);
 
   const reload = useCallback(async () => {
-    await tasksQuery.refetch();
-  }, [tasksQuery]);
+    await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.list(filter) });
+  }, [queryClient, filter]);
 
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: TaskUpdate }) => updateTaskRequest(id, input),
@@ -95,9 +102,12 @@ export function useGlobalTasks(enabled = true) {
   });
 
   return {
-    tasks: tasksQuery.data ?? [],
-    loading: tasksQuery.isLoading,
-    error: toQueryError(tasksQuery.error),
+    tasks,
+    total: progressive.total,
+    loadedCount: progressive.loadedCount,
+    loading: progressive.loading,
+    loadingMore: progressive.loadingMore,
+    error: progressive.error,
     reload,
     updateTask: (id: number, input: TaskUpdate) => updateTaskMutation.mutateAsync({ id, input }),
     updateTaskTags: (id: number, tagIds: number[]) => updateTaskTagsMutation.mutateAsync({ id, tagIds }),

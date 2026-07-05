@@ -13,6 +13,7 @@ import {
   listTaskLinkCandidates,
   listOwnerTasks,
   listTasks,
+  listTasksPaginated,
   moveTask,
   unlinkOwnerTask,
   updateOwnerTaskBoard,
@@ -22,7 +23,7 @@ import type { DashboardOverdueTaskOwner, DashboardTaskOwner, TaskOwner } from ".
 import { ensureDayPlanOwnedByUser } from "../services/day-plan.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { badRequest } from "../utils/errors.js";
-import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema } from "../utils/route-schemas.js";
 
 const taskBodySchema = {
   type: "object",
@@ -115,6 +116,20 @@ const taskLinkCandidatesQuerySchema = {
   }
 } as const;
 
+// Query-Schema der globalen Aufgabenliste. OPT-IN-Pagination: ohne `page` liefert die
+// Route weiterhin das nackte Array (unverändert für interne/MCP-Aufrufer), mit `page`
+// ein Paginated<Task>. `status`/`q` sind serverseitige Filter (Status-Gleichheit + Suche
+// in Titel/Beschreibung).
+const tasksListQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    status: { type: "string", minLength: 1 },
+    q: { type: "string" },
+    ...paginationQuerySchema
+  }
+} as const;
+
 const dashboardTaskQuerySchema = {
   type: "object",
   additionalProperties: false,
@@ -168,7 +183,18 @@ async function ensureDashboardDayPlanAccess(app: FastifyInstance, request: Fasti
 }
 
 export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/tasks", { schema: { response: { 200: arrayResponseSchema } } }, async () => listTasks(app.db));
+  app.get<{ Querystring: { status?: string; q?: string; page?: number; pageSize?: number } }>(
+    "/tasks",
+    { schema: { querystring: tasksListQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
+    async (request) => {
+      const { status, q, page, pageSize } = request.query;
+      // Opt-in: nur wenn `page` gesetzt ist, paginiert antworten — sonst Array-Alt-Verhalten.
+      if (page !== undefined) {
+        return listTasksPaginated(app.db, { status, q }, page, pageSize ?? 25);
+      }
+      return listTasks(app.db);
+    }
+  );
 
   app.get<{ Querystring: { ownerType?: DashboardTaskOwner["type"]; ownerId?: number } }>(
     "/tasks/stats",

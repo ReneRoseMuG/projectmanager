@@ -1,8 +1,22 @@
 ﻿import type { FastifyInstance } from "fastify";
 import type { MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
-import { createMilestone, deleteMilestone, getMilestone, listMilestones, listProjectMilestones, updateMilestone } from "../services/milestones.service.js";
+import { createMilestone, deleteMilestone, getMilestone, listMilestones, listMilestonesPaginated, listProjectMilestones, updateMilestone } from "../services/milestones.service.js";
 import { createJournalActor } from "../services/journal.service.js";
-import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema } from "../utils/route-schemas.js";
+
+// Serverseitige Filter + Opt-in-Pagination der globalen Meilensteinliste. `status`/`q` bilden
+// den bisher clientseitigen Status- und Suchfilter nach; ist `page` gesetzt, liefert die Route
+// Paginated<Milestone>, sonst weiterhin das nackte Array (Rückwärtskompatibilität für MCP/
+// interne Aufrufer). Projektgebundene Listen (byProject) bleiben davon unberührt.
+const milestoneListQuerySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    status: { type: "string" },
+    q: { type: "string" },
+    ...paginationQuerySchema
+  }
+} as const;
 
 const milestoneBodySchema = {
   type: "object",
@@ -46,7 +60,18 @@ const projectMilestoneBodySchema = {
 } as const;
 
 export async function registerMilestoneRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/milestones", { schema: { response: { 200: arrayResponseSchema } } }, async () => listMilestones(app.db));
+  app.get<{ Querystring: { status?: string; q?: string; page?: number; pageSize?: number } }>(
+    "/milestones",
+    { schema: { querystring: milestoneListQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
+    async (request) => {
+      const { status, q, page, pageSize } = request.query;
+      // Opt-in: nur wenn `page` gesetzt ist, paginiert antworten — sonst Array-Alt-Verhalten.
+      if (page !== undefined) {
+        return listMilestonesPaginated(app.db, { status, q }, page, pageSize ?? 25);
+      }
+      return listMilestones(app.db);
+    }
+  );
 
   app.get<{ Params: { id: number } }>(
     "/projects/:id/milestones",

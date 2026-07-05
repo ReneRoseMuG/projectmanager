@@ -1,15 +1,18 @@
 import type { TicketInput, TicketMoveInput, TicketPositionInput, TicketUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
+import { useProgressiveList } from "./useProgressiveList";
 import {
   createOwnerTicket as createOwnerTicketRequest,
   createTicket as createTicketRequest,
   deleteTicket as deleteTicketRequest,
   getOwnerTickets,
   getTickets,
+  getTicketsPage,
   linkOwnerTicket as linkOwnerTicketRequest,
   moveTicketLocation as moveTicketLocationRequest,
   setTicketTags,
+  type TicketListFilter,
   type TicketOwner,
   unlinkOwnerTicket as unlinkOwnerTicketRequest,
   updateTicket as updateTicketRequest,
@@ -39,6 +42,26 @@ function ownerTicketKey(owner?: TicketOwner | null) {
     return queryKeys.wiki.tickets(owner.id);
   }
   return queryKeys.useCases.tickets(owner.id);
+}
+
+// Progressiver Abruf der projektübergreifenden Ticket-Hauptliste. Statt Seitenzahl-Blättern
+// werden die Blöcke sequenziell nachgeladen und angehängt, bis alle Datensätze geladen sind.
+// Filter/Suche werden serverseitig je Block angewandt; `total` ist die Gesamtzahl nach
+// Filter/Suche. Der Query-Key liegt unter tickets.root, daher greift die bestehende
+// Prefix-Invalidierung der Ticket-Mutationen automatisch. Owner-gebundene Listen bleiben bei
+// useTickets(owner).
+export function useTicketsLibrary(filter: TicketListFilter) {
+  const list = useProgressiveList(queryKeys.tickets.list(filter as object), (page, pageSize) =>
+    getTicketsPage(filter, { page, pageSize })
+  );
+  return {
+    tickets: list.items,
+    total: list.total,
+    loadedCount: list.loadedCount,
+    loading: list.loading,
+    loadingMore: list.loadingMore,
+    error: list.error
+  };
 }
 
 export function useTickets(owner?: TicketOwner | null) {

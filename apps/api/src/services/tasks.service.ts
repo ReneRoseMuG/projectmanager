@@ -1,12 +1,12 @@
-﻿import type { Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskStats, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
+﻿import type { Paginated, Task, TaskBoardItem, TaskBoardPositionInput, TaskDetail, TaskInput, TaskOwner, TaskStats, TaskUpdate, VisibleParentContext } from "@taskmanager/shared-types";
 import type { TaskMoveInput } from "@taskmanager/shared-types";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { dayPlans, dayPlanTasks, featureTasks, features, milestoneTasks, milestones, projectTasks, projects, taskAttachments, taskComments, taskNotes, tasks, useCases, useCaseTasks, wikiPageTasks, wikiPages } from "../db/schema.js";
 import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
-import { taskRepository, type TaskRecord } from "../repositories/task.repository.js";
+import { taskRepository, type TaskListFilter, type TaskRecord } from "../repositories/task.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
-import { deleteTaskAttachmentsForIds, listTaskAttachments } from "./attachments.service.js";
+import { listTaskAttachments } from "./attachments.service.js";
 import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { listComments } from "./comments.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
@@ -26,7 +26,7 @@ import {
 } from "./journal.service.js";
 import { deleteTaskCommentsForIds } from "./comments.service.js";
 import { deleteTaskNotesForIds, listTaskNotes } from "./notes.service.js";
-import { assertCompatibleProjectContexts, projectContextsAreCompatible, taskOwnerProjectContext, taskProjectContext } from "./project-context.service.js";
+import { assertCompatibleProjectContexts, buildTaskProjectContextMap, projectContextsAreCompatible, taskOwnerProjectContext, taskProjectContext } from "./project-context.service.js";
 import { getTaskTags, getTaskTagsMap } from "./tags.service.js";
 import { getUserOption, normalizeAssignableUserId } from "./users.service.js";
 
@@ -37,6 +37,9 @@ export type DashboardOverdueTaskOwner = { type: "project" | "milestone" | "dayPl
 
 type MappableTaskRecord = Pick<TaskRecord, "id" | "parentId" | "title" | "description" | "status" | "priority" | "responsibleUserId" | "dueDate" | "version" | "createdAt" | "updatedAt">;
 export type OwnerTaskRecord = MappableTaskRecord & { boardPosition: number; visibleParent?: VisibleParentContext | null };
+// Dashboard-Rohzeile: wie eine mappbare Task, aber ohne verpflichtende boardPosition —
+// die Statistik-/Auswahllogik braucht nur status/id/dueDate/createdAt/updatedAt.
+type DashboardTaskRow = MappableTaskRecord & { visibleParent?: VisibleParentContext | null };
 interface SupportCounts {
   attachmentCount: number;
   noteCount: number;
@@ -533,6 +536,44 @@ export async function listTasks(database: DbClient): Promise<Task[]> {
   return Promise.all(rows.map((task) => mapTask(database, task, Promise.resolve(tagsByTask.get(task.id) ?? []), Promise.resolve(subtaskCounts.get(task.id) ?? 0), undefined, Promise.resolve(supportCountsMap.get(task.id) ?? emptySupportCounts))));
 }
 
+// Seitenbasierte Variante der globalen Aufgabenliste (MS-75 Pagination-Muster, opt-in
+// über den Query-Parameter `page`; listTasks bleibt der Array-Alt-Pfad, DTO identisch).
+// Echte SQL-Pagination: WHERE/ORDER BY/LIMIT/OFFSET + COUNT(*) im Repository; `total` ist
+// die Gesamtzahl nach Filter/Suche VOR der Pagination. Nur die Seiten-Records werden
+// anschließend gebündelt angereichert (je Relation eine Batch-Query über die Seiten-IDs),
+// sodass der Fan-out unabhängig von der Gesamtzahl konstant bleibt.
+export async function listTasksPaginated(
+  database: DbClient,
+  filter: TaskListFilter,
+  page: number,
+  pageSize: number
+): Promise<Paginated<Task>> {
+  const [rows, total] = await Promise.all([
+    taskRepository.findRootTasksPage(database, filter, page, pageSize),
+    taskRepository.countRootTasks(database, filter)
+  ]);
+  const ids = rows.map((task) => task.id);
+  const [tagsByTask, subtaskCounts, supportCountsMap] = await Promise.all([
+    getTaskTagsMap(database, ids),
+    getSubtaskCounts(database, ids),
+    getTaskSupportCounts(database, ids)
+  ]);
+
+  const data = await Promise.all(
+    rows.map((task) =>
+      mapTask(
+        database,
+        task,
+        Promise.resolve(tagsByTask.get(task.id) ?? []),
+        Promise.resolve(subtaskCounts.get(task.id) ?? 0),
+        undefined,
+        Promise.resolve(supportCountsMap.get(task.id) ?? emptySupportCounts)
+      )
+    )
+  );
+  return { data, total, page, pageSize };
+}
+
 async function listNeutralTasks(database: DbClient): Promise<Task[]> {
   const rows = await database
     .select(taskSelect)
@@ -622,12 +663,11 @@ export async function listTaskLinkCandidates(database: DbClient, owner: TaskOwne
 
   const ownerContext = await taskOwnerProjectContext(database, compatibilityOwner);
 
-  const candidatePairs = await Promise.all(
-    allTasks
-      .filter((task) => !linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status))
-      .map(async (task) => ({ task, context: await taskProjectContext(database, task.id) }))
-  );
-  return candidatePairs.filter(({ context }) => projectContextsAreCompatible(ownerContext, context)).map(({ task }) => task);
+  // Kontext aller Kandidaten gebündelt auflösen (eine Handvoll inArray-Queries)
+  // statt pro Aufgabe rekursiv — gleiche Kandidaten, gleiche Kontextmenge.
+  const candidates = allTasks.filter((task) => !linkedTaskIds.has(task.id) && !closedStatusKeys.has(task.status));
+  const contextByTaskId = await buildTaskProjectContextMap(database, candidates.map((task) => task.id));
+  return candidates.filter((task) => projectContextsAreCompatible(ownerContext, contextByTaskId.get(task.id) ?? new Set<number>()));
 }
 
 export async function listSubtasks(database: DbClient, taskId: number): Promise<Task[]> {
@@ -643,14 +683,21 @@ export async function listSubtasks(database: DbClient, taskId: number): Promise<
   return Promise.all(rows.map((task) => mapTask(database, task, Promise.resolve(tagsByTask.get(task.id) ?? []), Promise.resolve(subtaskCounts.get(task.id) ?? 0), undefined, Promise.resolve(supportCountsMap.get(task.id) ?? emptySupportCounts))));
 }
 
-async function listDashboardTasks(database: DbClient, owner?: DashboardTaskOwner): Promise<Task[]> {
+/**
+ * Rohzeilen-Variante von listDashboardTasks für die Dashboard-Statistiken.
+ *
+ * Liefert dieselbe sichtbare Zeilenmenge in EXAKT derselben Reihenfolge wie
+ * listDashboardTasks, aber ohne teures Voll-Mapping (keine Tags/Counts/User pro
+ * Zeile). Die Owner-Sichtbarkeits- und Dedup-Logik (inherited-Milestone-Merge,
+ * Mehrfach-Tagesplan-Dedup, Projekt-Dedup) bleibt zeichengleich erhalten, damit
+ * Status-Counts und recent/overdue-Auswahl unverändert bleiben. Erst die
+ * aufrufende Funktion mappt bei Bedarf die ≤limit ausgewählten Einträge voll.
+ */
+async function listDashboardTaskRows(database: DbClient, owner?: DashboardTaskOwner): Promise<DashboardTaskRow[]> {
   if (!owner) {
-    return listTasks(database);
+    return taskRepository.findRootTasks(database);
   }
   if (owner.type === "dayPlan") {
-    // Persönliche Planung ist datumsübergreifend: alle Tagesplan-Aufgaben desselben Users,
-    // nicht nur die des übergebenen (heutigen) Plans. Der Owner-Plan ist über
-    // ensureDashboardDayPlanAccess bereits dem aktuellen User zugeordnet (keine Fremddaten).
     const ownerPlan = await database
       .select({ userId: dayPlans.userId })
       .from(dayPlans)
@@ -666,30 +713,23 @@ async function listDashboardTasks(database: DbClient, owner?: DashboardTaskOwner
       .innerJoin(dayPlans, eq(dayPlanTasks.ownerId, dayPlans.id))
       .where(and(eq(dayPlans.userId, ownerPlan.userId), isNull(tasks.parentId)))
       .orderBy(tasks.status, dayPlanTasks.position);
-    // Eine Aufgabe kann an mehreren Tagesplänen hängen → dedupliziert genau einmal.
     const seen = new Set<number>();
-    const uniqueRows = rows.filter((row) => {
+    return rows.filter((row) => {
       if (seen.has(row.id)) {
         return false;
       }
       seen.add(row.id);
       return true;
     });
-    const ids = uniqueRows.map((task) => task.id);
-    const [tagsByTask, subtaskCounts, supportCountsMap] = await Promise.all([
-      getTaskTagsMap(database, ids),
-      getSubtaskCounts(database, ids),
-      getTaskSupportCounts(database, ids)
-    ]);
-
-    return Promise.all(uniqueRows.map((task) => mapTaskBoardItem(database, task, tagsByTask.get(task.id) ?? [], subtaskCounts.get(task.id) ?? 0, supportCountsMap.get(task.id) ?? emptySupportCounts)));
   }
   if (owner.type === "task") {
-    return listSubtasks(database, owner.id);
+    await getTaskRecord(database, owner.id);
+    return taskRepository.findChildren(database, owner.id);
   }
   if (owner.type === "project") {
+    await ensureOwnerExists(database, { type: "project", id: owner.id });
     const seen = new Set<number>();
-    return (await listOwnerTasks(database, { type: "project", id: owner.id })).filter((task) => {
+    return (await selectVisibleOwnerTaskRows(database, { type: "project", id: owner.id })).filter((task) => {
       if (seen.has(task.id)) {
         return false;
       }
@@ -697,7 +737,30 @@ async function listDashboardTasks(database: DbClient, owner?: DashboardTaskOwner
       return true;
     });
   }
-  return listOwnerTasks(database, { type: "milestone", id: owner.id });
+  await ensureOwnerExists(database, { type: "milestone", id: owner.id });
+  return selectVisibleOwnerTaskRows(database, { type: "milestone", id: owner.id });
+}
+
+async function mapDashboardTaskRows(database: DbClient, rows: DashboardTaskRow[]): Promise<Task[]> {
+  const ids = rows.map((task) => task.id);
+  const [tagsByTask, subtaskCounts, supportCountsMap] = await Promise.all([
+    getTaskTagsMap(database, ids),
+    getSubtaskCounts(database, ids),
+    getTaskSupportCounts(database, ids)
+  ]);
+
+  return Promise.all(
+    rows.map((task) =>
+      mapTask(
+        database,
+        task,
+        Promise.resolve(tagsByTask.get(task.id) ?? []),
+        Promise.resolve(subtaskCounts.get(task.id) ?? 0),
+        task.visibleParent,
+        Promise.resolve(supportCountsMap.get(task.id) ?? emptySupportCounts)
+      )
+    )
+  );
 }
 
 function dateKey(value: string): number {
@@ -711,7 +774,9 @@ function isOpenTaskStatus(status: string, closedStatusKeys: Set<string>): boolea
 
 export async function getTaskStats(database: DbClient, owner?: DashboardTaskOwner): Promise<TaskStats> {
   const statusCounts: Record<string, number> = {};
-  for (const task of await listDashboardTasks(database, owner)) {
+  // Nur die sichtbaren Rohzeilen zählen — kein Voll-Mapping (Tags/Counts/User) nötig,
+  // da ausschließlich der Status je Zeile relevant ist.
+  for (const task of await listDashboardTaskRows(database, owner)) {
     statusCounts[task.status] = (statusCounts[task.status] ?? 0) + 1;
   }
   return {
@@ -729,20 +794,25 @@ export async function listRecentTasks(
   // Board- und Listen-Widgets zeigen geschlossene Aufgaben in einer eigenen Geschlossen-Gruppe;
   // nur das Journal-Widget ("Aktuelle Aufgaben") blendet sie weiterhin per Default aus.
   const closedStatusKeys = options.includeClosed ? null : await listClosedCatalogEntryKeys(database, "workStatus");
-  return [...(await listDashboardTasks(database, options.owner))]
+  // Auf Rohzeilen filtern/sortieren/schneiden — der Sort-Vergleich nutzt nur
+  // status/id sowie createdAt/updatedAt und hat einen eindeutigen id-Tiebreak;
+  // erst die ≤limit ausgewählten Zeilen werden voll gemappt.
+  const selected = [...(await listDashboardTaskRows(database, options.owner))]
     .filter((task) => closedStatusKeys === null || isOpenTaskStatus(task.status, closedStatusKeys))
     .sort((left, right) => dateKey(right[sort]) - dateKey(left[sort]) || right.id - left.id)
     .slice(0, limit);
+  return mapDashboardTaskRows(database, selected);
 }
 
 export async function listOverdueTasks(database: DbClient, options: { owner?: DashboardOverdueTaskOwner; limit?: number } = {}): Promise<Task[]> {
   const limit = Math.max(1, Math.min(options.limit ?? 10, 50));
   const today = new Date().toISOString().slice(0, 10);
   const closedStatusKeys = await listClosedCatalogEntryKeys(database, "workStatus");
-  return [...(await listDashboardTasks(database, options.owner))]
+  const selected = [...(await listDashboardTaskRows(database, options.owner))]
     .filter((task) => task.dueDate !== null && task.dueDate < today && isOpenTaskStatus(task.status, closedStatusKeys))
     .sort((left, right) => String(left.dueDate).localeCompare(String(right.dueDate)) || left.id - right.id)
     .slice(0, limit);
+  return mapDashboardTaskRows(database, selected);
 }
 
 export async function createOwnerTask(database: DbClient, owner: TaskOwner, input: TaskInput, actor?: JournalActor | null): Promise<TaskBoardItem> {
@@ -1077,7 +1147,6 @@ export async function deleteTask(database: DbClient, id: number, actor?: Journal
     throw conflict(`Aufgabe kann nicht gelöscht werden, solange Beziehungen bestehen: ${blockers.join(", ")}.`);
   }
 
-  await deleteTaskAttachmentsForIds(database, taskIds);
   await deleteTaskNotesForIds(database, taskIds);
   await deleteTaskCommentsForIds(database, taskIds);
 

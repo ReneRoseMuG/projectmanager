@@ -1,7 +1,11 @@
 ﻿import type { FastifyInstance } from "fastify";
-import { createBacklogItem, deleteBacklogItem, getBacklogItem, listBacklogItems, updateBacklogItem, type BacklogFilters, type BacklogInput } from "../services/backlog.service.js";
+import { createBacklogItem, deleteBacklogItem, getBacklogItem, listBacklogItems, listBacklogItemsPaginated, updateBacklogItem, type BacklogFilters, type BacklogInput } from "../services/backlog.service.js";
 import { createJournalActor } from "../services/journal.service.js";
-import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, expectedVersionPropertySchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema } from "../utils/route-schemas.js";
+
+// Query-Parameter der Backlog-Liste: bestehende Filter + optionale Titelsuche (`q`) und
+// opt-in Pagination (`page`/`pageSize`). Ohne `page` bleibt das Verhalten das nackte Array.
+type BacklogListQuery = BacklogFilters & { page?: number; pageSize?: number };
 
 const backlogQuerySchema = {
   type: "object",
@@ -9,7 +13,9 @@ const backlogQuerySchema = {
   properties: {
     featureId: { type: "integer", minimum: 1 },
     useCaseId: { type: "integer", minimum: 1 },
-    status: { type: "string", minLength: 1 }
+    status: { type: "string", minLength: 1 },
+    q: { type: "string", minLength: 1 },
+    ...paginationQuerySchema
   }
 } as const;
 
@@ -40,10 +46,17 @@ const backlogPatchSchema = {
 } as const;
 
 export async function registerBacklogRoutes(app: FastifyInstance): Promise<void> {
-  app.get<{ Params: { id: number }; Querystring: BacklogFilters }>(
+  app.get<{ Params: { id: number }; Querystring: BacklogListQuery }>(
     "/projects/:id/backlog",
-    { schema: { params: idParamSchema, querystring: backlogQuerySchema, response: { 200: arrayResponseSchema } } },
-    async (request) => listBacklogItems(app.db, request.params.id, request.query)
+    // Opt-in Pagination: mit `page` → Paginated<BacklogItem>, ohne → nacktes Array (Alt-Pfad).
+    { schema: { params: idParamSchema, querystring: backlogQuerySchema, response: { 200: { oneOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
+    async (request) => {
+      const { page, pageSize, ...filters } = request.query;
+      if (page === undefined) {
+        return listBacklogItems(app.db, request.params.id, filters);
+      }
+      return listBacklogItemsPaginated(app.db, request.params.id, filters, page, pageSize ?? 25);
+    }
   );
 
   app.post<{ Params: { id: number }; Body: BacklogInput }>(

@@ -28,6 +28,23 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/dom";
 import { describe, expect, it, vi } from "vitest";
 import { addPendingComment, changeInput, clickTab, feature, formTestMocks, getFileInput, project, renderWithProviders, wikiPage } from "../../../../fixtures/web/components/test/ownerFormTestUtils";
 import { ProjectForm } from "../../../../../apps/web/src/components/projects/ProjectForm";
+import * as useBacklogModule from "../../../../../apps/web/src/hooks/useBacklog";
+
+// Der Listen-Skalierungs-Umbau (MS-75) trennt Backlog in useBacklog (Mutationen/Chip-Counts, von der
+// Fixture ownerFormTestUtils gemockt) und das neue useBacklogPaginated (progressiv nachgeladenes
+// Board). ProjectForm konsumiert beide. Der Fixture-Mock von useBacklog gewinnt gegenüber einem
+// zweiten vi.mock hier (Registrierungsreihenfolge), deckt aber useBacklogPaginated nicht ab. Statt
+// die geteilte Fixture zu ändern, wird der fehlende Export zur Laufzeit auf dem gemockten Modul
+// ergänzt — mit einer Rückgabe analog zum echten useBacklogPaginated (items/total/loadedCount/
+// loading/loadingMore/error).
+(useBacklogModule as unknown as { useBacklogPaginated: unknown }).useBacklogPaginated = () => ({
+  items: [],
+  total: 0,
+  loadedCount: 0,
+  loading: false,
+  loadingMore: false,
+  error: null,
+});
 
 function changeTitleInForm(heading: string, value: string) {
   const form = screen.getByRole("heading", { name: heading }).closest("form");
@@ -48,16 +65,18 @@ describe("ProjectForm", () => {
     expect(detailsBody).toHaveClass("w-full");
     expect(detailsBody).not.toHaveClass("max-w-5xl");
 
-    // Details-Tab: Flex-Fill-Kette — overflow-hidden statt overflow-auto damit der Editor wächst
+    // Details-Tab: Der scrollende Content-Wrapper hält die Höhe,
+    // das innere min-h-full-flex-col-Div reicht sie an die fill-Section weiter.
     const contentWrapper = detailsBody?.parentElement;
-    expect(contentWrapper).toHaveClass("overflow-hidden");
-    expect(contentWrapper).not.toHaveClass("overflow-auto");
-    expect(contentWrapper).toHaveClass("flex", "flex-col");
+    expect(detailsBody).toHaveClass("flex", "min-h-full", "flex-col");
+    expect(contentWrapper).toHaveClass("flex-1", "overflow-auto");
+    expect(contentWrapper).not.toHaveClass("overflow-hidden");
 
     clickTab("Aufgaben");
 
-    const boardBody = screen.getByTestId("owner-task-board").closest("section")?.parentElement;
-    expect(boardBody).not.toHaveClass("max-w-5xl");
+    const boardShell = screen.getByTestId("owner-task-board").parentElement;
+    expect(boardShell).toHaveClass("flex", "min-h-full", "flex-col");
+    expect(boardShell).not.toHaveClass("max-w-5xl");
     expect(screen.queryByTestId("form-sidebar")).not.toBeInTheDocument();
   });
 

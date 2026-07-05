@@ -101,7 +101,10 @@ function renderNotesPage() {
 beforeEach(() => {
   pageMocks.useAllNotes.mockReturnValue({
     notes,
+    total: notes.length,
+    loadedCount: notes.length,
     loading: false,
+    loadingMore: false,
     error: null,
     reload: vi.fn(),
     removeNote: vi.fn()
@@ -127,15 +130,24 @@ describe("NotesPage", () => {
     expect(screen.queryByTitle("Neue Notiz")).not.toBeInTheDocument();
   });
 
-  it("filtert Notizen über den Vorschauinhalt", () => {
+  it("reicht die Suche serverseitig als q-Filter durch (Titel + Inhalt)", () => {
+    // Die Suche läuft jetzt serverseitig über useAllNotes/getNotesPage. Das Backend durchsucht
+    // Titel UND content_json (verifiziert in note.repository.ts), deckt also die frühere
+    // clientseitige Vorschau-/Inhaltssuche 1:1 ab. Die Page filtert nicht mehr clientseitig,
+    // sondern gibt den getrimmten Suchbegriff als Filter { q } an den Hook weiter.
     renderNotesPage();
 
     fireEvent.change(screen.getByPlaceholderText("Suchen"), {
-      target: { value: "Alpha" }
+      target: { value: "  Alpha  " }
     });
 
-    expect(screen.getByText("Release-Entscheidung")).toBeInTheDocument();
-    expect(screen.queryByText("Meeting-Notiz")).not.toBeInTheDocument();
+    expect(pageMocks.useAllNotes).toHaveBeenLastCalledWith({ q: "Alpha" });
+  });
+
+  it("übergibt bei leerer Suche einen Filter ohne q", () => {
+    renderNotesPage();
+
+    expect(pageMocks.useAllNotes).toHaveBeenLastCalledWith({});
   });
 
   it("öffnet die bestehende Notiz-Detailroute mit returnTo", async () => {

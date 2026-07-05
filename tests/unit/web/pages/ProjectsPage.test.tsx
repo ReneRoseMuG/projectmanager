@@ -77,13 +77,26 @@ vi.mock("../../../../apps/web/src/hooks/useCatalogs", () => ({
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useProjects", () => ({
+  // Volle Liste + Mutationen (Chip-Counts, Subtitle) — jetzt inkl. updateProjectTags.
   useProjects() {
     return {
       projects: hookMocks.projects,
       loading: false,
       error: null,
       updateProject: vi.fn(),
+      updateProjectTags: vi.fn(),
       removeProject: vi.fn(),
+    };
+  },
+  // Serverseitig gefilterte/progressiv nachgeladene Anzeigeliste (Listen-Skalierung MS-75).
+  useProjectLibrary() {
+    return {
+      projects: hookMocks.projects,
+      total: hookMocks.projects.length,
+      loadedCount: hookMocks.projects.length,
+      loading: false,
+      loadingMore: false,
+      error: null,
     };
   },
 }));

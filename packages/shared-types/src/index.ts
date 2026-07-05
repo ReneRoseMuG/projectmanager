@@ -527,6 +527,15 @@ export interface VersionedUpdate {
 
 export type WithExpectedVersion<T> = T & VersionedUpdate;
 
+// Generische Hülle für seitenbasierte Pagination (page/pageSize + Gesamtzahl).
+// `total` ist die Gesamtzahl NACH Filter/Suche, aber vor dem Zuschnitt auf die Seite.
+export interface Paginated<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface CatalogEntry {
   id: number;
   kind: CatalogKind;
@@ -619,10 +628,14 @@ export interface TagUsageCounts {
   tickets: number;
 }
 
+export type TagDomain = "pm" | "dms";
+
 export interface Tag {
   id: number;
   name: string;
   color: string;
+  isSystem: boolean;
+  domain: TagDomain;
   version: number;
   usageCounts?: TagUsageCounts;
 }
@@ -903,14 +916,34 @@ export interface NoteMoveInput {
   target: MoveOwner<NoteMoveTargetType>;
 }
 
+export interface AttachmentCategory {
+  id: number;
+  name: string;
+  color: string;
+  version: number;
+}
+
+export interface AttachmentFolder {
+  id: number;
+  parentId: number | null;
+  projectId: number | null;
+  name: string;
+  version: number;
+}
+
 export interface Attachment {
   id: number;
   owners: AttachmentOwner[];
   originalName: string;
+  displayName: string | null;
+  description: string | null;
   filename: string;
   mimetype: string;
   size: number;
   url: string;
+  categories?: AttachmentCategory[];
+  tags?: Tag[];
+  folders?: AttachmentFolder[];
   createdAt: string;
   updatedAt: string;
   version: number;

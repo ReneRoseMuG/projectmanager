@@ -41,6 +41,7 @@ import {
   Code2,
   Columns2,
   Copy,
+  Download,
   FileText,
   Heading1,
   Heading2,
@@ -67,6 +68,7 @@ import { Markdown } from "tiptap-markdown";
 import { errorMessage } from "../../hooks/errors";
 import { useStandaloneView } from "../../hooks/useStandaloneView";
 import { hasVisibleHtmlContent } from "../../lib/html-utils";
+import { exportRichTextDocument, type RichTextExportFormat } from "../../utils/richTextExport";
 import { withStandaloneView } from "../../utils/standalone";
 import { useToast } from "./ToastProvider";
 import { Column, ColumnBlock } from "./tiptap-column-node";
@@ -104,6 +106,8 @@ interface RichTextInlineFieldProps {
   wikiPages?: Array<{ id: number; title: string }>;
   /** When false, mounts TipTap in non-editable mode: no toolbar interaction. Wiki links navigate on click in both modes. */
   editable?: boolean;
+  /** Optional title used for DOCX/PDF/Markdown exports from the toolbar. */
+  exportTitle?: string;
   /**
    * Runs before a wiki link inside the content navigates away. Lets the host
    * complete a pending auto-save first; navigation proceeds only when it resolves true.
@@ -126,6 +130,7 @@ interface RichTextInlineEditorProps {
   commitOnBlur: boolean;
   liveUpdate: boolean;
   editable?: boolean;
+  exportTitle?: string;
   onBeforeNavigate?: () => void | Promise<void>;
   onLiveChange: (html: string) => void;
   onFocusStart: (html: string) => void;
@@ -228,7 +233,7 @@ function closestWikiPageAnchor(target: EventTarget | null): HTMLAnchorElement | 
   return targetElement?.closest<HTMLAnchorElement>('a[data-wiki-page-id], a[href^="wiki://"], a[href^="/wiki/"]') ?? null;
 }
 
-export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload, wikiPages, editable, onBeforeNavigate }: RichTextInlineFieldProps) {
+export function RichTextInlineField({ value, valueFormat = "html", onChange, placeholder, minRows, toolbar = "full", readOnly = false, commitOnBlur = true, liveUpdate = false, className = "", fill = false, testIdPrefix, onImageUpload, wikiPages, editable, exportTitle, onBeforeNavigate }: RichTextInlineFieldProps) {
   const [originalValue, setOriginalValue] = useState("");
   const hasContent = valueFormat === "markdown" ? Boolean(value?.trim()) : hasVisibleHtmlContent(value);
   const minRowsStyle = useMemo(() => (minRows ? ({ "--rich-text-field-min-rows": minRows } as React.CSSProperties) : undefined), [minRows]);
@@ -259,6 +264,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
           onImageUpload={onImageUpload}
           wikiPages={wikiPages}
           editable={editable}
+          exportTitle={exportTitle}
           onBeforeNavigate={onBeforeNavigate}
           fill={fill}
           commitOnBlur={commitOnBlur}
@@ -313,7 +319,7 @@ export function RichTextInlineField({ value, valueFormat = "html", onChange, pla
   );
 }
 
-function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, wikiPages, editable, onBeforeNavigate, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
+function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, minRows, toolbar, clickPosition, testIdPrefix, onImageUpload, wikiPages, editable, exportTitle, onBeforeNavigate, fill, commitOnBlur, liveUpdate, onLiveChange, onFocusStart, onCommit, onCancel }: RichTextInlineEditorProps) {
   const cancellingRef = useRef(false);
   const [imageUploadCount, setImageUploadCount] = useState(0);
   const [hasFocus, setHasFocus] = useState(false);
@@ -529,7 +535,7 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
   return (
     <div
       className={cn(
-        fill ? "flex flex-1 flex-col overflow-y-auto" : "overflow-clip",
+        fill ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "overflow-clip",
         "rounded-md border bg-white shadow-sm transition-colors",
         editable === false
           ? "border-transparent shadow-none"
@@ -542,21 +548,23 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
     >
       {toolbar !== "none" ? (
         <div className={cn("sticky top-0 z-10 border-b border-line bg-white", editable === false ? "invisible pointer-events-none" : undefined)}>
-          <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} wikiPages={wikiPages} />
+          <RichTextToolbar editor={editor} variant={toolbar} focused={hasFocus} onImageUpload={onImageUpload} imageUploading={imageUploadCount > 0} wikiPages={wikiPages} exportTitle={exportTitle} />
         </div>
       ) : null}
-      <EditorContent editor={editor} className={fill ? "flex flex-1 flex-col [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1" : undefined} />
+      <EditorContent editor={editor} className={fill ? "flex min-h-0 flex-1 flex-col overflow-y-auto [&_.ProseMirror]:min-h-full [&_.ProseMirror]:flex-1" : undefined} />
     </div>
   );
 }
 
-function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploading, wikiPages }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none">; focused: boolean; onImageUpload?: ImageUploadHandler; imageUploading: boolean; wikiPages?: Array<{ id: number; title: string }> }) {
+function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploading, wikiPages, exportTitle }: { editor: Editor; variant: Exclude<RichTextToolbarVariant, "none">; focused: boolean; onImageUpload?: ImageUploadHandler; imageUploading: boolean; wikiPages?: Array<{ id: number; title: string }>; exportTitle?: string }) {
   const showFullToolbar = variant === "full";
   const [pickerUploading, setPickerUploading] = useState(false);
   const [, setToolbarVersion] = useState(0);
   const [wikiPickerOpen, setWikiPickerOpen] = useState(false);
   const [wikiFilter, setWikiFilter] = useState("");
   const wikiPickerRef = React.useRef<HTMLDivElement>(null);
+  const [exportPickerOpen, setExportPickerOpen] = useState(false);
+  const exportPickerRef = React.useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
   const hasTextSelection = !editor.state.selection.empty;
   const [copied, setCopied] = useState(false);
@@ -581,6 +589,27 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [wikiPickerOpen]);
+
+  React.useEffect(() => {
+    if (!exportPickerOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (exportPickerRef.current && !exportPickerRef.current.contains(e.target as Node)) {
+        setExportPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [exportPickerOpen]);
+
+  const handleExport = (format: RichTextExportFormat) => {
+    try {
+      const fileName = exportRichTextDocument({ html: editor.getHTML(), title: exportTitle, format });
+      setExportPickerOpen(false);
+      showToast({ tone: "success", title: "Datei exportiert", message: fileName });
+    } catch (exportError) {
+      showToast({ tone: "error", title: "Export fehlgeschlagen", message: errorMessage(exportError) });
+    }
+  };
 
   useEffect(() => {
     const refreshToolbarState = () => setToolbarVersion((version) => version + 1);
@@ -690,6 +719,34 @@ function RichTextToolbar({ editor, variant, focused, onImageUpload, imageUploadi
           <ToolbarButton onClick={() => void handleCopyHtml()} active={copied} title={copied ? "Kopiert" : "HTML kopieren"} icon={copied ? <Check /> : <Copy />} />
         </>
       ) : null}
+      <Separator />
+      <div className="relative" ref={exportPickerRef}>
+        <ToolbarButton
+          onClick={() => setExportPickerOpen((open) => !open)}
+          active={exportPickerOpen}
+          title="Als Datei exportieren"
+          icon={<Download />}
+        />
+        {exportPickerOpen ? (
+          <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-md border border-line bg-white py-1 shadow-md">
+            {([
+              ["docx", "DOCX"],
+              ["pdf", "PDF"],
+              ["markdown", "Markdown"],
+            ] as Array<[RichTextExportFormat, string]>).map(([format, label]) => (
+              <button
+                key={format}
+                type="button"
+                className="w-full px-3 py-1.5 text-left text-xs font-medium text-ink hover:bg-shell"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => handleExport(format)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

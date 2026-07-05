@@ -6,12 +6,35 @@ import {
   deleteProject as deleteProjectRequest,
   getProject,
   getProjects,
+  getProjectsPage,
   setProjectTags,
-  updateProject as updateProjectRequest
+  updateProject as updateProjectRequest,
+  type ProjectListFilter
 } from "../api/projects";
 import { invalidateProjectScope, invalidateProjects } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
+import { useProgressiveList } from "./useProgressiveList";
+
+// Progressiv nachladende Projektliste: statt Seitenzahl-Blättern werden die Blöcke
+// sequenziell nachgeladen und angehängt (siehe useProgressiveList). Status und Suche
+// bleiben serverseitig und gehen je Block als Filter mit. `total` ist die Gesamtzahl
+// nach Filter/Suche.
+export function useProjectLibrary(filter: ProjectListFilter) {
+  const { items, total, loadedCount, loading, loadingMore, error } = useProgressiveList(
+    queryKeys.projects.list(filter as object),
+    (page, pageSize) => getProjectsPage(filter, { page, pageSize })
+  );
+  return {
+    projects: items,
+    total,
+    loadedCount,
+    loading,
+    loadingMore,
+    // useProgressiveList liefert error bereits als string | null.
+    error
+  };
+}
 
 export function useProjects(projectId?: number) {
   const queryClient = useQueryClient();
@@ -106,7 +129,9 @@ export function useProjects(projectId?: number) {
   );
 
   return {
-    projects: projectsQuery.data ?? [],
+    // Array-Guard: schützt die Status-Chip-Counts (projects.filter(...)) selbst dann, wenn der
+    // Cache-Eintrag versehentlich mit einer Nicht-Array-Form belegt würde (siehe useProgressiveList).
+    projects: Array.isArray(projectsQuery.data) ? projectsQuery.data : [],
     project: projectQuery.data ?? null,
     loading: projectsQuery.isLoading || projectQuery.isLoading,
     error: toQueryError(projectsQuery.error ?? projectQuery.error),

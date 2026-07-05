@@ -2,7 +2,7 @@ import type { AdminUser, AdminUserInput, AdminUserUpdate, Role, UserOption } fro
 import bcrypt from "bcryptjs";
 import { inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
-import { users } from "../db/schema.js";
+import { roles, users } from "../db/schema.js";
 import { roleRepository } from "../repositories/role.repository.js";
 import { userRepository, type UserRecord, type UserUpdateData } from "../repositories/user.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
@@ -72,6 +72,11 @@ async function resolveRole(database: DbClient, roleId: number): Promise<Role> {
 
 export async function mapAdminUser(database: DbClient, record: UserRecord): Promise<AdminUser> {
   const role = await resolveRole(database, record.roleId);
+  return buildAdminUser(record, role);
+}
+
+// Baut das AdminUser-DTO aus Record + bereits aufgelöster Rolle (identische Feldstruktur wie zuvor).
+function buildAdminUser(record: UserRecord, role: Role): AdminUser {
   return {
     id: record.id,
     firstName: record.firstName,
@@ -88,9 +93,34 @@ export async function mapAdminUser(database: DbClient, record: UserRecord): Prom
   };
 }
 
+// Lädt alle vorkommenden Rollen samt Permissions gebündelt (2 Queries statt 2 pro User)
+// und liefert eine roleId → Role Map. Fehlerverhalten identisch zu resolveRole.
+async function loadRolesForUsers(database: DbClient, records: UserRecord[]): Promise<Map<number, Role>> {
+  const roleIds = [...new Set(records.map((record) => record.roleId))];
+  const roleMap = new Map<number, Role>();
+  if (roleIds.length === 0) {
+    return roleMap;
+  }
+  // Rollen und Permissions je einmal gebündelt laden (inArray statt Query pro Rolle)
+  const roleRecords = await database.select().from(roles).where(inArray(roles.id, roleIds));
+  const permissionRecords = await roleRepository.findPermissionsByRoleIds(database, roleIds);
+  for (const roleRecord of roleRecords) {
+    roleMap.set(roleRecord.id, mapRole(roleRecord, permissionRecords));
+  }
+  // Fehlerfall wie bei resolveRole: referenzierte Rolle existiert nicht
+  for (const roleId of roleIds) {
+    if (!roleMap.has(roleId)) {
+      throw badRequest(`Role with id ${roleId} does not exist`);
+    }
+  }
+  return roleMap;
+}
+
 export async function listAdminUsers(database: DbClient): Promise<AdminUser[]> {
   const users = await userRepository.findAll(database);
-  return Promise.all(users.map((user) => mapAdminUser(database, user)));
+  const roleMap = await loadRolesForUsers(database, users);
+  // Zuordnung im Speicher — keine Query pro User mehr
+  return users.map((user) => buildAdminUser(user, roleMap.get(user.roleId) as Role));
 }
 
 export function mapUserOption(record: UserRecord): UserOption {

@@ -2,7 +2,7 @@ import type { PushSubscriptionInput, PushSubscriptionStatus, PushVapidKeyRespons
 import webpush from "web-push";
 import type { AppConfig } from "../config.js";
 import type { DbClient } from "../db/client.js";
-import { notificationRepository } from "../repositories/notification.repository.js";
+import { notificationRepository, sentNotificationKey } from "../repositories/notification.repository.js";
 import { pushSubscriptionRepository, type PushSubscriptionRecord } from "../repositories/push-subscription.repository.js";
 import { badRequest } from "../utils/errors.js";
 import { listDueNotificationEvents, listNotificationRecipients, type NotificationLogger } from "./notification.service.js";
@@ -104,13 +104,29 @@ export async function sendPendingPushNotifications(database: DbClient, appConfig
   const now = options.now ?? new Date();
   const dueEvents = await listDueNotificationEvents(database, now);
   const recipients = await listNotificationRecipients(database);
+  if (dueEvents.length === 0 || recipients.length === 0) {
+    return;
+  }
+
+  // Pro Tick EINMAL alle bereits gesendeten Push-Kombinationen laden statt wasSent pro Kombination.
+  const sentKeys = await notificationRepository.findSentKeys(database, {
+    eventIds: dueEvents.map((event) => event.id),
+    userIds: recipients.map((recipient) => recipient.id),
+    channel: "push"
+  });
+  // Push-Subscriptions pro Tick EINMAL für alle Empfänger laden (findByUsers statt findByUser je Iteration).
+  // Die Subscription hängt nicht vom Event ab — Reihenfolge pro User identisch zu findByUser.
+  const subscriptionsByUser = await pushSubscriptionRepository.findByUsers(database, recipients.map((recipient) => recipient.id));
+  // Neue "gesendet"-Einträge sammeln und am Ende als Batch-Insert schreiben.
+  const recorded: Array<{ eventId: number; userId: number; channel: "push"; reminderMinutes: number; sentAt: string }> = [];
 
   for (const event of dueEvents) {
     for (const recipient of recipients) {
-      if (await notificationRepository.wasSent(database, { eventId: event.id, userId: recipient.id, channel: "push", reminderMinutes: event.reminderMinutes })) {
+      const key = sentNotificationKey({ eventId: event.id, userId: recipient.id, channel: "push", reminderMinutes: event.reminderMinutes });
+      if (sentKeys.has(key)) {
         continue;
       }
-      const subscriptions = await pushSubscriptionRepository.findByUser(database, recipient.id);
+      const subscriptions = subscriptionsByUser.get(recipient.id) ?? [];
       if (subscriptions.length === 0) {
         continue;
       }
@@ -130,7 +146,9 @@ export async function sendPendingPushNotifications(database: DbClient, appConfig
       }
 
       if (delivered) {
-        await notificationRepository.recordSent(database, {
+        // Innerhalb desselben Ticks Doppelversand vermeiden, falls dieselbe Kombination erneut auftritt.
+        sentKeys.add(key);
+        recorded.push({
           eventId: event.id,
           userId: recipient.id,
           channel: "push",
@@ -140,4 +158,6 @@ export async function sendPendingPushNotifications(database: DbClient, appConfig
       }
     }
   }
+
+  await notificationRepository.recordSentMany(database, recorded);
 }

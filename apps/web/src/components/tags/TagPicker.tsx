@@ -1,4 +1,4 @@
-import type { Tag } from "@taskmanager/shared-types";
+import type { Tag, TagDomain } from "@taskmanager/shared-types";
 import { Minus, Plus, Tag as TagIcon } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,6 +8,7 @@ import { useTags } from "../../hooks/useTags";
 interface TagPickerProps {
   selected: Tag[];
   onChange: (tags: Tag[]) => void;
+  domain: TagDomain;
   variant?: "default" | "panel";
 }
 
@@ -41,8 +42,8 @@ function TagPill({ tag, onRemove }: { tag: Tag; onRemove: (id: number) => void }
   );
 }
 
-export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
-  const { tags, createTag } = useTags();
+export function TagPicker({ selected, onChange, domain, variant }: TagPickerProps) {
+  const { tags, createTag } = useTags(domain);
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
@@ -58,10 +59,11 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
     () =>
       tags.filter(
         (t) =>
+          t.domain === domain &&
           !selectedIds.has(t.id) &&
           t.name.toLowerCase().includes(search.toLowerCase()),
       ),
-    [tags, selectedIds, search],
+    [tags, domain, selectedIds, search],
   );
 
   useEffect(() => {
@@ -123,7 +125,7 @@ export function TagPicker({ selected, onChange, variant }: TagPickerProps) {
   const createAndAdd = async () => {
     const trimmed = newName.trim();
     if (!trimmed) return;
-    const tag = await createTag({ name: trimmed, color: newColor });
+    const tag = await createTag({ name: trimmed, color: newColor, domain });
     onChange([...selected, tag]);
     setNewName("");
     setNewColor(DEFAULT_TAG_COLOR);

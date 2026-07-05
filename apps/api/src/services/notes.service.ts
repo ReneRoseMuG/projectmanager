@@ -1,4 +1,4 @@
-import type { MoveOwner, Note, NoteInput, NoteMoveInput, NoteUpdate, VisibleParentContext } from "@taskmanager/shared-types";
+import type { MoveOwner, Note, NoteInput, NoteMoveInput, NoteUpdate, Paginated, VisibleParentContext } from "@taskmanager/shared-types";
 import { and, eq, inArray } from "drizzle-orm";
 import type { DbClient, DbSession } from "../db/client.js";
 import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
@@ -335,6 +335,31 @@ export async function listNotes(database: DbClient): Promise<Note[]> {
   const parentContextsByNoteId = await listParentContextsByNoteId(database, rows.map((row) => row.id));
 
   return rows.map((row) => mapNote(row, parentContextsByNoteId.get(row.id) ?? []));
+}
+
+export interface NotesPageFilter {
+  q?: string;
+}
+
+// Seitenbasierte Variante der Notizen-Hauptliste (MS-75 Pagination-Muster). Opt-in über den
+// Query-Parameter `page`; `listNotes` bleibt der Array-Alt-Pfad. Filter/Suche bilden exakt die
+// bisherige clientseitige Suche nach (Titel ODER Inhalt) ab. `total` = Anzahl nach Filter, VOR
+// Pagination. Echte SQL-Pagination im Repository (WHERE + ORDER BY + LIMIT/OFFSET + COUNT(*));
+// nur die geladenen Seiten-Zeilen werden anschließend mit parentContexts angereichert.
+export async function listNotesPaginated(
+  database: DbClient,
+  filter: NotesPageFilter,
+  page: number,
+  pageSize: number
+): Promise<Paginated<Note>> {
+  const [total, rows] = await Promise.all([
+    noteRepository.countForSearch(database, filter.q),
+    noteRepository.listForSearchPage(database, { q: filter.q, page, pageSize })
+  ]);
+
+  const parentContextsByNoteId = await listParentContextsByNoteId(database, rows.map((row) => row.id));
+  const data = rows.map((row) => mapNote(row, parentContextsByNoteId.get(row.id) ?? []));
+  return { data, total, page, pageSize };
 }
 
 export async function createProjectNote(database: DbClient, projectId: number, input: NoteInput, actor?: JournalActor | null): Promise<Note> {

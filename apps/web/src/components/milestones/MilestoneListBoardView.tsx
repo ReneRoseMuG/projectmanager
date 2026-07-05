@@ -29,6 +29,16 @@ interface MilestoneListBoardViewProps {
   onCreateTicket?: (milestone: Milestone) => void;
   filters?: ReactNode;
   readOnly?: boolean;
+  // Optional kontrollierte Suche: sind beide gesetzt, wird das Suchfeld von außen gesteuert
+  // (z. B. serverseitige `q`-Suche in der globalen Meilensteinliste) und die interne
+  // Namensfilterung entfällt. Ohne diese Props bleibt das clientseitige Verhalten unverändert.
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  // Optional kontrollierter Statusfilter: ist `onStatusFilterChange` gesetzt, filtert der
+  // Server nach Status; die interne Statusfilterung und die interne FilterChips-Leiste
+  // entfallen (die Seite reicht die Chips dann über `filters` herein).
+  statusFilter?: Milestone["status"] | "all";
+  onStatusFilterChange?: (status: Milestone["status"] | "all") => void;
 }
 
 function toListBoardMode(viewMode: ViewMode): ListBoardMode {
@@ -48,23 +58,35 @@ function matchesSearch(milestone: Milestone, searchValue: string) {
   return milestone.name.toLocaleLowerCase("de-DE").includes(normalized);
 }
 
-export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange, onCreateTask, onCreateTicket, filters, readOnly = false }: MilestoneListBoardViewProps) {
+export function MilestoneListBoardView({ milestones, loading = false, viewMode, onViewModeChange, onCreate, onEdit, onOpenInTab, onDelete, onStatusChange, onDueDateChange, onTagsChange, onCreateTask, onCreateTicket, filters, readOnly = false, searchValue: controlledSearchValue, onSearchChange: controlledOnSearchChange, statusFilter: controlledStatusFilter, onStatusFilterChange: controlledOnStatusFilterChange }: MilestoneListBoardViewProps) {
   const catalogs = useCatalogs();
   const canReadTags = useHasPermission("tags", "read");
   const canWriteMilestones = useHasPermission("milestones", "write");
   const [internalViewMode, setInternalViewMode] = useState<ViewMode>("kanban");
-  const [searchValue, setSearchValue] = useState("");
-  const [statusFilter, setStatusFilter] = useState<Milestone["status"] | "all">("all");
+  const [internalSearchValue, setInternalSearchValue] = useState("");
+  const [internalStatusFilter, setInternalStatusFilter] = useState<Milestone["status"] | "all">("all");
+  // Kontrollierte Suche/Status (serverseitig) haben Vorrang: dann keine interne Filterung,
+  // weil die Liste bereits gefiltert vom Server kommt. Sonst wie bisher clientseitig.
+  const searchControlled = controlledOnSearchChange !== undefined;
+  const searchValue = searchControlled ? controlledSearchValue ?? "" : internalSearchValue;
+  const setSearchValue = searchControlled ? controlledOnSearchChange : setInternalSearchValue;
+  const statusControlled = controlledOnStatusFilterChange !== undefined;
+  const statusFilter = statusControlled ? controlledStatusFilter ?? "all" : internalStatusFilter;
+  const setStatusFilter = statusControlled ? controlledOnStatusFilterChange : setInternalStatusFilter;
   const currentViewMode = viewMode ?? internalViewMode;
   const statusColumns = useMemo(
     () => catalogEntriesByKind(catalogs.entries, "workStatus").map((entry) => ({ value: entry.key, label: entry.label, sortOrder: entry.sortOrder, isClosed: entry.isClosed, color: entry.color })),
     [catalogs.entries],
   );
+  // Server-Modus liefert die Liste bereits gefiltert/paginiert — interne Filterung entfällt.
   const filteredMilestones = useMemo(
-    () => milestones.filter((milestone) => statusFilter === "all" || milestone.status === statusFilter),
-    [milestones, statusFilter],
+    () => (statusControlled ? milestones : milestones.filter((milestone) => statusFilter === "all" || milestone.status === statusFilter)),
+    [milestones, statusFilter, statusControlled],
   );
-  const visibleMilestones = useMemo(() => filteredMilestones.filter((milestone) => matchesSearch(milestone, searchValue)), [filteredMilestones, searchValue]);
+  const visibleMilestones = useMemo(
+    () => (searchControlled ? filteredMilestones : filteredMilestones.filter((milestone) => matchesSearch(milestone, searchValue))),
+    [filteredMilestones, searchValue, searchControlled],
+  );
   const filterOptions = statusColumns.map((column) => ({
     value: column.value as Milestone["status"],
     label: column.label,
@@ -72,7 +94,7 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
     count: milestones.filter((milestone) => milestone.status === column.value).length,
   }));
   const tagEditingEnabled = !readOnly && canReadTags && canWriteMilestones && Boolean(onTagsChange);
-  const tagController = useTags(tagEditingEnabled);
+  const tagController = useTags("pm", tagEditingEnabled);
   const editableTags = tagEditingEnabled ? tagController.tags : undefined;
   const handleTagsChange = tagEditingEnabled ? onTagsChange : undefined;
 
@@ -103,7 +125,7 @@ export function MilestoneListBoardView({ milestones, loading = false, viewMode, 
       onItemStatusChange={!readOnly && onStatusChange ? (milestone, status) => onStatusChange(milestone, status as Milestone["status"]) : undefined}
       searchValue={searchValue}
       onSearchChange={setSearchValue}
-      toolbarFilters={<FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={milestones.length} />}
+      toolbarFilters={statusControlled ? undefined : <FilterChips value={statusFilter} onChange={setStatusFilter} options={filterOptions} allCount={milestones.length} />}
       filters={readOnly ? undefined : filters}
       loading={loading}
       emptyState={<EmptyState icon={<Flag size={22} />} title="Keine Meilensteine" body="Lege Meilensteine an, um Projektziele und abhängige Arbeit zu bündeln." tone="teal" variant="tinted" />}

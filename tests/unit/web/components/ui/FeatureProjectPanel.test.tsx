@@ -21,7 +21,11 @@ import type { ViewMode } from "../../../../../apps/web/src/types";
 import { FeatureProjectPanel } from "../../../../../apps/web/src/components/features/FeatureProjectPanel";
 import { buildProject, buildProjectSet, buildTag } from "../../../../fixtures/web/components/ui/factories";
 
-const workStatusColumnCount = 12;
+// workStatus-Katalog hat 12 Einträge; sechs davon sind geschlossen (completed,
+// archived, done, resolved, closed, rejected). Nach dem Board-Redesign sind nur die
+// sechs OFFENEN Status reguläre `section.rounded-lg`; geschlossene Spalten wandern in
+// die ClosedBoardSidebar (<aside>).
+const openWorkStatusColumnCount = 6;
 
 vi.mock("../../../../../apps/web/src/hooks/useCatalogs", () => ({
   useCatalogs() {
@@ -104,22 +108,25 @@ describe("FeatureProjectPanel", () => {
     ).not.toBeInTheDocument();
 
     const columns = container.querySelectorAll("section.rounded-lg");
-    expect(columns).toHaveLength(workStatusColumnCount);
+    expect(columns).toHaveLength(openWorkStatusColumnCount);
+    // "Aktiv" ist ein offener Status und bleibt Board-Spalte; "Archiviert" ist
+    // geschlossen und hat daher keine Section-Überschrift mehr.
     expect(screen.getByRole("heading", { name: "Aktiv" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Archiviert" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("heading", { name: "Archiviert" }),
+    ).not.toBeInTheDocument();
 
     const activeColumn = screen
       .getByRole("heading", { name: "Aktiv" })
       .closest("section");
     expect(activeColumn).toContainElement(screen.getByText("Projekt Aktiv"));
-    const archivedColumn = screen
-      .getByRole("heading", { name: "Archiviert" })
-      .closest("section");
-    expect(archivedColumn).toContainElement(
-      screen.getByText("Projekt Archiviert"),
-    );
+
+    // Das archivierte (geschlossene) Projekt erscheint in der ClosedBoardSidebar.
+    const closedSidebar = container.querySelector("aside") as HTMLElement;
+    expect(closedSidebar).toBeInTheDocument();
+    expect(
+      within(closedSidebar).getByText("Projekt Archiviert"),
+    ).toBeInTheDocument();
   });
 
   it("fügt ein ausgewähltes Projekt über den Plus-Flow hinzu", async () => {
@@ -199,17 +206,28 @@ describe("FeatureProjectPanel", () => {
     );
   });
 
-  it("meldet Moduswechsel und zeigt EmptyState ohne verknüpfte Projekte", () => {
+  it("meldet Moduswechsel über die Ansichtsumschaltung", () => {
     const onViewModeChange = vi.fn();
-    const { container } = renderFeatureProjectPanel({
-      projects: [],
-      onViewModeChange,
-    });
+    // Moduswechsel setzt eine sichtbare Ansichtsumschaltung voraus; diese erscheint nur
+    // bei vorhandenen Projekten (bei leerer Liste blendet die Toolbar sie bewusst aus).
+    renderFeatureProjectPanel({ onViewModeChange });
 
     fireEvent.click(screen.getByRole("button", { name: "Liste" }));
 
     expect(onViewModeChange).toHaveBeenCalledWith("list");
+  });
+
+  it("zeigt EmptyState ohne verknüpfte Projekte und ohne Ansichtsumschaltung", () => {
+    const { container } = renderFeatureProjectPanel({ projects: [] });
+
+    // Bei leerer Liste gibt es keine Karten/Zeilen und keine Ansichtsumschaltung.
     expect(screen.getByText("Keine Projekte verknüpft")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Liste" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Kanban" }),
+    ).not.toBeInTheDocument();
     expect(
       container.querySelector("article[class*='border-l-[4px]']"),
     ).not.toBeInTheDocument();

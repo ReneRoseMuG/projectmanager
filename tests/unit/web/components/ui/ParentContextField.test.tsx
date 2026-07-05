@@ -5,7 +5,7 @@
  * ParentContextField
  *
  * Abgedeckte Regeln:
- * - Sichtbare Parent-Kontexte werden als read-only Badges mit Referenz gerendert.
+ * - Sichtbare Parent-Kontexte werden als read-only Chips mit eindeutiger Referenz, Icon und Label gerendert.
  * - Leere oder fehlende Parent-Kontexte erzeugen keine UI.
  * - Bei onUnlink erscheint ein ×-Button nur für direct-Einträge mit unlinkbarem Typ (TKT-65).
  * - inherited-Einträge und nicht-unlinkbare Typen (task, ticket) erhalten keinen ×-Button.

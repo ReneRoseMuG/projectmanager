@@ -2,6 +2,22 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 05.07.26 | 10:31:47 | Fix | Flex-Fill Test-Assertions | ✅ |
+| 05.07.26 | 07:55:34 | Fix | Parent Context Referenz | ✅ |
+| 05.07.26 | 07:52:02 | Fix | API Config Test Isolation | ✅ |
+| 05.07.26 | 07:43:53 | Fix | Veraltete Test-Assertions | ✅ |
+| 05.07.26 | 07:07:47 | Fix | Editor-Dateiexport | ✅ |
+| 05.07.26 | 06:54:43 | Fix | Rich Text Bold Auswahl | ✅ |
+| 05.07.26 | 06:47:01 | Fix | Wiki Editor Toolbar Sticky | ✅ |
+| 04.07.26 | 23:11:02 | Feature | Tag-Domäne (PM/DMS) + Sichtbarkeitstrennung | ✅ |
+| 04.07.26 | 13:06:59 | Feature | Progressives Nachladen statt Pagination | ✅ |
+| 04.07.26 | 12:43:03 | Feature | Seitenzahl-Pagination für Listen | ✅ |
+| 04.07.26 | 11:40:56 | Feature/Fix | Datenzugriffe-Audit + Fixes (Cluster A–E) | ⚠️ |
+| 04.07.26 | 10:37:34 | Nachtrag | MCP-Kommentar nachgeholt | ✅ |
+| 04.07.26 | 07:33:00 | Nachtrag | MCP-Kommentar blockiert | ⚠️ |
+| 04.07.26 | 07:31:33 | Fix | MS-75 Migration abbruchsicher | ✅ |
+| 04.07.26 | 07:21:07 | Diagnose | MS-75 DMS 500 Schema-Drift | 🔎 |
+| 03.07.26 | 12:04:02 | Feature | MS-75 DMS Umsetzung (Pakete 1–7) | ⚠️ |
 | 03.07.26 | 06:32:32 | Feature | Termin-Uhrzeit + zentrale Zeitformatierung | ✅ |
 | 03.07.26 | 06:19:50 | Feature | Attachments auf Nextcloud | ✅ |
 | 02.07.26 | 15:35:35 | Fix | DayPlan Aufgaben-Tab | ✅ |

@@ -1,8 +1,10 @@
 import type { Ticket } from "@taskmanager/shared-types";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import type { TicketOwner } from "../api/tickets";
+import type { TicketListFilter, TicketOwner } from "../api/tickets";
 import { TicketListBoardView } from "../components/tickets/TicketListBoardView";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
+import { LoadMoreIndicator } from "../components/ui/LoadMoreIndicator";
 import { PageHero } from "../components/ui/PageHero";
 import { ProjectMilestoneFilterBar } from "../components/ui/ProjectMilestoneFilterBar";
 import { useToast } from "../components/ui/ToastProvider";
@@ -10,7 +12,7 @@ import { errorMessageAsync } from "../hooks/errors";
 import { useMilestones } from "../hooks/useMilestones";
 import { useProjects } from "../hooks/useProjects";
 import { useStandaloneView } from "../hooks/useStandaloneView";
-import { useTickets } from "../hooks/useTickets";
+import { useTickets, useTicketsLibrary } from "../hooks/useTickets";
 import { useViewMode } from "../hooks/useViewMode";
 import { withStandaloneView } from "../utils/standalone";
 
@@ -48,6 +50,31 @@ export function TicketsPage() {
       ? { type: "project", id: projectId }
       : null;
   const tickets = useTickets(owner ?? undefined);
+
+  // Progressives Nachladen NUR für die projektübergreifende Hauptliste (kein Owner). Bei
+  // gewähltem Projekt/Meilenstein bleibt die owner-gebundene Liste (useTickets) unberührt.
+  const isGlobalList = owner === null;
+  const [statusFilter, setStatusFilter] = useState<Ticket["status"] | "all">("all");
+  const [search, setSearch] = useState<string>("");
+  // Serverseitiger Filter: Status (Gleichheit) + Freitextsuche `q` (Titel). Ersetzt die
+  // frühere clientseitige Filterung in der TicketListBoardView. Chip-Counts bleiben dort
+  // aus der (vollen) Seitenliste; gefiltert wird serverseitig über die Gesamtmenge.
+  const listFilter = useMemo<TicketListFilter>(() => {
+    const next: TicketListFilter = {};
+    if (statusFilter !== "all") {
+      next.status = statusFilter;
+    }
+    if (search.trim()) {
+      next.q = search.trim();
+    }
+    return next;
+  }, [statusFilter, search]);
+  const ticketsLibrary = useTicketsLibrary(listFilter);
+
+  // Datenquelle je nach Kontext: progressiv nachgeladene Hauptliste vs. owner-gebundene Liste.
+  const listTickets = isGlobalList ? ticketsLibrary.tickets : tickets.tickets;
+  const listLoading = isGlobalList ? ticketsLibrary.loading : tickets.loading;
+  const listError = isGlobalList ? ticketsLibrary.error : tickets.error;
   const currentReturnTo = `${location.pathname}${location.search}`;
   const targetForMode = (to: string) => (standalone ? withStandaloneView(to) : to);
 
@@ -136,19 +163,19 @@ export function TicketsPage() {
       <PageHero
         variant="list"
         title="Tickets"
-        subtitle={`${tickets.tickets.length} Einträge`}
+        subtitle={`${isGlobalList ? ticketsLibrary.total : tickets.tickets.length} Einträge`}
       />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-auto px-4 pt-4 md:px-5 md:pt-5">
-        {tickets.error || projects.error || milestones.error ? (
+        {listError || projects.error || milestones.error ? (
           <div className="rounded-md border border-crimson bg-crimson/10 p-3 text-sm text-crimson">
-            {tickets.error ?? projects.error ?? milestones.error}
+            {listError ?? projects.error ?? milestones.error}
           </div>
         ) : null}
 
         <TicketListBoardView
-          tickets={tickets.tickets}
-          loading={tickets.loading || projects.loading || milestones.loading}
+          tickets={listTickets}
+          loading={listLoading || projects.loading || milestones.loading}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onAdd={() => navigate(ticketCreateTarget())}
@@ -159,6 +186,12 @@ export function TicketsPage() {
           onStatusChange={updateTicketStatus}
           onDueDateChange={updateTicketDueDate}
           onTagsChange={updateTicketTags}
+          // Nur in der Hauptliste steuern wir Suche/Status serverseitig; bei gewähltem
+          // Projekt/Meilenstein bleibt die interne clientseitige Filterung unverändert.
+          searchValue={isGlobalList ? search : undefined}
+          onSearchChange={isGlobalList ? setSearch : undefined}
+          statusFilter={isGlobalList ? statusFilter : undefined}
+          onStatusFilterChange={isGlobalList ? setStatusFilter : undefined}
           filters={
             <ProjectMilestoneFilterBar
               projects={projects.projects}
@@ -170,6 +203,14 @@ export function TicketsPage() {
             />
           }
         />
+
+        {isGlobalList ? (
+          <LoadMoreIndicator
+            loadedCount={ticketsLibrary.loadedCount}
+            total={ticketsLibrary.total}
+            loadingMore={ticketsLibrary.loadingMore}
+          />
+        ) : null}
       </div>
     </div>
   );

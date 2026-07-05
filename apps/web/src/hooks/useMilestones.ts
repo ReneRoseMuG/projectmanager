@@ -1,4 +1,4 @@
-import type { MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
+import type { Milestone, MilestoneInput, MilestoneUpdate } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import {
@@ -7,16 +7,38 @@ import {
   deleteMilestone as deleteMilestoneRequest,
   getMilestone,
   getMilestones,
+  getMilestonesPage,
   getProjectMilestones,
   setMilestoneTags,
-  updateMilestone as updateMilestoneRequest
+  updateMilestone as updateMilestoneRequest,
+  type MilestoneListFilter
 } from "../api/milestones";
+import { useProgressiveList } from "./useProgressiveList";
 import { invalidateMilestoneScope, invalidateMilestones } from "../queries/invalidation";
 import { toQueryError } from "../queries/queryErrors";
 import { queryKeys } from "../queries/queryKeys";
 
 interface UseMilestonesOptions {
   enabled?: boolean;
+}
+
+// Progressiv nachladende globale Meilensteinliste (statt Seitenzahl-Blättern). Die Blöcke
+// werden sequenziell über den paginierten Backend-Pfad geholt und angehängt, bis alle
+// Datensätze geladen sind; `total` ist die Gesamtzahl nach Filter/Suche. Nur für die globale
+// Liste — projektgebundene Listen laufen weiterhin über useMilestones.
+export function useMilestoneLibrary(filter: MilestoneListFilter) {
+  const { items, total, loadedCount, loading, loadingMore, error } = useProgressiveList<Milestone>(
+    queryKeys.milestones.list(filter as object),
+    (page, pageSize) => getMilestonesPage(filter, { page, pageSize })
+  );
+  return {
+    milestones: items,
+    total,
+    loadedCount,
+    loading,
+    loadingMore,
+    error
+  };
 }
 
 export function useMilestones(milestoneId?: number | null, projectId?: number | null, options: UseMilestonesOptions = {}) {
@@ -125,7 +147,9 @@ export function useMilestones(milestoneId?: number | null, projectId?: number | 
   );
 
   return {
-    milestones: milestonesQuery.data ?? [],
+    // Array-Guard: schützt die Status-Chip-Counts (milestones.filter(...)) selbst dann, wenn der
+    // Cache-Eintrag versehentlich mit einer Nicht-Array-Form belegt würde (siehe useProgressiveList).
+    milestones: Array.isArray(milestonesQuery.data) ? milestonesQuery.data : [],
     milestone: milestoneQuery.data ?? null,
     loading: milestonesQuery.isLoading || milestoneQuery.isLoading,
     error: toQueryError(milestonesQuery.error ?? milestoneQuery.error),

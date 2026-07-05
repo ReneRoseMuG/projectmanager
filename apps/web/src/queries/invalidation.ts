@@ -28,6 +28,10 @@ export async function invalidateAdminRoles(queryClient: QueryClient): Promise<vo
   await invalidateMany(queryClient, [queryKeys.adminRoles.root, queryKeys.adminUsers.root, queryKeys.users.root, queryKeys.auth.root]);
 }
 
+export async function invalidateDocuments(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.documents.root, queryKeys.globalSearch.root]);
+}
+
 export async function invalidateMilestones(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.milestones.root, queryKeys.projects.root, queryKeys.dashboards.root, queryKeys.globalSearch.root]);
 }

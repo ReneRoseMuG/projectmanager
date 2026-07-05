@@ -31,6 +31,7 @@ description: >
 - UI-Visuals, Layout, Styling, Dashboards, Formulare oder Interaktionen betroffen → `docs/design-leitfaden.md` laden
 - DB-Migration, Dump-Registry, Truncate-Fixture oder Seed-Änderung nötig?
 - Query-Keys, Invalidierung, TanStack-Hooks oder E2E-Setup betroffen?
+- Skalierung/Zugriffsmuster: Wie viele Datensätze realistisch (bis in die Tausende)? Wie viele DB-Roundtrips je Anfrage? N+1- oder Pool-Risiko (Aiven: `connectionLimit 10`, `queueLimit 50`)? Sammel-Queries gebündelt (`inArray`) statt pro Element?
 - Was bleibt bewusst unverändert?
 - Was kann kaputtgehen — wie wird das Risiko begrenzt?
 - Woran ist Erfolg beobachtbar — welcher Test oder welche Prüfung beweist die Umsetzung?
@@ -131,6 +132,7 @@ Vor jedem Plan benennen:
 - [ ] Betroffene Domäne und Schichten
 - [ ] Auth/Rollen/Permissions betroffen?
 - [ ] DB-Migration nötig?
+- [ ] Skalierung/N+1 geprüft (reale Datenmenge, Roundtrips, gebündelte statt Pro-Element-Queries)?
 - [ ] UI/Design-Leitfaden relevant?
 - [ ] Was bleibt unverändert?
 - [ ] Beobachtbare Erfolgskriterien / Verifikationsweg benannt

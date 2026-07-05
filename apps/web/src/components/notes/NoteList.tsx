@@ -1,6 +1,6 @@
 import type { MoveOwner, Note } from "@taskmanager/shared-types";
 import { StickyNote } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { errorMessage } from "../../hooks/errors";
 import type { NoteOwner } from "../../hooks/useNotes";
 import { withStandaloneView } from "../../utils/standalone";
@@ -24,6 +24,13 @@ interface NoteListProps {
   loading?: boolean;
   emptyTitle?: string;
   emptyBody?: string;
+  // Kontrollierte Suche: Wird `search` gesetzt, übernimmt der Aufrufer die Filterung
+  // (z. B. serverseitig paginiert). Die Liste filtert dann NICHT mehr selbst und reicht
+  // Suchwert/Handler nur an die Toolbar durch. Ohne diese Props gilt das bisherige
+  // Verhalten mit interner clientseitiger Suche.
+  search?: string;
+  onSearchChange?: (value: string) => void;
+  footer?: ReactNode;
 }
 
 function matchesSearch(note: Note, searchValue: string) {
@@ -109,14 +116,22 @@ export function NoteList({
   canDelete = true,
   loading = false,
   emptyTitle = "Keine Notizen",
-  emptyBody = "Erstelle eine Notiz, um Kontext und Entscheidungen festzuhalten."
+  emptyBody = "Erstelle eine Notiz, um Kontext und Entscheidungen festzuhalten.",
+  search,
+  onSearchChange,
+  footer
 }: NoteListProps) {
   const [mode, setMode] = useState<ListBoardMode>("board");
-  const [searchValue, setSearchValue] = useState("");
+  const [internalSearch, setInternalSearch] = useState("");
   const [moveNote, setMoveNote] = useState<Note | null>(null);
+  // Kontrollierter Modus (externer Suchwert vorhanden) → Server filtert bereits, Liste zeigt
+  // die Notizen unverändert. Sonst: interner Suchwert + clientseitige Filterung wie bisher.
+  const isControlled = search !== undefined;
+  const searchValue = isControlled ? search : internalSearch;
+  const setSearchValue = isControlled ? (onSearchChange ?? (() => undefined)) : setInternalSearch;
   const visibleNotes = useMemo(
-    () => notes.filter((note) => matchesSearch(note, searchValue)),
-    [notes, searchValue],
+    () => (isControlled ? notes : notes.filter((note) => matchesSearch(note, searchValue))),
+    [isControlled, notes, searchValue],
   );
   const openInTab = owner
     ? (note: Note) => {
@@ -175,6 +190,7 @@ export function NoteList({
           />
         )}
       />
+      {footer}
       {movableOwner && onMove ? (
         <NoteMoveDialog
           note={moveNote}

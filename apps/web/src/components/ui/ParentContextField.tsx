@@ -53,7 +53,7 @@ export function ParentContextField({ parents, onUnlink }: ParentContextFieldProp
       <div className="grid gap-1.5">
         {visibleParents.map((parent) => {
           const Icon = parentIcons[parent.type];
-          const reference = parentReferencePrefixes[parent.type];
+          const reference = `${parentReferencePrefixes[parent.type]}-${parent.id}`;
           const canUnlink = !!onUnlink && parent.origin === "direct" && UNLINKABLE_PARENT_TYPES.has(parent.type);
           return (
             <span

@@ -51,6 +51,17 @@ vi.mock("../../../../../apps/web/src/hooks/useTags", () => ({
   }),
 }));
 
+// Geschlossene workStatus-Keys (isClosed im Katalog): Meilensteine mit diesem Status
+// erscheinen im Board nicht als reguläre Karte, sondern in der ClosedBoardSidebar.
+const closedStatusValues = new Set<string>([
+  "completed",
+  "archived",
+  "done",
+  "resolved",
+  "closed",
+  "rejected",
+]);
+
 function renderMilestoneList({
   milestones = buildMilestoneSet(),
   onCreate = vi.fn(),
@@ -110,13 +121,26 @@ describe("MilestoneListBoardView", () => {
       within(activeColumn).queryByText("2 Features"),
     ).not.toBeInTheDocument();
 
+    // Board-Redesign: Nur offene Meilensteine erscheinen als reguläre Board-Karten
+    // (article.p-5). Die geschlossenen Status (Abgeschlossen, Archiviert, Erledigt,
+    // Gelöst, Geschlossen, Verworfen) wandern als ClosedItemRow in die Sidebar.
+    const openMilestones = milestones.filter(
+      (milestone) => !closedStatusValues.has(milestone.status),
+    );
     const cards = container.querySelectorAll("article.p-5");
-    expect(cards).toHaveLength(milestones.length);
+    expect(cards).toHaveLength(openMilestones.length);
     cards.forEach((card) => {
       expect(card).toHaveClass("min-w-0");
       expect(card).toHaveClass("max-w-full");
       expect(card).toHaveClass("h-full");
     });
+
+    // Ein geschlossener Meilenstein (Archiviert) erscheint in der ClosedBoardSidebar.
+    const closedSidebar = container.querySelector("aside") as HTMLElement;
+    expect(closedSidebar).toBeInTheDocument();
+    expect(
+      within(closedSidebar).getByText("Meilenstein Archiviert"),
+    ).toBeInTheDocument();
   });
 
   it("rendert die gemeinsame Toolbar mit icon-only Add", () => {

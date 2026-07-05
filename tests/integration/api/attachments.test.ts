@@ -204,7 +204,7 @@ describe("Attachments API", () => {
     expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, originalName: filename, owners: [{ type: ownerType, id: owner.id }] })]);
   });
 
-  it("DELETE /api/wiki/:id/attachments/:attachmentId entfernt Wiki-Attachments", async () => {
+  it("DELETE /api/wiki/:id/attachments/:attachmentId entfernt die Wiki-Verknüpfung und behält das Attachment", async () => {
     const page = await createWikiPage(app);
     const created = await supertest(app.server)
       .post(`/api/wiki/${page.id}/attachments`)
@@ -215,8 +215,10 @@ describe("Attachments API", () => {
 
     const listed = await supertest(app.server).get(`/api/wiki/${page.id}/attachments`).expect(200);
     expect(listed.body).toEqual([]);
+    const [linkRows] = await testDb.pool.execute("SELECT attachment_id FROM wiki_page_attachments WHERE wiki_page_id = ? AND attachment_id = ?", [page.id, created.body.id]);
+    expect((linkRows as unknown[]).length).toBe(0);
     const [existRows] = await testDb.pool.execute("SELECT id FROM attachments WHERE id = ?", [created.body.id]);
-    expect((existRows as unknown[]).length).toBe(0);
+    expect((existRows as unknown[]).length).toBe(1);
   });
 
   it("POST zu nicht existierendem Projekt gibt 404 zurueck", async () => {

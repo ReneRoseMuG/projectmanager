@@ -8,6 +8,7 @@ import { registerStatic } from "./plugins/static.js";
 import { registerAdminRoleRoutes } from "./routes/admin-roles.js";
 import { registerAdminUserRoutes } from "./routes/admin-users.js";
 import { registerAttachmentsRoutes } from "./routes/attachments.js";
+import { registerDmsRoutes } from "./routes/dms.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerBacklogRoutes } from "./routes/backlog.js";
 import { registerCommentsRoutes } from "./routes/comments.js";
@@ -90,6 +91,7 @@ export async function buildApp(
   await app.register(registerNotesRoutes, { prefix: "/api" });
   await app.register(registerContentImageRoutes, { prefix: "/api" });
   await app.register(registerAttachmentsRoutes, { prefix: "/api" });
+  await app.register(registerDmsRoutes, { prefix: "/api" });
   await app.register(registerEventsRoutes, { prefix: "/api" });
   await app.register(registerPushRoutes, { prefix: "/api" });
   await app.register(registerFeaturesRoutes, { prefix: "/api" });

@@ -27,6 +27,11 @@ interface ProjectListBoardViewProps {
   showToolbarAdd?: boolean;
   readOnly?: boolean;
   viewMode?: ListBoardMode;
+  // Optional kontrollierte Suche: sind beide gesetzt, wird das Suchfeld von außen gesteuert
+  // (z. B. serverseitige `q`-Suche in der Projektliste) und die interne Namensfilterung
+  // entfällt. Ohne diese Props bleibt das bisherige clientseitige Verhalten unverändert.
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 function matchesSearch(project: Project, searchValue: string) {
@@ -55,6 +60,8 @@ export function ProjectListBoardView({
   showToolbarAdd = true,
   readOnly = false,
   viewMode,
+  searchValue: controlledSearchValue,
+  onSearchChange: controlledOnSearchChange,
 }: ProjectListBoardViewProps) {
   const catalogs = useCatalogs();
   const statusColumns = useMemo(
@@ -64,13 +71,18 @@ export function ProjectListBoardView({
   const canReadTags = useHasPermission("tags", "read");
   const canWriteProjects = useHasPermission("projects", "write");
   const [mode, setMode] = useState<ListBoardMode>("board");
-  const [searchValue, setSearchValue] = useState("");
+  const [internalSearchValue, setInternalSearchValue] = useState("");
+  // Kontrollierte Suche (serverseitig) hat Vorrang: dann keine interne Namensfilterung,
+  // weil die Liste bereits gefiltert vom Server kommt. Sonst wie bisher clientseitig.
+  const searchControlled = controlledOnSearchChange !== undefined;
+  const searchValue = searchControlled ? controlledSearchValue ?? "" : internalSearchValue;
+  const setSearchValue = searchControlled ? controlledOnSearchChange : setInternalSearchValue;
   const visibleProjects = useMemo(
-    () => projects.filter((project) => matchesSearch(project, searchValue)),
-    [projects, searchValue],
+    () => (searchControlled ? projects : projects.filter((project) => matchesSearch(project, searchValue))),
+    [projects, searchValue, searchControlled],
   );
   const tagEditingEnabled = !readOnly && canReadTags && canWriteProjects && Boolean(onTagsChange);
-  const tagController = useTags(tagEditingEnabled);
+  const tagController = useTags("pm", tagEditingEnabled);
   const editableTags = tagEditingEnabled ? tagController.tags : undefined;
   const handleTagsChange = tagEditingEnabled ? onTagsChange : undefined;
 

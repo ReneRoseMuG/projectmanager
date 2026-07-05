@@ -157,13 +157,26 @@ vi.mock("../../../../apps/web/src/hooks/useProjects", () => ({
 }));
 
 vi.mock("../../../../apps/web/src/hooks/useMilestones", () => ({
+  // Mutationen + volle Liste (Chip-Counts). Jetzt inkl. updateMilestoneTags.
   useMilestones() {
     return {
       milestones: hookMocks.milestones,
       loading: false,
       error: null,
       updateMilestone: vi.fn(),
+      updateMilestoneTags: vi.fn(),
       removeMilestone: vi.fn(),
+    };
+  },
+  // Globale, serverseitig gefilterte/progressiv nachgeladene Liste (Listen-Skalierung MS-75).
+  useMilestoneLibrary() {
+    return {
+      milestones: hookMocks.milestones,
+      total: hookMocks.milestones.length,
+      loadedCount: hookMocks.milestones.length,
+      loading: false,
+      loadingMore: false,
+      error: null,
     };
   },
 }));

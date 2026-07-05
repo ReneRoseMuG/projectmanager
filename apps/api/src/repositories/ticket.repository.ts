@@ -1,8 +1,39 @@
-﻿import { and, eq, inArray, isNull } from "drizzle-orm";
+﻿import { and, eq, inArray, isNull, like, sql, type SQL } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { tickets } from "../db/schema.js";
 import { assertVersion } from "./base.repository.js";
+
+// Serverseitige Filter für die paginierte Root-Ticket-Liste (MS-DMS-Pattern).
+// Bildet exakt ab, was die Ticket-Hauptseite bisher clientseitig filtert/sucht:
+// Status (Katalog-Key, exakter Vergleich) und Suchtext `q` (Titel, case-insensitive
+// Teilstring). `type` ist optional ergänzt (exakter Vergleich), analog zur DMS-Route.
+export interface TicketListFilter {
+  status?: string;
+  type?: string;
+  q?: string;
+}
+
+// Baut die WHERE-Klausel für Root-Tickets (parentId IS NULL) inkl. optionaler Filter.
+// Wird von Seiten-Query und COUNT geteilt, damit `total` und Seite garantiert dieselbe
+// Grundmenge sehen.
+function rootTicketWhere(filter: TicketListFilter): SQL {
+  const conditions: SQL[] = [isNull(tickets.parentId)];
+  if (filter.status) {
+    conditions.push(eq(tickets.status, filter.status));
+  }
+  if (filter.type) {
+    conditions.push(eq(tickets.type, filter.type));
+  }
+  if (filter.q) {
+    // Case-insensitive Teilstring auf dem Titel (utf8mb4-Collation ist bereits
+    // case-insensitive; Wildcards im Suchbegriff werden escaped, damit % und _ als
+    // Literal suchen).
+    const escaped = filter.q.replace(/[\\%_]/g, (char) => `\\${char}`);
+    conditions.push(like(tickets.title, `%${escaped}%`));
+  }
+  return and(...conditions) as SQL;
+}
 
 export type TicketRecord = typeof tickets.$inferSelect;
 export type TicketCreateData = Omit<typeof tickets.$inferInsert, "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy">;
@@ -41,6 +72,26 @@ export const ticketRepository = {
 
   async findRootTickets(database: DbSession): Promise<TicketRecord[]> {
     return database.select().from(tickets).where(isNull(tickets.parentId)).orderBy(tickets.status, ...recencyOrder(tickets));
+  },
+
+  // Echte SQL-Pagination für die Root-Ticket-Liste: gleiche WHERE-Grundmenge und
+  // gleiche Sortierung wie findRootTickets (Status, dann Aktualität), zusätzlich
+  // optionale Filter/Suche sowie LIMIT/OFFSET. Liefert nur die Seiten-Zeilen; die
+  // Anreicherung übernimmt der bestehende Batch-Mapper im Service.
+  async findRootTicketsPage(database: DbSession, filter: TicketListFilter, limit: number, offset: number): Promise<TicketRecord[]> {
+    return database
+      .select()
+      .from(tickets)
+      .where(rootTicketWhere(filter))
+      .orderBy(tickets.status, ...recencyOrder(tickets))
+      .limit(limit)
+      .offset(offset);
+  },
+
+  // Gesamtzahl der Root-Tickets nach Filter/Suche (vor Pagination) für `total`.
+  async countRootTickets(database: DbSession, filter: TicketListFilter): Promise<number> {
+    const rows = await database.select({ value: sql<number>`count(*)` }).from(tickets).where(rootTicketWhere(filter));
+    return Number(firstRow(rows)?.value ?? 0);
   },
 
   async findChildren(database: DbSession, parentId: number): Promise<TicketRecord[]> {

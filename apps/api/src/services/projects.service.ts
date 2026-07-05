@@ -1,12 +1,10 @@
-﻿import type { Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
+﻿import type { Paginated, Project, ProjectInput, ProjectUpdate } from "@taskmanager/shared-types";
 import { eq, inArray } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { firstRow, mutationAffectedRows, recencyOrder } from "../db/query-utils.js";
 import { backlogItems, milestones, projectAttachments, projectComments, projectNotes, projects, projectTasks, projectTickets, tasks, wikiPages } from "../db/schema.js";
-import { projectRepository, type ProjectRecord } from "../repositories/project.repository.js";
-import { badRequest, notFound } from "../utils/errors.js";
-import { deleteProjectAttachmentsForIds } from "./attachments.service.js";
-import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
+import { projectRepository, type ProjectListFilter, type ProjectRecord } from "../repositories/project.repository.js";
+import { badRequest, notFound } from "../utils/errors.js";import { ensureCatalogEntryExists, listClosedCatalogEntryKeys, resolveDefaultCatalogEntryKey } from "./catalogs.service.js";
 import { cleanNullable, requireNonEmpty } from "./helpers.js";
 import {
   buildCreateSummary,
@@ -174,6 +172,35 @@ export async function listProjects(database: DbClient): Promise<Project[]> {
   return Promise.all(rows.map((project) => mapProject(database, project, counts.get(project.id), tagsByProject.get(project.id) ?? [])));
 }
 
+// Seitenbasierte Variante der Projektliste (MS-75 Pagination-Muster). Anders als die
+// DMS-Bibliothek wird hier ECHT SQL-seitig paginiert: das Repository liefert bereits nur
+// die Seiten-Records (WHERE + ORDER BY + LIMIT/OFFSET) plus die Gesamtzahl nach Filter.
+// Nur diese Seiten-Zeilen werden anschließend über das vorhandene Batch-Mapping
+// (getProjectCounts/getProjectTagsMap) angereichert. Der Filter (status/q) bildet den
+// bisher clientseitigen Statusfilter serverseitig nach; `q` sucht in Name + Beschreibung.
+export async function listProjectsPaginated(
+  database: DbClient,
+  filter: ProjectListFilter,
+  page: number,
+  pageSize: number
+): Promise<Paginated<Project>> {
+  const [rows, total] = await Promise.all([
+    projectRepository.findPage(database, filter, page, pageSize),
+    projectRepository.countFiltered(database, filter)
+  ]);
+
+  const ids = rows.map((project) => project.id);
+  const [counts, tagsByProject] = await Promise.all([
+    getProjectCounts(database, ids),
+    getProjectTagsMap(database, ids)
+  ]);
+
+  const data = await Promise.all(
+    rows.map((project) => mapProject(database, project, counts.get(project.id), tagsByProject.get(project.id) ?? []))
+  );
+  return { data, total, page, pageSize };
+}
+
 export async function getProject(database: DbClient, id: number): Promise<Project> {
   const project = firstRow(await database.select().from(projects).where(eq(projects.id, id)));
   if (!project) {
@@ -286,7 +313,6 @@ export async function deleteProject(database: DbClient, id: number, actor?: Jour
     throw notFound(`Project with id ${id} not found`);
   }
 
-  await deleteProjectAttachmentsForIds(database, [id]);
   await deleteMilestoneOwnedSupportForProjectIds(database, [id]);
 
   await deleteProjectNotesForIds(database, [id]);

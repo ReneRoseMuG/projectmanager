@@ -39,7 +39,10 @@ function createQueryClient() {
 
 describe("Notes query invalidation", () => {
   it("definiert einen stabilen globalen Notes-List-Key", () => {
-    expect(queryKeys.notes.list()).toEqual(["notes", "list"]);
+    // Der Skalierungs-Umbau gab allen Listen-Keys die Signatur (filter = {}, pagination = {}),
+    // damit gefilterte/paginierte Abrufe eigene Cache-Einträge bekommen. Der Default-Key bleibt
+    // stabil (leerer Filter/Pagination) — nur die Struktur ist um die beiden leeren Objekte länger.
+    expect(queryKeys.notes.list()).toEqual(["notes", "list", {}, {}]);
   });
 
   it("invalidiert die globale Notes-Liste bei Owner- und Detailänderungen", async () => {
