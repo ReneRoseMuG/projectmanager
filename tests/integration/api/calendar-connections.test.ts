@@ -30,6 +30,7 @@
 import type { FastifyInstance } from "fastify";
 import supertest from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { config } from "../../../apps/api/src/config.js";
 import { calendarConnectionRepository } from "../../../apps/api/src/repositories/calendar.repository.js";
 import { clearCalendarSyncHandlers, registerCalendarSyncHandler } from "../../../apps/api/src/services/calendar-sync.service.js";
 import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
@@ -115,6 +116,36 @@ describe("Calendar Connections API (AP-0.3)", () => {
     const res = await agent.post(`/api/calendar-connections/${conn.id}/sync`).expect(200);
     expect(res.body.status).toBe("error");
     expect(res.body.lastError).toContain("Kein Sync-Handler");
+  });
+
+  it("GET /calendar-connections/config meldet, ob Google serverseitig eingerichtet ist", async () => {
+    const agent = await login("admin@local");
+    const originalId = config.googleClientId;
+    const originalSecret = config.googleClientSecret;
+    config.googleClientId = "client-id";
+    config.googleClientSecret = "client-secret";
+    try {
+      const res = await agent.get("/api/calendar-connections/config").expect(200);
+      expect(res.body.googleConfigured).toBe(true);
+      expect(typeof res.body.autoSyncEnabled).toBe("boolean");
+    } finally {
+      config.googleClientId = originalId;
+      config.googleClientSecret = originalSecret;
+    }
+  });
+
+  it("POST /calendar-connections/sync-all synchronisiert nur die eigenen Verbindungen", async () => {
+    const agent = await login("admin@local");
+    registerCalendarSyncHandler("google", async () => {});
+    await makeConnection(ADMIN_ID, { provider: "google", displayName: "A" });
+    await makeConnection(ADMIN_ID, { provider: "google", displayName: "B" });
+    const otherUserId = await createUser("fremd@local", 2);
+    const foreign = await makeConnection(otherUserId, { provider: "google", displayName: "Fremd" });
+
+    const res = await agent.post("/api/calendar-connections/sync-all").expect(200);
+    expect(res.body).toMatchObject({ processed: 2, synced: 2, failed: 0 });
+    // Fremde Verbindung unberührt.
+    expect((await calendarConnectionRepository.findById(testDb.db, foreign.id))?.lastSyncAt).toBeNull();
   });
 
   it("POST /:id/sync mit registriertem Handler synchronisiert erfolgreich (Status active)", async () => {

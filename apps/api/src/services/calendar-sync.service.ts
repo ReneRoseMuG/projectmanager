@@ -69,6 +69,22 @@ export async function runConnectionSync(database: DbClient, connection: Calendar
   }
 }
 
+/** Synchronisiert alle Verbindungen eines Nutzers auf einmal (manueller Sammel-Abgleich aus der UI). */
+export async function syncAllUserConnections(database: DbClient, userId: number): Promise<{ processed: number; synced: number; failed: number }> {
+  const connections = await calendarConnectionRepository.listByUser(database, userId);
+  let synced = 0;
+  let failed = 0;
+  for (const connection of connections) {
+    const result = await runConnectionSync(database, connection);
+    if (result.status === "error" || result.status === "reauth_required") {
+      failed += 1;
+    } else {
+      synced += 1;
+    }
+  }
+  return { processed: connections.length, synced, failed };
+}
+
 /** Schreibt das Sync-Ergebnis in die Verbindung und liefert die aktualisierte API-Sicht. */
 async function applyResult(database: DbClient, connection: CalendarConnectionRecord, result: RecordSyncResultInput): Promise<CalendarConnection> {
   const updated = await calendarConnectionRepository.recordSyncResult(database, connection.id, result);

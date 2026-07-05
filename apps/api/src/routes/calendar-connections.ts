@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { deleteCalendarConnection, listCalendarConnections, requireOwnedConnection } from "../services/calendar-connection.service.js";
 import { listCalendarJournal } from "../services/calendar-journal.service.js";
 import { listGoogleCalendars, selectGoogleCalendar } from "../services/google/google-calendar.service.js";
-import { syncCalendarConnection } from "../services/calendar-sync.service.js";
+import { syncAllUserConnections, syncCalendarConnection } from "../services/calendar-sync.service.js";
 import { connectNextCloud, type ConnectNextCloudInput } from "../services/nextcloud-connection.service.js";
 import { buildGoogleAuthUrl, handleGoogleCallback } from "../services/google/google-oauth.service.js";
 import { handlePushNotification, watchGoogleCalendar } from "../services/google/google-push.service.js";
@@ -47,6 +47,17 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
   // Sync-Journal des Nutzers (AP-4.3): Anlage/Trennung, Sync, Fehler, Konflikte — neueste zuerst.
   app.get("/calendar-connections/journal", { schema: { response: { 200: arrayResponseSchema } } }, async (request) =>
     listCalendarJournal(app.db, requireUserId(request))
+  );
+
+  // Server-Konfigurationsstatus für die UI: ist Google einrichtbar, läuft der automatische Abgleich?
+  app.get("/calendar-connections/config", { schema: { response: { 200: objectResponseSchema } } }, async (request) => {
+    requireUserId(request);
+    return { googleConfigured: Boolean(config.googleClientId && config.googleClientSecret), autoSyncEnabled: config.calendarSyncEnabled };
+  });
+
+  // Manueller Sammel-Abgleich aller eigenen Verbindungen.
+  app.post("/calendar-connections/sync-all", { schema: { response: { 200: objectResponseSchema } } }, async (request) =>
+    syncAllUserConnections(app.db, requireUserId(request))
   );
 
   app.post<{ Body: ConnectNextCloudInput }>(

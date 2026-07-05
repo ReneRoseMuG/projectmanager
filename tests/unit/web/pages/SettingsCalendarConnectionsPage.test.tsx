@@ -39,9 +39,14 @@ import { SettingsCalendarConnectionsPage } from "../../../../apps/web/src/pages/
 const mocks = vi.hoisted(() => ({
   connections: [] as CalendarConnection[],
   journal: [] as CalendarJournalEntry[],
+  config: { googleConfigured: true, autoSyncEnabled: false } as { googleConfigured: boolean; autoSyncEnabled: boolean },
   syncConnection: vi.fn(),
   deleteConnection: vi.fn(),
   connectGoogle: vi.fn(),
+  connectNextCloud: vi.fn(),
+  loadGoogleCalendars: vi.fn(),
+  selectGoogleCalendar: vi.fn(),
+  syncAll: vi.fn(),
   showToast: vi.fn(),
   permissions: [{ resource: "*", action: "*" }] as Array<{ resource: string; action: string }>
 }));
@@ -50,13 +55,21 @@ vi.mock("../../../../apps/web/src/hooks/useCalendarConnections", () => ({
   useCalendarConnections: () => ({
     connections: mocks.connections,
     journal: mocks.journal,
+    config: mocks.config,
     loading: false,
     error: null,
     syncConnection: mocks.syncConnection,
     deleteConnection: mocks.deleteConnection,
     connectGoogle: mocks.connectGoogle,
+    connectNextCloud: mocks.connectNextCloud,
+    loadGoogleCalendars: mocks.loadGoogleCalendars,
+    selectGoogleCalendar: mocks.selectGoogleCalendar,
+    syncAll: mocks.syncAll,
     isSyncing: false,
-    isDeleting: false
+    isDeleting: false,
+    isConnectingNextCloud: false,
+    isSelectingCalendar: false,
+    isSyncingAll: false
   })
 }));
 
@@ -76,6 +89,7 @@ const CONNECTIONS: CalendarConnection[] = [
 beforeEach(() => {
   mocks.connections = CONNECTIONS;
   mocks.journal = [];
+  mocks.config = { googleConfigured: true, autoSyncEnabled: false };
   mocks.permissions = [{ resource: "*", action: "*" }];
 });
 
@@ -84,6 +98,10 @@ afterEach(() => {
   mocks.syncConnection.mockReset();
   mocks.deleteConnection.mockReset();
   mocks.connectGoogle.mockReset();
+  mocks.connectNextCloud.mockReset();
+  mocks.loadGoogleCalendars.mockReset();
+  mocks.selectGoogleCalendar.mockReset();
+  mocks.syncAll.mockReset();
   mocks.showToast.mockReset();
 });
 
@@ -180,5 +198,48 @@ describe("SettingsCalendarConnectionsPage (AP-0.3)", () => {
     expect(screen.getByText("Konflikt gelöst")).toBeInTheDocument();
     expect(screen.getByText("Getrennt")).toBeInTheDocument();
     expect(screen.getByText("Alt-Verbindung")).toBeInTheDocument();
+  });
+
+  // Nachrüstung: Einrichtungs-UI (NextCloud, Google-Kalenderauswahl, Config-Hinweis, Sammel-Sync)
+  it("deaktiviert Google und zeigt einen Hinweis, wenn die Server-Konfiguration fehlt", () => {
+    mocks.config = { googleConfigured: false, autoSyncEnabled: false };
+    render(<SettingsCalendarConnectionsPage />);
+    expect(screen.getByRole("button", { name: /Google verbinden/ })).toBeDisabled();
+    expect(screen.getByText(/serverseitig noch nicht eingerichtet/)).toBeInTheDocument();
+  });
+
+  it("öffnet das NextCloud-Formular und verbindet mit den eingegebenen Daten", async () => {
+    mocks.connectNextCloud.mockResolvedValue({});
+    render(<SettingsCalendarConnectionsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /NextCloud verbinden/ }));
+    fireEvent.change(screen.getByLabelText(/Anzeigename/), { target: { value: "Büro" } });
+    fireEvent.change(screen.getByLabelText(/Server-Adresse/), { target: { value: "https://cloud.example.com" } });
+    fireEvent.change(screen.getByLabelText(/Benutzername/), { target: { value: "rene" } });
+    fireEvent.change(screen.getByLabelText(/App-Passwort/), { target: { value: "app-pw" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verbinden" }));
+    await waitFor(() =>
+      expect(mocks.connectNextCloud).toHaveBeenCalledWith({ displayName: "Büro", baseUrl: "https://cloud.example.com", username: "rene", appPassword: "app-pw" })
+    );
+  });
+
+  it("löst den Sammel-Abgleich aus", async () => {
+    mocks.syncAll.mockResolvedValue({ processed: 2, synced: 2, failed: 0 });
+    render(<SettingsCalendarConnectionsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /Alle abgleichen/ }));
+    await waitFor(() => expect(mocks.syncAll).toHaveBeenCalled());
+  });
+
+  it("lädt die Google-Kalender und setzt den gewählten Zielkalender", async () => {
+    mocks.loadGoogleCalendars.mockResolvedValue([
+      { id: "primary-cal", summary: "Mein Kalender", backgroundColor: null, accessRole: "owner", primary: true, writable: true },
+      { id: "readonly-cal", summary: "Feiertage", backgroundColor: null, accessRole: "reader", primary: false, writable: false }
+    ]);
+    mocks.selectGoogleCalendar.mockResolvedValue(undefined);
+    render(<SettingsCalendarConnectionsPage />);
+    fireEvent.click(screen.getByRole("button", { name: /Kalender wählen/ }));
+    await waitFor(() => expect(mocks.loadGoogleCalendars).toHaveBeenCalledWith(1));
+    const chooseButton = await screen.findByRole("button", { name: /Mein Kalender/ });
+    fireEvent.click(chooseButton);
+    await waitFor(() => expect(mocks.selectGoogleCalendar).toHaveBeenCalledWith(1, "primary-cal"));
   });
 });
