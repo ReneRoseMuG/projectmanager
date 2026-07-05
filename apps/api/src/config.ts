@@ -50,6 +50,8 @@ export interface AppConfig {
   // Kalender-Sync-Scheduler (MS-79 AP-4.1): periodischer Hintergrund-Abgleich aller Verbindungen.
   calendarSyncEnabled: boolean;
   calendarSyncIntervalMs: number;
+  // Google Push (MS-79 AP-4.2, optional): öffentliche HTTPS-Webhook-URL. Null → Push deaktiviert.
+  googlePushWebhookUrl: string | null;
 }
 
 function resolveFromApiRoot(value: string): string {
@@ -113,5 +115,6 @@ export const config: AppConfig = {
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || null,
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI?.trim() || "http://localhost:3001/api/calendar-connections/google/callback",
   calendarSyncEnabled: booleanFromEnv(process.env.CALENDAR_SYNC_ENABLED),
-  calendarSyncIntervalMs: numberFromEnv(process.env.CALENDAR_SYNC_INTERVAL_MS, 15 * 60 * 1000)
+  calendarSyncIntervalMs: numberFromEnv(process.env.CALENDAR_SYNC_INTERVAL_MS, 15 * 60 * 1000),
+  googlePushWebhookUrl: process.env.GOOGLE_PUSH_WEBHOOK_URL?.trim() || null
 };

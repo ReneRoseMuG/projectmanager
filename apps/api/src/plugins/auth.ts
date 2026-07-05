@@ -7,7 +7,7 @@ import { getApiKeyAdminUser, getBypassAdminUser, getCurrentUser } from "../servi
 import { hasPermission } from "../services/roles.service.js";
 import { forbidden, unauthorized } from "../utils/errors.js";
 
-const openApiPrefixes = ["/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/set-password", "/api/health", "/api/calendar-connections/google/callback"];
+const openApiPrefixes = ["/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/set-password", "/api/health", "/api/calendar-connections/google/callback", "/api/calendar-connections/google/notifications"];
 const setupAllowedPrefixes = ["/api/auth/logout", "/api/auth/me", "/api/auth/set-password"];
 
 function requestPath(request: FastifyRequest): string {

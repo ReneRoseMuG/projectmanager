@@ -4,8 +4,9 @@ import { listGoogleCalendars, selectGoogleCalendar } from "../services/google/go
 import { syncCalendarConnection } from "../services/calendar-sync.service.js";
 import { connectNextCloud, type ConnectNextCloudInput } from "../services/nextcloud-connection.service.js";
 import { buildGoogleAuthUrl, handleGoogleCallback } from "../services/google/google-oauth.service.js";
+import { handlePushNotification, watchGoogleCalendar } from "../services/google/google-push.service.js";
 import { config } from "../config.js";
-import { unauthorized } from "../utils/errors.js";
+import { badRequest, unauthorized } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
 
 const nextCloudConnectSchema = {
@@ -67,6 +68,19 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
     }
   });
 
+  // Google Push-Benachrichtigung (offen, da von Google aufgerufen; der HMAC-Token in
+  // X-Goog-Channel-Token schützt gegen Fälschung). Google erwartet stets 200 (sonst Retry-Sturm).
+  app.post("/calendar-connections/google/notifications", async (request, reply) => {
+    const channelId = request.headers["x-goog-channel-id"];
+    const token = request.headers["x-goog-channel-token"];
+    const resourceState = request.headers["x-goog-resource-state"];
+    // "sync" ist der initiale Handshake nach der Registrierung — nur quittieren, nicht synchronisieren.
+    if (resourceState !== "sync" && typeof channelId === "string" && typeof token === "string") {
+      await handlePushNotification(app.db, channelId, token);
+    }
+    return reply.status(200).send();
+  });
+
   app.get<{ Params: { id: number } }>(
     "/calendar-connections/:id/google/calendars",
     { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
@@ -82,6 +96,19 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
     async (request) => {
       await requireOwnedConnection(app.db, request.params.id, requireUserId(request));
       return selectGoogleCalendar(app.db, request.params.id, request.body.calendarId);
+    }
+  );
+
+  // Google Push aktivieren (events.watch) — erfordert eine konfigurierte öffentliche Webhook-URL.
+  app.post<{ Params: { id: number } }>(
+    "/calendar-connections/:id/google/watch",
+    { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
+    async (request) => {
+      await requireOwnedConnection(app.db, request.params.id, requireUserId(request));
+      if (!config.googlePushWebhookUrl) {
+        throw badRequest("Google Push ist nicht konfiguriert (GOOGLE_PUSH_WEBHOOK_URL fehlt).");
+      }
+      return watchGoogleCalendar(app.db, request.params.id, config.googlePushWebhookUrl);
     }
   );
 
