@@ -89,6 +89,10 @@ export function CalendarDashboardProvider({ children }: { children: ReactNode })
   };
 
   const openEvent = (event: CalendarEvent) => {
+    if (event.readonly) {
+      showToast({ tone: "info", title: "Importierter Termin", message: "Dieser Termin stammt aus einem verbundenen Kalender und ist schreibgeschützt." });
+      return;
+    }
     if (!canWriteEvents) {
       return;
     }

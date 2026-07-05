@@ -174,7 +174,7 @@ export function EventForm({ open, event, initialDate, initialOwners, onSubmit, o
             <input type="checkbox" checked={isAllDay} onChange={(inputEvent) => setIsAllDay(inputEvent.target.checked)} />
             Ganztägig
           </label>
-          {event && canDelete ? (
+          {event && canDelete && !event.readonly ? (
             <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => void onDelete(event).catch(() => undefined)}>
               Löschen
             </Button>
