@@ -1,9 +1,10 @@
-import type { CalendarEvent, Milestone, Project, Task } from "@taskmanager/shared-types";
+import type { CalendarEvent, EventOrigin, Milestone, Project, Task } from "@taskmanager/shared-types";
 import { addDays, addMonths, endOfISOWeek, format, getISOWeek, parseISO, startOfISOWeek } from "date-fns";
 import { de } from "date-fns/locale";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "../ui/Button";
+import { FilterChips } from "../ui/FilterChips";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { MonthCalendar } from "./MonthCalendar";
 import { WeekCalendar } from "./WeekCalendar";
@@ -67,6 +68,24 @@ export function CalendarWidgetView({
   const title = viewTitle(viewMode, visibleDate);
   const canCreateEvents = mode === "interactive" && Boolean(onDateClick);
 
+  const [originFilter, setOriginFilter] = useState<EventOrigin | "all">("all");
+  const originCounts = useMemo(() => {
+    const counts: Record<EventOrigin, number> = { local: 0, nextcloud: 0, google: 0 };
+    for (const event of events) {
+      counts[event.origin] += 1;
+    }
+    return counts;
+  }, [events]);
+  const originOptions = ([
+    ["local", "Lokal"],
+    ["nextcloud", "NextCloud"],
+    ["google", "Google"]
+  ] as const)
+    .filter(([origin]) => originCounts[origin] > 0)
+    .map(([origin, label]) => ({ value: origin, label, count: originCounts[origin] }));
+  const showOriginFilter = originOptions.length > 1;
+  const visibleEvents = originFilter === "all" ? events : events.filter((event) => event.origin === originFilter);
+
   const movePrevious = () => {
     setVisibleDate((current) => viewMode === "month" ? addMonths(current, -1) : addDays(current, -7));
   };
@@ -110,10 +129,16 @@ export function CalendarWidgetView({
           </div>
         </header>
 
+        {showOriginFilter ? (
+          <div className="border-b border-line bg-white px-4 py-2" data-testid="calendar-origin-filter">
+            <FilterChips value={originFilter} onChange={setOriginFilter} options={originOptions} allLabel="Alle Kalender" allCount={events.length} />
+          </div>
+        ) : null}
+
         <div className="min-h-0 flex-1 overflow-auto">
           {viewMode === "week" ? (
             <WeekCalendar
-              events={events}
+              events={visibleEvents}
               tasks={tasks}
               projects={projects}
               milestones={milestones}
@@ -128,7 +153,7 @@ export function CalendarWidgetView({
             />
           ) : (
             <MonthCalendar
-              events={events}
+              events={visibleEvents}
               tasks={tasks}
               visibleDate={visibleDate}
               onVisibleDateChange={setVisibleDate}
