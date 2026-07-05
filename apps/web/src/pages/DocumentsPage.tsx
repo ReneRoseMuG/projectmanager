@@ -47,25 +47,37 @@ function formatBytes(bytes: number): string {
 }
 
 function documentTitle(document: Attachment): string {
-  return document.displayName ?? document.originalName;
+  return stripFileExtension(document.displayName ?? document.originalName);
 }
 
-// Verständliche Typ-Darstellung: Klartext-Label + Kürzel-Badge statt rohem MIME-Type.
+function stripFileExtension(name: string): string {
+  const extensionIndex = name.lastIndexOf(".");
+  if (extensionIndex <= 0) {
+    return name;
+  }
+  return name.slice(0, extensionIndex).trimEnd();
+}
+
+// Verständliche Typ-Darstellung: Kürzel-Badge und Größe statt rohem MIME-Type.
 // Der technische MIME-Type bleibt als Tooltip (title) erreichbar.
 function DocumentMeta({ document }: { document: Attachment }) {
   const typeMeta = describeAttachmentType(document);
+  const size = formatBytes(document.size);
   return (
     <span
-      className="flex items-center gap-1.5 text-xs text-steel-500"
+      className="flex w-32 items-center justify-end gap-2 text-xs text-steel-500"
       title={document.mimetype}
+      aria-label={`${typeMeta.label}, ${size}`}
     >
-      <span
-        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${typeMeta.toneClassName}`}
-      >
-        {typeMeta.badge}
+      <span className="flex w-10 justify-end">
+        <span
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${typeMeta.toneClassName}`}
+        >
+          {typeMeta.badge}
+        </span>
       </span>
-      <span className="whitespace-nowrap">
-        {typeMeta.label} · {formatBytes(document.size)}
+      <span className="w-20 whitespace-nowrap text-right tabular-nums">
+        {size}
       </span>
     </span>
   );
@@ -588,6 +600,9 @@ export function DocumentsPage() {
                       </div>
                     }
                     meta={<DocumentMeta document={document} />}
+                    metaClassName="w-32"
+                    pillsClassName="w-44 justify-start"
+                    actionsClassName="w-16"
                     actions={
                       <div className="flex items-center gap-1">
                         <a

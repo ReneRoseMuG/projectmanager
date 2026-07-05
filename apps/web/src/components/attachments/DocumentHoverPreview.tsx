@@ -1,5 +1,11 @@
 import type { Attachment } from "@taskmanager/shared-types";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { describeAttachmentType } from "./attachmentTypes";
 import { DocumentPreviewBody, prettyBytes } from "./DocumentPreviewBody";
 
@@ -26,11 +32,14 @@ export function DocumentHoverPreview({
   children,
 }: DocumentHoverPreviewProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const cursorRef = useRef<{ x: number; y: number } | null>(null);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [position, setPosition] = useState<{
     top: number;
     left: number;
+    width: number;
+    maxHeight: number;
   } | null>(null);
 
   useEffect(
@@ -45,22 +54,45 @@ export function DocumentHoverPreview({
     [],
   );
 
+  const clamp = (value: number, min: number, max: number) =>
+    Math.min(Math.max(value, min), Math.max(min, max));
+
   const computeAndOpen = () => {
     const node = wrapperRef.current;
     if (!node) {
       return;
     }
     const rect = node.getBoundingClientRect();
-    const spaceRight = window.innerWidth - rect.right;
-    const left =
-      spaceRight >= POPOVER_WIDTH + MARGIN
-        ? rect.right + MARGIN
-        : Math.max(MARGIN, rect.left - POPOVER_WIDTH - MARGIN);
-    const top = Math.max(
-      MARGIN,
-      Math.min(rect.top, window.innerHeight - MAX_HEIGHT - MARGIN),
+    const cursor =
+      cursorRef.current ?? {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+    const width = Math.min(
+      POPOVER_WIDTH,
+      Math.max(0, window.innerWidth - MARGIN * 2),
     );
-    setPosition({ top, left });
+    const maxHeight = Math.min(
+      MAX_HEIGHT,
+      Math.max(0, window.innerHeight - MARGIN * 2),
+    );
+    const left = clamp(
+      cursor.x - width - MARGIN,
+      MARGIN,
+      window.innerWidth - width - MARGIN,
+    );
+    const topAbove = cursor.y - maxHeight - MARGIN;
+    const topBelow = cursor.y + MARGIN;
+    const top = clamp(
+      topAbove >= MARGIN ? topAbove : topBelow,
+      MARGIN,
+      window.innerHeight - maxHeight - MARGIN,
+    );
+    setPosition({ top, left, width, maxHeight });
+  };
+
+  const rememberCursor = (event: MouseEvent<HTMLDivElement>) => {
+    cursorRef.current = { x: event.clientX, y: event.clientY };
   };
 
   const scheduleOpen = () => {
@@ -97,7 +129,11 @@ export function DocumentHoverPreview({
   return (
     <div
       ref={wrapperRef}
-      onMouseEnter={scheduleOpen}
+      onMouseEnter={(event) => {
+        rememberCursor(event);
+        scheduleOpen();
+      }}
+      onMouseMove={rememberCursor}
       onMouseLeave={scheduleClose}
     >
       {children}
@@ -107,7 +143,8 @@ export function DocumentHoverPreview({
           style={{
             top: position.top,
             left: position.left,
-            maxHeight: MAX_HEIGHT,
+            width: position.width,
+            maxHeight: position.maxHeight,
           }}
           role="tooltip"
           onMouseEnter={scheduleOpen}

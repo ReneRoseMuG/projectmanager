@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 05.07.26 | 11:46:46 | Fix | Dokument-Manager Meta und Preview | ✅ |
 | 05.07.26 | 10:31:47 | Fix | Flex-Fill Test-Assertions | ✅ |
 | 05.07.26 | 07:55:34 | Fix | Parent Context Referenz | ✅ |
 | 05.07.26 | 07:52:02 | Fix | API Config Test Isolation | ✅ |
