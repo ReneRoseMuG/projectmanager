@@ -48,17 +48,24 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-/** Wandelt eine Google-Zeitangabe in lokale Wandzeit ("YYYY-MM-DDTHH:mm:ss") + Ganztags-Flag. */
+const OFFSET_PATTERN = /([+-]\d{2}:\d{2}|Z)$/;
+
+/**
+ * Wandelt eine Google-Zeitangabe in lokale Wandzeit ("YYYY-MM-DDTHH:mm:ss") + Ganztags-Flag.
+ * DST-robust: Nur ein absoluter Zeitpunkt (dateTime mit Offset/Z) wird in die Ziel-Zeitzone
+ * umgerechnet — die Wandzeit einer wiederkehrenden 10:00-Instanz bleibt über Sommer-/Winterzeit
+ * konstant. Ein dateTime ohne Offset trägt die Wandzeit bereits im lokalen Teil und wird direkt
+ * übernommen (keine Interpretation in der zufälligen Maschinen-Zeitzone).
+ */
 function mapGoogleTime(point: GoogleTimePoint): { iso: string; isAllDay: boolean } {
   if (point.date) {
     return { iso: `${point.date}T00:00:00`, isAllDay: true };
   }
   const dateTime = point.dateTime ?? "";
-  if (point.timeZone) {
+  if (point.timeZone && OFFSET_PATTERN.test(dateTime)) {
     return { iso: wallTimeIso(new Date(dateTime), point.timeZone), isAllDay: false };
   }
-  // Ohne Zeitzone: den lokalen Wandzeit-Teil vor Offset/Z übernehmen.
-  return { iso: dateTime.replace(/([+-]\d{2}:\d{2}|Z)$/, "").slice(0, 19), isAllDay: false };
+  return { iso: dateTime.replace(OFFSET_PATTERN, "").slice(0, 19), isAllDay: false };
 }
 
 interface EventsPage {
