@@ -33,7 +33,28 @@ interface GoogleEventPayload {
   description?: string;
   start: GoogleTimeValue;
   end: GoogleTimeValue;
-  extendedProperties: { private: { pmOrigin: string } };
+  // Herkunftsmarke: source (pmOrigin) + lokale Identität/Version — Basis für die Echo-Erkennung (AP-3.2).
+  extendedProperties: { private: { pmOrigin: string; pmLocalId: string; pmLocalVersion: string } };
+}
+
+/** Retry-Politik für Google-Schreibzugriffe bei transienten Fehlern (429 Rate-Limit, 5xx). In Tests
+ *  wird baseDelayMs auf 0 gesetzt, um ohne echte Wartezeit zu prüfen. */
+export const googleWriteRetry = { maxAttempts: 3, baseDelayMs: 500 };
+
+type GoogleWriteResponse = Awaited<ReturnType<GoogleTokenFetch>>;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Führt einen Google-Schreibzugriff aus und wiederholt ihn bei 429/5xx mit exponentiellem Backoff. */
+async function withWriteRetry(operation: () => Promise<GoogleWriteResponse>): Promise<GoogleWriteResponse> {
+  let response = await operation();
+  for (let attempt = 1; attempt < googleWriteRetry.maxAttempts && (response.status === 429 || response.status >= 500); attempt += 1) {
+    await sleep(googleWriteRetry.baseDelayMs * 2 ** (attempt - 1));
+    response = await operation();
+  }
+  return response;
 }
 
 /** Wandelt eine lokale Wandzeit in eine Google-Zeitangabe (Ganztag → date, sonst dateTime + timeZone). */
@@ -50,7 +71,7 @@ function toPayload(event: typeof events.$inferSelect): GoogleEventPayload {
     description: event.description ?? undefined,
     start: toGoogleTime(event.startTime, event.isAllDay),
     end: toGoogleTime(event.endTime, event.isAllDay),
-    extendedProperties: { private: { pmOrigin: ORIGIN_MARKER } }
+    extendedProperties: { private: { pmOrigin: ORIGIN_MARKER, pmLocalId: String(event.id), pmLocalVersion: event.updatedAt } }
   };
 }
 
@@ -102,11 +123,13 @@ export async function exportEventToGoogle(database: DbClient, connectionId: numb
   const mapping = await eventMappingRepository.findByLocalEvent(database, localEventId);
 
   if (mapping) {
-    const response = await fetchImpl(`${EVENTS_BASE}/${encodeURIComponent(target.externalId)}/events/${encodeURIComponent(mapping.externalId)}`, {
-      method: "PATCH",
-      headers: authHeaders(accessToken),
-      body
-    });
+    const response = await withWriteRetry(() =>
+      fetchImpl(`${EVENTS_BASE}/${encodeURIComponent(target.externalId)}/events/${encodeURIComponent(mapping.externalId)}`, {
+        method: "PATCH",
+        headers: authHeaders(accessToken),
+        body
+      })
+    );
     if (response.status !== 200) {
       throw new GoogleAuthError("exchange", `Google-Aktualisierung fehlgeschlagen: HTTP ${response.status}.`);
     }
@@ -116,11 +139,13 @@ export async function exportEventToGoogle(database: DbClient, connectionId: numb
     return { action: "update", externalId: mapping.externalId };
   }
 
-  const response = await fetchImpl(`${EVENTS_BASE}/${encodeURIComponent(target.externalId)}/events`, {
-    method: "POST",
-    headers: authHeaders(accessToken),
-    body
-  });
+  const response = await withWriteRetry(() =>
+    fetchImpl(`${EVENTS_BASE}/${encodeURIComponent(target.externalId)}/events`, {
+      method: "POST",
+      headers: authHeaders(accessToken),
+      body
+    })
+  );
   if (response.status !== 200) {
     throw new GoogleAuthError("exchange", `Google-Anlage fehlgeschlagen: HTTP ${response.status}.`);
   }
@@ -150,10 +175,12 @@ export async function deleteExportedEvent(database: DbClient, connectionId: numb
   }
   const target = await ensureGoogleTargetCalendar(database, connectionId, fetchImpl);
   const accessToken = await ensureGoogleAccessToken(database, connectionId, fetchImpl);
-  const response = await fetchImpl(`${EVENTS_BASE}/${encodeURIComponent(target.externalId)}/events/${encodeURIComponent(mapping.externalId)}`, {
-    method: "DELETE",
-    headers: authHeaders(accessToken)
-  });
+  const response = await withWriteRetry(() =>
+    fetchImpl(`${EVENTS_BASE}/${encodeURIComponent(target.externalId)}/events/${encodeURIComponent(mapping.externalId)}`, {
+      method: "DELETE",
+      headers: authHeaders(accessToken)
+    })
+  );
   // 200/204 gelöscht; 404/410 bereits entfernt — beides ist ein erfolgreicher Endzustand.
   if (![200, 204, 404, 410].includes(response.status)) {
     throw new GoogleAuthError("exchange", `Google-Löschung fehlgeschlagen: HTTP ${response.status}.`);

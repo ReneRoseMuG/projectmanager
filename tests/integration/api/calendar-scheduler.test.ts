@@ -30,7 +30,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { calendarConnectionRepository } from "../../../apps/api/src/repositories/calendar.repository.js";
 import { clearCalendarSyncHandlers, registerCalendarSyncHandler } from "../../../apps/api/src/services/calendar-sync.service.js";
-import { isCalendarSyncSchedulerRunning, runScheduledSync, startCalendarSyncScheduler, stopCalendarSyncScheduler } from "../../../apps/api/src/services/calendar-scheduler.service.js";
+import { isCalendarSyncSchedulerRunning, jitteredDelay, resetSchedulerBackoff, runScheduledSync, schedulerBackoff, startCalendarSyncScheduler, stopCalendarSyncScheduler } from "../../../apps/api/src/services/calendar-scheduler.service.js";
 import { createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 describe("Sync-Scheduler (AP-4.1)", () => {
@@ -42,9 +42,11 @@ describe("Sync-Scheduler (AP-4.1)", () => {
   beforeEach(async () => {
     await truncateAll(testDb.pool);
     clearCalendarSyncHandlers();
+    resetSchedulerBackoff();
   });
   afterEach(() => {
     stopCalendarSyncScheduler();
+    resetSchedulerBackoff();
   });
   afterAll(async () => {
     await testDb?.close();
@@ -62,7 +64,7 @@ describe("Sync-Scheduler (AP-4.1)", () => {
     const fail = await calendarConnectionRepository.create(testDb.db, { userId: 1, provider: "google", displayName: "FAIL" }, 1);
 
     const result = await runScheduledSync(testDb.db);
-    expect(result).toEqual({ processed: 2, synced: 1, failed: 1 });
+    expect(result).toEqual({ processed: 2, synced: 1, failed: 1, skipped: 0 });
     expect(synced).toEqual([ok.id]);
 
     const okReloaded = await calendarConnectionRepository.findById(testDb.db, ok.id);
@@ -81,13 +83,13 @@ describe("Sync-Scheduler (AP-4.1)", () => {
     await calendarConnectionRepository.create(testDb.db, { userId: 1, provider: "google", displayName: "G-ohne-Handler" }, 1);
 
     const result = await runScheduledSync(testDb.db);
-    expect(result).toEqual({ processed: 2, synced: 1, failed: 1 });
+    expect(result).toEqual({ processed: 2, synced: 1, failed: 1, skipped: 0 });
     expect(synced).toEqual([withHandler.id]);
   });
 
   it("verarbeitet eine leere Verbindungsliste ohne Fehler", async () => {
     const result = await runScheduledSync(testDb.db);
-    expect(result).toEqual({ processed: 0, synced: 0, failed: 0 });
+    expect(result).toEqual({ processed: 0, synced: 0, failed: 0, skipped: 0 });
   });
 
   it("startet und stoppt den Scheduler idempotent", () => {
@@ -112,5 +114,35 @@ describe("Sync-Scheduler (AP-4.1)", () => {
     stopCalendarSyncScheduler();
 
     expect(ticks).toBeGreaterThanOrEqual(1);
+  });
+
+  it("verzögert eine wiederholt fehlschlagende Verbindung per Backoff und erholt sich nach Erfolg", async () => {
+    let shouldFail = true;
+    registerCalendarSyncHandler("google", async () => {
+      if (shouldFail) {
+        throw new Error("boom");
+      }
+    });
+    await calendarConnectionRepository.create(testDb.db, { userId: 1, provider: "google", displayName: "Flaky" }, 1);
+    const base = schedulerBackoff.baseDelayMs;
+
+    // t=0: Fehler → Backoff bis t=base.
+    expect(await runScheduledSync(testDb.db, 0)).toMatchObject({ failed: 1, skipped: 0 });
+    // Innerhalb des Backoff-Fensters: übersprungen (kein erneuter Versuch).
+    expect(await runScheduledSync(testDb.db, base - 1)).toMatchObject({ processed: 1, failed: 0, skipped: 1 });
+    // t=base: wieder fällig, failt erneut → längeres Fenster (bis t=3·base).
+    expect(await runScheduledSync(testDb.db, base)).toMatchObject({ failed: 1, skipped: 0 });
+    expect(await runScheduledSync(testDb.db, base + 1)).toMatchObject({ skipped: 1 });
+    // Erholung: Handler erfolgreich nach dem zweiten Backoff-Fenster → Backoff zurückgesetzt.
+    shouldFail = false;
+    expect(await runScheduledSync(testDb.db, base * 3)).toMatchObject({ synced: 1, skipped: 0 });
+    expect(await runScheduledSync(testDb.db, base * 3 + 1)).toMatchObject({ synced: 1, skipped: 0 });
+  });
+
+  it("streut das Intervall mit ±25 % Jitter", () => {
+    const values = Array.from({ length: 100 }, () => jitteredDelay(1000));
+    expect(Math.min(...values)).toBeGreaterThanOrEqual(750);
+    expect(Math.max(...values)).toBeLessThanOrEqual(1250);
+    expect(new Set(values).size).toBeGreaterThan(1);
   });
 });

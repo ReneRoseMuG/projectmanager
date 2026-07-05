@@ -37,7 +37,7 @@ import { calendarConnectionRepository, eventMappingRepository, externalCalendarR
 import type { CalDavFetch } from "../../../apps/api/src/services/caldav/caldav-client.js";
 import { calendarCredentialService } from "../../../apps/api/src/services/calendar-credential.service.js";
 import { clearCalendarSyncHandlers, syncCalendarConnection } from "../../../apps/api/src/services/calendar-sync.service.js";
-import { runScheduledSync } from "../../../apps/api/src/services/calendar-scheduler.service.js";
+import { resetSchedulerBackoff, runScheduledSync } from "../../../apps/api/src/services/calendar-scheduler.service.js";
 import { resetCredentialCipherCache } from "../../../apps/api/src/services/credential-cipher.js";
 import { exportEventToGoogle, loadLocalEvent } from "../../../apps/api/src/services/google/google-export.service.js";
 import { registerGoogleSyncHandler } from "../../../apps/api/src/services/google/google-events.service.js";
@@ -89,6 +89,7 @@ describe("Kalender-Synchronisation — E2E-Abnahme (AP-4.4)", () => {
   beforeEach(async () => {
     await truncateAll(testDb.pool);
     clearCalendarSyncHandlers();
+    resetSchedulerBackoff();
   });
   afterAll(async () => {
     config.calendarEncryptionKey = originalKey;

@@ -23,11 +23,13 @@ iCal-/Zeitzonen-Logik und Routing sind echt.
 | 2.1 Google OAuth & Token | Auth-Code-Flow, CSRF-State, Token verschlüsselt, invalid_grant → reauth | `google-oauth.test.ts` |
 | 2.2 Google Zielkalender | nur beschreibbare Kalender, genau ein Ziel, primary-Fallback | `google-calendar.test.ts` |
 | 2.3 Google → App Import | nextSyncToken, Pagination, cancelled→Löschung, 410→Resync, idempotent | `google-events.test.ts` |
-| 3.1 App → Google Export | insert/update/delete, Herkunftsmarke, lastschonender Batch | `google-export.test.ts` |
+| 3.1 App → Google Export | insert/update/delete, Herkunftsmarke (source/localId/localVersion), Retry+Backoff bei 429/5xx, lastschonender Batch | `google-export.test.ts` |
 | 3.2 Bidirektional/Konflikt/Echo | etag-Echo-Schutz, Last-Write-Wins, kein Duplikat | `google-sync.test.ts` |
 | 3.3 Serien & Zeitzonen beidseitig | konstante Wandzeit über DST, Round-Trip ohne Drift, Ganztag | `google-timezones.test.ts` |
-| 4.1 Sync-Scheduler | periodischer Lauf, Fehlerisolation je Verbindung, Überlappungsschutz | `calendar-scheduler.test.ts` |
+| 4.1 Sync-Scheduler | periodischer Lauf mit ±25 % Jitter, Truncated-Exponential-Backoff pro Verbindung, Fehlerisolation, Überlappungsschutz | `calendar-scheduler.test.ts` |
 | 4.2 Google Push (optional) | events.watch, Webhook mit HMAC-Token, offen erreichbar, Fälschungsabwehr | `google-push.test.ts` |
+
+> **AP-4.2 – bewusst zurückgestellt:** Persistente Channel-Verwaltung, automatisches Kanal-Renewal und `channels.stop` beim Trennen sind mangels öffentlich erreichbarer HTTPS-Test-URL nicht aktivier-/abnehmbar und daher zurückgestellt (DoD-konform). Die Kern-Push-Mechanik (watch-Registrierung + Webhook + HMAC-Token-Schutz) ist implementiert und getestet; der Polling-Scheduler (AP-4.1) hält die Daten in der Zwischenzeit konsistent.
 | 4.3 Fehler-/Status-UI, Re-Auth, Journal | reauth_required, Re-Auth ohne Dublette, Journal für Sync/Fehler/Konflikt/Trennung | `calendar-journal.test.ts`, `SettingsCalendarConnectionsPage.test.tsx` |
 | 4.4 E2E-Abnahme (Gate) | fünf E2E-Szenarien, Coverage, statische Prüfung | `calendar-sync-e2e.test.ts` (diese Datei) |
 

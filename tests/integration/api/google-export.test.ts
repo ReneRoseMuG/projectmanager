@@ -39,7 +39,7 @@ import { insertId } from "../../../apps/api/src/db/query-utils.js";
 import { calendarConnectionRepository, eventMappingRepository, externalCalendarRepository } from "../../../apps/api/src/repositories/calendar.repository.js";
 import { calendarCredentialService } from "../../../apps/api/src/services/calendar-credential.service.js";
 import { resetCredentialCipherCache } from "../../../apps/api/src/services/credential-cipher.js";
-import { deleteExportedEvent, exportEventToGoogle, exportPendingLocalEvents } from "../../../apps/api/src/services/google/google-export.service.js";
+import { deleteExportedEvent, exportEventToGoogle, exportPendingLocalEvents, googleWriteRetry } from "../../../apps/api/src/services/google/google-export.service.js";
 import { GoogleAuthError, type GoogleTokenFetch } from "../../../apps/api/src/services/google/google-oauth.service.js";
 import { createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
@@ -83,6 +83,7 @@ describe("App → Google Export (AP-3.1)", () => {
     testDb = await createTestDb();
     originalKey = config.calendarEncryptionKey;
     config.calendarEncryptionKey = "google-export-test-key";
+    googleWriteRetry.baseDelayMs = 0; // Retry ohne echte Wartezeit prüfen
     resetCredentialCipherCache();
   });
   beforeEach(async () => {
@@ -243,5 +244,49 @@ describe("App → Google Export (AP-3.1)", () => {
     const deleted = await deleteExportedEvent(testDb.db, connectionId, eventId, recordingFetch({ deleteStatus: 404 }).fetchImpl);
     expect(deleted).toBe(true);
     expect(await eventMappingRepository.findByLocalEvent(testDb.db, eventId)).toBeUndefined();
+  });
+
+  it("versieht das exportierte Event mit vollständiger Herkunftsmarke (source, localId, localVersion)", async () => {
+    const { connectionId } = await setupWithTarget();
+    const eventId = await insertLocalEvent({ title: "Marke", startTime: "2026-07-01T10:00:00", endTime: "2026-07-01T11:00:00" });
+    const { fetchImpl, requests } = recordingFetch({ insertId: "g-marke" });
+    await exportEventToGoogle(testDb.db, connectionId, eventId, fetchImpl);
+    const ext = requests.find((request) => request.method === "POST")?.body?.extendedProperties as { private?: Record<string, string> } | undefined;
+    expect(ext?.private?.pmOrigin).toBe("projektmanager");
+    expect(ext?.private?.pmLocalId).toBe(String(eventId));
+    expect(ext?.private?.pmLocalVersion).toBeTruthy();
+  });
+
+  it("wiederholt einen 429-Schreibzugriff mit Backoff und liefert danach Erfolg", async () => {
+    const { connectionId } = await setupWithTarget();
+    const eventId = await insertLocalEvent({ title: "RateLimit", startTime: "2026-07-01T10:00:00", endTime: "2026-07-01T11:00:00" });
+    let attempts = 0;
+    const flakeyFetch: GoogleTokenFetch = async (_url, init) => {
+      if (init.method === "POST") {
+        attempts += 1;
+        if (attempts < 3) {
+          return { status: 429, json: async () => ({ error: "rateLimitExceeded" }) };
+        }
+        return { status: 200, json: async () => ({ id: "g-retried", etag: "e", iCalUID: null }) };
+      }
+      return { status: 200, json: async () => ({}) };
+    };
+    const outcome = await exportEventToGoogle(testDb.db, connectionId, eventId, flakeyFetch);
+    expect(outcome.action).toBe("insert");
+    expect(attempts).toBe(3); // zwei Wiederholungen bis Erfolg
+  });
+
+  it("gibt nach erschöpften Wiederholungen bei anhaltendem 429 einen Fehler zurück", async () => {
+    const { connectionId } = await setupWithTarget();
+    const eventId = await insertLocalEvent({ title: "Dauerlimit", startTime: "2026-07-01T10:00:00", endTime: "2026-07-01T11:00:00" });
+    let attempts = 0;
+    const alwaysLimited: GoogleTokenFetch = async (_url, init) => {
+      if (init.method === "POST") {
+        attempts += 1;
+      }
+      return { status: 429, json: async () => ({ error: "rateLimitExceeded" }) };
+    };
+    await expect(exportEventToGoogle(testDb.db, connectionId, eventId, alwaysLimited)).rejects.toBeInstanceOf(GoogleAuthError);
+    expect(attempts).toBe(3); // maxAttempts erschöpft
   });
 });

@@ -14,6 +14,11 @@ import { defaultGoogleFetch, ensureGoogleAccessToken, GoogleAuthError, type Goog
  * Aktivierung setzt eine öffentlich erreichbare HTTPS-Webhook-URL voraus (config.googlePushWebhookUrl,
  * z. B. via Reverse-Proxy/Tunnel). Ohne diese bleibt der periodische Scheduler (AP-4.1) der Weg.
  *
+ * Bewusst zurückgestellt (AP-4.2), da ohne öffentliche Test-URL weder aktivierbar noch real abnehmbar:
+ * persistente Channel-Verwaltung (channelId/resourceId/expiration), automatisches Kanal-Renewal vor
+ * Ablauf und channels.stop beim Trennen. Der Polling-Scheduler (AP-4.1, inkl. Backoff) hält die Daten
+ * in der Zwischenzeit konsistent — Push ist reine Latenz-Optimierung, kein Korrektheits-Baustein.
+ *
  * Sicherheit ohne Channel-Persistenz: Die Channel-Id kodiert die Verbindung (pm-cal-<id>), der
  * mitgegebene Token ist ein HMAC über die Verbindung. Der Webhook verifiziert beide durch Nachrechnen
  * — eine gefälschte Benachrichtigung ohne gültigen Token wird abgewiesen.

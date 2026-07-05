@@ -3,9 +3,14 @@ import { calendarConnectionRepository } from "../repositories/calendar.repositor
 import { runConnectionSync } from "./calendar-sync.service.js";
 
 /**
- * Sync-Scheduler (AP-4.1). Stößt in festem Intervall den Abgleich aller Kalenderverbindungen an.
- * Robustheit: Ein Fehler je Verbindung wird isoliert (die übrigen laufen weiter), und überlappende
- * Ticks werden verhindert (dauert ein Lauf länger als das Intervall, wird der nächste übersprungen).
+ * Sync-Scheduler (AP-4.1). Stößt in gejittertem Intervall den Abgleich aller Kalenderverbindungen an.
+ * Robustheit:
+ * - Fehlerisolation: ein Fehler je Verbindung stoppt die anderen nicht.
+ * - Überlappungsschutz: dauert ein Lauf länger als das Intervall, wird der nächste übersprungen.
+ * - Jitter (±25 %): verhindert, dass alle Verbindungen exakt gleichzeitig gegen die Fremd-APIs laufen.
+ * - Backoff pro Verbindung: nach einem Fehler wird die betroffene Verbindung mit Truncated Exponential
+ *   Backoff seltener erneut versucht (schützt vor 429/5xx-Sturm), ohne die anderen zu bremsen; nach
+ *   einem erfolgreichen Lauf wird der Backoff zurückgesetzt.
  * Der Timer ist unref'd — er hält den Prozess nicht am Leben und blockiert kein Server-Shutdown.
  */
 
@@ -13,30 +18,69 @@ export interface ScheduledSyncResult {
   processed: number;
   synced: number;
   failed: number;
+  skipped: number;
 }
 
-/** Ein Scheduler-Tick: synchronisiert alle Verbindungen einmal, fehlertolerant je Verbindung. */
-export async function runScheduledSync(database: DbClient): Promise<ScheduledSyncResult> {
+export const schedulerBackoff = { baseDelayMs: 60_000, maxDelayMs: 30 * 60_000 };
+
+interface BackoffEntry {
+  failures: number;
+  nextAttempt: number;
+}
+
+const backoffState = new Map<number, BackoffEntry>();
+
+/** Nur für Tests: Backoff-Zustand zurücksetzen, um einen definierten Ausgangszustand herzustellen. */
+export function resetSchedulerBackoff(): void {
+  backoffState.clear();
+}
+
+function registerFailure(connectionId: number, now: number): void {
+  const failures = (backoffState.get(connectionId)?.failures ?? 0) + 1;
+  const delay = Math.min(schedulerBackoff.baseDelayMs * 2 ** (failures - 1), schedulerBackoff.maxDelayMs);
+  backoffState.set(connectionId, { failures, nextAttempt: now + delay });
+}
+
+/** ±25 % Jitter auf ein Basisintervall (nie negativ). */
+export function jitteredDelay(intervalMs: number): number {
+  const spread = intervalMs * 0.25 * (Math.random() * 2 - 1);
+  return Math.max(0, Math.round(intervalMs + spread));
+}
+
+/**
+ * Ein Scheduler-Tick: synchronisiert alle fälligen Verbindungen, fehlertolerant je Verbindung.
+ * `now` ist injizierbar (Testzeit); Verbindungen im Backoff-Fenster werden übersprungen.
+ */
+export async function runScheduledSync(database: DbClient, now: number = Date.now()): Promise<ScheduledSyncResult> {
   const connections = await calendarConnectionRepository.listAll(database);
   let synced = 0;
   let failed = 0;
+  let skipped = 0;
   for (const connection of connections) {
+    const backoff = backoffState.get(connection.id);
+    if (backoff && backoff.nextAttempt > now) {
+      skipped += 1;
+      continue;
+    }
     try {
       const result = await runConnectionSync(database, connection);
       if (result.status === "error") {
+        registerFailure(connection.id, now);
         failed += 1;
       } else {
+        backoffState.delete(connection.id);
         synced += 1;
       }
     } catch {
       // Unerwartete Fehler (z. B. DB) einer Verbindung dürfen die übrigen nicht stoppen.
+      registerFailure(connection.id, now);
       failed += 1;
     }
   }
-  return { processed: connections.length, synced, failed };
+  return { processed: connections.length, synced, failed, skipped };
 }
 
-let timer: ReturnType<typeof setInterval> | null = null;
+let timer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
 
 async function tick(database: DbClient): Promise<void> {
@@ -51,23 +95,31 @@ async function tick(database: DbClient): Promise<void> {
   }
 }
 
-/** Startet den periodischen Scheduler (idempotent — ein bereits laufender Timer wird nicht dupliziert). */
-export function startCalendarSyncScheduler(database: DbClient, intervalMs: number): void {
-  if (timer) {
-    return;
-  }
-  timer = setInterval(() => {
-    void tick(database);
-  }, intervalMs);
+function scheduleNext(database: DbClient, intervalMs: number): void {
+  timer = setTimeout(() => {
+    void tick(database).finally(() => {
+      if (timer) {
+        scheduleNext(database, intervalMs);
+      }
+    });
+  }, jitteredDelay(intervalMs));
   if (typeof timer.unref === "function") {
     timer.unref();
   }
 }
 
+/** Startet den periodischen Scheduler (idempotent — ein bereits laufender Timer wird nicht dupliziert). */
+export function startCalendarSyncScheduler(database: DbClient, intervalMs: number): void {
+  if (timer) {
+    return;
+  }
+  scheduleNext(database, intervalMs);
+}
+
 /** Stoppt den Scheduler und gibt den Timer frei. */
 export function stopCalendarSyncScheduler(): void {
   if (timer) {
-    clearInterval(timer);
+    clearTimeout(timer);
     timer = null;
   }
   running = false;
