@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { deleteCalendarConnection, listCalendarConnections } from "../services/calendar-connection.service.js";
+import { deleteCalendarConnection, listCalendarConnections, requireOwnedConnection } from "../services/calendar-connection.service.js";
+import { listGoogleCalendars, selectGoogleCalendar } from "../services/google/google-calendar.service.js";
 import { syncCalendarConnection } from "../services/calendar-sync.service.js";
 import { connectNextCloud, type ConnectNextCloudInput } from "../services/nextcloud-connection.service.js";
 import { buildGoogleAuthUrl, handleGoogleCallback } from "../services/google/google-oauth.service.js";
@@ -17,6 +18,13 @@ const nextCloudConnectSchema = {
     username: { type: "string", minLength: 1 },
     appPassword: { type: "string", minLength: 1 }
   }
+} as const;
+
+const googleSelectSchema = {
+  type: "object",
+  required: ["calendarId"],
+  additionalProperties: false,
+  properties: { calendarId: { type: "string", minLength: 1 } }
 } as const;
 
 /** Der globale Auth-Guard erzwingt bereits die Rolle (calendarConnections/read|write|delete);
@@ -58,6 +66,24 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
       return reply.redirect(`${target}?google=error`);
     }
   });
+
+  app.get<{ Params: { id: number } }>(
+    "/calendar-connections/:id/google/calendars",
+    { schema: { params: idParamSchema, response: { 200: arrayResponseSchema } } },
+    async (request) => {
+      await requireOwnedConnection(app.db, request.params.id, requireUserId(request));
+      return listGoogleCalendars(app.db, request.params.id);
+    }
+  );
+
+  app.post<{ Params: { id: number }; Body: { calendarId: string } }>(
+    "/calendar-connections/:id/google/select",
+    { schema: { params: idParamSchema, body: googleSelectSchema, response: { 200: objectResponseSchema } } },
+    async (request) => {
+      await requireOwnedConnection(app.db, request.params.id, requireUserId(request));
+      return selectGoogleCalendar(app.db, request.params.id, request.body.calendarId);
+    }
+  );
 
   app.post<{ Params: { id: number } }>(
     "/calendar-connections/:id/sync",

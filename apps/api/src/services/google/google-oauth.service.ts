@@ -34,9 +34,9 @@ export interface GoogleTokenResponse {
   json(): Promise<Record<string, unknown>>;
 }
 
-export type GoogleTokenFetch = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<GoogleTokenResponse>;
+export type GoogleTokenFetch = (url: string, init: { method: string; headers: Record<string, string>; body?: string }) => Promise<GoogleTokenResponse>;
 
-const defaultTokenFetch: GoogleTokenFetch = async (url, init) => {
+export const defaultGoogleFetch: GoogleTokenFetch = async (url, init) => {
   const response = await fetch(url, init);
   return { status: response.status, json: () => response.json() as Promise<Record<string, unknown>> };
 };
@@ -130,7 +130,7 @@ async function refresh(refreshToken: string, fetchImpl: GoogleTokenFetch): Promi
 }
 
 /** Callback nach der Google-Zustimmung: State prüfen, Code eintauschen, Verbindung + verschlüsselte Tokens anlegen. */
-export async function handleGoogleCallback(database: DbClient, code: string, state: string, fetchImpl: GoogleTokenFetch = defaultTokenFetch): Promise<CalendarConnection> {
+export async function handleGoogleCallback(database: DbClient, code: string, state: string, fetchImpl: GoogleTokenFetch = defaultGoogleFetch): Promise<CalendarConnection> {
   const userId = verifyState(state);
   const tokens = await exchangeCode(code, fetchImpl);
   const connection = await database.transaction(async (tx) => {
@@ -151,7 +151,7 @@ export async function handleGoogleCallback(database: DbClient, code: string, sta
  * Refresh-Token. Bei widerrufenem Token (invalid_grant) wird die Verbindung auf "reauth_required"
  * gesetzt und der Fehler weitergereicht.
  */
-export async function ensureGoogleAccessToken(database: DbClient, connectionId: number, fetchImpl: GoogleTokenFetch = defaultTokenFetch): Promise<string> {
+export async function ensureGoogleAccessToken(database: DbClient, connectionId: number, fetchImpl: GoogleTokenFetch = defaultGoogleFetch): Promise<string> {
   const credentials = await calendarCredentialService.load(database, connectionId);
   if (!credentials?.refreshToken) {
     throw new GoogleAuthError("config", "Für diese Google-Verbindung sind keine Zugangsdaten hinterlegt.");
