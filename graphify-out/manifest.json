@@ -100,8 +100,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/db/schema.ts": {
-    "mtime": 1783275309.321397,
-    "ast_hash": "cd2e53ea387e8c3bb6c28772b3eb2d66",
+    "mtime": 1783290444.818276,
+    "ast_hash": "f40b41c54596b7ce7aa807a60cb63042",
     "semantic_hash": ""
   },
   "apps/api/src/index.ts": {
@@ -2085,8 +2085,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/queries/queryKeys.ts": {
-    "mtime": 1783276197.9237146,
-    "ast_hash": "e9a9f00f665d1eaefd87de5816616a43",
+    "mtime": 1783282472.936466,
+    "ast_hash": "87508230650808d5f301159d24edd68d",
     "semantic_hash": ""
   },
   "apps/web/src/types.ts": {
@@ -6905,13 +6905,13 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/attachments/DocumentHoverPreview.tsx": {
-    "mtime": 1783244731.6775782,
-    "ast_hash": "02dc3cc84ec70522e4b7c3557d034ead",
+    "mtime": 1783282113.6381469,
+    "ast_hash": "f9cb08db3458e4ee6051f5274aff7ec4",
     "semantic_hash": ""
   },
   "apps/web/src/components/attachments/DocumentPreviewBody.tsx": {
-    "mtime": 1783240502.3787334,
-    "ast_hash": "59e392a1151f892aa7e1281fe06d6750",
+    "mtime": 1783282113.6803255,
+    "ast_hash": "8f0f41cc2a770f2bbb4bb51dad8e1779",
     "semantic_hash": ""
   },
   "tests/browser/web/list-progressive-render.spec.ts": {
@@ -7010,13 +7010,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/repositories/calendar.repository.ts": {
-    "mtime": 1783275463.2665153,
-    "ast_hash": "7239322ae6c31db7d31e9143f63cafb3",
+    "mtime": 1783290509.7484522,
+    "ast_hash": "6259d4861bd97c92007744a5b7eb2106",
     "semantic_hash": ""
   },
   "apps/api/src/routes/calendar-connections.ts": {
-    "mtime": 1783275907.2564418,
-    "ast_hash": "6bcaf5f6f1a2900f2f040a8080d9e59e",
+    "mtime": 1783290651.691525,
+    "ast_hash": "b4fb626933977e0c0c43279948e063dc",
     "semantic_hash": ""
   },
   "apps/api/src/services/caldav/caldav-client.ts": {
@@ -7030,8 +7030,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/calendar-sync.service.ts": {
-    "mtime": 1783275606.101921,
-    "ast_hash": "f750ce5e0567c497ca4821c3089555c5",
+    "mtime": 1783282410.2709556,
+    "ast_hash": "e2c9728b826f4dc274cd804bc0ca2973",
     "semantic_hash": ""
   },
   "apps/api/src/services/ical-import.service.ts": {
@@ -7050,18 +7050,18 @@
     "semantic_hash": ""
   },
   "apps/web/src/api/calendar-connections.ts": {
-    "mtime": 1783276189.697153,
-    "ast_hash": "9294e927297192a7e174579490aa2c93",
+    "mtime": 1783282448.1808548,
+    "ast_hash": "973418cdf917789639bfb13883c07319",
     "semantic_hash": ""
   },
   "apps/web/src/hooks/useCalendarConnections.ts": {
-    "mtime": 1783276215.4280195,
-    "ast_hash": "503043b9e1e24f5f80b903dcfef45d8b",
+    "mtime": 1783282504.5005076,
+    "ast_hash": "c41f068178670795d9d89f2bfef00030",
     "semantic_hash": ""
   },
   "apps/web/src/pages/SettingsCalendarConnectionsPage.tsx": {
-    "mtime": 1783276283.431101,
-    "ast_hash": "4f7f1d0716eb46196809f37ad4aac57b",
+    "mtime": 1783282681.582745,
+    "ast_hash": "0fab794514e3ea30b7ccd9b9746eb7c3",
     "semantic_hash": ""
   },
   "apps/web/src/utils/richTextExport.ts": {
@@ -7070,8 +7070,8 @@
     "semantic_hash": ""
   },
   "tests/integration/api/calendar-connections.test.ts": {
-    "mtime": 1783266710.9420092,
-    "ast_hash": "370cba333ffbd360b96244201f8cd899",
+    "mtime": 1783282921.4533284,
+    "ast_hash": "f08bd686a945aa36a0b77e7a3210ce22",
     "semantic_hash": ""
   },
   "tests/integration/api/calendar-readonly.test.ts": {
@@ -7115,8 +7115,8 @@
     "semantic_hash": ""
   },
   "tests/unit/web/pages/SettingsCalendarConnectionsPage.test.tsx": {
-    "mtime": 1783276548.7813451,
-    "ast_hash": "eae320fba8cb12848a514a6d5a7964fb",
+    "mtime": 1783282840.0490613,
+    "ast_hash": "9df974a492944729f3a3c436f44373f7",
     "semantic_hash": ""
   },
   "tests/unit/web/styles/rich-text-surface-css.test.ts": {
@@ -7185,8 +7185,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/calendar-scheduler.service.ts": {
-    "mtime": 1783279202.9792328,
-    "ast_hash": "1eed9c70883286a8b54b91a98c6ee91e",
+    "mtime": 1783290673.1338565,
+    "ast_hash": "3928f4a6a4b16aefc07dcd1be4441954",
     "semantic_hash": ""
   },
   "apps/api/src/services/google/google-calendar.service.ts": {
@@ -7210,8 +7210,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/google/google-push.service.ts": {
-    "mtime": 1783279467.5249555,
-    "ast_hash": "c678fba9498144b90c4b686b386fe4bd",
+    "mtime": 1783290611.2263346,
+    "ast_hash": "581fe5b487f7eedc327d49636be40eed",
     "semantic_hash": ""
   },
   "tests/integration/api/calendar-journal.test.ts": {
@@ -7250,8 +7250,8 @@
     "semantic_hash": ""
   },
   "tests/integration/api/google-push.test.ts": {
-    "mtime": 1783274997.781064,
-    "ast_hash": "d840b80126d51b36ad5b760fd028b1b8",
+    "mtime": 1783290825.4660592,
+    "ast_hash": "83e6f41cdf1bbaee6ee15d5b24d19cf9",
     "semantic_hash": ""
   },
   "tests/integration/api/google-sync.test.ts": {
@@ -7275,8 +7275,18 @@
     "semantic_hash": ""
   },
   "docs/ms79-calendarsync-abnahme.md": {
-    "mtime": 1783279631.1962717,
-    "ast_hash": "79ea791807bf80b7c9235cf1111d6a9c",
+    "mtime": 1783291043.855991,
+    "ast_hash": "4470af564710f47cb01cd0f42fc7b7b2",
+    "semantic_hash": ""
+  },
+  "apps/api/src/db/migrations/20260705222736_sharp_susan_delgado/migration.sql": {
+    "mtime": 1783290474.6654916,
+    "ast_hash": "0ef5db98277c226d8c4feb6c4e87d908",
+    "semantic_hash": ""
+  },
+  "apps/api/src/db/migrations/20260705222736_sharp_susan_delgado/snapshot.json": {
+    "mtime": 1783290456.5266252,
+    "ast_hash": "11e84a728a9ae307536081a94267eb66",
     "semantic_hash": ""
   }
 }
