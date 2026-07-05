@@ -54,9 +54,28 @@ export interface ExportOutcome {
   externalId?: string;
 }
 
-async function loadEvent(database: DbClient, localEventId: number): Promise<typeof events.$inferSelect | undefined> {
+/** Lädt einen lokalen Termin (oder undefined). Von der Import-/Sync-Ebene mitgenutzt. */
+export async function loadLocalEvent(database: DbClient, localEventId: number): Promise<typeof events.$inferSelect | undefined> {
   const [event] = await database.select().from(events).where(eq(events.id, localEventId));
   return event;
+}
+
+/**
+ * Lokale Änderungsversion eines Termins: Sekunden-Unix-Timestamp seiner updatedAt. Sekundengenau
+ * genügt für den periodischen Sync (Minuten-Intervall); die Spalte seen_version ist INT (gültig bis
+ * 2038 — projektweite Grenze aller Sekunden-Timestamps, bei Bedarf später auf BIGINT erweiterbar).
+ */
+export function versionOf(iso: string): number {
+  return Math.floor(Date.parse(iso) / 1000);
+}
+
+/**
+ * Ein gemappter Termin gilt als lokal geändert, wenn seine updatedAt-Version größer ist als der beim
+ * letzten Sync festgehaltene seenVersion-Stand. Ohne seenVersion (Alt-Mapping) wird konservativ „nicht
+ * geändert" angenommen, damit die Remote-Seite als Standardquelle greift.
+ */
+export function isLocallyModified(event: typeof events.$inferSelect, seenVersion: number | null): boolean {
+  return seenVersion !== null && versionOf(event.updatedAt) > seenVersion;
 }
 
 function authHeaders(accessToken: string): Record<string, string> {
@@ -68,7 +87,7 @@ function authHeaders(accessToken: string): Record<string, string> {
  * aktualisiert ihn andernfalls (update). Die Aufrufer-Ebene entscheidet, welche Termine exportiert werden.
  */
 export async function exportEventToGoogle(database: DbClient, connectionId: number, localEventId: number, fetchImpl: GoogleTokenFetch = defaultGoogleFetch): Promise<ExportOutcome> {
-  const event = await loadEvent(database, localEventId);
+  const event = await loadLocalEvent(database, localEventId);
   if (!event) {
     return { action: "skipped" };
   }
@@ -87,7 +106,8 @@ export async function exportEventToGoogle(database: DbClient, connectionId: numb
       throw new GoogleAuthError("exchange", `Google-Aktualisierung fehlgeschlagen: HTTP ${response.status}.`);
     }
     const data = await response.json();
-    await eventMappingRepository.update(database, mapping.id, { etag: typeof data.etag === "string" ? data.etag : null });
+    // seenVersion = gepushter lokaler Stand → dieser Termin gilt danach als synchron (nicht mehr „dirty").
+    await eventMappingRepository.update(database, mapping.id, { etag: typeof data.etag === "string" ? data.etag : null, seenVersion: versionOf(event.updatedAt) });
     return { action: "update", externalId: mapping.externalId };
   }
 
@@ -110,6 +130,7 @@ export async function exportEventToGoogle(database: DbClient, connectionId: numb
     externalId: data.id,
     iCalUid: typeof data.iCalUID === "string" ? data.iCalUID : null,
     etag: typeof data.etag === "string" ? data.etag : null,
+    seenVersion: versionOf(event.updatedAt),
     origin: "local",
     direction: "both"
   });
@@ -159,4 +180,27 @@ export async function exportPendingLocalEvents(database: DbClient, connectionId:
     }
   }
   return { inserted };
+}
+
+/**
+ * Schreibt gemappte Termine mit lokaler Änderung (updatedAt > seenVersion) per PATCH zu Google.
+ * Deckt sowohl geänderte App-Termine als auch bei einem Konflikt lokal gewonnene Google-Termine ab.
+ * Unveränderte Termine werden übersprungen — kein Massen-Update bei jedem Sync.
+ */
+export async function exportDirtyMappedEvents(database: DbClient, connectionId: number, fetchImpl: GoogleTokenFetch = defaultGoogleFetch): Promise<{ updated: number }> {
+  let updated = 0;
+  for (const mapping of await eventMappingRepository.listByConnection(database, connectionId)) {
+    if (mapping.direction !== "both") {
+      continue;
+    }
+    const event = await loadLocalEvent(database, mapping.localEventId);
+    if (!event) {
+      continue;
+    }
+    if (isLocallyModified(event, mapping.seenVersion)) {
+      await exportEventToGoogle(database, connectionId, mapping.localEventId, fetchImpl);
+      updated += 1;
+    }
+  }
+  return { updated };
 }
