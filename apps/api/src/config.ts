@@ -47,6 +47,9 @@ export interface AppConfig {
   googleClientId: string | null;
   googleClientSecret: string | null;
   googleRedirectUri: string;
+  // Kalender-Sync-Scheduler (MS-79 AP-4.1): periodischer Hintergrund-Abgleich aller Verbindungen.
+  calendarSyncEnabled: boolean;
+  calendarSyncIntervalMs: number;
 }
 
 function resolveFromApiRoot(value: string): string {
@@ -108,5 +111,7 @@ export const config: AppConfig = {
   calendarEncryptionKey: process.env.CALENDAR_ENCRYPTION_KEY?.trim() || null,
   googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || null,
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || null,
-  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI?.trim() || "http://localhost:3001/api/calendar-connections/google/callback"
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI?.trim() || "http://localhost:3001/api/calendar-connections/google/callback",
+  calendarSyncEnabled: booleanFromEnv(process.env.CALENDAR_SYNC_ENABLED),
+  calendarSyncIntervalMs: numberFromEnv(process.env.CALENDAR_SYNC_INTERVAL_MS, 15 * 60 * 1000)
 };

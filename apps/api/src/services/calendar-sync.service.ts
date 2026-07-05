@@ -37,7 +37,15 @@ export async function syncCalendarConnection(database: DbClient, id: number, use
   if (!connection || connection.userId !== userId) {
     throw notFound(`Calendar connection ${id} not found`);
   }
+  return runConnectionSync(database, connection);
+}
 
+/**
+ * Führt den Sync einer bereits geladenen Verbindung aus — der System-/Scheduler-Pfad ohne
+ * Ownership-Prüfung (AP-4.1). Setzt den Status auf "syncing", ruft den Handler und spiegelt Erfolg
+ * ("active") oder Fehler ("error" + Meldung) zurück. Fehlt der Handler, ist das ein Fehlerzustand.
+ */
+export async function runConnectionSync(database: DbClient, connection: CalendarConnectionRecord): Promise<CalendarConnection> {
   const handler = syncHandlers.get(connection.provider);
   if (!handler) {
     return applyResult(database, connection, {
@@ -46,7 +54,7 @@ export async function syncCalendarConnection(database: DbClient, id: number, use
     });
   }
 
-  await calendarConnectionRepository.recordSyncResult(database, id, { status: "syncing", lastError: null });
+  await calendarConnectionRepository.recordSyncResult(database, connection.id, { status: "syncing", lastError: null });
   try {
     await handler(database, connection);
     return applyResult(database, connection, { status: "active", lastError: null });

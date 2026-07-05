@@ -44,6 +44,7 @@ import { createRealtimeEventBus } from "./services/realtime-event-bus.service.js
 import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
 import { registerNextCloudSyncHandler } from "./services/nextcloud-sync.service.js";
 import { registerGoogleSyncHandler } from "./services/google/google-events.service.js";
+import { startCalendarSyncScheduler, stopCalendarSyncScheduler } from "./services/calendar-scheduler.service.js";
 import { seedAuthData } from "./services/auth.service.js";
 import { seedDefaultCatalogEntries } from "./services/catalogs.service.js";
 import { errorHandler } from "./utils/errors.js";
@@ -61,6 +62,7 @@ export async function buildApp(
   app.setErrorHandler(errorHandler);
   app.addHook("onClose", async () => {
     stopAllAttachmentWatchers();
+    stopCalendarSyncScheduler();
   });
 
   await registerCors(app);
@@ -110,6 +112,11 @@ export async function buildApp(
   // Provider-Sync-Handler im zentralen Dispatcher registrieren (NextCloud read-only, Google bidirektional).
   registerNextCloudSyncHandler();
   registerGoogleSyncHandler();
+
+  // Periodischen Sync-Scheduler starten (AP-4.1), sofern per Umgebung aktiviert.
+  if (config.calendarSyncEnabled) {
+    startCalendarSyncScheduler(app.db, config.calendarSyncIntervalMs);
+  }
 
   return app;
 }
