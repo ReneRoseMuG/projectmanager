@@ -1,6 +1,8 @@
+import { config } from "../config.js";
 import type { DbClient } from "../db/client.js";
 import { calendarConnectionRepository } from "../repositories/calendar.repository.js";
 import { runConnectionSync } from "./calendar-sync.service.js";
+import { renewExpiringChannels } from "./google/google-push.service.js";
 
 /**
  * Sync-Scheduler (AP-4.1). Stößt in gejittertem Intervall den Abgleich aller Kalenderverbindungen an.
@@ -90,6 +92,14 @@ async function tick(database: DbClient): Promise<void> {
   running = true;
   try {
     await runScheduledSync(database);
+    // Ablaufende Google-Push-Kanäle erneuern (nur wenn Push konfiguriert ist; best-effort).
+    if (config.googlePushWebhookUrl) {
+      try {
+        await renewExpiringChannels(database, config.googlePushWebhookUrl, Date.now());
+      } catch {
+        // Ein Renewal-Fehler darf den regulären Abgleich nicht stören.
+      }
+    }
   } finally {
     running = false;
   }

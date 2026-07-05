@@ -27,9 +27,16 @@ iCal-/Zeitzonen-Logik und Routing sind echt.
 | 3.2 Bidirektional/Konflikt/Echo | etag-Echo-Schutz, Last-Write-Wins, kein Duplikat | `google-sync.test.ts` |
 | 3.3 Serien & Zeitzonen beidseitig | konstante Wandzeit über DST, Round-Trip ohne Drift, Ganztag | `google-timezones.test.ts` |
 | 4.1 Sync-Scheduler | periodischer Lauf mit ±25 % Jitter, Truncated-Exponential-Backoff pro Verbindung, Fehlerisolation, Überlappungsschutz | `calendar-scheduler.test.ts` |
-| 4.2 Google Push (optional) | events.watch, Webhook mit HMAC-Token, offen erreichbar, Fälschungsabwehr | `google-push.test.ts` |
+| 4.2 Google Push (optional) | events.watch + Persistenz, Renewal, channels.stop, Auto-Aktivierung, Webhook mit HMAC-Token | `google-push.test.ts` |
 
-> **AP-4.2 – bewusst zurückgestellt:** Persistente Channel-Verwaltung, automatisches Kanal-Renewal und `channels.stop` beim Trennen sind mangels öffentlich erreichbarer HTTPS-Test-URL nicht aktivier-/abnehmbar und daher zurückgestellt (DoD-konform). Die Kern-Push-Mechanik (watch-Registrierung + Webhook + HMAC-Token-Schutz) ist implementiert und getestet; der Polling-Scheduler (AP-4.1) hält die Daten in der Zwischenzeit konsistent.
+> **AP-4.2 – vollständiger Kanal-Lebenszyklus:** events.watch registriert **und persistiert**
+> channelId/resourceId/expiration am Zielkalender; `renewExpiringChannels` erneuert ablaufende Kanäle
+> (im Scheduler-Tick verdrahtet), `channels.stop` meldet beim Trennen ab, die Kalenderauswahl aktiviert
+> Push automatisch (sofern `GOOGLE_PUSH_WEBHOOK_URL` gesetzt), der Webhook wehrt gefälschte Aufrufe per
+> HMAC-Token ab. Alles mit simulierten Antworten getestet (Persistenz, Stop, Renewal-Schwelle, virtuelle
+> Zeit). **Verbleibende Grenze:** der *reale Empfang* echter Google-Zustellungen ist erst mit einer
+> öffentlich erreichbaren HTTPS-Webhook-URL abnehmbar; ohne sie deckt der Polling-Scheduler (AP-4.1) die
+> Funktion vollständig ab (Push ist reine Latenz-Optimierung).
 | 4.3 Fehler-/Status-UI, Re-Auth, Journal | reauth_required, Re-Auth ohne Dublette, Journal für Sync/Fehler/Konflikt/Trennung | `calendar-journal.test.ts`, `SettingsCalendarConnectionsPage.test.tsx` |
 | 4.4 E2E-Abnahme (Gate) | fünf E2E-Szenarien, Coverage, statische Prüfung | `calendar-sync-e2e.test.ts` (diese Datei) |
 

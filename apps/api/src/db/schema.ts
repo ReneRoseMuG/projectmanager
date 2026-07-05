@@ -928,6 +928,11 @@ export const externalCalendars = mysqlTable(
     color: shortText("color"),
     imported: boolean("imported").notNull().default(false),
     readonly: boolean("readonly").notNull().default(false),
+    // Google-Push-Kanal (MS-79 AP-4.2): events.watch-Registrierung je Zielkalender. resourceId +
+    // channelId werden für channels.stop benötigt, expiration (ms since epoch) für das Renewal.
+    pushChannelId: shortText("push_channel_id"),
+    pushResourceId: shortText("push_resource_id", { length: 512 }),
+    pushExpiration: varchar("push_expiration", { length: 32 }),
     createdAt: timestampText("created_at"),
     updatedAt: timestampText("updated_at")
   },

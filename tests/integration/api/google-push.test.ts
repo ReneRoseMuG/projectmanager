@@ -36,16 +36,16 @@ import { calendarConnectionRepository, externalCalendarRepository } from "../../
 import { calendarCredentialService } from "../../../apps/api/src/services/calendar-credential.service.js";
 import { resetCredentialCipherCache } from "../../../apps/api/src/services/credential-cipher.js";
 import { clearCalendarSyncHandlers, registerCalendarSyncHandler } from "../../../apps/api/src/services/calendar-sync.service.js";
-import { handlePushNotification, pushChannelId, signPushToken, watchGoogleCalendar } from "../../../apps/api/src/services/google/google-push.service.js";
+import { handlePushNotification, pushChannelId, renewExpiringChannels, signPushToken, stopGoogleWatch, watchGoogleCalendar } from "../../../apps/api/src/services/google/google-push.service.js";
 import { GoogleAuthError, type GoogleTokenFetch } from "../../../apps/api/src/services/google/google-oauth.service.js";
 import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
 
 const ADMIN_ID = 1;
 
-function watchFetch(status = 200, body: Record<string, unknown> = { resourceId: "res-1", expiration: "1999999999999" }): { fetchImpl: GoogleTokenFetch; requests: Array<{ method: string; body?: Record<string, unknown> }> } {
-  const requests: Array<{ method: string; body?: Record<string, unknown> }> = [];
-  const fetchImpl: GoogleTokenFetch = async (_url, init) => {
-    requests.push({ method: init.method, body: init.body ? (JSON.parse(init.body) as Record<string, unknown>) : undefined });
+function watchFetch(status = 200, body: Record<string, unknown> = { resourceId: "res-1", expiration: "1999999999999" }): { fetchImpl: GoogleTokenFetch; requests: Array<{ url: string; method: string; body?: Record<string, unknown> }> } {
+  const requests: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
+  const fetchImpl: GoogleTokenFetch = async (url, init) => {
+    requests.push({ url, method: init.method, body: init.body ? (JSON.parse(init.body) as Record<string, unknown>) : undefined });
     return { status, json: async () => body };
   };
   return { fetchImpl, requests };
@@ -164,5 +164,51 @@ describe("Google Push (events.watch) (AP-4.2)", () => {
       .expect(200);
 
     expect(synced).toEqual([]);
+  });
+
+  it("persistiert die Kanaldaten (channelId/resourceId/expiration) am Zielkalender", async () => {
+    const connectionId = await setupConnection();
+    await watchGoogleCalendar(testDb.db, connectionId, "https://example.com/hook", watchFetch(200, { resourceId: "res-42", expiration: "1999999999999" }).fetchImpl);
+    const target = (await externalCalendarRepository.listByConnection(testDb.db, connectionId)).find((calendar) => calendar.pushChannelId);
+    expect(target?.pushChannelId).toBe(pushChannelId(connectionId));
+    expect(target?.pushResourceId).toBe("res-42");
+    expect(target?.pushExpiration).toBe("1999999999999");
+  });
+
+  it("meldet den Kanal per channels.stop ab und löscht die lokalen Kanaldaten", async () => {
+    const connectionId = await setupConnection();
+    await watchGoogleCalendar(testDb.db, connectionId, "https://example.com/hook", watchFetch().fetchImpl);
+    const stop = watchFetch(204, {});
+    const stopped = await stopGoogleWatch(testDb.db, connectionId, stop.fetchImpl);
+
+    expect(stopped).toBe(true);
+    expect(stop.requests[0]?.url).toContain("/channels/stop");
+    expect(stop.requests[0]?.body?.id).toBe(pushChannelId(connectionId));
+    expect(stop.requests[0]?.body?.resourceId).toBe("res-1");
+    const target = (await externalCalendarRepository.listByConnection(testDb.db, connectionId)).find((calendar) => calendar.imported);
+    expect(target?.pushChannelId).toBeNull();
+  });
+
+  it("meldet false, wenn kein aktiver Push-Kanal zum Abmelden existiert", async () => {
+    const connectionId = await setupConnection();
+    expect(await stopGoogleWatch(testDb.db, connectionId, watchFetch().fetchImpl)).toBe(false);
+  });
+
+  it("erneuert nur Kanäle, die innerhalb des Schwellenfensters ablaufen", async () => {
+    const NOW = 1_700_000_000_000;
+    const soon = await setupConnection();
+    const later = await setupConnection();
+    await watchGoogleCalendar(testDb.db, soon, "https://hook", watchFetch(200, { resourceId: "r-soon", expiration: String(NOW + 3_600_000) }).fetchImpl); // +1 h
+    await watchGoogleCalendar(testDb.db, later, "https://hook", watchFetch(200, { resourceId: "r-late", expiration: String(NOW + 48 * 3_600_000) }).fetchImpl); // +48 h
+
+    const renew = watchFetch(200, { resourceId: "r-renewed", expiration: String(NOW + 7 * 24 * 3_600_000) });
+    const result = await renewExpiringChannels(testDb.db, "https://hook", NOW, renew.fetchImpl);
+
+    expect(result.renewed).toBe(1);
+    // Der bald ablaufende Kanal trägt jetzt die neue Ablaufzeit, der ferne ist unverändert.
+    const soonTarget = (await externalCalendarRepository.listByConnection(testDb.db, soon)).find((calendar) => calendar.pushChannelId);
+    expect(soonTarget?.pushExpiration).toBe(String(NOW + 7 * 24 * 3_600_000));
+    const laterTarget = (await externalCalendarRepository.listByConnection(testDb.db, later)).find((calendar) => calendar.pushChannelId);
+    expect(laterTarget?.pushExpiration).toBe(String(NOW + 48 * 3_600_000));
   });
 });

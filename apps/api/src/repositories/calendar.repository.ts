@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { calendarConnections, calendarSyncJournal, calendarSyncStates, eventMappings, externalCalendars } from "../db/schema.js";
@@ -160,6 +160,27 @@ export const externalCalendarRepository = {
 
   async listByConnection(database: DbSession, connectionId: number): Promise<ExternalCalendarRecord[]> {
     return database.select().from(externalCalendars).where(eq(externalCalendars.connectionId, connectionId)).orderBy(asc(externalCalendars.id));
+  },
+
+  /** Speichert die Google-Push-Kanaldaten eines Zielkalenders (AP-4.2). */
+  async setPushChannel(database: DbSession, id: number, input: { channelId: string; resourceId: string | null; expiration: string | null }): Promise<void> {
+    await database
+      .update(externalCalendars)
+      .set({ pushChannelId: input.channelId, pushResourceId: input.resourceId, pushExpiration: input.expiration, updatedAt: nowIso() })
+      .where(eq(externalCalendars.id, id));
+  },
+
+  /** Entfernt die Push-Kanaldaten (nach channels.stop bzw. beim Trennen). */
+  async clearPushChannel(database: DbSession, id: number): Promise<void> {
+    await database
+      .update(externalCalendars)
+      .set({ pushChannelId: null, pushResourceId: null, pushExpiration: null, updatedAt: nowIso() })
+      .where(eq(externalCalendars.id, id));
+  },
+
+  /** Alle Zielkalender mit aktivem Push-Kanal (Basis für Renewal). */
+  async listWithActivePushChannel(database: DbSession): Promise<ExternalCalendarRecord[]> {
+    return database.select().from(externalCalendars).where(isNotNull(externalCalendars.pushChannelId)).orderBy(asc(externalCalendars.id));
   },
 
   /** Insert or update a discovered calendar keyed by (connectionId, externalId). */

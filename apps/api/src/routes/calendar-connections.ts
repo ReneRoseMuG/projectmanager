@@ -5,7 +5,7 @@ import { listGoogleCalendars, selectGoogleCalendar } from "../services/google/go
 import { syncAllUserConnections, syncCalendarConnection } from "../services/calendar-sync.service.js";
 import { connectNextCloud, type ConnectNextCloudInput } from "../services/nextcloud-connection.service.js";
 import { buildGoogleAuthUrl, handleGoogleCallback } from "../services/google/google-oauth.service.js";
-import { handlePushNotification, watchGoogleCalendar } from "../services/google/google-push.service.js";
+import { handlePushNotification, stopGoogleWatch, watchGoogleCalendar } from "../services/google/google-push.service.js";
 import { config } from "../config.js";
 import { badRequest, unauthorized } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
@@ -112,7 +112,17 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
     { schema: { params: idParamSchema, body: googleSelectSchema, response: { 200: objectResponseSchema } } },
     async (request) => {
       await requireOwnedConnection(app.db, request.params.id, requireUserId(request));
-      return selectGoogleCalendar(app.db, request.params.id, request.body.calendarId);
+      const result = await selectGoogleCalendar(app.db, request.params.id, request.body.calendarId);
+      // Push-Kanal automatisch aktivieren, sofern eine Webhook-URL konfiguriert ist (best-effort — ein
+      // Fehler hier darf die Kalenderauswahl nicht scheitern lassen; Polling bleibt das Sicherheitsnetz).
+      if (config.googlePushWebhookUrl) {
+        try {
+          await watchGoogleCalendar(app.db, request.params.id, config.googlePushWebhookUrl);
+        } catch {
+          app.log.warn(`Push-Kanal für Verbindung ${request.params.id} konnte nicht aktiviert werden.`);
+        }
+      }
+      return result;
     }
   );
 
@@ -139,7 +149,17 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
     "/calendar-connections/:id",
     { schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      await deleteCalendarConnection(app.db, request.params.id, requireUserId(request));
+      const userId = requireUserId(request);
+      const connection = await requireOwnedConnection(app.db, request.params.id, userId);
+      // Google-Push-Kanal abmelden, bevor die Verbindung samt Kanaldaten entfernt wird (best-effort).
+      if (connection.provider === "google" && config.googlePushWebhookUrl) {
+        try {
+          await stopGoogleWatch(app.db, request.params.id);
+        } catch {
+          app.log.warn(`Push-Kanal für Verbindung ${request.params.id} konnte nicht abgemeldet werden.`);
+        }
+      }
+      await deleteCalendarConnection(app.db, request.params.id, userId);
       return reply.status(204).send();
     }
   );
