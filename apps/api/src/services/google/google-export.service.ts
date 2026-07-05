@@ -25,11 +25,15 @@ const APP_TIME_ZONE = "Europe/Berlin";
 
 type GoogleTimeValue = { dateTime: string; timeZone: string } | { date: string };
 
+/** Herkunftsmarke am exportierten Google-Event: kennzeichnet App-Termine (AP-3.1 / Abnahme AP-4.4). */
+const ORIGIN_MARKER = "projektmanager";
+
 interface GoogleEventPayload {
   summary: string;
   description?: string;
   start: GoogleTimeValue;
   end: GoogleTimeValue;
+  extendedProperties: { private: { pmOrigin: string } };
 }
 
 /** Wandelt eine lokale Wandzeit in eine Google-Zeitangabe (Ganztag → date, sonst dateTime + timeZone). */
@@ -45,7 +49,8 @@ function toPayload(event: typeof events.$inferSelect): GoogleEventPayload {
     summary: event.title,
     description: event.description ?? undefined,
     start: toGoogleTime(event.startTime, event.isAllDay),
-    end: toGoogleTime(event.endTime, event.isAllDay)
+    end: toGoogleTime(event.endTime, event.isAllDay),
+    extendedProperties: { private: { pmOrigin: ORIGIN_MARKER } }
   };
 }
 
