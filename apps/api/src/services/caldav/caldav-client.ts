@@ -256,3 +256,118 @@ export async function fetchCalendarEvents(
   assertResponseOk(response.status);
   return parseEventsFromMultistatus(await response.text());
 }
+
+export interface SyncChange {
+  href: string;
+  etag: string | null;
+  /** true, wenn das Objekt serverseitig gelöscht wurde (Status 404/410 im sync-report). */
+  deleted: boolean;
+}
+
+export interface SyncCollectionResult {
+  changes: SyncChange[];
+  syncToken: string | null;
+  /** true, wenn der übergebene sync-token ungültig war und ein Full-Resync nötig ist. */
+  invalidToken: boolean;
+}
+
+/** Delta-Abgleich per sync-collection REPORT (RFC 6578). Leerer Token = Initialabgleich. */
+export async function syncCollection(
+  credentials: NextCloudCredentials,
+  calendarHref: string,
+  syncToken: string | null,
+  fetchImpl: CalDavFetch = defaultFetch,
+  timeoutMs = 30000
+): Promise<SyncCollectionResult> {
+  const url = new URL(calendarHref, normalizeBaseUrl(credentials.baseUrl)).toString();
+  const body =
+    '<?xml version="1.0" encoding="utf-8"?>' +
+    '<d:sync-collection xmlns:d="DAV:">' +
+    `<d:sync-token>${syncToken ?? ""}</d:sync-token>` +
+    "<d:sync-level>1</d:sync-level>" +
+    "<d:prop><d:getetag/></d:prop></d:sync-collection>";
+  const response = await fetchWithTimeout(
+    fetchImpl,
+    url,
+    { method: "REPORT", headers: { Authorization: basicAuthHeader(credentials.username, credentials.appPassword), Depth: "1", "Content-Type": "application/xml; charset=utf-8" }, body },
+    timeoutMs
+  );
+  const text = await response.text();
+  if (text.includes("valid-sync-token") || response.status === 409) {
+    return { changes: [], syncToken: null, invalidToken: true };
+  }
+  assertResponseOk(response.status);
+  return parseSyncCollection(text);
+}
+
+/** Parst eine sync-collection-Antwort in Änderungen (neu/geändert/gelöscht) + neuen sync-token. */
+export function parseSyncCollection(xml: string): SyncCollectionResult {
+  const parser = new XMLParser({ removeNSPrefix: true, ignoreAttributes: true, trimValues: true });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = parser.parse(xml) as Record<string, unknown>;
+  } catch {
+    throw new CalDavError("parse", "Die sync-collection-Antwort konnte nicht gelesen werden.");
+  }
+  const multistatus = (parsed.multistatus ?? {}) as Record<string, unknown>;
+  const changes: SyncChange[] = [];
+  for (const response of toArray(multistatus.response as unknown)) {
+    const entry = response as Record<string, unknown>;
+    const href = coerceText(entry.href);
+    if (!href) {
+      continue;
+    }
+    const statusText = collectStatuses(entry);
+    const deleted = statusText.includes(" 404 ") || statusText.includes(" 410 ");
+    let etag: string | null = null;
+    for (const propstat of toArray(entry.propstat as unknown)) {
+      const prop = (propstat as Record<string, unknown>).prop as Record<string, unknown> | undefined;
+      etag = etag ?? coerceText(prop?.getetag);
+    }
+    changes.push({ href, etag, deleted });
+  }
+  return { changes, syncToken: coerceText(multistatus["sync-token"]), invalidToken: false };
+}
+
+function collectStatuses(entry: Record<string, unknown>): string {
+  const parts: string[] = [];
+  const push = (value: unknown): void => {
+    const text = coerceText(value);
+    if (text) {
+      parts.push(` ${text} `);
+    }
+  };
+  push(entry.status);
+  for (const propstat of toArray(entry.propstat as unknown)) {
+    push((propstat as Record<string, unknown>).status);
+  }
+  return parts.join(" ");
+}
+
+/** Lädt die vollständigen iCal-Daten gezielt für bestimmte hrefs (calendar-multiget REPORT). */
+export async function calendarMultiget(
+  credentials: NextCloudCredentials,
+  calendarHref: string,
+  hrefs: string[],
+  fetchImpl: CalDavFetch = defaultFetch,
+  timeoutMs = 30000
+): Promise<RawCalendarEvent[]> {
+  if (hrefs.length === 0) {
+    return [];
+  }
+  const url = new URL(calendarHref, normalizeBaseUrl(credentials.baseUrl)).toString();
+  const body =
+    '<?xml version="1.0" encoding="utf-8"?>' +
+    '<c:calendar-multiget xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">' +
+    "<d:prop><d:getetag/><c:calendar-data/></d:prop>" +
+    hrefs.map((href) => `<d:href>${href}</d:href>`).join("") +
+    "</c:calendar-multiget>";
+  const response = await fetchWithTimeout(
+    fetchImpl,
+    url,
+    { method: "REPORT", headers: { Authorization: basicAuthHeader(credentials.username, credentials.appPassword), Depth: "1", "Content-Type": "application/xml; charset=utf-8" }, body },
+    timeoutMs
+  );
+  assertResponseOk(response.status);
+  return parseEventsFromMultistatus(await response.text());
+}

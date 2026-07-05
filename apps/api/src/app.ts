@@ -42,6 +42,7 @@ import { openFileWithDefaultApp } from "./services/file-opener.service.js";
 import { stopAllAttachmentWatchers } from "./services/attachment-watcher.service.js";
 import { createRealtimeEventBus } from "./services/realtime-event-bus.service.js";
 import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
+import { registerNextCloudSyncHandler } from "./services/nextcloud-sync.service.js";
 import { seedAuthData } from "./services/auth.service.js";
 import { seedDefaultCatalogEntries } from "./services/catalogs.service.js";
 import { errorHandler } from "./utils/errors.js";
@@ -104,6 +105,9 @@ export async function buildApp(
   await app.register(registerDocLinksRoutes, { prefix: "/api" });
   await app.register(registerImportsRoutes, { prefix: "/api" });
   await app.register(registerJournalRoutes, { prefix: "/api" });
+
+  // Provider-Sync-Handler im zentralen Dispatcher registrieren (NextCloud read-only).
+  registerNextCloudSyncHandler();
 
   return app;
 }
