@@ -992,6 +992,7 @@ function DocumentDetailPanel({
           selected={(document.tags ?? []) as Tag[]}
           onChange={onSetTags}
           domain="dms"
+          tone="dark"
         />
       </section>
 
