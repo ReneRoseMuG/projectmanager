@@ -15,7 +15,14 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
 import { describeAttachmentType } from "../components/attachments/attachmentTypes";
 import { DocumentPreviewBody } from "../components/attachments/DocumentPreviewBody";
@@ -35,6 +42,21 @@ import { useHasPermission } from "../hooks/usePermissions";
 import { useTags } from "../hooks/useTags";
 import { toQueryError } from "../queries/queryErrors";
 import type { DocumentLibraryFilter } from "../api/documents";
+import { assetUrl } from "../api/client";
+
+// Detail-Panel-Breite (MS-75): Pre-Render-Kalkulation beim Öffnen eines Dokuments. Die
+// Breite ergibt sich aus der verfügbaren Zeilenbreite minus Mindestbreite der Dateiliste,
+// gedeckelt auf die Breite des Dokuments (Bild: naturalWidth). Der linke Panelrand ist
+// zusätzlich per Maus ziehbar.
+const MIN_CARD_WIDTH = 380;
+const MIN_DETAIL_WIDTH = 320;
+const NON_IMAGE_MAX_WIDTH = 1000;
+const ROW_GAP = 24;
+const PANEL_CHROME = 28;
+
+function clampDetailWidth(value: number, max: number): number {
+  return Math.max(MIN_DETAIL_WIDTH, Math.min(value, max));
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
@@ -154,6 +176,92 @@ export function DocumentsPage() {
     documents.find((document) => document.id === selectedId) ?? null;
   const uploadFolder =
     typeof folderScope === "number" ? folderScope : undefined;
+
+  // Aktuelle Dokumentliste als Ref, damit die Breiten-Kalkulation nur beim Öffnen eines
+  // (anderen) Dokuments läuft – nicht bei jedem progressiven Nachladen.
+  const documentsRef = useRef(documents);
+  documentsRef.current = documents;
+  const rowRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLElement>(null);
+  const manualResizeRef = useRef(false);
+  const [detailWidth, setDetailWidth] = useState<number | null>(null);
+
+  const getMaxDetailWidth = useCallback(() => {
+    const row = rowRef.current;
+    if (!row) {
+      return NON_IMAGE_MAX_WIDTH;
+    }
+    const leftWidth = leftPanelRef.current?.offsetWidth ?? 280;
+    const available = row.clientWidth - leftWidth - 2 * ROW_GAP;
+    return Math.max(MIN_DETAIL_WIDTH, available - MIN_CARD_WIDTH);
+  }, []);
+
+  // Pre-Render-Kalkulation: beim Öffnen die ideale Panelbreite bestimmen. Bilder werden
+  // kurz vorgeladen, um die natürliche Breite zu kennen; bis dahin gilt die Maximalbreite.
+  useEffect(() => {
+    if (selectedId == null) {
+      return;
+    }
+    const doc = documentsRef.current.find((entry) => entry.id === selectedId);
+    if (!doc) {
+      return;
+    }
+    manualResizeRef.current = false;
+    const max = getMaxDetailWidth();
+    if (describeAttachmentType(doc).family === "image") {
+      setDetailWidth(clampDetailWidth(max, max));
+      const probe = new Image();
+      probe.onload = () => {
+        if (manualResizeRef.current) {
+          return;
+        }
+        const docWidth = probe.naturalWidth
+          ? probe.naturalWidth + PANEL_CHROME
+          : max;
+        setDetailWidth(clampDetailWidth(docWidth, max));
+      };
+      probe.src = assetUrl(doc.url);
+    } else {
+      setDetailWidth(clampDetailWidth(NON_IMAGE_MAX_WIDTH, max));
+    }
+  }, [selectedId, getMaxDetailWidth]);
+
+  // Fensterbreite verändert die verfügbare Breite → aktuelle Breite nachklemmen.
+  useEffect(() => {
+    function handleWindowResize() {
+      setDetailWidth((current) =>
+        current == null
+          ? current
+          : clampDetailWidth(current, getMaxDetailWidth()),
+      );
+    }
+    window.addEventListener("resize", handleWindowResize);
+    return () => window.removeEventListener("resize", handleWindowResize);
+  }, [getMaxDetailWidth]);
+
+  const handleDetailResizeStart = useCallback(
+    (event: ReactMouseEvent) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const max = getMaxDetailWidth();
+      const startWidth = detailWidth ?? max;
+      manualResizeRef.current = true;
+      document.body.style.userSelect = "none";
+      function onMove(moveEvent: MouseEvent) {
+        setDetailWidth(
+          clampDetailWidth(startWidth + (startX - moveEvent.clientX), max),
+        );
+      }
+      function onUp() {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        document.body.style.userSelect = "";
+      }
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [detailWidth, getMaxDetailWidth],
+  );
 
   const startEdit = (
     id: number,
@@ -295,9 +403,10 @@ export function DocumentsPage() {
         </p>
       </header>
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div ref={rowRef} className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Verwaltung: Sammlungen & Kategorien */}
         <DocumentSidePanel
+          ref={leftPanelRef}
           side="left"
           title="Verwaltung"
           storageKey="ui.documents.folders.collapsed"
@@ -646,6 +755,8 @@ export function DocumentsPage() {
         <DocumentDetailPanel
           key={selected.id}
           document={selected}
+          widthPx={detailWidth ?? undefined}
+          onResizeStart={handleDetailResizeStart}
           categories={categories}
           folders={folders}
           canWrite={canWrite}
@@ -695,6 +806,8 @@ export function DocumentsPage() {
             title="Details"
             storageKey="ui.documents.detail.collapsed"
             railIcon={FileText}
+            widthPx={detailWidth ?? undefined}
+            onResizeStart={handleDetailResizeStart}
           >
             <div className="flex flex-1 flex-col items-center justify-center gap-2 py-12 text-center">
               <FileText size={28} className="text-white/25" />
@@ -714,6 +827,8 @@ export function DocumentsPage() {
 
 interface DocumentDetailPanelProps {
   document: Attachment;
+  widthPx?: number;
+  onResizeStart?: (event: ReactMouseEvent) => void;
   categories: AttachmentCategory[];
   folders: AttachmentFolder[];
   canWrite: boolean;
@@ -731,6 +846,8 @@ interface DocumentDetailPanelProps {
 
 function DocumentDetailPanel({
   document,
+  widthPx,
+  onResizeStart,
   categories,
   folders,
   canWrite,
@@ -759,6 +876,8 @@ function DocumentDetailPanel({
       title={document.displayName ?? document.originalName}
       storageKey="ui.documents.detail.collapsed"
       railIcon={FileText}
+      widthPx={widthPx}
+      onResizeStart={onResizeStart}
       headerActions={
         <button
           type="button"

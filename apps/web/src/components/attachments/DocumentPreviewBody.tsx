@@ -195,7 +195,7 @@ export function DocumentPreviewBody({
           onClick={() => setLightboxOpen(true)}
         >
           <img
-            className="max-h-[68vh] min-h-[40vh] w-full object-contain"
+            className="max-h-[80vh] w-full object-contain"
             src={url}
             alt={attachment.originalName}
           />
