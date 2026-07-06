@@ -193,7 +193,7 @@ export function DocumentPreviewBody({
     if (compact) {
       return (
         <img
-          className="h-40 w-full rounded-md border border-line bg-shell object-contain"
+          className="h-64 w-full rounded-md border border-line bg-shell object-contain"
           src={url}
           alt={attachment.originalName}
         />
@@ -232,7 +232,7 @@ export function DocumentPreviewBody({
       <embed
         className={
           compact
-            ? "h-56 w-full rounded-md border border-line"
+            ? "h-80 w-full rounded-md border border-line"
             : "h-72 rounded-md border border-line"
         }
         src={url}
@@ -252,7 +252,7 @@ export function DocumentPreviewBody({
   if (meta.family === "video") {
     return (
       <video
-        className={`${compact ? "max-h-56" : "max-h-72"} w-full rounded-md border border-line bg-black`}
+        className={`${compact ? "max-h-80" : "max-h-72"} w-full rounded-md border border-line bg-black`}
         src={url}
         controls
       />
@@ -301,7 +301,7 @@ export function DocumentPreviewBody({
       <embed
         className={
           compact
-            ? "h-56 w-full rounded-md border border-line"
+            ? "h-80 w-full rounded-md border border-line"
             : "h-72 rounded-md border border-line"
         }
         src={previewUrl}

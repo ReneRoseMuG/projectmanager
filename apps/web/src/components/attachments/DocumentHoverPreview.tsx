@@ -13,12 +13,18 @@ import { DocumentPreviewBody, prettyBytes } from "./DocumentPreviewBody";
 // erscheint verzögert ein schwebendes Popover mit der kompakten Vorschau. Die Vorschau
 // (und damit die evtl. teure Office-Konvertierung) wird ERST beim Öffnen gemountet, nicht
 // für jede Listenzeile — zusammen mit dem Server-/Query-Cache lädt jedes Dokument so höchstens
-// einmal. Ein Öffnungs- und Schließ-Delay überbrückt den Spalt zwischen Zeile und Popover,
-// damit die Maus hineinwandern (und in Text/PDF scrollen) kann.
+// einmal.
+//
+// Positionierung dicht am Mauszeiger: In der oberen Bildschirmhälfte öffnet das Popover per
+// top-Anker nach UNTEN, in der unteren Hälfte per bottom-Anker nach OBEN. Dadurch bleibt die
+// dem Cursor zugewandte Kante IMMER `GAP` px entfernt — unabhängig von der erst nach dem Laden
+// bekannten Inhaltshöhe. (Ein maxHeight-basierter Offset ließ das Popover früher mehrere hundert
+// Pixel entfernt erscheinen, weil er die maximale statt der tatsächlichen Höhe reservierte.)
 
-const POPOVER_WIDTH = 340;
+const POPOVER_WIDTH = 400;
 const MARGIN = 12;
-const MAX_HEIGHT = 440;
+const GAP = 14;
+const MAX_HEIGHT = 460;
 const OPEN_DELAY_MS = 220;
 const CLOSE_DELAY_MS = 140;
 
@@ -36,10 +42,11 @@ export function DocumentHoverPreview({
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [position, setPosition] = useState<{
-    top: number;
     left: number;
     width: number;
     maxHeight: number;
+    top?: number;
+    bottom?: number;
   } | null>(null);
 
   useEffect(
@@ -63,32 +70,40 @@ export function DocumentHoverPreview({
       return;
     }
     const rect = node.getBoundingClientRect();
-    const cursor =
-      cursorRef.current ?? {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
-      };
+    const cursor = cursorRef.current ?? {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
     const width = Math.min(
       POPOVER_WIDTH,
       Math.max(0, window.innerWidth - MARGIN * 2),
     );
-    const maxHeight = Math.min(
-      MAX_HEIGHT,
-      Math.max(0, window.innerHeight - MARGIN * 2),
-    );
-    const left = clamp(
-      cursor.x - width - MARGIN,
+
+    // Horizontal: bevorzugt dicht rechts neben dem Cursor, sonst links — nah dran (GAP).
+    let left = cursor.x + GAP;
+    if (left + width + MARGIN > window.innerWidth) {
+      left = cursor.x - width - GAP;
+    }
+    left = clamp(
+      left,
       MARGIN,
-      window.innerWidth - width - MARGIN,
+      Math.max(MARGIN, window.innerWidth - width - MARGIN),
     );
-    const topAbove = cursor.y - maxHeight - MARGIN;
-    const topBelow = cursor.y + MARGIN;
-    const top = clamp(
-      topAbove >= MARGIN ? topAbove : topBelow,
-      MARGIN,
-      window.innerHeight - maxHeight - MARGIN,
-    );
-    setPosition({ top, left, width, maxHeight });
+
+    // Vertikal: obere Hälfte → nach unten (top-Anker), untere Hälfte → nach oben (bottom-Anker).
+    // Die cursornahe Kante liegt so immer GAP px vom Zeiger, egal wie hoch der Inhalt wird.
+    if (cursor.y <= window.innerHeight / 2) {
+      const top = cursor.y + GAP;
+      const maxHeight = Math.min(MAX_HEIGHT, window.innerHeight - top - MARGIN);
+      setPosition({ left, width, top, maxHeight });
+    } else {
+      const bottom = window.innerHeight - cursor.y + GAP;
+      const maxHeight = Math.min(
+        MAX_HEIGHT,
+        window.innerHeight - bottom - MARGIN,
+      );
+      setPosition({ left, width, bottom, maxHeight });
+    }
   };
 
   const rememberCursor = (event: MouseEvent<HTMLDivElement>) => {
@@ -139,18 +154,20 @@ export function DocumentHoverPreview({
       {children}
       {position ? (
         <div
-          className="fixed z-40 w-[340px] overflow-auto rounded-lg border border-line bg-white p-3 shadow-panel"
+          className="fixed z-40 flex flex-col overflow-auto rounded-lg border border-line bg-white p-3 shadow-panel"
           style={{
-            top: position.top,
             left: position.left,
             width: position.width,
             maxHeight: position.maxHeight,
+            ...(position.top !== undefined
+              ? { top: position.top }
+              : { bottom: position.bottom }),
           }}
           role="tooltip"
           onMouseEnter={scheduleOpen}
           onMouseLeave={scheduleClose}
         >
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-2 flex shrink-0 items-center gap-2">
             <span
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${meta.toneClassName}`}
             >
