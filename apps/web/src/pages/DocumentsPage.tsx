@@ -689,7 +689,24 @@ export function DocumentsPage() {
             )
           }
         />
-      ) : null}
+        ) : (
+          <DocumentSidePanel
+            side="right"
+            title="Details"
+            storageKey="ui.documents.detail.collapsed"
+            railIcon={FileText}
+          >
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 py-12 text-center">
+              <FileText size={28} className="text-white/25" />
+              <p className="text-sm font-medium text-white/60">
+                Kein Dokument ausgewählt
+              </p>
+              <p className="text-xs text-white/40">
+                Doppelklick auf ein Dokument öffnet hier die Details.
+              </p>
+            </div>
+          </DocumentSidePanel>
+        )}
       </div>
     </div>
   );
