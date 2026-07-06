@@ -8,32 +8,32 @@ export default {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"]
       },
       colors: {
-        ink: "var(--color-ink)",
-        shell: "var(--color-shell)",
-        line: "var(--color-line)",
-        white: "var(--color-white)",
+        ink: "rgb(var(--color-ink-rgb) / <alpha-value>)",
+        shell: "rgb(var(--color-shell-rgb) / <alpha-value>)",
+        line: "rgb(var(--color-line-rgb) / <alpha-value>)",
+        white: "rgb(var(--color-white-rgb) / <alpha-value>)",
         steel: {
-          50: "var(--color-steel-50)",
-          100: "var(--color-steel-100)",
-          200: "var(--color-steel-200)",
-          300: "var(--color-steel-300)",
-          400: "var(--color-steel-400)",
-          500: "var(--color-steel-500)",
-          600: "var(--color-steel-600)",
-          700: "var(--color-steel-700)",
-          800: "var(--color-steel-800)",
-          900: "var(--color-steel-900)"
+          50: "rgb(var(--color-steel-50-rgb) / <alpha-value>)",
+          100: "rgb(var(--color-steel-100-rgb) / <alpha-value>)",
+          200: "rgb(var(--color-steel-200-rgb) / <alpha-value>)",
+          300: "rgb(var(--color-steel-300-rgb) / <alpha-value>)",
+          400: "rgb(var(--color-steel-400-rgb) / <alpha-value>)",
+          500: "rgb(var(--color-steel-500-rgb) / <alpha-value>)",
+          600: "rgb(var(--color-steel-600-rgb) / <alpha-value>)",
+          700: "rgb(var(--color-steel-700-rgb) / <alpha-value>)",
+          800: "rgb(var(--color-steel-800-rgb) / <alpha-value>)",
+          900: "rgb(var(--color-steel-900-rgb) / <alpha-value>)"
         },
-        crimson: "var(--color-crimson)",
-        tangerine: "var(--color-tangerine)",
+        crimson: "rgb(var(--color-crimson-rgb) / <alpha-value>)",
+        tangerine: "rgb(var(--color-tangerine-rgb) / <alpha-value>)",
         mustard: {
-          DEFAULT: "var(--color-mustard)",
-          dark: "var(--color-mustard-dark)"
+          DEFAULT: "rgb(var(--color-mustard-rgb) / <alpha-value>)",
+          dark: "rgb(var(--color-mustard-dark-rgb) / <alpha-value>)"
         },
-        fern: "var(--color-fern)",
-        teal: "var(--color-teal)",
-        violet: "var(--color-violet)",
-        magenta: "var(--color-magenta)"
+        fern: "rgb(var(--color-fern-rgb) / <alpha-value>)",
+        teal: "rgb(var(--color-teal-rgb) / <alpha-value>)",
+        violet: "rgb(var(--color-violet-rgb) / <alpha-value>)",
+        magenta: "rgb(var(--color-magenta-rgb) / <alpha-value>)"
       },
       boxShadow: {
         panel: "var(--shadow-panel)",

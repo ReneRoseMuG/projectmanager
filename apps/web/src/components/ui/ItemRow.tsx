@@ -14,6 +14,7 @@ interface ItemRowProps {
   footer?: ReactNode;
   onOpen?: () => void;
   openOnClick?: boolean;
+  selected?: boolean;
   className?: string;
   descriptionClassName?: string;
   pillsClassName?: string;
@@ -35,6 +36,7 @@ export function ItemRow({
   footer,
   onOpen,
   openOnClick = false,
+  selected = false,
   className = "",
   descriptionClassName = "truncate",
   pillsClassName = "",
@@ -47,7 +49,11 @@ export function ItemRow({
 
   return (
     <article
-      className={`group/reference-row relative grid h-full ${columns} items-center gap-4 rounded-lg border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm transition hover:z-30 hover:border-steel-300 hover:shadow-panel focus-within:z-30 ${onOpen ? "cursor-pointer" : ""} ${className}`}
+      className={`group/reference-row relative grid h-full ${columns} items-center gap-4 rounded-lg border border-l-[4px] px-4 py-3.5 transition hover:z-30 focus-within:z-30 ${
+        selected
+          ? "border-steel-400 bg-steel-100 shadow-panel"
+          : "border-line bg-white shadow-sm hover:border-steel-300 hover:shadow-panel"
+      } ${onOpen ? "cursor-pointer" : ""} ${className}`}
       style={accentColor ? { borderLeftColor: accentColor } : undefined}
       onClick={openOnClick ? onOpen : undefined}
       onDoubleClick={openOnClick ? undefined : onOpen}
