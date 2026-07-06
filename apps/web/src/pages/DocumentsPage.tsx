@@ -681,6 +681,7 @@ export function DocumentsPage() {
                     title={documentTitle(document)}
                     description={document.description ?? undefined}
                     onOpen={() => setSelectedId(document.id)}
+                    openOnClick
                     pills={
                       <div className="flex flex-wrap gap-1">
                         {(document.categories ?? []).map((category) => (
