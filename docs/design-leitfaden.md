@@ -160,6 +160,7 @@ TopBar (h-16, bg-white, border-b border-line)
 - Content Area: immer `flex flex-col gap-6 h-full min-h-0 w-full min-w-0`.
 - Seitenheader (`<header>`): `<h1 class="text-2xl font-semibold text-ink">` + optional `<p class="text-sm text-steel-500">` für Untertitel / Zähler.
 - Kein eigenes Layout außerhalb dieser Struktur ohne explizite Begründung.
+- Seiten mit Steuerspalte und/oder Detailbereich neben einer scrollenden Liste (Dokumente-Seite) nutzen `DocumentSidePanel` (§8.25) als dunkle, kollabierbare Randspalten; die Liste dehnt sich dazwischen. Begründete Ausnahme zur Ein-Spalten-Grundstruktur.
 
 ---
 
@@ -466,6 +467,17 @@ Große Listen und Board-Ansichten laden **nicht** per Seitenzahl-Pagination, son
 - Serverseitige Filter und Suche gehen in **jeden** Block-Abruf; ein Filter- oder Suchwechsel startet das Laden automatisch neu (queryKey-Wechsel).
 - Datenquelle ist die opt-in-paginierte API (`Paginated<T>` über den Query-Parameter `page`); der Alt-Pfad ohne `page` (nacktes Array) bleibt für interne und owner-gebundene Nutzungen bestehen.
 - Keine eigene Seitenzahl-Leiste und kein „Mehr laden"-Button — das Nachladen läuft automatisch.
+
+### 8.25 Seiten-interne Collapse-Panels (DocumentSidePanel)
+
+Seiten mit einer Steuerspalte und/oder einem Detailbereich neben einer scrollenden Hauptliste (aktuell die Dokumente-Seite) verwenden dafür `DocumentSidePanel` (`apps/web/src/components/attachments/DocumentSidePanel.tsx`) — ein dunkles, kollabierbares Panel im Stil der Navigations-Sidebar (§9), aber als **Inhalts-Panel**, nicht als Navigation.
+
+- **Optik:** `bg-gradient-to-b from-steel-800 to-steel-900`, weiße Schrift; Panel-interne Abschnittsüberschriften `text-xs font-semibold uppercase tracking-wide text-white/55`. Flächen `bg-white/[0.04]`, Ränder `border-white/10`, Eingabefelder `bg-steel-900/50 border-white/15 text-white`.
+- **Collapse-Toggle:** Pflicht je Panel; Icons `PanelLeftClose/PanelLeftOpen` (links) bzw. `PanelRightClose/PanelRightOpen` (rechts). Zustand pro Panel in `localStorage` persistent (Schema `ui.<seite>.<panel>.collapsed`, z. B. `ui.documents.folders.collapsed`). Eingeklappt zeigt das Panel eine schmale Rail (`w-14`) mit Toggle und Kontext-Icon.
+- **Platzierung:** Ab `lg` sticky am Rand (`lg:sticky lg:top-0 lg:self-start`, `lg:max-h-[calc(100vh-3rem)]`), scrollt bei Bedarf in sich selbst; darunter stapeln die Spalten im Fluss. Die Hauptliste dazwischen dehnt sich (`flex-1 min-w-0`).
+- Inhalte im Panel folgen weiter den übrigen Regeln (z. B. `Section` §8.21 für Konfigurationsgruppen); `DocumentSidePanel` liefert nur die dunkle, kollabierbare Hülle.
+
+**Verboten:** Detailinhalte als Modal-Overlay, wenn ein seiten-internes Panel vorgesehen ist; ein Panel ohne Collapse-Toggle oder ohne Zustands-Persistenz; Sticky-Panels als Flex-/Grid-Items ohne `self-start` (verhindert das Kleben).
 
 ---
 

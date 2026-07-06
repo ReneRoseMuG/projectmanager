@@ -11,9 +11,8 @@ import { describeAttachmentType } from "./attachmentTypes";
 // Geteilter Vorschau-Renderer für Anhänge (MS-75). Rendert je nach Dateifamilie die
 // passende Vorschau: Bild/PDF/Audio/Video direkt als Asset, Text/CSV und Office-Dokumente
 // über die serverseitige Vorschau (useAttachmentPreview → gecachte Konvertierung). Wird von
-// der Anhang-Karte (AttachmentPreview) und der Hover-/Detail-Vorschau der Dokumente-Seite
-// genutzt, damit die Vorschau-Logik nur an EINER Stelle lebt. `compact` verkleinert die
-// Höhen für das Hover-Popover und lässt die Bild-Lightbox weg.
+// der Anhang-Karte (AttachmentPreview) und dem Detail-Panel der Dokumente-Seite genutzt,
+// damit die Vorschau-Logik nur an EINER Stelle lebt.
 
 export function prettyBytes(size: number): string {
   if (size < 1024) {
@@ -172,12 +171,10 @@ function CsvPreview({
 
 interface DocumentPreviewBodyProps {
   attachment: Attachment;
-  compact?: boolean;
 }
 
 export function DocumentPreviewBody({
   attachment,
-  compact = false,
 }: DocumentPreviewBodyProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const meta = describeAttachmentType(attachment);
@@ -190,15 +187,6 @@ export function DocumentPreviewBody({
   const previewUrl = preview?.previewUrl ? assetUrl(preview.previewUrl) : url;
 
   if (meta.family === "image") {
-    if (compact) {
-      return (
-        <img
-          className="h-40 w-full rounded-md border border-line bg-shell object-contain"
-          src={url}
-          alt={attachment.originalName}
-        />
-      );
-    }
     return (
       <>
         <button
@@ -230,11 +218,7 @@ export function DocumentPreviewBody({
   if (meta.family === "pdf") {
     return (
       <embed
-        className={
-          compact
-            ? "h-56 w-full rounded-md border border-line"
-            : "h-72 rounded-md border border-line"
-        }
+        className="h-72 rounded-md border border-line"
         src={url}
         type="application/pdf"
       />
@@ -252,7 +236,7 @@ export function DocumentPreviewBody({
   if (meta.family === "video") {
     return (
       <video
-        className={`${compact ? "max-h-56" : "max-h-72"} w-full rounded-md border border-line bg-black`}
+        className="max-h-72 w-full rounded-md border border-line bg-black"
         src={url}
         controls
       />
@@ -299,11 +283,7 @@ export function DocumentPreviewBody({
   if (preview.kind === "generatedPdf" && preview.previewUrl) {
     return (
       <embed
-        className={
-          compact
-            ? "h-56 w-full rounded-md border border-line"
-            : "h-72 rounded-md border border-line"
-        }
+        className="h-72 rounded-md border border-line"
         src={previewUrl}
         type="application/pdf"
       />

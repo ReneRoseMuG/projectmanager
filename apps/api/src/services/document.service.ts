@@ -217,7 +217,10 @@ export async function listDocumentLibrary(database: DbClient, filter: DocumentLi
 function applyLibraryFilters(documents: Attachment[], filter: DocumentLibraryFilter): Attachment[] {
   let result = documents;
   if (filter.folder === "unsorted") {
-    result = result.filter((document) => document.owners.length === 0 && (document.folders?.length ?? 0) === 0);
+    // „Nicht einsortiert" = in keiner Sammlung. Eine Fachobjekt-Bindung (owners) zählt
+    // bewusst NICHT als einsortiert, sonst blieben alle als Anhang entstandenen Dokumente
+    // hier unsichtbar (sie haben fast immer einen Owner).
+    result = result.filter((document) => (document.folders?.length ?? 0) === 0);
   }
   if (filter.category !== undefined) {
     result = result.filter((document) => (document.categories ?? []).some((category) => category.id === filter.category));
