@@ -15,11 +15,18 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
 import { describeAttachmentType } from "../components/attachments/attachmentTypes";
-import { DocumentHoverPreview } from "../components/attachments/DocumentHoverPreview";
 import { DocumentPreviewBody } from "../components/attachments/DocumentPreviewBody";
+import { DocumentSidePanel } from "../components/attachments/DocumentSidePanel";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ItemRow } from "../components/ui/ItemRow";
 import { LoadMoreIndicator } from "../components/ui/LoadMoreIndicator";
@@ -35,6 +42,21 @@ import { useHasPermission } from "../hooks/usePermissions";
 import { useTags } from "../hooks/useTags";
 import { toQueryError } from "../queries/queryErrors";
 import type { DocumentLibraryFilter } from "../api/documents";
+import { assetUrl } from "../api/client";
+
+// Detail-Panel-Breite (MS-75): Pre-Render-Kalkulation beim Öffnen eines Dokuments. Die
+// Breite ergibt sich aus der verfügbaren Zeilenbreite minus Mindestbreite der Dateiliste,
+// gedeckelt auf die Breite des Dokuments (Bild: naturalWidth). Der linke Panelrand ist
+// zusätzlich per Maus ziehbar.
+const MIN_CARD_WIDTH = 380;
+const MIN_DETAIL_WIDTH = 320;
+const NON_IMAGE_MAX_WIDTH = 1000;
+const ROW_GAP = 24;
+const PANEL_CHROME = 28;
+
+function clampDetailWidth(value: number, max: number): number {
+  return Math.max(MIN_DETAIL_WIDTH, Math.min(value, max));
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
@@ -167,6 +189,92 @@ export function DocumentsPage() {
   const uploadFolder =
     typeof folderScope === "number" ? folderScope : undefined;
 
+  // Aktuelle Dokumentliste als Ref, damit die Breiten-Kalkulation nur beim Öffnen eines
+  // (anderen) Dokuments läuft – nicht bei jedem progressiven Nachladen.
+  const documentsRef = useRef(documents);
+  documentsRef.current = documents;
+  const rowRef = useRef<HTMLDivElement>(null);
+  const leftPanelRef = useRef<HTMLElement>(null);
+  const manualResizeRef = useRef(false);
+  const [detailWidth, setDetailWidth] = useState<number | null>(null);
+
+  const getMaxDetailWidth = useCallback(() => {
+    const row = rowRef.current;
+    if (!row) {
+      return NON_IMAGE_MAX_WIDTH;
+    }
+    const leftWidth = leftPanelRef.current?.offsetWidth ?? 280;
+    const available = row.clientWidth - leftWidth - 2 * ROW_GAP;
+    return Math.max(MIN_DETAIL_WIDTH, available - MIN_CARD_WIDTH);
+  }, []);
+
+  // Pre-Render-Kalkulation: beim Öffnen die ideale Panelbreite bestimmen. Bilder werden
+  // kurz vorgeladen, um die natürliche Breite zu kennen; bis dahin gilt die Maximalbreite.
+  useEffect(() => {
+    if (selectedId == null) {
+      return;
+    }
+    const doc = documentsRef.current.find((entry) => entry.id === selectedId);
+    if (!doc) {
+      return;
+    }
+    manualResizeRef.current = false;
+    const max = getMaxDetailWidth();
+    if (describeAttachmentType(doc).family === "image") {
+      setDetailWidth(clampDetailWidth(max, max));
+      const probe = new Image();
+      probe.onload = () => {
+        if (manualResizeRef.current) {
+          return;
+        }
+        const docWidth = probe.naturalWidth
+          ? probe.naturalWidth + PANEL_CHROME
+          : max;
+        setDetailWidth(clampDetailWidth(docWidth, max));
+      };
+      probe.src = assetUrl(doc.url);
+    } else {
+      setDetailWidth(clampDetailWidth(NON_IMAGE_MAX_WIDTH, max));
+    }
+  }, [selectedId, getMaxDetailWidth]);
+
+  // Fensterbreite verändert die verfügbare Breite → aktuelle Breite nachklemmen.
+  useEffect(() => {
+    function handleWindowResize() {
+      setDetailWidth((current) =>
+        current == null
+          ? current
+          : clampDetailWidth(current, getMaxDetailWidth()),
+      );
+    }
+    window.addEventListener("resize", handleWindowResize);
+    return () => window.removeEventListener("resize", handleWindowResize);
+  }, [getMaxDetailWidth]);
+
+  const handleDetailResizeStart = useCallback(
+    (event: ReactMouseEvent) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const max = getMaxDetailWidth();
+      const startWidth = detailWidth ?? max;
+      manualResizeRef.current = true;
+      document.body.style.userSelect = "none";
+      function onMove(moveEvent: MouseEvent) {
+        setDetailWidth(
+          clampDetailWidth(startWidth + (startX - moveEvent.clientX), max),
+        );
+      }
+      function onUp() {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        document.body.style.userSelect = "";
+      }
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [detailWidth, getMaxDetailWidth],
+  );
+
   const startEdit = (
     id: number,
     currentName: string,
@@ -251,10 +359,10 @@ export function DocumentsPage() {
     <button
       type="button"
       onClick={() => setFolderScope(scope)}
-      className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm ${
+      className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
         folderScope === scope
-          ? "bg-steel-100 text-ink"
-          : "text-steel-600 hover:bg-steel-50"
+          ? "bg-white/10 font-semibold text-white"
+          : "text-white/70 hover:bg-white/5 hover:text-white"
       }`}
     >
       {icon}
@@ -276,12 +384,12 @@ export function DocumentsPage() {
             cancelEdit();
           }
         }}
-        className="min-w-0 flex-1 rounded-md border border-line bg-white px-2 py-1 text-sm text-ink"
+        className="min-w-0 flex-1 rounded-md border border-white/15 bg-steel-900/50 px-2 py-1 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
       />
       <button
         type="button"
         onClick={onSave}
-        className="rounded-md p-1 text-emerald-600 hover:bg-emerald-50"
+        className="rounded-md p-1 text-emerald-300 hover:bg-white/10"
         title="Speichern"
       >
         <Check size={14} />
@@ -289,7 +397,7 @@ export function DocumentsPage() {
       <button
         type="button"
         onClick={cancelEdit}
-        className="rounded-md p-1 text-steel-500 hover:bg-steel-50"
+        className="rounded-md p-1 text-white/55 hover:bg-white/10 hover:text-white"
         title="Abbrechen"
       >
         <X size={14} />
@@ -307,17 +415,23 @@ export function DocumentsPage() {
         </p>
       </header>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div ref={rowRef} className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Verwaltung: Sammlungen & Kategorien */}
-        <aside className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1 rounded-lg border border-line bg-white p-2">
-            <span className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-steel-400">
+        <DocumentSidePanel
+          ref={leftPanelRef}
+          side="left"
+          title="Verwaltung"
+          storageKey="ui.documents.folders.collapsed"
+          railIcon={FolderArchive}
+        >
+          <div className="flex flex-col gap-1 rounded-lg border border-white/10 bg-white/[0.04] p-2">
+            <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-white/55">
               Sammlungen
             </span>
             {scopeButton("all", "Alle Dokumente", <Layers size={16} />)}
             {scopeButton("unsorted", "Nicht einsortiert", <Inbox size={16} />)}
             {folders.length > 0 ? (
-              <div className="my-1 border-t border-line" />
+              <div className="my-1 border-t border-white/10" />
             ) : null}
             {folders.map((folder) =>
               editingFolderId === folder.id ? (
@@ -333,10 +447,10 @@ export function DocumentsPage() {
                   <button
                     type="button"
                     onClick={() => setFolderScope(folder.id)}
-                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left text-sm ${
+                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
                       folderScope === folder.id
-                        ? "bg-steel-100 text-ink"
-                        : "text-steel-600 hover:bg-steel-50"
+                        ? "bg-white/10 font-semibold text-white"
+                        : "text-white/70 hover:bg-white/5 hover:text-white"
                     }`}
                   >
                     <FolderArchive size={16} />
@@ -349,7 +463,7 @@ export function DocumentsPage() {
                         onClick={() =>
                           startEdit(folder.id, folder.name, "folder")
                         }
-                        className="rounded-md p-1 text-steel-400 hover:bg-steel-50 hover:text-ink"
+                        className="rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white"
                         title="Umbenennen"
                       >
                         <Pencil size={14} />
@@ -357,7 +471,7 @@ export function DocumentsPage() {
                       <button
                         type="button"
                         onClick={() => handleDeleteFolder(folder)}
-                        className="rounded-md p-1 text-steel-400 hover:bg-rose-50 hover:text-rose-600"
+                        className="rounded-md p-1 text-white/45 hover:bg-crimson/20 hover:text-crimson"
                         title="Löschen"
                       >
                         <Trash2 size={14} />
@@ -369,7 +483,7 @@ export function DocumentsPage() {
             )}
             {canWrite ? (
               <form
-                className="mt-1 flex items-center gap-1 border-t border-line px-1 pt-2"
+                className="mt-1 flex items-center gap-1 border-t border-white/10 px-1 pt-2"
                 onSubmit={(event) => {
                   event.preventDefault();
                   const name = newFolderName.trim();
@@ -392,11 +506,11 @@ export function DocumentsPage() {
                   value={newFolderName}
                   onChange={(event) => setNewFolderName(event.target.value)}
                   placeholder="Neue Sammlung…"
-                  className="min-w-0 flex-1 rounded-md border border-line bg-white px-2 py-1 text-xs text-ink"
+                  className="min-w-0 flex-1 rounded-md border border-white/15 bg-steel-900/50 px-2 py-1 text-xs text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
                 />
                 <button
                   type="submit"
-                  className="rounded-md bg-steel-800 px-2 py-1 text-xs text-white"
+                  className="rounded-md bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/15"
                 >
                   +
                 </button>
@@ -404,12 +518,12 @@ export function DocumentsPage() {
             ) : null}
           </div>
 
-          <div className="flex flex-col gap-1 rounded-lg border border-line bg-white p-2">
-            <span className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-steel-400">
+          <div className="flex flex-col gap-1 rounded-lg border border-white/10 bg-white/[0.04] p-2">
+            <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-white/55">
               Kategorien
             </span>
             {categories.length === 0 ? (
-              <span className="px-3 py-1 text-xs text-steel-400">
+              <span className="px-3 py-1 text-xs text-white/40">
                 Noch keine Kategorien.
               </span>
             ) : null}
@@ -423,7 +537,7 @@ export function DocumentsPage() {
                   key={category.id}
                   className="group flex items-center gap-1"
                 >
-                  <span className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-sm text-steel-600">
+                  <span className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-sm text-white/70">
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: category.color }}
@@ -437,7 +551,7 @@ export function DocumentsPage() {
                         onClick={() =>
                           startEdit(category.id, category.name, "category")
                         }
-                        className="rounded-md p-1 text-steel-400 hover:bg-steel-50 hover:text-ink"
+                        className="rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white"
                         title="Umbenennen"
                       >
                         <Pencil size={14} />
@@ -445,7 +559,7 @@ export function DocumentsPage() {
                       <button
                         type="button"
                         onClick={() => handleDeleteCategory(category)}
-                        className="rounded-md p-1 text-steel-400 hover:bg-rose-50 hover:text-rose-600"
+                        className="rounded-md p-1 text-white/45 hover:bg-crimson/20 hover:text-crimson"
                         title="Löschen"
                       >
                         <Trash2 size={14} />
@@ -457,7 +571,7 @@ export function DocumentsPage() {
             )}
             {canWrite ? (
               <form
-                className="mt-1 flex items-center gap-1 border-t border-line px-1 pt-2"
+                className="mt-1 flex items-center gap-1 border-t border-white/10 px-1 pt-2"
                 onSubmit={(event) => {
                   event.preventDefault();
                   const name = newCategoryName.trim();
@@ -475,11 +589,11 @@ export function DocumentsPage() {
                   value={newCategoryName}
                   onChange={(event) => setNewCategoryName(event.target.value)}
                   placeholder="Neue Kategorie…"
-                  className="min-w-0 flex-1 rounded-md border border-line bg-white px-2 py-1 text-xs text-ink"
+                  className="min-w-0 flex-1 rounded-md border border-white/15 bg-steel-900/50 px-2 py-1 text-xs text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
                 />
                 <button
                   type="submit"
-                  className="rounded-md bg-steel-800 px-2 py-1 text-xs text-white"
+                  className="rounded-md bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/15"
                 >
                   +
                 </button>
@@ -496,12 +610,13 @@ export function DocumentsPage() {
                 )
               }
               size="sm"
+              tone="dark"
             />
           ) : null}
-        </aside>
+        </DocumentSidePanel>
 
         {/* Bibliothek */}
-        <section className="flex min-w-0 flex-col gap-4">
+        <section className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="search"
@@ -573,11 +688,13 @@ export function DocumentsPage() {
           ) : (
             <div className="flex flex-col gap-2">
               {documents.map((document) => (
-                <DocumentHoverPreview key={document.id} document={document}>
                   <ItemRow
+                    key={document.id}
                     title={documentTitle(document)}
                     description={document.description ?? undefined}
                     onOpen={() => setSelectedId(document.id)}
+                    openOnClick
+                    selected={document.id === selectedId}
                     pills={
                       <div className="flex flex-wrap gap-1">
                         {(document.categories ?? []).map((category) => (
@@ -640,7 +757,6 @@ export function DocumentsPage() {
                       </div>
                     }
                   />
-                </DocumentHoverPreview>
               ))}
             </div>
           )}
@@ -651,12 +767,13 @@ export function DocumentsPage() {
             loadingMore={loadingMore}
           />
         </section>
-      </div>
 
-      {selected ? (
+        {selected ? (
         <DocumentDetailPanel
           key={selected.id}
           document={selected}
+          widthPx={detailWidth ?? undefined}
+          onResizeStart={handleDetailResizeStart}
           categories={categories}
           folders={folders}
           canWrite={canWrite}
@@ -700,13 +817,35 @@ export function DocumentsPage() {
             )
           }
         />
-      ) : null}
+        ) : (
+          <DocumentSidePanel
+            side="right"
+            title="Details"
+            storageKey="ui.documents.detail.collapsed"
+            railIcon={FileText}
+            widthPx={detailWidth ?? undefined}
+            onResizeStart={handleDetailResizeStart}
+          >
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 py-12 text-center">
+              <FileText size={28} className="text-white/25" />
+              <p className="text-sm font-medium text-white/60">
+                Kein Dokument ausgewählt
+              </p>
+              <p className="text-xs text-white/40">
+                Doppelklick auf ein Dokument öffnet hier die Details.
+              </p>
+            </div>
+          </DocumentSidePanel>
+        )}
+      </div>
     </div>
   );
 }
 
 interface DocumentDetailPanelProps {
   document: Attachment;
+  widthPx?: number;
+  onResizeStart?: (event: ReactMouseEvent) => void;
   categories: AttachmentCategory[];
   folders: AttachmentFolder[];
   canWrite: boolean;
@@ -724,6 +863,8 @@ interface DocumentDetailPanelProps {
 
 function DocumentDetailPanel({
   document,
+  widthPx,
+  onResizeStart,
   categories,
   folders,
   canWrite,
@@ -747,167 +888,164 @@ function DocumentDetailPanel({
   );
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex justify-end bg-black/20"
-      onClick={onClose}
+    <DocumentSidePanel
+      side="right"
+      title={document.displayName ?? document.originalName}
+      storageKey="ui.documents.detail.collapsed"
+      railIcon={FileText}
+      widthPx={widthPx}
+      onResizeStart={onResizeStart}
+      headerActions={
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-7 shrink-0 items-center rounded-md px-2 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+        >
+          Schließen
+        </button>
+      }
     >
-      <div
-        className="flex h-full w-full max-w-md flex-col gap-5 overflow-auto bg-white p-6 shadow-steel"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="text-lg font-semibold text-ink">
-            {document.displayName ?? document.originalName}
-          </h2>
+      <p className="text-xs text-white/50">
+        Originaldatei: {document.originalName}
+      </p>
+
+      <section className="flex flex-col gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-white/55">
+          Vorschau
+        </span>
+        <DocumentPreviewBody attachment={document} />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-white/55">
+          Metadaten
+        </span>
+        <input
+          value={displayName}
+          onChange={(event) => setDisplayName(event.target.value)}
+          placeholder="Anzeigename"
+          disabled={!canWrite}
+          className="rounded-md border border-white/15 bg-steel-900/50 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50"
+        />
+        <textarea
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="Beschreibung"
+          disabled={!canWrite}
+          rows={3}
+          className="rounded-md border border-white/15 bg-steel-900/50 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50"
+        />
+        {canWrite ? (
           <button
             type="button"
-            onClick={onClose}
-            className="text-sm text-steel-500 hover:text-ink"
+            onClick={() =>
+              onSaveMetadata({
+                displayName: displayName.trim() || null,
+                description: description.trim() || null,
+              })
+            }
+            className="self-start rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/20"
           >
-            Schließen
+            Metadaten speichern
           </button>
-        </div>
-        <p className="text-xs text-steel-500">
-          Originaldatei: {document.originalName}
-        </p>
+        ) : null}
+      </section>
 
-        <section className="flex flex-col gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-steel-400">
-            Vorschau
-          </span>
-          <DocumentPreviewBody attachment={document} />
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-steel-400">
-            Metadaten
-          </span>
-          <input
-            value={displayName}
-            onChange={(event) => setDisplayName(event.target.value)}
-            placeholder="Anzeigename"
-            disabled={!canWrite}
-            className="rounded-md border border-line bg-white px-3 py-2 text-sm text-ink"
-          />
-          <textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="Beschreibung"
-            disabled={!canWrite}
-            rows={3}
-            className="rounded-md border border-line bg-white px-3 py-2 text-sm text-ink"
-          />
-          {canWrite ? (
-            <button
-              type="button"
-              onClick={() =>
-                onSaveMetadata({
-                  displayName: displayName.trim() || null,
-                  description: description.trim() || null,
-                })
-              }
-              className="self-start rounded-md bg-steel-800 px-3 py-1.5 text-sm text-white hover:bg-steel-700"
+      <section className="flex flex-col gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-white/55">
+          Sammlungen
+        </span>
+        <div className="flex flex-wrap gap-1">
+          {documentFolders.map((folder) => (
+            <span
+              key={folder.id}
+              className="flex items-center gap-1 rounded-md bg-white/10 px-2 py-0.5 text-xs text-white"
             >
-              Metadaten speichern
-            </button>
-          ) : null}
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-steel-400">
-            Sammlungen
-          </span>
-          <div className="flex flex-wrap gap-1">
-            {documentFolders.map((folder) => (
-              <span
-                key={folder.id}
-                className="flex items-center gap-1 rounded-md bg-steel-100 px-2 py-0.5 text-xs text-ink"
-              >
-                <FolderArchive size={12} />
-                {folder.name}
-                {canWrite ? (
-                  <button
-                    type="button"
-                    onClick={() => onRemoveFromFolder(folder.id)}
-                    className="text-steel-500 hover:text-rose-600"
-                    title="Aus Sammlung entfernen"
-                  >
-                    <X size={12} />
-                  </button>
-                ) : null}
-              </span>
-            ))}
-            {documentFolders.length === 0 ? (
-              <span className="text-xs text-steel-400">
-                In keiner Sammlung.
-              </span>
-            ) : null}
-          </div>
-          {canWrite && availableFolders.length > 0 ? (
-            <select
-              value=""
-              onChange={(event) => {
-                if (event.target.value) {
-                  onAddToFolder(Number(event.target.value));
-                }
-              }}
-              className="rounded-md border border-line bg-white px-2 py-1.5 text-sm text-ink"
-            >
-              <option value="">In Sammlung einsortieren…</option>
-              {availableFolders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </select>
-          ) : null}
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-steel-400">
-            Labels
-          </span>
-          <TagPicker
-            selected={(document.tags ?? []) as Tag[]}
-            onChange={onSetTags}
-            domain="dms"
-          />
-        </section>
-
-        <section className="flex flex-col gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-steel-400">
-            Kategorien
-          </span>
-          <div className="flex flex-wrap gap-1">
-            {categories.map((category) => {
-              const assigned = assignedCategoryIds.has(category.id);
-              return (
+              <FolderArchive size={12} />
+              {folder.name}
+              {canWrite ? (
                 <button
-                  key={category.id}
                   type="button"
-                  disabled={!canWrite}
-                  onClick={() =>
-                    assigned
-                      ? onRemoveCategory(category.id)
-                      : onAssignCategory(category.id)
-                  }
-                  className={`rounded-md px-2 py-0.5 text-xs ${assigned ? "text-white" : "border border-line text-steel-600"}`}
-                  style={
-                    assigned ? { backgroundColor: category.color } : undefined
-                  }
+                  onClick={() => onRemoveFromFolder(folder.id)}
+                  className="text-white/50 hover:text-crimson"
+                  title="Aus Sammlung entfernen"
                 >
-                  {category.name}
+                  <X size={12} />
                 </button>
-              );
-            })}
-            {categories.length === 0 ? (
-              <span className="text-xs text-steel-400">
-                Kategorien werden links verwaltet.
-              </span>
-            ) : null}
-          </div>
-        </section>
-      </div>
-    </div>
+              ) : null}
+            </span>
+          ))}
+          {documentFolders.length === 0 ? (
+            <span className="text-xs text-white/40">In keiner Sammlung.</span>
+          ) : null}
+        </div>
+        {canWrite && availableFolders.length > 0 ? (
+          <select
+            value=""
+            onChange={(event) => {
+              if (event.target.value) {
+                onAddToFolder(Number(event.target.value));
+              }
+            }}
+            className="rounded-md border border-white/15 bg-steel-900/50 px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+          >
+            <option value="" className="text-ink">
+              In Sammlung einsortieren…
+            </option>
+            {availableFolders.map((folder) => (
+              <option key={folder.id} value={folder.id} className="text-ink">
+                {folder.name}
+              </option>
+            ))}
+          </select>
+        ) : null}
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-white/55">
+          Labels
+        </span>
+        <TagPicker
+          selected={(document.tags ?? []) as Tag[]}
+          onChange={onSetTags}
+          domain="dms"
+          tone="dark"
+        />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-white/55">
+          Kategorien
+        </span>
+        <div className="flex flex-wrap gap-1">
+          {categories.map((category) => {
+            const assigned = assignedCategoryIds.has(category.id);
+            return (
+              <button
+                key={category.id}
+                type="button"
+                disabled={!canWrite}
+                onClick={() =>
+                  assigned
+                    ? onRemoveCategory(category.id)
+                    : onAssignCategory(category.id)
+                }
+                className={`rounded-md px-2 py-0.5 text-xs ${assigned ? "text-white" : "border border-white/20 text-white/70 hover:bg-white/5"}`}
+                style={
+                  assigned ? { backgroundColor: category.color } : undefined
+                }
+              >
+                {category.name}
+              </button>
+            );
+          })}
+          {categories.length === 0 ? (
+            <span className="text-xs text-white/40">
+              Kategorien werden links verwaltet.
+            </span>
+          ) : null}
+        </div>
+      </section>
+    </DocumentSidePanel>
   );
 }

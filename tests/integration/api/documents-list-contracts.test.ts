@@ -32,7 +32,7 @@
  *   applyLibraryFilters filtert. Deshalb werden q/folder hier über den Array-Pfad geprüft.
  * - Suche `q`: Teilstring über originalName/displayName; Treffer drin, Gegenbeispiel raus.
  * - Filter `folder`: numerische Sammlungs-ID → nur einsortierte Dokumente; `unsorted` → nur
- *   ownerlose, nicht einsortierte Dokumente. Jeweils mit id-genauem Gegenbeispiel.
+ *   Dokumente ohne Sammlung (eine Fachobjekt-Bindung schließt NICHT aus). Jeweils mit id-genauem Gegenbeispiel.
  * - Grenzfälle Pagination (paginationQuerySchema): page {minimum:1}, pageSize {min:1,max:100}.
  *     * pageSize > 100 → Ajv 400 (kein Clamping).
  *     * page <= 0 / pageSize <= 0 → Ajv 400 (kein Defaulting/Clamping).
@@ -207,7 +207,7 @@ describe("Dokumentenbibliothek-Listen-API: Array/Paginated, Filter, Suche, Pagin
       expect(inFolderIds).toContain(inFolder.id);
       expect(inFolderIds).not.toContain(outside.id);
 
-      // folder=unsorted: nur das ordnerlose (ownerlose) Dokument, das einsortierte ist Gegenbeispiel
+      // folder=unsorted: nur das ordnerlose Dokument, das einsortierte ist Gegenbeispiel
       const unsortedRes = await admin.get("/api/documents?folder=unsorted").expect(200);
       const unsortedIds = (unsortedRes.body as DocumentListItem[]).map((doc) => doc.id);
       expect(unsortedIds).toContain(outside.id);

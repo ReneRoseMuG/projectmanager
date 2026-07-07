@@ -102,7 +102,7 @@ function TextPreview({ preview }: { preview: AttachmentPreviewInfo }) {
 
   return (
     <div className="grid gap-2">
-      <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md border border-line bg-shell p-3 font-mono text-xs leading-relaxed text-ink">
+      <pre className="max-h-[68vh] min-h-[320px] overflow-auto whitespace-pre-wrap break-words rounded-md border border-line bg-shell p-3 font-mono text-xs leading-relaxed text-ink">
         {preview.text.content}
       </pre>
       {preview.text.truncated ? (
@@ -136,7 +136,7 @@ function CsvPreview({
 
   return (
     <div className="grid gap-2">
-      <div className="max-h-72 overflow-auto rounded-md border border-line bg-white">
+      <div className="max-h-[68vh] min-h-[320px] overflow-auto rounded-md border border-line bg-white">
         <table className="min-w-full border-collapse text-left text-xs">
           <tbody>
             {rows.map((row, rowIndex) => (
@@ -207,7 +207,7 @@ export function DocumentPreviewBody({
           onClick={() => setLightboxOpen(true)}
         >
           <img
-            className="h-48 w-full object-contain"
+            className="max-h-[80vh] w-full object-contain"
             src={url}
             alt={attachment.originalName}
           />
@@ -233,7 +233,7 @@ export function DocumentPreviewBody({
         className={
           compact
             ? "h-80 w-full rounded-md border border-line"
-            : "h-72 rounded-md border border-line"
+            : "h-[74vh] min-h-[420px] w-full rounded-md border border-line"
         }
         src={url}
         type="application/pdf"
@@ -252,7 +252,7 @@ export function DocumentPreviewBody({
   if (meta.family === "video") {
     return (
       <video
-        className={`${compact ? "max-h-80" : "max-h-72"} w-full rounded-md border border-line bg-black`}
+        className={`${compact ? "max-h-80" : "max-h-[68vh]"} w-full rounded-md border border-line bg-black`}
         src={url}
         controls
       />
@@ -302,7 +302,7 @@ export function DocumentPreviewBody({
         className={
           compact
             ? "h-80 w-full rounded-md border border-line"
-            : "h-72 rounded-md border border-line"
+            : "h-[74vh] min-h-[420px] w-full rounded-md border border-line"
         }
         src={previewUrl}
         type="application/pdf"

@@ -23,8 +23,10 @@
  * - Sammlung-CRUD mit Zyklusschutz (400) und Loeschschutz bei Unter-Sammlungen (409 -> recursive).
  * - Dokument in Sammlung einsortieren/entfernen + gefilterte Bibliotheks-Abfrage (mit Gegenbeispiel).
  * - Owner-loser Direktupload landet unter Nicht einsortiert.
+ * - Fachobjekt-gebundenes, aber sammlungsloses Dokument erscheint ebenfalls unter Nicht einsortiert (nur die Sammlung entscheidet).
  * - Geschuetzte System-Labels sind ueber setDocumentTags nicht setzbar (400).
  * - Orphan-Verhalten: Anhaenge werden beim Loeschen des Fachobjekts NICHT geloescht, sondern Nicht einsortiert.
+ * - Verwaister Owner-Link (Fachobjekt bereits geloescht) blockiert das Loeschen des Dokuments nicht (204 statt 404).
  *
  * Fehlerfaelle:
  * - 401 ohne Session, 403 Reader-Negativfall, 409 Dublette/Versionskonflikt/Loeschschutz, 400 Zyklus/System-Label.
@@ -186,6 +188,25 @@ describe("DMS API", () => {
     expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(doc.id);
   });
 
+  it("fuehrt ein an ein Fachobjekt gebundenes, sammlungsloses Dokument als Nicht einsortiert", async () => {
+    const admin = await loginAdmin();
+    const project = await admin.post("/api/projects").send({ name: "DMS-Projekt", status: "active", color: "#6366f1" }).expect(201);
+    const upload = await admin
+      .post(`/api/projects/${project.body.id}/attachments`)
+      .attach("file", Buffer.from("gebunden, aber ohne Sammlung"), { filename: "gebunden.txt", contentType: "text/plain" })
+      .expect(201);
+
+    // Owner-gebunden, aber in keiner Sammlung -> erscheint unter Nicht einsortiert.
+    const unsorted = await admin.get("/api/documents?folder=unsorted").expect(200);
+    expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(upload.body.id);
+
+    // Sobald es in eine Sammlung einsortiert wird, verschwindet es dort -> die Sammlung entscheidet, nicht der Owner.
+    const folder = await admin.post("/api/attachment-folders").send({ name: "Vertraege" }).expect(201);
+    await admin.post(`/api/attachment-folders/${folder.body.id}/documents/${upload.body.id}`).expect(204);
+    const afterSort = await admin.get("/api/documents?folder=unsorted").expect(200);
+    expect((afterSort.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(upload.body.id);
+  });
+
   // --- System-Label-Schutz ---
 
   it("verhindert das Setzen eines geschuetzten System-Labels (400)", async () => {
@@ -218,5 +239,26 @@ describe("DMS API", () => {
     // und er erscheint als Nicht einsortiert
     const unsorted = await admin.get("/api/documents?folder=unsorted").expect(200);
     expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(upload.body.id);
+  });
+
+  it("loescht ein Dokument trotz verwaistem Owner-Link (kein 404)", async () => {
+    // Reproduziert den Produktionsfehler: Wird das Fachobjekt eines Owner-Links geloescht, ohne
+    // dass die Junction-Zeile mitentfernt wird (in der Prod-DB mangels FK-Cascade beobachtet),
+    // darf das Loeschen des Dokuments NICHT mit 404 abbrechen. Der verwaiste Link wird technisch
+    // injiziert (FK-Checks kurz aus), da die Test-DB die Cascade korrekt anwendet.
+    const admin = await loginAdmin();
+    const doc = await uploadDocument(admin, "verwaist.txt");
+
+    const conn = await testDb.pool.getConnection();
+    try {
+      await conn.query("SET FOREIGN_KEY_CHECKS=0");
+      await conn.execute("INSERT INTO wiki_page_attachments (wiki_page_id, attachment_id) VALUES (?, ?)", [999999, doc.id]);
+      await conn.query("SET FOREIGN_KEY_CHECKS=1");
+    } finally {
+      conn.release();
+    }
+
+    await admin.delete(`/api/documents/${doc.id}`).expect(204);
+    await admin.get(`/api/documents/${doc.id}`).expect(404);
   });
 });

@@ -28,7 +28,7 @@ import {
 } from "../db/schema.js";
 import { attachmentRepository, type AttachmentRecord } from "../repositories/attachment.repository.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
-import { badRequest, internalError, notFound } from "../utils/errors.js";
+import { AppError, badRequest, internalError, notFound } from "../utils/errors.js";
 import { removeAttachmentPreviews } from "./attachment-preview.service.js";
 import { watchAttachmentForChanges } from "./attachment-watcher.service.js";
 import type { FileOpener } from "./file-opener.service.js";
@@ -193,6 +193,20 @@ async function getOwnerJournalObject(database: DbClient, owner: AttachmentOwner)
   return makeJournalObject("ticket", ticket.id, ticket.title);
 }
 
+// Tolerante Variante für den Löschpfad: Ist das verknüpfte Fachobjekt bereits gelöscht
+// (verwaister Owner-Link), liefert diese Funktion null statt einen NOT_FOUND zu werfen.
+// getOwnerJournalObject bleibt für Erstell-/Link-Pfade bewusst streng.
+async function resolveOwnerJournalObjectOrNull(database: DbClient, owner: AttachmentOwner): Promise<JournalObjectRef | null> {
+  try {
+    return await getOwnerJournalObject(database, owner);
+  } catch (error) {
+    if (error instanceof AppError && error.error === "NOT_FOUND") {
+      return null;
+    }
+    throw error;
+  }
+}
+
 function attachmentJournalObject(record: Pick<AttachmentRecord, "id" | "originalName">): JournalObjectRef {
   return makeJournalObject("attachment", record.id, record.originalName);
 }
@@ -320,8 +334,9 @@ async function removeAttachmentFiles(records: AttachmentCleanupRecord[]): Promis
 // MS-75 (DMS): Der frühere Owner-basierte Auto-Cleanup von Anhängen entfällt. Beim
 // Löschen eines Fachobjekts entfernt die FK-Cascade der Junction-Tabellen nur die
 // Verknüpfung; das Dokument selbst bleibt bestehen und wird im DMS als "Nicht
-// einsortiert" geführt, solange es keine weitere Bindung (Fachobjekt oder Sammlung)
-// besitzt. Endgültiges Löschen erfolgt nur noch explizit über deleteAttachment.
+// einsortiert" geführt, solange es keiner Sammlung zugeordnet ist (eine reine
+// Fachobjekt-Bindung zählt nicht als einsortiert). Endgültiges Löschen erfolgt nur
+// noch explizit über deleteAttachment.
 
 async function persistAttachment(values: {
   database: DbClient;
@@ -879,7 +894,12 @@ export async function deleteAttachment(database: DbClient, id: number, actor?: J
     throw notFound(`Attachment with id ${id} not found`);
   }
 
-  const ownerContexts = await Promise.all((await listAttachmentOwners(database, id)).map(async (owner) => makeJournalContext(await getOwnerJournalObject(database, owner), "owner")));
+  // Verwaiste Owner-Links (Fachobjekt bereits gelöscht) dürfen das Löschen nicht blockieren:
+  // Für solche Owner wird der Journal-Kontext übersprungen statt mit 404 abzubrechen.
+  const owners = await listAttachmentOwners(database, id);
+  const ownerContexts = (await Promise.all(owners.map((owner) => resolveOwnerJournalObjectOrNull(database, owner))))
+    .filter((object): object is JournalObjectRef => object !== null)
+    .map((object) => makeJournalContext(object, "owner"));
   await database.transaction(async (tx) => {
     const journalObject = attachmentJournalObject(record);
     await recordJournalEntry(tx, {

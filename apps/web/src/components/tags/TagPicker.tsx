@@ -10,6 +10,7 @@ interface TagPickerProps {
   onChange: (tags: Tag[]) => void;
   domain: TagDomain;
   variant?: "default" | "panel";
+  tone?: "light" | "dark";
 }
 
 const DEFAULT_TAG_COLOR = "var(--color-steel-600)";
@@ -42,7 +43,11 @@ function TagPill({ tag, onRemove }: { tag: Tag; onRemove: (id: number) => void }
   );
 }
 
-export function TagPicker({ selected, onChange, domain, variant }: TagPickerProps) {
+export function TagPicker({ selected, onChange, domain, variant, tone }: TagPickerProps) {
+  const dark = tone === "dark";
+  const fieldClass = dark
+    ? "border-white/15 bg-steel-900/60 text-white placeholder:text-white/40 outline-none focus:border-white/45"
+    : "border-line outline-none focus:border-steel-600";
   const { tags, createTag } = useTags(domain);
   const [open, setOpen] = useState(false);
   const [dropUp, setDropUp] = useState(false);
@@ -140,7 +145,7 @@ export function TagPicker({ selected, onChange, domain, variant }: TagPickerProp
     <button
       type="button"
       aria-label="Tag hinzufügen"
-      className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-line bg-white text-steel-500 transition hover:bg-shell hover:text-ink"
+      className={`inline-flex h-6 w-6 items-center justify-center rounded-md border transition ${dark ? "border-white/15 bg-white/10 text-white/70 hover:bg-white/15 hover:text-white" : "border-line bg-white text-steel-500 hover:bg-shell hover:text-ink"}`}
       onClick={openPicker}
     >
       <Plus size={13} />
@@ -151,7 +156,7 @@ export function TagPicker({ selected, onChange, domain, variant }: TagPickerProp
     <>
       <div className="p-2">
         <input
-          className="h-8 w-full rounded border border-line px-2 text-sm outline-none focus:border-steel-600"
+          className={`h-8 w-full rounded border px-2 text-sm ${fieldClass}`}
           placeholder="Suchen…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -163,7 +168,7 @@ export function TagPicker({ selected, onChange, domain, variant }: TagPickerProp
           <button
             key={tag.id}
             type="button"
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-sm hover:bg-shell"
+            className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm ${dark ? "text-white/85 hover:bg-white/10" : "hover:bg-shell"}`}
             onClick={() => addTag(tag)}
           >
             <span
@@ -174,16 +179,16 @@ export function TagPicker({ selected, onChange, domain, variant }: TagPickerProp
           </button>
         ))}
         {availableTags.length === 0 && (
-          <div className="px-3 py-2 text-xs text-steel-500">
+          <div className={`px-3 py-2 text-xs ${dark ? "text-white/50" : "text-steel-500"}`}>
             {search ? "Kein Tag gefunden" : "Alle Tags bereits ausgewählt"}
           </div>
         )}
       </div>
-      <div className="border-t border-line p-2">
+      <div className={`border-t p-2 ${dark ? "border-white/15" : "border-line"}`}>
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-1.5">
           <ColorPicker value={newColor} onChange={setNewColor} />
           <input
-            className="h-7 min-w-0 rounded border border-line px-2 text-xs outline-none focus:border-steel-600"
+            className={`h-7 min-w-0 rounded border px-2 text-xs ${fieldClass}`}
             placeholder="Neues Tag…"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
@@ -197,7 +202,7 @@ export function TagPicker({ selected, onChange, domain, variant }: TagPickerProp
           <button
             type="button"
             disabled={!newName.trim()}
-            className="h-7 rounded border border-steel-300 px-2 text-xs font-medium text-steel-600 transition hover:border-steel-500 hover:text-ink disabled:opacity-50"
+            className={`h-7 rounded border px-2 text-xs font-medium transition disabled:opacity-50 ${dark ? "border-white/20 text-white/70 hover:border-white/40 hover:text-white" : "border-steel-300 text-steel-600 hover:border-steel-500 hover:text-ink"}`}
             onClick={() => void createAndAdd()}
           >
             Neu
@@ -254,10 +259,10 @@ export function TagPicker({ selected, onChange, domain, variant }: TagPickerProp
   return (
     <div ref={containerRef} className="grid gap-1">
       <div className="flex items-center gap-1.5">
-        <TagIcon size={12} className="shrink-0 text-steel-400" />
-        <span className="text-xs font-bold uppercase tracking-wide text-steel-700">Tags</span>
+        <TagIcon size={12} className={`shrink-0 ${dark ? "text-white/50" : "text-steel-400"}`} />
+        <span className={`text-xs font-bold uppercase tracking-wide ${dark ? "text-white/60" : "text-steel-700"}`}>Tags</span>
       </div>
-      <div className="relative min-h-[2.5rem] rounded-md border border-line bg-white px-2 py-1.5">
+      <div className={`relative min-h-[2.5rem] rounded-md border px-2 py-1.5 ${dark ? "border-white/15 bg-white/[0.04]" : "border-line bg-white"}`}>
         <div className="flex flex-wrap items-center gap-1.5">
           {selected.map((tag) => (
             <TagPill key={tag.id} tag={tag} onRemove={removeTag} />
@@ -265,7 +270,7 @@ export function TagPicker({ selected, onChange, domain, variant }: TagPickerProp
           {addButton}
         </div>
         {open ? (
-          <div className={`absolute right-0 ${dropdownPositionClass} z-50 w-64 rounded-md border border-line bg-white shadow-md`}>
+          <div className={`absolute right-0 ${dropdownPositionClass} z-50 w-64 rounded-md border shadow-md ${dark ? "border-white/15 bg-steel-800" : "border-line bg-white"}`}>
             {dropdownContent}
           </div>
         ) : null}
