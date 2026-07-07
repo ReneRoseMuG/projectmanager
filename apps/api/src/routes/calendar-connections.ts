@@ -6,6 +6,7 @@ import { syncAllUserConnections, syncCalendarConnection } from "../services/cale
 import { connectNextCloud, type ConnectNextCloudInput } from "../services/nextcloud-connection.service.js";
 import { buildGoogleAuthUrl, handleGoogleCallback } from "../services/google/google-oauth.service.js";
 import { handlePushNotification, stopGoogleWatch, watchGoogleCalendar } from "../services/google/google-push.service.js";
+import { getEffectiveCalendarConfig } from "../services/calendar-config.service.js";
 import { config } from "../config.js";
 import { badRequest, unauthorized } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema } from "../utils/route-schemas.js";
@@ -52,7 +53,8 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
   // Server-Konfigurationsstatus für die UI: ist Google einrichtbar, läuft der automatische Abgleich?
   app.get("/calendar-connections/config", { schema: { response: { 200: objectResponseSchema } } }, async (request) => {
     requireUserId(request);
-    return { googleConfigured: Boolean(config.googleClientId && config.googleClientSecret), autoSyncEnabled: config.calendarSyncEnabled };
+    const effective = await getEffectiveCalendarConfig(app.db);
+    return { googleConfigured: Boolean(effective.googleClientId && effective.googleClientSecret), autoSyncEnabled: effective.syncEnabled };
   });
 
   // Manueller Sammel-Abgleich aller eigenen Verbindungen.
@@ -67,7 +69,7 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
   );
 
   app.get("/calendar-connections/google/auth-url", { schema: { response: { 200: objectResponseSchema } } }, async (request) => ({
-    url: buildGoogleAuthUrl(requireUserId(request))
+    url: await buildGoogleAuthUrl(app.db, requireUserId(request))
   }));
 
   // OAuth-Rücksprung von Google (offen, da vom Browser-Redirect aufgerufen — der signierte State schützt).
@@ -115,9 +117,10 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
       const result = await selectGoogleCalendar(app.db, request.params.id, request.body.calendarId);
       // Push-Kanal automatisch aktivieren, sofern eine Webhook-URL konfiguriert ist (best-effort — ein
       // Fehler hier darf die Kalenderauswahl nicht scheitern lassen; Polling bleibt das Sicherheitsnetz).
-      if (config.googlePushWebhookUrl) {
+      const effective = await getEffectiveCalendarConfig(app.db);
+      if (effective.googlePushWebhookUrl) {
         try {
-          await watchGoogleCalendar(app.db, request.params.id, config.googlePushWebhookUrl);
+          await watchGoogleCalendar(app.db, request.params.id, effective.googlePushWebhookUrl);
         } catch {
           app.log.warn(`Push-Kanal für Verbindung ${request.params.id} konnte nicht aktiviert werden.`);
         }
@@ -132,10 +135,11 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
     { schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => {
       await requireOwnedConnection(app.db, request.params.id, requireUserId(request));
-      if (!config.googlePushWebhookUrl) {
-        throw badRequest("Google Push ist nicht konfiguriert (GOOGLE_PUSH_WEBHOOK_URL fehlt).");
+      const effective = await getEffectiveCalendarConfig(app.db);
+      if (!effective.googlePushWebhookUrl) {
+        throw badRequest("Google Push ist nicht konfiguriert (Webhook-URL fehlt).");
       }
-      return watchGoogleCalendar(app.db, request.params.id, config.googlePushWebhookUrl);
+      return watchGoogleCalendar(app.db, request.params.id, effective.googlePushWebhookUrl);
     }
   );
 
@@ -152,11 +156,14 @@ export async function registerCalendarConnectionRoutes(app: FastifyInstance): Pr
       const userId = requireUserId(request);
       const connection = await requireOwnedConnection(app.db, request.params.id, userId);
       // Google-Push-Kanal abmelden, bevor die Verbindung samt Kanaldaten entfernt wird (best-effort).
-      if (connection.provider === "google" && config.googlePushWebhookUrl) {
-        try {
-          await stopGoogleWatch(app.db, request.params.id);
-        } catch {
-          app.log.warn(`Push-Kanal für Verbindung ${request.params.id} konnte nicht abgemeldet werden.`);
+      if (connection.provider === "google") {
+        const effective = await getEffectiveCalendarConfig(app.db);
+        if (effective.googlePushWebhookUrl) {
+          try {
+            await stopGoogleWatch(app.db, request.params.id);
+          } catch {
+            app.log.warn(`Push-Kanal für Verbindung ${request.params.id} konnte nicht abgemeldet werden.`);
+          }
         }
       }
       await deleteCalendarConnection(app.db, request.params.id, userId);

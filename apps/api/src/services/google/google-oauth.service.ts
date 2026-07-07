@@ -4,6 +4,7 @@ import { config } from "../../config.js";
 import type { DbClient, DbSession } from "../../db/client.js";
 import { calendarConnectionRepository, type CalendarConnectionRecord } from "../../repositories/calendar.repository.js";
 import { calendarCredentialService } from "../calendar-credential.service.js";
+import { getEffectiveCalendarConfig, type EffectiveCalendarConfig } from "../calendar-config.service.js";
 import { mapCalendarConnection } from "../calendar-connection.service.js";
 import { recordConnectionJournal } from "../calendar-journal.service.js";
 
@@ -42,11 +43,11 @@ export const defaultGoogleFetch: GoogleTokenFetch = async (url, init) => {
   return { status: response.status, json: () => response.json() as Promise<Record<string, unknown>> };
 };
 
-function requireClientCredentials(): { clientId: string; clientSecret: string } {
-  if (!config.googleClientId || !config.googleClientSecret) {
-    throw new GoogleAuthError("config", "Google ist nicht konfiguriert (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET fehlen).");
+function requireClientCredentials(effective: EffectiveCalendarConfig): { clientId: string; clientSecret: string } {
+  if (!effective.googleClientId || !effective.googleClientSecret) {
+    throw new GoogleAuthError("config", "Google ist nicht konfiguriert (Client-ID / Client-Secret fehlen).");
   }
-  return { clientId: config.googleClientId, clientSecret: config.googleClientSecret };
+  return { clientId: effective.googleClientId, clientSecret: effective.googleClientSecret };
 }
 
 // -------------------------------------------------------------------------
@@ -78,11 +79,12 @@ export function verifyState(state: string): number {
 }
 
 /** Baut die Google-Zustimmungs-URL (offline access + consent, damit ein Refresh-Token kommt). */
-export function buildGoogleAuthUrl(userId: number): string {
-  const { clientId } = requireClientCredentials();
+export async function buildGoogleAuthUrl(database: DbClient, userId: number): Promise<string> {
+  const effective = await getEffectiveCalendarConfig(database);
+  const { clientId } = requireClientCredentials(effective);
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: config.googleRedirectUri,
+    redirect_uri: effective.googleRedirectUri,
     response_type: "code",
     scope: GOOGLE_SCOPE,
     access_type: "offline",
@@ -99,13 +101,13 @@ interface GoogleTokens {
   expiresAt: number;
 }
 
-async function exchangeCode(code: string, fetchImpl: GoogleTokenFetch): Promise<GoogleTokens> {
-  const { clientId, clientSecret } = requireClientCredentials();
+async function exchangeCode(effective: EffectiveCalendarConfig, code: string, fetchImpl: GoogleTokenFetch): Promise<GoogleTokens> {
+  const { clientId, clientSecret } = requireClientCredentials(effective);
   const body = new URLSearchParams({
     code,
     client_id: clientId,
     client_secret: clientSecret,
-    redirect_uri: config.googleRedirectUri,
+    redirect_uri: effective.googleRedirectUri,
     grant_type: "authorization_code"
   }).toString();
   const response = await fetchImpl(GOOGLE_TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
@@ -116,8 +118,8 @@ async function exchangeCode(code: string, fetchImpl: GoogleTokenFetch): Promise<
   return { accessToken: data.access_token, refreshToken: data.refresh_token, expiresAt: Date.now() + Number(data.expires_in ?? 3600) * 1000 };
 }
 
-async function refresh(refreshToken: string, fetchImpl: GoogleTokenFetch): Promise<{ accessToken: string; expiresAt: number }> {
-  const { clientId, clientSecret } = requireClientCredentials();
+async function refresh(effective: EffectiveCalendarConfig, refreshToken: string, fetchImpl: GoogleTokenFetch): Promise<{ accessToken: string; expiresAt: number }> {
+  const { clientId, clientSecret } = requireClientCredentials(effective);
   const body = new URLSearchParams({ refresh_token: refreshToken, client_id: clientId, client_secret: clientSecret, grant_type: "refresh_token" }).toString();
   const response = await fetchImpl(GOOGLE_TOKEN_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
   const data = await response.json();
@@ -133,7 +135,8 @@ async function refresh(refreshToken: string, fetchImpl: GoogleTokenFetch): Promi
 /** Callback nach der Google-Zustimmung: State prüfen, Code eintauschen, Verbindung + verschlüsselte Tokens anlegen. */
 export async function handleGoogleCallback(database: DbClient, code: string, state: string, fetchImpl: GoogleTokenFetch = defaultGoogleFetch): Promise<CalendarConnection> {
   const userId = verifyState(state);
-  const tokens = await exchangeCode(code, fetchImpl);
+  const effective = await getEffectiveCalendarConfig(database);
+  const tokens = await exchangeCode(effective, code, fetchImpl);
   // Re-Auth (AP-4.3): eine bestehende Google-Verbindung des Nutzers wird wiederverwendet — Zielkalender
   // und Event-Mappings bleiben erhalten, es entsteht keine Dublette. Sonst wird neu angelegt.
   const existing = (await calendarConnectionRepository.listByUser(database, userId)).find((entry) => entry.provider === "google");
@@ -171,7 +174,8 @@ export async function ensureGoogleAccessToken(database: DbClient, connectionId: 
     return credentials.accessToken;
   }
   try {
-    const refreshed = await refresh(credentials.refreshToken, fetchImpl);
+    const effective = await getEffectiveCalendarConfig(database);
+    const refreshed = await refresh(effective, credentials.refreshToken, fetchImpl);
     await calendarCredentialService.store(database, connectionId, { ...credentials, accessToken: refreshed.accessToken, expiresAt: String(refreshed.expiresAt) });
     return refreshed.accessToken;
   } catch (error) {

@@ -114,6 +114,10 @@ export const queryKeys = {
     journal: () => [...queryKeys.calendarConnections.root, "journal"] as const,
     config: () => [...queryKeys.calendarConnections.root, "config"] as const
   },
+  calendarSettings: {
+    root: ["calendarSettings"] as const,
+    config: () => [...queryKeys.calendarSettings.root, "config"] as const
+  },
   pushNotifications: {
     root: ["pushNotifications"] as const,
     vapidKey: () => [...queryKeys.pushNotifications.root, "vapidKey"] as const,

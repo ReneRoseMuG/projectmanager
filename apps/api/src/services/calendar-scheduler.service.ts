@@ -1,6 +1,6 @@
-import { config } from "../config.js";
 import type { DbClient } from "../db/client.js";
 import { calendarConnectionRepository } from "../repositories/calendar.repository.js";
+import { getEffectiveCalendarConfig } from "./calendar-config.service.js";
 import { runConnectionSync } from "./calendar-sync.service.js";
 import { renewExpiringChannels } from "./google/google-push.service.js";
 
@@ -84,6 +84,7 @@ export async function runScheduledSync(database: DbClient, now: number = Date.no
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 let running = false;
+let currentIntervalMs: number | null = null;
 
 async function tick(database: DbClient): Promise<void> {
   if (running) {
@@ -93,9 +94,11 @@ async function tick(database: DbClient): Promise<void> {
   try {
     await runScheduledSync(database);
     // Ablaufende Google-Push-Kanäle erneuern (nur wenn Push konfiguriert ist; best-effort).
-    if (config.googlePushWebhookUrl) {
+    // Webhook-URL aus der wirksamen Konfiguration (DB → .env), damit Änderungen ohne Neustart greifen.
+    const effective = await getEffectiveCalendarConfig(database);
+    if (effective.googlePushWebhookUrl) {
       try {
-        await renewExpiringChannels(database, config.googlePushWebhookUrl, Date.now());
+        await renewExpiringChannels(database, effective.googlePushWebhookUrl, Date.now());
       } catch {
         // Ein Renewal-Fehler darf den regulären Abgleich nicht stören.
       }
@@ -123,6 +126,7 @@ export function startCalendarSyncScheduler(database: DbClient, intervalMs: numbe
   if (timer) {
     return;
   }
+  currentIntervalMs = intervalMs;
   scheduleNext(database, intervalMs);
 }
 
@@ -133,6 +137,25 @@ export function stopCalendarSyncScheduler(): void {
     timer = null;
   }
   running = false;
+  currentIntervalMs = null;
+}
+
+/**
+ * Bringt den Scheduler in Einklang mit der wirksamen Konfiguration (DB → .env): startet ihn bei
+ * aktiviertem Sync, stoppt ihn bei deaktiviertem und startet ihn bei geändertem Intervall neu.
+ * Idempotent — für den Boot und für die Nachführung nach jeder Konfig-Änderung gedacht.
+ */
+export async function applyCalendarSchedulerState(database: DbClient): Promise<void> {
+  const effective = await getEffectiveCalendarConfig(database);
+  if (!effective.syncEnabled) {
+    stopCalendarSyncScheduler();
+    return;
+  }
+  if (timer && currentIntervalMs === effective.syncIntervalMs) {
+    return;
+  }
+  stopCalendarSyncScheduler();
+  startCalendarSyncScheduler(database, effective.syncIntervalMs);
 }
 
 /** Nur für Tests: laufender Timer? */

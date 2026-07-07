@@ -268,6 +268,10 @@ export async function invalidateSettings(queryClient: QueryClient): Promise<void
   await invalidateMany(queryClient, [queryKeys.settings.root]);
 }
 
+export async function invalidateCalendarSettings(queryClient: QueryClient): Promise<void> {
+  await invalidateMany(queryClient, [queryKeys.calendarSettings.root]);
+}
+
 export async function invalidatePushNotifications(queryClient: QueryClient): Promise<void> {
   await invalidateMany(queryClient, [queryKeys.pushNotifications.root]);
 }

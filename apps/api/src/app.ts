@@ -12,6 +12,7 @@ import { registerDmsRoutes } from "./routes/dms.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerBacklogRoutes } from "./routes/backlog.js";
 import { registerCalendarConnectionRoutes } from "./routes/calendar-connections.js";
+import { registerCalendarSettingsRoutes } from "./routes/calendar-settings.js";
 import { registerCommentsRoutes } from "./routes/comments.js";
 import { registerContentImageRoutes } from "./routes/content-images.js";
 import { registerCatalogRoutes } from "./routes/catalogs.js";
@@ -44,7 +45,7 @@ import { createRealtimeEventBus } from "./services/realtime-event-bus.service.js
 import { assertSafeTestRuntimeTargets } from "./runtime-safety.js";
 import { registerNextCloudSyncHandler } from "./services/nextcloud-sync.service.js";
 import { registerGoogleSyncHandler } from "./services/google/google-events.service.js";
-import { startCalendarSyncScheduler, stopCalendarSyncScheduler } from "./services/calendar-scheduler.service.js";
+import { applyCalendarSchedulerState, stopCalendarSyncScheduler } from "./services/calendar-scheduler.service.js";
 import { seedAuthData } from "./services/auth.service.js";
 import { seedDefaultCatalogEntries } from "./services/catalogs.service.js";
 import { errorHandler } from "./utils/errors.js";
@@ -91,6 +92,7 @@ export async function buildApp(
   await app.register(registerCatalogRoutes, { prefix: "/api" });
   await app.register(registerTagsRoutes, { prefix: "/api" });
   await app.register(registerSettingsRoutes, { prefix: "/api" });
+  await app.register(registerCalendarSettingsRoutes, { prefix: "/api" });
   await app.register(registerDashboardRoutes, { prefix: "/api" });
   await app.register(registerDayPlanRoutes, { prefix: "/api" });
   await app.register(registerNotesRoutes, { prefix: "/api" });
@@ -113,10 +115,8 @@ export async function buildApp(
   registerNextCloudSyncHandler();
   registerGoogleSyncHandler();
 
-  // Periodischen Sync-Scheduler starten (AP-4.1), sofern per Umgebung aktiviert.
-  if (config.calendarSyncEnabled) {
-    startCalendarSyncScheduler(app.db, config.calendarSyncIntervalMs);
-  }
+  // Periodischen Sync-Scheduler an die wirksame Konfiguration angleichen (DB → .env-Fallback). AP-4.1.
+  await applyCalendarSchedulerState(app.db);
 
   return app;
 }

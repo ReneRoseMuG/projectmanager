@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 07.07.26 | 08:10:38 | Feature | Kalender-Sync-Konfig in DB (Admin) | ✅ |
 | 07.07.26 | 04:53:09 | Fix | Wiki Navigation WIKI-20 | ✅ |
 | 07.07.26 | 04:49:06 | Fix | Wiki Autosave Navigation | ✅ |
 | 07.07.26 | 04:22:24 | Feature | DMS in CalendarSync integriert | ⚠️ |

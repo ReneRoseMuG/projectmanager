@@ -194,9 +194,9 @@ export function SettingsCalendarConnectionsPage() {
 
         {config && !googleReady ? (
           <div className="rounded-md border border-tangerine/30 bg-tangerine/10 p-3 text-sm text-ink">
-            <span className="font-semibold">Google ist serverseitig noch nicht eingerichtet.</span> Zum Aktivieren müssen{" "}
-            <code className="rounded bg-white/60 px-1">GOOGLE_CLIENT_ID</code>, <code className="rounded bg-white/60 px-1">GOOGLE_CLIENT_SECRET</code> und{" "}
-            <code className="rounded bg-white/60 px-1">GOOGLE_REDIRECT_URI</code> in der Server-Konfiguration gesetzt werden (siehe <code className="rounded bg-white/60 px-1">apps/api/.env.example</code>). Bis dahin ist „Google verbinden" deaktiviert; NextCloud funktioniert unabhängig davon.
+            <span className="font-semibold">Google ist serverseitig noch nicht eingerichtet.</span> Ein Administrator kann die
+            Google-Zugangsdaten (Client-ID, Client-Secret, Redirect-URI) zentral unter{" "}
+            <span className="font-semibold">Admin → Kalender-Synchronisation</span> hinterlegen. Bis dahin ist „Google verbinden" deaktiviert; NextCloud funktioniert unabhängig davon.
           </div>
         ) : null}
 

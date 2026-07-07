@@ -191,6 +191,24 @@ createTaskComment(db, taskId, input, userId?)
 deleteComment(db, id)
 ```
 
+### Server-Konfiguration (DB-gestützt)
+Konfiguration, die zentral statt pro Arbeitsplatz gelten soll, wird nicht nur aus der
+`.env` gelesen, sondern als versionierte Zeile im generischen Settings-Speicher
+(`settings_values`, Scope `GLOBAL`) gehalten. Muster:
+
+- **Auflösung** über einen dedizierten Service (`{bereich}-config.service.ts`) mit fester
+  Vorrangkette **DB-Zeile → `.env` → Default**. Die `.env` bleibt Rückfallebene, damit die
+  Umstellung bruchfrei ist.
+- **Secrets** werden vor dem Speichern mit dem `credential-cipher` (AES-256-GCM)
+  verschlüsselt abgelegt und nur maskiert ausgeliefert; der Klartext verlässt den Server nie.
+- **Ein Wurzelgeheimnis** (Encryption-Key) bleibt zwingend in der Umgebung — nie in der DB
+  neben den verschlüsselten Daten.
+- **Route** flach (`/{bereich}-settings`, GET/PUT) mit `config.auth`-Override; Schreiben
+  erfordert die Admin-Permission der Domäne (z. B. `settings:admin`). Versionierung über
+  `settings_values.version` + `expectedVersion` (409 bei Konflikt).
+
+Referenz: MS-79 Kalender-Sync (`calendar-config.service.ts`, `routes/calendar-settings.ts`).
+
 ---
 
 ## 5. Ist-Zustand und bekannter Änderungsbedarf

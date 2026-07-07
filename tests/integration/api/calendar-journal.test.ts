@@ -50,8 +50,8 @@ const USER_ID = 1;
 
 const oauthFetch: GoogleTokenFetch = async () => ({ status: 200, json: async () => ({ access_token: "at", refresh_token: "rt", expires_in: 3600 }) });
 
-function stateFromAuthUrl(): string {
-  const url = new URL(buildGoogleAuthUrl(USER_ID));
+async function stateFromAuthUrl(db: TestDb["db"]): Promise<string> {
+  const url = new URL(await buildGoogleAuthUrl(db, USER_ID));
   const state = url.searchParams.get("state");
   if (!state) {
     throw new Error("kein state in der Auth-URL");
@@ -168,14 +168,14 @@ describe("Fehler-/Status-UI, Re-Auth & Journal (AP-4.3)", () => {
   });
 
   it("führt Re-Auth ohne zweite Verbindung durch, erhält Mappings und protokolliert connected", async () => {
-    const first = await handleGoogleCallback(testDb.db, "code-1", stateFromAuthUrl(), oauthFetch);
+    const first = await handleGoogleCallback(testDb.db, "code-1", await stateFromAuthUrl(testDb.db), oauthFetch);
     // Ein Zielkalender + Mapping an die Verbindung hängen — sie müssen die Re-Auth überleben.
     const target = await externalCalendarRepository.upsert(testDb.db, { connectionId: first.id, externalId: "cal-keep", name: "Bestandskalender", imported: true, readonly: false });
     const now = new Date().toISOString();
     const inserted = await testDb.db.insert(events).values({ title: "Bestand", startTime: "2026-07-01T10:00:00", endTime: "2026-07-01T11:00:00", isAllDay: false, origin: "google", readonly: false, createdAt: now, updatedAt: now });
     await eventMappingRepository.create(testDb.db, { connectionId: first.id, externalCalendarId: target.id, localEventId: insertId(inserted), externalId: "keep-me", origin: "google", direction: "both" });
 
-    const second = await handleGoogleCallback(testDb.db, "code-2", stateFromAuthUrl(), oauthFetch);
+    const second = await handleGoogleCallback(testDb.db, "code-2", await stateFromAuthUrl(testDb.db), oauthFetch);
     expect(second.id).toBe(first.id);
 
     const googleConnections = (await calendarConnectionRepository.listByUser(testDb.db, USER_ID)).filter((entry) => entry.provider === "google");

@@ -72,8 +72,8 @@ describe("Google OAuth (AP-2.1)", () => {
     await testDb?.close();
   });
 
-  it("buildGoogleAuthUrl trägt offline access, consent, Scope und einen gültigen State", () => {
-    const url = buildGoogleAuthUrl(1);
+  it("buildGoogleAuthUrl trägt offline access, consent, Scope und einen gültigen State", async () => {
+    const url = await buildGoogleAuthUrl(testDb.db, 1);
     expect(url).toContain("access_type=offline");
     expect(url).toContain("prompt=consent");
     expect(url).toContain("calendar");
@@ -85,7 +85,7 @@ describe("Google OAuth (AP-2.1)", () => {
   });
 
   it("Callback tauscht Code, legt Verbindung an und speichert das Refresh-Token verschlüsselt", async () => {
-    const state = extractState(buildGoogleAuthUrl(1));
+    const state = extractState(await buildGoogleAuthUrl(testDb.db, 1));
     const connection = await handleGoogleCallback(testDb.db, "auth-code-1", state, tokenFetch(200, { access_token: "at-1", refresh_token: "rt-secret-1", expires_in: 3600 }));
 
     expect(connection.provider).toBe("google");
@@ -106,7 +106,7 @@ describe("Google OAuth (AP-2.1)", () => {
   });
 
   it("erneuert ein abgelaufenes Access-Token per Refresh", async () => {
-    const state = extractState(buildGoogleAuthUrl(1));
+    const state = extractState(await buildGoogleAuthUrl(testDb.db, 1));
     await handleGoogleCallback(testDb.db, "c", state, tokenFetch(200, { access_token: "old", refresh_token: "rt", expires_in: -10 }));
     const connection = (await calendarConnectionRepository.listByUser(testDb.db, 1))[0];
 
@@ -115,7 +115,7 @@ describe("Google OAuth (AP-2.1)", () => {
   });
 
   it("setzt bei invalid_grant den Status auf reauth_required und meldet den Fehler", async () => {
-    const state = extractState(buildGoogleAuthUrl(1));
+    const state = extractState(await buildGoogleAuthUrl(testDb.db, 1));
     await handleGoogleCallback(testDb.db, "c", state, tokenFetch(200, { access_token: "old", refresh_token: "rt", expires_in: -10 }));
     const connection = (await calendarConnectionRepository.listByUser(testDb.db, 1))[0];
 
@@ -126,7 +126,7 @@ describe("Google OAuth (AP-2.1)", () => {
   });
 
   it("gibt ein noch gültiges Access-Token ohne Refresh zurück", async () => {
-    const state = extractState(buildGoogleAuthUrl(1));
+    const state = extractState(await buildGoogleAuthUrl(testDb.db, 1));
     await handleGoogleCallback(testDb.db, "c", state, tokenFetch(200, { access_token: "still-valid", refresh_token: "rt", expires_in: 3600 }));
     const connection = (await calendarConnectionRepository.listByUser(testDb.db, 1))[0];
     let called = false;
@@ -139,23 +139,23 @@ describe("Google OAuth (AP-2.1)", () => {
   });
 
   it("meldet einen fehlgeschlagenen Code-Tausch als Fehler", async () => {
-    const state = extractState(buildGoogleAuthUrl(1));
+    const state = extractState(await buildGoogleAuthUrl(testDb.db, 1));
     await expect(handleGoogleCallback(testDb.db, "bad", state, tokenFetch(400, { error: "invalid_request" }))).rejects.toMatchObject({ reason: "exchange" });
     expect(await calendarConnectionRepository.listByUser(testDb.db, 1)).toHaveLength(0);
   });
 
   it("meldet einen fehlgeschlagenen Refresh (nicht invalid_grant) als Fehler", async () => {
-    const state = extractState(buildGoogleAuthUrl(1));
+    const state = extractState(await buildGoogleAuthUrl(testDb.db, 1));
     await handleGoogleCallback(testDb.db, "c", state, tokenFetch(200, { access_token: "old", refresh_token: "rt", expires_in: -10 }));
     const connection = (await calendarConnectionRepository.listByUser(testDb.db, 1))[0];
     await expect(ensureGoogleAccessToken(testDb.db, connection.id, tokenFetch(500, { error: "server_error" }))).rejects.toMatchObject({ reason: "exchange" });
   });
 
-  it("verlangt konfigurierte Client-Credentials", () => {
+  it("verlangt konfigurierte Client-Credentials", async () => {
     const previous = config.googleClientId;
     config.googleClientId = null;
     try {
-      expect(() => buildGoogleAuthUrl(1)).toThrow(GoogleAuthError);
+      await expect(buildGoogleAuthUrl(testDb.db, 1)).rejects.toThrow(GoogleAuthError);
     } finally {
       config.googleClientId = previous;
     }

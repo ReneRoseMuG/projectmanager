@@ -187,6 +187,41 @@ export function getSettingDefinition(key: string): SettingDefinition | undefined
 
 export const settingDefinitions = Object.values(settingsRegistry) as SettingDefinition[];
 
+// --- Kalender-Synchronisation: zentrale Server-Konfiguration (MS-79, DB-gestützt) ---
+// Diese Konfiguration wird zentral in der Datenbank gehalten, damit sie nur einmal gepflegt werden
+// muss statt an jedem Arbeitsplatz in der .env. Das Google-Client-Secret wird serverseitig
+// verschlüsselt abgelegt (derselbe Cipher wie für die Kalender-Zugangsdaten) und NIE im Klartext
+// an den Client ausgeliefert — die View meldet nur, ob ein Secret hinterlegt ist.
+export const CALENDAR_SYNC_MIN_INTERVAL_MS = 60_000;
+export const CALENDAR_SYNC_DEFAULT_INTERVAL_MS = 15 * 60_000;
+
+export interface CalendarSyncConfigView {
+  googleClientId: string;
+  /** Maskiert: true, sobald ein Client-Secret hinterlegt ist (DB oder .env-Fallback). Nie der Klartext. */
+  googleClientSecretSet: boolean;
+  googleRedirectUri: string;
+  syncEnabled: boolean;
+  syncIntervalMs: number;
+  googlePushWebhookUrl: string;
+  /** Optimistic-Locking-Version der DB-Zeile; 0, solange noch keine gespeichert wurde. */
+  version: number;
+  /** true, wenn noch keine DB-Konfiguration existiert und die Werte aus der .env stammen. */
+  usingEnvFallback: boolean;
+  /** true, wenn CALENDAR_ENCRYPTION_KEY gesetzt ist; ohne ihn lässt sich kein Secret speichern. */
+  encryptionKeyConfigured: boolean;
+}
+
+export interface UpdateCalendarSyncConfigRequest {
+  googleClientId: string;
+  /** Weggelassen/null = Secret unverändert lassen; "" = Secret entfernen; nicht-leer = neu setzen. */
+  googleClientSecret?: string | null;
+  googleRedirectUri: string;
+  syncEnabled: boolean;
+  syncIntervalMs: number;
+  googlePushWebhookUrl: string;
+  expectedVersion: number;
+}
+
 export const DASHBOARD_CONTEXTS = ["global", "project", "milestone", "task", "home", "calendar", "dayPlan", "dayPlanCalendar"] as const;
 export const DASHBOARD_OWNER_TYPES = ["project", "milestone", "task", "dayPlan"] as const;
 export const DASHBOARD_WIDGET_IDS = [

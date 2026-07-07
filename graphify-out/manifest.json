@@ -50,8 +50,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/app.ts": {
-    "mtime": 1783391219.1034367,
-    "ast_hash": "cd7f407703c18c14dc056bd1901082ca",
+    "mtime": 1783396406.96876,
+    "ast_hash": "372321cd4fd8c93fa6a7a2c9ff9ed401",
     "semantic_hash": ""
   },
   "apps/api/src/config.ts": {
@@ -740,8 +740,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/App.tsx": {
-    "mtime": 1783391219.2049444,
-    "ast_hash": "35e777401b56742506a81322a4668935",
+    "mtime": 1783396855.7408545,
+    "ast_hash": "3911a05bfe8295561f1c2b1448893621",
     "semantic_hash": ""
   },
   "apps/web/src/api/admin-roles.ts": {
@@ -1095,8 +1095,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/layout/AdminSidebar.tsx": {
-    "mtime": 1783391219.2402356,
-    "ast_hash": "8662c7e498b8d6750c828d8beda522c6",
+    "mtime": 1783396859.6452763,
+    "ast_hash": "cde05993cc5c32fda443e96a12438897",
     "semantic_hash": ""
   },
   "apps/web/src/components/layout/ApiHealthPopover.tsx": {
@@ -2070,8 +2070,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/queries/invalidation.ts": {
-    "mtime": 1783391219.335949,
-    "ast_hash": "221056843651c3fafd1349dfc86e14b9",
+    "mtime": 1783396710.9463737,
+    "ast_hash": "27f594832218a068a0451b0fca77393c",
     "semantic_hash": ""
   },
   "apps/web/src/queries/queryClient.ts": {
@@ -2085,8 +2085,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/queries/queryKeys.ts": {
-    "mtime": 1783391219.335949,
-    "ast_hash": "87508230650808d5f301159d24edd68d",
+    "mtime": 1783396708.409908,
+    "ast_hash": "18d063cf58dc665c4215f27970742f58",
     "semantic_hash": ""
   },
   "apps/web/src/types.ts": {
@@ -2170,8 +2170,8 @@
     "semantic_hash": ""
   },
   "packages/shared-types/src/index.ts": {
-    "mtime": 1783391220.4208343,
-    "ast_hash": "fff2d19bf6a5471e23bf64adc2fb1722",
+    "mtime": 1783396147.4687278,
+    "ast_hash": "4529db6da09c11c50f93b1c0f94ced58",
     "semantic_hash": ""
   },
   "packages/shared-types/tsconfig.json": {
@@ -2365,8 +2365,8 @@
     "semantic_hash": ""
   },
   "tests/fixtures/api/app.ts": {
-    "mtime": 1783391220.4818766,
-    "ast_hash": "d8b5672c22000dba346d8254e92bbae6",
+    "mtime": 1783397647.9408238,
+    "ast_hash": "befc638efa5b34bdc1b3d51979049032",
     "semantic_hash": ""
   },
   "tests/fixtures/api/db.ts": {
@@ -3230,8 +3230,8 @@
     "semantic_hash": ""
   },
   "docs/design-leitfaden.md": {
-    "mtime": 1783391219.350856,
-    "ast_hash": "3b71599e29bf92a3e879b0d7037bd4d0",
+    "mtime": 1783393374.9542048,
+    "ast_hash": "5638ff090d52d4c9fdaac687176900b3",
     "semantic_hash": ""
   },
   "docs/skill-documentation/code-discipline.md": {
@@ -7015,8 +7015,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/routes/calendar-connections.ts": {
-    "mtime": 1783391219.144873,
-    "ast_hash": "aa9dd5f02302ec515219c7e1458a9e66",
+    "mtime": 1783396541.625504,
+    "ast_hash": "7a52913d9da3e7f00a888c19952c4e90",
     "semantic_hash": ""
   },
   "apps/api/src/services/caldav/caldav-client.ts": {
@@ -7060,8 +7060,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/pages/SettingsCalendarConnectionsPage.tsx": {
-    "mtime": 1783391219.3350186,
-    "ast_hash": "d7bb6b8fc5bbd57bffc98af6a7f6db35",
+    "mtime": 1783396914.4329648,
+    "ast_hash": "73ceb88af8707ed7a8ed1f8d85796120",
     "semantic_hash": ""
   },
   "apps/web/src/utils/richTextExport.ts": {
@@ -7185,8 +7185,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/calendar-scheduler.service.ts": {
-    "mtime": 1783391219.1637275,
-    "ast_hash": "5d84281c930aaac4e74b8ae1ea268415",
+    "mtime": 1783396330.3741064,
+    "ast_hash": "05caf3857097489f4c06940c5f55d219",
     "semantic_hash": ""
   },
   "apps/api/src/services/google/google-calendar.service.ts": {
@@ -7205,8 +7205,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/services/google/google-oauth.service.ts": {
-    "mtime": 1783391219.1739187,
-    "ast_hash": "0ba342d0e3628b5bc60425c8e37f8137",
+    "mtime": 1783396483.4523783,
+    "ast_hash": "24dc0e3c6952ab8a627cd66aebf3b22d",
     "semantic_hash": ""
   },
   "apps/api/src/services/google/google-push.service.ts": {
@@ -7215,8 +7215,8 @@
     "semantic_hash": ""
   },
   "tests/integration/api/calendar-journal.test.ts": {
-    "mtime": 1783391220.4985054,
-    "ast_hash": "74b6b2e55a5aec26482d556327c6e88c",
+    "mtime": 1783397356.1890442,
+    "ast_hash": "dd0b7b724af85f687c77fafc9710c245",
     "semantic_hash": ""
   },
   "tests/integration/api/calendar-scheduler.test.ts": {
@@ -7245,8 +7245,8 @@
     "semantic_hash": ""
   },
   "tests/integration/api/google-oauth.test.ts": {
-    "mtime": 1783391220.518379,
-    "ast_hash": "743eb5a143428a6c133579a87ba10b71",
+    "mtime": 1783397327.5054102,
+    "ast_hash": "1091dcb27099ebe70a6ceabd8c04c5ee",
     "semantic_hash": ""
   },
   "tests/integration/api/google-push.test.ts": {
@@ -7307,6 +7307,36 @@
   "logs/2026-07-07-04-53-09-fix-wiki-navigation-wiki-20.md": {
     "mtime": 1783392807.8029165,
     "ast_hash": "3471b0d53ad5f8e6a07299260e03cb5d",
+    "semantic_hash": ""
+  },
+  "apps/api/src/routes/calendar-settings.ts": {
+    "mtime": 1783396390.2515583,
+    "ast_hash": "b7fe90e404cdfde74aa35b2fcf4eba0e",
+    "semantic_hash": ""
+  },
+  "apps/api/src/services/calendar-config.service.ts": {
+    "mtime": 1783396260.746634,
+    "ast_hash": "9c497c2703596c2014e35f00ca340cfc",
+    "semantic_hash": ""
+  },
+  "apps/web/src/api/calendarSettings.ts": {
+    "mtime": 1783396701.9241457,
+    "ast_hash": "b23909549709952df76e7357a1c210a6",
+    "semantic_hash": ""
+  },
+  "apps/web/src/hooks/useCalendarSyncSettings.ts": {
+    "mtime": 1783396706.381435,
+    "ast_hash": "5706a7ad3a3da7ccd66f954bc0059ecd",
+    "semantic_hash": ""
+  },
+  "apps/web/src/pages/admin/CalendarSyncSettingsPage.tsx": {
+    "mtime": 1783396838.4216366,
+    "ast_hash": "901804b798cb34bb06a26004441da62d",
+    "semantic_hash": ""
+  },
+  "tests/integration/api/calendar-config.test.ts": {
+    "mtime": 1783397267.8050697,
+    "ast_hash": "cf860866ee9931c5d4ca602288099d46",
     "semantic_hash": ""
   }
 }

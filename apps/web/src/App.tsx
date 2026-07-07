@@ -34,6 +34,7 @@ import { TicketDetailPage } from "./pages/TicketDetailPage";
 import { TaskDetailPage } from "./pages/TaskDetailPage";
 import { UseCaseDetailPage } from "./pages/UseCaseDetailPage";
 import { WikiPage } from "./pages/WikiPage";
+import { CalendarSyncSettingsPage } from "./pages/admin/CalendarSyncSettingsPage";
 import { RolesPage } from "./pages/admin/RolesPage";
 import { UISettingsPage } from "./pages/admin/UISettingsPage";
 import { UsersPage } from "./pages/admin/UsersPage";
@@ -144,6 +145,7 @@ export default function App() {
       <Route path="/admin/users/:id" element={adminAccess ? <Navigate to="/admin/users" replace /> : <ForbiddenPage />} />
       <Route path="/admin/roles" element={adminAccess ? <AdminLayout><RolesPage /></AdminLayout> : <ForbiddenPage />} />
       <Route path="/admin/ui" element={adminAccess ? <AdminLayout><UISettingsPage /></AdminLayout> : <ForbiddenPage />} />
+      <Route path="/admin/calendar" element={adminAccess ? <AdminLayout><CalendarSyncSettingsPage /></AdminLayout> : <ForbiddenPage />} />
       <Route path="/admin/roles/new" element={adminAccess ? <Navigate to="/admin/roles" replace /> : <ForbiddenPage />} />
       <Route path="/admin/roles/:id" element={adminAccess ? <Navigate to="/admin/roles" replace /> : <ForbiddenPage />} />
       <Route path="/setup-password" element={<Navigate to="/" replace />} />
