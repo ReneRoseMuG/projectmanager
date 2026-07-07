@@ -65,7 +65,11 @@ function TagRow({ tag, onReload }: { tag: Tag; onReload: () => Promise<void> }) 
 
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_8rem_minmax(9rem,1fr)_7rem_auto] items-center gap-3 border-t border-line py-3 text-sm">
-      <span className="h-6 w-6 rounded-full border border-white shadow-sm" style={{ backgroundColor: editing ? color : tag.color }} />
+      {editing ? (
+        <ColorPicker value={color} onChange={setColor} />
+      ) : (
+        <span className="h-6 w-6 rounded-full border border-white shadow-sm" style={{ backgroundColor: tag.color }} />
+      )}
       {editing ? (
         <input className="h-9 min-w-0 rounded-md border border-line px-3 outline-none focus:border-magenta" value={name} onChange={(event) => setName(event.target.value)} />
       ) : (
