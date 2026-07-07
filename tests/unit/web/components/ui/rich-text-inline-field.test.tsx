@@ -829,6 +829,21 @@ describe("RichTextInlineField", () => {
     expect(navigateMock).toHaveBeenCalledWith("/wiki/99");
   });
 
+  it("T-EN5b bricht Wiki-Link-Navigation ab wenn onBeforeNavigate false liefert", async () => {
+    const onBeforeNavigate = vi.fn().mockResolvedValue(false);
+    renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} onBeforeNavigate={onBeforeNavigate} testIdPrefix="field" />);
+
+    const editorContainer = screen.getByTestId("field-editor");
+    const anchor = document.createElement("a");
+    anchor.href = "wiki://99";
+    editorContainer.appendChild(anchor);
+
+    fireEvent.click(anchor);
+
+    await waitFor(() => expect(onBeforeNavigate).toHaveBeenCalledTimes(1));
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
   it("T-27 setzt Flex-Fill-Klassen und scrollt nur den Editor-Inhalt wenn fill=true", () => {
     renderWithProviders(<RichTextInlineField value="<p>Text</p>" onChange={vi.fn()} fill testIdPrefix="field" />);
 

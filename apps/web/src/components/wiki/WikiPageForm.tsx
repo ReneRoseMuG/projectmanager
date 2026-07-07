@@ -17,6 +17,7 @@ import { JournalPanel } from "../journal/JournalPanel";
 import { NoteEditor } from "../notes/NoteEditor";
 import { NoteList } from "../notes/NoteList";
 import { objectReference } from "../../lib/references";
+import { hasVisibleHtmlContent } from "../../lib/html-utils";
 import { Button } from "../ui/Button";
 import { DetailHeaderActions } from "../ui/DetailHeaderActions";
 import { CommentThread } from "../ui/CommentThread";
@@ -97,15 +98,31 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
   const [resetCount, setResetCount] = useState(0);
   const formStateRef = useRef({ title, parentId, content, relatedPages });
   formStateRef.current = { title, parentId, content, relatedPages };
+  const effectiveEditable = editable ?? (inline ? false : true);
+  const autoSaveAbortedRef = useRef(false);
   // Tracks the page version the current editor content is based on. Used as expectedVersion
   // in autosave to ensure external changes are detected via 409 (TKT-129).
   const baseVersionRef = useRef<number>(page?.version ?? 0);
 
   const autoSave = useAutoSave({
-    enabled: !!page && !!onAutoSave,
+    enabled: !!page && !!onAutoSave && effectiveEditable,
     save: async () => {
       if (!onAutoSave) return;
+      autoSaveAbortedRef.current = false;
       const s = formStateRef.current;
+      if (page && hasVisibleHtmlContent(page.content) && !hasVisibleHtmlContent(s.content)) {
+        const approved = await confirm({
+          title: "Leere Wiki-Seite speichern?",
+          body: `Die Seite "${page.title}" hatte bereits Inhalt. Soll der leere Inhalt wirklich gespeichert werden?`,
+          severity: "warn",
+          confirmLabel: "Leer speichern",
+          cancelLabel: "Nicht speichern",
+        });
+        if (!approved) {
+          autoSaveAbortedRef.current = true;
+          return false;
+        }
+      }
       try {
         const result = await onAutoSave(
           { title: s.title, parentId: s.parentId, content: s.content },
@@ -138,7 +155,6 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
   const [activeTab, setActiveTab] = useState<WikiPageFormTab>("details");
   const [editingNote, setEditingNote] = useState<Note | null>(null);
-  const effectiveEditable = (!!page && !!onAutoSave) || (editable ?? (inline ? false : true));
   const parentPage = parentId !== null ? pages.find((item) => item.id === parentId) ?? parent ?? null : null;
   const parentPageSummary: WikiPageRelationSummary | null = parentPage
     ? { id: parentPage.id, title: parentPage.title, parentId: parentPage.parentId }
@@ -226,20 +242,28 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
   // Persist any pending auto-save before leaving the editor. The title only flushes
   // on blur, so navigation triggers a final flush. No discard prompt: with auto-save
   // there is nothing unsaved to guard against (TKT-95).
-  const flushPendingSave = async (): Promise<void> => {
+  const flushPendingSave = async (): Promise<boolean> => {
     if (page && onAutoSave && dirty) {
-      await autoSave.flush();
+      const saved = await autoSave.flush();
+      return saved || !autoSaveAbortedRef.current;
     }
+    return true;
   };
 
   const requestClose = async () => {
-    await flushPendingSave();
-    onClose();
+    const saved = await flushPendingSave();
+    if (saved) {
+      onClose();
+    }
   };
 
   const navigateToWikiPage = onNavigateToWikiPage
     ? (pageId: number) => {
-        void flushPendingSave().then(() => onNavigateToWikiPage(pageId));
+        void flushPendingSave().then((saved) => {
+          if (saved) {
+            onNavigateToWikiPage(pageId);
+          }
+        });
       }
     : undefined;
 
@@ -328,9 +352,17 @@ export function WikiPageForm({ open, page, parent, tree, projects, onSubmit, onA
             }
           />
         ) : null}
-        {embeddedActionPage && !effectiveEditable && onEdit ? (
+        {embeddedActionPage && ((!effectiveEditable && onEdit) || (effectiveEditable && onAutoSave)) ? (
           <div className="flex min-h-[40px] items-center justify-end gap-3 border-b border-line bg-shell px-5 py-2">
-            <DetailHeaderActions tone="onLight" onEdit={onEdit} />
+            {!effectiveEditable && onEdit ? (
+              <DetailHeaderActions tone="onLight" onEdit={onEdit} />
+            ) : (
+              <DetailHeaderActions
+                tone="onLight"
+                onClose={() => void requestClose()}
+                closeLabel="Bearbeitung schließen"
+              />
+            )}
           </div>
         ) : null}
         {conflictDetected ? (

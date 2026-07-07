@@ -302,6 +302,7 @@ export function WikiPage() {
                 <TaskListSkeleton />
               ) : wiki.page ? (
                 <WikiPageForm
+                  key={wiki.page.id}
                   inline
                   inlineChrome={standalone ? "standalone" : "embedded"}
                   open={true}
@@ -310,7 +311,7 @@ export function WikiPage() {
                   tree={wiki.tree}
                   projects={projects}
                   onSubmit={submitInlineForm}
-                  onAutoSave={wiki.page ? autoSaveInlineForm : undefined}
+                  onAutoSave={wiki.page && editing ? autoSaveInlineForm : undefined}
                   onReloadRequested={wiki.page ? handleReloadRequest : undefined}
                   onAutoSaveStatusChange={handleInlineSaveStatus}
                   onDelete={canWrite ? deletePage : undefined}

@@ -4,7 +4,7 @@ export type AutoSaveStatus = "idle" | "saving" | "saved" | "error";
 
 interface UseAutoSaveOptions {
   enabled: boolean;
-  save: () => Promise<void>;
+  save: () => Promise<boolean | void>;
 }
 
 interface UseAutoSaveResult {
@@ -57,13 +57,17 @@ export function useAutoSave({ enabled, save }: UseAutoSaveOptions): UseAutoSaveR
     }
     let ok = false;
     try {
-      await saveRef.current();
-      ok = true;
+      const result = await saveRef.current();
+      ok = result !== false;
       if (mountedRef.current) {
-        setStatus("saved");
-        savedTimerRef.current = setTimeout(() => {
-          if (mountedRef.current) setStatus("idle");
-        }, SAVED_RESET_MS);
+        if (ok) {
+          setStatus("saved");
+          savedTimerRef.current = setTimeout(() => {
+            if (mountedRef.current) setStatus("idle");
+          }, SAVED_RESET_MS);
+        } else {
+          setStatus("idle");
+        }
       }
     } catch (err) {
       ok = false;

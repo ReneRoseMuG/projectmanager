@@ -86,7 +86,7 @@ const homeItems: NavigationItem[] = [
 
 const documentationItems: NavigationItem[] = [
   { to: "/features", label: "Features", icon: BookOpen, resource: "features" },
-  { to: "/wiki", label: "Wiki", icon: Library, resource: "wiki" },
+  { to: "/wiki/20", label: "Wiki", icon: Library, resource: "wiki" },
   { to: "/documents", label: "Dokumente", icon: FolderArchive, resource: "attachments" },
 ];
 

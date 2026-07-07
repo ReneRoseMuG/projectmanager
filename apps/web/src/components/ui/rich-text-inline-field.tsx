@@ -112,7 +112,7 @@ interface RichTextInlineFieldProps {
    * Runs before a wiki link inside the content navigates away. Lets the host
    * complete a pending auto-save first; navigation proceeds only when it resolves true.
    */
-  onBeforeNavigate?: () => void | Promise<void>;
+  onBeforeNavigate?: () => boolean | void | Promise<boolean | void>;
 }
 
 interface RichTextInlineEditorProps {
@@ -131,7 +131,7 @@ interface RichTextInlineEditorProps {
   liveUpdate: boolean;
   editable?: boolean;
   exportTitle?: string;
-  onBeforeNavigate?: () => void | Promise<void>;
+  onBeforeNavigate?: () => boolean | void | Promise<boolean | void>;
   onLiveChange: (html: string) => void;
   onFocusStart: (html: string) => void;
   onCommit: (html: string) => void;
@@ -521,8 +521,13 @@ function RichTextInlineEditor({ value, valueFormat, originalValue, placeholder, 
     event.preventDefault();
     const target = standalone ? withStandaloneView(`/wiki/${wikiPageId}`) : `/wiki/${wikiPageId}`;
     if (onBeforeNavigate) {
-      // Persist any pending auto-save, then always navigate (no dirty guard, TKT-95).
-      void Promise.resolve(onBeforeNavigate()).then(() => navigate(target));
+      // Persist any pending auto-save before navigating. A false result means the
+      // host intentionally kept the user on the current page.
+      void Promise.resolve(onBeforeNavigate()).then((approved) => {
+        if (approved !== false) {
+          navigate(target);
+        }
+      });
       return;
     }
     navigate(target);

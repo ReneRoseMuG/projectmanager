@@ -253,6 +253,7 @@ Kein `rounded-2xl`.
 Container: `rounded-lg border border-l-[4px] border-line bg-white px-4 py-3.5 shadow-sm hover:shadow-panel`.  
 Linker farbiger Akzentrand als Status-Signal.  
 Beschreibung (Untertitel) standardmäßig einzeilig (`truncate`). Für inhaltsreiche Einträge (z. B. Kommentare) über `descriptionClassName` mehrzeilig erlaubt (`line-clamp-3` = max. drei Zeilen). Titel bleibt einzeilig (`truncate`).  
+Optionale Spalten (Pills/Labels) reservieren **keine feste Breite** (`w-*`), wenn sie leer sein können — stattdessen inhaltsbasiert mit Obergrenze (`max-w-*`), damit der Titel in schmalen Listen (z. B. Dokumente-Seite mit zwei Randpanels) nicht unnötig gekürzt wird. Feste Breite (`w-*`) nur für Spalten, die immer Inhalt haben und über Zeilen fluchten sollen (Meta, Aktionen).  
 Kein `rounded-xl`.
 
 ### 8.11 Modal

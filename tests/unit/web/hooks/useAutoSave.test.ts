@@ -179,6 +179,20 @@ describe("useAutoSave", () => {
     expect(result.current.status).toBe("error");
   });
 
+  it("flush() löst zu false auf und bleibt idle wenn save bewusst abbricht", async () => {
+    const save = vi.fn().mockResolvedValue(false);
+    const { result } = renderHook(() => useAutoSave({ enabled: true, save }));
+
+    let resolved: boolean | undefined;
+    await act(async () => {
+      resolved = await result.current.flush();
+    });
+
+    expect(resolved).toBe(false);
+    expect(result.current.status).toBe("idle");
+    expect(result.current.errorMessage).toBeNull();
+  });
+
   it("flush() löst sofort zu true auf wenn enabled=false (nichts zu speichern)", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() => useAutoSave({ enabled: false, save }));

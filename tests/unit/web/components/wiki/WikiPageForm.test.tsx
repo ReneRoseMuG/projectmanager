@@ -430,4 +430,56 @@ describe("WikiPageForm", () => {
     );
     expect(onAutoSave).toHaveBeenCalledTimes(2);
   });
+
+  it("fragt vor Autosave nach wenn eine zuvor gefüllte Wiki-Seite leer gespeichert würde", async () => {
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(
+      <WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />,
+    );
+
+    fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: "<p></p>" } });
+
+    expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByText("Leere Wiki-Seite speichern?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Nicht speichern" }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(onAutoSave).not.toHaveBeenCalled();
+  });
+
+  it("speichert eine leere zuvor gefüllte Wiki-Seite erst nach Bestätigung", async () => {
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(
+      <WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />,
+    );
+
+    fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: "<p></p>" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Leer speichern" }));
+
+    await waitFor(() =>
+      expect(onAutoSave).toHaveBeenCalledWith(
+        expect.objectContaining({ content: "<p></p>" }),
+        expect.any(Array),
+        wikiPage.version,
+      ),
+    );
+  });
+
+  it("behandelt reine Medieninhalte nicht als leere Seite", async () => {
+    const onAutoSave = vi.fn().mockResolvedValue(undefined);
+    renderWithProviders(
+      <WikiPageForm open page={wikiPage} tree={[]} projects={[]} onSubmit={vi.fn()} onAutoSave={onAutoSave} onClose={vi.fn()} />,
+    );
+
+    fireEvent.change(screen.getByTestId("wiki-page-form-content-view"), { target: { value: '<img src="/content/image.png">' } });
+
+    await waitFor(() =>
+      expect(onAutoSave).toHaveBeenCalledWith(
+        expect.objectContaining({ content: '<img src="/content/image.png">' }),
+        expect.any(Array),
+        wikiPage.version,
+      ),
+    );
+    expect(screen.queryByText("Leere Wiki-Seite speichern?")).not.toBeInTheDocument();
+  });
 });

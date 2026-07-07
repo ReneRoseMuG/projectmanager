@@ -7,6 +7,10 @@ export function hasVisibleHtmlContent(value: string | null | undefined): boolean
     return false;
   }
 
+  if (/<(?:img|video|audio|iframe|canvas|svg)\b/i.test(value) || /<div\b[^>]*\bdata-tldraw\b/i.test(value)) {
+    return true;
+  }
+
   const normalized = value
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")

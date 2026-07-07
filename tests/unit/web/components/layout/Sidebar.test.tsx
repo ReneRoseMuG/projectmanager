@@ -183,8 +183,10 @@ describe("Sidebar", () => {
     const featuresLink = screen.getByText("Features").closest("a");
     const featuresTabButton = screen.getByTitle("Features in neuem Tab öffnen");
     const projectsLink = screen.getByText("Projekte").closest("a");
+    const wikiLink = screen.getByTitle("Wiki");
 
     expect(featuresLink).toHaveClass("sidebar-edge-nav-row");
+    expect(wikiLink).toHaveAttribute("href", "/wiki/20");
     expect(projectsLink).toHaveClass(
       "sidebar-edge-nav-row",
       "sidebar-edge-nav-row-active",
@@ -218,6 +220,17 @@ describe("Sidebar", () => {
 
     expect(window.open).toHaveBeenCalledWith(
       "/?standalone=1",
+      "_blank",
+    );
+  });
+
+  it("öffnet Wiki-20 in einem neuen Standalone-Tab", () => {
+    renderSidebar(readerUser);
+
+    fireEvent.click(screen.getByTitle("Wiki in neuem Tab öffnen"));
+
+    expect(window.open).toHaveBeenCalledWith(
+      "/wiki/20?standalone=1",
       "_blank",
     );
   });

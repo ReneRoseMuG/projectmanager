@@ -122,12 +122,17 @@ export function useWiki(pageId?: number) {
     [queryClient]
   );
 
+  const activePage = validPageId !== undefined && pageQuery.data?.id === validPageId
+    ? pageQuery.data
+    : null;
+
   return {
     tree: treeQuery.data ?? [],
-    // In der Listenansicht (keine pageId) nie eine – via keepPreviousData gehaltene – Seite durchreichen.
-    page: validPageId !== undefined ? pageQuery.data ?? null : null,
+    // In der Listenansicht oder während eines Seitenwechsels nie eine via keepPreviousData
+    // gehaltene fremde Seite durchreichen.
+    page: activePage,
     loading: treeQuery.isLoading,
-    pageLoading: validPageId !== undefined && pageQuery.isLoading,
+    pageLoading: validPageId !== undefined && (pageQuery.isLoading || pageQuery.isPlaceholderData),
     error: toQueryError(treeQuery.error ?? pageQuery.error),
     reload,
     createWikiPage,

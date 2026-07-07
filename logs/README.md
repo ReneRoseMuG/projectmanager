@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 07.07.26 | 04:53:09 | Fix | Wiki Navigation WIKI-20 | ✅ |
+| 07.07.26 | 04:49:06 | Fix | Wiki Autosave Navigation | ✅ |
 | 07.07.26 | 04:22:24 | Feature | DMS in CalendarSync integriert | ⚠️ |
 | 05.07.26 | 11:46:46 | Fix | Dokument-Manager Meta und Preview | ✅ |
 | 05.07.26 | 10:31:47 | Fix | Flex-Fill Test-Assertions | ✅ |

@@ -718,7 +718,7 @@ export function DocumentsPage() {
                     }
                     meta={<DocumentMeta document={document} />}
                     metaClassName="w-32"
-                    pillsClassName="w-44 justify-start"
+                    pillsClassName="max-w-[11rem] justify-start"
                     actionsClassName="w-16"
                     actions={
                       <div className="flex items-center gap-1">

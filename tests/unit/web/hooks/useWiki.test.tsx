@@ -19,15 +19,19 @@
  * - Navigationsbaum und Seiteninhalt werden über getrennte Abfragen geladen.
  * - Ein Seitenwechsel lädt den Baum nicht erneut (seitenübergreifender Baum-Cache).
  * - Ohne pageId wird nur der Baum geladen.
+ * - Während eines Seitenwechsels darf keepPreviousData keine fremde Wiki-Seite an die Route durchreichen.
+ *
+ * Fehlerfälle:
+ * - Alte WIKI-16-Daten dürfen beim Wechsel auf WIKI-202 nicht als aktive WIKI-202-Seite erscheinen.
  *
  * Ziel:
- * Die Query-Trennung absichern, die den wiederholten Baum-Neuaufbau bei jedem Seitenaufruf beseitigt.
+ * Die Query-Trennung und den Wiki-Hook gegen Content-Verschleppung bei Detailseiten-Navigation absichern.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@testing-library/jest-dom/vitest";
 import { screen, waitFor } from "@testing-library/dom";
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import type { WikiPage, WikiTreeNode } from "@taskmanager/shared-types";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -65,6 +69,7 @@ const alpha: WikiPage = {
 };
 
 const beta: WikiPage = { ...alpha, id: 11, title: "Beta", content: "<p>B</p>" };
+const wiki202: WikiPage = { ...alpha, id: 202, title: "Detail", content: "<p>Detail</p>" };
 
 const tree: WikiTreeNode[] = [
   { ...alpha, children: [] },
@@ -89,6 +94,14 @@ function Harness({ pageId }: { pageId?: number }) {
       <span data-testid="page-title">{page?.title ?? "—"}</span>
     </div>
   );
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
 }
 
 afterEach(() => {
@@ -149,5 +162,39 @@ describe("useWiki", () => {
 
     await waitFor(() => expect(screen.getByTestId("tree-count")).toHaveTextContent("2"));
     expect(getWikiPageMock).not.toHaveBeenCalled();
+  });
+
+  it("gibt beim Seitenwechsel keine vorherige Detailseite als aktive Seite aus", async () => {
+    const detailRequest = createDeferred<WikiPage>();
+    getWikiTreeMock.mockResolvedValue(tree);
+    getWikiPageMock.mockImplementation((id: number) => {
+      if (id === 202) {
+        return detailRequest.promise;
+      }
+      return Promise.resolve(alpha);
+    });
+
+    const client = newClient();
+    const { rerender } = render(
+      <Provider client={client}>
+        <Harness pageId={10} />
+      </Provider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("page-title")).toHaveTextContent("Alpha"));
+
+    rerender(
+      <Provider client={client}>
+        <Harness pageId={202} />
+      </Provider>,
+    );
+
+    expect(screen.getByTestId("page-title")).toHaveTextContent("—");
+    expect(screen.getByTestId("page-loading")).toHaveTextContent("true");
+
+    await act(async () => {
+      detailRequest.resolve(wiki202);
+    });
+
+    await waitFor(() => expect(screen.getByTestId("page-title")).toHaveTextContent("Detail"));
   });
 });
