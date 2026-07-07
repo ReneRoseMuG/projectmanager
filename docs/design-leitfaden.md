@@ -480,6 +480,18 @@ Seiten mit einer Steuerspalte und/oder einem Detailbereich neben einer scrollend
 
 **Verboten:** Detailinhalte als Modal-Overlay, wenn ein seiten-internes Panel vorgesehen ist; ein Panel ohne Collapse-Toggle oder ohne Zustands-Persistenz; Sticky-Panels als Flex-/Grid-Items ohne `self-start` (verhindert das Kleben).
 
+### 8.26 DMS-Kachelansicht (DocumentTile / DocumentViewer)
+
+Die Dokumente-Bibliothek zeigt Dateien als **Kachel-Grid** statt als Liste — `DocumentTile` (`apps/web/src/components/attachments/DocumentTile.tsx`) im CSS-Grid `repeat(auto-fill, minmax(<size>, 1fr))`. Links bleibt die Verwaltungs-Navigation als `DocumentSidePanel` (§8.25); die früher rechte Detailspalte entfällt zugunsten einer Großansicht per Doppelklick.
+
+- **Kachel:** quadratischer Thumbnail-Bereich (`aspect-square`) — bei Bildern das Asset (`object-cover`, `loading="lazy"`), sonst das Typ-Icon aus `describeAttachmentType` mit Kürzel-Badge — darunter der Dateiname. Auswahl-Checkbox oben links (bei Hover/Auswahl sichtbar), Löschen bei Hover. Radii/Schatten/Selektion nach §5/§6/§10.4 (`rounded-lg`, `shadow-sm`/`shadow-panel`, Auswahl `ring-2 ring-steel-300`).
+- **Kachelgröße:** S/M/L über einen Segmented-Wähler in der Toolbar; steuert die minimale Spaltenbreite, persistent in `localStorage` (`ui.documents.thumbnailSize`).
+- **Interaktion:** Einfachklick togglet die Mehrfachauswahl, Doppelklick öffnet die Großansicht.
+- **Zuweisung über die Navigation:** bei aktiver Auswahl weist ein Klick auf einen Sammlungs-/Kategorie-Eintrag der linken Navigation die Markierten zu (Doppelmodus — sonst filtert der Klick); Zip-Download und Auswahl-Aufheben über eine Auswahl-Leiste über dem Grid.
+- **Endungsfilter:** ein Toolbar-Dropdown grenzt die **sichtbaren** Kacheln clientseitig auf eine Dateiendung ein; die Optionen ergeben sich aus den geladenen Dokumenten.
+
+**Großansicht (`DocumentViewer`):** Der Doppelklick öffnet die Datei in voller Größe als Overlay (Vorschau über `DocumentPreviewBody`) samt Metadaten- und Label-Pflege — die Vollansicht **einer Datei** ist bewusst ein Overlay, nicht das seiten-interne Detailpanel aus §8.25. Schließen per Schaltfläche, Escape oder Backdrop-Klick.
+
 ---
 
 ## 9. Navigations-Sidebar
