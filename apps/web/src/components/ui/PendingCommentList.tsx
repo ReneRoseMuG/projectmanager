@@ -88,7 +88,7 @@ export function PendingCommentList({ comments, onAdd, onUpdate, onRemove }: Pend
             body={
               <RichTextInlineField
                 value={richTextToHtml(comment.text)}
-                valueFormat={commentValueFormat(comment.text)}
+                valueFormat={commentValueFormat()}
                 readOnly
                 testIdPrefix={`pending-comment-${comment.index}-body`}
                 onChange={() => undefined}

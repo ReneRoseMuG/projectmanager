@@ -969,21 +969,6 @@ export function TaskForm({
   );
 }
 
-function removeDraftByKindIndex<TItem extends { kind: "new" | "existing" }>(
-  items: TItem[],
-  kind: TItem["kind"],
-  removeIndex: number,
-): TItem[] {
-  let currentIndex = -1;
-  return items.filter((item) => {
-    if (item.kind !== kind) {
-      return true;
-    }
-    currentIndex += 1;
-    return currentIndex !== removeIndex;
-  });
-}
-
 export function TaskDraftDialog({
   open,
   onCreate,

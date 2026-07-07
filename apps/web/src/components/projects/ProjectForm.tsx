@@ -23,7 +23,6 @@ import {
   Inbox,
   ListChecks,
   ListTodo,
-  Trash2,
   Users,
 } from "lucide-react";
 import type { FormEvent } from "react";
@@ -242,7 +241,6 @@ export function ProjectForm({
   const [color, setColor] = useState("var(--color-steel-700)");
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
@@ -401,14 +399,9 @@ export function ProjectForm({
     if (!project || !onDelete) {
       return;
     }
-    setDeleting(true);
-    try {
-      const deleted = await onDelete(project);
-      if (deleted) {
-        onClose();
-      }
-    } finally {
-      setDeleting(false);
+    const deleted = await onDelete(project);
+    if (deleted) {
+      onClose();
     }
   };
 

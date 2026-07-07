@@ -11,7 +11,7 @@ import type {
   UseCase,
   UseCaseInput,
 } from "@taskmanager/shared-types";
-import { BookOpen, Bug, Layers3, ListChecks, ListTodo, Trash2, Users } from "lucide-react";
+import { BookOpen, Bug, Layers3, ListChecks, ListTodo, Users } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAutoSave } from "../../hooks/useAutoSave";
@@ -179,7 +179,6 @@ export function UseCaseForm({
   const [selectedFeatureId, setSelectedFeatureId] = useState<number | "">("");
   const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
   const [pendingTickets, setPendingTickets] = useState<DraftTicket[]>([]);
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
@@ -302,14 +301,9 @@ export function UseCaseForm({
       return;
     }
 
-    setDeleting(true);
-    try {
-      const deleted = await onDelete(useCase);
-      if (deleted) {
-        onClose();
-      }
-    } finally {
-      setDeleting(false);
+    const deleted = await onDelete(useCase);
+    if (deleted) {
+      onClose();
     }
   };
 

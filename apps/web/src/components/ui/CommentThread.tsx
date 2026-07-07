@@ -41,7 +41,7 @@ function CommentCard({
   onEdit: (comment: Comment) => void;
   onDelete: (id: number) => Promise<void>;
 }) {
-  const valueFormat = commentValueFormat(comment.body);
+  const valueFormat = commentValueFormat();
   const body = richTextToHtml(comment.body);
 
   return (

@@ -81,7 +81,7 @@ function normalizeWhitespace(value: string): string {
 }
 
 function escapeMarkdown(value: string): string {
-  return value.replace(/([\\`*_{}\[\]()#+\-.!|>])/g, "\\$1");
+  return value.replace(/([\\`*_{}[\]()#+\-.!|>])/g, "\\$1");
 }
 
 function inlineMarkdown(node: Node): string {

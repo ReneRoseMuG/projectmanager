@@ -11,7 +11,7 @@ export function commentTextFromHtml(value: string) {
   return richTextToPlainText(value);
 }
 
-export function commentValueFormat(_value: string): RichTextValueFormat {
+export function commentValueFormat(): RichTextValueFormat {
   return "html";
 }
 

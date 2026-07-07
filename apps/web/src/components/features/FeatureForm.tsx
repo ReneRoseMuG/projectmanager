@@ -19,7 +19,6 @@ import {
   FolderKanban,
   ListChecks,
   ListTodo,
-  Trash2,
   Users,
 } from "lucide-react";
 import type { FormEvent } from "react";
@@ -254,7 +253,6 @@ export function FeatureForm({
   const [responsibleUserId, setResponsibleUserId] = useState<number | null>(null);
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [useCaseViewMode, setUseCaseViewMode] = useState<ViewMode>("kanban");
   const [pendingUseCases, setPendingUseCases] = useState<DraftUseCase[]>([]);
   const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
@@ -385,14 +383,9 @@ export function FeatureForm({
     if (!feature || !onDelete) {
       return;
     }
-    setDeleting(true);
-    try {
-      const deleted = await onDelete(feature);
-      if (deleted) {
-        onClose();
-      }
-    } finally {
-      setDeleting(false);
+    const deleted = await onDelete(feature);
+    if (deleted) {
+      onClose();
     }
   };
 

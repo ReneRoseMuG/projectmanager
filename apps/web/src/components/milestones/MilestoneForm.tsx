@@ -15,7 +15,6 @@ import {
   FolderKanban,
   Link2,
   ListChecks,
-  Trash2,
   Users,
 } from "lucide-react";
 import type { FormEvent } from "react";
@@ -67,7 +66,6 @@ import { CatalogSelect } from "../ui/CatalogSelect";
 import { RichTextInlineField } from "../ui/rich-text-inline-field";
 import { Section } from "../ui/Section";
 import { Select } from "../ui/Select";
-import { TaskListSkeleton } from "../ui/Skeleton";
 import { TabBar, type Tab } from "../ui/TabBar";
 import { useToast } from "../ui/ToastProvider";
 import { UserSelectField } from "../users/UserSelectField";
@@ -194,7 +192,6 @@ export function MilestoneForm({
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [isCreatingNote, setIsCreatingNote] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [pendingTasks, setPendingTasks] = useState<DraftTask[]>([]);
   const [pendingTickets, setPendingTickets] = useState<DraftTicket[]>([]);
   const [pendingComments, setPendingComments] = useState<DraftComment[]>([]);
@@ -234,7 +231,6 @@ export function MilestoneForm({
   });
   const af = milestone ? autoSave.flush : undefined;
 
-  const returnTo = `${location.pathname}${location.search}`;
   const projectOptions = projects.map((project) => ({
     value: project.id,
     label: project.name,
@@ -350,14 +346,9 @@ export function MilestoneForm({
     if (!milestone || !onDelete) {
       return;
     }
-    setDeleting(true);
-    try {
-      const deleted = await onDelete(milestone);
-      if (deleted) {
-        onClose();
-      }
-    } finally {
-      setDeleting(false);
+    const deleted = await onDelete(milestone);
+    if (deleted) {
+      onClose();
     }
   };
 
