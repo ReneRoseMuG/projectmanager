@@ -2,10 +2,10 @@ import type {
   Attachment,
   AttachmentCategory,
   AttachmentFolder,
-  Tag,
 } from "@taskmanager/shared-types";
 import {
   Check,
+  Download,
   FileText,
   FolderArchive,
   Inbox,
@@ -14,29 +14,20 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-} from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
-import { describeAttachmentType } from "../components/attachments/attachmentTypes";
-import { DocumentBulkPanel } from "../components/attachments/DocumentBulkPanel";
-import { DocumentCard, documentTitle } from "../components/attachments/DocumentCard";
+import { DocumentTile, documentTitle } from "../components/attachments/DocumentTile";
+import { DocumentViewer } from "../components/attachments/DocumentViewer";
 import {
-  clampDetailWidth,
-  initialDetailWidth,
-  MIN_DETAIL_WIDTH,
-  NON_IMAGE_MAX_WIDTH,
-} from "../components/attachments/documentPreviewWidth";
-import { DocumentPreviewBody } from "../components/attachments/DocumentPreviewBody";
+  THUMBNAIL_SIZES,
+  loadThumbnailSize,
+  saveThumbnailSize,
+  thumbnailMinPx,
+  type ThumbnailSize,
+} from "../components/attachments/documentThumbnailSize";
 import { DocumentSidePanel } from "../components/attachments/DocumentSidePanel";
 import { EmptyState } from "../components/ui/EmptyState";
 import { LoadMoreIndicator } from "../components/ui/LoadMoreIndicator";
-import { TagPicker } from "../components/tags/TagPicker";
 import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { useToast } from "../components/ui/ToastProvider";
 import {
@@ -49,15 +40,6 @@ import { useHasPermission } from "../hooks/usePermissions";
 import { useTags } from "../hooks/useTags";
 import { toQueryError } from "../queries/queryErrors";
 import type { DocumentLibraryFilter } from "../api/documents";
-import { assetUrl } from "../api/client";
-
-// Detail-Panel-Breite (MS-75): Pre-Render-Kalkulation beim Öffnen eines Dokuments. Die
-// Breite ergibt sich aus der verfügbaren Zeilenbreite minus Mindestbreite der Dateiliste,
-// gedeckelt auf die Breite des Dokuments (Bild: naturalWidth). Der linke Panelrand ist
-// zusätzlich per Maus ziehbar. Konstanten und Startbreiten-Logik: documentPreviewWidth.
-const MIN_CARD_WIDTH = 380;
-const ROW_GAP = 24;
-const PANEL_CHROME = 28;
 
 export function DocumentsPage() {
   const canWrite = useHasPermission("attachments", "write");
@@ -72,8 +54,11 @@ export function DocumentsPage() {
   const [tagFilter, setTagFilter] = useState<number | "">("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [search, setSearch] = useState<string>("");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [openedId, setOpenedId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [thumbnailSize, setThumbnailSize] = useState<ThumbnailSize>(() =>
+    loadThumbnailSize(),
+  );
   const [newFolderName, setNewFolderName] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
@@ -114,10 +99,8 @@ export function DocumentsPage() {
     uploadDocument,
     deleteDocument,
     setTags,
-    assignCategory,
-    removeCategory,
     updateMetadata,
-    addToFolder,
+    removeCategory,
     removeFromFolder,
     addToFolderBulk,
     assignCategoryBulk,
@@ -148,95 +131,124 @@ export function DocumentsPage() {
     [showToast],
   );
 
-  const selected =
-    documents.find((document) => document.id === selectedId) ?? null;
+  const opened = documents.find((doc) => doc.id === openedId) ?? null;
   const uploadFolder =
     typeof folderScope === "number" ? folderScope : undefined;
 
-  // Aktuelle Dokumentliste als Ref, damit die Breiten-Kalkulation nur beim Öffnen eines
-  // (anderen) Dokuments läuft – nicht bei jedem progressiven Nachladen.
-  const documentsRef = useRef(documents);
-  documentsRef.current = documents;
-  const rowRef = useRef<HTMLDivElement>(null);
-  const leftPanelRef = useRef<HTMLElement>(null);
-  const manualResizeRef = useRef(false);
-  const [detailWidth, setDetailWidth] = useState<number | null>(null);
+  const selectionActive = selectedIds.size > 0;
 
-  const getMaxDetailWidth = useCallback(() => {
-    const row = rowRef.current;
-    if (!row) {
-      return NON_IMAGE_MAX_WIDTH;
-    }
-    const leftWidth = leftPanelRef.current?.offsetWidth ?? 280;
-    const available = row.clientWidth - leftWidth - 2 * ROW_GAP;
-    return Math.max(MIN_DETAIL_WIDTH, available - MIN_CARD_WIDTH);
-  }, []);
+  const changeThumbnailSize = (size: ThumbnailSize) => {
+    setThumbnailSize(size);
+    saveThumbnailSize(size);
+  };
 
-  // Pre-Render-Kalkulation: beim Öffnen die ideale Panelbreite bestimmen (initialDetailWidth).
-  // Bilder werden zusätzlich kurz vorgeladen, um die natürliche Breite zu kennen; bis dahin
-  // gilt die von initialDetailWidth gelieferte Startbreite.
-  useEffect(() => {
-    if (selectedId == null) {
-      return;
-    }
-    const doc = documentsRef.current.find((entry) => entry.id === selectedId);
-    if (!doc) {
-      return;
-    }
-    manualResizeRef.current = false;
-    const max = getMaxDetailWidth();
-    setDetailWidth(initialDetailWidth(doc, max));
-    if (describeAttachmentType(doc).family === "image") {
-      const probe = new Image();
-      probe.onload = () => {
-        if (manualResizeRef.current) {
-          return;
-        }
-        const docWidth = probe.naturalWidth
-          ? probe.naturalWidth + PANEL_CHROME
-          : max;
-        setDetailWidth(clampDetailWidth(docWidth, max));
-      };
-      probe.src = assetUrl(doc.url);
-    }
-  }, [selectedId, getMaxDetailWidth]);
-
-  // Fensterbreite verändert die verfügbare Breite → aktuelle Breite nachklemmen.
-  useEffect(() => {
-    function handleWindowResize() {
-      setDetailWidth((current) =>
-        current == null
-          ? current
-          : clampDetailWidth(current, getMaxDetailWidth()),
-      );
-    }
-    window.addEventListener("resize", handleWindowResize);
-    return () => window.removeEventListener("resize", handleWindowResize);
-  }, [getMaxDetailWidth]);
-
-  const handleDetailResizeStart = useCallback(
-    (event: ReactMouseEvent) => {
-      event.preventDefault();
-      const startX = event.clientX;
-      const max = getMaxDetailWidth();
-      const startWidth = detailWidth ?? max;
-      manualResizeRef.current = true;
-      document.body.style.userSelect = "none";
-      function onMove(moveEvent: MouseEvent) {
-        setDetailWidth(
-          clampDetailWidth(startWidth + (startX - moveEvent.clientX), max),
-        );
+  const removeFromSelection = (id: number) => {
+    setSelectedIds((current) => {
+      if (!current.has(id)) {
+        return current;
       }
-      function onUp() {
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("mouseup", onUp);
-        document.body.style.userSelect = "";
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
       }
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
-    },
-    [detailWidth, getMaxDetailWidth],
-  );
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleDeleteDocument = (doc: Attachment) => {
+    if (
+      window.confirm(`Dokument „${documentTitle(doc)}" endgültig löschen?`)
+    ) {
+      void run(() => deleteDocument(doc.id), "Dokument gelöscht");
+      if (openedId === doc.id) {
+        setOpenedId(null);
+      }
+      removeFromSelection(doc.id);
+    }
+  };
+
+  // Nach einer erfolgreichen Bulk-Operation nachfragen, ob weitere Aktionen auf derselben
+  // Auswahl folgen. Bei „Nein" wird die (in gefilterten Ansichten sonst verwaiste) Auswahl
+  // vollständig aufgehoben — sie zeigt sonst auf Dokumente, die aus der Liste gefallen sind.
+  const promptContinueOrClear = async () => {
+    const keepSelection = await confirm({
+      title: "Weitere Bulk-Operation?",
+      body: `${selectedIds.size} ${
+        selectedIds.size === 1 ? "Dokument bleibt" : "Dokumente bleiben"
+      } ausgewählt. Möchtest du eine weitere Bulk-Operation ausführen?`,
+      confirmLabel: "Ausgewählt lassen",
+      cancelLabel: "Auswahl aufheben",
+    });
+    if (!keepSelection) {
+      clearSelection();
+    }
+  };
+
+  const handleBulkAssignFolder = async (folderId: number) => {
+    const ok = await run(
+      () => addToFolderBulk(folderId, [...selectedIds]),
+      "Auswahl in Sammlung einsortiert",
+    );
+    if (ok) {
+      await promptContinueOrClear();
+    }
+  };
+
+  const handleBulkAssignCategory = async (categoryId: number) => {
+    const ok = await run(
+      () => assignCategoryBulk(categoryId, [...selectedIds]),
+      "Kategorie zugewiesen",
+    );
+    if (ok) {
+      await promptContinueOrClear();
+    }
+  };
+
+  const handleBulkDownload = async () => {
+    const ids = [...selectedIds];
+    const ok = await run(async () => {
+      const blob = await downloadZip(ids);
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = "dokumente.zip";
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+    if (ok) {
+      await promptContinueOrClear();
+    }
+  };
+
+  // Navigation im Doppelmodus: ohne Auswahl filtert ein Klick, mit aktiver Auswahl sortiert er
+  // die markierten Dokumente in die Sammlung ein bzw. weist die Kategorie zu.
+  const handleNavFolderClick = (folderId: number) => {
+    if (selectionActive) {
+      void handleBulkAssignFolder(folderId);
+    } else {
+      setFolderScope(folderId);
+    }
+  };
+
+  const handleNavCategoryClick = (categoryId: number) => {
+    if (selectionActive) {
+      void handleBulkAssignCategory(categoryId);
+    } else {
+      setCategoryFilter((current) => (current === categoryId ? "" : categoryId));
+    }
+  };
 
   const startEdit = (
     id: number,
@@ -314,100 +326,6 @@ export function DocumentsPage() {
     }
   };
 
-  const selectionActive = selectedIds.size > 0;
-
-  const removeFromSelection = (id: number) => {
-    setSelectedIds((current) => {
-      if (!current.has(id)) {
-        return current;
-      }
-      const next = new Set(current);
-      next.delete(id);
-      return next;
-    });
-  };
-
-  const toggleSelect = (id: number) => {
-    // Mehrfachauswahl und Einzel-Vorschau schließen sich gegenseitig aus.
-    setSelectedId(null);
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const clearSelection = () => setSelectedIds(new Set());
-
-  const handleDeleteDocument = (document: Attachment) => {
-    if (
-      window.confirm(`Dokument „${documentTitle(document)}" endgültig löschen?`)
-    ) {
-      void run(() => deleteDocument(document.id), "Dokument gelöscht");
-      if (selectedId === document.id) {
-        setSelectedId(null);
-      }
-      removeFromSelection(document.id);
-    }
-  };
-
-  // Nach einer erfolgreichen Bulk-Operation nachfragen, ob weitere Aktionen auf derselben
-  // Auswahl folgen. Bei „Nein" wird die (in gefilterten Ansichten sonst verwaiste) Auswahl
-  // vollständig aufgehoben — sie zeigt sonst auf Dokumente, die aus der Liste gefallen sind.
-  const promptContinueOrClear = async () => {
-    const keepSelection = await confirm({
-      title: "Weitere Bulk-Operation?",
-      body: `${selectedIds.size} ${
-        selectedIds.size === 1 ? "Dokument bleibt" : "Dokumente bleiben"
-      } ausgewählt. Möchtest du eine weitere Bulk-Operation ausführen?`,
-      confirmLabel: "Ausgewählt lassen",
-      cancelLabel: "Auswahl aufheben",
-    });
-    if (!keepSelection) {
-      clearSelection();
-    }
-  };
-
-  const handleBulkAssignFolder = async (folderId: number) => {
-    const ok = await run(
-      () => addToFolderBulk(folderId, [...selectedIds]),
-      "Auswahl in Sammlung einsortiert",
-    );
-    if (ok) {
-      await promptContinueOrClear();
-    }
-  };
-
-  const handleBulkAssignCategory = async (categoryId: number) => {
-    const ok = await run(
-      () => assignCategoryBulk(categoryId, [...selectedIds]),
-      "Kategorie zugewiesen",
-    );
-    if (ok) {
-      await promptContinueOrClear();
-    }
-  };
-
-  const handleBulkDownload = async () => {
-    const ids = [...selectedIds];
-    const ok = await run(async () => {
-      const blob = await downloadZip(ids);
-      const url = URL.createObjectURL(blob);
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = "dokumente.zip";
-      link.click();
-      URL.revokeObjectURL(url);
-    });
-    if (ok) {
-      await promptContinueOrClear();
-    }
-  };
-
   const scopeButton = (
     scope: number | "unsorted" | "all",
     label: string,
@@ -472,15 +390,21 @@ export function DocumentsPage() {
         </p>
       </header>
 
-      <div ref={rowRef} className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Verwaltung: Sammlungen & Kategorien */}
         <DocumentSidePanel
-          ref={leftPanelRef}
           side="left"
           title="Verwaltung"
           storageKey="ui.documents.folders.collapsed"
           railIcon={FolderArchive}
         >
+          {selectionActive ? (
+            <div className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-xs text-white/80">
+              {selectedIds.size} ausgewählt — auf eine Sammlung oder Kategorie
+              klicken, um sie zuzuweisen.
+            </div>
+          ) : null}
+
           <div className="flex flex-col gap-1 rounded-lg border border-white/10 bg-white/[0.04] p-2">
             <span className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-white/55">
               Sammlungen
@@ -503,12 +427,17 @@ export function DocumentsPage() {
                 >
                   <button
                     type="button"
-                    onClick={() => setFolderScope(folder.id)}
+                    onClick={() => handleNavFolderClick(folder.id)}
                     className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
-                      folderScope === folder.id
+                      folderScope === folder.id && !selectionActive
                         ? "bg-white/10 font-semibold text-white"
                         : "text-white/70 hover:bg-white/5 hover:text-white"
                     }`}
+                    title={
+                      selectionActive
+                        ? `${selectedIds.size} Dokument(e) hier einsortieren`
+                        : undefined
+                    }
                   >
                     <FolderArchive size={16} />
                     <span className="truncate">{folder.name}</span>
@@ -594,13 +523,26 @@ export function DocumentsPage() {
                   key={category.id}
                   className="group flex items-center gap-1"
                 >
-                  <span className="flex min-w-0 flex-1 items-center gap-2 px-3 py-1.5 text-sm text-white/70">
+                  <button
+                    type="button"
+                    onClick={() => handleNavCategoryClick(category.id)}
+                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition ${
+                      categoryFilter === category.id && !selectionActive
+                        ? "bg-white/10 font-semibold text-white"
+                        : "text-white/70 hover:bg-white/5 hover:text-white"
+                    }`}
+                    title={
+                      selectionActive
+                        ? `${selectedIds.size} Dokument(e) dieser Kategorie zuweisen`
+                        : undefined
+                    }
+                  >
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: category.color }}
                     />
                     <span className="truncate">{category.name}</span>
-                  </span>
+                  </button>
                   {canWrite ? (
                     <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
                       <button
@@ -683,22 +625,6 @@ export function DocumentsPage() {
               className="min-w-[180px] flex-1 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink"
             />
             <select
-              value={categoryFilter}
-              onChange={(event) =>
-                setCategoryFilter(
-                  event.target.value ? Number(event.target.value) : "",
-                )
-              }
-              className="rounded-md border border-line bg-white px-2 py-2 text-sm text-ink"
-            >
-              <option value="">Alle Kategorien</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-            <select
               value={tagFilter}
               onChange={(event) =>
                 setTagFilter(
@@ -726,7 +652,58 @@ export function DocumentsPage() {
               <option value="video/">Video</option>
               <option value="audio/">Audio</option>
             </select>
+            {/* Kachelgröße */}
+            <div
+              className="flex items-center gap-0.5 rounded-md border border-line bg-white p-0.5"
+              role="group"
+              aria-label="Kachelgröße"
+            >
+              {THUMBNAIL_SIZES.map((size) => (
+                <button
+                  key={size.value}
+                  type="button"
+                  onClick={() => changeThumbnailSize(size.value)}
+                  className={`h-8 w-8 rounded text-xs font-semibold transition ${
+                    thumbnailSize === size.value
+                      ? "bg-steel-800 text-white"
+                      : "text-steel-500 hover:bg-steel-50"
+                  }`}
+                  title={`Kachelgröße ${size.label}`}
+                  aria-pressed={thumbnailSize === size.value}
+                >
+                  {size.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {selectionActive ? (
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-steel-300 bg-steel-100 px-3 py-2">
+              <span className="text-sm font-medium text-ink">
+                {selectedIds.size} ausgewählt
+              </span>
+              <span className="text-xs text-steel-500">
+                Auf eine Sammlung oder Kategorie links klicken zum Zuweisen.
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleBulkDownload()}
+                  className="flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-ink shadow-sm transition hover:bg-steel-50"
+                >
+                  <Download size={15} />
+                  Als Zip
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="rounded-md px-3 py-1.5 text-sm font-medium text-steel-600 transition hover:bg-white"
+                >
+                  Auswahl aufheben
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {error ? (
             <p className="text-sm text-rose-600">
@@ -743,18 +720,23 @@ export function DocumentsPage() {
               body="Für die aktuelle Auswahl gibt es keine Dokumente."
             />
           ) : (
-            <div className="flex flex-col gap-2">
-              {documents.map((document) => (
-                <DocumentCard
-                  key={document.id}
-                  document={document}
-                  selected={document.id === selectedId}
-                  isSelected={selectedIds.has(document.id)}
-                  selectionActive={selectionActive}
-                  onToggleSelect={() => toggleSelect(document.id)}
-                  onOpen={() => setSelectedId(document.id)}
+            <div
+              className="grid gap-3"
+              style={{
+                gridTemplateColumns: `repeat(auto-fill, minmax(${thumbnailMinPx(
+                  thumbnailSize,
+                )}px, 1fr))`,
+              }}
+            >
+              {documents.map((doc) => (
+                <DocumentTile
+                  key={doc.id}
+                  document={doc}
+                  isSelected={selectedIds.has(doc.id)}
+                  onToggleSelect={() => toggleSelect(doc.id)}
+                  onOpen={() => setOpenedId(doc.id)}
                   canDelete={canDelete}
-                  onDelete={() => handleDeleteDocument(document)}
+                  onDelete={() => handleDeleteDocument(doc)}
                 />
               ))}
             </div>
@@ -766,298 +748,45 @@ export function DocumentsPage() {
             loadingMore={loadingMore}
           />
         </section>
+      </div>
 
-        {selectionActive ? (
-          <DocumentBulkPanel
-            count={selectedIds.size}
-            categories={categories}
-            folders={folders}
-            canWrite={canWrite}
-            widthPx={detailWidth ?? undefined}
-            onResizeStart={handleDetailResizeStart}
-            onAssignFolder={handleBulkAssignFolder}
-            onAssignCategory={handleBulkAssignCategory}
-            onDownload={handleBulkDownload}
-            onClear={clearSelection}
-          />
-        ) : selected ? (
-        <DocumentDetailPanel
-          key={selected.id}
-          document={selected}
-          widthPx={detailWidth ?? undefined}
-          onResizeStart={handleDetailResizeStart}
-          categories={categories}
-          folders={folders}
+      {opened ? (
+        <DocumentViewer
+          key={opened.id}
+          document={opened}
           canWrite={canWrite}
-          onClose={() => setSelectedId(null)}
+          onClose={() => setOpenedId(null)}
+          onSaveMetadata={(input) =>
+            run(
+              () =>
+                updateMetadata(opened.id, {
+                  ...input,
+                  expectedVersion: opened.version,
+                }),
+              "Gespeichert",
+            )
+          }
           onSetTags={(next) =>
             run(
               () =>
                 setTags(
-                  selected.id,
+                  opened.id,
                   next.map((tag) => tag.id),
                 ),
               undefined,
             )
           }
-          onAssignCategory={(categoryId) =>
-            run(() => assignCategory(selected.id, categoryId))
-          }
-          onRemoveCategory={(categoryId) =>
-            run(() => removeCategory(selected.id, categoryId))
-          }
-          onAddToFolder={(folderId) =>
+          onRemoveFolder={(folderId) =>
             run(
-              () => addToFolder(folderId, selected.id),
-              "In Sammlung einsortiert",
-            )
-          }
-          onRemoveFromFolder={(folderId) =>
-            run(
-              () => removeFromFolder(folderId, selected.id),
+              () => removeFromFolder(folderId, opened.id),
               "Aus Sammlung entfernt",
             )
           }
-          onSaveMetadata={(input) =>
-            run(
-              () =>
-                updateMetadata(selected.id, {
-                  ...input,
-                  expectedVersion: selected.version,
-                }),
-              "Gespeichert",
-            )
+          onRemoveCategory={(categoryId) =>
+            run(() => removeCategory(opened.id, categoryId), "Kategorie entfernt")
           }
         />
-        ) : (
-          <DocumentSidePanel
-            side="right"
-            title="Details"
-            storageKey="ui.documents.detail.collapsed"
-            railIcon={FileText}
-            widthPx={detailWidth ?? undefined}
-            onResizeStart={handleDetailResizeStart}
-          >
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 py-12 text-center">
-              <FileText size={28} className="text-white/25" />
-              <p className="text-sm font-medium text-white/60">
-                Kein Dokument ausgewählt
-              </p>
-              <p className="text-xs text-white/40">
-                Doppelklick auf ein Dokument öffnet hier die Details.
-              </p>
-            </div>
-          </DocumentSidePanel>
-        )}
-      </div>
+      ) : null}
     </div>
-  );
-}
-
-interface DocumentDetailPanelProps {
-  document: Attachment;
-  widthPx?: number;
-  onResizeStart?: (event: ReactMouseEvent) => void;
-  categories: AttachmentCategory[];
-  folders: AttachmentFolder[];
-  canWrite: boolean;
-  onClose: () => void;
-  onSetTags: (tags: Tag[]) => void;
-  onAssignCategory: (categoryId: number) => void;
-  onRemoveCategory: (categoryId: number) => void;
-  onAddToFolder: (folderId: number) => void;
-  onRemoveFromFolder: (folderId: number) => void;
-  onSaveMetadata: (input: {
-    displayName: string | null;
-    description: string | null;
-  }) => void;
-}
-
-function DocumentDetailPanel({
-  document,
-  widthPx,
-  onResizeStart,
-  categories,
-  folders,
-  canWrite,
-  onClose,
-  onSetTags,
-  onAssignCategory,
-  onRemoveCategory,
-  onAddToFolder,
-  onRemoveFromFolder,
-  onSaveMetadata,
-}: DocumentDetailPanelProps) {
-  const [displayName, setDisplayName] = useState(document.displayName ?? "");
-  const [description, setDescription] = useState(document.description ?? "");
-  const assignedCategoryIds = new Set(
-    (document.categories ?? []).map((category) => category.id),
-  );
-  const documentFolders = document.folders ?? [];
-  const assignedFolderIds = new Set(documentFolders.map((folder) => folder.id));
-  const availableFolders = folders.filter(
-    (folder) => !assignedFolderIds.has(folder.id),
-  );
-
-  return (
-    <DocumentSidePanel
-      side="right"
-      title={document.displayName ?? document.originalName}
-      storageKey="ui.documents.detail.collapsed"
-      railIcon={FileText}
-      widthPx={widthPx}
-      onResizeStart={onResizeStart}
-      headerActions={
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-7 shrink-0 items-center rounded-md px-2 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-        >
-          Schließen
-        </button>
-      }
-    >
-      <p className="text-xs text-white/50">
-        Originaldatei: {document.originalName}
-      </p>
-
-      <section className="flex flex-col gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-white/55">
-          Vorschau
-        </span>
-        <DocumentPreviewBody attachment={document} />
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-white/55">
-          Metadaten
-        </span>
-        <input
-          value={displayName}
-          onChange={(event) => setDisplayName(event.target.value)}
-          placeholder="Anzeigename"
-          disabled={!canWrite}
-          className="rounded-md border border-white/15 bg-steel-900/50 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50"
-        />
-        <textarea
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="Beschreibung"
-          disabled={!canWrite}
-          rows={3}
-          className="rounded-md border border-white/15 bg-steel-900/50 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50"
-        />
-        {canWrite ? (
-          <button
-            type="button"
-            onClick={() =>
-              onSaveMetadata({
-                displayName: displayName.trim() || null,
-                description: description.trim() || null,
-              })
-            }
-            className="self-start rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/20"
-          >
-            Metadaten speichern
-          </button>
-        ) : null}
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-white/55">
-          Sammlungen
-        </span>
-        <div className="flex flex-wrap gap-1">
-          {documentFolders.map((folder) => (
-            <span
-              key={folder.id}
-              className="flex items-center gap-1 rounded-md bg-white/10 px-2 py-0.5 text-xs text-white"
-            >
-              <FolderArchive size={12} />
-              {folder.name}
-              {canWrite ? (
-                <button
-                  type="button"
-                  onClick={() => onRemoveFromFolder(folder.id)}
-                  className="text-white/50 hover:text-crimson"
-                  title="Aus Sammlung entfernen"
-                >
-                  <X size={12} />
-                </button>
-              ) : null}
-            </span>
-          ))}
-          {documentFolders.length === 0 ? (
-            <span className="text-xs text-white/40">In keiner Sammlung.</span>
-          ) : null}
-        </div>
-        {canWrite && availableFolders.length > 0 ? (
-          <select
-            value=""
-            onChange={(event) => {
-              if (event.target.value) {
-                onAddToFolder(Number(event.target.value));
-              }
-            }}
-            className="rounded-md border border-white/15 bg-steel-900/50 px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-          >
-            <option value="" className="text-ink">
-              In Sammlung einsortieren…
-            </option>
-            {availableFolders.map((folder) => (
-              <option key={folder.id} value={folder.id} className="text-ink">
-                {folder.name}
-              </option>
-            ))}
-          </select>
-        ) : null}
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-white/55">
-          Labels
-        </span>
-        <TagPicker
-          selected={(document.tags ?? []) as Tag[]}
-          onChange={onSetTags}
-          domain="dms"
-          tone="dark"
-        />
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-white/55">
-          Kategorien
-        </span>
-        <div className="flex flex-wrap gap-1">
-          {categories.map((category) => {
-            const assigned = assignedCategoryIds.has(category.id);
-            return (
-              <button
-                key={category.id}
-                type="button"
-                disabled={!canWrite}
-                onClick={() =>
-                  assigned
-                    ? onRemoveCategory(category.id)
-                    : onAssignCategory(category.id)
-                }
-                className={`rounded-md px-2 py-0.5 text-xs ${assigned ? "text-white" : "border border-white/20 text-white/70 hover:bg-white/5"}`}
-                style={
-                  assigned ? { backgroundColor: category.color } : undefined
-                }
-              >
-                {category.name}
-              </button>
-            );
-          })}
-          {categories.length === 0 ? (
-            <span className="text-xs text-white/40">
-              Kategorien werden links verwaltet.
-            </span>
-          ) : null}
-        </div>
-      </section>
-    </DocumentSidePanel>
   );
 }
