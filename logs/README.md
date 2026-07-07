@@ -2,6 +2,10 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 07.07.26 | 11:15:39 | Fix | Audit-Funde: Lockfile, nodemailer 9, Lint-Cleanup, Tag-ColorPicker | ✅ |
+| 07.07.26 | 10:27:30 | C/Feature | Dokument-Manager Multiselect + Bulk (Zuweisen/Zip) | ✅ |
+| 07.07.26 | 09:52:30 | B/Feature | Dokument-Manager zweizeilige Card | ✅ |
+| 07.07.26 | 09:45:13 | A/Fix | Dokument-Manager Preview-Breite (nicht-anzeigbar) | ✅ |
 | 07.07.26 | 08:10:38 | Feature | Kalender-Sync-Konfig in DB (Admin) | ✅ |
 | 07.07.26 | 04:53:09 | Fix | Wiki Navigation WIKI-20 | ✅ |
 | 07.07.26 | 04:49:06 | Fix | Wiki Autosave Navigation | ✅ |
