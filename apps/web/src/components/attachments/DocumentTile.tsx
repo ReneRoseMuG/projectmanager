@@ -20,6 +20,16 @@ export function documentTitle(document: Attachment): string {
   return stripFileExtension(document.displayName ?? document.originalName);
 }
 
+// Kleingeschriebene Dateiendung ohne Punkt (leer bei fehlender Endung oder Dotfiles wie
+// ".gitignore"). Basis für den Endungsfilter der Grid-Ansicht.
+export function fileExtension(name: string): string {
+  const index = name.lastIndexOf(".");
+  if (index <= 0) {
+    return "";
+  }
+  return name.slice(index + 1).toLowerCase();
+}
+
 interface DocumentTileProps {
   document: Attachment;
   isSelected: boolean;

@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 07.07.26 | 16:48:20 | Feature | DMS Endungsfilter (clientseitig, sichtbare Kacheln) | ✅ |
 | 07.07.26 | 16:15:56 | Nachtrag | MCP-Kommentar Kachelansicht nachgeholt | ✅ |
 | 07.07.26 | 15:41:40 | Nachtrag | MCP-Kommentar Kachelansicht blockiert (MCP nicht erreichbar) | ⚠️ |
 | 07.07.26 | 15:32:15 | Feature | DMS Kachelansicht (Grid, Thumbnails, Größenwähler, Lightbox) | ✅ |

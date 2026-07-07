@@ -14,9 +14,13 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
-import { DocumentTile, documentTitle } from "../components/attachments/DocumentTile";
+import {
+  DocumentTile,
+  documentTitle,
+  fileExtension,
+} from "../components/attachments/DocumentTile";
 import { DocumentViewer } from "../components/attachments/DocumentViewer";
 import {
   THUMBNAIL_SIZES,
@@ -41,6 +45,9 @@ import { useTags } from "../hooks/useTags";
 import { toQueryError } from "../queries/queryErrors";
 import type { DocumentLibraryFilter } from "../api/documents";
 
+// Sentinel für die Dropdown-Option „ohne Endung" (echte Endungen sind nie leer).
+const EXT_NONE = "__none__";
+
 export function DocumentsPage() {
   const canWrite = useHasPermission("attachments", "write");
   const canDelete = useHasPermission("attachments", "delete");
@@ -54,6 +61,7 @@ export function DocumentsPage() {
   const [tagFilter, setTagFilter] = useState<number | "">("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [search, setSearch] = useState<string>("");
+  const [extFilter, setExtFilter] = useState<string>("");
   const [openedId, setOpenedId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [thumbnailSize, setThumbnailSize] = useState<ThumbnailSize>(() =>
@@ -136,6 +144,46 @@ export function DocumentsPage() {
     typeof folderScope === "number" ? folderScope : undefined;
 
   const selectionActive = selectedIds.size > 0;
+
+  // Endungsfilter über die aktuell sichtbaren (geladenen) Dokumente — rein clientseitig, damit
+  // er sich auf die gewählte Ansicht (z. B. eine Sammlung) bezieht und keinen Server-Roundtrip
+  // braucht. Das Dropdown bietet nur die tatsächlich vorkommenden Endungen an.
+  const extInfo = useMemo(() => {
+    const set = new Set<string>();
+    let hasNone = false;
+    for (const doc of documents) {
+      const ext = fileExtension(doc.originalName);
+      if (ext) {
+        set.add(ext);
+      } else {
+        hasNone = true;
+      }
+    }
+    return { list: [...set].sort(), hasNone };
+  }, [documents]);
+
+  const visibleDocuments = useMemo(() => {
+    if (!extFilter) {
+      return documents;
+    }
+    if (extFilter === EXT_NONE) {
+      return documents.filter((doc) => fileExtension(doc.originalName) === "");
+    }
+    return documents.filter((doc) => fileExtension(doc.originalName) === extFilter);
+  }, [documents, extFilter]);
+
+  // Passt der gewählte Endungsfilter nicht mehr in die fertig geladene Ansicht (z. B. nach einem
+  // Sammlungswechsel), zurücksetzen — sonst zeigt das Dropdown einen Wert ohne passende Option.
+  useEffect(() => {
+    if (loading || loadingMore || extFilter === "") {
+      return;
+    }
+    const stillAvailable =
+      extFilter === EXT_NONE ? extInfo.hasNone : extInfo.list.includes(extFilter);
+    if (!stillAvailable) {
+      setExtFilter("");
+    }
+  }, [extFilter, extInfo, loading, loadingMore]);
 
   const changeThumbnailSize = (size: ThumbnailSize) => {
     setThumbnailSize(size);
@@ -652,6 +700,23 @@ export function DocumentsPage() {
               <option value="video/">Video</option>
               <option value="audio/">Audio</option>
             </select>
+            <select
+              value={extFilter}
+              onChange={(event) => setExtFilter(event.target.value)}
+              disabled={extInfo.list.length === 0 && !extInfo.hasNone}
+              className="rounded-md border border-line bg-white px-2 py-2 text-sm text-ink disabled:opacity-50"
+              title="Nach Dateiendung in der aktuellen Ansicht filtern"
+            >
+              <option value="">Alle Endungen</option>
+              {extInfo.list.map((ext) => (
+                <option key={ext} value={ext}>
+                  .{ext}
+                </option>
+              ))}
+              {extInfo.hasNone ? (
+                <option value={EXT_NONE}>(ohne Endung)</option>
+              ) : null}
+            </select>
             {/* Kachelgröße */}
             <div
               className="flex items-center gap-0.5 rounded-md border border-line bg-white p-0.5"
@@ -719,6 +784,12 @@ export function DocumentsPage() {
               title="Keine Dokumente"
               body="Für die aktuelle Auswahl gibt es keine Dokumente."
             />
+          ) : visibleDocuments.length === 0 ? (
+            <EmptyState
+              icon={<FileText size={28} />}
+              title="Keine Treffer"
+              body="Keine sichtbare Datei mit dieser Endung."
+            />
           ) : (
             <div
               className="grid gap-3"
@@ -728,7 +799,7 @@ export function DocumentsPage() {
                 )}px, 1fr))`,
               }}
             >
-              {documents.map((doc) => (
+              {visibleDocuments.map((doc) => (
                 <DocumentTile
                   key={doc.id}
                   document={doc}

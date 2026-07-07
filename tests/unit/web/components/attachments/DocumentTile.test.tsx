@@ -12,7 +12,8 @@
  * - Ohne Löschrecht wird kein Löschen-Button angeboten.
  *
  * Ziel:
- * Absichern, dass Darstellung, Auswahl, Öffnen und Löschen sauber getrennt auslösen.
+ * Absichern, dass Darstellung, Auswahl, Öffnen und Löschen sauber getrennt auslösen sowie die
+ * Dateiendung (Basis des Endungsfilters) robust extrahiert wird.
  */
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, screen } from "@testing-library/dom";
@@ -20,7 +21,10 @@ import { cleanup, render } from "@testing-library/react";
 import type { Attachment } from "@taskmanager/shared-types";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DocumentTile } from "../../../../../apps/web/src/components/attachments/DocumentTile";
+import {
+  DocumentTile,
+  fileExtension,
+} from "../../../../../apps/web/src/components/attachments/DocumentTile";
 
 vi.mock("../../../../../apps/web/src/api/client", () => ({
   assetUrl: (path: string) => `http://assets.test${path}`,
@@ -109,5 +113,21 @@ describe("DocumentTile", () => {
   it("bietet ohne Löschrecht keinen Löschen-Button", () => {
     renderTile({ canDelete: false });
     expect(screen.queryByRole("button", { name: "Endgültig löschen" })).not.toBeInTheDocument();
+  });
+});
+
+describe("fileExtension", () => {
+  it("liefert die kleingeschriebene Endung", () => {
+    expect(fileExtension("Rechnung.PDF")).toBe("pdf");
+    expect(fileExtension("Tabelle.xlsx")).toBe("xlsx");
+  });
+
+  it("nimmt bei mehreren Punkten die letzte Endung", () => {
+    expect(fileExtension("archiv.tar.gz")).toBe("gz");
+  });
+
+  it("liefert leer bei fehlender Endung oder Dotfile", () => {
+    expect(fileExtension("README")).toBe("");
+    expect(fileExtension(".gitignore")).toBe("");
   });
 });
