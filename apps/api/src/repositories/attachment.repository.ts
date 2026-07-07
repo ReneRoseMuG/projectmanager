@@ -25,6 +25,21 @@ export const attachmentRepository = {
     return database.select({ id: attachments.id, filename: attachments.filename }).from(attachments).where(inArray(attachments.id, uniqueIds));
   },
 
+  // Für den Bulk-Download benötigte Felder: Ablagename (Platte) + Originalname (Zip-Eintrag).
+  async findDownloadRecords(
+    database: DbSession,
+    ids: number[]
+  ): Promise<Array<Pick<AttachmentRecord, "id" | "filename" | "originalName">>> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+    return database
+      .select({ id: attachments.id, filename: attachments.filename, originalName: attachments.originalName })
+      .from(attachments)
+      .where(inArray(attachments.id, uniqueIds));
+  },
+
   async create(database: DbSession, data: AttachmentCreateData, userId?: number): Promise<AttachmentRecord> {
     const now = nowIso();
     const result = await database

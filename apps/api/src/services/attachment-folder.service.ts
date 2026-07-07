@@ -170,6 +170,22 @@ export async function addAttachmentToFolder(database: DbClient, folderId: number
   await database.insert(folderAttachments).ignore().values({ folderId, attachmentId });
 }
 
+// Bulk-Variante (Mehrfachauswahl): weist mehrere Dokumente EINER Sammlung zu. Nicht
+// existierende Attachment-IDs werden vorab gefiltert (kein FK-Fehler), die Zuordnung erfolgt
+// als EIN gebündelter Insert — konstante Roundtrip-Zahl statt einer Query pro Dokument.
+export async function addAttachmentsToFolder(database: DbClient, folderId: number, attachmentIds: number[]): Promise<void> {
+  await ensureFolderExists(database, folderId);
+  const uniqueIds = [...new Set(attachmentIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+  const existing = await attachmentRepository.findCleanupRecords(database, uniqueIds);
+  if (existing.length === 0) {
+    return;
+  }
+  await database.insert(folderAttachments).ignore().values(existing.map((row) => ({ folderId, attachmentId: row.id })));
+}
+
 export async function removeAttachmentFromFolder(database: DbClient, folderId: number, attachmentId: number): Promise<void> {
   await database
     .delete(folderAttachments)

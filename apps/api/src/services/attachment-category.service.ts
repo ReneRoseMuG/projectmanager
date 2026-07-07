@@ -101,6 +101,22 @@ export async function assignCategoryToAttachment(database: DbClient, attachmentI
   await database.insert(attachmentCategoryLinks).ignore().values({ categoryId, attachmentId });
 }
 
+// Bulk-Variante (Mehrfachauswahl): weist EINER Kategorie mehrere Dokumente zu. Nicht
+// existierende Attachment-IDs werden vorab gefiltert, die Zuordnung erfolgt als EIN
+// gebündelter Insert — konstante Roundtrip-Zahl statt einer Query pro Dokument.
+export async function assignCategoryToAttachments(database: DbClient, categoryId: number, attachmentIds: number[]): Promise<void> {
+  await ensureCategoryExists(database, categoryId);
+  const uniqueIds = [...new Set(attachmentIds)];
+  if (uniqueIds.length === 0) {
+    return;
+  }
+  const existing = await attachmentRepository.findCleanupRecords(database, uniqueIds);
+  if (existing.length === 0) {
+    return;
+  }
+  await database.insert(attachmentCategoryLinks).ignore().values(existing.map((row) => ({ categoryId, attachmentId: row.id })));
+}
+
 export async function removeCategoryFromAttachment(database: DbClient, attachmentId: number, categoryId: number): Promise<void> {
   await database
     .delete(attachmentCategoryLinks)

@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { createUnboundAttachment, deleteAttachment } from "../services/attachments.service.js";
 import {
   assignCategoryToAttachment,
+  assignCategoryToAttachments,
   createAttachmentCategory,
   deleteAttachmentCategory,
   listAttachmentCategories,
@@ -9,6 +10,7 @@ import {
   updateAttachmentCategory
 } from "../services/attachment-category.service.js";
 import {
+  addAttachmentsToFolder,
   addAttachmentToFolder,
   createAttachmentFolder,
   deleteAttachmentFolder,
@@ -18,6 +20,7 @@ import {
   updateAttachmentFolder
 } from "../services/attachment-folder.service.js";
 import { getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
+import { buildDocumentsArchive } from "../services/document-download.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { badRequest } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema, tagIdsBodySchema } from "../utils/route-schemas.js";
@@ -163,6 +166,36 @@ const moveDocumentBodySchema = {
   properties: {
     fromFolderId: { type: "integer", minimum: 1 },
     toFolderId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+// Mehrfachauswahl-Body: mindestens eine gültige Dokument-ID.
+const bulkAttachmentIdsBodySchema = {
+  type: "object",
+  required: ["attachmentIds"],
+  additionalProperties: false,
+  properties: {
+    attachmentIds: {
+      type: "array",
+      minItems: 1,
+      items: { type: "integer", minimum: 1 }
+    }
+  }
+} as const;
+
+const folderIdParamSchema = {
+  type: "object",
+  required: ["folderId"],
+  properties: {
+    folderId: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+const categoryIdParamSchema = {
+  type: "object",
+  required: ["categoryId"],
+  properties: {
+    categoryId: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -354,6 +387,47 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       await removeCategoryFromAttachment(app.db, request.params.id, request.params.categoryId);
       return reply.status(204).send();
+    }
+  );
+
+  // --- Bulk-Operationen (Mehrfachauswahl) ---
+  app.post<{ Params: { folderId: number }; Body: { attachmentIds: number[] } }>(
+    "/documents/bulk/folders/:folderId",
+    { config: attachmentsAuth("write"), schema: { params: folderIdParamSchema, body: bulkAttachmentIdsBodySchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
+      await addAttachmentsToFolder(app.db, request.params.folderId, request.body.attachmentIds);
+      return reply.status(204).send();
+    }
+  );
+
+  app.post<{ Params: { categoryId: number }; Body: { attachmentIds: number[] } }>(
+    "/documents/bulk/categories/:categoryId",
+    { config: attachmentsAuth("write"), schema: { params: categoryIdParamSchema, body: bulkAttachmentIdsBodySchema, response: { 204: { type: "null" } } } },
+    async (request, reply) => {
+      await assignCategoryToAttachments(app.db, request.params.categoryId, request.body.attachmentIds);
+      return reply.status(204).send();
+    }
+  );
+
+  // Bulk-Download: ausgewählte Dokumente als Zip streamen. Kein Response-Schema (Binär-Stream).
+  // buildDocumentsArchive wirft bei leerer/unbekannter Auswahl VOR dem Hijack — Fastify liefert
+  // dann regulär 400/404. Erst wenn ein Archiv steht, übernehmen wir den rohen Response-Stream.
+  app.post<{ Body: { attachmentIds: number[] } }>(
+    "/documents/download",
+    { config: attachmentsAuth("read"), schema: { body: bulkAttachmentIdsBodySchema } },
+    async (request, reply) => {
+      const archive = await buildDocumentsArchive(app.db, request.body.attachmentIds);
+      reply.hijack();
+      reply.raw.writeHead(200, {
+        "Content-Type": "application/zip",
+        "Content-Disposition": 'attachment; filename="dokumente.zip"'
+      });
+      archive.on("error", (error) => {
+        request.log.error(error, "Bulk-Download-Zip fehlgeschlagen");
+        reply.raw.destroy(error);
+      });
+      archive.pipe(reply.raw);
+      await archive.finalize();
     }
   );
 }

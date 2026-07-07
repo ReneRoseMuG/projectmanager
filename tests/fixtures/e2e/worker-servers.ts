@@ -123,11 +123,7 @@ export async function startWorkerServers(opts: StartWorkerServersOptions): Promi
       ADMIN_LAST_NAME: "Admin",
       ADMIN_INITIAL_PASSWORD: "password123",
       SESSION_SECRET: "playwright-session-secret-change-me-12345",
-      ATTACHMENT_SYNC_ENABLED: "false",
-      NOTIFICATIONS_ENABLED: "false",
-      SFTP_HOST: "",
-      SFTP_USER: "",
-      SFTP_PASSWORD: ""
+      NOTIFICATIONS_ENABLED: "false"
     },
     stdio: "pipe"
   });

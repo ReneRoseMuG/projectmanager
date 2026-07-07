@@ -145,3 +145,18 @@ export async function addDocumentToFolder(folderId: number, attachmentId: number
 export async function removeDocumentFromFolder(folderId: number, attachmentId: number): Promise<void> {
   await api.delete(`attachment-folders/${folderId}/documents/${attachmentId}`);
 }
+
+// --- Mehrfachauswahl (Bulk) ---
+export async function addDocumentsToFolder(folderId: number, attachmentIds: number[]): Promise<void> {
+  await api.post(`documents/bulk/folders/${folderId}`, { json: { attachmentIds } });
+}
+
+export async function assignDocumentsCategory(categoryId: number, attachmentIds: number[]): Promise<void> {
+  await api.post(`documents/bulk/categories/${categoryId}`, { json: { attachmentIds } });
+}
+
+// Bulk-Download: das Backend bündelt die Dokumente zu einem Zip. Höherer Timeout, weil das
+// Packen mehrerer/großer Dateien länger dauern kann als der Standard-Request.
+export async function downloadDocumentsZip(attachmentIds: number[]): Promise<Blob> {
+  return api.post("documents/download", { json: { attachmentIds }, timeout: 120000 }).blob();
+}

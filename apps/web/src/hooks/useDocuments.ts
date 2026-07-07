@@ -122,6 +122,14 @@ export function useDocumentActions() {
     mutationFn: ({ folderId, attachmentId }: { folderId: number; attachmentId: number }) => documentsApi.removeDocumentFromFolder(folderId, attachmentId),
     onSuccess: invalidate
   });
+  const addToFolderBulkMutation = useMutation({
+    mutationFn: ({ folderId, attachmentIds }: { folderId: number; attachmentIds: number[] }) => documentsApi.addDocumentsToFolder(folderId, attachmentIds),
+    onSuccess: invalidate
+  });
+  const assignCategoryBulkMutation = useMutation({
+    mutationFn: ({ categoryId, attachmentIds }: { categoryId: number; attachmentIds: number[] }) => documentsApi.assignDocumentsCategory(categoryId, attachmentIds),
+    onSuccess: invalidate
+  });
 
   return {
     uploadDocument: (file: File, folderId?: number) => uploadMutation.mutateAsync({ file, folderId }),
@@ -133,6 +141,10 @@ export function useDocumentActions() {
     assignCategory: (id: number, categoryId: number) => assignCategoryMutation.mutateAsync({ id, categoryId }),
     removeCategory: (id: number, categoryId: number) => removeCategoryMutation.mutateAsync({ id, categoryId }),
     addToFolder: (folderId: number, attachmentId: number) => addToFolderMutation.mutateAsync({ folderId, attachmentId }),
-    removeFromFolder: (folderId: number, attachmentId: number) => removeFromFolderMutation.mutateAsync({ folderId, attachmentId })
+    removeFromFolder: (folderId: number, attachmentId: number) => removeFromFolderMutation.mutateAsync({ folderId, attachmentId }),
+    addToFolderBulk: (folderId: number, attachmentIds: number[]) => addToFolderBulkMutation.mutateAsync({ folderId, attachmentIds }),
+    assignCategoryBulk: (categoryId: number, attachmentIds: number[]) => assignCategoryBulkMutation.mutateAsync({ categoryId, attachmentIds }),
+    // Reiner Lese-Download (Zip-Blob), kein Server-State → keine Invalidierung.
+    downloadZip: (attachmentIds: number[]) => documentsApi.downloadDocumentsZip(attachmentIds)
   };
 }

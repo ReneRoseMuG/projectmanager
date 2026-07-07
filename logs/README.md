@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 07.07.26 | 13:21:20 | Fix | DMS Bulk-Workflow: Nachfrage + Deselektion | ✅ |
+| 07.07.26 | 11:19:47 | Nachtrag | MCP-Abschlusskommentar Dokument-Manager nachgeholt | ✅ |
 | 07.07.26 | 11:15:39 | Fix | Audit-Funde: Lockfile, nodemailer 9, Lint-Cleanup, Tag-ColorPicker | ✅ |
 | 07.07.26 | 10:27:30 | C/Feature | Dokument-Manager Multiselect + Bulk (Zuweisen/Zip) | ✅ |
 | 07.07.26 | 09:52:30 | B/Feature | Dokument-Manager zweizeilige Card | ✅ |

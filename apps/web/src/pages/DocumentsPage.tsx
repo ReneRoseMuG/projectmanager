@@ -6,7 +6,6 @@ import type {
 } from "@taskmanager/shared-types";
 import {
   Check,
-  Download,
   FileText,
   FolderArchive,
   Inbox,
@@ -25,12 +24,20 @@ import {
 } from "react";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
 import { describeAttachmentType } from "../components/attachments/attachmentTypes";
+import { DocumentBulkPanel } from "../components/attachments/DocumentBulkPanel";
+import { DocumentCard, documentTitle } from "../components/attachments/DocumentCard";
+import {
+  clampDetailWidth,
+  initialDetailWidth,
+  MIN_DETAIL_WIDTH,
+  NON_IMAGE_MAX_WIDTH,
+} from "../components/attachments/documentPreviewWidth";
 import { DocumentPreviewBody } from "../components/attachments/DocumentPreviewBody";
 import { DocumentSidePanel } from "../components/attachments/DocumentSidePanel";
 import { EmptyState } from "../components/ui/EmptyState";
-import { ItemRow } from "../components/ui/ItemRow";
 import { LoadMoreIndicator } from "../components/ui/LoadMoreIndicator";
 import { TagPicker } from "../components/tags/TagPicker";
+import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { useToast } from "../components/ui/ToastProvider";
 import {
   useCategories,
@@ -47,68 +54,16 @@ import { assetUrl } from "../api/client";
 // Detail-Panel-Breite (MS-75): Pre-Render-Kalkulation beim Öffnen eines Dokuments. Die
 // Breite ergibt sich aus der verfügbaren Zeilenbreite minus Mindestbreite der Dateiliste,
 // gedeckelt auf die Breite des Dokuments (Bild: naturalWidth). Der linke Panelrand ist
-// zusätzlich per Maus ziehbar.
+// zusätzlich per Maus ziehbar. Konstanten und Startbreiten-Logik: documentPreviewWidth.
 const MIN_CARD_WIDTH = 380;
-const MIN_DETAIL_WIDTH = 320;
-const NON_IMAGE_MAX_WIDTH = 1000;
 const ROW_GAP = 24;
 const PANEL_CHROME = 28;
-
-function clampDetailWidth(value: number, max: number): number {
-  return Math.max(MIN_DETAIL_WIDTH, Math.min(value, max));
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function documentTitle(document: Attachment): string {
-  return stripFileExtension(document.displayName ?? document.originalName);
-}
-
-function stripFileExtension(name: string): string {
-  const extensionIndex = name.lastIndexOf(".");
-  if (extensionIndex <= 0) {
-    return name;
-  }
-  return name.slice(0, extensionIndex).trimEnd();
-}
-
-// Verständliche Typ-Darstellung: Kürzel-Badge und Größe statt rohem MIME-Type.
-// Der technische MIME-Type bleibt als Tooltip (title) erreichbar.
-function DocumentMeta({ document }: { document: Attachment }) {
-  const typeMeta = describeAttachmentType(document);
-  const size = formatBytes(document.size);
-  return (
-    <span
-      className="flex w-32 items-center justify-end gap-2 text-xs text-steel-500"
-      title={document.mimetype}
-      aria-label={`${typeMeta.label}, ${size}`}
-    >
-      <span className="flex w-10 justify-end">
-        <span
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${typeMeta.toneClassName}`}
-        >
-          {typeMeta.badge}
-        </span>
-      </span>
-      <span className="w-20 whitespace-nowrap text-right tabular-nums">
-        {size}
-      </span>
-    </span>
-  );
-}
 
 export function DocumentsPage() {
   const canWrite = useHasPermission("attachments", "write");
   const canDelete = useHasPermission("attachments", "delete");
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
 
   const [folderScope, setFolderScope] = useState<number | "unsorted" | "all">(
     "all",
@@ -118,6 +73,7 @@ export function DocumentsPage() {
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [search, setSearch] = useState<string>("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [newFolderName, setNewFolderName] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
@@ -163,22 +119,30 @@ export function DocumentsPage() {
     updateMetadata,
     addToFolder,
     removeFromFolder,
+    addToFolderBulk,
+    assignCategoryBulk,
+    downloadZip,
   } = useDocumentActions();
 
   // Führt eine Schreibaktion aus und macht Fehler (und optional Erfolg) sichtbar.
   const run = useCallback(
-    async (action: () => Promise<unknown>, successTitle?: string) => {
+    async (
+      action: () => Promise<unknown>,
+      successTitle?: string,
+    ): Promise<boolean> => {
       try {
         await action();
         if (successTitle) {
           showToast({ tone: "success", title: successTitle });
         }
+        return true;
       } catch (mutationError) {
         showToast({
           tone: "error",
           title: "Aktion fehlgeschlagen",
           message: toQueryError(mutationError) ?? "Unbekannter Fehler",
         });
+        return false;
       }
     },
     [showToast],
@@ -208,8 +172,9 @@ export function DocumentsPage() {
     return Math.max(MIN_DETAIL_WIDTH, available - MIN_CARD_WIDTH);
   }, []);
 
-  // Pre-Render-Kalkulation: beim Öffnen die ideale Panelbreite bestimmen. Bilder werden
-  // kurz vorgeladen, um die natürliche Breite zu kennen; bis dahin gilt die Maximalbreite.
+  // Pre-Render-Kalkulation: beim Öffnen die ideale Panelbreite bestimmen (initialDetailWidth).
+  // Bilder werden zusätzlich kurz vorgeladen, um die natürliche Breite zu kennen; bis dahin
+  // gilt die von initialDetailWidth gelieferte Startbreite.
   useEffect(() => {
     if (selectedId == null) {
       return;
@@ -220,8 +185,8 @@ export function DocumentsPage() {
     }
     manualResizeRef.current = false;
     const max = getMaxDetailWidth();
+    setDetailWidth(initialDetailWidth(doc, max));
     if (describeAttachmentType(doc).family === "image") {
-      setDetailWidth(clampDetailWidth(max, max));
       const probe = new Image();
       probe.onload = () => {
         if (manualResizeRef.current) {
@@ -233,8 +198,6 @@ export function DocumentsPage() {
         setDetailWidth(clampDetailWidth(docWidth, max));
       };
       probe.src = assetUrl(doc.url);
-    } else {
-      setDetailWidth(clampDetailWidth(NON_IMAGE_MAX_WIDTH, max));
     }
   }, [selectedId, getMaxDetailWidth]);
 
@@ -348,6 +311,100 @@ export function DocumentsPage() {
         setCategoryFilter("");
       }
       void run(() => deleteCategory(category.id), "Kategorie gelöscht");
+    }
+  };
+
+  const selectionActive = selectedIds.size > 0;
+
+  const removeFromSelection = (id: number) => {
+    setSelectedIds((current) => {
+      if (!current.has(id)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleSelect = (id: number) => {
+    // Mehrfachauswahl und Einzel-Vorschau schließen sich gegenseitig aus.
+    setSelectedId(null);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const handleDeleteDocument = (document: Attachment) => {
+    if (
+      window.confirm(`Dokument „${documentTitle(document)}" endgültig löschen?`)
+    ) {
+      void run(() => deleteDocument(document.id), "Dokument gelöscht");
+      if (selectedId === document.id) {
+        setSelectedId(null);
+      }
+      removeFromSelection(document.id);
+    }
+  };
+
+  // Nach einer erfolgreichen Bulk-Operation nachfragen, ob weitere Aktionen auf derselben
+  // Auswahl folgen. Bei „Nein" wird die (in gefilterten Ansichten sonst verwaiste) Auswahl
+  // vollständig aufgehoben — sie zeigt sonst auf Dokumente, die aus der Liste gefallen sind.
+  const promptContinueOrClear = async () => {
+    const keepSelection = await confirm({
+      title: "Weitere Bulk-Operation?",
+      body: `${selectedIds.size} ${
+        selectedIds.size === 1 ? "Dokument bleibt" : "Dokumente bleiben"
+      } ausgewählt. Möchtest du eine weitere Bulk-Operation ausführen?`,
+      confirmLabel: "Ausgewählt lassen",
+      cancelLabel: "Auswahl aufheben",
+    });
+    if (!keepSelection) {
+      clearSelection();
+    }
+  };
+
+  const handleBulkAssignFolder = async (folderId: number) => {
+    const ok = await run(
+      () => addToFolderBulk(folderId, [...selectedIds]),
+      "Auswahl in Sammlung einsortiert",
+    );
+    if (ok) {
+      await promptContinueOrClear();
+    }
+  };
+
+  const handleBulkAssignCategory = async (categoryId: number) => {
+    const ok = await run(
+      () => assignCategoryBulk(categoryId, [...selectedIds]),
+      "Kategorie zugewiesen",
+    );
+    if (ok) {
+      await promptContinueOrClear();
+    }
+  };
+
+  const handleBulkDownload = async () => {
+    const ids = [...selectedIds];
+    const ok = await run(async () => {
+      const blob = await downloadZip(ids);
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = "dokumente.zip";
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+    if (ok) {
+      await promptContinueOrClear();
     }
   };
 
@@ -688,75 +745,17 @@ export function DocumentsPage() {
           ) : (
             <div className="flex flex-col gap-2">
               {documents.map((document) => (
-                  <ItemRow
-                    key={document.id}
-                    title={documentTitle(document)}
-                    description={document.description ?? undefined}
-                    onOpen={() => setSelectedId(document.id)}
-                    openOnClick
-                    selected={document.id === selectedId}
-                    pills={
-                      <div className="flex flex-wrap gap-1">
-                        {(document.categories ?? []).map((category) => (
-                          <span
-                            key={`c${category.id}`}
-                            className="rounded-md px-2 py-0.5 text-xs text-white"
-                            style={{ backgroundColor: category.color }}
-                          >
-                            {category.name}
-                          </span>
-                        ))}
-                        {(document.tags ?? []).map((tag) => (
-                          <span
-                            key={`t${tag.id}`}
-                            className="rounded-md border border-line px-2 py-0.5 text-xs text-steel-600"
-                          >
-                            {tag.name}
-                          </span>
-                        ))}
-                      </div>
-                    }
-                    meta={<DocumentMeta document={document} />}
-                    metaClassName="w-32"
-                    pillsClassName="max-w-[11rem] justify-start"
-                    actionsClassName="w-16"
-                    actions={
-                      <div className="flex items-center gap-1">
-                        <a
-                          href={document.url}
-                          download
-                          className="rounded-md p-1.5 text-steel-500 hover:bg-steel-50"
-                          title="Herunterladen"
-                        >
-                          <Download size={16} />
-                        </a>
-                        {canDelete ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (
-                                window.confirm(
-                                  `Dokument „${documentTitle(document)}" endgültig löschen?`,
-                                )
-                              ) {
-                                void run(
-                                  () => deleteDocument(document.id),
-                                  "Dokument gelöscht",
-                                );
-                                if (selectedId === document.id) {
-                                  setSelectedId(null);
-                                }
-                              }
-                            }}
-                            className="rounded-md p-1.5 text-steel-500 hover:bg-rose-50 hover:text-rose-600"
-                            title="Endgültig löschen"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        ) : null}
-                      </div>
-                    }
-                  />
+                <DocumentCard
+                  key={document.id}
+                  document={document}
+                  selected={document.id === selectedId}
+                  isSelected={selectedIds.has(document.id)}
+                  selectionActive={selectionActive}
+                  onToggleSelect={() => toggleSelect(document.id)}
+                  onOpen={() => setSelectedId(document.id)}
+                  canDelete={canDelete}
+                  onDelete={() => handleDeleteDocument(document)}
+                />
               ))}
             </div>
           )}
@@ -768,7 +767,20 @@ export function DocumentsPage() {
           />
         </section>
 
-        {selected ? (
+        {selectionActive ? (
+          <DocumentBulkPanel
+            count={selectedIds.size}
+            categories={categories}
+            folders={folders}
+            canWrite={canWrite}
+            widthPx={detailWidth ?? undefined}
+            onResizeStart={handleDetailResizeStart}
+            onAssignFolder={handleBulkAssignFolder}
+            onAssignCategory={handleBulkAssignCategory}
+            onDownload={handleBulkDownload}
+            onClear={clearSelection}
+          />
+        ) : selected ? (
         <DocumentDetailPanel
           key={selected.id}
           document={selected}

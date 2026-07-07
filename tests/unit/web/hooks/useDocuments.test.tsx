@@ -47,6 +47,9 @@ vi.mock("../../../../apps/web/src/api/documents", () => ({
   removeDocumentCategory: vi.fn().mockResolvedValue(undefined),
   addDocumentToFolder: vi.fn().mockResolvedValue(undefined),
   removeDocumentFromFolder: vi.fn().mockResolvedValue(undefined),
+  addDocumentsToFolder: vi.fn().mockResolvedValue(undefined),
+  assignDocumentsCategory: vi.fn().mockResolvedValue(undefined),
+  downloadDocumentsZip: vi.fn().mockResolvedValue(new Blob(["zip"], { type: "application/zip" })),
   getAttachmentCategories: vi.fn().mockResolvedValue([]),
   createAttachmentCategory: vi.fn().mockResolvedValue({ id: 1 }),
   updateAttachmentCategory: vi.fn().mockResolvedValue({ id: 1 }),
@@ -100,6 +103,39 @@ describe("useDocumentActions", () => {
     expect(documentsApi.removeDocumentFromFolder).toHaveBeenCalledWith(3, 10);
     // deleteDocument nutzt die API direkt als mutationFn; TanStack reicht ein Kontext-Objekt als 2. Argument durch.
     expect(documentsApi.deleteDocument).toHaveBeenCalledWith(10, expect.anything());
+  });
+
+  it("weist Sammlung und Kategorie gebündelt zu und invalidiert die Ansicht", async () => {
+    const libraryKey = queryKeys.documents.library({});
+    client.setQueryData(libraryKey, [{ id: 10 }]);
+
+    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.addToFolderBulk(5, [10, 11]);
+      await result.current.assignCategoryBulk(3, [10, 11]);
+    });
+
+    expect(documentsApi.addDocumentsToFolder).toHaveBeenCalledWith(5, [10, 11]);
+    expect(documentsApi.assignDocumentsCategory).toHaveBeenCalledWith(3, [10, 11]);
+    await waitFor(() => expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(true));
+  });
+
+  it("lädt die Auswahl als Zip herunter, ohne die Ansicht zu invalidieren", async () => {
+    const libraryKey = queryKeys.documents.library({});
+    client.setQueryData(libraryKey, [{ id: 10 }]);
+
+    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
+
+    let blob: Blob | undefined;
+    await act(async () => {
+      blob = await result.current.downloadZip([10, 11]);
+    });
+
+    expect(documentsApi.downloadDocumentsZip).toHaveBeenCalledWith([10, 11]);
+    expect(blob).toBeInstanceOf(Blob);
+    // Reiner Download verändert keinen Server-State → Ansicht bleibt gültig.
+    expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(false);
   });
 });
 

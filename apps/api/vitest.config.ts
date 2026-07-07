@@ -35,11 +35,7 @@ export default defineConfig({
       ADMIN_INITIAL_PASSWORD: "password123",
       UPLOAD_DIR: path.join(runtimeRoot, "uploads"),
       PREVIEW_CACHE_DIR: path.join(runtimeRoot, "previews"),
-      CONTENT_DIR: path.join(runtimeRoot, "content"),
-      ATTACHMENT_SYNC_ENABLED: "false",
-      SFTP_HOST: "",
-      SFTP_USER: "",
-      SFTP_PASSWORD: ""
+      CONTENT_DIR: path.join(runtimeRoot, "content")
     }
   }
 });
