@@ -21,6 +21,8 @@
  * - Einsortieren/Verschieben/Entfernen rufen den passenden Endpunkt mit den richtigen Argumenten.
  * - Sammlungs-/Kategorie-Verwaltung (umbenennen/loeschen) ruft den passenden Endpunkt.
  * - Nach jeder Mutation wird die Dokument-Ansicht invalidiert (beobachtbar am QueryClient).
+ * - AUSNAHME Upload: Die Upload-Mutation invalidiert bewusst NICHT. Der Uploader laedt mehrere
+ *   Dateien sequenziell hoch; nachgeladen wird einmal am Ende ueber refreshDocuments.
  *
  * Ziel:
  * Absichern, dass die Organisier- und Verwaltungs-Bedienung wirklich die richtigen Server-Aktionen
@@ -103,6 +105,29 @@ describe("useDocumentActions", () => {
     expect(documentsApi.removeDocumentFromFolder).toHaveBeenCalledWith(3, 10);
     // deleteDocument nutzt die API direkt als mutationFn; TanStack reicht ein Kontext-Objekt als 2. Argument durch.
     expect(documentsApi.deleteDocument).toHaveBeenCalledWith(10, expect.anything());
+  });
+
+  it("invalidiert beim Upload NICHT - erst refreshDocuments laedt die Ansicht nach", async () => {
+    const libraryKey = queryKeys.documents.library({});
+    client.setQueryData(libraryKey, [{ id: 10 }]);
+
+    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.uploadDocument(new File(["x"], "a.txt"), 5, 7);
+    });
+
+    expect(documentsApi.uploadDocument).toHaveBeenCalledWith(expect.any(File), 5, 7);
+    // Der Kern der Aenderung: Eine Invalidierung je Datei wuerde bei einem Mehrfach-Upload die
+    // gesamte (progressiv geladene) Bibliothek je Datei neu holen - und weil mutateAsync auf
+    // onSuccess wartet, wuerde der naechste Upload darauf blockieren.
+    expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(false);
+
+    // Nachgeladen wird genau einmal, am Ende des Upload-Vorgangs.
+    await act(async () => {
+      await result.current.refreshDocuments();
+    });
+    await waitFor(() => expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(true));
   });
 
   it("weist Sammlung und Kategorie gebündelt zu und invalidiert die Ansicht", async () => {

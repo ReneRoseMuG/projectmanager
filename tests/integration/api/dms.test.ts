@@ -27,9 +27,13 @@
  * - Geschuetzte System-Labels sind ueber setDocumentTags nicht setzbar (400).
  * - Orphan-Verhalten: Anhaenge werden beim Loeschen des Fachobjekts NICHT geloescht, sondern Nicht einsortiert.
  * - Verwaister Owner-Link (Fachobjekt bereits geloescht) blockiert das Loeschen des Dokuments nicht (204 statt 404).
+ * - Upload-Kontext: `?folder=` und `?category=` ordnen die hochgeladene Datei symmetrisch zu (mit Gegenbeispiel
+ *   ohne Query); der Upload bleibt schreibgeschuetzt (403 fuer Leser).
  *
  * Fehlerfaelle:
  * - 401 ohne Session, 403 Reader-Negativfall, 409 Dublette/Versionskonflikt/Loeschschutz, 400 Zyklus/System-Label.
+ * - Upload mit unbekannter Kategorie: 404. Bekannte Grenze, die der Test festhaelt: Upload und Zuordnung liegen
+ *   nicht in einer Transaktion, das Attachment bleibt angelegt (gilt seit jeher ebenso fuer `folder`).
  *
  * Ziel:
  * Die neue DMS-Oberflaeche und die geaenderte Aufraeum-Semantik gegen Regressionen absichern.
@@ -205,6 +209,55 @@ describe("DMS API", () => {
     await admin.post(`/api/attachment-folders/${folder.body.id}/documents/${upload.body.id}`).expect(204);
     const afterSort = await admin.get("/api/documents?folder=unsorted").expect(200);
     expect((afterSort.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(upload.body.id);
+  });
+
+  // --- Upload-Kontext (Sammlung + Kategorie) ---
+
+  it("Upload übernimmt Sammlung und Kategorie aus der Query", async () => {
+    const admin = await loginAdmin();
+    const folder = await admin.post("/api/attachment-folders").send({ name: "Rechnungen" }).expect(201);
+    const category = await admin.post("/api/attachment-categories").send({ name: "Wichtig" }).expect(201);
+
+    const withContext = await admin
+      .post(`/api/documents?folder=${folder.body.id}&category=${category.body.id}`)
+      .attach("file", Buffer.from("Inhalt"), { filename: "mit-kontext.txt", contentType: "text/plain" })
+      .expect(201);
+
+    const created = await admin.get(`/api/documents/${withContext.body.id}`).expect(200);
+    expect(created.body.folders).toEqual([expect.objectContaining({ id: folder.body.id })]);
+    expect(created.body.categories).toEqual([expect.objectContaining({ id: category.body.id })]);
+
+    // Gegenbeispiel: ohne Query bleibt das Dokument ohne Sammlung und ohne Kategorie.
+    const plain = await uploadDocument(admin, "ohne-kontext.txt");
+    const fetched = await admin.get(`/api/documents/${plain.id}`).expect(200);
+    expect(fetched.body.folders).toEqual([]);
+    expect(fetched.body.categories).toEqual([]);
+  });
+
+  it("Upload mit unbekannter Kategorie antwortet 404 — das Dokument bleibt dennoch angelegt", async () => {
+    const admin = await loginAdmin();
+    const res = await admin
+      .post("/api/documents?category=999999")
+      .attach("file", Buffer.from("Inhalt"), { filename: "unbekannt.txt", contentType: "text/plain" })
+      .expect(404);
+    expect(res.body).toMatchObject({ error: "NOT_FOUND", statusCode: 404 });
+
+    // Bekannte Grenze: Upload und Zuordnung liegen nicht in einer Transaktion. Das Attachment ist
+    // bereits erzeugt, wenn die Zuordnung scheitert — dasselbe Verhalten gilt seit jeher für `folder`.
+    const list = await admin.get("/api/documents").expect(200);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].categories).toEqual([]);
+  });
+
+  it("Upload mit Kontext bleibt schreibgeschützt: Leser erhält 403", async () => {
+    const admin = await loginAdmin();
+    const category = await admin.post("/api/attachment-categories").send({ name: "Gesperrt" }).expect(201);
+    const reader = await loginReader();
+
+    await reader
+      .post(`/api/documents?category=${category.body.id}`)
+      .attach("file", Buffer.from("Inhalt"), { filename: "verboten.txt", contentType: "text/plain" })
+      .expect(403);
   });
 
   // --- System-Label-Schutz ---

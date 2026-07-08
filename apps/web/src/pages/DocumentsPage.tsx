@@ -25,7 +25,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
 import {
   DocumentTile,
@@ -181,7 +181,7 @@ export function DocumentsPage() {
 
   // Progressives Nachladen: der erste Block erscheint sofort, weitere Blöcke laden automatisch
   // nach. Ein Filter-/Suchwechsel ändert den queryKey und startet das Laden von vorne.
-  const { documents, total, loadedCount, loading, loadingMore, error } =
+  const { documents, total, loadedCount, loading, loadingMore, isComplete, error } =
     useDocumentLibrary(filter);
   const { folders, createFolder, updateFolder, deleteFolder } = useFolders();
   const { categories, createCategory, updateCategory, deleteCategory } =
@@ -189,6 +189,7 @@ export function DocumentsPage() {
   const { tags } = useTags("dms");
   const {
     uploadDocument,
+    refreshDocuments,
     deleteDocument,
     setTags,
     updateMetadata,
@@ -224,8 +225,15 @@ export function DocumentsPage() {
   );
 
   const opened = documents.find((doc) => doc.id === openedId) ?? null;
+
+  // Ablage-Kontext des Uploads: Sammlung und Kategorie der aktuellen Ansicht sind das ZIEL der
+  // hochgeladenen Datei. Label, Typ, Endung und Suche sind dagegen bloße Einschränkungen — sie
+  // taugen nicht als Ziel und würden die neue Datei nur sofort wieder verstecken.
   const uploadFolder =
     typeof folderScope === "number" ? folderScope : undefined;
+  const uploadCategory = categoryFilter !== "" ? categoryFilter : undefined;
+  const hasNarrowingFilter =
+    tagFilter !== "" || typeFilter !== "" || extFilter !== "" || search.trim() !== "";
 
   const selectionActive = selectedIds.size > 0;
 
@@ -258,8 +266,12 @@ export function DocumentsPage() {
 
   // Passt der gewählte Endungsfilter nicht mehr in die fertig geladene Ansicht (z. B. nach einem
   // Sammlungswechsel), zurücksetzen — sonst zeigt das Dropdown einen Wert ohne passende Option.
+  //
+  // Gate ist `isComplete` und NICHT `loading || loadingMore`: Zwischen zwei Blöcken des progressiven
+  // Nachladens sind beide kurz false. Kommt die gewählte Endung erst in einem späteren Block vor,
+  // würde der Filter dort fälschlich zurückgesetzt.
   useEffect(() => {
-    if (loading || loadingMore || extFilter === "") {
+    if (!isComplete || extFilter === "") {
       return;
     }
     const stillAvailable =
@@ -267,7 +279,34 @@ export function DocumentsPage() {
     if (!stillAvailable) {
       setExtFilter("");
     }
-  }, [extFilter, extInfo, loading, loadingMore]);
+  }, [extFilter, extInfo, isComplete]);
+
+  // Wer aus der Ansicht fällt, verliert seine Markierung. Sonst zählt die Auswahl-Leiste
+  // unsichtbare Kacheln mit, sie lassen sich nicht mehr einzeln abwählen — und ein Drag einer
+  // sichtbaren Kachel zöge sie stillschweigend mit (verborgene Schreibwirkung).
+  //
+  // Das Gate ist `isComplete` und ausdrücklich NICHT `loading || loadingMore`: Zwischen zwei
+  // Blöcken des progressiven Nachladens sind beide kurz false, obwohl noch Dokumente fehlen —
+  // dort würde die Auswahl fälschlich gelöscht.
+  useEffect(() => {
+    if (!isComplete) {
+      return;
+    }
+    const visibleIds = new Set(visibleDocuments.map((doc) => doc.id));
+    setSelectedIds((current) => {
+      if (current.size === 0) {
+        return current;
+      }
+      const next = new Set<number>();
+      for (const id of current) {
+        if (visibleIds.has(id)) {
+          next.add(id);
+        }
+      }
+      // Teilmenge von `current` — gleiche Größe heißt unverändert. Kein neuer State, keine Schleife.
+      return next.size === current.size ? current : next;
+    });
+  }, [isComplete, visibleDocuments]);
 
   // Inhaltsgesteuerte Breite der Verwaltungsspalte: so breit, dass der längste Sammlungs- oder
   // Kategoriename ausgeschrieben bleibt, geklemmt auf einen Korridor. Erst nach dem Laden der
@@ -335,6 +374,66 @@ export function DocumentsPage() {
       }
       removeFromSelection(doc.id);
     }
+  };
+
+  // Zielangabe für den Abschluss-Toast. Der Upload schreibt eine Zuordnung, die aus dem
+  // Ansichtszustand abgeleitet ist — damit das keine verborgene Schreibwirkung wird, muss das Ziel
+  // ausdrücklich benannt werden.
+  const uploadTargetLabel = useMemo(() => {
+    const folderName =
+      uploadFolder !== undefined
+        ? folders.find((folder) => folder.id === uploadFolder)?.name
+        : undefined;
+    const categoryName =
+      uploadCategory !== undefined
+        ? categories.find((category) => category.id === uploadCategory)?.name
+        : undefined;
+    const targets: string[] = [];
+    if (folderName) {
+      targets.push(`Sammlung „${folderName}"`);
+    }
+    if (categoryName) {
+      targets.push(`Kategorie „${categoryName}"`);
+    }
+    return targets.length > 0 ? `Einsortiert in ${targets.join(" · ")}` : undefined;
+  }, [uploadFolder, uploadCategory, folders, categories]);
+
+  // Der Uploader lädt mehrere Dateien sequenziell hoch. Erfolge werden gezählt statt je Datei
+  // gemeldet — bei 20 Dateien wären 20 Toasts unbrauchbar. Fehler meldet `run` weiterhin einzeln.
+  const uploadBatch = useRef({ succeeded: 0 });
+
+  const handleUpload = async (file: File): Promise<boolean> => {
+    const ok = await run(() => uploadDocument(file, uploadFolder, uploadCategory));
+    if (ok) {
+      uploadBatch.current.succeeded += 1;
+    }
+    return ok;
+  };
+
+  // Einmal je Upload-Vorgang, nicht je Datei: einschränkende Filter räumen (sonst wäre die frisch
+  // hochgeladene Datei sofort unsichtbar), EINMAL nachladen, EINEN Toast zeigen. Ohne einen einzigen
+  // Erfolg geschieht nichts — dann bleiben auch die Filter stehen.
+  const handleUploadBatchComplete = async () => {
+    const succeeded = uploadBatch.current.succeeded;
+    uploadBatch.current.succeeded = 0;
+    if (succeeded === 0) {
+      return;
+    }
+    if (hasNarrowingFilter) {
+      setTagFilter("");
+      setTypeFilter("");
+      setExtFilter("");
+      setSearch("");
+    }
+    await refreshDocuments();
+    showToast({
+      tone: "success",
+      title:
+        succeeded === 1
+          ? "Dokument hochgeladen"
+          : `${succeeded} Dokumente hochgeladen`,
+      message: uploadTargetLabel,
+    });
   };
 
   const handleBulkDownload = async () => {
@@ -755,12 +854,8 @@ export function DocumentsPage() {
 
           {canWrite ? (
             <AttachmentUploader
-              onUpload={(file) =>
-                run(
-                  () => uploadDocument(file, uploadFolder),
-                  "Dokument hochgeladen",
-                )
-              }
+              onUpload={handleUpload}
+              onBatchComplete={handleUploadBatchComplete}
               size="sm"
               tone="dark"
             />

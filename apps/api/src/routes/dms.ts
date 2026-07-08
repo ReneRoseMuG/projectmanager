@@ -129,7 +129,8 @@ const uploadQuerySchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    folder: { type: "integer", minimum: 1 }
+    folder: { type: "integer", minimum: 1 },
+    category: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -322,7 +323,11 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  app.post<{ Querystring: { folder?: number } }>(
+  // `folder` und `category` sind der Ablage-Kontext der Dokumente-Seite: Wer in einer Sammlung
+  // bzw. unter einer Kategorie steht und hochlädt, ordnet die Datei genau dort ein. Beide sind
+  // optional und wirken symmetrisch. Schlägt eine Zuordnung fehl (unbekanntes Ziel → 404), ist das
+  // Attachment bereits angelegt — bekannte Grenze, die schon für `folder` galt.
+  app.post<{ Querystring: { folder?: number; category?: number } }>(
     "/documents",
     { config: attachmentsAuth("write"), schema: { ...uploadBodySchema, querystring: uploadQuerySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
@@ -330,6 +335,9 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
       const document = await createUnboundAttachment(app.db, upload, createJournalActor(request.currentUser));
       if (request.query.folder !== undefined) {
         await addAttachmentToFolder(app.db, request.query.folder, document.id);
+      }
+      if (request.query.category !== undefined) {
+        await assignCategoryToAttachment(app.db, document.id, request.query.category);
       }
       return reply.status(201).send(await getDocument(app.db, document.id));
     }

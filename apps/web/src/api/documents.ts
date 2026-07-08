@@ -60,10 +60,24 @@ export async function getDocument(id: number): Promise<Attachment> {
   return api.get(`documents/${id}`).json<Attachment>();
 }
 
-export async function uploadDocument(file: File, folderId?: number): Promise<Attachment> {
+// `folderId` und `categoryId` sind der Ablage-Kontext der Dokumente-Seite: Die Datei wird direkt in
+// die geöffnete Sammlung bzw. unter die gewählte Kategorie einsortiert. Beide optional, symmetrisch.
+export async function uploadDocument(
+  file: File,
+  folderId?: number,
+  categoryId?: number
+): Promise<Attachment> {
   const formData = new FormData();
   formData.append("file", file);
-  const path = folderId !== undefined ? `documents?folder=${folderId}` : "documents";
+  const params = new URLSearchParams();
+  if (folderId !== undefined) {
+    params.set("folder", String(folderId));
+  }
+  if (categoryId !== undefined) {
+    params.set("category", String(categoryId));
+  }
+  const queryString = params.toString();
+  const path = queryString ? `documents?${queryString}` : "documents";
   return api.post(path, { body: formData }).json<Attachment>();
 }
 

@@ -27,9 +27,13 @@
  * - Ein Drop ins Leere oder auf eine Nicht-Zielzeile bleibt folgenlos.
  * - Ohne Schreibrecht sind Ziehen und Ablegen deaktiviert und lösen keine Schreiboperation aus.
  * - Ein Klick auf eine Sammlung filtert — auch bei aktiver Auswahl — und schreibt nichts.
+ * - Ausgefilterte Dokumente (Server-Filter wie Endungsfilter) verlieren ihre Markierung, sobald
+ *   die Liste vollständig geladen ist; die Drag-Nutzlast enthält danach nur sichtbare IDs.
  *
  * Fehlerfälle:
  * - Drop ohne Ziel, Drop auf eine fremde ID, Drop ohne `attachments:write`.
+ * - Unvollständig geladene Liste: die Auswahl darf NICHT bereinigt werden (zwischen zwei Blöcken
+ *   sind `loading` und `loadingMore` beide false, obwohl noch Dokumente fehlen).
  *
  * Ziel:
  * Den früheren Doppelmodus (Klick = filtern ODER zuweisen) dauerhaft ausschließen und beweisen,
@@ -64,16 +68,16 @@ const permissions = vi.hoisted(() => ({ canWrite: true, canDelete: true }));
 const library = vi.hoisted(() => ({ lastFilter: {} as Record<string, unknown> }));
 
 const fixtures = vi.hoisted(() => {
-  const document = (id: number) => ({
+  const document = (id: number, extension: string, mimetype: string) => ({
     id,
     owners: [],
-    originalName: `Doc-${id}.pdf`,
+    originalName: `Doc-${id}.${extension}`,
     displayName: null,
     description: null,
-    filename: `stored-${id}.pdf`,
-    mimetype: "application/pdf",
+    filename: `stored-${id}.${extension}`,
+    mimetype,
     size: 1024,
-    url: `/uploads/stored-${id}.pdf`,
+    url: `/uploads/stored-${id}.${extension}`,
     categories: [],
     tags: [],
     folders: [],
@@ -81,8 +85,17 @@ const fixtures = vi.hoisted(() => {
     updatedAt: "2026-07-07T08:00:00.000Z",
     version: 1,
   });
+  const all = [
+    document(1, "pdf", "application/pdf"),
+    document(2, "pdf", "application/pdf"),
+    document(3, "txt", "text/plain"),
+  ];
   return {
-    documents: [document(1), document(2), document(3)],
+    all,
+    // Veränderlich: was der Bibliotheks-Hook gerade liefert. Ein Test kann damit einen
+    // Filterwechsel (Dokument fällt heraus) und einen unvollständigen Ladezustand simulieren.
+    documents: [...all],
+    isComplete: true,
     folders: [
       { id: 7, parentId: null, projectId: null, name: "Rechnungen", version: 1 },
     ],
@@ -123,10 +136,11 @@ vi.mock("../../../../apps/web/src/hooks/useDocuments", () => ({
     library.lastFilter = filter;
     return {
       documents: fixtures.documents,
-      total: fixtures.documents.length,
+      total: fixtures.all.length,
       loadedCount: fixtures.documents.length,
       loading: false,
       loadingMore: false,
+      isComplete: fixtures.isComplete,
       error: undefined,
     };
   },
@@ -184,14 +198,20 @@ function fireDrop(overId: string | null, ids: number[]) {
   });
 }
 
+function checkboxFor(id: number) {
+  return screen.getByRole("checkbox", { name: `„Doc-${id}" auswählen` });
+}
+
 function selectDocument(id: number) {
-  fireEvent.click(screen.getByRole("checkbox", { name: `„Doc-${id}" auswählen` }));
+  fireEvent.click(checkboxFor(id));
 }
 
 beforeEach(() => {
   permissions.canWrite = true;
   permissions.canDelete = true;
   library.lastFilter = {};
+  fixtures.documents = [...fixtures.all];
+  fixtures.isComplete = true;
   dnd.draggables.clear();
   dnd.droppables.clear();
   localStorage.clear();
@@ -288,5 +308,65 @@ describe("DocumentsPage — Klick filtert, auch bei aktiver Auswahl", () => {
     expect(library.lastFilter).toEqual({ category: 42 });
     expect(actions.assignCategoryBulk).not.toHaveBeenCalled();
     expect(actions.addToFolderBulk).not.toHaveBeenCalled();
+  });
+});
+
+describe("DocumentsPage — ausgefilterte Dokumente verlieren ihre Markierung", () => {
+  it("deselektiert ein Dokument, das aus der gefilterten Ergebnisliste gefallen ist", () => {
+    const { rerender } = render(<DocumentsPage />);
+    selectDocument(1);
+    selectDocument(2);
+    expect(screen.getByText("2 ausgewählt")).toBeInTheDocument();
+
+    // Dokument 2 fällt aus der Ergebnisliste (Sammlungs-, Kategorie-, Label- oder Suchfilter).
+    fixtures.documents = fixtures.all.filter((doc) => doc.id !== 2);
+    rerender(<DocumentsPage />);
+
+    expect(screen.getByText("1 ausgewählt")).toBeInTheDocument();
+    // Gegenbeispiel: das weiterhin sichtbare Dokument 1 bleibt markiert.
+    expect(checkboxFor(1)).toBeChecked();
+  });
+
+  it("deselektiert ein Dokument, das der Endungsfilter ausblendet", () => {
+    render(<DocumentsPage />);
+    selectDocument(1); // .pdf
+    selectDocument(3); // .txt
+    expect(screen.getByText("2 ausgewählt")).toBeInTheDocument();
+
+    fireEvent.change(
+      screen.getByTitle("Nach Dateiendung in der aktuellen Ansicht filtern"),
+      { target: { value: "txt" } },
+    );
+
+    expect(screen.getByText("1 ausgewählt")).toBeInTheDocument();
+    expect(checkboxFor(3)).toBeChecked();
+  });
+
+  it("lässt die Auswahl unangetastet, solange noch Blöcke nachgeladen werden", () => {
+    const { rerender } = render(<DocumentsPage />);
+    selectDocument(1);
+    selectDocument(2);
+
+    // Zustand zwischen zwei Blöcken des progressiven Nachladens: `loading` und `loadingMore` sind
+    // beide false, die Liste ist aber unvollständig. Hier darf NICHTS bereinigt werden — sonst
+    // verlöre eine Auswahl Dokumente, die bloß noch nicht geladen sind.
+    fixtures.isComplete = false;
+    fixtures.documents = fixtures.all.filter((doc) => doc.id === 1);
+    rerender(<DocumentsPage />);
+
+    expect(screen.getByText("2 ausgewählt")).toBeInTheDocument();
+  });
+
+  it("zieht nach der Bereinigung nur noch sichtbare Dokumente", () => {
+    const { rerender } = render(<DocumentsPage />);
+    selectDocument(1);
+    selectDocument(2);
+    expect(dnd.draggables.get("dms-doc-1")?.data).toEqual({ ids: [1, 2] });
+
+    fixtures.documents = fixtures.all.filter((doc) => doc.id !== 2);
+    rerender(<DocumentsPage />);
+
+    // Das unsichtbar gewordene Dokument 2 kann nicht mehr stillschweigend mitgezogen werden.
+    expect(dnd.draggables.get("dms-doc-1")?.data).toEqual({ ids: [1] });
   });
 });

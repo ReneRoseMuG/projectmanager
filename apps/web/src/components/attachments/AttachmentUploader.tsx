@@ -5,11 +5,17 @@ import { Button } from "../ui/Button";
 
 interface AttachmentUploaderProps {
   onUpload: (file: File) => Promise<unknown>;
+  /**
+   * Läuft einmal je Upload-Vorgang, nachdem ALLE Dateien durch sind — nicht je Datei. Der Aufrufer
+   * kann hier gesammelt nachladen, statt nach jeder einzelnen Datei die ganze Liste neu zu holen.
+   * Optional: Aufrufer ohne diese Prop invalidieren wie bisher in ihrer eigenen Mutation.
+   */
+  onBatchComplete?: () => void | Promise<void>;
   size?: "default" | "sm";
   tone?: "light" | "dark";
 }
 
-export function AttachmentUploader({ onUpload, size = "default", tone = "light" }: AttachmentUploaderProps) {
+export function AttachmentUploader({ onUpload, onBatchComplete, size = "default", tone = "light" }: AttachmentUploaderProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [active, setActive] = useState(false);
   const [uploading, setUploading] = useState<string[]>([]);
@@ -26,6 +32,13 @@ export function AttachmentUploader({ onUpload, size = "default", tone = "light" 
     } catch {
       // Upload errors are surfaced by the caller via toast feedback.
     } finally {
+      // Auch nach einem Fehler: Bereits hochgeladene Dateien sollen sichtbar werden. Wird abgewartet,
+      // damit die "lädt hoch"-Anzeige bis zum abgeschlossenen Nachladen stehen bleibt.
+      try {
+        await onBatchComplete?.();
+      } catch {
+        // Ein fehlgeschlagenes Nachladen ändert nichts am Ergebnis des Uploads.
+      }
       setUploading([]);
     }
   };

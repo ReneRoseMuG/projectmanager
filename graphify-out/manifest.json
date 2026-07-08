@@ -930,8 +930,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/attachments/AttachmentUploader.tsx": {
-    "mtime": 1783341123.1558838,
-    "ast_hash": "80e64ffc134c4222ce22f7e69640af21",
+    "mtime": 1783507501.9112313,
+    "ast_hash": "3d67874094f5b44248deb1da24aca4c4",
     "semantic_hash": ""
   },
   "apps/web/src/components/attachments/attachmentTypes.ts": {
@@ -3230,8 +3230,8 @@
     "semantic_hash": ""
   },
   "docs/design-leitfaden.md": {
-    "mtime": 1783436261.2226205,
-    "ast_hash": "f6fca0dac5bf7e14d0b125bc9b758b34",
+    "mtime": 1783499136.0401924,
+    "ast_hash": "795dc42f52ba24bdc060665f39a2eb7f",
     "semantic_hash": ""
   },
   "docs/skill-documentation/code-discipline.md": {
@@ -6155,8 +6155,8 @@
     "semantic_hash": ""
   },
   "logs/README.md": {
-    "mtime": 1783498927.5495422,
-    "ast_hash": "1a49e3e898284521077fec8cc24c49d4",
+    "mtime": 1783507863.7572944,
+    "ast_hash": "aa3e524d372ee4a1ca5f3ecb40180306",
     "semantic_hash": ""
   },
   "logs/ms26-api-build-latest.txt": {
@@ -6795,8 +6795,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/routes/dms.ts": {
-    "mtime": 1783412512.2731335,
-    "ast_hash": "2cef4c91dee383884c61f13199783509",
+    "mtime": 1783506674.9867377,
+    "ast_hash": "d9261c09c5b61f57c56dc9cdc1743c98",
     "semantic_hash": ""
   },
   "apps/api/src/services/attachment-category.service.ts": {
@@ -6815,18 +6815,18 @@
     "semantic_hash": ""
   },
   "apps/web/src/api/documents.ts": {
-    "mtime": 1783411192.384685,
-    "ast_hash": "506aa648151f9364443516e03ed92667",
+    "mtime": 1783506696.8476646,
+    "ast_hash": "e42d810d2506cbc74e6028ffe83402f2",
     "semantic_hash": ""
   },
   "apps/web/src/hooks/useDocuments.ts": {
-    "mtime": 1783411211.878343,
-    "ast_hash": "d4f5025bf507b397919f0232e31f3a0c",
+    "mtime": 1783507516.709234,
+    "ast_hash": "9b8dc4d8818b2d0e7b32026906bb397d",
     "semantic_hash": ""
   },
   "apps/web/src/pages/DocumentsPage.tsx": {
-    "mtime": 1783498449.8729072,
-    "ast_hash": "ae6ecbe950361856be4db5eeba3c68dd",
+    "mtime": 1783507570.9867191,
+    "ast_hash": "0d103bc8f45fd3adae6c5e5e848a4f17",
     "semantic_hash": ""
   },
   "logs/2026-07-03-06-32-32-feature-termin-uhrzeit-zentrale-formatierung.md": {
@@ -6835,13 +6835,13 @@
     "semantic_hash": ""
   },
   "tests/integration/api/dms.test.ts": {
-    "mtime": 1783337947.8363261,
-    "ast_hash": "7fb03073e71512194bad64970e366949",
+    "mtime": 1783506989.5632272,
+    "ast_hash": "5b22a17c6fb3d391306aa46deaccd979",
     "semantic_hash": ""
   },
   "tests/unit/web/hooks/useDocuments.test.tsx": {
-    "mtime": 1783411599.537582,
-    "ast_hash": "23194c25ce9587862dc6dd9632e6779a",
+    "mtime": 1783507788.1014748,
+    "ast_hash": "8e86c61a9a183a8e25ddaddff4a48dd8",
     "semantic_hash": ""
   },
   "logs/2026-07-03-12-04-02-feature-ms75-dms-umsetzung.md": {
@@ -7430,8 +7430,8 @@
     "semantic_hash": ""
   },
   "tests/unit/web/pages/DocumentsPage.dnd.test.tsx": {
-    "mtime": 1783498724.704536,
-    "ast_hash": "5a00e517cbc5e46ffcf43fd22563fbef",
+    "mtime": 1783505600.9051087,
+    "ast_hash": "7d7a7c9f50dbdb9d43b08972ce74ccf1",
     "semantic_hash": ""
   },
   "logs/2026-07-07-11-19-47-nachtrag-mcp-kommentar-nachgeholt.md": {
@@ -7472,6 +7472,41 @@
   "logs/2026-07-08-10-19-51-feature-dms-dnd-zuweisung.md": {
     "mtime": 1783498922.3232043,
     "ast_hash": "c05597a2a2b54fc2a05b729ab6ca9e85",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-08-10-25-44-doku-design-leitfaden-dnd-zuweisung.md": {
+    "mtime": 1783499169.83602,
+    "ast_hash": "b5e9180b2d6d92ee8df0dbd9408f1e9e",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-08-10-29-40-nachtrag-mcp-kommentar-dnd-zuweisung.md": {
+    "mtime": 1783499403.3098178,
+    "ast_hash": "99afe0958b3dbb04902095ba6e311b0d",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-08-12-14-13-fix-dms-auswahl-bereinigung.md": {
+    "mtime": 1783505689.8489966,
+    "ast_hash": "6680558315e5c1e5d28f7586299bc8d6",
+    "semantic_hash": ""
+  },
+  "tests/unit/web/pages/DocumentsPage.upload.test.tsx": {
+    "mtime": 1783507723.469302,
+    "ast_hash": "1a35802bc29d719ac2afc6842552e580",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-08-12-36-50-feature-dms-upload-kontext.md": {
+    "mtime": 1783507054.2575893,
+    "ast_hash": "1a1e25254e28400a6b0f2d65057b0a8c",
+    "semantic_hash": ""
+  },
+  "tests/unit/web/components/attachments/AttachmentUploader.test.tsx": {
+    "mtime": 1783507632.9956017,
+    "ast_hash": "e3ee17a9928e83a54aadfe1146c9685e",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-08-12-50-13-fix-dms-upload-einmal-nachladen.md": {
+    "mtime": 1783507857.5258498,
+    "ast_hash": "9ed7c488c170fe4f3ca9d6fe87e93996",
     "semantic_hash": ""
   }
 }

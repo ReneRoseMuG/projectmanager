@@ -2,6 +2,10 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 08.07.26 | 12:50:13 | Fix | Mehrfach-Upload lädt die Bibliothek nur noch einmal nach | ✅ |
+| 08.07.26 | 12:36:50 | Feature | Upload übernimmt Sammlung + Kategorie; Endungsfilter-Gate korrigiert | ✅ |
+| 08.07.26 | 12:14:13 | Fix | Ausgefilterte Dokumente verlieren ihre Markierung | ✅ |
+| 08.07.26 | 10:29:40 | Nachtrag | MCP-Abschlusskommentar D&D-Zuweisung nachgeholt (PROJ-3) | ✅ |
 | 08.07.26 | 10:25:44 | Doku | Design-Leitfaden §8.25/§8.26 auf D&D-Zuweisung nachgezogen | ✅ |
 | 08.07.26 | 10:19:51 | Feature | DMS Zuweisung per Drag & Drop, Panel-Scroll, Auto-Breite | ✅ |
 | 07.07.26 | 16:58:01 | Doku | Design-Leitfaden §8.26 (DMS-Kachelansicht) | ✅ |

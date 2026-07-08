@@ -27,6 +27,9 @@ export function useDocumentLibrary(filter: DocumentLibraryFilter) {
     loadedCount: list.loadedCount,
     loading: list.loading,
     loadingMore: list.loadingMore,
+    // Erst wenn ALLE Blöcke geladen sind. Zwischen zwei Blöcken sind `loading` und `loadingMore`
+    // beide kurz false, obwohl noch Dokumente fehlen — wer auf „fertig" prüfen will, braucht dies.
+    isComplete: list.isComplete,
     error: list.error,
     reload
   };
@@ -87,9 +90,13 @@ export function useDocumentActions() {
   const queryClient = useQueryClient();
   const invalidate = useCallback(() => invalidateDocuments(queryClient), [queryClient]);
 
+  // BEWUSST OHNE `onSuccess: invalidate`. Der Uploader lädt mehrere Dateien sequenziell hoch; eine
+  // Invalidierung je Datei würde jedes Mal die gesamte (progressiv geladene) Bibliothek neu holen —
+  // und weil `mutateAsync` auf `onSuccess` wartet, würde der nächste Upload darauf blockieren.
+  // Der Aufrufer lädt stattdessen EINMAL am Ende des Upload-Vorgangs über `refreshDocuments` nach.
   const uploadMutation = useMutation({
-    mutationFn: ({ file, folderId }: { file: File; folderId?: number }) => documentsApi.uploadDocument(file, folderId),
-    onSuccess: invalidate
+    mutationFn: ({ file, folderId, categoryId }: { file: File; folderId?: number; categoryId?: number }) =>
+      documentsApi.uploadDocument(file, folderId, categoryId)
   });
   const metadataMutation = useMutation({
     mutationFn: ({ id, input }: { id: number; input: { displayName?: string | null; description?: string | null; expectedVersion: number } }) =>
@@ -132,7 +139,10 @@ export function useDocumentActions() {
   });
 
   return {
-    uploadDocument: (file: File, folderId?: number) => uploadMutation.mutateAsync({ file, folderId }),
+    uploadDocument: (file: File, folderId?: number, categoryId?: number) =>
+      uploadMutation.mutateAsync({ file, folderId, categoryId }),
+    // Gehört zu `uploadDocument`: einmal nach dem gesamten Upload-Vorgang aufrufen.
+    refreshDocuments: invalidate,
     updateMetadata: (id: number, input: { displayName?: string | null; description?: string | null; expectedVersion: number }) =>
       metadataMutation.mutateAsync({ id, input }),
     setTags: (id: number, tagIds: number[]) => tagsMutation.mutateAsync({ id, tagIds }),
