@@ -1,0 +1,292 @@
+// @vitest-environment jsdom
+
+/**
+ * Test Scope:
+ * DocumentsPage — Zuweisen per Drag & Drop und die Trennung von Filtern und Zuweisen (MS-75).
+ *
+ * Test-Ebene:
+ * - Unit
+ *
+ * Realitätsgrad:
+ * - Echte DocumentsPage-Verdrahtung inkl. echter DocumentSidePanel- und DocumentTile-Komponenten.
+ *   Auswahl, Filterzustand und Drop-Auflösung laufen im echten Seitencode.
+ *
+ * Mock-Entscheidung:
+ * - `@dnd-kit/core` wird als Page-Grenze gemockt (Muster aus WikiTree.test.tsx): Die Bibliothek ist
+ *   der externe Collaborator; geprüft wird unsere Drop-Auflösung, nicht dnd-kit. Der Mock greift
+ *   `onDragEnd` ab und protokolliert die an `useDraggable`/`useDroppable` übergebenen Optionen.
+ * - Datenhooks, Toast und Asset-URL werden gemockt; Uploader und Viewer sind für diese Prüfung
+ *   ohne Belang und werden als Stubs ersetzt.
+ *
+ * Isolation:
+ * - jsdom, keine API-Aufrufe, keine echte Navigation.
+ *
+ * Abgedeckte Regeln:
+ * - Ein Drop auf eine Sammlung sortiert genau die gezogenen Dokumente ein; auf eine Kategorie weist zu.
+ * - Wird eine markierte Kachel gezogen, wandert die ganze Auswahl mit; eine unmarkierte allein.
+ * - Ein Drop ins Leere oder auf eine Nicht-Zielzeile bleibt folgenlos.
+ * - Ohne Schreibrecht sind Ziehen und Ablegen deaktiviert und lösen keine Schreiboperation aus.
+ * - Ein Klick auf eine Sammlung filtert — auch bei aktiver Auswahl — und schreibt nichts.
+ *
+ * Fehlerfälle:
+ * - Drop ohne Ziel, Drop auf eine fremde ID, Drop ohne `attachments:write`.
+ *
+ * Ziel:
+ * Den früheren Doppelmodus (Klick = filtern ODER zuweisen) dauerhaft ausschließen und beweisen,
+ * dass eine Massenzuweisung nur durch eine echte Ziehbewegung auf ein echtes Ziel entsteht.
+ */
+import "@testing-library/jest-dom/vitest";
+import { fireEvent, screen } from "@testing-library/dom";
+import { act, cleanup, render } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const dnd = vi.hoisted(() => ({
+  onDragEnd: undefined as ((event: unknown) => void) | undefined,
+  draggables: new Map<string, { data?: unknown; disabled?: boolean }>(),
+  droppables: new Map<string, { disabled?: boolean }>(),
+}));
+
+const actions = vi.hoisted(() => ({
+  addToFolderBulk: vi.fn(async () => undefined),
+  assignCategoryBulk: vi.fn(async () => undefined),
+  uploadDocument: vi.fn(async () => undefined),
+  deleteDocument: vi.fn(async () => undefined),
+  setTags: vi.fn(async () => undefined),
+  updateMetadata: vi.fn(async () => undefined),
+  removeCategory: vi.fn(async () => undefined),
+  removeFromFolder: vi.fn(async () => undefined),
+  downloadZip: vi.fn(async () => new Blob()),
+}));
+
+const permissions = vi.hoisted(() => ({ canWrite: true, canDelete: true }));
+
+const library = vi.hoisted(() => ({ lastFilter: {} as Record<string, unknown> }));
+
+const fixtures = vi.hoisted(() => {
+  const document = (id: number) => ({
+    id,
+    owners: [],
+    originalName: `Doc-${id}.pdf`,
+    displayName: null,
+    description: null,
+    filename: `stored-${id}.pdf`,
+    mimetype: "application/pdf",
+    size: 1024,
+    url: `/uploads/stored-${id}.pdf`,
+    categories: [],
+    tags: [],
+    folders: [],
+    createdAt: "2026-07-07T08:00:00.000Z",
+    updatedAt: "2026-07-07T08:00:00.000Z",
+    version: 1,
+  });
+  return {
+    documents: [document(1), document(2), document(3)],
+    folders: [
+      { id: 7, parentId: null, projectId: null, name: "Rechnungen", version: 1 },
+    ],
+    categories: [{ id: 42, name: "Wichtig", color: "#ff0000", version: 1 }],
+  };
+});
+
+vi.mock("@dnd-kit/core", () => ({
+  DndContext: ({
+    children,
+    onDragEnd,
+  }: {
+    children: ReactNode;
+    onDragEnd?: (event: unknown) => void;
+  }) => {
+    dnd.onDragEnd = onDragEnd;
+    return <div data-testid="dnd-context">{children}</div>;
+  },
+  DragOverlay: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+  PointerSensor: class PointerSensor {},
+  useSensor: () => ({}),
+  useSensors: () => [],
+  useDraggable: (options: { id: string; data?: unknown; disabled?: boolean }) => {
+    dnd.draggables.set(options.id, {
+      data: options.data,
+      disabled: options.disabled,
+    });
+    return { setNodeRef: () => undefined, listeners: {}, isDragging: false };
+  },
+  useDroppable: (options: { id: string; disabled?: boolean }) => {
+    dnd.droppables.set(options.id, { disabled: options.disabled });
+    return { setNodeRef: () => undefined, isOver: false };
+  },
+}));
+
+vi.mock("../../../../apps/web/src/hooks/useDocuments", () => ({
+  useDocumentLibrary: (filter: Record<string, unknown>) => {
+    library.lastFilter = filter;
+    return {
+      documents: fixtures.documents,
+      total: fixtures.documents.length,
+      loadedCount: fixtures.documents.length,
+      loading: false,
+      loadingMore: false,
+      error: undefined,
+    };
+  },
+  useFolders: () => ({
+    folders: fixtures.folders,
+    createFolder: vi.fn(),
+    updateFolder: vi.fn(),
+    deleteFolder: vi.fn(),
+  }),
+  useCategories: () => ({
+    categories: fixtures.categories,
+    createCategory: vi.fn(),
+    updateCategory: vi.fn(),
+    deleteCategory: vi.fn(),
+  }),
+  useDocumentActions: () => actions,
+}));
+
+vi.mock("../../../../apps/web/src/hooks/usePermissions", () => ({
+  useHasPermission: (_resource: string, action: string) =>
+    action === "write" ? permissions.canWrite : permissions.canDelete,
+}));
+
+vi.mock("../../../../apps/web/src/hooks/useTags", () => ({
+  useTags: () => ({ tags: [] }),
+}));
+
+vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({
+  useToast: () => ({ showToast: vi.fn() }),
+}));
+
+vi.mock("../../../../apps/web/src/api/client", () => ({
+  assetUrl: (path: string) => path,
+}));
+
+vi.mock("../../../../apps/web/src/components/attachments/AttachmentUploader", () => ({
+  AttachmentUploader: () => <div data-testid="uploader" />,
+}));
+
+vi.mock("../../../../apps/web/src/components/attachments/DocumentViewer", () => ({
+  DocumentViewer: () => <div data-testid="viewer" />,
+}));
+
+// Nach den Mocks importieren, damit die Seite die Stubs sieht.
+const { DocumentsPage } = await import(
+  "../../../../apps/web/src/pages/DocumentsPage"
+);
+
+function fireDrop(overId: string | null, ids: number[]) {
+  act(() => {
+    dnd.onDragEnd?.({
+      active: { data: { current: { ids } } },
+      over: overId === null ? null : { id: overId },
+    });
+  });
+}
+
+function selectDocument(id: number) {
+  fireEvent.click(screen.getByRole("checkbox", { name: `„Doc-${id}" auswählen` }));
+}
+
+beforeEach(() => {
+  permissions.canWrite = true;
+  permissions.canDelete = true;
+  library.lastFilter = {};
+  dnd.draggables.clear();
+  dnd.droppables.clear();
+  localStorage.clear();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe("DocumentsPage — Zuweisen per Drag & Drop", () => {
+  it("sortiert die gezogene Auswahl in die Sammlung ein, auf die abgelegt wurde", () => {
+    render(<DocumentsPage />);
+    selectDocument(1);
+    selectDocument(2);
+
+    // Die markierte Kachel trägt die gesamte Auswahl als Nutzlast, die unmarkierte nur sich selbst.
+    expect(dnd.draggables.get("dms-doc-1")?.data).toEqual({ ids: [1, 2] });
+    expect(dnd.draggables.get("dms-doc-3")?.data).toEqual({ ids: [3] });
+
+    fireDrop("dms-folder-7", [1, 2]);
+
+    expect(actions.addToFolderBulk).toHaveBeenCalledTimes(1);
+    expect(actions.addToFolderBulk).toHaveBeenCalledWith(7, [1, 2]);
+    // Gegenbeispiel: Das nicht markierte Dokument 3 ist nicht betroffen, und keine Kategorie wurde gesetzt.
+    expect(actions.assignCategoryBulk).not.toHaveBeenCalled();
+  });
+
+  it("weist beim Ablegen auf eine Kategorie die Kategorie zu, nicht die Sammlung", () => {
+    render(<DocumentsPage />);
+    fireDrop("dms-category-42", [3]);
+
+    expect(actions.assignCategoryBulk).toHaveBeenCalledTimes(1);
+    expect(actions.assignCategoryBulk).toHaveBeenCalledWith(42, [3]);
+    expect(actions.addToFolderBulk).not.toHaveBeenCalled();
+  });
+
+  it("bleibt folgenlos beim Drop ins Leere oder auf eine Nicht-Zielzeile", () => {
+    render(<DocumentsPage />);
+
+    fireDrop(null, [1, 2]);
+    fireDrop("dms-doc-2", [1]);
+
+    expect(actions.addToFolderBulk).not.toHaveBeenCalled();
+    expect(actions.assignCategoryBulk).not.toHaveBeenCalled();
+  });
+
+  it("bietet „Alle Dokumente“ und „Nicht einsortiert“ nicht als Ablageziel an", () => {
+    render(<DocumentsPage />);
+
+    // Genau die echten Sammlungen und Kategorien sind Ziele — die Filterzeilen nicht.
+    expect([...dnd.droppables.keys()].sort()).toEqual([
+      "dms-category-42",
+      "dms-folder-7",
+    ]);
+  });
+
+  it("schreibt ohne Schreibrecht nicht und deaktiviert Ziehen wie Ablegen", () => {
+    permissions.canWrite = false;
+    render(<DocumentsPage />);
+
+    expect(dnd.draggables.get("dms-doc-1")?.disabled).toBe(true);
+    expect(dnd.droppables.get("dms-folder-7")?.disabled).toBe(true);
+
+    // Selbst ein künstlich ausgelöster Drop darf nichts schreiben — das Frontend-Gating
+    // ist nur Komfort, der Guard im Drop-Handler muss halten.
+    fireDrop("dms-folder-7", [1]);
+    expect(actions.addToFolderBulk).not.toHaveBeenCalled();
+  });
+});
+
+describe("DocumentsPage — Klick filtert, auch bei aktiver Auswahl", () => {
+  it("filtert bei einem Klick auf eine Sammlung und löst keine Zuweisung aus", () => {
+    render(<DocumentsPage />);
+    selectDocument(1);
+    selectDocument(2);
+    expect(screen.getByText("2 ausgewählt")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rechnungen" }));
+
+    // Beobachtbar: Der Bibliotheksfilter zeigt jetzt auf die Sammlung …
+    expect(library.lastFilter).toEqual({ folder: 7 });
+    // … und es wurde nichts geschrieben. Das ist der Regressionsschutz gegen den alten Doppelmodus.
+    expect(actions.addToFolderBulk).not.toHaveBeenCalled();
+    expect(actions.assignCategoryBulk).not.toHaveBeenCalled();
+  });
+
+  it("filtert bei einem Klick auf eine Kategorie und löst keine Zuweisung aus", () => {
+    render(<DocumentsPage />);
+    selectDocument(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Wichtig" }));
+
+    expect(library.lastFilter).toEqual({ category: 42 });
+    expect(actions.assignCategoryBulk).not.toHaveBeenCalled();
+    expect(actions.addToFolderBulk).not.toHaveBeenCalled();
+  });
+});

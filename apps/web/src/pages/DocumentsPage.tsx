@@ -1,3 +1,14 @@
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import type {
   Attachment,
   AttachmentCategory,
@@ -14,7 +25,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AttachmentUploader } from "../components/attachments/AttachmentUploader";
 import {
   DocumentTile,
@@ -30,9 +41,21 @@ import {
   type ThumbnailSize,
 } from "../components/attachments/documentThumbnailSize";
 import { DocumentSidePanel } from "../components/attachments/DocumentSidePanel";
+import {
+  categoryDropId,
+  documentDragId,
+  dragDocumentIds,
+  dragIdsFromData,
+  folderDropId,
+  parseDropTarget,
+} from "../components/attachments/documentDnd";
+import {
+  PANEL_MIN_WIDTH,
+  computePanelWidth,
+  type PanelRow,
+} from "../components/attachments/documentPanelWidth";
 import { EmptyState } from "../components/ui/EmptyState";
 import { LoadMoreIndicator } from "../components/ui/LoadMoreIndicator";
-import { useConfirm } from "../components/ui/ConfirmDialogProvider";
 import { useToast } from "../components/ui/ToastProvider";
 import {
   useCategories,
@@ -48,11 +71,64 @@ import type { DocumentLibraryFilter } from "../api/documents";
 // Sentinel für die Dropdown-Option „ohne Endung" (echte Endungen sind nie leer).
 const EXT_NONE = "__none__";
 
+// Ziehbare Hülle um eine Dokumentkachel. Bewusst ein Wrapper statt einer Änderung an DocumentTile:
+// dessen Klick-Verdrahtung (Einfachklick markiert, Doppelklick öffnet, Checkbox und Löschen mit
+// stopPropagation) bleibt so unangetastet. `drag.attributes` wird nicht gespreizt — es setzt
+// role="button" und tabIndex auf einen Container, der bereits Checkbox und Button enthält, und
+// bringt ohne KeyboardSensor keinen Nutzen.
+function DraggableTile({
+  documentId,
+  ids,
+  disabled,
+  children,
+}: {
+  documentId: number;
+  ids: number[];
+  disabled: boolean;
+  children: ReactNode;
+}) {
+  const drag = useDraggable({
+    id: documentDragId(documentId),
+    data: { ids },
+    disabled,
+  });
+  return (
+    <div
+      ref={drag.setNodeRef}
+      {...drag.listeners}
+      className={drag.isDragging ? "opacity-50" : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Ablageziel um eine Sammlungs- oder Kategoriezeile. Die Zeile selbst bleibt unverändert. Der Hook
+// braucht eine eigene Komponente, weil er nicht innerhalb eines `.map()`-Callbacks laufen darf.
+function DroppableRow({
+  dropId,
+  disabled,
+  children,
+}: {
+  dropId: string;
+  disabled: boolean;
+  children: ReactNode;
+}) {
+  const drop = useDroppable({ id: dropId, disabled });
+  return (
+    <div
+      ref={drop.setNodeRef}
+      className={`rounded-md ${drop.isOver ? "bg-white/10 ring-1 ring-inset ring-white/35" : ""}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function DocumentsPage() {
   const canWrite = useHasPermission("attachments", "write");
   const canDelete = useHasPermission("attachments", "delete");
   const { showToast } = useToast();
-  const { confirm } = useConfirm();
 
   const [folderScope, setFolderScope] = useState<number | "unsorted" | "all">(
     "all",
@@ -74,6 +150,14 @@ export function DocumentsPage() {
     null,
   );
   const [editName, setEditName] = useState("");
+  const [activeDragIds, setActiveDragIds] = useState<number[] | null>(null);
+  const [panelWidth, setPanelWidth] = useState(PANEL_MIN_WIDTH);
+
+  // Ziehen beginnt erst ab 6 px Mausbewegung — darunter bleibt es ein Klick. Derselbe Wert wie im
+  // Wiki-Baum, damit Markieren (Einfachklick) und Öffnen (Doppelklick) der Kachel unverändert bleiben.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
 
   const filter = useMemo<DocumentLibraryFilter>(() => {
     const next: DocumentLibraryFilter = {};
@@ -185,6 +269,32 @@ export function DocumentsPage() {
     }
   }, [extFilter, extInfo, loading, loadingMore]);
 
+  // Inhaltsgesteuerte Breite der Verwaltungsspalte: so breit, dass der längste Sammlungs- oder
+  // Kategoriename ausgeschrieben bleibt, geklemmt auf einen Korridor. Erst nach dem Laden der
+  // Schriften messen, sonst rechnet die Canvas mit einem Fallback-Font und liefert zu schmal.
+  useEffect(() => {
+    let cancelled = false;
+    const rows: PanelRow[] = [
+      ...folders.map((folder) => ({
+        label: folder.name,
+        indent: folder.parentId ? 12 : 0,
+      })),
+      ...categories.map((category) => ({ label: category.name })),
+    ];
+    const applyWidth = () => {
+      if (cancelled) {
+        return;
+      }
+      setPanelWidth(computePanelWidth(rows, canWrite));
+    };
+    void (window.document.fonts?.ready ?? Promise.resolve())
+      .then(applyWidth)
+      .catch(applyWidth);
+    return () => {
+      cancelled = true;
+    };
+  }, [folders, categories, canWrite]);
+
   const changeThumbnailSize = (size: ThumbnailSize) => {
     setThumbnailSize(size);
     saveThumbnailSize(size);
@@ -227,46 +337,9 @@ export function DocumentsPage() {
     }
   };
 
-  // Nach einer erfolgreichen Bulk-Operation nachfragen, ob weitere Aktionen auf derselben
-  // Auswahl folgen. Bei „Nein" wird die (in gefilterten Ansichten sonst verwaiste) Auswahl
-  // vollständig aufgehoben — sie zeigt sonst auf Dokumente, die aus der Liste gefallen sind.
-  const promptContinueOrClear = async () => {
-    const keepSelection = await confirm({
-      title: "Weitere Bulk-Operation?",
-      body: `${selectedIds.size} ${
-        selectedIds.size === 1 ? "Dokument bleibt" : "Dokumente bleiben"
-      } ausgewählt. Möchtest du eine weitere Bulk-Operation ausführen?`,
-      confirmLabel: "Ausgewählt lassen",
-      cancelLabel: "Auswahl aufheben",
-    });
-    if (!keepSelection) {
-      clearSelection();
-    }
-  };
-
-  const handleBulkAssignFolder = async (folderId: number) => {
-    const ok = await run(
-      () => addToFolderBulk(folderId, [...selectedIds]),
-      "Auswahl in Sammlung einsortiert",
-    );
-    if (ok) {
-      await promptContinueOrClear();
-    }
-  };
-
-  const handleBulkAssignCategory = async (categoryId: number) => {
-    const ok = await run(
-      () => assignCategoryBulk(categoryId, [...selectedIds]),
-      "Kategorie zugewiesen",
-    );
-    if (ok) {
-      await promptContinueOrClear();
-    }
-  };
-
   const handleBulkDownload = async () => {
     const ids = [...selectedIds];
-    const ok = await run(async () => {
+    await run(async () => {
       const blob = await downloadZip(ids);
       const url = URL.createObjectURL(blob);
       const link = window.document.createElement("a");
@@ -275,26 +348,41 @@ export function DocumentsPage() {
       link.click();
       URL.revokeObjectURL(url);
     });
-    if (ok) {
-      await promptContinueOrClear();
-    }
   };
 
-  // Navigation im Doppelmodus: ohne Auswahl filtert ein Klick, mit aktiver Auswahl sortiert er
-  // die markierten Dokumente in die Sammlung ein bzw. weist die Kategorie zu.
+  // Ein Klick auf eine Sammlung oder Kategorie filtert — immer. Zugewiesen wird ausschließlich per
+  // Drag & Drop. Damit tut dieselbe Zeile nicht je nach unsichtbarem Auswahlzustand zwei
+  // verschiedene Dinge (der frühere Doppelmodus).
   const handleNavFolderClick = (folderId: number) => {
-    if (selectionActive) {
-      void handleBulkAssignFolder(folderId);
-    } else {
-      setFolderScope(folderId);
-    }
+    setFolderScope(folderId);
   };
 
   const handleNavCategoryClick = (categoryId: number) => {
-    if (selectionActive) {
-      void handleBulkAssignCategory(categoryId);
+    setCategoryFilter((current) => (current === categoryId ? "" : categoryId));
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const ids = dragIdsFromData(event.active.data.current);
+    setActiveDragIds(ids.length > 0 ? ids : null);
+  };
+
+  // Ablegen auf einer Sammlung sortiert ein, auf einer Kategorie weist zu. Ein Drop ins Leere oder
+  // auf „Alle Dokumente"/„Nicht einsortiert" liefert kein Ziel und bleibt folgenlos. Ohne
+  // Schreibrecht passiert nichts — die API bleibt die eigentliche Sicherheitsgrenze.
+  const handleDragEnd = (event: DragEndEvent) => {
+    const ids = dragIdsFromData(event.active.data.current);
+    setActiveDragIds(null);
+    const target = parseDropTarget(event.over?.id);
+    if (!target || !canWrite || ids.length === 0) {
+      return;
+    }
+    if (target.kind === "folder") {
+      void run(
+        () => addToFolderBulk(target.id, ids),
+        ids.length === 1 ? "Dokument einsortiert" : "Dokumente einsortiert",
+      );
     } else {
-      setCategoryFilter((current) => (current === categoryId ? "" : categoryId));
+      void run(() => assignCategoryBulk(target.id, ids), "Kategorie zugewiesen");
     }
   };
 
@@ -438,6 +526,12 @@ export function DocumentsPage() {
         </p>
       </header>
 
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => setActiveDragIds(null)}
+      >
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         {/* Verwaltung: Sammlungen & Kategorien */}
         <DocumentSidePanel
@@ -445,11 +539,12 @@ export function DocumentsPage() {
           title="Verwaltung"
           storageKey="ui.documents.folders.collapsed"
           railIcon={FolderArchive}
+          widthPx={panelWidth}
         >
           {selectionActive ? (
             <div className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-xs text-white/80">
               {selectedIds.size} ausgewählt — auf eine Sammlung oder Kategorie
-              klicken, um sie zuzuweisen.
+              ziehen, um sie zuzuweisen.
             </div>
           ) : null}
 
@@ -462,59 +557,65 @@ export function DocumentsPage() {
             {folders.length > 0 ? (
               <div className="my-1 border-t border-white/10" />
             ) : null}
-            {folders.map((folder) =>
-              editingFolderId === folder.id ? (
-                <div key={folder.id}>
-                  {editRow(() => saveFolderName(folder))}
-                </div>
-              ) : (
-                <div
-                  key={folder.id}
-                  className="group flex items-center gap-1"
-                  style={{ paddingLeft: folder.parentId ? 12 : 0 }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleNavFolderClick(folder.id)}
-                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
-                      folderScope === folder.id && !selectionActive
-                        ? "bg-white/10 font-semibold text-white"
-                        : "text-white/70 hover:bg-white/5 hover:text-white"
-                    }`}
-                    title={
-                      selectionActive
-                        ? `${selectedIds.size} Dokument(e) hier einsortieren`
-                        : undefined
-                    }
-                  >
-                    <FolderArchive size={16} />
-                    <span className="truncate">{folder.name}</span>
-                  </button>
-                  {canWrite ? (
-                    <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          startEdit(folder.id, folder.name, "folder")
-                        }
-                        className="rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white"
-                        title="Umbenennen"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteFolder(folder)}
-                        className="rounded-md p-1 text-white/45 hover:bg-crimson/20 hover:text-crimson"
-                        title="Löschen"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+            {folders.length > 0 ? (
+              <div className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
+                {folders.map((folder) =>
+                  editingFolderId === folder.id ? (
+                    <div key={folder.id}>
+                      {editRow(() => saveFolderName(folder))}
                     </div>
-                  ) : null}
-                </div>
-              ),
-            )}
+                  ) : (
+                    <DroppableRow
+                      key={folder.id}
+                      dropId={folderDropId(folder.id)}
+                      disabled={!canWrite}
+                    >
+                      <div
+                        className="group flex items-center gap-1"
+                        style={{ paddingLeft: folder.parentId ? 12 : 0 }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleNavFolderClick(folder.id)}
+                          className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${
+                            folderScope === folder.id
+                              ? "bg-white/10 font-semibold text-white"
+                              : "text-white/70 hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          <FolderArchive size={16} className="shrink-0" />
+                          <span className="min-w-0 break-words">
+                            {folder.name}
+                          </span>
+                        </button>
+                        {canWrite ? (
+                          <div className="flex shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                startEdit(folder.id, folder.name, "folder")
+                              }
+                              className="rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white"
+                              title="Umbenennen"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteFolder(folder)}
+                              className="rounded-md p-1 text-white/45 hover:bg-crimson/20 hover:text-crimson"
+                              title="Löschen"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </DroppableRow>
+                  ),
+                )}
+              </div>
+            ) : null}
             {canWrite ? (
               <form
                 className="mt-1 flex items-center gap-1 border-t border-white/10 px-1 pt-2"
@@ -561,61 +662,65 @@ export function DocumentsPage() {
                 Noch keine Kategorien.
               </span>
             ) : null}
-            {categories.map((category) =>
-              editingCategoryId === category.id ? (
-                <div key={category.id}>
-                  {editRow(() => saveCategoryName(category))}
-                </div>
-              ) : (
-                <div
-                  key={category.id}
-                  className="group flex items-center gap-1"
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleNavCategoryClick(category.id)}
-                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition ${
-                      categoryFilter === category.id && !selectionActive
-                        ? "bg-white/10 font-semibold text-white"
-                        : "text-white/70 hover:bg-white/5 hover:text-white"
-                    }`}
-                    title={
-                      selectionActive
-                        ? `${selectedIds.size} Dokument(e) dieser Kategorie zuweisen`
-                        : undefined
-                    }
-                  >
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: category.color }}
-                    />
-                    <span className="truncate">{category.name}</span>
-                  </button>
-                  {canWrite ? (
-                    <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          startEdit(category.id, category.name, "category")
-                        }
-                        className="rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white"
-                        title="Umbenennen"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCategory(category)}
-                        className="rounded-md p-1 text-white/45 hover:bg-crimson/20 hover:text-crimson"
-                        title="Löschen"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+            {categories.length > 0 ? (
+              <div className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
+                {categories.map((category) =>
+                  editingCategoryId === category.id ? (
+                    <div key={category.id}>
+                      {editRow(() => saveCategoryName(category))}
                     </div>
-                  ) : null}
-                </div>
-              ),
-            )}
+                  ) : (
+                    <DroppableRow
+                      key={category.id}
+                      dropId={categoryDropId(category.id)}
+                      disabled={!canWrite}
+                    >
+                      <div className="group flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleNavCategoryClick(category.id)}
+                          className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition ${
+                            categoryFilter === category.id
+                              ? "bg-white/10 font-semibold text-white"
+                              : "text-white/70 hover:bg-white/5 hover:text-white"
+                          }`}
+                        >
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          <span className="min-w-0 break-words">
+                            {category.name}
+                          </span>
+                        </button>
+                        {canWrite ? (
+                          <div className="flex shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                startEdit(category.id, category.name, "category")
+                              }
+                              className="rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white"
+                              title="Umbenennen"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(category)}
+                              className="rounded-md p-1 text-white/45 hover:bg-crimson/20 hover:text-crimson"
+                              title="Löschen"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </DroppableRow>
+                  ),
+                )}
+              </div>
+            ) : null}
             {canWrite ? (
               <form
                 className="mt-1 flex items-center gap-1 border-t border-white/10 px-1 pt-2"
@@ -665,12 +770,15 @@ export function DocumentsPage() {
         {/* Bibliothek */}
         <section className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
+            {/* Das Suchfeld bekommt eine feste Breite statt `flex-1`: sonst frisst es den ganzen
+                Restplatz und drängt die Dropdowns in den Umbruch. Die Dropdowns halten eine
+                lesbare Mindestbreite, die Kachelgröße sitzt rechts. */}
             <input
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Dokumente durchsuchen…"
-              className="min-w-[180px] flex-1 rounded-md border border-line bg-white px-3 py-2 text-sm text-ink"
+              className="w-full min-w-[180px] rounded-md border border-line bg-white px-3 py-2 text-sm text-ink sm:w-64"
             />
             <select
               value={tagFilter}
@@ -679,7 +787,7 @@ export function DocumentsPage() {
                   event.target.value ? Number(event.target.value) : "",
                 )
               }
-              className="rounded-md border border-line bg-white px-2 py-2 text-sm text-ink"
+              className="min-w-[8.5rem] rounded-md border border-line bg-white px-2 py-2 text-sm text-ink"
             >
               <option value="">Alle Labels</option>
               {tags.map((tag) => (
@@ -691,7 +799,7 @@ export function DocumentsPage() {
             <select
               value={typeFilter}
               onChange={(event) => setTypeFilter(event.target.value)}
-              className="rounded-md border border-line bg-white px-2 py-2 text-sm text-ink"
+              className="min-w-[8.5rem] rounded-md border border-line bg-white px-2 py-2 text-sm text-ink"
             >
               <option value="">Alle Typen</option>
               <option value="image/">Bild</option>
@@ -704,7 +812,7 @@ export function DocumentsPage() {
               value={extFilter}
               onChange={(event) => setExtFilter(event.target.value)}
               disabled={extInfo.list.length === 0 && !extInfo.hasNone}
-              className="rounded-md border border-line bg-white px-2 py-2 text-sm text-ink disabled:opacity-50"
+              className="min-w-[8.5rem] rounded-md border border-line bg-white px-2 py-2 text-sm text-ink disabled:opacity-50"
               title="Nach Dateiendung in der aktuellen Ansicht filtern"
             >
               <option value="">Alle Endungen</option>
@@ -719,7 +827,7 @@ export function DocumentsPage() {
             </select>
             {/* Kachelgröße */}
             <div
-              className="flex items-center gap-0.5 rounded-md border border-line bg-white p-0.5"
+              className="ml-auto flex items-center gap-0.5 rounded-md border border-line bg-white p-0.5"
               role="group"
               aria-label="Kachelgröße"
             >
@@ -748,7 +856,7 @@ export function DocumentsPage() {
                 {selectedIds.size} ausgewählt
               </span>
               <span className="text-xs text-steel-500">
-                Auf eine Sammlung oder Kategorie links klicken zum Zuweisen.
+                Auf eine Sammlung oder Kategorie links ziehen zum Zuweisen.
               </span>
               <div className="ml-auto flex items-center gap-2">
                 <button
@@ -800,15 +908,21 @@ export function DocumentsPage() {
               }}
             >
               {visibleDocuments.map((doc) => (
-                <DocumentTile
+                <DraggableTile
                   key={doc.id}
-                  document={doc}
-                  isSelected={selectedIds.has(doc.id)}
-                  onToggleSelect={() => toggleSelect(doc.id)}
-                  onOpen={() => setOpenedId(doc.id)}
-                  canDelete={canDelete}
-                  onDelete={() => handleDeleteDocument(doc)}
-                />
+                  documentId={doc.id}
+                  ids={dragDocumentIds(doc.id, selectedIds)}
+                  disabled={!canWrite}
+                >
+                  <DocumentTile
+                    document={doc}
+                    isSelected={selectedIds.has(doc.id)}
+                    onToggleSelect={() => toggleSelect(doc.id)}
+                    onOpen={() => setOpenedId(doc.id)}
+                    canDelete={canDelete}
+                    onDelete={() => handleDeleteDocument(doc)}
+                  />
+                </DraggableTile>
               ))}
             </div>
           )}
@@ -820,6 +934,17 @@ export function DocumentsPage() {
           />
         </section>
       </div>
+
+        <DragOverlay>
+          {activeDragIds ? (
+            <div className="rounded-md bg-steel-800 px-3 py-2 text-sm font-medium text-white shadow-panel">
+              {activeDragIds.length === 1
+                ? "1 Dokument"
+                : `${activeDragIds.length} Dokumente`}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {opened ? (
         <DocumentViewer

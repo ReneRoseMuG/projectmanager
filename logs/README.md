@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 08.07.26 | 10:25:44 | Doku | Design-Leitfaden §8.25/§8.26 auf D&D-Zuweisung nachgezogen | ✅ |
+| 08.07.26 | 10:19:51 | Feature | DMS Zuweisung per Drag & Drop, Panel-Scroll, Auto-Breite | ✅ |
 | 07.07.26 | 16:58:01 | Doku | Design-Leitfaden §8.26 (DMS-Kachelansicht) | ✅ |
 | 07.07.26 | 16:48:20 | Feature | DMS Endungsfilter (clientseitig, sichtbare Kacheln) | ✅ |
 | 07.07.26 | 16:15:56 | Nachtrag | MCP-Kommentar Kachelansicht nachgeholt | ✅ |

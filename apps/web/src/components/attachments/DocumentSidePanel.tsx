@@ -18,9 +18,10 @@ import {
 // `storageKey` in localStorage persistent. Ab `lg` klebt das Panel am Rand (sticky) und
 // scrollt bei Bedarf in sich selbst; darunter läuft es normal im Fluss mit und stapelt.
 //
-// Das rechte Detail-Panel kann eine dynamische, per Maus gezogene Breite bekommen:
-// `widthPx` setzt die Breite (ab `lg`), `onResizeStart` aktiviert den Zieh-Griff am
-// linken Panelrand. Ohne `widthPx` gilt die feste responsive Breite als Fallback.
+// Beide Panels können eine dynamische Breite bekommen: `widthPx` setzt die Breite (ab `lg`).
+// Rechts stammt der Wert aus dem Zieh-Griff (`onResizeStart`), links wird er inhaltsgesteuert
+// berechnet, damit lange Sammlungs- und Kategorienamen ausgeschrieben bleiben. Ohne `widthPx`
+// gilt die feste responsive Breite als Fallback.
 
 interface DocumentSidePanelProps {
   side: "left" | "right";
@@ -68,20 +69,20 @@ export const DocumentSidePanel = forwardRef<HTMLElement, DocumentSidePanelProps>
         ? PanelLeftClose
         : PanelRightClose;
 
-    const useStyleWidth = !collapsed && side === "right" && widthPx != null;
+    const useStyleWidth = !collapsed && widthPx != null;
     const widthClass = collapsed
       ? "w-14"
-      : side === "left"
-        ? "w-full lg:w-[280px]"
-        : useStyleWidth
-          ? "max-lg:!w-full"
+      : useStyleWidth
+        ? "max-lg:!w-full"
+        : side === "left"
+          ? "w-full lg:w-[280px]"
           : "w-full lg:w-[440px] xl:w-[560px] 2xl:w-[680px]";
 
     return (
       <aside
         ref={ref}
         style={useStyleWidth ? { width: widthPx } : undefined}
-        className={`relative flex shrink-0 flex-col overflow-hidden rounded-lg bg-gradient-to-b from-steel-800 to-steel-900 text-white shadow-panel lg:sticky lg:top-0 lg:max-h-[calc(100vh-3rem)] lg:self-start ${useStyleWidth ? "" : "transition-[width] duration-200"} ${widthClass}`}
+        className={`relative flex shrink-0 flex-col overflow-hidden rounded-lg bg-gradient-to-b from-steel-800 to-steel-900 text-white shadow-panel lg:sticky lg:top-0 lg:max-h-[calc(100vh-3rem)] lg:self-start ${useStyleWidth && side === "right" ? "" : "transition-[width] duration-200"} ${widthClass}`}
       >
         {side === "right" && !collapsed && onResizeStart ? (
           <div

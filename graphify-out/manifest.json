@@ -1675,8 +1675,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/wiki/WikiTree.tsx": {
-    "mtime": 1782715568.611475,
-    "ast_hash": "c49f7855c76475c79db269045a9aa552",
+    "mtime": 1783498041.827006,
+    "ast_hash": "79ee0b0f2316dafeef9da1733b4e8cd8",
     "semantic_hash": ""
   },
   "apps/web/src/hooks/errors.ts": {
@@ -3230,8 +3230,8 @@
     "semantic_hash": ""
   },
   "docs/design-leitfaden.md": {
-    "mtime": 1783406462.6792483,
-    "ast_hash": "5638ff090d52d4c9fdaac687176900b3",
+    "mtime": 1783436261.2226205,
+    "ast_hash": "f6fca0dac5bf7e14d0b125bc9b758b34",
     "semantic_hash": ""
   },
   "docs/skill-documentation/code-discipline.md": {
@@ -6155,8 +6155,8 @@
     "semantic_hash": ""
   },
   "logs/README.md": {
-    "mtime": 1783415815.7562108,
-    "ast_hash": "e22e0b9487bac22096aa859c99e8ff37",
+    "mtime": 1783498927.5495422,
+    "ast_hash": "1a49e3e898284521077fec8cc24c49d4",
     "semantic_hash": ""
   },
   "logs/ms26-api-build-latest.txt": {
@@ -6825,8 +6825,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/pages/DocumentsPage.tsx": {
-    "mtime": 1783411494.1020937,
-    "ast_hash": "4ffae77877fdd3788dc2d5167c4fcd78",
+    "mtime": 1783498449.8729072,
+    "ast_hash": "ae6ecbe950361856be4db5eeba3c68dd",
     "semantic_hash": ""
   },
   "logs/2026-07-03-06-32-32-feature-termin-uhrzeit-zentrale-formatierung.md": {
@@ -7290,8 +7290,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/components/attachments/DocumentSidePanel.tsx": {
-    "mtime": 1783348500.616184,
-    "ast_hash": "88de906066a7ec1ed44cfb268b7fd5bf",
+    "mtime": 1783498100.7180333,
+    "ast_hash": "b0a9d1d0112ffa9a82945c2926fcfb77",
     "semantic_hash": ""
   },
   "logs/2026-07-07-04-22-24-feature-dms-calendersync-merge.md": {
@@ -7344,21 +7344,6 @@
     "ast_hash": "1bc17360743f20e64d5028d8781ca031",
     "semantic_hash": ""
   },
-  "apps/web/src/components/attachments/DocumentBulkPanel.tsx": {
-    "mtime": 1783411304.663105,
-    "ast_hash": "65f46d24d41b84af3ec31551081ad8d5",
-    "semantic_hash": ""
-  },
-  "apps/web/src/components/attachments/DocumentCard.tsx": {
-    "mtime": 1783411258.030159,
-    "ast_hash": "a468e955760dd50a5d6dd79fd2e015c0",
-    "semantic_hash": ""
-  },
-  "apps/web/src/components/attachments/documentPreviewWidth.ts": {
-    "mtime": 1783410123.5277514,
-    "ast_hash": "649462e81af9f8d247c9de8052f96fae",
-    "semantic_hash": ""
-  },
   "tests/integration/api/calendar-credential-service.test.ts": {
     "mtime": 1783406462.754217,
     "ast_hash": "b50d22c63d175dec60ba569d625e5311",
@@ -7367,16 +7352,6 @@
   "tests/integration/api/dms-bulk.test.ts": {
     "mtime": 1783411776.0609126,
     "ast_hash": "b4c7330df7abb405525327e8eb527d91",
-    "semantic_hash": ""
-  },
-  "tests/unit/web/components/attachments/DocumentCard.test.tsx": {
-    "mtime": 1783411548.3094819,
-    "ast_hash": "8e90f2bf120ea9ef2bf32dd46061697d",
-    "semantic_hash": ""
-  },
-  "tests/unit/web/components/attachments/documentPreviewWidth.test.ts": {
-    "mtime": 1783410213.0276332,
-    "ast_hash": "c532ff59714511d24b111d508e585e8c",
     "semantic_hash": ""
   },
   "logs/2026-07-07-08-10-38-feature-calendarsync-db-config.md": {
@@ -7402,6 +7377,101 @@
   "logs/2026-07-07-11-15-39-fix-audit-findings.md": {
     "mtime": 1783415805.3690279,
     "ast_hash": "19ccb11ae01444336a24c23fa29033e3",
+    "semantic_hash": ""
+  },
+  "apps/web/src/components/attachments/DocumentTile.tsx": {
+    "mtime": 1783435524.6760752,
+    "ast_hash": "e868864d331d3e4c726fe7b5636506c7",
+    "semantic_hash": ""
+  },
+  "apps/web/src/components/attachments/DocumentViewer.tsx": {
+    "mtime": 1783430707.2462633,
+    "ast_hash": "510b6500373580c36be469c3ff8d822f",
+    "semantic_hash": ""
+  },
+  "apps/web/src/components/attachments/documentDnd.ts": {
+    "mtime": 1783498076.051821,
+    "ast_hash": "62fa55d9aca6da9071bdc33856b226d8",
+    "semantic_hash": ""
+  },
+  "apps/web/src/components/attachments/documentPanelWidth.ts": {
+    "mtime": 1783498059.4851127,
+    "ast_hash": "c16b4bad6ad7147546c183aa478b7564",
+    "semantic_hash": ""
+  },
+  "apps/web/src/components/attachments/documentThumbnailSize.ts": {
+    "mtime": 1783430509.2348514,
+    "ast_hash": "594b09289bb332e41d8af9a6c9801a11",
+    "semantic_hash": ""
+  },
+  "apps/web/src/utils/textMeasure.ts": {
+    "mtime": 1783498027.3608909,
+    "ast_hash": "d75f0d6292d70a55bb555c40bfb9cef3",
+    "semantic_hash": ""
+  },
+  "tests/unit/web/components/attachments/DocumentTile.test.tsx": {
+    "mtime": 1783435667.1114595,
+    "ast_hash": "6c097ab76417cbd74c39eb8e06e851cb",
+    "semantic_hash": ""
+  },
+  "tests/unit/web/components/attachments/documentDnd.test.ts": {
+    "mtime": 1783498570.5937965,
+    "ast_hash": "0065dcef13d76a7108ca158e41220bd5",
+    "semantic_hash": ""
+  },
+  "tests/unit/web/components/attachments/documentPanelWidth.test.ts": {
+    "mtime": 1783498591.9322338,
+    "ast_hash": "921f3b0577a10362467501324567816e",
+    "semantic_hash": ""
+  },
+  "tests/unit/web/components/attachments/documentThumbnailSize.test.ts": {
+    "mtime": 1783431012.104377,
+    "ast_hash": "f40138faf1f7245ec356ee90c2cca80f",
+    "semantic_hash": ""
+  },
+  "tests/unit/web/pages/DocumentsPage.dnd.test.tsx": {
+    "mtime": 1783498724.704536,
+    "ast_hash": "5a00e517cbc5e46ffcf43fd22563fbef",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-07-11-19-47-nachtrag-mcp-kommentar-nachgeholt.md": {
+    "mtime": 1783416006.980713,
+    "ast_hash": "a2a8dca559ecb06722e556e005fc97ac",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-07-13-21-20-dms-bulk-workflow-nachfrage.md": {
+    "mtime": 1783423301.0822694,
+    "ast_hash": "fd52c787be000535aa9022a52a71fbe3",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-07-15-32-15-dms-kachelansicht.md": {
+    "mtime": 1783431176.738296,
+    "ast_hash": "87ed590a1b32e7d2e68372dd60de7c4d",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-07-15-41-40-nachtrag-mcp-kommentar-blockiert.md": {
+    "mtime": 1783431720.1923778,
+    "ast_hash": "834e3ddb37d4e8ce453ff023cdb052d3",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-07-16-15-56-nachtrag-mcp-kommentar-nachgeholt.md": {
+    "mtime": 1783433770.1356282,
+    "ast_hash": "f7bc953d59858813d8b58142f3ae060d",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-07-16-48-20-dms-endungsfilter.md": {
+    "mtime": 1783435722.831692,
+    "ast_hash": "66f4f77e301bbee166d42110465a92da",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-07-16-58-01-design-leitfaden-8-26-kachelansicht.md": {
+    "mtime": 1783436300.4946885,
+    "ast_hash": "cec37296466c41a6c76c6047a0337069",
+    "semantic_hash": ""
+  },
+  "logs/2026-07-08-10-19-51-feature-dms-dnd-zuweisung.md": {
+    "mtime": 1783498922.3232043,
+    "ast_hash": "c05597a2a2b54fc2a05b729ab6ca9e85",
     "semantic_hash": ""
   }
 }

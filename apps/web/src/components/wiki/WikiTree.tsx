@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { WikiTreeNode } from "../../hooks/useWiki";
 import { withStandaloneView } from "../../utils/standalone";
+import { measureTextWidth } from "../../utils/textMeasure";
 
 interface WikiTreeProps {
   tree: WikiTreeNode[];
@@ -49,22 +50,12 @@ const WIKI_INSERT_PREFIX = "wiki-insert:";
 // Persists the tree scroll position across remounts triggered by page navigation (TKT-138).
 let treeScrollTop = 0;
 
-function measureTextWidth(text: string): number {
-  try {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return 0;
-    ctx.font = "500 13.5px Inter, ui-sans-serif, system-ui, sans-serif";
-    return ctx.measureText(text).width;
-  } catch {
-    return 0;
-  }
-}
+const TREE_ROW_FONT = "500 13.5px Inter, ui-sans-serif, system-ui, sans-serif";
 
 function computeIdealWidth(nodes: WikiTreeNode[], canMove: boolean, collapsedIds: Set<number>, level = 0): number {
   let max = 0;
   for (const node of nodes) {
-    const w = Math.ceil(measureTextWidth(node.title)) + level * LEVEL_INDENT + FIXED_OVERHEAD + (canMove ? MOVE_HANDLE_OVERHEAD : 0);
+    const w = Math.ceil(measureTextWidth(node.title, TREE_ROW_FONT)) + level * LEVEL_INDENT + FIXED_OVERHEAD + (canMove ? MOVE_HANDLE_OVERHEAD : 0);
     if (w > max) max = w;
     // Collapsed nodes hide their children, so those titles must not widen the tree (TKT-136).
     if (!collapsedIds.has(node.id)) {
