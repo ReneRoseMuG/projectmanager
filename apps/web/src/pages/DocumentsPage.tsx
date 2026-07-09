@@ -71,6 +71,18 @@ import type { DocumentLibraryFilter } from "../api/documents";
 // Sentinel für die Dropdown-Option „ohne Endung" (echte Endungen sind nie leer).
 const EXT_NONE = "__none__";
 
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = window.document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  window.document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 // Ziehbare Hülle um eine Dokumentkachel. Bewusst ein Wrapper statt einer Änderung an DocumentTile:
 // dessen Klick-Verdrahtung (Einfachklick markiert, Doppelklick öffnet, Checkbox und Löschen mit
 // stopPropagation) bleibt so unangetastet. `drag.attributes` wird nicht gespreizt — es setzt
@@ -197,6 +209,7 @@ export function DocumentsPage() {
     removeFromFolder,
     addToFolderBulk,
     assignCategoryBulk,
+    downloadDocument,
     downloadZip,
   } = useDocumentActions();
 
@@ -440,12 +453,14 @@ export function DocumentsPage() {
     const ids = [...selectedIds];
     await run(async () => {
       const blob = await downloadZip(ids);
-      const url = URL.createObjectURL(blob);
-      const link = window.document.createElement("a");
-      link.href = url;
-      link.download = "dokumente.zip";
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, "dokumente.zip");
+    });
+  };
+
+  const handleDocumentDownload = async (doc: Attachment) => {
+    await run(async () => {
+      const blob = await downloadDocument(doc.id);
+      downloadBlob(blob, doc.originalName);
     });
   };
 
@@ -1014,6 +1029,7 @@ export function DocumentsPage() {
                     isSelected={selectedIds.has(doc.id)}
                     onToggleSelect={() => toggleSelect(doc.id)}
                     onOpen={() => setOpenedId(doc.id)}
+                    onDownload={() => handleDocumentDownload(doc)}
                     canDelete={canDelete}
                     onDelete={() => handleDeleteDocument(doc)}
                   />

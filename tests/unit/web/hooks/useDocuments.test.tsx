@@ -51,6 +51,7 @@ vi.mock("../../../../apps/web/src/api/documents", () => ({
   removeDocumentFromFolder: vi.fn().mockResolvedValue(undefined),
   addDocumentsToFolder: vi.fn().mockResolvedValue(undefined),
   assignDocumentsCategory: vi.fn().mockResolvedValue(undefined),
+  downloadDocument: vi.fn().mockResolvedValue(new Blob(["file"], { type: "text/plain" })),
   downloadDocumentsZip: vi.fn().mockResolvedValue(new Blob(["zip"], { type: "application/zip" })),
   getAttachmentCategories: vi.fn().mockResolvedValue([]),
   createAttachmentCategory: vi.fn().mockResolvedValue({ id: 1 }),
@@ -160,6 +161,22 @@ describe("useDocumentActions", () => {
     expect(documentsApi.downloadDocumentsZip).toHaveBeenCalledWith([10, 11]);
     expect(blob).toBeInstanceOf(Blob);
     // Reiner Download verändert keinen Server-State → Ansicht bleibt gültig.
+    expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(false);
+  });
+
+  it("lÃ¤dt ein einzelnes Dokument herunter, ohne die Ansicht zu invalidieren", async () => {
+    const libraryKey = queryKeys.documents.library({});
+    client.setQueryData(libraryKey, [{ id: 10 }]);
+
+    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
+
+    let blob: Blob | undefined;
+    await act(async () => {
+      blob = await result.current.downloadDocument(10);
+    });
+
+    expect(documentsApi.downloadDocument).toHaveBeenCalledWith(10);
+    expect(blob).toBeInstanceOf(Blob);
     expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(false);
   });
 });

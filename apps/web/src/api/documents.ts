@@ -68,6 +68,10 @@ export async function getDocument(id: number): Promise<Attachment> {
   return api.get(`documents/${id}`).json<Attachment>();
 }
 
+export async function downloadDocument(id: number): Promise<Blob> {
+  return api.get(`documents/${id}/download`, { timeout: 120000 }).blob();
+}
+
 // `folderId` und `categoryId` sind der Ablage-Kontext der Dokumente-Seite: Die Datei wird direkt in
 // die geöffnete Sammlung bzw. unter die gewählte Kategorie einsortiert. Beide optional, symmetrisch.
 export async function uploadDocument(

@@ -64,6 +64,7 @@ function renderTile(props: Partial<ComponentProps<typeof DocumentTile>> = {}) {
     isSelected: false,
     onToggleSelect: vi.fn(),
     onOpen: vi.fn(),
+    onDownload: vi.fn(),
     canDelete: true,
     onDelete: vi.fn(),
     ...props,
@@ -149,6 +150,14 @@ describe("DocumentTile", () => {
     const props = renderTile();
     fireEvent.click(screen.getByRole("button", { name: "Endgültig löschen" }));
     expect(props.onDelete).toHaveBeenCalledTimes(1);
+    expect(props.onOpen).not.toHaveBeenCalled();
+    expect(props.onToggleSelect).not.toHaveBeenCalled();
+  });
+
+  it("lÃ¤dt Ã¼ber den Button herunter, ohne zu Ã¶ffnen oder auszuwÃ¤hlen", () => {
+    const props = renderTile();
+    fireEvent.click(screen.getByRole("button", { name: "Herunterladen" }));
+    expect(props.onDownload).toHaveBeenCalledTimes(1);
     expect(props.onOpen).not.toHaveBeenCalled();
     expect(props.onToggleSelect).not.toHaveBeenCalled();
   });

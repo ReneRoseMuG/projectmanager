@@ -20,7 +20,7 @@ import {
   updateAttachmentFolder
 } from "../services/attachment-folder.service.js";
 import { getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
-import { buildDocumentsArchive } from "../services/document-download.service.js";
+import { buildDocumentsArchive, getDocumentDownloadFile } from "../services/document-download.service.js";
 import { getAttachmentThumbnail } from "../services/attachment-preview.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { createReadStream } from "node:fs";
@@ -218,6 +218,11 @@ function currentUserId(request: FastifyRequest): number | undefined {
   return request.currentUser?.id;
 }
 
+function downloadContentDisposition(filename: string): string {
+  const fallback = filename.replace(/["\\\r\n]/g, "_");
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
 export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
   // --- Kategorien ---
   app.get(
@@ -349,6 +354,21 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     "/documents/:id",
     { config: attachmentsAuth("read"), schema: { params: idParamSchema, response: { 200: objectResponseSchema } } },
     async (request) => getDocument(app.db, request.params.id)
+  );
+
+  // Einzel-Download: berechtigungspflichtiger Stream statt direkter /uploads-Verlinkung.
+  // Kein Response-Schema, weil die Antwort ein Binär-Stream ist.
+  app.get<{ Params: { id: number } }>(
+    "/documents/:id/download",
+    { config: attachmentsAuth("read"), schema: { params: idParamSchema } },
+    async (request, reply) => {
+      const download = await getDocumentDownloadFile(app.db, request.params.id);
+      return reply
+        .type(download.mimetype)
+        .header("Content-Length", String(download.size))
+        .header("Content-Disposition", downloadContentDisposition(download.originalName))
+        .send(createReadStream(download.diskPath));
+    }
   );
 
   app.patch<{ Params: { id: number }; Body: { displayName?: string | null; description?: string | null; expectedVersion: number } }>(

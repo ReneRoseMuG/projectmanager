@@ -96,10 +96,10 @@ describe("DMS API", () => {
     return reader;
   }
 
-  async function uploadDocument(admin: ReturnType<typeof supertest.agent>, name: string, folderId?: number) {
+  async function uploadDocument(admin: ReturnType<typeof supertest.agent>, name: string, folderId?: number, content = `Inhalt ${name}`) {
     const url = folderId !== undefined ? `/api/documents?folder=${folderId}` : "/api/documents";
-    const res = await admin.post(url).attach("file", Buffer.from(`Inhalt ${name}`), { filename: name, contentType: "text/plain" }).expect(201);
-    return res.body as { id: number };
+    const res = await admin.post(url).attach("file", Buffer.from(content), { filename: name, contentType: "text/plain" }).expect(201);
+    return res.body as { id: number; filename: string };
   }
 
   // --- Berechtigungen ---
@@ -192,6 +192,51 @@ describe("DMS API", () => {
     const doc = await uploadDocument(admin, "frei.txt");
     const unsorted = await admin.get("/api/documents?folder=unsorted").expect(200);
     expect((unsorted.body as Array<{ id: number }>).map((item) => item.id)).toContain(doc.id);
+  });
+
+  it("streamt ein einzelnes Dokument als berechtigten Download", async () => {
+    const admin = await loginAdmin();
+    const doc = await uploadDocument(admin, "einzel.txt", undefined, "Einzelinhalt");
+
+    const res = await admin.get(`/api/documents/${doc.id}/download`).responseType("blob").expect(200);
+    expect(res.headers["content-type"]).toContain("text/plain");
+    expect(res.headers["content-disposition"]).toContain("einzel.txt");
+    expect((res.body as Buffer).toString("utf8")).toBe("Einzelinhalt");
+  });
+
+  it("lehnt einen DMS-Direktupload mit bereits vorhandenem Dateiinhalt ab", async () => {
+    const admin = await loginAdmin();
+    const original = await uploadDocument(admin, "original.txt", undefined, "gleicher Inhalt");
+
+    await admin
+      .post("/api/documents")
+      .attach("file", Buffer.from("gleicher Inhalt"), { filename: "kopie.txt", contentType: "text/plain" })
+      .expect(409);
+
+    const [rows] = await testDb.pool.execute("SELECT COUNT(*) AS count FROM attachments");
+    expect((rows as Array<{ count: number }>)[0].count).toBe(1);
+    await expect(fs.stat(path.join(config.uploadDir, original.filename))).resolves.toBeDefined();
+  });
+
+  it("erkennt bestehende Legacy-Dokumente ohne Hash beim naechsten Upload und zieht den Hash nach", async () => {
+    const admin = await loginAdmin();
+    const content = "legacy Inhalt";
+    const filename = "legacy-storage.txt";
+    const now = new Date().toISOString();
+    await fs.mkdir(config.uploadDir, { recursive: true });
+    await fs.writeFile(path.join(config.uploadDir, filename), content, "utf8");
+    await testDb.pool.execute(
+      "INSERT INTO attachments (original_name, filename, mimetype, size, version, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)",
+      ["legacy.txt", filename, "text/plain", Buffer.byteLength(content), now, now]
+    );
+
+    await admin
+      .post("/api/documents")
+      .attach("file", Buffer.from(content), { filename: "legacy-kopie.txt", contentType: "text/plain" })
+      .expect(409);
+
+    const [rows] = await testDb.pool.execute("SELECT content_hash FROM attachments WHERE filename = ?", [filename]);
+    expect((rows as Array<{ content_hash: string | null }>)[0].content_hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("fuehrt ein an ein Fachobjekt gebundenes, sammlungsloses Dokument als Nicht einsortiert", async () => {

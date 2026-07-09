@@ -60,6 +60,7 @@ const actions = vi.hoisted(() => ({
   updateMetadata: vi.fn(async () => undefined),
   removeCategory: vi.fn(async () => undefined),
   removeFromFolder: vi.fn(async () => undefined),
+  downloadDocument: vi.fn(async () => new Blob()),
   downloadZip: vi.fn(async () => new Blob()),
 }));
 

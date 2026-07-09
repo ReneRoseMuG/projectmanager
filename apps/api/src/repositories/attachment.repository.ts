@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { attachments } from "../db/schema.js";
@@ -38,6 +38,31 @@ export const attachmentRepository = {
       .select({ id: attachments.id, filename: attachments.filename, originalName: attachments.originalName })
       .from(attachments)
       .where(inArray(attachments.id, uniqueIds));
+  },
+
+  async findByContentHash(database: DbSession, contentHash: string): Promise<AttachmentRecord[]> {
+    return database
+      .select()
+      .from(attachments)
+      .where(eq(attachments.contentHash, contentHash))
+      .orderBy(asc(attachments.id));
+  },
+
+  async findHashBackfillCandidates(
+    database: DbSession,
+    size: number
+  ): Promise<Array<Pick<AttachmentRecord, "id" | "filename" | "originalName" | "size" | "contentHash">>> {
+    return database
+      .select({
+        id: attachments.id,
+        filename: attachments.filename,
+        originalName: attachments.originalName,
+        size: attachments.size,
+        contentHash: attachments.contentHash
+      })
+      .from(attachments)
+      .where(and(eq(attachments.size, size), isNull(attachments.contentHash)))
+      .orderBy(asc(attachments.id));
   },
 
   async create(database: DbSession, data: AttachmentCreateData, userId?: number): Promise<AttachmentRecord> {
@@ -92,15 +117,23 @@ export const attachmentRepository = {
     return mutationAffectedRows(await database.delete(attachments).where(inArray(attachments.id, uniqueIds)));
   },
 
-  async updateSizeAndVersion(database: DbSession, id: number, data: { size: number; updatedBy: number | null }): Promise<void> {
+  async updateSizeAndVersion(database: DbSession, id: number, data: { size: number; contentHash: string; updatedBy: number | null }): Promise<void> {
     await database
       .update(attachments)
       .set({
         size: data.size,
+        contentHash: data.contentHash,
         updatedBy: data.updatedBy,
         updatedAt: nowIso(),
         version: sql`${attachments.version} + 1`
       })
       .where(eq(attachments.id, id));
+  },
+
+  async backfillContentHash(database: DbSession, id: number, contentHash: string): Promise<void> {
+    await database
+      .update(attachments)
+      .set({ contentHash })
+      .where(and(eq(attachments.id, id), isNull(attachments.contentHash)));
   }
 };

@@ -1,5 +1,5 @@
 import type { Attachment } from "@taskmanager/shared-types";
-import { Trash2 } from "lucide-react";
+import { Download, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { assetUrl } from "../../api/client";
 import { documentThumbnailUrl } from "../../api/documents";
@@ -8,7 +8,7 @@ import { describeAttachmentType, type AttachmentFamily } from "./attachmentTypes
 // Kachel der Dokumente-Grid-Ansicht (MS-75). Quadratischer Thumbnail-Bereich (bei Bildern das
 // skalierte Bild, sonst ein großes Typ-Icon + Badge) mit Dateinamen darunter. Einfachklick
 // togglet die Auswahl, Doppelklick öffnet die Datei groß (Lightbox). Die volle Detail- und
-// Metadatenpflege liegt in der Großansicht; hier bleibt nur ein schneller Löschen-Zugriff.
+// Metadatenpflege liegt in der Großansicht; hier bleiben nur schnelle Datei-Aktionen.
 
 // Dokumente, aus denen der Server die erste Seite als Vorschaubild rendern kann (PDF direkt,
 // Office/ODF über die PDF-Fassung). Das Typ-Icon bleibt darunter liegen: Es ist der Platzhalter,
@@ -48,6 +48,7 @@ interface DocumentTileProps {
   isSelected: boolean;
   onToggleSelect: () => void;
   onOpen: () => void;
+  onDownload: () => void;
   canDelete: boolean;
   onDelete: () => void;
 }
@@ -57,6 +58,7 @@ export function DocumentTile({
   isSelected,
   onToggleSelect,
   onOpen,
+  onDownload,
   canDelete,
   onDelete,
 }: DocumentTileProps) {
@@ -118,19 +120,35 @@ export function DocumentTile({
           }`}
         />
 
-        {canDelete ? (
+        <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
           <button
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              onDelete();
+              onDownload();
             }}
-            className="absolute right-2 top-2 rounded-md bg-white/90 p-1 text-steel-500 opacity-0 shadow-sm transition-opacity hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
-            title="Endgültig löschen"
+            className="rounded-md bg-white/90 p-1 text-steel-500 shadow-sm transition hover:bg-steel-50 hover:text-steel-700"
+            title="Herunterladen"
+            aria-label="Herunterladen"
           >
-            <Trash2 size={14} />
+            <Download size={14} />
           </button>
-        ) : null}
+
+          {canDelete ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete();
+              }}
+              className="rounded-md bg-white/90 p-1 text-steel-500 shadow-sm transition hover:bg-rose-50 hover:text-rose-600"
+              title="Endgültig löschen"
+              aria-label="Endgültig löschen"
+            >
+              <Trash2 size={14} />
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="min-w-0 px-2 py-1.5">

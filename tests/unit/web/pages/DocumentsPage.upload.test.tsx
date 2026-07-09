@@ -52,6 +52,7 @@ const actions = vi.hoisted(() => ({
   updateMetadata: vi.fn(async () => undefined),
   removeCategory: vi.fn(async () => undefined),
   removeFromFolder: vi.fn(async () => undefined),
+  downloadDocument: vi.fn(async () => new Blob()),
   downloadZip: vi.fn(async () => new Blob()),
 }));
 
@@ -242,6 +243,41 @@ describe("DocumentsPage — Upload übernimmt den Ablage-Kontext", () => {
       title: "Dokument hochgeladen",
       message: `Einsortiert in Sammlung „Rechnungen" · Kategorie „Wichtig"`,
     });
+  });
+});
+
+describe("DocumentsPage - Download", () => {
+  it("laedt die Auswahl als Zip und gibt die Blob-URL verzoegert frei", async () => {
+    vi.useFakeTimers();
+    const originalCreateObjectUrl = URL.createObjectURL;
+    const originalRevokeObjectUrl = URL.revokeObjectURL;
+    const createObjectUrl = vi.fn(() => "blob:zip");
+    const revokeObjectUrl = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectUrl });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectUrl });
+
+    try {
+      render(<DocumentsPage />);
+      fireEvent.click(screen.getByText("Doc-1"));
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Als Zip" }));
+      });
+
+      expect(actions.downloadZip).toHaveBeenCalledWith([1]);
+      expect(createObjectUrl).toHaveBeenCalledTimes(1);
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(revokeObjectUrl).not.toHaveBeenCalled();
+
+      vi.runOnlyPendingTimers();
+      expect(revokeObjectUrl).toHaveBeenCalledWith("blob:zip");
+    } finally {
+      vi.useRealTimers();
+      click.mockRestore();
+      Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectUrl });
+      Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectUrl });
+    }
   });
 });
 

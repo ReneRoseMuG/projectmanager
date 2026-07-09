@@ -139,6 +139,38 @@ describe("Attachments API", () => {
     expect(res.body.mimetype).toBe("application/pdf");
   });
 
+  it("verknuepft ein Inhaltsduplikat mit dem neuen Parent, ohne Datei und Datensatz zu duplizieren", async () => {
+    const project = await createProject(app);
+    const task = await createTask(app, project.id);
+
+    const first = await supertest(app.server)
+      .post(`/api/projects/${project.id}/attachments`)
+      .attach("file", Buffer.from("identischer Inhalt"), { filename: "original.txt", contentType: "text/plain" })
+      .expect(201);
+    const second = await supertest(app.server)
+      .post(`/api/tasks/${task.id}/attachments`)
+      .attach("file", Buffer.from("identischer Inhalt"), { filename: "kopie.txt", contentType: "text/plain" })
+      .expect(201);
+
+    expect(second.body.id).toBe(first.body.id);
+    expect(second.body.filename).toBe(first.body.filename);
+    expect(second.body.owners).toEqual(
+      expect.arrayContaining([
+        { type: "project", id: project.id },
+        { type: "task", id: task.id }
+      ])
+    );
+
+    const [attachmentRows] = await testDb.pool.execute("SELECT COUNT(*) AS count FROM attachments");
+    expect((attachmentRows as Array<{ count: number }>)[0].count).toBe(1);
+    await expect(fs.stat(path.join(uploadDir, first.body.filename))).resolves.toBeDefined();
+
+    const projectList = await supertest(app.server).get(`/api/projects/${project.id}/attachments`).expect(200);
+    const taskList = await supertest(app.server).get(`/api/tasks/${task.id}/attachments`).expect(200);
+    expect((projectList.body as Array<{ id: number }>).map((item) => item.id)).toEqual([first.body.id]);
+    expect((taskList.body as Array<{ id: number }>).map((item) => item.id)).toEqual([first.body.id]);
+  });
+
   it.each([
     {
       label: "project",

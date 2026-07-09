@@ -2,10 +2,10 @@ import type { Attachment, AttachmentOwner, JournalObjectType, RecentAttachment }
 import { and, desc, eq, inArray } from "drizzle-orm";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { config } from "../config.js";
 import type { DbClient, DbSession } from "../db/client.js";
-import { firstRow } from "../db/query-utils.js";
+import { firstRow, mutationAffectedRows } from "../db/query-utils.js";
 import {
   attachments,
   featureAttachments,
@@ -28,7 +28,7 @@ import {
 } from "../db/schema.js";
 import { attachmentRepository, type AttachmentRecord } from "../repositories/attachment.repository.js";
 import { assertSafeTestDirectoryPath } from "../runtime-safety.js";
-import { AppError, badRequest, internalError, notFound } from "../utils/errors.js";
+import { AppError, badRequest, conflict, internalError, notFound } from "../utils/errors.js";
 import { removeAttachmentPreviews } from "./attachment-preview.service.js";
 import { watchAttachmentForChanges } from "./attachment-watcher.service.js";
 import type { FileOpener } from "./file-opener.service.js";
@@ -58,6 +58,7 @@ const attachmentSelect = {
   filename: attachments.filename,
   mimetype: attachments.mimetype,
   size: attachments.size,
+  contentHash: attachments.contentHash,
   displayName: attachments.displayName,
   description: attachments.description,
   version: attachments.version,
@@ -225,7 +226,7 @@ function isSameOrInside(targetPath: string, rootPath: string): boolean {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
-function attachmentDiskPath(record: AttachmentRecord): string {
+function attachmentDiskPath(record: Pick<AttachmentRecord, "filename">): string {
   const diskPath = path.resolve(config.uploadDir, record.filename);
   if (!isSameOrInside(diskPath, config.uploadDir)) {
     throw badRequest("Attachment filename points outside the upload directory");
@@ -240,6 +241,61 @@ async function fileExists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function calculateContentHash(buffer: Buffer): string {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+async function calculateFileHash(filePath: string): Promise<string | null> {
+  try {
+    return calculateContentHash(await fs.readFile(filePath));
+  } catch {
+    return null;
+  }
+}
+
+async function attachmentFileExists(record: Pick<AttachmentRecord, "filename">): Promise<boolean> {
+  try {
+    return fileExists(attachmentDiskPath(record));
+  } catch {
+    return false;
+  }
+}
+
+async function calculateAttachmentFileHash(record: Pick<AttachmentRecord, "filename">): Promise<string | null> {
+  try {
+    return calculateFileHash(attachmentDiskPath(record));
+  } catch {
+    return null;
+  }
+}
+
+async function findDuplicateAttachment(
+  database: DbClient,
+  upload: AttachmentUpload,
+  contentHash: string
+): Promise<AttachmentRecord | undefined> {
+  const hashedRecords = await attachmentRepository.findByContentHash(database, contentHash);
+  for (const record of hashedRecords) {
+    if (await attachmentFileExists(record)) {
+      return record;
+    }
+  }
+
+  const backfillCandidates = await attachmentRepository.findHashBackfillCandidates(database, upload.buffer.byteLength);
+  for (const candidate of backfillCandidates) {
+    const fileHash = await calculateAttachmentFileHash(candidate);
+    if (!fileHash) {
+      continue;
+    }
+    await attachmentRepository.backfillContentHash(database, candidate.id, fileHash);
+    if (fileHash === contentHash) {
+      return attachmentRepository.findById(database, candidate.id);
+    }
+  }
+
+  return undefined;
 }
 
 export async function listAttachmentOwners(database: DbClient, attachmentId: number): Promise<AttachmentOwner[]> {
@@ -297,28 +353,23 @@ export async function listAttachmentOwnersForIds(
   return result;
 }
 
-async function insertAttachmentLink(database: DbSession, owner: AttachmentOwner, attachmentId: number): Promise<void> {
+async function insertAttachmentLink(database: DbSession, owner: AttachmentOwner, attachmentId: number): Promise<boolean> {
   if (owner.type === "project") {
-    await database.insert(projectAttachments).ignore().values({ projectId: owner.id, attachmentId });
-    return;
+    return mutationAffectedRows(await database.insert(projectAttachments).ignore().values({ projectId: owner.id, attachmentId })) > 0;
   }
   if (owner.type === "task") {
-    await database.insert(taskAttachments).ignore().values({ taskId: owner.id, attachmentId });
-    return;
+    return mutationAffectedRows(await database.insert(taskAttachments).ignore().values({ taskId: owner.id, attachmentId })) > 0;
   }
   if (owner.type === "milestone") {
-    await database.insert(milestoneAttachments).ignore().values({ milestoneId: owner.id, attachmentId });
-    return;
+    return mutationAffectedRows(await database.insert(milestoneAttachments).ignore().values({ milestoneId: owner.id, attachmentId })) > 0;
   }
   if (owner.type === "feature") {
-    await database.insert(featureAttachments).ignore().values({ featureId: owner.id, attachmentId });
-    return;
+    return mutationAffectedRows(await database.insert(featureAttachments).ignore().values({ featureId: owner.id, attachmentId })) > 0;
   }
   if (owner.type === "wikiPage") {
-    await database.insert(wikiPageAttachments).ignore().values({ wikiPageId: owner.id, attachmentId });
-    return;
+    return mutationAffectedRows(await database.insert(wikiPageAttachments).ignore().values({ wikiPageId: owner.id, attachmentId })) > 0;
   }
-  await database.insert(ticketAttachments).ignore().values({ ticketId: owner.id, attachmentId });
+  return mutationAffectedRows(await database.insert(ticketAttachments).ignore().values({ ticketId: owner.id, attachmentId })) > 0;
 }
 
 async function removeAttachmentFiles(records: AttachmentCleanupRecord[]): Promise<void> {
@@ -347,6 +398,27 @@ async function persistAttachment(values: {
   assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   await fs.mkdir(config.uploadDir, { recursive: true });
 
+  const contentHash = calculateContentHash(values.upload.buffer);
+  const ownerObject = await getOwnerJournalObject(values.database, values.owner);
+  const duplicate = await findDuplicateAttachment(values.database, values.upload, contentHash);
+  if (duplicate) {
+    await values.database.transaction(async (tx) => {
+      const wasLinked = await insertAttachmentLink(tx, values.owner, duplicate.id);
+      if (!wasLinked) {
+        return;
+      }
+      const attachmentObject = attachmentJournalObject(duplicate);
+      await recordJournalEntry(tx, {
+        operation: "create",
+        object: attachmentObject,
+        summary: buildAttachmentCreateSummary(attachmentObject, ownerObject),
+        actor: values.actor,
+        contexts: [makeJournalContext(ownerObject, "owner")]
+      });
+    });
+    return mapAttachment(values.database, duplicate);
+  }
+
   const filename = makeFilename(values.upload.originalName);
   const diskPath = path.join(config.uploadDir, filename);
   await fs.writeFile(diskPath, values.upload.buffer);
@@ -356,11 +428,11 @@ async function persistAttachment(values: {
       originalName: values.upload.originalName,
       filename,
       mimetype: values.upload.mimetype,
-      size: values.upload.buffer.byteLength
+      size: values.upload.buffer.byteLength,
+      contentHash
     }, values.actor?.actorUserId ?? undefined);
     await insertAttachmentLink(tx, values.owner, attachment.id);
     const attachmentObject = attachmentJournalObject(attachment);
-    const ownerObject = await getOwnerJournalObject(values.database, values.owner);
     await recordJournalEntry(tx, {
       operation: "create",
       object: attachmentObject,
@@ -381,6 +453,12 @@ export async function createUnboundAttachment(database: DbClient, upload: Attach
   assertSafeTestDirectoryPath(config.uploadDir, "UPLOAD_DIR");
   await fs.mkdir(config.uploadDir, { recursive: true });
 
+  const contentHash = calculateContentHash(upload.buffer);
+  const duplicate = await findDuplicateAttachment(database, upload, contentHash);
+  if (duplicate) {
+    throw conflict(`Dokument "${duplicate.originalName}" ist bereits vorhanden.`);
+  }
+
   const filename = makeFilename(upload.originalName);
   const diskPath = path.join(config.uploadDir, filename);
   await fs.writeFile(diskPath, upload.buffer);
@@ -391,7 +469,8 @@ export async function createUnboundAttachment(database: DbClient, upload: Attach
       originalName: upload.originalName,
       filename,
       mimetype: upload.mimetype,
-      size: upload.buffer.byteLength
+      size: upload.buffer.byteLength,
+      contentHash
     },
     actor?.actorUserId ?? undefined
   );

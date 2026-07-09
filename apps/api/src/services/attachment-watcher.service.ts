@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import type { DbClient } from "../db/client.js";
 import { attachmentRepository } from "../repositories/attachment.repository.js";
@@ -50,12 +51,14 @@ function finishWatcherAfterChange(attachmentId: number, onSettled: () => void): 
 async function applyAttachmentFileChange(database: DbClient, attachmentId: number, diskPath: string, actorUserId: number | null): Promise<void> {
   try {
     const stat = fs.statSync(diskPath);
+    const contentHash = createHash("sha256").update(fs.readFileSync(diskPath)).digest("hex");
     const record = await attachmentRepository.findById(database, attachmentId);
     if (!record) {
       return;
     }
     await attachmentRepository.updateSizeAndVersion(database, attachmentId, {
       size: stat.size,
+      contentHash,
       updatedBy: actorUserId
     });
   } catch {

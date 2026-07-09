@@ -602,6 +602,7 @@ export const attachments = mysqlTable(
     filename: shortText("filename").notNull(),
     mimetype: shortText("mimetype").notNull(),
     size: int("size").notNull(),
+    contentHash: shortText("content_hash", { length: 64 }),
     displayName: shortText("display_name"),
     description: longtext("description"),
     version: int("version").notNull().default(1),
@@ -609,7 +610,10 @@ export const attachments = mysqlTable(
     updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestampText("created_at"),
     updatedAt: timestampText("updated_at")
-  }
+  },
+  (table) => ({
+    contentHashIdx: index("attachments_content_hash_idx").on(table.contentHash)
+  })
 );
 
 export const projectAttachments = mysqlTable(

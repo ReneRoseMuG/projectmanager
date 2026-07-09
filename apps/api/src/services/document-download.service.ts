@@ -37,6 +37,33 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
+export interface DocumentDownloadFile {
+  diskPath: string;
+  originalName: string;
+  mimetype: string;
+  size: number;
+}
+
+export async function getDocumentDownloadFile(database: DbClient, attachmentId: number): Promise<DocumentDownloadFile> {
+  const record = await attachmentRepository.findById(database, attachmentId);
+  if (!record) {
+    throw notFound(`Document with id ${attachmentId} not found`);
+  }
+  const diskPath = path.resolve(config.uploadDir, record.filename);
+  if (!isSameOrInside(diskPath, config.uploadDir)) {
+    throw badRequest("Attachment filename points outside the upload directory");
+  }
+  if (!(await fileExists(diskPath))) {
+    throw notFound("Die Datei wurde im Upload-Verzeichnis nicht gefunden.");
+  }
+  return {
+    diskPath,
+    originalName: record.originalName,
+    mimetype: record.mimetype,
+    size: record.size
+  };
+}
+
 // Kollisionsfreier Eintragsname im Zip: gleiche Originalnamen bekommen " (2)", " (3)" …
 function uniqueEntryName(originalName: string, used: Set<string>): string {
   if (!used.has(originalName)) {
@@ -69,6 +96,7 @@ export async function buildDocumentsArchive(database: DbClient, attachmentIds: n
 
   const archive = new ZipArchive({ zlib: { level: 9 } });
   const usedNames = new Set<string>();
+  let appended = 0;
   for (const record of records) {
     const diskPath = path.resolve(config.uploadDir, record.filename);
     if (!isSameOrInside(diskPath, config.uploadDir)) {
@@ -78,6 +106,10 @@ export async function buildDocumentsArchive(database: DbClient, attachmentIds: n
       continue;
     }
     archive.file(diskPath, { name: uniqueEntryName(record.originalName, usedNames) });
+    appended += 1;
+  }
+  if (appended === 0) {
+    throw notFound("Keine der ausgewählten Dateien wurde im Upload-Verzeichnis gefunden.");
   }
   return archive;
 }

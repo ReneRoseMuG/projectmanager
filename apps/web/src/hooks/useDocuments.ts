@@ -154,7 +154,8 @@ export function useDocumentActions() {
     removeFromFolder: (folderId: number, attachmentId: number) => removeFromFolderMutation.mutateAsync({ folderId, attachmentId }),
     addToFolderBulk: (folderId: number, attachmentIds: number[]) => addToFolderBulkMutation.mutateAsync({ folderId, attachmentIds }),
     assignCategoryBulk: (categoryId: number, attachmentIds: number[]) => assignCategoryBulkMutation.mutateAsync({ categoryId, attachmentIds }),
-    // Reiner Lese-Download (Zip-Blob), kein Server-State → keine Invalidierung.
+    // Reine Lese-Downloads (Blob), kein Server-State → keine Invalidierung.
+    downloadDocument: (id: number) => documentsApi.downloadDocument(id),
     downloadZip: (attachmentIds: number[]) => documentsApi.downloadDocumentsZip(attachmentIds)
   };
 }

@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 09.07.26 | 14:45:31 | Feature | TKT-156/157/158 DMS-Download und Duplikaterkennung | ✅ |
 | 08.07.26 | 14:55:07 | Feature | Vorschaubilder für PDF, Office und ODF in der Kachelansicht | ✅ |
 | 08.07.26 | 14:08:53 | Doku | Leitfäden: Auswahl/Filter, Upload-Kontext, Batch-Nachladen | ✅ |
 | 08.07.26 | 12:50:13 | Fix | Mehrfach-Upload lädt die Bibliothek nur noch einmal nach | ✅ |
