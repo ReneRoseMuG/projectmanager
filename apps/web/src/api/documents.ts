@@ -1,5 +1,13 @@
 import type { Attachment, AttachmentCategory, AttachmentFolder, Paginated } from "@taskmanager/shared-types";
-import { api } from "./client";
+import { api, apiBaseUrl } from "./client";
+
+// Quelle für das Kachel-Vorschaubild. Wird direkt als `<img src>` benutzt: Der Browser schickt die
+// Session-Cookie mit (SameSite=lax greift auch bei abweichendem Port), und `loading="lazy"` sorgt
+// dafür, dass nur sichtbare Kacheln eine Erzeugung anstoßen. Fehlt ein Bild, antwortet die Route 404
+// und die Kachel behält ihr Typ-Icon.
+export function documentThumbnailUrl(id: number): string {
+  return `${apiBaseUrl}/documents/${id}/thumbnail`;
+}
 
 export interface DocumentLibraryFilter {
   folder?: number | "unsorted";

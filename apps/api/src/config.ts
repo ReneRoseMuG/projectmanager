@@ -18,6 +18,9 @@ export interface AppConfig {
   previewTextMaxBytes: number;
   previewConversionMaxBytes: number;
   previewConversionTimeoutMs: number;
+  thumbnailWidth: number;
+  thumbnailHeight: number;
+  thumbnailConcurrency: number;
   libreOfficePath: string;
   contentDir: string;
   notificationsEnabled: boolean;
@@ -88,6 +91,13 @@ export const config: AppConfig = {
   previewTextMaxBytes: numberFromEnv(process.env.PREVIEW_TEXT_MAX_BYTES, 100 * 1024),
   previewConversionMaxBytes: numberFromEnv(process.env.PREVIEW_CONVERSION_MAX_BYTES, 25 * 1024 * 1024),
   previewConversionTimeoutMs: numberFromEnv(process.env.PREVIEW_CONVERSION_TIMEOUT_MS, 15000),
+  // Kachel-Vorschaubild: erste Seite als PNG. LibreOffice skaliert selbst (FilterOptions), deshalb
+  // braucht es keine Bildbibliothek. A4-Seitenverhältnis.
+  thumbnailWidth: numberFromEnv(process.env.THUMBNAIL_WIDTH, 400),
+  thumbnailHeight: numberFromEnv(process.env.THUMBNAIL_HEIGHT, 566),
+  // Jede Erzeugung startet einen LibreOffice-Prozess (~800 ms). Ein Kachelraster darf davon nicht
+  // Dutzende gleichzeitig auslösen.
+  thumbnailConcurrency: numberFromEnv(process.env.THUMBNAIL_CONCURRENCY, 2),
   libreOfficePath: process.env.LIBREOFFICE_PATH ?? "soffice",
   contentDir: resolveFromApiRoot(process.env.CONTENT_DIR ?? "./content"),
   notificationsEnabled: booleanFromEnv(process.env.NOTIFICATIONS_ENABLED),

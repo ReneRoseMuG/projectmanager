@@ -46,6 +46,8 @@ import path from "node:path";
 import supertest from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../fixtures/api/index.js";
+import { config } from "../../../apps/api/src/config.js";
+import { thumbnailFilename } from "../../../apps/api/src/services/attachment-preview.service.js";
 
 const uploadDir = path.join(os.tmpdir(), `taskmanager-api-dms-${process.pid}`);
 
@@ -258,6 +260,53 @@ describe("DMS API", () => {
       .post(`/api/documents?category=${category.body.id}`)
       .attach("file", Buffer.from("Inhalt"), { filename: "verboten.txt", contentType: "text/plain" })
       .expect(403);
+  });
+
+  // --- Kachel-Vorschaubild (Thumbnail) ---
+
+  // Der Cache-Treffer wird vorab hergestellt. So pruefen diese Tests Routing, Berechtigung, Header und
+  // Auslieferung real, ohne einen LibreOffice-Prozess zu starten. Die Rasterung selbst ist nicht
+  // portabel testbar (LibreOffice ist nicht auf jeder Maschine vorhanden) und wurde manuell verifiziert.
+  const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+  async function seedThumbnail(admin: ReturnType<typeof supertest.agent>, documentId: number) {
+    const detail = await admin.get(`/api/documents/${documentId}`).expect(200);
+    const cachedName = thumbnailFilename({ id: documentId, filename: detail.body.filename });
+    await fs.mkdir(config.previewCacheDir, { recursive: true });
+    await fs.writeFile(path.join(config.previewCacheDir, cachedName), pngBytes);
+  }
+
+  it("Thumbnail: liefert das gecachte PNG mit Bild-Header aus", async () => {
+    const admin = await loginAdmin();
+    const created = await uploadDocument(admin, "vorschau.pdf");
+    await seedThumbnail(admin, created.id);
+
+    const res = await admin.get(`/api/documents/${created.id}/thumbnail`).responseType("blob").expect(200);
+    expect(res.headers["content-type"]).toContain("image/png");
+    expect(res.headers["cache-control"]).toContain("private");
+    expect(Buffer.from(res.body as Buffer)).toEqual(pngBytes);
+  });
+
+  it("Thumbnail: ein Leser darf es sehen (read), ohne Session nicht (401)", async () => {
+    const admin = await loginAdmin();
+    const created = await uploadDocument(admin, "vorschau.pdf");
+    await seedThumbnail(admin, created.id);
+
+    await supertest(app.server).get(`/api/documents/${created.id}/thumbnail`).expect(401);
+
+    const reader = await loginReader();
+    await reader.get(`/api/documents/${created.id}/thumbnail`).expect(200);
+  });
+
+  it("Thumbnail: 404 fuer Dateitypen ohne Vorschaubild und fuer unbekannte Dokumente", async () => {
+    const admin = await loginAdmin();
+    // Gegenbeispiel: Eine Textdatei hat kein Seitenlayout — die Route antwortet sofort, ohne Konvertierung.
+    const text = await uploadDocument(admin, "notiz.txt");
+
+    const missing = await admin.get(`/api/documents/${text.id}/thumbnail`).expect(404);
+    expect(missing.body).toMatchObject({ error: "NOT_FOUND", statusCode: 404 });
+
+    await admin.get("/api/documents/999999/thumbnail").expect(404);
   });
 
   // --- System-Label-Schutz ---

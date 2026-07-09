@@ -21,8 +21,10 @@ import {
 } from "../services/attachment-folder.service.js";
 import { getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
 import { buildDocumentsArchive } from "../services/document-download.service.js";
+import { getAttachmentThumbnail } from "../services/attachment-preview.service.js";
 import { createJournalActor } from "../services/journal.service.js";
-import { badRequest } from "../utils/errors.js";
+import { createReadStream } from "node:fs";
+import { badRequest, notFound } from "../utils/errors.js";
 import { arrayResponseSchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema, tagIdsBodySchema } from "../utils/route-schemas.js";
 
 // MS-75 (DMS): Alle Routen laufen unter der bestehenden Ressource "attachments" (kein
@@ -395,6 +397,24 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     async (request, reply) => {
       await removeCategoryFromAttachment(app.db, request.params.id, request.params.categoryId);
       return reply.status(204).send();
+    }
+  );
+
+  // Kachel-Vorschaubild: erste Seite als PNG, faul erzeugt und im Vorschau-Cache abgelegt. Für Typen
+  // ohne Vorschaubild (Text, Video, Archiv …) und bei fehlgeschlagener Erzeugung antwortet die Route
+  // 404 — die Kachel behält dann ihr Typ-Icon. Kein Response-Schema (Binär-Stream).
+  app.get<{ Params: { id: number } }>(
+    "/documents/:id/thumbnail",
+    { config: attachmentsAuth("read"), schema: { params: idParamSchema } },
+    async (request, reply) => {
+      const thumbnailPath = await getAttachmentThumbnail(app.db, request.params.id);
+      if (!thumbnailPath) {
+        throw notFound(`No thumbnail available for attachment with id ${request.params.id}`);
+      }
+      return reply
+        .type("image/png")
+        .header("Cache-Control", "private, max-age=86400")
+        .send(createReadStream(thumbnailPath));
     }
   );
 

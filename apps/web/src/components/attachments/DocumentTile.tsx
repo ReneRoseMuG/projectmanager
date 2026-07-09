@@ -1,12 +1,25 @@
 import type { Attachment } from "@taskmanager/shared-types";
 import { Trash2 } from "lucide-react";
+import { useState } from "react";
 import { assetUrl } from "../../api/client";
-import { describeAttachmentType } from "./attachmentTypes";
+import { documentThumbnailUrl } from "../../api/documents";
+import { describeAttachmentType, type AttachmentFamily } from "./attachmentTypes";
 
 // Kachel der Dokumente-Grid-Ansicht (MS-75). Quadratischer Thumbnail-Bereich (bei Bildern das
 // skalierte Bild, sonst ein großes Typ-Icon + Badge) mit Dateinamen darunter. Einfachklick
 // togglet die Auswahl, Doppelklick öffnet die Datei groß (Lightbox). Die volle Detail- und
 // Metadatenpflege liegt in der Großansicht; hier bleibt nur ein schneller Löschen-Zugriff.
+
+// Dokumente, aus denen der Server die erste Seite als Vorschaubild rendern kann (PDF direkt,
+// Office/ODF über die PDF-Fassung). Das Typ-Icon bleibt darunter liegen: Es ist der Platzhalter,
+// solange das Bild lädt, und der Rückfall, wenn es keins gibt (404) oder die Erzeugung scheitert.
+const THUMBNAIL_FAMILIES: ReadonlySet<AttachmentFamily> = new Set([
+  "pdf",
+  "word",
+  "spreadsheet",
+  "presentation",
+  "opendocument",
+]);
 
 function stripFileExtension(name: string): string {
   const extensionIndex = name.lastIndexOf(".");
@@ -50,6 +63,8 @@ export function DocumentTile({
   const meta = describeAttachmentType(document);
   const Icon = meta.Icon;
   const title = documentTitle(document);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const showThumbnail = THUMBNAIL_FAMILIES.has(meta.family) && !thumbnailFailed;
 
   return (
     <article
@@ -71,14 +86,25 @@ export function DocumentTile({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-steel-400">
-            <Icon size={40} strokeWidth={1.5} />
-            <span
-              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${meta.toneClassName}`}
-            >
-              {meta.badge}
-            </span>
-          </div>
+          <>
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-steel-400">
+              <Icon size={40} strokeWidth={1.5} />
+              <span
+                className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${meta.toneClassName}`}
+              >
+                {meta.badge}
+              </span>
+            </div>
+            {showThumbnail ? (
+              <img
+                src={documentThumbnailUrl(document.id)}
+                alt={`Vorschau von ${title}`}
+                loading="lazy"
+                onError={() => setThumbnailFailed(true)}
+                className="absolute inset-0 h-full w-full bg-white object-contain"
+              />
+            ) : null}
+          </>
         )}
 
         <input

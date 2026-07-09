@@ -3,13 +3,16 @@
  * DocumentTile — Kachel der Dokumente-Grid-Ansicht (MS-75).
  *
  * Abgedeckte Regeln:
- * - Bilder zeigen ein Thumbnail (Asset-URL), andere Typen ein Typ-Icon mit Badge.
+ * - Bilder zeigen das Asset direkt, Typen ohne Seitenlayout ein Typ-Icon mit Badge.
+ * - PDF, Office und ODF fordern zusätzlich ein serverseitig gerendertes Vorschaubild an; das
+ *   Typ-Icon bleibt darunter liegen und ist damit Platzhalter wie Rückfall.
  * - Die Auswahl-Checkbox togglet die Mehrfachauswahl.
  * - Einfachklick auf die Kachel togglet die Auswahl, Doppelklick öffnet die Datei.
  * - Der Löschen-Button löscht, ohne zu öffnen oder auszuwählen (stopPropagation).
  *
  * Fehlerfälle:
  * - Ohne Löschrecht wird kein Löschen-Button angeboten.
+ * - Schlägt das Laden des Vorschaubilds fehl (404, Erzeugung gescheitert), bleibt das Typ-Icon stehen.
  *
  * Ziel:
  * Absichern, dass Darstellung, Auswahl, Öffnen und Löschen sauber getrennt auslösen sowie die
@@ -28,6 +31,10 @@ import {
 
 vi.mock("../../../../../apps/web/src/api/client", () => ({
   assetUrl: (path: string) => `http://assets.test${path}`,
+}));
+
+vi.mock("../../../../../apps/web/src/api/documents", () => ({
+  documentThumbnailUrl: (id: number) => `http://api.test/api/documents/${id}/thumbnail`,
 }));
 
 function doc(overrides: Partial<Attachment> = {}): Attachment {
@@ -78,8 +85,44 @@ describe("DocumentTile", () => {
     expect(screen.getByRole("img")).toHaveAttribute("src", "http://assets.test/uploads/foto.png");
   });
 
-  it("zeigt bei Nicht-Bildern ein Typ-Icon mit Badge statt eines Bildes", () => {
-    renderTile({ document: doc({ originalName: "bericht.pdf", mimetype: "application/pdf" }) });
+  it("zeigt bei Typen ohne Seitenlayout ein Typ-Icon mit Badge statt eines Bildes", () => {
+    renderTile({ document: doc({ originalName: "backup.zip", mimetype: "application/zip" }) });
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("ZIP")).toBeInTheDocument();
+  });
+
+  it("fordert für Video kein Vorschaubild an", () => {
+    renderTile({ document: doc({ originalName: "film.mp4", mimetype: "video/mp4" }) });
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
+  it("zeigt für PDF ein Vorschaubild der ersten Seite über dem Typ-Icon", () => {
+    renderTile();
+    const preview = screen.getByRole("img", { name: "Vorschau von Rechnung" });
+    expect(preview).toHaveAttribute("src", "http://api.test/api/documents/1/thumbnail");
+    expect(preview).toHaveAttribute("loading", "lazy");
+    // Das Typ-Icon liegt darunter: Platzhalter beim Laden, Rückfall bei Fehlern.
+    expect(screen.getByText("PDF")).toBeInTheDocument();
+  });
+
+  it("zeigt auch für ODF-Dokumente ein Vorschaubild", () => {
+    renderTile({
+      document: doc({
+        id: 9,
+        originalName: "notiz.odt",
+        mimetype: "application/vnd.oasis.opendocument.text",
+      }),
+    });
+    expect(screen.getByRole("img", { name: "Vorschau von notiz" })).toHaveAttribute(
+      "src",
+      "http://api.test/api/documents/9/thumbnail",
+    );
+  });
+
+  it("fällt bei fehlendem Vorschaubild auf das Typ-Icon zurück", () => {
+    renderTile();
+    fireEvent.error(screen.getByRole("img", { name: "Vorschau von Rechnung" }));
+
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByText("PDF")).toBeInTheDocument();
   });

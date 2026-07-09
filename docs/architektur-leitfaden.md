@@ -232,6 +232,7 @@ Codex führt vor jeder Refactoring-Aufgabe eine Bestandsaufnahme durch und dokum
 
 **Routes:**
 - `comments.ts`, `attachments.ts`: Routen-Registrierung anpassen, Parent-Kontext explizit übergeben
+- `dms.ts` (`POST /documents`): Der Handler orchestriert den „Ablage-Kontext des Uploads" selbst — `createUnboundAttachment`, danach optional `addAttachmentToFolder` und `assignCategoryToAttachment`. Diese Ablauflogik gehört nach §4 in eine Service-Funktion; der Handler soll validieren und **einen** Service aufrufen. Bekannte Grenze dabei: Der Ablauf ist nicht transaktional — schlägt eine Zuordnung fehl (unbekanntes Ziel → `404`), ist das Attachment bereits angelegt.
 
 **Migrations:**
 - `users`-Tabelle anlegen

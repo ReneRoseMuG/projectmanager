@@ -2,6 +2,8 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 08.07.26 | 14:55:07 | Feature | Vorschaubilder für PDF, Office und ODF in der Kachelansicht | ✅ |
+| 08.07.26 | 14:08:53 | Doku | Leitfäden: Auswahl/Filter, Upload-Kontext, Batch-Nachladen | ✅ |
 | 08.07.26 | 12:50:13 | Fix | Mehrfach-Upload lädt die Bibliothek nur noch einmal nach | ✅ |
 | 08.07.26 | 12:36:50 | Feature | Upload übernimmt Sammlung + Kategorie; Endungsfilter-Gate korrigiert | ✅ |
 | 08.07.26 | 12:14:13 | Fix | Ausgefilterte Dokumente verlieren ihre Markierung | ✅ |

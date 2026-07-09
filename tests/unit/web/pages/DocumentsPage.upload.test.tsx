@@ -135,8 +135,12 @@ vi.mock("../../../../apps/web/src/components/ui/ToastProvider", () => ({
   useToast: () => toast,
 }));
 
+// `api/documents` (nicht gemockt) importiert `api` und `apiBaseUrl` — die Kachel baut daraus die
+// Quelle ihres Vorschaubilds. Fehlt ein Export, scheitert bereits der Import.
 vi.mock("../../../../apps/web/src/api/client", () => ({
   assetUrl: (path: string) => path,
+  apiBaseUrl: "http://api.test/api",
+  api: {},
 }));
 
 // Der echte Uploader ruft `onUpload` je Datei und `onBatchComplete` einmal am Ende. Beides wird hier

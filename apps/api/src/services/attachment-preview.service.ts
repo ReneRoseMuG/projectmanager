@@ -95,7 +95,11 @@ function attachmentDiskPath(record: AttachmentRecord): string {
   return diskPath;
 }
 
-function previewProfile(record: AttachmentRecord): AttachmentPreviewProfile {
+// Nur die Felder, die das Profil wirklich braucht — so lässt sich die Typ-Zuordnung ohne einen
+// vollständigen DB-Datensatz prüfen (Unit-Tests).
+type PreviewSource = Pick<AttachmentRecord, "mimetype" | "originalName" | "filename">;
+
+function previewProfile(record: PreviewSource): AttachmentPreviewProfile {
   const mimetype = record.mimetype.toLowerCase();
   const extension = extensionOf(record.originalName || record.filename);
 
@@ -192,20 +196,35 @@ function conversionFailureMessage(error: unknown): string {
   return "Die Dokumentvorschau konnte nicht erzeugt werden.";
 }
 
-async function convertOfficePreview(record: AttachmentRecord, filePath: string): Promise<AttachmentPreviewInfo> {
-  const profile = previewProfile(record);
+async function runLibreOffice(profileDir: string, convertTo: string, outDir: string, sourcePath: string): Promise<void> {
+  await execFileAsync(
+    config.libreOfficePath,
+    ["--headless", "--nologo", "--nofirststartwizard", `-env:UserInstallation=${pathToFileURL(profileDir).href}`, "--convert-to", convertTo, "--outdir", outDir, sourcePath],
+    {
+      timeout: config.previewConversionTimeoutMs,
+      windowsHide: true,
+      maxBuffer: 1024 * 1024
+    }
+  );
+}
+
+type OfficePdfResult = { ok: true; path: string } | { ok: false; message: string };
+
+// Sorgt für die PDF-Fassung eines Office-/ODF-Dokuments und liefert deren Pfad im Vorschau-Cache.
+// Geteilt von der Dokumentvorschau und der Thumbnail-Erzeugung — beide brauchen dieselbe PDF, und
+// ein bereits konvertiertes Dokument kostet dadurch keinen zweiten LibreOffice-Aufruf.
+async function ensureOfficePdf(record: AttachmentRecord, filePath: string): Promise<OfficePdfResult> {
   const stat = await fs.stat(filePath);
   if (stat.size > config.previewConversionMaxBytes) {
-    return failedPreview(record, profile, "Die Datei ist zu groß für eine Dokumentvorschau.");
+    return { ok: false, message: "Die Datei ist zu groß für eine Dokumentvorschau." };
   }
 
   assertSafeTestDirectoryPath(config.previewCacheDir, "PREVIEW_CACHE_DIR");
   await fs.mkdir(config.previewCacheDir, { recursive: true });
 
-  const cachedFilename = previewFilename(record);
-  const cachedPath = path.join(config.previewCacheDir, cachedFilename);
+  const cachedPath = path.join(config.previewCacheDir, previewFilename(record));
   if (await fileExists(cachedPath)) {
-    return availablePreview(record, profile, previewUrl(cachedFilename), null, null);
+    return { ok: true, path: cachedPath };
   }
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "taskmanager-preview-"));
@@ -217,27 +236,28 @@ async function convertOfficePreview(record: AttachmentRecord, filePath: string):
 
     await fs.mkdir(profileDir, { recursive: true });
     await fs.copyFile(filePath, sourcePath);
-    await execFileAsync(
-      config.libreOfficePath,
-      ["--headless", "--nologo", "--nofirststartwizard", `-env:UserInstallation=${pathToFileURL(profileDir).href}`, "--convert-to", "pdf", "--outdir", workDir, sourcePath],
-      {
-        timeout: config.previewConversionTimeoutMs,
-        windowsHide: true,
-        maxBuffer: 1024 * 1024
-      }
-    );
+    await runLibreOffice(profileDir, "pdf", workDir, sourcePath);
 
     if (!(await fileExists(convertedPath))) {
-      return failedPreview(record, profile, "LibreOffice hat keine PDF-Vorschau erzeugt.");
+      return { ok: false, message: "LibreOffice hat keine PDF-Vorschau erzeugt." };
     }
 
     await fs.copyFile(convertedPath, cachedPath);
-    return availablePreview(record, profile, previewUrl(cachedFilename), null, null);
+    return { ok: true, path: cachedPath };
   } catch (error) {
-    return failedPreview(record, profile, conversionFailureMessage(error));
+    return { ok: false, message: conversionFailureMessage(error) };
   } finally {
     await fs.rm(workDir, { recursive: true, force: true });
   }
+}
+
+async function convertOfficePreview(record: AttachmentRecord, filePath: string): Promise<AttachmentPreviewInfo> {
+  const profile = previewProfile(record);
+  const result = await ensureOfficePdf(record, filePath);
+  if (!result.ok) {
+    return failedPreview(record, profile, result.message);
+  }
+  return availablePreview(record, profile, previewUrl(path.basename(result.path)), null, null);
 }
 
 function availablePreview(record: AttachmentRecord, profile: AttachmentPreviewProfile, url: string | null, text: AttachmentTextPreview | null, message: string | null): AttachmentPreviewInfo {
@@ -303,6 +323,146 @@ export async function getAttachmentPreview(database: DbClient, id: number): Prom
   }
 
   return convertOfficePreview(record, filePath);
+}
+
+// --- Kachel-Vorschaubild (Thumbnail) ---
+//
+// Erste Seite als PNG, faul beim ersten Anzeigen erzeugt und im Vorschau-Cache abgelegt. Alles läuft
+// über PDF: Ein PDF wird direkt gerastert, Office-/ODF-Dokumente nutzen zuerst die (gecachte)
+// PDF-Fassung. LibreOffice skaliert per FilterOptions selbst — deshalb braucht es keine Bildbibliothek.
+//
+// Der Dateiname trägt dasselbe Präfix `attachment-<id>-` wie die PDF-Vorschau; `removeAttachmentPreviews`
+// räumt beide beim Löschen des Dokuments ohne Zusatzcode auf.
+
+/** Dateitypen, für die sich ein Vorschaubild erzeugen lässt: PDF direkt, Office/ODF über die PDF-Fassung. */
+export function supportsThumbnail(record: PreviewSource): boolean {
+  const kind = previewProfile(record).kind;
+  return kind === "pdf" || kind === "generatedPdf";
+}
+
+export function thumbnailFilename(record: Pick<AttachmentRecord, "id" | "filename">): string {
+  const hash = crypto.createHash("sha256").update(record.filename).digest("hex").slice(0, 12);
+  return `attachment-${record.id}-${hash}-thumb.png`;
+}
+
+/** LibreOffice rendert die erste Seite und skaliert dabei exakt auf die Zielgröße. */
+export function thumbnailFilterArgument(width: number, height: number): string {
+  const options = {
+    PixelWidth: { type: "long", value: width },
+    PixelHeight: { type: "long", value: height }
+  };
+  return `png:draw_png_Export:${JSON.stringify(options)}`;
+}
+
+// Jede Erzeugung startet einen LibreOffice-Prozess. Ein Kachelraster fragt viele Bilder gleichzeitig
+// an — ohne Begrenzung wären das Dutzende Prozesse. Der freigewordene Platz wird direkt an einen
+// Wartenden übergeben, statt ihn erst freizugeben und neu zu belegen.
+let activeConversions = 0;
+const conversionWaiters: Array<() => void> = [];
+
+async function acquireConversionSlot(): Promise<void> {
+  if (activeConversions < config.thumbnailConcurrency) {
+    activeConversions += 1;
+    return;
+  }
+  await new Promise<void>((resolve) => conversionWaiters.push(resolve));
+}
+
+function releaseConversionSlot(): void {
+  const next = conversionWaiters.shift();
+  if (next) {
+    next();
+    return;
+  }
+  activeConversions -= 1;
+}
+
+// Mehrere Kacheln desselben Dokuments (oder ein Neuladen) sollen nicht mehrfach rendern.
+const inFlightThumbnails = new Map<number, Promise<string | null>>();
+
+async function rasterizeFirstPage(pdfPath: string, targetPath: string): Promise<boolean> {
+  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "taskmanager-thumbnail-"));
+  try {
+    const profileDir = path.join(workDir, "lo-profile");
+    const sourcePath = path.join(workDir, "source.pdf");
+    const renderedPath = path.join(workDir, "source.png");
+
+    await fs.mkdir(profileDir, { recursive: true });
+    await fs.copyFile(pdfPath, sourcePath);
+    await runLibreOffice(profileDir, thumbnailFilterArgument(config.thumbnailWidth, config.thumbnailHeight), workDir, sourcePath);
+
+    if (!(await fileExists(renderedPath))) {
+      return false;
+    }
+    await fs.copyFile(renderedPath, targetPath);
+    return true;
+  } catch {
+    // Ein fehlgeschlagenes Vorschaubild ist folgenlos: Die Kachel behält ihr Typ-Icon.
+    return false;
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true });
+  }
+}
+
+async function createThumbnail(record: AttachmentRecord, targetPath: string): Promise<string | null> {
+  const filePath = attachmentDiskPath(record);
+  if (!(await fileExists(filePath))) {
+    return null;
+  }
+  const stat = await fs.stat(filePath);
+  if (stat.size > config.previewConversionMaxBytes) {
+    return null;
+  }
+  await fs.mkdir(config.previewCacheDir, { recursive: true });
+
+  await acquireConversionSlot();
+  try {
+    // Während des Wartens auf einen Platz kann ein anderer Aufruf das Bild bereits erzeugt haben.
+    if (await fileExists(targetPath)) {
+      return targetPath;
+    }
+
+    let pdfPath = filePath;
+    if (previewProfile(record).kind === "generatedPdf") {
+      const converted = await ensureOfficePdf(record, filePath);
+      if (!converted.ok) {
+        return null;
+      }
+      pdfPath = converted.path;
+    }
+
+    return (await rasterizeFirstPage(pdfPath, targetPath)) ? targetPath : null;
+  } finally {
+    releaseConversionSlot();
+  }
+}
+
+/** Pfad zum Vorschaubild, oder `null` wenn der Dateityp keins hat bzw. die Erzeugung scheitert. */
+export async function getAttachmentThumbnail(database: DbClient, id: number): Promise<string | null> {
+  const record = firstRow(await database.select().from(attachments).where(eq(attachments.id, id)));
+  if (!record) {
+    throw notFound(`Attachment with id ${id} not found`);
+  }
+  if (!supportsThumbnail(record)) {
+    return null;
+  }
+
+  assertSafeTestDirectoryPath(config.previewCacheDir, "PREVIEW_CACHE_DIR");
+  const targetPath = path.join(config.previewCacheDir, thumbnailFilename(record));
+  if (await fileExists(targetPath)) {
+    return targetPath;
+  }
+
+  const pending = inFlightThumbnails.get(id);
+  if (pending) {
+    return pending;
+  }
+
+  const task = createThumbnail(record, targetPath).finally(() => {
+    inFlightThumbnails.delete(id);
+  });
+  inFlightThumbnails.set(id, task);
+  return task;
 }
 
 export async function removeAttachmentPreviews(id: number): Promise<void> {
