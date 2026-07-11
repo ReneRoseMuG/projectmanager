@@ -11,6 +11,7 @@ $script:repoRoot  = $RepoRoot
 $script:deployDir = $DeployDir
 $script:startPs1  = "$script:deployDir\Start.ps1"
 $script:stopPs1   = "$script:deployDir\Stop.ps1"
+$script:restartPs1 = "$script:deployDir\Restart.ps1"
 $script:updatePs1 = "$PSScriptRoot\update.ps1"
 
 # Icon: blaues Quadrat mit "PM"
@@ -47,6 +48,20 @@ $itemStart.Add_Click({
         "-WindowStyle Hidden -ExecutionPolicy Bypass -NonInteractive -File `"$script:startPs1`""
 })
 $menu.Items.Add($itemStart) | Out-Null
+
+# --- Neu starten ---
+$itemRestart = New-Object System.Windows.Forms.ToolStripMenuItem "Projekt Manager neu starten"
+$itemRestart.Add_Click({
+    if (-not (Test-Path $script:restartPs1)) {
+        [System.Windows.Forms.MessageBox]::Show(
+            "Restart.ps1 nicht gefunden.`nBitte zuerst das Update ausführen.",
+            "Projekt Manager", "OK", "Warning") | Out-Null
+        return
+    }
+    Start-Process powershell.exe -ArgumentList `
+        "-WindowStyle Hidden -ExecutionPolicy Bypass -NonInteractive -File `"$script:restartPs1`""
+})
+$menu.Items.Add($itemRestart) | Out-Null
 
 # --- Beenden ---
 $itemStop = New-Object System.Windows.Forms.ToolStripMenuItem "Projekt Manager beenden"

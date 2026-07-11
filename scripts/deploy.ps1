@@ -161,6 +161,7 @@ Sync-Dir "$repoRoot\docs\Zertifikate" "$Target\docs\Zertifikate"
 
 Copy-File "$repoRoot\packages\shared-types\package.json" "$Target\packages\shared-types\package.json"
 Copy-File "$repoRoot\scripts\serve-static.mjs" "$Target\scripts\serve-static.mjs"
+Copy-File "$repoRoot\scripts\restart.ps1" "$Target\Restart.ps1"
 if (Test-Path "$repoRoot\tsconfig.base.json") {
     Copy-File "$repoRoot\tsconfig.base.json" "$Target\tsconfig.base.json"
 }
@@ -344,8 +345,24 @@ if ($targetPids.Count -eq 0) {
         $proc = Get-Process -Id $p -ErrorAction SilentlyContinue
         if ($proc) {
             Stop-Process -Id $p -Force
+            if (-not $proc.WaitForExit(10000)) {
+                throw "Prozess $p ($($proc.Name)) konnte nicht beendet werden."
+            }
             Write-Host "Prozess $p ($($proc.Name)) beendet." -ForegroundColor Green
         }
+    }
+}
+
+foreach ($port in @(3001, 5173, 3010)) {
+    $deadline = (Get-Date).AddSeconds(10)
+    do {
+        $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
+        if (-not $listener) { break }
+        Start-Sleep -Milliseconds 250
+    } while ((Get-Date) -lt $deadline)
+
+    if ($listener) {
+        throw "Port $port ist nach dem Stoppen weiterhin belegt."
     }
 }
 
