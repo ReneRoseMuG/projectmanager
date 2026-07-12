@@ -631,7 +631,7 @@ export function DocumentsPage() {
   );
 
   return (
-    <div className="flex min-h-0 flex-col gap-6">
+    <div className="flex min-h-0 flex-col gap-6 lg:h-full">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-ink">Dokumente</h1>
         <p className="text-sm text-steel-500">
@@ -646,7 +646,7 @@ export function DocumentsPage() {
         onDragEnd={handleDragEnd}
         onDragCancel={() => setActiveDragIds(null)}
       >
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-6 lg:min-h-0 lg:flex-1 lg:flex-row lg:items-start lg:overflow-hidden">
         {/* Verwaltung: Sammlungen & Kategorien */}
         <DocumentSidePanel
           side="left"
@@ -878,8 +878,11 @@ export function DocumentsPage() {
         </DocumentSidePanel>
 
         {/* Bibliothek */}
-        <section className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-2">
+        <section className="flex min-w-0 flex-1 flex-col gap-4 lg:min-h-0 lg:self-stretch lg:overflow-hidden">
+          <div
+            data-testid="documents-filter-bar"
+            className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center gap-2 rounded-lg border border-line bg-white p-2 shadow-sm lg:static"
+          >
             {/* Das Suchfeld bekommt eine feste Breite statt `flex-1`: sonst frisst es den ganzen
                 Restplatz und drängt die Dropdowns in den Umbruch. Die Dropdowns halten eine
                 lesbare Mindestbreite, die Kachelgröße sitzt rechts. */}
@@ -960,89 +963,94 @@ export function DocumentsPage() {
             </div>
           </div>
 
-          {selectionActive ? (
-            <div className="flex flex-wrap items-center gap-3 rounded-md border border-steel-300 bg-steel-100 px-3 py-2">
-              <span className="text-sm font-medium text-ink">
-                {selectedIds.size} ausgewählt
-              </span>
-              <span className="text-xs text-steel-500">
-                Auf eine Sammlung oder Kategorie links ziehen zum Zuweisen.
-              </span>
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleBulkDownload()}
-                  className="flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-ink shadow-sm transition hover:bg-steel-50"
-                >
-                  <Download size={15} />
-                  Als Zip
-                </button>
-                <button
-                  type="button"
-                  onClick={clearSelection}
-                  className="rounded-md px-3 py-1.5 text-sm font-medium text-steel-600 transition hover:bg-white"
-                >
-                  Auswahl aufheben
-                </button>
+          <div
+            data-testid="documents-scroll-container"
+            className="flex flex-col gap-4 rounded-lg border border-line bg-white p-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+          >
+            {selectionActive ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-md border border-steel-300 bg-steel-100 px-3 py-2">
+                <span className="text-sm font-medium text-ink">
+                  {selectedIds.size} ausgewählt
+                </span>
+                <span className="text-xs text-steel-500">
+                  Auf eine Sammlung oder Kategorie links ziehen zum Zuweisen.
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkDownload()}
+                    className="flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-sm font-medium text-ink shadow-sm transition hover:bg-steel-50"
+                  >
+                    <Download size={15} />
+                    Als Zip
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    className="rounded-md px-3 py-1.5 text-sm font-medium text-steel-600 transition hover:bg-white"
+                  >
+                    Auswahl aufheben
+                  </button>
+                </div>
               </div>
-            </div>
-          ) : null}
+            ) : null}
 
-          {error ? (
-            <p className="text-sm text-rose-600">
-              Dokumente konnten nicht geladen werden: {error}
-            </p>
-          ) : null}
+            {error ? (
+              <p className="text-sm text-rose-600">
+                Dokumente konnten nicht geladen werden: {error}
+              </p>
+            ) : null}
 
-          {loading ? (
-            <p className="text-sm text-steel-500">Wird geladen…</p>
-          ) : documents.length === 0 ? (
-            <EmptyState
-              icon={<FileText size={28} />}
-              title="Keine Dokumente"
-              body="Für die aktuelle Auswahl gibt es keine Dokumente."
+            {loading ? (
+              <p className="text-sm text-steel-500">Wird geladen…</p>
+            ) : documents.length === 0 ? (
+              <EmptyState
+                icon={<FileText size={28} />}
+                title="Keine Dokumente"
+                body="Für die aktuelle Auswahl gibt es keine Dokumente."
+              />
+            ) : visibleDocuments.length === 0 ? (
+              <EmptyState
+                icon={<FileText size={28} />}
+                title="Keine Treffer"
+                body="Keine sichtbare Datei mit dieser Endung."
+              />
+            ) : (
+              <div
+                className="grid gap-3"
+                style={{
+                  gridTemplateColumns: `repeat(auto-fill, minmax(${thumbnailMinPx(
+                    thumbnailSize,
+                  )}px, 1fr))`,
+                }}
+              >
+                {visibleDocuments.map((doc) => (
+                  <DraggableTile
+                    key={doc.id}
+                    documentId={doc.id}
+                    ids={dragDocumentIds(doc.id, selectedIds)}
+                    disabled={!canWrite}
+                  >
+                    <DocumentTile
+                      document={doc}
+                      isSelected={selectedIds.has(doc.id)}
+                      onToggleSelect={() => toggleSelect(doc.id)}
+                      onOpen={() => setOpenedId(doc.id)}
+                      onDownload={() => handleDocumentDownload(doc)}
+                      canDelete={canDelete}
+                      onDelete={() => handleDeleteDocument(doc)}
+                    />
+                  </DraggableTile>
+                ))}
+              </div>
+            )}
+
+            <LoadMoreIndicator
+              loadedCount={loadedCount}
+              total={total}
+              loadingMore={loadingMore}
             />
-          ) : visibleDocuments.length === 0 ? (
-            <EmptyState
-              icon={<FileText size={28} />}
-              title="Keine Treffer"
-              body="Keine sichtbare Datei mit dieser Endung."
-            />
-          ) : (
-            <div
-              className="grid gap-3"
-              style={{
-                gridTemplateColumns: `repeat(auto-fill, minmax(${thumbnailMinPx(
-                  thumbnailSize,
-                )}px, 1fr))`,
-              }}
-            >
-              {visibleDocuments.map((doc) => (
-                <DraggableTile
-                  key={doc.id}
-                  documentId={doc.id}
-                  ids={dragDocumentIds(doc.id, selectedIds)}
-                  disabled={!canWrite}
-                >
-                  <DocumentTile
-                    document={doc}
-                    isSelected={selectedIds.has(doc.id)}
-                    onToggleSelect={() => toggleSelect(doc.id)}
-                    onOpen={() => setOpenedId(doc.id)}
-                    onDownload={() => handleDocumentDownload(doc)}
-                    canDelete={canDelete}
-                    onDelete={() => handleDeleteDocument(doc)}
-                  />
-                </DraggableTile>
-              ))}
-            </div>
-          )}
-
-          <LoadMoreIndicator
-            loadedCount={loadedCount}
-            total={total}
-            loadingMore={loadingMore}
-          />
+          </div>
         </section>
       </div>
 

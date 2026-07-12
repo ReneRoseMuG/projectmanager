@@ -27,13 +27,12 @@
  * - Geschuetzte System-Labels sind ueber setDocumentTags nicht setzbar (400).
  * - Orphan-Verhalten: Anhaenge werden beim Loeschen des Fachobjekts NICHT geloescht, sondern Nicht einsortiert.
  * - Verwaister Owner-Link (Fachobjekt bereits geloescht) blockiert das Loeschen des Dokuments nicht (204 statt 404).
- * - Upload-Kontext: `?folder=` und `?category=` ordnen die hochgeladene Datei symmetrisch zu (mit Gegenbeispiel
- *   ohne Query); der Upload bleibt schreibgeschuetzt (403 fuer Leser).
+ * - Upload-Kontext: singulaere sowie mehrfache Sammlungen/Kategorien und mehrere Tags werden nach vorheriger
+ *   Zielvalidierung zugeordnet (mit Gegenbeispiel ohne Query); der Upload bleibt schreibgeschuetzt (403 fuer Leser).
  *
  * Fehlerfaelle:
  * - 401 ohne Session, 403 Reader-Negativfall, 409 Dublette/Versionskonflikt/Loeschschutz, 400 Zyklus/System-Label.
- * - Upload mit unbekannter Kategorie: 404. Bekannte Grenze, die der Test festhaelt: Upload und Zuordnung liegen
- *   nicht in einer Transaktion, das Attachment bleibt angelegt (gilt seit jeher ebenso fuer `folder`).
+ * - Unbekannte Sammlung/Kategorie: 404 ohne Dateianlage; unbekannte oder fachfremde Tags: 400 ohne Dateianlage.
  *
  * Ziel:
  * Die neue DMS-Oberflaeche und die geaenderte Aufraeum-Semantik gegen Regressionen absichern.
@@ -258,42 +257,71 @@ describe("DMS API", () => {
     expect((afterSort.body as Array<{ id: number }>).map((item) => item.id)).not.toContain(upload.body.id);
   });
 
-  // --- Upload-Kontext (Sammlung + Kategorie) ---
+  // --- Upload-Kontext (Sammlung + Kategorie + Tags) ---
 
-  it("Upload übernimmt Sammlung und Kategorie aus der Query", async () => {
+  it("Upload übernimmt mehrere Sammlungen, Kategorien und DMS-Tags aus der Query", async () => {
     const admin = await loginAdmin();
-    const folder = await admin.post("/api/attachment-folders").send({ name: "Rechnungen" }).expect(201);
-    const category = await admin.post("/api/attachment-categories").send({ name: "Wichtig" }).expect(201);
+    const firstFolder = await admin.post("/api/attachment-folders").send({ name: "Rechnungen" }).expect(201);
+    const secondFolder = await admin.post("/api/attachment-folders").send({ name: "Eingang" }).expect(201);
+    const firstCategory = await admin.post("/api/attachment-categories").send({ name: "Wichtig" }).expect(201);
+    const secondCategory = await admin.post("/api/attachment-categories").send({ name: "Finanzen" }).expect(201);
+    const firstTag = await admin.post("/api/tags").send({ name: "Eingang", domain: "dms" }).expect(201);
+    const secondTag = await admin.post("/api/tags").send({ name: "Prüfen", domain: "dms" }).expect(201);
 
     const withContext = await admin
-      .post(`/api/documents?folder=${folder.body.id}&category=${category.body.id}`)
+      .post(`/api/documents?folders=${firstFolder.body.id},${secondFolder.body.id}&categories=${firstCategory.body.id},${secondCategory.body.id}&tags=${firstTag.body.id},${secondTag.body.id}`)
       .attach("file", Buffer.from("Inhalt"), { filename: "mit-kontext.txt", contentType: "text/plain" })
       .expect(201);
 
     const created = await admin.get(`/api/documents/${withContext.body.id}`).expect(200);
-    expect(created.body.folders).toEqual([expect.objectContaining({ id: folder.body.id })]);
-    expect(created.body.categories).toEqual([expect.objectContaining({ id: category.body.id })]);
+    expect(created.body.folders.map((folder: { id: number }) => folder.id).sort()).toEqual([firstFolder.body.id, secondFolder.body.id].sort());
+    expect(created.body.categories.map((category: { id: number }) => category.id).sort()).toEqual([firstCategory.body.id, secondCategory.body.id].sort());
+    expect(created.body.tags.map((tag: { id: number }) => tag.id).sort()).toEqual([firstTag.body.id, secondTag.body.id].sort());
 
     // Gegenbeispiel: ohne Query bleibt das Dokument ohne Sammlung und ohne Kategorie.
     const plain = await uploadDocument(admin, "ohne-kontext.txt");
     const fetched = await admin.get(`/api/documents/${plain.id}`).expect(200);
     expect(fetched.body.folders).toEqual([]);
     expect(fetched.body.categories).toEqual([]);
+    expect(fetched.body.tags).toEqual([]);
   });
 
-  it("Upload mit unbekannter Kategorie antwortet 404 — das Dokument bleibt dennoch angelegt", async () => {
+  it("validiert unbekannte Sammlung und Kategorie vor der Dateianlage", async () => {
     const admin = await loginAdmin();
-    const res = await admin
+    const categoryResponse = await admin
       .post("/api/documents?category=999999")
       .attach("file", Buffer.from("Inhalt"), { filename: "unbekannt.txt", contentType: "text/plain" })
       .expect(404);
-    expect(res.body).toMatchObject({ error: "NOT_FOUND", statusCode: 404 });
+    expect(categoryResponse.body).toMatchObject({ error: "NOT_FOUND", statusCode: 404 });
 
-    // Bekannte Grenze: Upload und Zuordnung liegen nicht in einer Transaktion. Das Attachment ist
-    // bereits erzeugt, wenn die Zuordnung scheitert — dasselbe Verhalten gilt seit jeher für `folder`.
+    const folderResponse = await admin
+      .post("/api/documents?folders=999998,999999")
+      .attach("file", Buffer.from("Inhalt"), { filename: "unbekannte-sammlung.txt", contentType: "text/plain" })
+      .expect(404);
+    expect(folderResponse.body).toMatchObject({ error: "NOT_FOUND", statusCode: 404 });
+
     const list = await admin.get("/api/documents").expect(200);
-    expect(list.body).toHaveLength(1);
-    expect(list.body[0].categories).toEqual([]);
+    expect(list.body).toEqual([]);
+  });
+
+  it("lehnt unbekannte und fachfremde Tags vor der Dateianlage ab", async () => {
+    const admin = await loginAdmin();
+    const pmTag = await admin.post("/api/tags").send({ name: "PM-Tag", domain: "pm" }).expect(201);
+
+    const unknown = await admin
+      .post("/api/documents?tags=999999")
+      .attach("file", Buffer.from("Inhalt"), { filename: "unbekanntes-tag.txt", contentType: "text/plain" })
+      .expect(400);
+    expect(unknown.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
+
+    const wrongDomain = await admin
+      .post(`/api/documents?tags=${pmTag.body.id}`)
+      .attach("file", Buffer.from("Inhalt"), { filename: "pm-tag.txt", contentType: "text/plain" })
+      .expect(400);
+    expect(wrongDomain.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
+
+    const list = await admin.get("/api/documents").expect(200);
+    expect(list.body).toEqual([]);
   });
 
   it("Upload mit Kontext bleibt schreibgeschützt: Leser erhält 403", async () => {

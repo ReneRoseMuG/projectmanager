@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { attachmentFolders } from "../db/schema.js";
@@ -18,6 +18,14 @@ function nowIso(): string {
 export const attachmentFolderRepository = {
   async findById(database: DbSession, id: number): Promise<AttachmentFolderRecord | undefined> {
     return firstRow(await database.select().from(attachmentFolders).where(eq(attachmentFolders.id, id)));
+  },
+
+  async findByIds(database: DbSession, ids: number[]): Promise<AttachmentFolderRecord[]> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) {
+      return [];
+    }
+    return database.select().from(attachmentFolders).where(inArray(attachmentFolders.id, uniqueIds));
   },
 
   async findRootFolders(database: DbSession): Promise<AttachmentFolderRecord[]> {

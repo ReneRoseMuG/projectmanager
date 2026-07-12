@@ -2,7 +2,7 @@
 
 /**
  * Test Scope:
- * DocumentsPage — Sammlung und Kategorie als Ablage-Kontext des Uploads (MS-75).
+ * DocumentsPage — Ablage-Kontext des Uploads und Filterleisten-Layout (MS-75).
  *
  * Test-Ebene:
  * - Unit
@@ -27,6 +27,7 @@
  *   zusammengefasst, und der Toast benennt das Ziel (keine verborgene Schreibwirkung).
  * - Erst am Ende werden Label-, Typ-, Endungsfilter und Suche geleert; Sammlung und Kategorie
  *   bleiben erhalten.
+ * - Dokumentkacheln scrollen in einem eigenen Container unterhalb der Filterleiste.
  *
  * Fehlerfälle:
  * - Schlägt der Upload fehl, bleiben die Filter unangetastet.
@@ -243,6 +244,25 @@ describe("DocumentsPage — Upload übernimmt den Ablage-Kontext", () => {
       title: "Dokument hochgeladen",
       message: `Einsortiert in Sammlung „Rechnungen" · Kategorie „Wichtig"`,
     });
+  });
+});
+
+describe("DocumentsPage — Filterleiste", () => {
+  it("trennt die Filterleiste vom scrollenden Dokumentbereich", () => {
+    render(<DocumentsPage />);
+
+    const filterBar = screen.getByTestId("documents-filter-bar");
+    const scrollContainer = screen.getByTestId("documents-scroll-container");
+    const documentTile = screen.getByTitle("Doc-1.pdf");
+
+    expect(scrollContainer).toHaveClass(
+      "lg:min-h-0",
+      "lg:flex-1",
+      "lg:overflow-y-auto",
+    );
+    expect(scrollContainer).toContainElement(documentTile);
+    expect(scrollContainer).not.toContainElement(filterBar);
+    expect(filterBar.parentElement).toBe(scrollContainer.parentElement);
   });
 });
 

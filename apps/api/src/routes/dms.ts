@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { createUnboundAttachment, deleteAttachment } from "../services/attachments.service.js";
+import { deleteAttachment } from "../services/attachments.service.js";
 import {
   assignCategoryToAttachment,
   assignCategoryToAttachments,
@@ -20,6 +20,7 @@ import {
   updateAttachmentFolder
 } from "../services/attachment-folder.service.js";
 import { getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
+import { importDocument } from "../services/document-import.service.js";
 import { buildDocumentsArchive, getDocumentDownloadFile } from "../services/document-download.service.js";
 import { getAttachmentThumbnail } from "../services/attachment-preview.service.js";
 import { createJournalActor } from "../services/journal.service.js";
@@ -132,7 +133,10 @@ const uploadQuerySchema = {
   additionalProperties: false,
   properties: {
     folder: { type: "integer", minimum: 1 },
-    category: { type: "integer", minimum: 1 }
+    category: { type: "integer", minimum: 1 },
+    folders: { type: "string", pattern: "^[1-9][0-9]*(,[1-9][0-9]*)*$" },
+    categories: { type: "string", pattern: "^[1-9][0-9]*(,[1-9][0-9]*)*$" },
+    tags: { type: "string", pattern: "^[1-9][0-9]*(,[1-9][0-9]*)*$" }
   }
 } as const;
 
@@ -330,23 +334,27 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  // `folder` und `category` sind der Ablage-Kontext der Dokumente-Seite: Wer in einer Sammlung
-  // bzw. unter einer Kategorie steht und hochlädt, ordnet die Datei genau dort ein. Beide sind
-  // optional und wirken symmetrisch. Schlägt eine Zuordnung fehl (unbekanntes Ziel → 404), ist das
-  // Attachment bereits angelegt — bekannte Grenze, die schon für `folder` galt.
-  app.post<{ Querystring: { folder?: number; category?: number } }>(
+  // Die singulären Parameter bleiben für die Web-Oberfläche kompatibel; der Windows-Importer
+  // verwendet die kommaseparierten Mehrfachparameter `folders`, `categories` und `tags`.
+  app.post<{ Querystring: { folder?: number; category?: number; folders?: string; categories?: string; tags?: string } }>(
     "/documents",
     { config: attachmentsAuth("write"), schema: { ...uploadBodySchema, querystring: uploadQuerySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
       const upload = await readUpload(request);
-      const document = await createUnboundAttachment(app.db, upload, createJournalActor(request.currentUser));
-      if (request.query.folder !== undefined) {
-        await addAttachmentToFolder(app.db, request.query.folder, document.id);
-      }
-      if (request.query.category !== undefined) {
-        await assignCategoryToAttachment(app.db, document.id, request.query.category);
-      }
-      return reply.status(201).send(await getDocument(app.db, document.id));
+      const tagIds = request.query.tags?.split(",").map(Number);
+      const folderIds = [request.query.folder, ...(request.query.folders?.split(",").map(Number) ?? [])].filter(
+        (id): id is number => id !== undefined
+      );
+      const categoryIds = [request.query.category, ...(request.query.categories?.split(",").map(Number) ?? [])].filter(
+        (id): id is number => id !== undefined
+      );
+      const document = await importDocument(
+        app.db,
+        upload,
+        { folderIds, categoryIds, tagIds },
+        createJournalActor(request.currentUser)
+      );
+      return reply.status(201).send(document);
     }
   );
 

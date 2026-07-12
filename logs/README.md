@@ -2,6 +2,18 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 12.07.26 | 03:38:33 | Fix | DMS mit eigenem Scrollcontainer | ✅ |
+| 12.07.26 | 03:25:27 | Fix | DMS-Filterzeile sticky | ✅ |
+| 11.07.26 | 18:15:20 | Fix | DMS-Import Deployment und Zuordnungen | ✅ |
+| 11.07.26 | 18:07:22 | Fix | Explorer-Import-Fortschritt | ✅ |
+| 11.07.26 | 18:04:03 | Fix / Feature | Explorer-Batch, Mehrfach-Picker und Encoding | ✅ |
+| 11.07.26 | 08:51:59 | Fix | Import-Terminal ausblenden | ✅ |
+| 11.07.26 | 08:51:16 | Fix | WPF-Einzeldatei-Dialog | ✅ |
+| 11.07.26 | 08:47:54 | Fix | Explorer-Dateiplatzhalter | ✅ |
+| 11.07.26 | 08:44:32 | Fix | Explorer-Befehlszuordnung | ✅ |
+| 11.07.26 | 08:13:19 | 3 | Explorer-Import Tests und Verifikation | ✅ |
+| 11.07.26 | 08:07:03 | 2 | Windows-Explorer-Importer | ✅ |
+| 11.07.26 | 08:01:06 | 1 | DMS-Importvertrag | ⚠️ |
 | 11.07.26 | 07:38:01 | Fix | Kontrollierter Neustart im Tray-Menü | ✅ |
 | 09.07.26 | 14:45:31 | Feature | TKT-156/157/158 DMS-Download und Duplikaterkennung | ✅ |
 | 08.07.26 | 14:55:07 | Feature | Vorschaubilder für PDF, Office und ODF in der Kachelansicht | ✅ |
