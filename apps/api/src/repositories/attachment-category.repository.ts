@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, max, or, sql } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { attachmentCategories } from "../db/schema.js";
@@ -9,7 +9,13 @@ export type AttachmentCategoryCreateData = Omit<
   typeof attachmentCategories.$inferInsert,
   "id" | "version" | "createdAt" | "updatedAt" | "createdBy" | "updatedBy"
 >;
-export type AttachmentCategoryUpdateData = Partial<Pick<AttachmentCategoryCreateData, "name" | "color">>;
+export type AttachmentCategoryUpdateData = Partial<Pick<AttachmentCategoryCreateData, "name" | "color" | "sortOrder">>;
+
+interface AttachmentCategoryOrderUpdate {
+  id: number;
+  expectedVersion: number;
+  sortOrder: number;
+}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -33,7 +39,15 @@ export const attachmentCategoryRepository = {
   },
 
   async findAll(database: DbSession): Promise<AttachmentCategoryRecord[]> {
-    return database.select().from(attachmentCategories).orderBy(attachmentCategories.name);
+    return database
+      .select()
+      .from(attachmentCategories)
+      .orderBy(asc(attachmentCategories.sortOrder), asc(attachmentCategories.name), asc(attachmentCategories.id));
+  },
+
+  async nextSortOrder(database: DbSession): Promise<number> {
+    const row = firstRow(await database.select({ value: max(attachmentCategories.sortOrder) }).from(attachmentCategories));
+    return row?.value === null || row?.value === undefined ? 0 : Number(row.value) + 1024;
   },
 
   async create(database: DbSession, data: AttachmentCategoryCreateData, userId?: number): Promise<AttachmentCategoryRecord> {
@@ -82,5 +96,25 @@ export const attachmentCategoryRepository = {
 
   async delete(database: DbSession, id: number): Promise<number> {
     return mutationAffectedRows(await database.delete(attachmentCategories).where(eq(attachmentCategories.id, id)));
+  },
+
+  async updateOrder(database: DbSession, items: AttachmentCategoryOrderUpdate[], userId?: number): Promise<number> {
+    if (items.length === 0) {
+      return 0;
+    }
+    const orderCases = sql.join(items.map((item) => sql`when ${item.id} then ${item.sortOrder}`), sql.raw(" "));
+    const versionConditions = items.map((item) =>
+      and(eq(attachmentCategories.id, item.id), eq(attachmentCategories.version, item.expectedVersion))
+    );
+    const result = await database
+      .update(attachmentCategories)
+      .set({
+        sortOrder: sql`case ${attachmentCategories.id} ${orderCases} else ${attachmentCategories.sortOrder} end`,
+        version: sql`${attachmentCategories.version} + 1`,
+        updatedBy: userId ?? null,
+        updatedAt: nowIso()
+      })
+      .where(or(...versionConditions));
+    return mutationAffectedRows(result);
   }
 };

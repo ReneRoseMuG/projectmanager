@@ -1,4 +1,4 @@
-import type { AttachmentCategory, AttachmentFolder } from "@taskmanager/shared-types";
+import type { AttachmentCategory, AttachmentCategoryOrderInput, AttachmentFolder, AttachmentFolderOrderInput } from "@taskmanager/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 import * as documentsApi from "../api/documents";
@@ -47,6 +47,7 @@ export function useCategories() {
     onSuccess: invalidate
   });
   const deleteMutation = useMutation({ mutationFn: documentsApi.deleteAttachmentCategory, onSuccess: invalidate });
+  const reorderMutation = useMutation({ mutationFn: documentsApi.reorderAttachmentCategories, onSuccess: invalidate });
 
   return {
     categories: query.data ?? ([] as AttachmentCategory[]),
@@ -55,7 +56,8 @@ export function useCategories() {
     createCategory: (input: { name: string; color?: string }) => createMutation.mutateAsync(input),
     updateCategory: (id: number, input: { name?: string; color?: string; expectedVersion: number }) =>
       updateMutation.mutateAsync({ id, input }),
-    deleteCategory: (id: number) => deleteMutation.mutateAsync(id)
+    deleteCategory: (id: number) => deleteMutation.mutateAsync(id),
+    reorderCategories: (input: AttachmentCategoryOrderInput) => reorderMutation.mutateAsync(input)
   };
 }
 
@@ -74,6 +76,7 @@ export function useFolders() {
     mutationFn: ({ id, recursive }: { id: number; recursive?: boolean }) => documentsApi.deleteAttachmentFolder(id, recursive),
     onSuccess: invalidate
   });
+  const reorderMutation = useMutation({ mutationFn: documentsApi.reorderAttachmentFolders, onSuccess: invalidate });
 
   return {
     folders: query.data ?? ([] as AttachmentFolder[]),
@@ -82,7 +85,8 @@ export function useFolders() {
     createFolder: (input: { name: string; parentId?: number | null; projectId?: number | null }) => createMutation.mutateAsync(input),
     updateFolder: (id: number, input: { name?: string; parentId?: number | null; projectId?: number | null; expectedVersion: number }) =>
       updateMutation.mutateAsync({ id, input }),
-    deleteFolder: (id: number, recursive?: boolean) => deleteMutation.mutateAsync({ id, recursive })
+    deleteFolder: (id: number, recursive?: boolean) => deleteMutation.mutateAsync({ id, recursive }),
+    reorderFolders: (input: AttachmentFolderOrderInput) => reorderMutation.mutateAsync(input)
   };
 }
 

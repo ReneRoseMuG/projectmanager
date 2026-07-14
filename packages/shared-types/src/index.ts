@@ -987,6 +987,7 @@ export interface AttachmentCategory {
   id: number;
   name: string;
   color: string;
+  sortOrder: number;
   version: number;
 }
 
@@ -995,7 +996,22 @@ export interface AttachmentFolder {
   parentId: number | null;
   projectId: number | null;
   name: string;
+  sortOrder: number;
   version: number;
+}
+
+export interface AttachmentOrderItem {
+  id: number;
+  expectedVersion: number;
+}
+
+export interface AttachmentCategoryOrderInput {
+  items: AttachmentOrderItem[];
+}
+
+export interface AttachmentFolderOrderInput {
+  parentId: number | null;
+  items: AttachmentOrderItem[];
 }
 
 export interface Attachment {
@@ -1379,4 +1395,3 @@ export interface WikiImportReport {
 export interface ContentImageUploadResponse {
   url: string;
 }
-

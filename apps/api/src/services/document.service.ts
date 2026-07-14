@@ -33,11 +33,11 @@ export interface DocumentLibraryFilter {
 
 async function loadCategories(database: DbClient, attachmentId: number): Promise<AttachmentCategory[]> {
   return database
-    .select({ id: attachmentCategories.id, name: attachmentCategories.name, color: attachmentCategories.color, version: attachmentCategories.version })
+    .select({ id: attachmentCategories.id, name: attachmentCategories.name, color: attachmentCategories.color, sortOrder: attachmentCategories.sortOrder, version: attachmentCategories.version })
     .from(attachmentCategoryLinks)
     .innerJoin(attachmentCategories, eq(attachmentCategoryLinks.categoryId, attachmentCategories.id))
     .where(eq(attachmentCategoryLinks.attachmentId, attachmentId))
-    .orderBy(attachmentCategories.name);
+    .orderBy(attachmentCategories.sortOrder, attachmentCategories.name);
 }
 
 async function loadTags(database: DbClient, attachmentId: number): Promise<Tag[]> {
@@ -52,11 +52,11 @@ async function loadTags(database: DbClient, attachmentId: number): Promise<Tag[]
 
 async function loadFolders(database: DbClient, attachmentId: number): Promise<AttachmentFolder[]> {
   return database
-    .select({ id: attachmentFolders.id, parentId: attachmentFolders.parentId, projectId: attachmentFolders.projectId, name: attachmentFolders.name, version: attachmentFolders.version })
+    .select({ id: attachmentFolders.id, parentId: attachmentFolders.parentId, projectId: attachmentFolders.projectId, name: attachmentFolders.name, sortOrder: attachmentFolders.sortOrder, version: attachmentFolders.version })
     .from(folderAttachments)
     .innerJoin(attachmentFolders, eq(folderAttachments.folderId, attachmentFolders.id))
     .where(eq(folderAttachments.attachmentId, attachmentId))
-    .orderBy(attachmentFolders.name);
+    .orderBy(attachmentFolders.sortOrder, attachmentFolders.name);
 }
 
 // Gebündelte Batch-Loader für die Bibliotheks-Liste: je Relation EINE Query über alle
@@ -67,11 +67,11 @@ async function loadCategoriesForIds(database: DbClient, attachmentIds: number[])
     return result;
   }
   const rows = await database
-    .select({ attachmentId: attachmentCategoryLinks.attachmentId, id: attachmentCategories.id, name: attachmentCategories.name, color: attachmentCategories.color, version: attachmentCategories.version })
+    .select({ attachmentId: attachmentCategoryLinks.attachmentId, id: attachmentCategories.id, name: attachmentCategories.name, color: attachmentCategories.color, sortOrder: attachmentCategories.sortOrder, version: attachmentCategories.version })
     .from(attachmentCategoryLinks)
     .innerJoin(attachmentCategories, eq(attachmentCategoryLinks.categoryId, attachmentCategories.id))
     .where(inArray(attachmentCategoryLinks.attachmentId, attachmentIds))
-    .orderBy(attachmentCategories.name);
+    .orderBy(attachmentCategories.sortOrder, attachmentCategories.name);
   for (const { attachmentId, ...category } of rows) {
     const existing = result.get(attachmentId);
     if (existing) {
@@ -112,11 +112,11 @@ async function loadFoldersForIds(database: DbClient, attachmentIds: number[]): P
     return result;
   }
   const rows = await database
-    .select({ attachmentId: folderAttachments.attachmentId, id: attachmentFolders.id, parentId: attachmentFolders.parentId, projectId: attachmentFolders.projectId, name: attachmentFolders.name, version: attachmentFolders.version })
+    .select({ attachmentId: folderAttachments.attachmentId, id: attachmentFolders.id, parentId: attachmentFolders.parentId, projectId: attachmentFolders.projectId, name: attachmentFolders.name, sortOrder: attachmentFolders.sortOrder, version: attachmentFolders.version })
     .from(folderAttachments)
     .innerJoin(attachmentFolders, eq(folderAttachments.folderId, attachmentFolders.id))
     .where(inArray(folderAttachments.attachmentId, attachmentIds))
-    .orderBy(attachmentFolders.name);
+    .orderBy(attachmentFolders.sortOrder, attachmentFolders.name);
   for (const { attachmentId, ...folder } of rows) {
     const existing = result.get(attachmentId);
     if (existing) {

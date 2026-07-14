@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { AttachmentCategoryOrderInput, AttachmentFolderOrderInput } from "@taskmanager/shared-types";
 import { deleteAttachment } from "../services/attachments.service.js";
 import {
   assignCategoryToAttachment,
@@ -7,6 +8,7 @@ import {
   deleteAttachmentCategory,
   listAttachmentCategories,
   removeCategoryFromAttachment,
+  reorderAttachmentCategories,
   updateAttachmentCategory
 } from "../services/attachment-category.service.js";
 import {
@@ -17,6 +19,7 @@ import {
   listAttachmentFolders,
   moveAttachmentBetweenFolders,
   removeAttachmentFromFolder,
+  reorderAttachmentFolders,
   updateAttachmentFolder
 } from "../services/attachment-folder.service.js";
 import { getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
@@ -99,6 +102,37 @@ const folderPatchSchema = {
     parentId: { type: ["integer", "null"], minimum: 1 },
     projectId: { type: ["integer", "null"], minimum: 1 },
     expectedVersion: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+const orderItemsSchema = {
+  type: "array",
+  minItems: 1,
+  items: {
+    type: "object",
+    required: ["id", "expectedVersion"],
+    additionalProperties: false,
+    properties: {
+      id: { type: "integer", minimum: 1 },
+      expectedVersion: { type: "integer", minimum: 1 }
+    }
+  }
+} as const;
+
+const categoryOrderBodySchema = {
+  type: "object",
+  required: ["items"],
+  additionalProperties: false,
+  properties: { items: orderItemsSchema }
+} as const;
+
+const folderOrderBodySchema = {
+  type: "object",
+  required: ["parentId", "items"],
+  additionalProperties: false,
+  properties: {
+    parentId: { type: ["integer", "null"], minimum: 1 },
+    items: orderItemsSchema
   }
 } as const;
 
@@ -244,6 +278,12 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  app.put<{ Body: AttachmentCategoryOrderInput }>(
+    "/attachment-categories/order",
+    { config: attachmentsAuth("write"), schema: { body: categoryOrderBodySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => reorderAttachmentCategories(app.db, request.body, currentUserId(request))
+  );
+
   app.patch<{ Params: { id: number }; Body: { name?: string; color?: string; expectedVersion: number } }>(
     "/attachment-categories/:id",
     { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: categoryPatchSchema, response: { 200: objectResponseSchema } } },
@@ -273,6 +313,12 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
       const folder = await createAttachmentFolder(app.db, request.body, currentUserId(request));
       return reply.status(201).send(folder);
     }
+  );
+
+  app.put<{ Body: AttachmentFolderOrderInput }>(
+    "/attachment-folders/order",
+    { config: attachmentsAuth("write"), schema: { body: folderOrderBodySchema, response: { 200: arrayResponseSchema } } },
+    async (request) => reorderAttachmentFolders(app.db, request.body, currentUserId(request))
   );
 
   app.patch<{ Params: { id: number }; Body: { name?: string; parentId?: number | null; projectId?: number | null; expectedVersion: number } }>(

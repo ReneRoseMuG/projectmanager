@@ -3,12 +3,13 @@ import {
   DragOverlay,
   PointerSensor,
   useDraggable,
-  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type {
   Attachment,
   AttachmentCategory,
@@ -19,6 +20,7 @@ import {
   Download,
   FileText,
   FolderArchive,
+  GripVertical,
   Inbox,
   Layers,
   Pencil,
@@ -115,24 +117,42 @@ function DraggableTile({
   );
 }
 
-// Ablageziel um eine Sammlungs- oder Kategoriezeile. Die Zeile selbst bleibt unverändert. Der Hook
-// braucht eine eigene Komponente, weil er nicht innerhalb eines `.map()`-Callbacks laufen darf.
-function DroppableRow({
+// Sortierbare Navigationszeile und zugleich Ablageziel für Dokumente. Der Griff startet die
+// Navigation-Sortierung; der Rest der Zeile behält seine Filter- und Aktionsverdrahtung.
+function SortableNavigationRow({
   dropId,
   disabled,
+  kind,
+  parentId,
   children,
 }: {
   dropId: string;
   disabled: boolean;
-  children: ReactNode;
+  kind: "folder" | "category";
+  parentId?: number | null;
+  children: (dragHandle: ReactNode) => ReactNode;
 }) {
-  const drop = useDroppable({ id: dropId, disabled });
+  const sortable = useSortable({ id: dropId, disabled, data: { kind: "navigation", entity: kind, parentId } });
   return (
     <div
-      ref={drop.setNodeRef}
-      className={`rounded-md ${drop.isOver ? "bg-white/10 ring-1 ring-inset ring-white/35" : ""}`}
+      ref={sortable.setNodeRef}
+      style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }}
+      className={`rounded-md ${sortable.isDragging ? "opacity-50" : ""} ${sortable.isOver ? "bg-white/10 ring-1 ring-inset ring-white/35" : ""}`}
     >
-      {children}
+      {children(
+        disabled ? null : (
+          <button
+            type="button"
+            {...sortable.attributes}
+            {...sortable.listeners}
+            className="cursor-grab rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white active:cursor-grabbing"
+            aria-label={`${kind === "folder" ? "Sammlung" : "Kategorie"} sortieren`}
+            title="Sortieren"
+          >
+            <GripVertical size={14} />
+          </button>
+        )
+      )}
     </div>
   );
 }
@@ -195,8 +215,8 @@ export function DocumentsPage() {
   // nach. Ein Filter-/Suchwechsel ändert den queryKey und startet das Laden von vorne.
   const { documents, total, loadedCount, loading, loadingMore, isComplete, error } =
     useDocumentLibrary(filter);
-  const { folders, createFolder, updateFolder, deleteFolder } = useFolders();
-  const { categories, createCategory, updateCategory, deleteCategory } =
+  const { folders, createFolder, updateFolder, deleteFolder, reorderFolders } = useFolders();
+  const { categories, createCategory, updateCategory, deleteCategory, reorderCategories } =
     useCategories();
   const { tags } = useTags("dms");
   const {
@@ -476,6 +496,10 @@ export function DocumentsPage() {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    if (event.active.data.current?.kind === "navigation") {
+      setActiveDragIds(null);
+      return;
+    }
     const ids = dragIdsFromData(event.active.data.current);
     setActiveDragIds(ids.length > 0 ? ids : null);
   };
@@ -484,8 +508,48 @@ export function DocumentsPage() {
   // auf „Alle Dokumente"/„Nicht einsortiert" liefert kein Ziel und bleibt folgenlos. Ohne
   // Schreibrecht passiert nichts — die API bleibt die eigentliche Sicherheitsgrenze.
   const handleDragEnd = (event: DragEndEvent) => {
-    const ids = dragIdsFromData(event.active.data.current);
     setActiveDragIds(null);
+    if (event.active.data.current?.kind === "navigation") {
+      if (!canWrite || event.over === null || event.active.id === event.over.id) {
+        return;
+      }
+      const source = parseDropTarget(event.active.id);
+      const target = parseDropTarget(event.over.id);
+      if (!source || !target || source.kind !== target.kind) {
+        return;
+      }
+      if (source.kind === "category") {
+        const oldIndex = categories.findIndex((category) => category.id === source.id);
+        const newIndex = categories.findIndex((category) => category.id === target.id);
+        if (oldIndex < 0 || newIndex < 0) {
+          return;
+        }
+        const next = arrayMove(categories, oldIndex, newIndex);
+        void run(
+          () => reorderCategories({ items: next.map((category) => ({ id: category.id, expectedVersion: category.version })) }),
+          "Kategorien sortiert"
+        );
+        return;
+      }
+      const sourceFolder = folders.find((folder) => folder.id === source.id);
+      const targetFolder = folders.find((folder) => folder.id === target.id);
+      if (!sourceFolder || !targetFolder || sourceFolder.parentId !== targetFolder.parentId) {
+        return;
+      }
+      const siblings = folders.filter((folder) => folder.parentId === sourceFolder.parentId);
+      const oldIndex = siblings.findIndex((folder) => folder.id === source.id);
+      const newIndex = siblings.findIndex((folder) => folder.id === target.id);
+      const next = arrayMove(siblings, oldIndex, newIndex);
+      void run(
+        () => reorderFolders({
+          parentId: sourceFolder.parentId,
+          items: next.map((folder) => ({ id: folder.id, expectedVersion: folder.version }))
+        }),
+        "Sammlungen sortiert"
+      );
+      return;
+    }
+    const ids = dragIdsFromData(event.active.data.current);
     const target = parseDropTarget(event.over?.id);
     if (!target || !canWrite || ids.length === 0) {
       return;
@@ -673,17 +737,21 @@ export function DocumentsPage() {
             ) : null}
             {folders.length > 0 ? (
               <div className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
+                <SortableContext items={folders.map((folder) => folderDropId(folder.id))} strategy={verticalListSortingStrategy}>
                 {folders.map((folder) =>
                   editingFolderId === folder.id ? (
                     <div key={folder.id}>
                       {editRow(() => saveFolderName(folder))}
                     </div>
                   ) : (
-                    <DroppableRow
+                    <SortableNavigationRow
                       key={folder.id}
                       dropId={folderDropId(folder.id)}
                       disabled={!canWrite}
+                      kind="folder"
+                      parentId={folder.parentId}
                     >
+                      {(dragHandle) => (
                       <div
                         className="group flex items-center gap-1"
                         style={{ paddingLeft: folder.parentId ? 12 : 0 }}
@@ -704,6 +772,7 @@ export function DocumentsPage() {
                         </button>
                         {canWrite ? (
                           <div className="flex shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+                            {dragHandle}
                             <button
                               type="button"
                               onClick={() =>
@@ -725,9 +794,11 @@ export function DocumentsPage() {
                           </div>
                         ) : null}
                       </div>
-                    </DroppableRow>
+                      )}
+                    </SortableNavigationRow>
                   ),
                 )}
+                </SortableContext>
               </div>
             ) : null}
             {canWrite ? (
@@ -778,17 +849,20 @@ export function DocumentsPage() {
             ) : null}
             {categories.length > 0 ? (
               <div className="flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
+                <SortableContext items={categories.map((category) => categoryDropId(category.id))} strategy={verticalListSortingStrategy}>
                 {categories.map((category) =>
                   editingCategoryId === category.id ? (
                     <div key={category.id}>
                       {editRow(() => saveCategoryName(category))}
                     </div>
                   ) : (
-                    <DroppableRow
+                    <SortableNavigationRow
                       key={category.id}
                       dropId={categoryDropId(category.id)}
                       disabled={!canWrite}
+                      kind="category"
                     >
+                      {(dragHandle) => (
                       <div className="group flex items-center gap-1">
                         <button
                           type="button"
@@ -809,6 +883,7 @@ export function DocumentsPage() {
                         </button>
                         {canWrite ? (
                           <div className="flex shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+                            {dragHandle}
                             <button
                               type="button"
                               onClick={() =>
@@ -830,9 +905,11 @@ export function DocumentsPage() {
                           </div>
                         ) : null}
                       </div>
-                    </DroppableRow>
+                      )}
+                    </SortableNavigationRow>
                   ),
                 )}
+                </SortableContext>
               </div>
             ) : null}
             {canWrite ? (

@@ -21,6 +21,7 @@
  * - Alle DMS-Routen laufen unter der Ressource attachments (401 ohne Session, 403 ohne Recht).
  * - Kategorie-CRUD mit Namens-Eindeutigkeit (409) und Versionskonflikt (409).
  * - Sammlung-CRUD mit Zyklusschutz (400) und Loeschschutz bei Unter-Sammlungen (409 -> recursive).
+ * - Persistente, versionsgepruefte Reihenfolge fuer Kategorien sowie Sammlungen derselben Ebene.
  * - Dokument in Sammlung einsortieren/entfernen + gefilterte Bibliotheks-Abfrage (mit Gegenbeispiel).
  * - Owner-loser Direktupload landet unter Nicht einsortiert.
  * - Fachobjekt-gebundenes, aber sammlungsloses Dokument erscheint ebenfalls unter Nicht einsortiert (nur die Sammlung entscheidet).
@@ -142,6 +143,35 @@ describe("DMS API", () => {
     expect(list.body).toEqual([]);
   });
 
+  it("Kategorie: speichert die Reihenfolge persistent und rollt veraltete Versionen vollstaendig zurueck", async () => {
+    const admin = await loginAdmin();
+    const first = await admin.post("/api/attachment-categories").send({ name: "Zuerst angelegt" }).expect(201);
+    const second = await admin.post("/api/attachment-categories").send({ name: "Danach angelegt" }).expect(201);
+
+    const reordered = await admin.put("/api/attachment-categories/order").send({ items: [
+      { id: second.body.id, expectedVersion: second.body.version },
+      { id: first.body.id, expectedVersion: first.body.version }
+    ] }).expect(200);
+    expect(reordered.body.map((category: { id: number }) => category.id)).toEqual([second.body.id, first.body.id]);
+    expect(reordered.body.map((category: { sortOrder: number }) => category.sortOrder)).toEqual([0, 1024]);
+
+    const persisted = await admin.get("/api/attachment-categories").expect(200);
+    expect(persisted.body.map((category: { id: number }) => category.id)).toEqual([second.body.id, first.body.id]);
+
+    const stale = await admin.put("/api/attachment-categories/order").send({ items: [
+      { id: first.body.id, expectedVersion: first.body.version },
+      { id: second.body.id, expectedVersion: second.body.version }
+    ] }).expect(409);
+    expect(stale.body).toMatchObject({ error: "CONFLICT", statusCode: 409 });
+    const afterConflict = await admin.get("/api/attachment-categories").expect(200);
+    expect(afterConflict.body.map((category: { id: number }) => category.id)).toEqual([second.body.id, first.body.id]);
+
+    const reader = await loginReader();
+    await reader.put("/api/attachment-categories/order").send({
+      items: reordered.body.map((category: { id: number; version: number }) => ({ id: category.id, expectedVersion: category.version }))
+    }).expect(403);
+  });
+
   // --- Sammlungen ---
 
   it("Sammlung: verschachteln, Zyklus verhindern 400, Loeschschutz bei Kindern 409 und rekursiv loeschen", async () => {
@@ -163,6 +193,37 @@ describe("DMS API", () => {
     await admin.delete(`/api/attachment-folders/${parent.body.id}?recursive=true`).expect(204);
     const list = await admin.get("/api/attachment-folders").expect(200);
     expect(list.body).toEqual([]);
+  });
+
+  it("Sammlung: sortiert nur vollstaendige Reihenfolgen derselben Ebene und liefert den Baum persistent", async () => {
+    const admin = await loginAdmin();
+    const firstRoot = await admin.post("/api/attachment-folders").send({ name: "Erste Wurzel" }).expect(201);
+    const secondRoot = await admin.post("/api/attachment-folders").send({ name: "Zweite Wurzel" }).expect(201);
+    const firstChild = await admin.post("/api/attachment-folders").send({ name: "Erstes Kind", parentId: firstRoot.body.id }).expect(201);
+    const secondChild = await admin.post("/api/attachment-folders").send({ name: "Zweites Kind", parentId: firstRoot.body.id }).expect(201);
+
+    await admin.put("/api/attachment-folders/order").send({ parentId: null, items: [
+      { id: secondRoot.body.id, expectedVersion: secondRoot.body.version },
+      { id: firstRoot.body.id, expectedVersion: firstRoot.body.version }
+    ] }).expect(200);
+    const childrenReordered = await admin.put("/api/attachment-folders/order").send({ parentId: firstRoot.body.id, items: [
+      { id: secondChild.body.id, expectedVersion: secondChild.body.version },
+      { id: firstChild.body.id, expectedVersion: firstChild.body.version }
+    ] }).expect(200);
+
+    expect(childrenReordered.body.map((folder: { id: number }) => folder.id)).toEqual([
+      secondRoot.body.id, firstRoot.body.id, secondChild.body.id, firstChild.body.id
+    ]);
+    const persisted = await admin.get("/api/attachment-folders").expect(200);
+    expect(persisted.body.map((folder: { id: number }) => folder.id)).toEqual([
+      secondRoot.body.id, firstRoot.body.id, secondChild.body.id, firstChild.body.id
+    ]);
+
+    const invalidLevel = await admin.put("/api/attachment-folders/order").send({ parentId: null, items: [
+      { id: firstRoot.body.id, expectedVersion: 2 },
+      { id: firstChild.body.id, expectedVersion: 2 }
+    ] }).expect(400);
+    expect(invalidLevel.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
   });
 
   // --- Dokument-Organisation & Bibliotheks-Filter ---

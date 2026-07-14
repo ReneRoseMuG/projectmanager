@@ -1,4 +1,4 @@
-import type { Attachment, AttachmentCategory, AttachmentFolder, Paginated } from "@taskmanager/shared-types";
+import type { Attachment, AttachmentCategory, AttachmentCategoryOrderInput, AttachmentFolder, AttachmentFolderOrderInput, Paginated } from "@taskmanager/shared-types";
 import { api, apiBaseUrl } from "./client";
 
 // Quelle für das Kachel-Vorschaubild. Wird direkt als `<img src>` benutzt: Der Browser schickt die
@@ -140,6 +140,10 @@ export async function deleteAttachmentCategory(id: number): Promise<void> {
   await api.delete(`attachment-categories/${id}`);
 }
 
+export async function reorderAttachmentCategories(input: AttachmentCategoryOrderInput): Promise<AttachmentCategory[]> {
+  return api.put("attachment-categories/order", { json: input }).json<AttachmentCategory[]>();
+}
+
 // --- Sammlungen ---
 export async function getAttachmentFolders(): Promise<AttachmentFolder[]> {
   return api.get("attachment-folders").json<AttachmentFolder[]>();
@@ -162,6 +166,10 @@ export async function updateAttachmentFolder(
 
 export async function deleteAttachmentFolder(id: number, recursive?: boolean): Promise<void> {
   await api.delete(recursive ? `attachment-folders/${id}?recursive=true` : `attachment-folders/${id}`);
+}
+
+export async function reorderAttachmentFolders(input: AttachmentFolderOrderInput): Promise<AttachmentFolder[]> {
+  return api.put("attachment-folders/order", { json: input }).json<AttachmentFolder[]>();
 }
 
 export async function addDocumentToFolder(folderId: number, attachmentId: number): Promise<void> {

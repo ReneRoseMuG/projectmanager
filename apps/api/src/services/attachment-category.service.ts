@@ -1,9 +1,10 @@
-import type { AttachmentCategory } from "@taskmanager/shared-types";
+import type { AttachmentCategory, AttachmentCategoryOrderInput } from "@taskmanager/shared-types";
 import { and, eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { attachmentCategoryLinks } from "../db/schema.js";
 import { attachmentCategoryRepository, type AttachmentCategoryRecord } from "../repositories/attachment-category.repository.js";
 import { attachmentRepository } from "../repositories/attachment.repository.js";
+import { assertVersion } from "../repositories/base.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 
 // MS-75 (DMS): Kategorien sind ein dokumenteigenes Sachklassifikations-Vokabular.
@@ -11,7 +12,29 @@ import { badRequest, conflict, notFound } from "../utils/errors.js";
 // neuen Journal-Objekttyp inkl. Migration) — Folgeschritt.
 
 function mapCategory(record: AttachmentCategoryRecord): AttachmentCategory {
-  return { id: record.id, name: record.name, color: record.color, version: record.version };
+  return { id: record.id, name: record.name, color: record.color, sortOrder: record.sortOrder, version: record.version };
+}
+
+function assertCompleteCategoryOrder(rows: AttachmentCategoryRecord[], input: AttachmentCategoryOrderInput): void {
+  if (input.items.length === 0) {
+    throw badRequest("Die Kategorienreihenfolge darf nicht leer sein.");
+  }
+  const ids = input.items.map((item) => item.id);
+  const idSet = new Set(ids);
+  if (idSet.size !== ids.length) {
+    throw badRequest("Die Kategorienreihenfolge enthält doppelte Einträge.");
+  }
+  if (rows.length !== ids.length || rows.some((row) => !idSet.has(row.id))) {
+    throw badRequest("Die Kategorienreihenfolge muss alle aktuellen Kategorien enthalten.");
+  }
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  for (const item of input.items) {
+    const current = byId.get(item.id);
+    if (!current) {
+      throw badRequest("Die Kategorienreihenfolge enthält einen unbekannten Eintrag.");
+    }
+    assertVersion(current.version, item.expectedVersion);
+  }
 }
 
 function cleanName(value: string | undefined): string {
@@ -52,8 +75,29 @@ export async function createAttachmentCategory(
   if (existing) {
     throw conflict(`Eine Kategorie mit dem Namen "${name}" existiert bereits.`);
   }
-  const created = await attachmentCategoryRepository.create(database, { name, color: input.color ?? "#94a3b8" }, userId);
+  const sortOrder = await attachmentCategoryRepository.nextSortOrder(database);
+  const created = await attachmentCategoryRepository.create(database, { name, color: input.color ?? "#94a3b8", sortOrder }, userId);
   return mapCategory(created);
+}
+
+export async function reorderAttachmentCategories(
+  database: DbClient,
+  input: AttachmentCategoryOrderInput,
+  userId?: number
+): Promise<AttachmentCategory[]> {
+  await database.transaction(async (tx) => {
+    const rows = await attachmentCategoryRepository.findAll(tx);
+    assertCompleteCategoryOrder(rows, input);
+    const affected = await attachmentCategoryRepository.updateOrder(
+      tx,
+      input.items.map((item, index) => ({ ...item, sortOrder: index * 1024 })),
+      userId
+    );
+    if (affected !== input.items.length) {
+      throw conflict("Die Kategorien wurden zwischenzeitlich geändert. Bitte neu laden.");
+    }
+  });
+  return listAttachmentCategories(database);
 }
 
 export async function updateAttachmentCategory(

@@ -699,6 +699,7 @@ export const attachmentCategories = mysqlTable("attachment_categories", {
   id: int("id").autoincrement().primaryKey(),
   name: shortText("name").notNull().unique(),
   color: shortText("color").notNull().default("#94a3b8"),
+  sortOrder: int("sort_order").notNull().default(0),
   version: int("version").notNull().default(1),
   createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
   updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -714,6 +715,7 @@ export const attachmentFolders = mysqlTable("attachment_folders", {
   parentId: int("parent_id").references((): AnyMySqlColumn => attachmentFolders.id, { onDelete: "restrict" }),
   projectId: int("project_id").references(() => projects.id, { onDelete: "set null" }),
   name: shortText("name").notNull(),
+  sortOrder: int("sort_order").notNull().default(0),
   version: int("version").notNull().default(1),
   createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
   updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
@@ -1476,5 +1478,4 @@ export const ticketComments = mysqlTable(
     ticketCommentUnique: uniqueIndex("ticket_comments_parent_comment_unique").on(table.ticketId, table.commentId)
   })
 );
-
 

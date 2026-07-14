@@ -1,10 +1,11 @@
-import type { AttachmentFolder } from "@taskmanager/shared-types";
+import type { AttachmentFolder, AttachmentFolderOrderInput } from "@taskmanager/shared-types";
 import { and, eq } from "drizzle-orm";
 import type { DbClient } from "../db/client.js";
 import { firstRow } from "../db/query-utils.js";
 import { attachmentFolders, folderAttachments, projects } from "../db/schema.js";
 import { attachmentFolderRepository, type AttachmentFolderRecord } from "../repositories/attachment-folder.repository.js";
 import { attachmentRepository } from "../repositories/attachment.repository.js";
+import { assertVersion } from "../repositories/base.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
 
 // MS-75 (DMS): Sammlungen ("virtuelle Ordner") sind hierarchisch (Selbst-FK parent_id)
@@ -12,7 +13,47 @@ import { badRequest, conflict, notFound } from "../utils/errors.js";
 // angebunden — Folgeschritt (analog Kategorien).
 
 function mapFolder(record: AttachmentFolderRecord): AttachmentFolder {
-  return { id: record.id, parentId: record.parentId, projectId: record.projectId, name: record.name, version: record.version };
+  return { id: record.id, parentId: record.parentId, projectId: record.projectId, name: record.name, sortOrder: record.sortOrder, version: record.version };
+}
+
+function flattenFolders(rows: AttachmentFolderRecord[]): AttachmentFolderRecord[] {
+  const childrenByParent = new Map<number | null, AttachmentFolderRecord[]>();
+  for (const row of rows) {
+    const siblings = childrenByParent.get(row.parentId) ?? [];
+    siblings.push(row);
+    childrenByParent.set(row.parentId, siblings);
+  }
+  const result: AttachmentFolderRecord[] = [];
+  const appendChildren = (parentId: number | null) => {
+    for (const child of childrenByParent.get(parentId) ?? []) {
+      result.push(child);
+      appendChildren(child.id);
+    }
+  };
+  appendChildren(null);
+  return result;
+}
+
+function assertCompleteFolderOrder(rows: AttachmentFolderRecord[], input: AttachmentFolderOrderInput): void {
+  if (input.items.length === 0) {
+    throw badRequest("Die Sammlungsreihenfolge darf nicht leer sein.");
+  }
+  const ids = input.items.map((item) => item.id);
+  const idSet = new Set(ids);
+  if (idSet.size !== ids.length) {
+    throw badRequest("Die Sammlungsreihenfolge enthält doppelte Einträge.");
+  }
+  if (rows.length !== ids.length || rows.some((row) => !idSet.has(row.id))) {
+    throw badRequest("Die Sammlungsreihenfolge muss alle Sammlungen derselben Ebene enthalten.");
+  }
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  for (const item of input.items) {
+    const current = byId.get(item.id);
+    if (!current) {
+      throw badRequest("Die Sammlungsreihenfolge enthält einen unbekannten Eintrag.");
+    }
+    assertVersion(current.version, item.expectedVersion);
+  }
 }
 
 function cleanName(value: string | undefined): string {
@@ -89,7 +130,7 @@ async function deleteFolderRecursive(database: DbClient, id: number): Promise<vo
 
 export async function listAttachmentFolders(database: DbClient): Promise<AttachmentFolder[]> {
   const rows = await attachmentFolderRepository.findAll(database);
-  return rows.map(mapFolder);
+  return flattenFolders(rows).map(mapFolder);
 }
 
 export async function createAttachmentFolder(
@@ -106,12 +147,38 @@ export async function createAttachmentFolder(
     await ensureProjectExists(database, input.projectId);
   }
   await assertNameUniquePerLevel(database, parentId, name);
+  const sortOrder = await attachmentFolderRepository.nextSortOrder(database, parentId);
   const created = await attachmentFolderRepository.create(
     database,
-    { name, parentId, projectId: input.projectId ?? null },
+    { name, parentId, projectId: input.projectId ?? null, sortOrder },
     userId
   );
   return mapFolder(created);
+}
+
+export async function reorderAttachmentFolders(
+  database: DbClient,
+  input: AttachmentFolderOrderInput,
+  userId?: number
+): Promise<AttachmentFolder[]> {
+  if (input.parentId !== null) {
+    await ensureFolderExists(database, input.parentId);
+  }
+  await database.transaction(async (tx) => {
+    const rows = input.parentId === null
+      ? await attachmentFolderRepository.findRootFolders(tx)
+      : await attachmentFolderRepository.findChildren(tx, input.parentId);
+    assertCompleteFolderOrder(rows, input);
+    const affected = await attachmentFolderRepository.updateOrder(
+      tx,
+      input.items.map((item, index) => ({ ...item, sortOrder: index * 1024 })),
+      userId
+    );
+    if (affected !== input.items.length) {
+      throw conflict("Die Sammlungen wurden zwischenzeitlich geändert. Bitte neu laden.");
+    }
+  });
+  return listAttachmentFolders(database);
 }
 
 export async function updateAttachmentFolder(
@@ -121,7 +188,7 @@ export async function updateAttachmentFolder(
   userId?: number
 ): Promise<AttachmentFolder> {
   const current = await ensureFolderExists(database, id);
-  const data: { name?: string; parentId?: number | null; projectId?: number | null } = {};
+  const data: { name?: string; parentId?: number | null; projectId?: number | null; sortOrder?: number } = {};
 
   const nextParentId = input.parentId !== undefined ? input.parentId : current.parentId;
   if (input.parentId !== undefined && input.parentId !== current.parentId) {
@@ -130,6 +197,7 @@ export async function updateAttachmentFolder(
     }
     await assertNoCycle(database, id, input.parentId);
     data.parentId = input.parentId;
+    data.sortOrder = await attachmentFolderRepository.nextSortOrder(database, input.parentId);
   }
   if (input.name !== undefined) {
     data.name = cleanName(input.name);

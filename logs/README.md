@@ -2,6 +2,7 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 12.07.26 | 04:14:02 | Feature | DMS-Sortierung für Sammlungen und Kategorien | ⚠️ |
 | 12.07.26 | 03:38:33 | Fix | DMS mit eigenem Scrollcontainer | ✅ |
 | 12.07.26 | 03:25:27 | Fix | DMS-Filterzeile sticky | ✅ |
 | 11.07.26 | 18:15:20 | Fix | DMS-Import Deployment und Zuordnungen | ✅ |

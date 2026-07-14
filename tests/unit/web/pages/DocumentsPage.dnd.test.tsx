@@ -27,6 +27,7 @@
  * - Ein Drop ins Leere oder auf eine Nicht-Zielzeile bleibt folgenlos.
  * - Ohne Schreibrecht sind Ziehen und Ablegen deaktiviert und lösen keine Schreiboperation aus.
  * - Ein Klick auf eine Sammlung filtert — auch bei aktiver Auswahl — und schreibt nichts.
+ * - Sammlungen derselben Ebene und Kategorien senden beim Sortier-Drop die vollständige neue Reihenfolge.
  * - Ausgefilterte Dokumente (Server-Filter wie Endungsfilter) verlieren ihre Markierung, sobald
  *   die Liste vollständig geladen ist; die Drag-Nutzlast enthält danach nur sichtbare IDs.
  *
@@ -54,6 +55,8 @@ const dnd = vi.hoisted(() => ({
 const actions = vi.hoisted(() => ({
   addToFolderBulk: vi.fn(async () => undefined),
   assignCategoryBulk: vi.fn(async () => undefined),
+  reorderFolders: vi.fn(async () => undefined),
+  reorderCategories: vi.fn(async () => undefined),
   uploadDocument: vi.fn(async () => undefined),
   deleteDocument: vi.fn(async () => undefined),
   setTags: vi.fn(async () => undefined),
@@ -98,9 +101,9 @@ const fixtures = vi.hoisted(() => {
     documents: [...all],
     isComplete: true,
     folders: [
-      { id: 7, parentId: null, projectId: null, name: "Rechnungen", version: 1 },
+      { id: 7, parentId: null, projectId: null, name: "Rechnungen", sortOrder: 0, version: 1 },
     ],
-    categories: [{ id: 42, name: "Wichtig", color: "#ff0000", version: 1 }],
+    categories: [{ id: 42, name: "Wichtig", color: "#ff0000", sortOrder: 0, version: 1 }],
   };
 });
 
@@ -132,6 +135,31 @@ vi.mock("@dnd-kit/core", () => ({
   },
 }));
 
+vi.mock("@dnd-kit/sortable", () => ({
+  SortableContext: ({ children }: { children: ReactNode }) => <>{children}</>,
+  verticalListSortingStrategy: {},
+  arrayMove: <T,>(items: T[], from: number, to: number) => {
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return next;
+  },
+  useSortable: (options: { id: string; data?: unknown; disabled?: boolean }) => {
+    dnd.droppables.set(options.id, { disabled: options.disabled });
+    return {
+      setNodeRef: () => undefined,
+      attributes: {},
+      listeners: {},
+      isDragging: false,
+      isOver: false,
+      transform: null,
+      transition: undefined,
+    };
+  },
+}));
+
+vi.mock("@dnd-kit/utilities", () => ({ CSS: { Transform: { toString: () => undefined } } }));
+
 vi.mock("../../../../apps/web/src/hooks/useDocuments", () => ({
   useDocumentLibrary: (filter: Record<string, unknown>) => {
     library.lastFilter = filter;
@@ -150,12 +178,14 @@ vi.mock("../../../../apps/web/src/hooks/useDocuments", () => ({
     createFolder: vi.fn(),
     updateFolder: vi.fn(),
     deleteFolder: vi.fn(),
+    reorderFolders: actions.reorderFolders,
   }),
   useCategories: () => ({
     categories: fixtures.categories,
     createCategory: vi.fn(),
     updateCategory: vi.fn(),
     deleteCategory: vi.fn(),
+    reorderCategories: actions.reorderCategories,
   }),
   useDocumentActions: () => actions,
 }));
@@ -203,6 +233,12 @@ function fireDrop(overId: string | null, ids: number[]) {
   });
 }
 
+function fireNavigationDrop(activeId: string, overId: string) {
+  act(() => {
+    dnd.onDragEnd?.({ active: { id: activeId, data: { current: { kind: "navigation" } } }, over: { id: overId } });
+  });
+}
+
 function checkboxFor(id: number) {
   return screen.getByRole("checkbox", { name: `„Doc-${id}" auswählen` });
 }
@@ -217,6 +253,8 @@ beforeEach(() => {
   library.lastFilter = {};
   fixtures.documents = [...fixtures.all];
   fixtures.isComplete = true;
+  fixtures.folders = [{ id: 7, parentId: null, projectId: null, name: "Rechnungen", sortOrder: 0, version: 1 }];
+  fixtures.categories = [{ id: 42, name: "Wichtig", color: "#ff0000", sortOrder: 0, version: 1 }];
   dnd.draggables.clear();
   dnd.droppables.clear();
   localStorage.clear();
@@ -285,6 +323,34 @@ describe("DocumentsPage — Zuweisen per Drag & Drop", () => {
     // ist nur Komfort, der Guard im Drop-Handler muss halten.
     fireDrop("dms-folder-7", [1]);
     expect(actions.addToFolderBulk).not.toHaveBeenCalled();
+  });
+});
+
+describe("DocumentsPage — Navigation persistent sortieren", () => {
+  it("sendet für Sammlungen und Kategorien die vollständige neue Reihenfolge mit Versionen", () => {
+    fixtures.folders.push({ id: 8, parentId: null, projectId: null, name: "Verträge", sortOrder: 1024, version: 3 });
+    fixtures.categories.push({ id: 43, name: "Später", color: "#00ff00", sortOrder: 1024, version: 2 });
+    render(<DocumentsPage />);
+
+    fireNavigationDrop("dms-folder-7", "dms-folder-8");
+    expect(actions.reorderFolders).toHaveBeenCalledWith({
+      parentId: null,
+      items: [{ id: 8, expectedVersion: 3 }, { id: 7, expectedVersion: 1 }],
+    });
+
+    fireNavigationDrop("dms-category-42", "dms-category-43");
+    expect(actions.reorderCategories).toHaveBeenCalledWith({
+      items: [{ id: 43, expectedVersion: 2 }, { id: 42, expectedVersion: 1 }],
+    });
+  });
+
+  it("verschiebt eine Sammlung nicht durch einen Drop auf eine andere Hierarchieebene", () => {
+    fixtures.folders.push({ id: 8, parentId: 7, projectId: null, name: "Unter-Sammlung", sortOrder: 0, version: 1 });
+    render(<DocumentsPage />);
+
+    fireNavigationDrop("dms-folder-7", "dms-folder-8");
+
+    expect(actions.reorderFolders).not.toHaveBeenCalled();
   });
 });
 

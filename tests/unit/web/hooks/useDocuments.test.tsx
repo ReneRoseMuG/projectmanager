@@ -19,7 +19,7 @@
  *
  * Abgedeckte Regeln:
  * - Einsortieren/Verschieben/Entfernen rufen den passenden Endpunkt mit den richtigen Argumenten.
- * - Sammlungs-/Kategorie-Verwaltung (umbenennen/loeschen) ruft den passenden Endpunkt.
+ * - Sammlungs-/Kategorie-Verwaltung (umbenennen/loeschen/sortieren) ruft den passenden Endpunkt.
  * - Nach jeder Mutation wird die Dokument-Ansicht invalidiert (beobachtbar am QueryClient).
  * - AUSNAHME Upload: Die Upload-Mutation invalidiert bewusst NICHT. Der Uploader laedt mehrere
  *   Dateien sequenziell hoch; nachgeladen wird einmal am Ende ueber refreshDocuments.
@@ -57,10 +57,12 @@ vi.mock("../../../../apps/web/src/api/documents", () => ({
   createAttachmentCategory: vi.fn().mockResolvedValue({ id: 1 }),
   updateAttachmentCategory: vi.fn().mockResolvedValue({ id: 1 }),
   deleteAttachmentCategory: vi.fn().mockResolvedValue(undefined),
+  reorderAttachmentCategories: vi.fn().mockResolvedValue([]),
   getAttachmentFolders: vi.fn().mockResolvedValue([]),
   createAttachmentFolder: vi.fn().mockResolvedValue({ id: 1 }),
   updateAttachmentFolder: vi.fn().mockResolvedValue({ id: 1 }),
-  deleteAttachmentFolder: vi.fn().mockResolvedValue(undefined)
+  deleteAttachmentFolder: vi.fn().mockResolvedValue(undefined),
+  reorderAttachmentFolders: vi.fn().mockResolvedValue([])
 }));
 
 let client: QueryClient;
@@ -205,5 +207,20 @@ describe("useFolders / useCategories Verwaltung", () => {
     expect(documentsApi.updateAttachmentCategory).toHaveBeenCalledWith(4, { name: "Umbenannt", expectedVersion: 2 });
     // deleteCategory nutzt die API direkt als mutationFn; TanStack reicht ein Kontext-Objekt als 2. Argument durch.
     expect(documentsApi.deleteAttachmentCategory).toHaveBeenCalledWith(4, expect.anything());
+  });
+
+  it("speichert die Reihenfolge von Sammlungen und Kategorien ueber die passenden Endpunkte", async () => {
+    const folders = renderHook(() => useFolders(), { wrapper: Wrapper });
+    const categories = renderHook(() => useCategories(), { wrapper: Wrapper });
+    const folderInput = { parentId: null, items: [{ id: 7, expectedVersion: 2 }, { id: 8, expectedVersion: 1 }] };
+    const categoryInput = { items: [{ id: 4, expectedVersion: 3 }, { id: 5, expectedVersion: 1 }] };
+
+    await act(async () => {
+      await folders.result.current.reorderFolders(folderInput);
+      await categories.result.current.reorderCategories(categoryInput);
+    });
+
+    expect(documentsApi.reorderAttachmentFolders).toHaveBeenCalledWith(folderInput, expect.anything());
+    expect(documentsApi.reorderAttachmentCategories).toHaveBeenCalledWith(categoryInput, expect.anything());
   });
 });
