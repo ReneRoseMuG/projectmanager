@@ -144,6 +144,7 @@ describe("MS-80 DMS-Schema-Migration", () => {
     await connection.query("ALTER TABLE `attachments` DROP COLUMN `content_hash`");
     await connection.query("DROP INDEX `attachments_library_created_at_idx` ON `attachments`");
     await connection.query("ALTER TABLE `attachments` DROP COLUMN `is_in_document_library`");
+    await connection.query("CREATE INDEX `ms80_test_folder_attachment_fk_idx` ON `folder_attachments` (`attachment_id`)");
     await connection.query("DROP INDEX `folder_attachments_attachment_unique` ON `folder_attachments`");
     await connection.query("DROP INDEX `tags_domain_name_unique` ON `tags`");
 

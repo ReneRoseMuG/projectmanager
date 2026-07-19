@@ -83,6 +83,7 @@ const documentLibraryQuerySchema = {
   additionalProperties: false,
   properties: {
     folder: { type: "string" },
+    category: {},
     tag: { type: "integer", minimum: 1 },
     tags: { type: "string", minLength: 1, maxLength: 220, pattern: "^[0-9]+(,[0-9]+)*$" },
     type: { type: "string", enum: ["image/", "application/pdf", "text/", "video/", "audio/"] },
@@ -99,7 +100,8 @@ const uploadQuerySchema = {
   properties: {
     folder: { type: "integer", minimum: 1 },
     tags: { type: "string", minLength: 1, maxLength: 220, pattern: "^[0-9]+(,[0-9]+)*$" },
-    folders: {}
+    folders: {},
+    category: {}
   }
 } as const;
 
@@ -181,10 +183,13 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // --- Dokumentenbibliothek ---
-  app.get<{ Querystring: { folder?: string; tag?: number; tags?: string; type?: string; q?: string; page?: number; pageSize?: number } }>(
+  app.get<{ Querystring: { folder?: string; category?: unknown; tag?: number; tags?: string; type?: string; q?: string; page?: number; pageSize?: number } }>(
     "/documents",
     { config: attachmentsAuth("read"), schema: { querystring: documentLibraryQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
     async (request) => {
+      if (request.query.category !== undefined) {
+        throw badRequest("Kategorien werden seit MS-80 nicht mehr unterstützt. Bitte DMS-Tags verwenden.");
+      }
       const { folder: folderParam, tag, tags: tagsParam, type, q, page, pageSize } = request.query;
       let folder: number | "unsorted" | undefined;
       if (folderParam === "unsorted") {
@@ -213,12 +218,15 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  app.post<{ Querystring: { folder?: number; tags?: string; folders?: unknown } }>(
+  app.post<{ Querystring: { folder?: number; tags?: string; folders?: unknown; category?: unknown } }>(
     "/documents",
     { config: attachmentsAuth("write"), schema: { ...uploadBodySchema, querystring: uploadQuerySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
       if (request.query.folders !== undefined) {
         throw badRequest("Mehrfachsammlungen werden seit MS-80 nicht mehr unterstützt. Bitte höchstens eine Sammlung über 'folder' angeben.");
+      }
+      if (request.query.category !== undefined) {
+        throw badRequest("Kategorien werden seit MS-80 nicht mehr unterstützt. Bitte DMS-Tags verwenden.");
       }
       const upload = await readUpload(request);
       const tagIds = request.query.tags?.split(",").map(Number);

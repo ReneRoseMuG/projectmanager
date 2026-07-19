@@ -21,7 +21,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildTestApp, createTestDb, truncateAll, type TestDb } from "../../../tests/fixtures/api/index.js";
+import { buildTestApp, createTestDb, type TestDb } from "../../../tests/fixtures/api/index.js";
 import { ProjectManagerApiClient } from "./api-client.js";
 import type { ReferenceContext } from "./reference-context.js";
 import { createProjectManagerMcpServer } from "./server.js";
@@ -31,7 +31,7 @@ import { createProjectManagerMcpServer } from "./server.js";
  *
  * Abgedeckte Regeln:
  * - Jedes verfügbare MCP-v1-Tool wird einmal über den MCP-Transport ausgeführt.
- * - Die Tools arbeiten gegen echte Fastify-Routen mit isolierter Temp-SQLite-Datenbank.
+ * - Die Tools arbeiten gegen echte Fastify-Routen mit isolierter temporärer MySQL-Datenbank.
  * - Attachment-Uploads verwenden ein isoliertes Temp-Upload-Verzeichnis.
  * - Owner-Attachments setzen die Bibliothekssichtbarkeit explizit; DMS-Importe geben Sichtbarkeit,
  *   direkte Sammlung, Tags und Version aus dem echten API-Vertrag zurück.
@@ -85,8 +85,7 @@ describe("MCP tools integration", () => {
     process.env.UPLOAD_DIR = uploadDir;
     process.env.PREVIEW_CACHE_DIR = previewCacheDir;
 
-    testDb = createTestDb();
-    truncateAll(testDb.sqlite);
+    testDb = await createTestDb();
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
     app = await buildTestApp(testDb, { enableAuth: true, enableMultipart: true });
@@ -108,10 +107,18 @@ describe("MCP tools integration", () => {
   });
 
   afterAll(async () => {
-    await mcpClient.close();
-    await mcpServer.close();
-    await app.close();
-    testDb.sqlite.close();
+    if (mcpClient) {
+      await mcpClient.close();
+    }
+    if (mcpServer) {
+      await mcpServer.close();
+    }
+    if (app) {
+      await app.close();
+    }
+    if (testDb) {
+      await testDb.close();
+    }
     await fs.rm(uploadDir, { recursive: true, force: true });
     await fs.rm(previewCacheDir, { recursive: true, force: true });
   });

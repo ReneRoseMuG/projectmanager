@@ -2,6 +2,12 @@
 
 | Datum | Uhrzeit | Schritt | Kurztitel | Status |
 |---|---|---|---|---|
+| 19.07.26 | 21:02:18 | 18 | Browserabnahme blockiert | 🔴 |
+| 19.07.26 | 21:02:17 | 17 | Gesamttest und Build | ⚠️ |
+| 19.07.26 | 20:44:36 | 16 | Serielle Testorchestrierung | ✅ |
+| 19.07.26 | 20:43:21 | 15 | MCP-MySQL-Testisolation | ⚠️ |
+| 19.07.26 | 20:41:02 | 14 | API-Testnachführung | ✅ |
+| 19.07.26 | 20:41:01 | 13 | Legacy-Kategorievertrag | ✅ |
 | 19.07.26 | 19:31:32 | 12 | Kategorie-Cleanup und Rollout | ⚠️ |
 | 19.07.26 | 19:01:11 | 11 | Berechtigungen, Versionierung und Dateischutz | ⚠️ |
 | 19.07.26 | 18:42:07 | 10 | Importer- und MCP-Verträge | ⚠️ |

@@ -85,7 +85,7 @@ async function createSourceRows(pool: mysql.Pool, includeTargetRelation: boolean
     "INSERT INTO attachment_categories (name, color, version) VALUES ('Cleanup', '#123456', 1)"
   );
   const [tag] = await pool.execute<mysql.ResultSetHeader>(
-    "INSERT INTO tags (name, color, is_system, domain, version) VALUES ('Cleanup', '#123456', false, 'dms', 1)"
+    "INSERT INTO tags (name, color, is_system, domain, version, created_at, updated_at) VALUES ('Cleanup', '#123456', false, 'dms', 1, NOW(), NOW())"
   );
   await pool.execute(
     "INSERT INTO attachment_category_links (category_id, attachment_id) VALUES (?, ?)",

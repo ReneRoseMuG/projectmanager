@@ -426,9 +426,13 @@ describe("DMS API", () => {
     const first = await uploadDocument(admin, "inhalt-a.txt", undefined, "identischer Inhalt");
     const second = await uploadDocument(admin, "anderer-name.txt", undefined, "identischer Inhalt");
     const sameNameDifferentContent = await uploadDocument(admin, "inhalt-a.txt", undefined, "abweichender Inhalt");
-    const hidden = await uploadDocument(admin, "versteckt.txt", undefined, "identischer Inhalt");
+    const hiddenProject = await admin.post("/api/projects").send({ name: "Verstecktes Duplikat", status: "active", color: "#6366f1" }).expect(201);
+    const hiddenUpload = await admin
+      .post(`/api/projects/${hiddenProject.body.id}/attachments?libraryVisibility=attachment-only`)
+      .attach("file", Buffer.from("identischer Inhalt"), { filename: "versteckt.txt", contentType: "text/plain" })
+      .expect(201);
+    const hidden = hiddenUpload.body as { id: number };
     const missing = await uploadDocument(admin, "fehlt.txt", undefined, "nicht mehr vorhanden");
-    await testDb.pool.execute("UPDATE attachments SET is_in_document_library = false WHERE id = ?", [hidden.id]);
     await setDocumentFolder(admin, first, folder.body.id);
     await fs.rm(path.join(uploadDir, missing.filename));
 
@@ -451,7 +455,9 @@ describe("DMS API", () => {
     await admin.post("/api/documents/duplicate-check").expect(202);
     const repeated = await waitForDuplicateCheck(admin);
     expect(repeated.groups[0]?.documents.map((document) => document.id)).toEqual([first.id, second.id]);
-    await admin.get(`/api/documents/${hidden.id}`).expect(200);
+    await admin.get(`/api/documents/${hidden.id}`).expect(404);
+    const hiddenOwnerAttachments = await admin.get(`/api/projects/${hiddenProject.body.id}/attachments`).expect(200);
+    expect(hiddenOwnerAttachments.body).toContainEqual(expect.objectContaining({ id: hidden.id, isInDocumentLibrary: false }));
   });
 
   it("fuehrt ein an ein Fachobjekt gebundenes, sammlungsloses Dokument als Nicht einsortiert", async () => {
@@ -497,6 +503,7 @@ describe("DMS API", () => {
     expect(withoutFolder.body).toMatchObject({ isInDocumentLibrary: true, folders: [], tags: [], version: expect.any(Number) });
 
     const storedFileCount = (await fs.readdir(uploadDir)).length;
+    const storedDocumentCount = ((await admin.get("/api/documents").expect(200)).body as Array<unknown>).length;
     await admin
       .post("/api/documents?folder=999999")
       .attach("file", Buffer.from("unbekannte Sammlung"), { filename: "unbekannt.txt", contentType: "text/plain" })
@@ -509,16 +516,22 @@ describe("DMS API", () => {
       .post(`/api/documents?tags=${pmTag.body.id}`)
       .attach("file", Buffer.from("falsche Domäne"), { filename: "pm-tag.txt", contentType: "text/plain" })
       .expect(400);
-    await admin
+    const legacyListResponse = await admin.get("/api/documents?category=1").expect(400);
+    expect(legacyListResponse.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
+    expect(legacyListResponse.body.message).toContain("Kategorien werden seit MS-80 nicht mehr unterstützt");
+    const legacyUploadResponse = await admin
       .post("/api/documents?category=1")
       .attach("file", Buffer.from("alte Kategorie"), { filename: "kategorie.txt", contentType: "text/plain" })
       .expect(400);
+    expect(legacyUploadResponse.body).toMatchObject({ error: "BAD_REQUEST", statusCode: 400 });
+    expect(legacyUploadResponse.body.message).toContain("Kategorien werden seit MS-80 nicht mehr unterstützt");
     const multiFolderResponse = await admin
       .post(`/api/documents?folders=${folder.body.id},999999`)
       .attach("file", Buffer.from("mehrere Sammlungen"), { filename: "mehrfach.txt", contentType: "text/plain" })
       .expect(400);
     expect(multiFolderResponse.body.message).toContain("Mehrfachsammlungen werden seit MS-80 nicht mehr unterstützt");
     expect((await fs.readdir(uploadDir)).length).toBe(storedFileCount);
+    expect((await admin.get("/api/documents").expect(200)).body as Array<unknown>).toHaveLength(storedDocumentCount);
   });
 
   it("erzwingt beim Owner-Upload die explizite Bibliotheksentscheidung", async () => {

@@ -136,7 +136,7 @@ describe("MS-80 Kategorie-zu-Tag-Migration", () => {
       "INSERT INTO attachment_categories (name, color, version) VALUES ('Transport', '#abcdef', 1)"
     );
     const [tag] = await testDb.pool.execute<mysql.ResultSetHeader>(
-      "INSERT INTO tags (name, color, is_system, domain, version) VALUES ('Transport', '#abcdef', false, 'dms', 1)"
+      "INSERT INTO tags (name, color, is_system, domain, version, created_at, updated_at) VALUES ('Transport', '#abcdef', false, 'dms', 1, NOW(), NOW())"
     );
     await testDb.pool.execute(
       "INSERT INTO attachment_category_links (category_id, attachment_id) VALUES (?, ?)",
@@ -155,7 +155,7 @@ describe("MS-80 Kategorie-zu-Tag-Migration", () => {
       "INSERT INTO attachment_categories (name, color, version) VALUES ('Geschützt', '#111111', 1)"
     );
     await testDb.pool.execute(
-      "INSERT INTO tags (name, color, is_system, domain, version) VALUES ('Geschützt', '#222222', true, 'dms', 1)"
+      "INSERT INTO tags (name, color, is_system, domain, version, created_at, updated_at) VALUES ('Geschützt', '#222222', true, 'dms', 1, NOW(), NOW())"
     );
     await testDb.pool.execute(
       "INSERT INTO attachment_category_links (category_id, attachment_id) VALUES (?, ?)",

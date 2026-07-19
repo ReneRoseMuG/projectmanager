@@ -197,13 +197,13 @@ describe("Attachments API", () => {
     const filename = `${label}-create-flow.txt`;
 
     const created = await supertest(app.server)
-      .post(owner.path)
+      .post(`${owner.path}?libraryVisibility=document-library`)
       .attach("file", Buffer.from(`Datei fuer ${label}`), { filename, contentType: "text/plain" })
       .expect(201);
     const listed = await supertest(app.server).get(owner.path).expect(200);
 
-    expect(created.body).toEqual(expect.objectContaining({ originalName: filename, owners: [{ type: ownerType, id: owner.id }] }));
-    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, originalName: filename, owners: [{ type: ownerType, id: owner.id }] })]);
+    expect(created.body).toEqual(expect.objectContaining({ originalName: filename, isInDocumentLibrary: true, owners: [{ type: ownerType, id: owner.id }] }));
+    expect(listed.body).toEqual([expect.objectContaining({ id: created.body.id, originalName: filename, isInDocumentLibrary: true, owners: [{ type: ownerType, id: owner.id }] })]);
   });
 
   it("DELETE /api/wiki/:id/attachments/:attachmentId entfernt die Wiki-Verknüpfung und behält das Attachment", async () => {
@@ -437,8 +437,10 @@ describe("Attachments API Auth", () => {
     const anonymousContent = await supertest(app.server).get(`/api/attachments/${attachment.id}/content`).expect(401);
     expect(anonymousContent.body).toMatchObject({ error: "UNAUTHORIZED", statusCode: 401 });
     await supertest(app.server).get(`/api/attachments/${attachment.id}/preview-file`).expect(401);
-    await supertest(app.server).get(`/uploads/${attachment.filename}`).expect(404);
-    await supertest(app.server).get("/previews/erraten.pdf").expect(404);
+    await supertest(app.server).get(`/uploads/${attachment.filename}`).expect(401);
+    await supertest(app.server).get("/previews/erraten.pdf").expect(401);
+    await admin.get(`/uploads/${attachment.filename}`).expect(404);
+    await admin.get("/previews/erraten.pdf").expect(404);
 
     const role = await admin
       .post("/api/admin/roles")
