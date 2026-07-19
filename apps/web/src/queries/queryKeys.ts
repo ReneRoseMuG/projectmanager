@@ -131,8 +131,8 @@ export const queryKeys = {
     root: ["documents"] as const,
     library: (filter: object = {}, pagination: object = {}) => [...queryKeys.documents.root, "library", filter, pagination] as const,
     detail: (id: number) => [...queryKeys.documents.root, "detail", id] as const,
-    categories: () => [...queryKeys.documents.root, "categories"] as const,
-    folders: () => [...queryKeys.documents.root, "folders"] as const
+    folders: () => [...queryKeys.documents.root, "folders"] as const,
+    duplicateCheck: () => [...queryKeys.documents.root, "duplicateCheck"] as const
   },
   events: {
     root: ["events"] as const,

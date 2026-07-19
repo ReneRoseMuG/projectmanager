@@ -1,4 +1,5 @@
 import type {
+  AttachmentLibrarySelection,
   DraftComment,
   DraftNote,
   DraftTicket,
@@ -340,9 +341,9 @@ export function TicketForm({
     }
   };
 
-  const uploadAttachment = async (file: File) => {
+  const uploadAttachment = async (file: File, librarySelection: AttachmentLibrarySelection) => {
     try {
-      const uploaded = await attachments.uploadAttachment(file);
+      const uploaded = await attachments.uploadAttachment(file, librarySelection);
       showToast({ tone: "success", title: "Datei hochgeladen" });
       return uploaded;
     } catch (attachmentError) {
@@ -699,26 +700,11 @@ export function TicketForm({
           <Section>
             {ticket ? (
               <div className="grid gap-4">
-                <AttachmentUploader size="sm" onUpload={uploadAttachment} />
+                <AttachmentUploader visibilityMode="owner" size="sm" onUpload={uploadAttachment} />
                 <AttachmentList
                   attachments={attachments.attachments}
-                  onDelete={(attachment) => {
-                    void confirm({
-                      title: "Datei löschen?",
-                      body: attachment.originalName,
-                      severity: "danger",
-                      confirmLabel: "Löschen",
-                    }).then((approved) => {
-                      if (approved) {
-                        void attachments
-                          .removeAttachment(attachment.id)
-                          .then(() => showToast({ tone: "success", title: "Datei gelöscht" }))
-                          .catch((attachmentError: unknown) =>
-                            showToast({ tone: "error", title: "Datei konnte nicht gelöscht werden", message: errorMessage(attachmentError) }),
-                          );
-                      }
-                    });
-                  }}
+                  onUnlink={attachments.unlinkAttachment}
+                  onDeletePermanently={attachments.deleteAttachmentPermanently}
                   onOpen={(attachment) => attachments.openAttachment(attachment.id)}
                   openingAttachmentId={attachments.openingAttachmentId}
                 />

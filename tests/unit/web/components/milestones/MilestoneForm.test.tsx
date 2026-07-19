@@ -180,7 +180,8 @@ vi.mock("../../../../../apps/web/src/hooks/useAttachments", () => ({
     return {
       attachments: [],
       uploadAttachment: vi.fn().mockResolvedValue(null),
-      removeAttachment: vi.fn().mockResolvedValue(undefined)
+      unlinkAttachment: vi.fn().mockResolvedValue(undefined),
+      deleteAttachmentPermanently: vi.fn().mockResolvedValue(undefined)
     };
   }
 }));

@@ -118,7 +118,7 @@ test.describe("Meilenstein-Formular und Projekt-Tab", () => {
     expect(noteResponse.ok()).toBeTruthy();
     const commentResponse = await request.post(`${apiBaseUrl}/milestones/${milestone.id}/comments`, { data: { body: "E2E Milestone Comment" } });
     expect(commentResponse.ok()).toBeTruthy();
-    const attachmentResponse = await request.post(`${apiBaseUrl}/milestones/${milestone.id}/attachments`, {
+    const attachmentResponse = await request.post(`${apiBaseUrl}/milestones/${milestone.id}/attachments?libraryVisibility=document-library`, {
       multipart: {
         file: {
           name: "e2e-milestone.txt",

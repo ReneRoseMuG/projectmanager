@@ -1,27 +1,31 @@
 import type { Attachment } from "@taskmanager/shared-types";
-import { Download, FolderOpen, Trash2 } from "lucide-react";
+import { Download, FolderOpen, Trash2, X } from "lucide-react";
 import { assetUrl } from "../../api/client";
 import { errorMessageAsync } from "../../hooks/errors";
 import { formatHumanDate } from "../../utils/date";
 import { Button } from "../ui/Button";
+import { useConfirm } from "../ui/ConfirmDialogProvider";
 import { useToast } from "../ui/ToastProvider";
 import { describeAttachmentType } from "./attachmentTypes";
 import { DocumentPreviewBody, prettyBytes } from "./DocumentPreviewBody";
 
 interface AttachmentPreviewProps {
   attachment: Attachment;
-  onDelete: (attachment: Attachment) => void;
+  onUnlink: (attachment: Attachment) => Promise<void>;
+  onDeletePermanently?: (attachment: Attachment) => Promise<void>;
   onOpen: (attachment: Attachment) => Promise<void>;
   opening?: boolean;
 }
 
 export function AttachmentPreview({
   attachment,
-  onDelete,
+  onUnlink,
+  onDeletePermanently,
   onOpen,
   opening = false,
 }: AttachmentPreviewProps) {
   const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const meta = describeAttachmentType(attachment);
   const url = assetUrl(attachment.url);
   const Icon = meta.Icon;
@@ -34,6 +38,57 @@ export function AttachmentPreview({
         tone: "error",
         title: "Datei konnte nicht geöffnet werden",
         message: await errorMessageAsync(openError),
+      });
+    }
+  };
+
+  const unlink = async () => {
+    const promotesToLibrary = !attachment.isInDocumentLibrary && attachment.owners.length <= 1;
+    const approved = await confirm({
+      title: promotesToLibrary ? "Verknüpfung lösen und Datei behalten?" : "Verknüpfung lösen?",
+      body: promotesToLibrary
+        ? "Dies ist die letzte Owner-Verknüpfung. Beim Lösen wird die Datei in die Dokumentenbibliothek aufgenommen, damit sie nicht verborgen und ownerlos zurückbleibt."
+        : "Nur die Verknüpfung zu diesem Element wird gelöst. Bibliothekssichtbarkeit, andere Owner und die physische Datei bleiben unverändert.",
+      severity: "warn",
+      confirmLabel: promotesToLibrary ? "Lösen & aufnehmen" : "Verknüpfung lösen"
+    });
+    if (!approved) {
+      return;
+    }
+    try {
+      await onUnlink(attachment);
+      showToast({ tone: "success", title: "Verknüpfung gelöst" });
+    } catch (unlinkError) {
+      showToast({
+        tone: "error",
+        title: "Verknüpfung konnte nicht gelöst werden",
+        message: await errorMessageAsync(unlinkError)
+      });
+    }
+  };
+
+  const deletePermanently = async () => {
+    if (!onDeletePermanently) {
+      return;
+    }
+    const approved = await confirm({
+      title: "Datei endgültig löschen?",
+      body: "Die physische Datei, alle Owner-Verknüpfungen sowie alle DMS-Zuordnungen werden dauerhaft entfernt. Diese Aktion kann nicht rückgängig gemacht werden.",
+      severity: "danger",
+      confirmLabel: "Endgültig löschen",
+      requireCheck: "Ich bestätige das endgültige Löschen."
+    });
+    if (!approved) {
+      return;
+    }
+    try {
+      await onDeletePermanently(attachment);
+      showToast({ tone: "success", title: "Datei endgültig gelöscht" });
+    } catch (deleteError) {
+      showToast({
+        tone: "error",
+        title: "Datei konnte nicht endgültig gelöscht werden",
+        message: await errorMessageAsync(deleteError)
       });
     }
   };
@@ -84,13 +139,23 @@ export function AttachmentPreview({
             onClick={() => void openLocally()}
           />
           <Button
-            aria-label="Löschen"
-            title="Löschen"
+            aria-label="Verknüpfung lösen"
+            title="Verknüpfung lösen"
             className="h-10 w-10"
-            icon={<Trash2 size={18} />}
+            icon={<X size={18} />}
             variant="ghost"
-            onClick={() => onDelete(attachment)}
+            onClick={() => void unlink()}
           />
+          {onDeletePermanently ? (
+            <Button
+              aria-label="Endgültig löschen"
+              title="Endgültig löschen"
+              className="h-10 w-10"
+              icon={<Trash2 size={18} />}
+              variant="ghost"
+              onClick={() => void deletePermanently()}
+            />
+          ) : null}
         </div>
       </div>
 

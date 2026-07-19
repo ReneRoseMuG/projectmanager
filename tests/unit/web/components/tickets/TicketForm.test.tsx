@@ -146,7 +146,7 @@ describe("TicketForm", () => {
           pendingRelations: [{ ticket, relationType: "related" }],
           pendingComments: [{ text: "Ticket-Kommentar" }],
           pendingNotes: [{ title: "Ticket-Notiz", contentJson: { html: "" } }],
-          pendingFiles: [{ file, previewUrl: undefined }]
+          pendingFiles: [{ file, previewUrl: undefined, librarySelection: "document-library" }]
         })
       )
     );

@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { DbSession } from "../db/client.js";
 import { firstRow, insertId, mutationAffectedRows } from "../db/query-utils.js";
 import { attachments } from "../db/schema.js";
@@ -57,7 +57,7 @@ export const attachmentRepository = {
     }
     assertVersion(current.version, expectedVersion);
     const now = nowIso();
-    await database
+    const result = await database
       .update(attachments)
       .set({
         ...data,
@@ -65,8 +65,78 @@ export const attachmentRepository = {
         updatedBy: userId ?? null,
         updatedAt: now
       })
-      .where(eq(attachments.id, id));
+      .where(and(eq(attachments.id, id), eq(attachments.version, expectedVersion)));
+    if (mutationAffectedRows(result) === 0) {
+      return undefined;
+    }
     return { ...current, ...data, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
+  },
+
+  async updateLibraryVisibility(
+    database: DbSession,
+    id: number,
+    expectedVersion: number,
+    isInDocumentLibrary: boolean,
+    userId?: number
+  ): Promise<AttachmentRecord | undefined> {
+    const current = await this.findById(database, id);
+    if (!current) {
+      return undefined;
+    }
+    assertVersion(current.version, expectedVersion);
+    const now = nowIso();
+    const result = await database
+      .update(attachments)
+      .set({
+        isInDocumentLibrary,
+        version: current.version + 1,
+        updatedBy: userId ?? null,
+        updatedAt: now
+      })
+      .where(and(eq(attachments.id, id), eq(attachments.version, expectedVersion)));
+    if (mutationAffectedRows(result) === 0) {
+      return undefined;
+    }
+    return {
+      ...current,
+      isInDocumentLibrary,
+      version: current.version + 1,
+      updatedBy: userId ?? null,
+      updatedAt: now
+    };
+  },
+
+  async bumpVersion(
+    database: DbSession,
+    id: number,
+    expectedVersion: number,
+    userId?: number
+  ): Promise<AttachmentRecord | undefined> {
+    const current = await this.findById(database, id);
+    if (!current) {
+      return undefined;
+    }
+    assertVersion(current.version, expectedVersion);
+    const now = nowIso();
+    const result = await database
+      .update(attachments)
+      .set({
+        version: current.version + 1,
+        updatedBy: userId ?? null,
+        updatedAt: now
+      })
+      .where(and(eq(attachments.id, id), eq(attachments.version, expectedVersion)));
+    if (mutationAffectedRows(result) === 0) {
+      return undefined;
+    }
+    return { ...current, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
+  },
+
+  async deleteVersioned(database: DbSession, id: number, expectedVersion: number): Promise<boolean> {
+    const result = await database
+      .delete(attachments)
+      .where(and(eq(attachments.id, id), eq(attachments.version, expectedVersion)));
+    return mutationAffectedRows(result) > 0;
   },
 
   async deleteByIds(database: DbSession, ids: number[]): Promise<number> {

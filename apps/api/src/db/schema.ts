@@ -486,18 +486,24 @@ export const wikiPageAttachments = mysqlTable(
   })
 );
 
-export const tags = mysqlTable("tags", {
-  id: int("id").autoincrement().primaryKey(),
-  name: shortText("name").notNull().unique(),
-  color: shortText("color").notNull().default("#94a3b8"),
-  isSystem: boolean("is_system").notNull().default(false),
-  domain: shortText("domain").notNull().default("pm"),
-  version: int("version").notNull().default(1),
-  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: timestampText("created_at"),
-  updatedAt: timestampText("updated_at")
-});
+export const tags = mysqlTable(
+  "tags",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    name: shortText("name").notNull(),
+    color: shortText("color").notNull().default("#94a3b8"),
+    isSystem: boolean("is_system").notNull().default(false),
+    domain: shortText("domain").notNull().default("pm"),
+    version: int("version").notNull().default(1),
+    createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
+    updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestampText("created_at"),
+    updatedAt: timestampText("updated_at")
+  },
+  (table) => ({
+    domainNameUnique: uniqueIndex("tags_domain_name_unique").on(table.domain, table.name)
+  })
+);
 
 export const projectTags = mysqlTable("project_tags", {
   projectId: int("project_id")
@@ -604,12 +610,23 @@ export const attachments = mysqlTable(
     size: int("size").notNull(),
     displayName: shortText("display_name"),
     description: longtext("description"),
+    contentHash: varchar("content_hash", { length: 64 }),
+    isInDocumentLibrary: boolean("is_in_document_library").notNull().default(true),
     version: int("version").notNull().default(1),
     createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
     updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestampText("created_at"),
     updatedAt: timestampText("updated_at")
-  }
+  },
+  (table) => ({
+    contentHashIndex: index("attachments_content_hash_idx").on(table.contentHash),
+    libraryCreatedAtIndex: index("attachments_library_created_at_idx").on(table.isInDocumentLibrary, table.createdAt),
+    libraryMimetypeCreatedAtIndex: index("attachments_library_mimetype_created_at_idx").on(
+      table.isInDocumentLibrary,
+      table.mimetype,
+      table.createdAt
+    )
+  })
 );
 
 export const projectAttachments = mysqlTable(
@@ -687,21 +704,6 @@ export const ticketAttachments = mysqlTable(
   })
 );
 
-// Dokumentenverwaltung (MS-75 / FT(16)): Organisations- und Sichtungsebene über
-// den bestehenden Anhängen. Kategorien und Sammlungen sind eigene Entitäten; die
-// Zuordnung von Dokumenten zu Kategorien, Labels (bestehende tags) und Sammlungen
-// läuft über dedizierte Junction-Tabellen mit Cascade — keine polymorphen Felder.
-export const attachmentCategories = mysqlTable("attachment_categories", {
-  id: int("id").autoincrement().primaryKey(),
-  name: shortText("name").notNull().unique(),
-  color: shortText("color").notNull().default("#94a3b8"),
-  version: int("version").notNull().default(1),
-  createdBy: int("created_by").references(() => users.id, { onDelete: "set null" }),
-  updatedBy: int("updated_by").references(() => users.id, { onDelete: "set null" }),
-  createdAt: timestampText("created_at"),
-  updatedAt: timestampText("updated_at")
-});
-
 // Virtuelle Sammlung ("Ordner"): hierarchisch (Selbst-FK parent_id, restrict — kein
 // DB-Kaskadenlöschen, der Service steuert die Löschung mit Bestätigung), optional an
 // ein Projekt gebunden (project_id nullable, set null — Sammlung bleibt als globale).
@@ -717,21 +719,6 @@ export const attachmentFolders = mysqlTable("attachment_folders", {
   updatedAt: timestampText("updated_at")
 });
 
-export const attachmentCategoryLinks = mysqlTable(
-  "attachment_category_links",
-  {
-    categoryId: int("category_id")
-      .notNull()
-      .references(() => attachmentCategories.id, { onDelete: "cascade" }),
-    attachmentId: int("attachment_id")
-      .notNull()
-      .references(() => attachments.id, { onDelete: "cascade" })
-  },
-  (table) => ({
-    pk: primaryKey({ columns: [table.categoryId, table.attachmentId] })
-  })
-);
-
 export const attachmentTags = mysqlTable(
   "attachment_tags",
   {
@@ -743,7 +730,8 @@ export const attachmentTags = mysqlTable(
       .references(() => tags.id, { onDelete: "cascade" })
   },
   (table) => ({
-    pk: primaryKey({ columns: [table.attachmentId, table.tagId] })
+    pk: primaryKey({ columns: [table.attachmentId, table.tagId] }),
+    tagAttachmentIndex: index("attachment_tags_tag_attachment_idx").on(table.tagId, table.attachmentId)
   })
 );
 
@@ -758,7 +746,8 @@ export const folderAttachments = mysqlTable(
       .references(() => attachments.id, { onDelete: "cascade" })
   },
   (table) => ({
-    pk: primaryKey({ columns: [table.folderId, table.attachmentId] })
+    pk: primaryKey({ columns: [table.folderId, table.attachmentId] }),
+    oneDirectFolderPerAttachment: uniqueIndex("folder_attachments_attachment_unique").on(table.attachmentId)
   })
 );
 

@@ -91,7 +91,7 @@ test("Ticket-Detailformular zeigt Tabs und echte Neben-Collections", async ({ pa
     });
     expect(noteResponse.ok()).toBeTruthy();
 
-    const attachmentResponse = await request.post(`${apiBaseUrl}/tickets/${ticket.id}/attachments`, {
+    const attachmentResponse = await request.post(`${apiBaseUrl}/tickets/${ticket.id}/attachments?libraryVisibility=document-library`, {
       multipart: {
         file: {
           name: attachmentName,

@@ -260,9 +260,12 @@ describe("PendingFileList", () => {
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(["image"], "screen.png", { type: "image/png" });
 
+    fireEvent.click(screen.getByRole("radio", { name: /Zusätzlich in der Dokumentenbibliothek/ }));
     fireEvent.change(input, { target: { files: [file] } });
 
-    expect(onAdd).toHaveBeenCalledWith([{ file, previewUrl: "blob:preview" }]);
+    expect(onAdd).toHaveBeenCalledWith([
+      { file, previewUrl: "blob:preview", librarySelection: "document-library" }
+    ]);
     expect(URL.createObjectURL).toHaveBeenCalledWith(file);
   });
 
@@ -274,10 +277,11 @@ describe("PendingFileList", () => {
     Object.defineProperty(largeFile, "size", { value: 26 * 1024 * 1024 });
 
     const { container } = render(
-      <PendingFileList files={[{ file: smallFile }]} onAdd={onAdd} onRemove={onRemove} />
+      <PendingFileList files={[{ file: smallFile, librarySelection: "attachment-only" }]} onAdd={onAdd} onRemove={onRemove} />
     );
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
 
+    fireEvent.click(screen.getByRole("radio", { name: /Nur als Anhang/ }));
     fireEvent.change(input, { target: { files: [largeFile] } });
     fireEvent.click(screen.getByRole("button", { name: "small.txt entfernen" }));
 

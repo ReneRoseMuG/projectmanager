@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Test Scope: Projects API
  *
  * Covers project CRUD, defaults, card-footer counts, timestamps, and cascade behavior.
@@ -168,7 +168,7 @@ describe("Projects API", () => {
     await createNoteForProject(app, project.id, { title: "Projekt-Notiz" });
     await supertest(app.server).post(`/api/projects/${project.id}/comments`).send({ body: "Projekt-Kommentar" }).expect(201);
     await supertest(app.server)
-      .post(`/api/projects/${project.id}/attachments`)
+      .post(`/api/projects/${project.id}/attachments?libraryVisibility=document-library`)
       .attach("file", Buffer.from("Projekt-Datei"), { filename: "project.txt", contentType: "text/plain" })
       .expect(201);
 

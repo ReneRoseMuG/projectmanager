@@ -2,7 +2,7 @@
 
 /**
  * Test Scope:
- * DMS-Frontend: useDocumentActions / useFolders / useCategories (MS-75).
+ * DMS-Frontend: useDocumentActions / useFolders (MS-80).
  *
  * Test-Ebene:
  * - Unit
@@ -19,7 +19,8 @@
  *
  * Abgedeckte Regeln:
  * - Einsortieren/Verschieben/Entfernen rufen den passenden Endpunkt mit den richtigen Argumenten.
- * - Sammlungs-/Kategorie-Verwaltung (umbenennen/loeschen) ruft den passenden Endpunkt.
+ * - Tag-Änderungen geben die geladene Dokumentversion für den Konfliktschutz weiter.
+ * - Sammlungsverwaltung (umbenennen/loeschen) ruft den passenden Endpunkt.
  * - Nach jeder Mutation wird die Dokument-Ansicht invalidiert (beobachtbar am QueryClient).
  *
  * Ziel:
@@ -32,7 +33,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as documentsApi from "../../../../apps/web/src/api/documents";
-import { useCategories, useDocumentActions, useFolders } from "../../../../apps/web/src/hooks/useDocuments";
+import { useDocumentActions, useFolders } from "../../../../apps/web/src/hooks/useDocuments";
 import { queryKeys } from "../../../../apps/web/src/queries/queryKeys";
 
 vi.mock("../../../../apps/web/src/api/documents", () => ({
@@ -41,16 +42,9 @@ vi.mock("../../../../apps/web/src/api/documents", () => ({
   uploadDocument: vi.fn().mockResolvedValue({ id: 1 }),
   updateDocumentMetadata: vi.fn().mockResolvedValue({}),
   setDocumentTags: vi.fn().mockResolvedValue({}),
-  moveDocument: vi.fn().mockResolvedValue(undefined),
-  deleteDocument: vi.fn().mockResolvedValue(undefined),
-  assignDocumentCategory: vi.fn().mockResolvedValue(undefined),
-  removeDocumentCategory: vi.fn().mockResolvedValue(undefined),
-  addDocumentToFolder: vi.fn().mockResolvedValue(undefined),
-  removeDocumentFromFolder: vi.fn().mockResolvedValue(undefined),
-  getAttachmentCategories: vi.fn().mockResolvedValue([]),
-  createAttachmentCategory: vi.fn().mockResolvedValue({ id: 1 }),
-  updateAttachmentCategory: vi.fn().mockResolvedValue({ id: 1 }),
-  deleteAttachmentCategory: vi.fn().mockResolvedValue(undefined),
+  setDocumentFolder: vi.fn().mockResolvedValue({ id: 10 }),
+  removeDocumentFromLibrary: vi.fn().mockResolvedValue(undefined),
+  deleteDocumentPermanently: vi.fn().mockResolvedValue(undefined),
   getAttachmentFolders: vi.fn().mockResolvedValue([]),
   createAttachmentFolder: vi.fn().mockResolvedValue({ id: 1 }),
   updateAttachmentFolder: vi.fn().mockResolvedValue({ id: 1 }),
@@ -80,10 +74,10 @@ describe("useDocumentActions", () => {
     const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
 
     await act(async () => {
-      await result.current.addToFolder(5, 10);
+      await result.current.setDocumentFolder(10, 5, 3);
     });
 
-    expect(documentsApi.addDocumentToFolder).toHaveBeenCalledWith(5, 10);
+    expect(documentsApi.setDocumentFolder).toHaveBeenCalledWith(10, 5, 3);
     await waitFor(() => expect(client.getQueryState(libraryKey)?.isInvalidated).toBe(true));
   });
 
@@ -91,41 +85,35 @@ describe("useDocumentActions", () => {
     const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
 
     await act(async () => {
-      await result.current.moveDocument(10, 1, 2);
-      await result.current.removeFromFolder(3, 10);
-      await result.current.deleteDocument(10);
+      await result.current.setDocumentFolder(10, null, 4);
+      await result.current.deleteDocumentPermanently(10, 5);
     });
 
-    expect(documentsApi.moveDocument).toHaveBeenCalledWith(10, 1, 2);
-    expect(documentsApi.removeDocumentFromFolder).toHaveBeenCalledWith(3, 10);
-    // deleteDocument nutzt die API direkt als mutationFn; TanStack reicht ein Kontext-Objekt als 2. Argument durch.
-    expect(documentsApi.deleteDocument).toHaveBeenCalledWith(10, expect.anything());
+    expect(documentsApi.setDocumentFolder).toHaveBeenCalledWith(10, null, 4);
+    expect(documentsApi.deleteDocumentPermanently).toHaveBeenCalledWith(10, 5);
+  });
+
+  it("setzt Tags mit der erwarteten Dokumentversion", async () => {
+    const { result } = renderHook(() => useDocumentActions(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.setTags(10, [3, 4], 7);
+    });
+
+    expect(documentsApi.setDocumentTags).toHaveBeenCalledWith(10, [3, 4], 7);
   });
 });
 
-describe("useFolders / useCategories Verwaltung", () => {
+describe("useFolders Verwaltung", () => {
   it("benennt eine Sammlung um und loescht sie ueber die passenden Endpunkte", async () => {
     const { result } = renderHook(() => useFolders(), { wrapper: Wrapper });
 
     await act(async () => {
       await result.current.updateFolder(7, { name: "Neu", expectedVersion: 1 });
-      await result.current.deleteFolder(7, true);
+      await result.current.deleteFolder(7, 2);
     });
 
     expect(documentsApi.updateAttachmentFolder).toHaveBeenCalledWith(7, { name: "Neu", expectedVersion: 1 });
-    expect(documentsApi.deleteAttachmentFolder).toHaveBeenCalledWith(7, true);
-  });
-
-  it("benennt eine Kategorie um und loescht sie ueber die passenden Endpunkte", async () => {
-    const { result } = renderHook(() => useCategories(), { wrapper: Wrapper });
-
-    await act(async () => {
-      await result.current.updateCategory(4, { name: "Umbenannt", expectedVersion: 2 });
-      await result.current.deleteCategory(4);
-    });
-
-    expect(documentsApi.updateAttachmentCategory).toHaveBeenCalledWith(4, { name: "Umbenannt", expectedVersion: 2 });
-    // deleteCategory nutzt die API direkt als mutationFn; TanStack reicht ein Kontext-Objekt als 2. Argument durch.
-    expect(documentsApi.deleteAttachmentCategory).toHaveBeenCalledWith(4, expect.anything());
+    expect(documentsApi.deleteAttachmentFolder).toHaveBeenCalledWith(7, 2);
   });
 });

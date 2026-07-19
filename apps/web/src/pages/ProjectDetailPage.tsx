@@ -171,7 +171,7 @@ export function ProjectDetailPage() {
         setSavingLabel(
           `Speichern… (Datei ${index + 1} von ${pending.files.length})`,
         );
-        await uploadProjectAttachment(projectId, file.file);
+        await uploadProjectAttachment(projectId, file.file, file.librarySelection);
       }
       showToast({ tone: "success", title: "Projekt-Zuordnungen gespeichert" });
     } catch (postCreateError) {

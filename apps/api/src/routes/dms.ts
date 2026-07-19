@@ -1,30 +1,22 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { createUnboundAttachment, deleteAttachment } from "../services/attachments.service.js";
+import { removeAttachmentFromDocumentLibrary } from "../services/attachments.service.js";
 import {
-  assignCategoryToAttachment,
-  createAttachmentCategory,
-  deleteAttachmentCategory,
-  listAttachmentCategories,
-  removeCategoryFromAttachment,
-  updateAttachmentCategory
-} from "../services/attachment-category.service.js";
-import {
-  addAttachmentToFolder,
   createAttachmentFolder,
   deleteAttachmentFolder,
   listAttachmentFolders,
-  moveAttachmentBetweenFolders,
-  removeAttachmentFromFolder,
+  setAttachmentFolder,
   updateAttachmentFolder
 } from "../services/attachment-folder.service.js";
 import { getDocument, listDocumentLibrary, listDocumentLibraryPaginated, setDocumentTags, updateDocumentMetadata } from "../services/document.service.js";
+import { importDocument } from "../services/document-import.service.js";
+import { getDocumentDuplicateCheck, startDocumentDuplicateCheck } from "../services/document-duplicate-check.service.js";
 import { createJournalActor } from "../services/journal.service.js";
 import { badRequest } from "../utils/errors.js";
-import { arrayResponseSchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema, tagIdsBodySchema } from "../utils/route-schemas.js";
+import { arrayResponseSchema, idParamSchema, objectResponseSchema, paginatedResponseSchema, paginationQuerySchema } from "../utils/route-schemas.js";
 
 // MS-75 (DMS): Alle Routen laufen unter der bestehenden Ressource "attachments" (kein
-// eigener Auth-Katalogeintrag). Da die Pfade (/documents, /attachment-categories,
-// /attachment-folders) nicht das Segment "/attachments" tragen, wird die Berechtigung
+// eigener Auth-Katalogeintrag). Da die Pfade (/documents und /attachment-folders)
+// nicht das Segment "/attachments" tragen, wird die Berechtigung
 // hier EXPLIZIT je Endpunkt gesetzt — sonst greift der Default "projects".
 function attachmentsAuth(action: "read" | "write" | "delete") {
   return { auth: { resource: "attachments" as const, action } };
@@ -49,27 +41,6 @@ const uploadBodySchema = {
     properties: {
       file: { $ref: "#multipartFile" }
     }
-  }
-} as const;
-
-const categoryBodySchema = {
-  type: "object",
-  required: ["name"],
-  additionalProperties: false,
-  properties: {
-    name: { type: "string", minLength: 1 },
-    color: { type: "string" }
-  }
-} as const;
-
-const categoryPatchSchema = {
-  type: "object",
-  required: ["expectedVersion"],
-  additionalProperties: false,
-  properties: {
-    name: { type: "string", minLength: 1 },
-    color: { type: "string" },
-    expectedVersion: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -112,10 +83,10 @@ const documentLibraryQuerySchema = {
   additionalProperties: false,
   properties: {
     folder: { type: "string" },
-    category: { type: "integer", minimum: 1 },
     tag: { type: "integer", minimum: 1 },
-    type: { type: "string" },
-    q: { type: "string" },
+    tags: { type: "string", minLength: 1, maxLength: 220, pattern: "^[0-9]+(,[0-9]+)*$" },
+    type: { type: "string", enum: ["image/", "application/pdf", "text/", "video/", "audio/"] },
+    q: { type: "string", maxLength: 200 },
     // Opt-in-Pagination: ist `page` gesetzt, liefert die Route Paginated<Attachment>,
     // sonst weiterhin das nackte Array (Rückwärtskompatibilität für MCP/interne Aufrufer).
     ...paginationQuerySchema
@@ -126,43 +97,38 @@ const uploadQuerySchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    folder: { type: "integer", minimum: 1 }
+    folder: { type: "integer", minimum: 1 },
+    tags: { type: "string", minLength: 1, maxLength: 220, pattern: "^[0-9]+(,[0-9]+)*$" },
+    folders: {}
   }
 } as const;
 
-const folderDeleteQuerySchema = {
+const expectedVersionQuerySchema = {
   type: "object",
+  required: ["expectedVersion"],
   additionalProperties: false,
   properties: {
-    recursive: { type: "boolean" }
+    expectedVersion: { type: "integer", minimum: 1 }
   }
 } as const;
 
-const documentCategoryParamSchema = {
+const documentFolderBodySchema = {
   type: "object",
-  required: ["id", "categoryId"],
-  properties: {
-    id: { type: "integer", minimum: 1 },
-    categoryId: { type: "integer", minimum: 1 }
-  }
-} as const;
-
-const folderDocumentParamSchema = {
-  type: "object",
-  required: ["folderId", "attachmentId"],
-  properties: {
-    folderId: { type: "integer", minimum: 1 },
-    attachmentId: { type: "integer", minimum: 1 }
-  }
-} as const;
-
-const moveDocumentBodySchema = {
-  type: "object",
-  required: ["fromFolderId", "toFolderId"],
+  required: ["folderId", "expectedVersion"],
   additionalProperties: false,
   properties: {
-    fromFolderId: { type: "integer", minimum: 1 },
-    toFolderId: { type: "integer", minimum: 1 }
+    folderId: { type: ["integer", "null"], minimum: 1 },
+    expectedVersion: { type: "integer", minimum: 1 }
+  }
+} as const;
+
+const documentTagsBodySchema = {
+  type: "object",
+  required: ["tagIds", "expectedVersion"],
+  additionalProperties: false,
+  properties: {
+    tagIds: { type: "array", maxItems: 20, uniqueItems: true, items: { type: "integer", minimum: 1 } },
+    expectedVersion: { type: "integer", minimum: 1 }
   }
 } as const;
 
@@ -183,37 +149,6 @@ function currentUserId(request: FastifyRequest): number | undefined {
 }
 
 export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
-  // --- Kategorien ---
-  app.get(
-    "/attachment-categories",
-    { config: attachmentsAuth("read"), schema: { response: { 200: arrayResponseSchema } } },
-    async () => listAttachmentCategories(app.db)
-  );
-
-  app.post<{ Body: { name: string; color?: string } }>(
-    "/attachment-categories",
-    { config: attachmentsAuth("write"), schema: { body: categoryBodySchema, response: { 201: objectResponseSchema } } },
-    async (request, reply) => {
-      const category = await createAttachmentCategory(app.db, request.body, currentUserId(request));
-      return reply.status(201).send(category);
-    }
-  );
-
-  app.patch<{ Params: { id: number }; Body: { name?: string; color?: string; expectedVersion: number } }>(
-    "/attachment-categories/:id",
-    { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: categoryPatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateAttachmentCategory(app.db, request.params.id, request.body, currentUserId(request))
-  );
-
-  app.delete<{ Params: { id: number } }>(
-    "/attachment-categories/:id",
-    { config: attachmentsAuth("delete"), schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await deleteAttachmentCategory(app.db, request.params.id);
-      return reply.status(204).send();
-    }
-  );
-
   // --- Sammlungen (virtuelle Ordner) ---
   app.get(
     "/attachment-folders",
@@ -236,40 +171,21 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     async (request) => updateAttachmentFolder(app.db, request.params.id, request.body, currentUserId(request))
   );
 
-  app.delete<{ Params: { id: number }; Querystring: { recursive?: boolean } }>(
+  app.delete<{ Params: { id: number }; Querystring: { expectedVersion: number } }>(
     "/attachment-folders/:id",
-    { config: attachmentsAuth("delete"), schema: { params: idParamSchema, querystring: folderDeleteQuerySchema, response: { 204: { type: "null" } } } },
+    { config: attachmentsAuth("delete"), schema: { params: idParamSchema, querystring: expectedVersionQuerySchema, response: { 204: { type: "null" } } } },
     async (request, reply) => {
-      await deleteAttachmentFolder(app.db, request.params.id, { recursive: request.query.recursive === true });
-      return reply.status(204).send();
-    }
-  );
-
-  // --- Dokument-Sammlung-Zuordnung ---
-  app.post<{ Params: { folderId: number; attachmentId: number } }>(
-    "/attachment-folders/:folderId/documents/:attachmentId",
-    { config: attachmentsAuth("write"), schema: { params: folderDocumentParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await addAttachmentToFolder(app.db, request.params.folderId, request.params.attachmentId);
-      return reply.status(204).send();
-    }
-  );
-
-  app.delete<{ Params: { folderId: number; attachmentId: number } }>(
-    "/attachment-folders/:folderId/documents/:attachmentId",
-    { config: attachmentsAuth("write"), schema: { params: folderDocumentParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await removeAttachmentFromFolder(app.db, request.params.folderId, request.params.attachmentId);
+      await deleteAttachmentFolder(app.db, request.params.id, request.query.expectedVersion);
       return reply.status(204).send();
     }
   );
 
   // --- Dokumentenbibliothek ---
-  app.get<{ Querystring: { folder?: string; category?: number; tag?: number; type?: string; q?: string; page?: number; pageSize?: number } }>(
+  app.get<{ Querystring: { folder?: string; tag?: number; tags?: string; type?: string; q?: string; page?: number; pageSize?: number } }>(
     "/documents",
     { config: attachmentsAuth("read"), schema: { querystring: documentLibraryQuerySchema, response: { 200: { anyOf: [arrayResponseSchema, paginatedResponseSchema] } } } },
     async (request) => {
-      const { folder: folderParam, category, tag, type, q, page, pageSize } = request.query;
+      const { folder: folderParam, tag, tags: tagsParam, type, q, page, pageSize } = request.query;
       let folder: number | "unsorted" | undefined;
       if (folderParam === "unsorted") {
         folder = "unsorted";
@@ -280,7 +196,15 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
         }
         folder = parsed;
       }
-      const documentFilter = { folder, category, tag, type, q };
+      const tagIds = [
+        ...(tag !== undefined ? [tag] : []),
+        ...(tagsParam ? tagsParam.split(",").map(Number) : [])
+      ];
+      const tags = [...new Set(tagIds)];
+      if (tags.length > 20) {
+        throw badRequest("Höchstens 20 Tags können gleichzeitig gefiltert werden.");
+      }
+      const documentFilter = { folder, tags, type, q };
       // Opt-in: nur wenn `page` gesetzt ist, paginiert antworten — sonst Array-Alt-Verhalten.
       if (page !== undefined) {
         return listDocumentLibraryPaginated(app.db, documentFilter, page, pageSize ?? 25);
@@ -289,17 +213,35 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
-  app.post<{ Querystring: { folder?: number } }>(
+  app.post<{ Querystring: { folder?: number; tags?: string; folders?: unknown } }>(
     "/documents",
     { config: attachmentsAuth("write"), schema: { ...uploadBodySchema, querystring: uploadQuerySchema, response: { 201: objectResponseSchema } } },
     async (request, reply) => {
-      const upload = await readUpload(request);
-      const document = await createUnboundAttachment(app.db, upload, createJournalActor(request.currentUser));
-      if (request.query.folder !== undefined) {
-        await addAttachmentToFolder(app.db, request.query.folder, document.id);
+      if (request.query.folders !== undefined) {
+        throw badRequest("Mehrfachsammlungen werden seit MS-80 nicht mehr unterstützt. Bitte höchstens eine Sammlung über 'folder' angeben.");
       }
-      return reply.status(201).send(await getDocument(app.db, document.id));
+      const upload = await readUpload(request);
+      const tagIds = request.query.tags?.split(",").map(Number);
+      const document = await importDocument(
+        app.db,
+        upload,
+        { folderId: request.query.folder, tagIds },
+        createJournalActor(request.currentUser)
+      );
+      return reply.status(201).send(document);
     }
+  );
+
+  app.get(
+    "/documents/duplicate-check",
+    { config: attachmentsAuth("read"), schema: { response: { 200: objectResponseSchema } } },
+    async () => getDocumentDuplicateCheck(app.db)
+  );
+
+  app.post(
+    "/documents/duplicate-check",
+    { config: attachmentsAuth("write"), schema: { response: { 202: objectResponseSchema } } },
+    async (_request, reply) => reply.status(202).send(await startDocumentDuplicateCheck(app.db))
   );
 
   app.get<{ Params: { id: number } }>(
@@ -311,49 +253,45 @@ export async function registerDmsRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: number }; Body: { displayName?: string | null; description?: string | null; expectedVersion: number } }>(
     "/documents/:id",
     { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: metadataPatchSchema, response: { 200: objectResponseSchema } } },
-    async (request) => updateDocumentMetadata(app.db, request.params.id, request.body, currentUserId(request))
+    async (request) => updateDocumentMetadata(app.db, request.params.id, request.body, createJournalActor(request.currentUser))
   );
 
-  app.put<{ Params: { id: number }; Body: { tagIds: number[] } }>(
+  app.put<{ Params: { id: number }; Body: { tagIds: number[]; expectedVersion: number } }>(
     "/documents/:id/tags",
-    { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: tagIdsBodySchema, response: { 200: objectResponseSchema } } },
-    async (request) => setDocumentTags(app.db, request.params.id, request.body.tagIds)
+    { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: documentTagsBodySchema, response: { 200: objectResponseSchema } } },
+    async (request) => setDocumentTags(
+      app.db,
+      request.params.id,
+      request.body.tagIds,
+      request.body.expectedVersion,
+      createJournalActor(request.currentUser)
+    )
   );
 
-  app.post<{ Params: { id: number }; Body: { fromFolderId: number; toFolderId: number } }>(
-    "/documents/:id/move",
-    { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: moveDocumentBodySchema, response: { 204: { type: "null" } } } },
+  app.put<{ Params: { id: number }; Body: { folderId: number | null; expectedVersion: number } }>(
+    "/documents/:id/folder",
+    { config: attachmentsAuth("write"), schema: { params: idParamSchema, body: documentFolderBodySchema, response: { 200: objectResponseSchema } } },
+    async (request) => {
+      await setAttachmentFolder(app.db, request.params.id, request.body, createJournalActor(request.currentUser));
+      return getDocument(app.db, request.params.id);
+    }
+  );
+
+  app.delete<{ Params: { id: number }; Querystring: { expectedVersion: number } }>(
+    "/documents/:id/library",
+    {
+      config: attachmentsAuth("write"),
+      schema: { params: idParamSchema, querystring: expectedVersionQuerySchema, response: { 204: { type: "null" } } }
+    },
     async (request, reply) => {
-      await moveAttachmentBetweenFolders(app.db, request.params.id, request.body.fromFolderId, request.body.toFolderId);
+      await removeAttachmentFromDocumentLibrary(
+        app.db,
+        request.params.id,
+        request.query.expectedVersion,
+        createJournalActor(request.currentUser)
+      );
       return reply.status(204).send();
     }
   );
 
-  app.delete<{ Params: { id: number } }>(
-    "/documents/:id",
-    { config: attachmentsAuth("delete"), schema: { params: idParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await deleteAttachment(app.db, request.params.id, createJournalActor(request.currentUser));
-      return reply.status(204).send();
-    }
-  );
-
-  // --- Dokument-Kategorie-Zuordnung ---
-  app.post<{ Params: { id: number; categoryId: number } }>(
-    "/documents/:id/categories/:categoryId",
-    { config: attachmentsAuth("write"), schema: { params: documentCategoryParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await assignCategoryToAttachment(app.db, request.params.id, request.params.categoryId);
-      return reply.status(204).send();
-    }
-  );
-
-  app.delete<{ Params: { id: number; categoryId: number } }>(
-    "/documents/:id/categories/:categoryId",
-    { config: attachmentsAuth("write"), schema: { params: documentCategoryParamSchema, response: { 204: { type: "null" } } } },
-    async (request, reply) => {
-      await removeCategoryFromAttachment(app.db, request.params.id, request.params.categoryId);
-      return reply.status(204).send();
-    }
-  );
 }

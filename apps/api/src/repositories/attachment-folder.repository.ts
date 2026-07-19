@@ -78,7 +78,7 @@ export const attachmentFolderRepository = {
     }
     assertVersion(current.version, expectedVersion);
     const now = nowIso();
-    await database
+    const result = await database
       .update(attachmentFolders)
       .set({
         ...data,
@@ -86,11 +86,18 @@ export const attachmentFolderRepository = {
         updatedBy: userId ?? null,
         updatedAt: now
       })
-      .where(eq(attachmentFolders.id, id));
+      .where(and(eq(attachmentFolders.id, id), eq(attachmentFolders.version, expectedVersion)));
+    if (mutationAffectedRows(result) === 0) {
+      return undefined;
+    }
     return { ...current, ...data, version: current.version + 1, updatedBy: userId ?? null, updatedAt: now };
   },
 
-  async delete(database: DbSession, id: number): Promise<number> {
-    return mutationAffectedRows(await database.delete(attachmentFolders).where(eq(attachmentFolders.id, id)));
+  async deleteVersioned(database: DbSession, id: number, expectedVersion: number): Promise<number> {
+    return mutationAffectedRows(
+      await database
+        .delete(attachmentFolders)
+        .where(and(eq(attachmentFolders.id, id), eq(attachmentFolders.version, expectedVersion)))
+    );
   }
 };

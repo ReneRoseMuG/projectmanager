@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type {
   Attachment,
+  AttachmentFolder,
   CatalogEntry,
   Comment,
   Feature,
@@ -32,6 +33,8 @@ import { createProjectManagerMcpServer } from "./server.js";
  * - Jedes verfügbare MCP-v1-Tool wird einmal über den MCP-Transport ausgeführt.
  * - Die Tools arbeiten gegen echte Fastify-Routen mit isolierter Temp-SQLite-Datenbank.
  * - Attachment-Uploads verwenden ein isoliertes Temp-Upload-Verzeichnis.
+ * - Owner-Attachments setzen die Bibliothekssichtbarkeit explizit; DMS-Importe geben Sichtbarkeit,
+ *   direkte Sammlung, Tags und Version aus dem echten API-Vertrag zurück.
  * - Schreibende Tools erzeugen oder ändern beobachtbare Daten versionsgeschützt.
  * - Destruktive Delete-Tools bleiben bewusst außerhalb der MCP-Oberfläche.
  *
@@ -342,7 +345,8 @@ describe("MCP tools integration", () => {
       parentId: task.id,
       fileName: "mcp-attachment.txt",
       contentBase64: Buffer.from(attachmentContent, "utf8").toString("base64"),
-      mimetype: "text/plain"
+      mimetype: "text/plain",
+      libraryVisibility: "attachment-only"
     });
     expect(attachment).toMatchObject({
       owners: [{ type: "task", id: task.id }],
@@ -354,6 +358,28 @@ describe("MCP tools integration", () => {
     expect(await seedClient.get<Attachment[]>(`tasks/${task.id}/attachments`)).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: attachment.id, originalName: "mcp-attachment.txt" })])
     );
+
+    const documentFolder = await seedClient.post<AttachmentFolder>("attachment-folders", { name: "MCP DMS Sammlung" });
+    const documentTag = await seedClient.post<Tag>("tags", { name: "MCP DMS Tag", domain: "dms" });
+    const libraryOptions = await callTool<{ folders: AttachmentFolder[]; tags: Tag[] }>(executedTools, "list_document_library_options");
+    expect(libraryOptions.folders).toEqual(expect.arrayContaining([expect.objectContaining({ id: documentFolder.id })]));
+    expect(libraryOptions.tags).toEqual(expect.arrayContaining([expect.objectContaining({ id: documentTag.id, domain: "dms" })]));
+
+    const importedDocument = await callTool<Attachment>(executedTools, "add_document_to_library", {
+      fileName: "mcp-document.txt",
+      contentBase64: Buffer.from("MCP document library content", "utf8").toString("base64"),
+      mimetype: "text/plain",
+      folderId: documentFolder.id,
+      tagIds: [documentTag.id]
+    });
+    expect(importedDocument).toMatchObject({
+      originalName: "mcp-document.txt",
+      isInDocumentLibrary: true,
+      folders: [expect.objectContaining({ id: documentFolder.id })],
+      tags: [expect.objectContaining({ id: documentTag.id, domain: "dms" })],
+      version: expect.any(Number)
+    });
+    expect(await fs.readFile(path.join(uploadDir, importedDocument.filename), "utf8")).toBe("MCP document library content");
 
     const tagCatalog = await callTool<Tag[]>(executedTools, "list_tags");
     expect(Array.isArray(tagCatalog)).toBe(true);
@@ -413,12 +439,14 @@ describe("MCP tools integration", () => {
         {
           fileName: "bulk-one.txt",
           contentBase64: Buffer.from("bulk one", "utf8").toString("base64"),
-          mimetype: "text/plain"
+          mimetype: "text/plain",
+          libraryVisibility: "attachment-only"
         },
         {
           fileName: "bulk-two.txt",
           contentBase64: Buffer.from("bulk two", "utf8").toString("base64"),
-          mimetype: "text/plain"
+          mimetype: "text/plain",
+          libraryVisibility: "attachment-only"
         }
       ]
     });
@@ -437,7 +465,8 @@ describe("MCP tools integration", () => {
           attachment: {
             fileName: "bulk-task.txt",
             contentBase64: Buffer.from("bulk task", "utf8").toString("base64"),
-            mimetype: "text/plain"
+            mimetype: "text/plain",
+            libraryVisibility: "attachment-only"
           }
         },
         {
@@ -468,7 +497,8 @@ describe("MCP tools integration", () => {
           attachment: {
             fileName: "bulk-ticket.txt",
             contentBase64: Buffer.from("bulk ticket", "utf8").toString("base64"),
-            mimetype: "text/plain"
+            mimetype: "text/plain",
+            libraryVisibility: "attachment-only"
           }
         }
       ]

@@ -948,20 +948,17 @@ export interface NoteMoveInput {
   target: MoveOwner<NoteMoveTargetType>;
 }
 
-export interface AttachmentCategory {
-  id: number;
-  name: string;
-  color: string;
-  version: number;
-}
-
 export interface AttachmentFolder {
   id: number;
   parentId: number | null;
   projectId: number | null;
   name: string;
+  childCount: number;
+  directDocumentCount: number;
   version: number;
 }
+
+export type AttachmentLibrarySelection = "attachment-only" | "document-library";
 
 export interface Attachment {
   id: number;
@@ -973,12 +970,51 @@ export interface Attachment {
   mimetype: string;
   size: number;
   url: string;
-  categories?: AttachmentCategory[];
+  contentHash: string | null;
+  isInDocumentLibrary: boolean;
   tags?: Tag[];
+  folder?: AttachmentFolder | null;
   folders?: AttachmentFolder[];
   createdAt: string;
   updatedAt: string;
   version: number;
+}
+
+export type DocumentDuplicateCheckStatus = "idle" | "running" | "completed" | "failed";
+export type DocumentDuplicateCheckIssueKind = "missing" | "unreadable" | "changed";
+
+export interface DocumentDuplicateCheckDocument {
+  id: number;
+  originalName: string;
+  displayName: string | null;
+  size: number;
+  createdAt: string;
+  folder: AttachmentFolder | null;
+  owners: AttachmentOwner[];
+}
+
+export interface DocumentDuplicateGroup {
+  hash: string;
+  documents: DocumentDuplicateCheckDocument[];
+}
+
+export interface DocumentDuplicateCheckIssue {
+  attachmentId: number;
+  originalName: string;
+  kind: DocumentDuplicateCheckIssueKind;
+  message: string;
+}
+
+export interface DocumentDuplicateCheck {
+  id: string | null;
+  status: DocumentDuplicateCheckStatus;
+  total: number;
+  processed: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  groups: DocumentDuplicateGroup[];
+  issues: DocumentDuplicateCheckIssue[];
+  error: string | null;
 }
 
 export type AttachmentOwner =

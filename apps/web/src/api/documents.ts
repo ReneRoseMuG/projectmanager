@@ -1,10 +1,14 @@
-import type { Attachment, AttachmentCategory, AttachmentFolder, Paginated } from "@taskmanager/shared-types";
+import type {
+  Attachment,
+  AttachmentFolder,
+  DocumentDuplicateCheck,
+  Paginated
+} from "@taskmanager/shared-types";
 import { api } from "./client";
 
 export interface DocumentLibraryFilter {
   folder?: number | "unsorted";
-  category?: number;
-  tag?: number;
+  tags?: number[];
   type?: string;
   q?: string;
 }
@@ -21,11 +25,8 @@ function buildLibraryQuery(filter: DocumentLibraryFilter, pagination?: DocumentL
   if (filter.folder !== undefined) {
     params.set("folder", String(filter.folder));
   }
-  if (filter.category !== undefined) {
-    params.set("category", String(filter.category));
-  }
-  if (filter.tag !== undefined) {
-    params.set("tag", String(filter.tag));
+  if ((filter.tags?.length ?? 0) > 0) {
+    params.set("tags", [...new Set(filter.tags)].sort((left, right) => left - right).join(","));
   }
   if (filter.type) {
     params.set("type", filter.type);
@@ -74,44 +75,28 @@ export async function updateDocumentMetadata(
   return api.patch(`documents/${id}`, { json: input }).json<Attachment>();
 }
 
-export async function setDocumentTags(id: number, tagIds: number[]): Promise<Attachment> {
-  return api.put(`documents/${id}/tags`, { json: { tagIds } }).json<Attachment>();
+export async function setDocumentTags(id: number, tagIds: number[], expectedVersion: number): Promise<Attachment> {
+  return api.put(`documents/${id}/tags`, { json: { tagIds, expectedVersion } }).json<Attachment>();
 }
 
-export async function moveDocument(id: number, fromFolderId: number, toFolderId: number): Promise<void> {
-  await api.post(`documents/${id}/move`, { json: { fromFolderId, toFolderId } });
+export async function setDocumentFolder(id: number, folderId: number | null, expectedVersion: number): Promise<Attachment> {
+  return api.put(`documents/${id}/folder`, { json: { folderId, expectedVersion } }).json<Attachment>();
 }
 
-export async function deleteDocument(id: number): Promise<void> {
-  await api.delete(`documents/${id}`);
+export async function removeDocumentFromLibrary(id: number, expectedVersion: number): Promise<void> {
+  await api.delete(`documents/${id}/library?expectedVersion=${expectedVersion}`);
 }
 
-export async function assignDocumentCategory(id: number, categoryId: number): Promise<void> {
-  await api.post(`documents/${id}/categories/${categoryId}`);
+export async function deleteDocumentPermanently(id: number, expectedVersion: number): Promise<void> {
+  await api.delete(`attachments/${id}?expectedVersion=${expectedVersion}`);
 }
 
-export async function removeDocumentCategory(id: number, categoryId: number): Promise<void> {
-  await api.delete(`documents/${id}/categories/${categoryId}`);
+export async function getDocumentDuplicateCheck(): Promise<DocumentDuplicateCheck> {
+  return api.get("documents/duplicate-check").json<DocumentDuplicateCheck>();
 }
 
-// --- Kategorien ---
-export async function getAttachmentCategories(): Promise<AttachmentCategory[]> {
-  return api.get("attachment-categories").json<AttachmentCategory[]>();
-}
-
-export async function createAttachmentCategory(input: { name: string; color?: string }): Promise<AttachmentCategory> {
-  return api.post("attachment-categories", { json: input }).json<AttachmentCategory>();
-}
-
-export async function updateAttachmentCategory(
-  id: number,
-  input: { name?: string; color?: string; expectedVersion: number }
-): Promise<AttachmentCategory> {
-  return api.patch(`attachment-categories/${id}`, { json: input }).json<AttachmentCategory>();
-}
-
-export async function deleteAttachmentCategory(id: number): Promise<void> {
-  await api.delete(`attachment-categories/${id}`);
+export async function startDocumentDuplicateCheck(): Promise<DocumentDuplicateCheck> {
+  return api.post("documents/duplicate-check").json<DocumentDuplicateCheck>();
 }
 
 // --- Sammlungen ---
@@ -134,14 +119,6 @@ export async function updateAttachmentFolder(
   return api.patch(`attachment-folders/${id}`, { json: input }).json<AttachmentFolder>();
 }
 
-export async function deleteAttachmentFolder(id: number, recursive?: boolean): Promise<void> {
-  await api.delete(recursive ? `attachment-folders/${id}?recursive=true` : `attachment-folders/${id}`);
-}
-
-export async function addDocumentToFolder(folderId: number, attachmentId: number): Promise<void> {
-  await api.post(`attachment-folders/${folderId}/documents/${attachmentId}`);
-}
-
-export async function removeDocumentFromFolder(folderId: number, attachmentId: number): Promise<void> {
-  await api.delete(`attachment-folders/${folderId}/documents/${attachmentId}`);
+export async function deleteAttachmentFolder(id: number, expectedVersion: number): Promise<void> {
+  await api.delete(`attachment-folders/${id}?expectedVersion=${expectedVersion}`);
 }
